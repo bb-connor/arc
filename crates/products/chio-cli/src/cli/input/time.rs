@@ -1,6 +1,6 @@
 //! One fallible fenced clock for CLI authority observations in this process.
 use chio_security_types::clock::{Clock, ClockError, ClockFence, ClockReading, SystemClock};
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex};
 
 static FENCE: LazyLock<Mutex<ClockFence>> = LazyLock::new(|| Mutex::new(ClockFence::default()));
 
@@ -9,9 +9,22 @@ fn observe(source: &dyn Clock, fence: &Mutex<ClockFence>) -> Result<ClockReading
     guard.observe(source.read()?)
 }
 
+struct CliClock;
+
+impl Clock for CliClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        observe(&SystemClock, &FENCE)
+    }
+}
+
+pub(crate) fn clock() -> Arc<dyn Clock> {
+    Arc::new(CliClock)
+}
+
 pub(crate) fn millis() -> Result<u64, crate::CliError> {
-    observe(&SystemClock, &FENCE)
-        .map(|reading| reading.unix_millis().get())
+    clock()
+        .unix_millis()
+        .map(|reading| reading.get())
         .map_err(|source| {
             crate::CliError::with_source(&chio_errors::_generated::error_codes::CLI_OTHER, source)
         })

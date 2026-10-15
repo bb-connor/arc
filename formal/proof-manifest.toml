@@ -144,7 +144,6 @@ covered_rust_symbols = [
 shell_entrypoints = [
   "<chio_kernel_core::GuardStep as From<chio_kernel::runtime::Verdict>>::from",
   "chio_kernel::DpopNonceStore::check_and_insert_through",
-  "chio_kernel::DpopNonceStore::reserve_for_dispatch_through",
   "chio_kernel::InMemoryBudgetStore::try_charge_cost",
   "chio_kernel::InMemoryBudgetStore::try_increment",
   "chio_kernel::ChioKernel::check_revocation",
@@ -1169,7 +1168,6 @@ rust_symbols = [
   "ExecutionNonceCredential::for_dispatch",
   "run_credential_store_operation", "DispatchCredentialReservation::rollback_entries",
   "DispatchCredentialReservation::commit_approval_marker",
-  "DispatchCredentialReservation::commit_dpop_marker",
 ]
 normalized_sha256 = "c09d6a68480e55f908ef8e9105af567c0ab9e5b6a25ecf6c4478fcd00e563d49"
 symbol_sha256 = [
@@ -1187,7 +1185,6 @@ symbol_sha256 = [
   { symbol = "run_credential_store_operation", sha256 = "8ce5a3ab7e72ac74b9fd2986f5f49d77d332738a83210eb5fc00a5e166980eb1" },
   { symbol = "DispatchCredentialReservation::rollback_entries", sha256 = "2d82e4e83211f09d6cb68e613b1114b031defc6730400100507b6a41193d6802" },
   { symbol = "DispatchCredentialReservation::commit_approval_marker", sha256 = "d4307b6f8fe4b068cc0bc40ce3530c927209535cf193dbde7525909b326e9c29" },
-  { symbol = "DispatchCredentialReservation::commit_dpop_marker", sha256 = "1f78a9b81ced024c8eee249b7dabcd0bb82bad78273d94aeb827c6ccdf7c6d84" },
 ]
 
 [[mirror]]

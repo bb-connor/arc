@@ -1,4 +1,5 @@
 use super::*;
+use crate::replay_retention::tests::TestClock;
 use std::sync::{Arc, Barrier};
 
 fn binding(destination: &str) -> DpopReplaySourceBinding {
@@ -18,25 +19,18 @@ fn preview(store: &DpopNonceStore) -> DpopReplaySourceSnapshot {
 }
 
 #[test]
-fn inventory_preserves_every_retention_kind_owner_and_inclusive_horizon() {
-    let store = store();
-    let through = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs()
-        + 600;
-    assert!(store.check_and_insert("local", "cap-a").unwrap());
+fn inventory_preserves_every_retention_kind_and_inclusive_horizon() {
+    let store = crate::dpop::clock_tests::store(Arc::new(TestClock::new(100)), 16);
+    let through = 700;
+    assert!(store.check_and_insert("private-local", "cap-a").unwrap());
     assert!(store
         .check_and_insert_through("signed", "cap-a", through)
-        .unwrap());
-    assert!(store
-        .reserve_for_dispatch_through("owned", "cap-b", through, "private-owner")
         .unwrap());
     assert!(store
         .check_and_insert_through("indefinite", "cap-c", u64::MAX)
         .unwrap());
     let snapshot = preview(&store);
-    assert_eq!(snapshot.markers().len(), 4);
+    assert_eq!(snapshot.markers().len(), 3);
     let bytes = snapshot.canonical_bytes().unwrap();
     assert_eq!(
         DpopReplaySourceSnapshot::from_canonical_bytes(&bytes).unwrap(),
@@ -59,29 +53,29 @@ fn inventory_preserves_every_retention_kind_owner_and_inclusive_horizon() {
         }
         _ => panic!("signed marker lost its retention kind"),
     }
-    assert_eq!(
-        snapshot.markers()[2].dispatch_reservation_id.as_deref(),
-        Some("private-owner")
-    );
     assert!(matches!(
-        &snapshot.markers()[3].retention,
+        &snapshot.markers()[2].retention,
         DpopReplaySourceRetention::Signed {
             exclusive_unix_ns: None,
             monotonic_deadline_offset_ns: None
         }
     ));
-    assert!(!format!("{snapshot:?}").contains("private-owner"));
-    assert!(store.verify_exact(&snapshot).is_err());
+    assert!(!format!("{snapshot:?}").contains("private-local"));
+    assert!(matches!(
+        store.verify_exact(&snapshot),
+        Err(KernelError::DpopVerificationFailed(reason))
+            if reason == "DPoP replay source: live source seal or retained inventory does not match"
+    ));
     assert_eq!(snapshot, preview(&store));
     store.seal_exact(&snapshot).unwrap();
     store.verify_exact(&snapshot).unwrap();
 }
 
 #[test]
-fn sealing_blocks_every_legacy_mutator_and_exact_retry_is_read_only() {
+fn sealing_blocks_every_source_mutator_and_exact_retry_is_read_only() {
     let store = store();
     assert!(store
-        .reserve_for_dispatch_through("owned", "cap", u64::MAX, "owner")
+        .check_and_insert_through("retained", "cap", u64::MAX)
         .unwrap());
     let snapshot = preview(&store);
     store.seal_exact(&snapshot).unwrap();
@@ -89,15 +83,23 @@ fn sealing_blocks_every_legacy_mutator_and_exact_retry_is_read_only() {
         store.check_and_insert("local", "cap"),
         store.check_and_insert_until("until", "cap", u64::MAX),
         store.check_and_insert_through("through", "cap", u64::MAX),
-        store.reserve_for_dispatch_through("reserve", "cap", u64::MAX, "owner"),
-        store.reserve_for_dispatch_until("reserve-until", "cap", u64::MAX, "owner"),
-        store.rollback_dispatch_reservation("owned", "cap", "owner"),
-        store.rollback_dispatch_reservation("owned", "cap", "wrong-owner"),
     ] {
-        assert!(result.is_err());
+        assert!(matches!(
+            result,
+            Err(KernelError::DpopVerificationFailed(reason))
+                if reason == "DPoP replay source: source is retired; replay mutations are forbidden"
+        ));
     }
-    assert!(store.ensure_accepting_proofs().is_err());
-    assert!(store.preview_unsealed(&binding("destination")).is_err());
+    assert!(matches!(
+        store.ensure_unsealed(),
+        Err(KernelError::DpopVerificationFailed(reason))
+            if reason == "DPoP replay source: source is retired; replay mutations are forbidden"
+    ));
+    assert!(matches!(
+        store.preview_unsealed(&binding("destination")),
+        Err(KernelError::DpopVerificationFailed(reason))
+            if reason == "DPoP replay source: source is retired; replay mutations are forbidden"
+    ));
     assert_eq!(store.utilization().unwrap(), (1, 16));
     store.seal_exact(&snapshot).unwrap();
     store.verify_exact(&snapshot).unwrap();
@@ -136,20 +138,25 @@ fn changed_destination_cannot_rebind_a_seal_and_failure_does_not_unseal() {
 }
 
 #[test]
-fn an_insert_rollback_cycle_invalidates_the_exact_preview() {
-    let store = store();
+fn a_replay_attempt_invalidates_the_exact_preview() {
+    let store = crate::dpop::clock_tests::store(Arc::new(TestClock::new(100)), 16);
+    assert!(store
+        .check_and_insert_through("nonce", "cap", u64::MAX)
+        .unwrap());
     let old = preview(&store);
-    assert!(store
-        .reserve_for_dispatch_through("nonce", "cap", u64::MAX, "owner")
+    assert!(!store
+        .check_and_insert_through("nonce", "cap", u64::MAX)
         .unwrap());
-    assert!(store
-        .rollback_dispatch_reservation("nonce", "cap", "owner")
-        .unwrap());
-    assert_eq!(store.utilization().unwrap().0, 0);
-    assert!(store.seal_exact(&old).is_err());
-    store.ensure_accepting_proofs().unwrap();
+    assert_eq!(store.utilization().unwrap().0, 1);
+    assert!(matches!(
+        store.seal_exact(&old),
+        Err(KernelError::DpopVerificationFailed(reason))
+            if reason == "DPoP replay source: source no longer matches the pinned instance and inventory"
+    ));
+    store.ensure_unsealed().unwrap();
     let current = preview(&store);
     assert_eq!(old.instance_id(), current.instance_id());
+    assert!(old.markers() == current.markers());
     assert_ne!(old.inventory_sha256(), current.inventory_sha256());
     store.seal_exact(&current).unwrap();
 }
@@ -182,30 +189,45 @@ fn insertion_and_retirement_share_one_linearization_boundary() {
 }
 
 #[test]
-fn rollback_and_retirement_cannot_omit_an_outstanding_reservation() {
+fn pruning_and_retirement_share_one_linearization_boundary() {
     for _ in 0..16 {
-        let store = Arc::new(store());
-        store
-            .reserve_for_dispatch_through("race", "cap", u64::MAX, "owner")
-            .unwrap();
+        let clock = Arc::new(TestClock::new(100));
+        let store = Arc::new(crate::dpop::clock_tests::store(clock.clone(), 16));
+        assert!(store.check_and_insert_until("expired", "cap", 110).unwrap());
         let snapshot = preview(&store);
+        clock.set(110, 10);
         let barrier = Arc::new(Barrier::new(2));
-        let rollback = {
+        let writer = {
             let (store, barrier) = (store.clone(), barrier.clone());
             std::thread::spawn(move || {
                 barrier.wait();
-                store.rollback_dispatch_reservation("race", "cap", "owner")
+                store.check_and_insert_until("fresh", "cap", 120)
             })
         };
         barrier.wait();
         let seal = store.seal_exact(&snapshot);
-        let release = rollback.join().unwrap();
-        assert_ne!(seal.is_ok(), release.is_ok());
+        let insertion = writer.join().unwrap();
+        assert_ne!(seal.is_ok(), insertion.is_ok());
         if seal.is_ok() {
             store.verify_exact(&snapshot).unwrap();
             assert_eq!(store.utilization().unwrap().0, 1);
+            assert!(matches!(
+                insertion,
+                Err(KernelError::DpopVerificationFailed(reason))
+                    if reason == "DPoP replay source: source is retired; replay mutations are forbidden"
+            ));
         } else {
-            assert!(release.unwrap());
+            assert!(insertion.unwrap());
+            assert!(matches!(
+                seal,
+                Err(KernelError::DpopVerificationFailed(reason))
+                    if reason == "DPoP replay source: source no longer matches the pinned instance and inventory"
+            ));
+            let current = preview(&store);
+            assert_eq!(current.markers().len(), 1);
+            assert_eq!(current.markers()[0].nonce, "fresh");
+            store.seal_exact(&current).unwrap();
+            store.verify_exact(&current).unwrap();
         }
     }
 }
@@ -234,28 +256,28 @@ fn previews_do_not_prune_and_real_pruning_is_retained_in_inventory() {
 
 #[test]
 fn unrepresentable_inventory_is_refused_without_reset_or_retirement() {
-    let store = store();
+    let clock = Arc::new(TestClock::new(100));
+    let store = crate::dpop::clock_tests::store(clock.clone(), 16);
     let oversized = "n".repeat(snapshot::MAX_KEY_BYTES + 1);
-    // Model physically retained history from a writer predating byte bounds.
-    // New runtime admission must not provide a bypass to manufacture it.
+    // Model retained identity corruption without admitting it through a writer.
     {
         let mut state = store.inner.lock().unwrap();
-        state.identity_bytes = identity::retained_bytes(&oversized, "cap", Some("owner")).unwrap();
+        state.identity_bytes = identity::retained_bytes(&oversized, "cap").unwrap();
         state.cache.put(
             (oversized.clone(), "cap".to_owned()),
             DpopNonceEntry {
-                retention: ReplayHorizon::Through(u64::MAX).project(SystemClock.read().unwrap()),
-                dispatch_reservation_id: Some("owner".to_owned()),
+                retention: ReplayHorizon::Through(u64::MAX).project(clock.read().unwrap()),
             },
         );
         state.capability_counts.insert("cap".to_owned(), 1);
     }
     assert!(store.preview_unsealed(&binding("destination")).is_err());
     assert_eq!(store.utilization().unwrap().0, 1);
-    store.ensure_accepting_proofs().unwrap();
-    assert!(store
-        .rollback_dispatch_reservation(&oversized, "cap", "owner")
-        .is_err());
+    store.ensure_unsealed().unwrap();
+    assert!(matches!(
+        store.check_and_insert_through(&oversized, "cap", u64::MAX),
+        Err(KernelError::Dpop(DpopError::IdentityLimit))
+    ));
     assert_eq!(store.utilization().unwrap().0, 1);
     assert!(store.preview_unsealed(&binding("destination")).is_err());
 }

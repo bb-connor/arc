@@ -4,6 +4,10 @@ use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
 use chio_test_support::prelude::*;
 use tower::ServiceExt;
 
+#[path = "tests/dpop_authority.rs"]
+mod dpop_authority;
+use dpop_authority::DpopFixture;
+
 #[path = "tests/approvals.rs"]
 mod approvals;
 #[path = "tests/authenticated.rs"]
@@ -31,6 +35,7 @@ fn issuing_kernel(
             signer,
             MediationBudget::Configured(budget),
             super::MediationPolicy {
+                dpop_replay_authority: None,
                 issuers: trusted_capability_issuers,
                 hash: None,
                 receipt_store: None,
@@ -108,9 +113,8 @@ fn issue_invocation_capability(
         .test_unwrap()
 }
 
-/// Control token the mediated test state configures so `/v1/reconcile`, now
-/// behind the reconcile control gate, admits the trusted tool server that
-/// presents it. `/v1/evaluate` is not gated, so evaluate tests are unaffected.
+/// Control token the trusted tool server presents to `/v1/reconcile` in tests.
+/// The reconcile control gate requires it; `/v1/evaluate` does not use this gate.
 const MEDIATED_CONTROL_TOKEN: &str = "tool-server-control-token";
 
 /// Build proxy state for the mediated route with the standard reconcile
@@ -201,12 +205,15 @@ fn mediated_test_state_core(
         hold_capable,
         payment_adapter,
         revocation_store,
+        None,
     )
 }
 
 /// Provision a fresh admission authority under `directory` for a durable
 /// mediation kernel.
-fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStores {
+fn durable_admission_authority(
+    directory: &std::path::Path,
+) -> chio_store_sqlite::SqliteAuthorityStore {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -222,9 +229,16 @@ fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStor
     }
     builder.create(&locks).test_unwrap();
     chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks).test_unwrap();
-    let authority =
-        chio_store_sqlite::SqliteAuthorityStore::open_serving(&database, &locks).test_unwrap();
-    DurableAdmissionStores::serving(&authority)
+    chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )
+    .test_unwrap()
+}
+
+fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStores {
+    DurableAdmissionStores::serving(&durable_admission_authority(directory))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -237,6 +251,7 @@ fn mediated_test_state_with_durable_admission(
     hold_capable: bool,
     payment_adapter: Option<Box<dyn chio_kernel::PaymentAdapter>>,
     revocation_store: Option<Arc<dyn chio_kernel::RevocationStore>>,
+    dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
 ) -> Arc<ProxyState> {
     let budget_store = budget.store();
     let approval_store: Arc<dyn ApprovalStore> = Arc::new(InMemoryApprovalStore::new());
@@ -246,30 +261,48 @@ fn mediated_test_state_with_durable_admission(
         trusted_capability_issuers.push(signer_public_key.clone());
     }
     let trusted_receipt_signers = vec![signer_public_key];
-    let evaluator = RequestEvaluator::new_ephemeral_with_approval_store(
-        Vec::new(),
-        signer.clone(),
-        "test-policy".to_string(),
-        Arc::clone(&approval_store),
-    );
+    let evaluator = match (&budget, dpop_replay_authority.as_ref()) {
+        (MediationBudget::Durable(durable), Some(authority)) => {
+            RequestEvaluator::new_with_durable_stores_and_admission(
+                Vec::new(),
+                signer.clone(),
+                chio_core_types::sha256_hex(b"api-protect-dpop-http"),
+                Arc::clone(&approval_store),
+                trusted_capability_issuers.clone(),
+                None,
+                None,
+                Some(durable.clone()),
+                Some(authority.clone()),
+                true,
+                Arc::new(clock::ProxyClock::default()),
+            )
+            .test_unwrap()
+        }
+        _ => RequestEvaluator::new_ephemeral_with_approval_store(
+            Vec::new(),
+            signer.clone(),
+            "test-policy".to_string(),
+            Arc::clone(&approval_store),
+        ),
+    };
     let egress_contract = default_upstream_egress_contract("http://127.0.0.1:1").test_unwrap();
     let http_client = client_builder_with_contract(&egress_contract)
         .build()
         .test_unwrap();
     // One shared mediation kernel for the process, matching production wiring:
-    // reuse keeps the approval-token and DPoP replay stores authoritative and
-    // makes the nonce minted on `/v1/evaluate` the one settled on
-    // `/v1/reconcile`.
+    // reuse keeps approval-token state on its owner and the configured durable
+    // DPoP authority attached. The nonce minted on `/v1/evaluate` is the one
+    // settled on `/v1/reconcile`.
     let mediation_kernel = Mutex::new(
         build_mediation_kernel(
             &signer,
             budget,
             super::MediationPolicy {
+                dpop_replay_authority: dpop_replay_authority.as_ref(),
                 issuers: &trusted_capability_issuers,
                 hash: None,
-                // Legacy financial regression fixtures intentionally exercise the
-                // ephemeral admission profile. Durable production composition is
-                // exercised separately with qualified admission stores.
+                // Fixtures use an ephemeral receipt log. The budget profile
+                // independently selects whether admission stores are attached.
                 receipt_store: None,
             },
             Vec::new(),
@@ -378,43 +411,26 @@ fn issue_dpop_capability(
     agent: &Keypair,
     server: &str,
     tool: &str,
-    max_per: u64,
-    currency: &str,
-) -> CapabilityToken {
-    issue_dpop_capability_with_total(kernel, agent, server, tool, max_per, max_per, currency)
-}
-
-fn issue_dpop_capability_with_total(
-    kernel: &Arc<ChioKernel>,
-    agent: &Keypair,
-    server: &str,
-    tool: &str,
-    max_per: u64,
-    max_total: u64,
-    currency: &str,
 ) -> CapabilityToken {
     let grant = ToolGrant {
         server_id: server.to_string(),
         tool_name: tool.to_string(),
         operations: vec![Operation::Invoke],
         constraints: vec![],
-        max_invocations: None,
-        max_cost_per_invocation: Some(MonetaryAmount {
-            units: max_per,
-            currency: currency.to_string(),
-        }),
-        max_total_cost: Some(MonetaryAmount {
-            units: max_total,
-            currency: currency.to_string(),
-        }),
+        max_invocations: Some(10),
+        max_cost_per_invocation: None,
+        max_total_cost: None,
         dpop_required: Some(true),
     };
-    let scope = ChioScope {
-        grants: vec![grant],
-        ..ChioScope::default()
-    };
     kernel
-        .issue_capability(&agent.public_key(), scope, 3600)
+        .issue_capability(
+            &agent.public_key(),
+            ChioScope {
+                grants: vec![grant],
+                ..ChioScope::default()
+            },
+            3600,
+        )
         .test_unwrap()
 }
 
@@ -513,6 +529,7 @@ fn dpop_proof_for(
     server: &str,
     tool: &str,
     parameters: &serde_json::Value,
+    authority: &chio_kernel::dpop::authority::DpopReplayAuthority,
 ) -> DpopProof {
     // Match the kernel's action-hash computation exactly: SHA-256 hex over
     // the canonical JSON of the tool arguments.
@@ -524,7 +541,7 @@ fn dpop_proof_for(
         .as_secs();
     DpopProof::sign(
         DpopProofBody {
-            replay_authority: None,
+            replay_authority: authority.clone(),
             schema: DPOP_SCHEMA.to_string(),
             capability_id: cap.id.clone(),
             tool_server: server.to_string(),
@@ -1082,6 +1099,7 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -1119,6 +1137,7 @@ fn build_budget_store_remote_is_not_hold_capable() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -1159,6 +1178,7 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -1198,6 +1218,7 @@ fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -1263,6 +1284,7 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
         &signer,
         MediationBudget::Configured(Arc::clone(&budget)),
         super::MediationPolicy {
+            dpop_replay_authority: None,
             issuers: &[],
             hash: None,
             receipt_store: None,
@@ -1273,9 +1295,8 @@ fn mediation_kernel_installs_budget_store_and_strict_nonce_config() {
     )
     .unwrap();
     // Strict nonce mode is what routes every mediated request through the
-    // authorization-reserve path. DPoP verification state is installed here
-    // too; the `mediated_dpop_capability_requires_valid_proof` integration
-    // test exercises it end to end.
+    // authorization-reserve path. DPoP requires an explicitly configured,
+    // activated durable authority, exercised by the DPoP integration tests.
     assert!(
         kernel.execution_nonce_required(),
         "mediation kernel must always run execution-nonce strict mode"

@@ -22,9 +22,7 @@ mod store_diagnostic;
 impl Fixture {
     fn configure_native_capture_dpop(&mut self) -> TestResult {
         use chio_kernel::admission_operation::AdmissionDigest;
-        use chio_kernel::dpop::authority::{
-            DpopReplayAuthorityInputV1, DpopReplayAuthorityV1, DPOP_AUTHORITY_SCHEMA,
-        };
+        use chio_kernel::dpop::authority::{DpopReplayAuthority, DpopReplayAuthorityInput};
         use chio_kernel::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
         use chio_kernel::dpop::{DpopNonceStore, DpopProof, DpopProofBody};
         let source = DpopNonceStore::with_clock(
@@ -58,7 +56,7 @@ impl Fixture {
             &fence,
             now_ms()?,
         )?;
-        let authority = DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+        let authority = DpopReplayAuthority::new(DpopReplayAuthorityInput {
             destination_store_uuid: AdmissionIdentifier::try_new("destination", &fence.store_uuid)?,
             dpop_authority_id: authority_id,
             expectation_id: AdmissionDigest::try_new(
@@ -73,8 +71,8 @@ impl Fixture {
             .set_operation_owned_dpop_authority(authority.clone())?;
         self.request.dpop_proof = Some(DpopProof::sign(
             DpopProofBody {
-                schema: DPOP_AUTHORITY_SCHEMA.into(),
-                replay_authority: Some(authority),
+                schema: chio_kernel::DPOP_SCHEMA.into(),
+                replay_authority: authority,
                 capability_id: self.request.capability.id.clone(),
                 tool_server: self.request.server_id.clone(),
                 tool_name: self.request.tool_name.clone(),

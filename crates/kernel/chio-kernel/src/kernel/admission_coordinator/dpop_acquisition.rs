@@ -9,16 +9,16 @@ use crate::admission_operation::dpop_claim::{
 };
 use crate::admission_operation::AdmissionRecoveryLease;
 use crate::dpop::authority::{
-    verify_authority_dpop_proof_stateless, DpopReplayAuthorityV1, VerifiedDpopReplayProof,
+    verify_dpop_proof_stateless, DpopReplayAuthority, VerifiedDpopReplayProof,
 };
 
 impl ChioKernel {
-    /// Select an independently configured, already activated v2 domain.
+    /// Select an independently configured, already activated replay domain.
     /// This requires the qualified durable runtime. Once installed, this kernel
-    /// cannot replace its domain or use the legacy nonce cache for DPoP calls.
+    /// cannot replace its domain.
     pub fn set_operation_owned_dpop_authority(
         &mut self,
-        authority: DpopReplayAuthorityV1,
+        authority: DpopReplayAuthority,
     ) -> Result<(), KernelError> {
         if self
             .dpop_authority
@@ -32,10 +32,12 @@ impl ChioKernel {
         Ok(())
     }
 
-    fn verify_dpop_activation(
-        &self,
-        authority: &DpopReplayAuthorityV1,
-    ) -> Result<u64, KernelError> {
+    /// Return the independently selected authority for proof construction.
+    pub fn operation_owned_dpop_authority(&self) -> Option<&DpopReplayAuthority> {
+        self.dpop_authority.as_ref()
+    }
+
+    fn verify_dpop_activation(&self, authority: &DpopReplayAuthority) -> Result<u64, KernelError> {
         let runtime = self.durable_runtime()?;
         let _guard = runtime.lock_mutations()?;
         let now = runtime.refresh_trusted_time(0)?;
@@ -65,11 +67,11 @@ impl ChioKernel {
         let authority = self
             .dpop_authority
             .as_ref()
-            .ok_or_else(|| error("operation-owned DPoP authority is not configured"))?;
+            .ok_or(crate::dpop::DpopError::MissingAuthority)?;
         let now = self.verify_dpop_activation(authority)?;
         let action =
             canonical_json_bytes(arguments).map_err(|_| error("DPoP action encoding failed"))?;
-        verify_authority_dpop_proof_stateless(
+        verify_dpop_proof_stateless(
             proof,
             capability,
             server,
@@ -101,7 +103,7 @@ impl ChioKernel {
         let authority = self
             .dpop_authority
             .as_ref()
-            .ok_or_else(|| error("DPoP authority disappeared before acquisition"))?;
+            .ok_or(crate::dpop::DpopError::MissingAuthority)?;
         if credential.authority() != authority {
             return Err(error("prepared DPoP changed its configured authority"));
         }

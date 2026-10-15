@@ -838,8 +838,8 @@ run_exact_target --label "prepared flow dispatch binding" --allow-filtered --exp
   -- cargo test -p chio-control-plane --lib security::adapters::tests::prepared_dispatch::
 
 run_exact_target --label "security dispatch credential boundaries" --allow-filtered --expected \
-  kernel::tests::security_dispatch::clock::dropped_dispatch_retains_dpop_without_rollback_ownership \
-  kernel::tests::security_dispatch::clock::installed_dpop_and_default_approval_follow_the_kernel_clock \
+  kernel::tests::security_dispatch::clock::dropped_dispatch_retains_operation_owned_dpop \
+  kernel::tests::security_dispatch::clock::installed_replay_source_and_default_approval_follow_the_kernel_clock \
   kernel::tests::security_dispatch::clock::dpop_rule_codes_survive_root_and_nested_signed_denials \
   kernel::tests::security_dispatch::clock::governed_window_refusals_keep_their_code_in_root_and_nested_receipts \
   kernel::tests::security_dispatch::clock::nonce_clock_failure_keeps_its_code_in_the_signed_denial \

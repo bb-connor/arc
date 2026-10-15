@@ -2589,9 +2589,11 @@ dependencies = [
  "chio-manifest",
  "chio-mcp-edge",
  "chio-security-types",
+ "chio-store-sqlite",
  "chio-test-support",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
 ]
 
@@ -4478,9 +4480,11 @@ dependencies = [
  "chio-kernel",
  "chio-manifest",
  "chio-security-types",
+ "chio-store-sqlite",
  "chrono",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "uuid",

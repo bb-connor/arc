@@ -508,6 +508,7 @@ impl ProtectProxy {
                 .map(|store| store as Arc<dyn chio_kernel::ReceiptStore>),
             revocation_store.clone(),
             durable_admission.clone(),
+            self.config.dpop_replay_authority.clone(),
             self.config.allow_ephemeral_receipts,
             Arc::new(clock.clone()),
         )
@@ -599,6 +600,7 @@ impl ProtectProxy {
                     &keypair,
                     budget,
                     super::mediated::MediationPolicy {
+                        dpop_replay_authority: self.config.dpop_replay_authority.as_ref(),
                         issuers: &trusted_capability_issuers,
                         hash: Some(&policy_hash),
                         receipt_store: durable_receipt_store
@@ -856,6 +858,7 @@ mod windows_authority_tests {
             receipt_db: Some(receipt_database_string),
             allow_ephemeral_receipts: false,
             sidecar_control_token: None,
+            dpop_replay_authority: None,
             receipt_retention: None,
             signer_seed_file: None,
             signer_seed_hex: None,

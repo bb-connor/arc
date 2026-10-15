@@ -8,7 +8,6 @@ import { canonicalizeJson } from "./invariants/json.ts";
  * The schema identifier for DPoP proofs. Must match chio-kernel's DPOP_SCHEMA constant.
  */
 export const DPOP_SCHEMA = "chio.dpop_proof.v1";
-export const DPOP_AUTHORITY_SCHEMA = "chio.dpop_proof.v2";
 
 /** Independently configured durable domain. This data does not prove activation. */
 export interface DpopReplayAuthority {
@@ -23,9 +22,8 @@ export interface DpopReplayAuthority {
  * The body of a DPoP proof. Field names use snake_case to match Rust/serde serialization.
  * Field order in canonical JSON is alphabetical (RFC 8785), which also matches serde's default.
  *
- * V1 fields (alphabetical order as they appear in canonical JSON):
- *   action_hash, agent_key, capability_id, issued_at, nonce, schema, tool_name, tool_server
- * V2 adds replay_authority between nonce and schema in the canonical preimage.
+ * Fields in canonical order: action_hash, agent_key, capability_id, issued_at,
+ * nonce, replay_authority, schema, tool_name, tool_server.
  */
 export interface DpopProofBody {
   action_hash: string;
@@ -33,7 +31,7 @@ export interface DpopProofBody {
   capability_id: string;
   issued_at: number;
   nonce: string;
-  replay_authority?: DpopReplayAuthority;
+  replay_authority: DpopReplayAuthority;
   schema: string;
   tool_name: string;
   tool_server: string;
@@ -56,38 +54,9 @@ export interface SignDpopProofParams {
   toolName: string;
   actionArgs: unknown;
   agentSeedHex: string;
+  replayAuthority: DpopReplayAuthority;
   nonce?: string;
   issuedAt?: number;
-}
-
-/**
- * Sign a DPoP proof for a Chio tool invocation.
- *
- * The proof body is serialized as RFC 8785 canonical JSON before signing,
- * ensuring compatibility with chio-kernel's verify_dpop_proof.
- *
- * @throws DpopSignError if the agentSeedHex is invalid or signing fails.
- */
-export function signDpopProof(params: SignDpopProofParams): DpopProof {
-  return signProof(params);
-}
-
-export interface SignAuthorityDpopProofParams extends SignDpopProofParams {
-  replayAuthority: DpopReplayAuthority;
-}
-
-/**
- * Sign the explicit v2 durable profile. Obtain the domain through authenticated
- * configuration; a proof must not choose the verifier's authority. Legacy
- * nonce-store verifiers reject this profile. Signing does not reserve a nonce.
- */
-export function signAuthorityDpopProof(params: SignAuthorityDpopProofParams): DpopProof {
-  try {
-    return signProof(params, copyAuthority(params.replayAuthority));
-  } catch (cause) {
-    if (cause instanceof DpopSignError) throw cause;
-    throw new DpopSignError("invalid durable DPoP authority", { cause });
-  }
 }
 
 function copyAuthority(input: DpopReplayAuthority): DpopReplayAuthority {
@@ -120,7 +89,13 @@ function copyAuthority(input: DpopReplayAuthority): DpopReplayAuthority {
   return value;
 }
 
-function signProof(params: SignDpopProofParams, authority?: DpopReplayAuthority): DpopProof {
+/**
+ * Sign a DPoP proof with the replay authority from authenticated configuration.
+ * Signing does not reserve a nonce or authorize execution.
+ *
+ * @throws DpopSignError if the authority, proof bounds, seed or signing is invalid.
+ */
+export function signDpopProof(params: SignDpopProofParams): DpopProof {
   const {
     capabilityId,
     toolServer,
@@ -132,9 +107,10 @@ function signProof(params: SignDpopProofParams, authority?: DpopReplayAuthority)
   } = params;
 
   try {
-    if (authority && (!Number.isSafeInteger(issuedAt) || issuedAt < 0
+    const authority = copyAuthority(params.replayAuthority);
+    if (!Number.isSafeInteger(issuedAt) || issuedAt < 0
       || issuedAt > 9_007_199_254_740 - authority.proof_ttl_secs
-      || Buffer.byteLength(nonce, "utf8") > 4096 || Buffer.byteLength(capabilityId, "utf8") > 4096)) {
+      || Buffer.byteLength(nonce, "utf8") > 4096 || Buffer.byteLength(capabilityId, "utf8") > 4096) {
       throw new DpopSignError("durable DPoP proof exceeds its identity or clock bounds");
     }
     // Compute action_hash: SHA-256 hex of canonical JSON of actionArgs
@@ -153,11 +129,11 @@ function signProof(params: SignDpopProofParams, authority?: DpopReplayAuthority)
       capability_id: capabilityId,
       issued_at: issuedAt,
       nonce,
-      schema: authority ? DPOP_AUTHORITY_SCHEMA : DPOP_SCHEMA,
+      replay_authority: authority,
+      schema: DPOP_SCHEMA,
       tool_name: toolName,
       tool_server: toolServer,
     };
-    if (authority) body.replay_authority = authority;
 
     // Sign canonical JSON of body
     const bodyCanonical = canonicalizeJson(body);

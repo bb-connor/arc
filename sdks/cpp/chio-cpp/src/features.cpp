@@ -111,6 +111,9 @@ Result<std::string> StaticSeedKeyProvider::ed25519_seed_hex() {
   return Result<std::string>::success(seed_hex_);
 }
 
+DpopProofBuilder::DpopProofBuilder(DpopReplayAuthority authority)
+    : authority_(std::move(authority)) {}
+
 DpopProofBuilder& DpopProofBuilder::capability_id(std::string value) {
   params_.capability_id = std::move(value);
   return *this;
@@ -170,7 +173,7 @@ Result<DpopProof> DpopProofBuilder::build() const {
     auto clock = clock_ ? clock_ : std::make_shared<SystemClock>();
     params.issued_at = clock->now_unix_secs();
   }
-  return sign_dpop_proof(params);
+  return sign_dpop_proof(params, authority_);
 }
 
 ReceiptVerifier::ReceiptVerifier(std::shared_ptr<ReceiptQueryClient> remote_query)

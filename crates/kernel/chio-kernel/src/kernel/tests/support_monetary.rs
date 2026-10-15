@@ -1249,17 +1249,30 @@ fn make_dpop_grant(server: &str, tool: &str) -> ToolGrant {
     }
 }
 
-/// Build a kernel that has a DPoP store configured and a single DPoP-required grant.
+/// Build a kernel with an activated replay authority and a DPoP-required grant.
 pub(super) fn make_dpop_kernel_and_cap(
     agent_kp: &Keypair,
     server: &str,
     tool: &str,
 ) -> (ChioKernel, CapabilityToken) {
+    let (kernel, capability, _) = make_dpop_kernel_and_cap_with_store(agent_kp, server, tool);
+    (kernel, capability)
+}
+
+pub(super) fn make_dpop_kernel_and_cap_with_store(
+    agent_kp: &Keypair,
+    server: &str,
+    tool: &str,
+) -> (
+    ChioKernel,
+    CapabilityToken,
+    Arc<super::durable_admission::TestAdmissionOperationStore>,
+) {
     let config = KernelConfig {
         keypair: Keypair::generate(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "dpop-test-policy".to_string(),
+        policy_hash: chio_core::crypto::sha256_hex(b"dpop-test-policy"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -1276,18 +1289,14 @@ pub(super) fn make_dpop_kernel_and_cap(
     let mut kernel = make_kernel(config);
     kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
 
-    let nonce_store = dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300))
-        .expect("positive replay store test capacities");
-    kernel
-        .set_dpop_store(nonce_store, dpop::DpopConfig::default())
-        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
+    let store = super::durable_admission::dpop_acquisition::install_fixture_authority(&mut kernel);
 
     let grant = make_dpop_grant(server, tool);
     let cap = kernel
         .issue_capability(&agent_kp.public_key(), make_scope(vec![grant]), 3600)
         .unwrap();
 
-    (kernel, cap)
+    (kernel, cap, store)
 }
 
 /// Build a valid DPoP proof for a given request context.
@@ -1307,7 +1316,7 @@ pub(super) fn make_dpop_proof(
         .expect("time error")
         .as_secs();
     let body = dpop::DpopProofBody {
-        replay_authority: None,
+        replay_authority: super::durable_admission::dpop_acquisition::fixture_authority(),
         schema: dpop::DPOP_SCHEMA.to_string(),
         capability_id: cap.id.clone(),
         tool_server: server.to_string(),

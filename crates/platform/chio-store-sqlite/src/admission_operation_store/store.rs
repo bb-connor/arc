@@ -11,7 +11,7 @@ use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantAuthorityBindingV1, RuntimeParticipantClaimHistoryV1,
     RuntimeParticipantClaimIntentV1, RuntimeParticipantClaimReferenceV1,
 };
-use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
+use chio_kernel::dpop::authority::DpopReplayAuthority;
 
 mod native_security;
 
@@ -283,10 +283,10 @@ impl AdmissionOperationStore for SqliteAdmissionOperationStore {
 
     fn load_dpop_replay_activation(
         &self,
-        binding: &DpopReplayAuthorityV1,
+        binding: &DpopReplayAuthority,
         fence: &StoreMutationFence,
         now: u64,
-    ) -> Result<DpopReplayAuthorityV1, AdmissionOperationStoreError> {
+    ) -> Result<DpopReplayAuthority, AdmissionOperationStoreError> {
         Self::load_dpop_replay_activation(self, binding, fence, now)
     }
     fn claim_dpop_replay(

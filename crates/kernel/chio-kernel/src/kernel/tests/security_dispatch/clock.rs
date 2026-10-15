@@ -102,7 +102,7 @@ fn dpop_rule_codes_survive_root_and_nested_signed_denials() -> TestResult {
             (0, DpopError::Action.code()),
             (1, DpopError::Expired.code()),
             (2, DpopError::Signature.code()),
-            (3, DpopError::Replayed.code()),
+            (3, DpopError::AuthorityMismatch.code()),
             (4, DpopError::MissingProof.code()),
         ] {
             let agent = Keypair::generate();
@@ -120,13 +120,7 @@ fn dpop_rule_codes_survive_root_and_nested_signed_denials() -> TestResult {
                 0 => proof.body.action_hash = "wrong-action".into(),
                 1 => proof.body.issued_at = 1,
                 2 => proof.signature = Keypair::generate().sign(b"not-the-proof"),
-                3 => {
-                    assert!(kernel
-                        .dpop_nonce_store
-                        .as_ref()
-                        .ok_or("DPoP store")?
-                        .check_and_insert_through("nonce", &cap.id, proof.body.issued_at + 300)?);
-                }
+                3 => proof.body.replay_authority = crate::dpop::test_authority(),
                 _ => {}
             }
             request.dpop_proof = (kind != 4).then_some(proof);
@@ -148,14 +142,13 @@ fn dpop_rule_codes_survive_root_and_nested_signed_denials() -> TestResult {
 }
 
 #[test]
-fn installed_dpop_and_default_approval_follow_the_kernel_clock() -> TestResult {
+fn installed_replay_source_and_default_approval_follow_the_kernel_clock() -> TestResult {
     use crate::replay_retention::tests::TestClock;
     let clock = Arc::new(TestClock::new(100));
     let mut kernel = ChioKernel::new_with_clock(make_config(), clock.clone());
-    kernel.set_dpop_store(
+    kernel.set_dpop_replay_source(
         DpopNonceStore::new(2, Duration::from_secs(60))
             .expect("positive replay store test capacities"),
-        DpopConfig::default(),
     )?;
     let dpop = kernel.dpop_nonce_store.as_ref().ok_or("DPoP store")?;
     let approval = kernel
@@ -188,39 +181,40 @@ fn installed_dpop_and_default_approval_follow_the_kernel_clock() -> TestResult {
 }
 
 #[test]
-fn dropped_dispatch_retains_dpop_without_rollback_ownership() -> TestResult {
-    use crate::admission_operation::AdmissionIdentifier;
-    use crate::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
+fn dropped_dispatch_retains_operation_owned_dpop() -> TestResult {
+    use crate::admission_operation::dpop_claim::DpopReplayClaimDisposition;
     let agent = Keypair::generate();
-    let (kernel, cap) = make_dpop_kernel_and_cap(&agent, "srv-a", "read_file");
+    let (kernel, cap, store) = super::super::support_monetary::make_dpop_kernel_and_cap_with_store(
+        &agent,
+        "srv-a",
+        "read_file",
+    );
     let mut request = make_request("dropped-dpop", &cap, "read_file", "srv-a");
-    let proof = make_dpop_proof(
+    request.dpop_proof = Some(make_dpop_proof(
         &agent,
         &cap,
         "srv-a",
         "read_file",
         &request.arguments,
         "nonce",
-    );
-    let now = proof.body.issued_at;
-    request.dpop_proof = Some(proof);
-    let store = kernel.dpop_nonce_store.as_ref().ok_or("DPoP store")?;
-    let binding = DpopReplaySourceBinding {
-        dpop_authority_id: AdmissionIdentifier::try_new("authority", "dpop")?,
-        destination_authority_id: AdmissionIdentifier::try_new("destination", "kernel")?,
-    };
-    let mut reservation = kernel.reserve_dispatch_credentials(&request, &cap, true, now, false)?;
-    let before = store.preview_unsealed(&binding)?;
-    let owner = before.markers()[0]
-        .dispatch_reservation_id
-        .as_deref()
-        .ok_or("owner")?;
+    ));
+    let admission = super::super::durable_admission::dpop_acquisition::claim(&kernel, &request);
+    let mut reservation = kernel.reserve_admitted_dispatch_credentials(
+        &request,
+        true,
+        current_unix_timestamp(),
+        Some(&admission),
+        0,
+    )?;
+    let before = store.dpop_history();
+    assert_eq!(before.len(), 1);
     reservation.retain_if_dropped()?;
     drop(reservation);
-    let after = store.preview_unsealed(&binding)?;
-    assert_eq!(after.markers().len(), 1);
-    assert_eq!(after.markers()[0].dispatch_reservation_id, None);
-    assert!(!store.rollback_dispatch_reservation("nonce", &cap.id, owner)?);
-    assert!(!store.check_and_insert_through("nonce", &cap.id, now + 300)?);
+    let after = store.dpop_history();
+    assert_eq!(after, before);
+    assert_eq!(
+        after[0].disposition,
+        DpopReplayClaimDisposition::ReservedBeforeDispatch
+    );
     Ok(())
 }

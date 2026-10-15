@@ -2,16 +2,17 @@
 use super::*;
 use crate::admission_operation::dpop_claim::*;
 use crate::admission_operation::{AdmissionDigest, AdmissionRecoveryLease};
-use crate::dpop::authority::DpopReplayAuthorityV1;
+use crate::dpop::authority::DpopReplayAuthority;
 use std::sync::{Arc, Mutex};
 
 #[path = "dpop_acquisition/callbacks.rs"]
 mod callbacks;
 #[path = "dpop_acquisition/fixture.rs"]
 mod fixture;
+use callbacks::Mode;
 pub(super) use callbacks::TestDpop;
-use callbacks::{Mode, State};
 use fixture::*;
+pub(in crate::kernel::tests) use fixture::{fixture_authority, install_fixture_authority};
 
 pub(super) fn selected_profile_fixture() -> (
     ChioKernel,
@@ -20,6 +21,37 @@ pub(super) fn selected_profile_fixture() -> (
     Arc<AtomicU64>,
 ) {
     fixture(Mode::Normal)
+}
+
+impl TestAdmissionOperationStore {
+    pub(in crate::kernel::tests) fn dpop_history(&self) -> Vec<DpopReplayClaimHistoryV1> {
+        self.dpop_recovery
+            .0
+            .lock()
+            .expect("DPoP state")
+            .history
+            .clone()
+    }
+}
+
+pub(in crate::kernel::tests) fn claim(
+    kernel: &ChioKernel,
+    request: &ToolCallRequest,
+) -> DurableToolAdmission {
+    let mut admission = begin(kernel, request);
+    let prepared = kernel
+        .prepare_dispatch_credentials(
+            request,
+            &request.capability,
+            true,
+            current_unix_timestamp(),
+            false,
+        )
+        .expect("DPoP preparation");
+    kernel
+        .claim_prepared_dpop(&prepared, &mut admission, 0, current_unix_timestamp_ms())
+        .expect("operation-owned DPoP claim");
+    admission
 }
 
 #[test]
@@ -31,9 +63,10 @@ fn dpop_configuration_and_reservation_cannot_bypass_durable_custody() {
         .set_operation_owned_dpop_authority(domain)
         .is_err());
     assert!(no_runtime.dpop_authority.is_none());
-    assert!(kernel
-        .verify_dpop_for_request(&request, &request.capability)
-        .is_err());
+    assert!(matches!(
+        no_runtime.verify_required_dpop_preview(&request, &request.capability),
+        Err(KernelError::Dpop(crate::dpop::DpopError::MissingAuthority))
+    ));
     let prepared = kernel
         .prepare_dispatch_credentials(
             &request,
@@ -60,7 +93,7 @@ fn dpop_configuration_and_reservation_cannot_bypass_durable_custody() {
 fn dispatch_deadline_keeps_the_original_dpop_window() {
     let (kernel, request, _, _) = fixture(Mode::Normal);
     let proof = request.dpop_proof.as_ref().expect("original proof");
-    let deadline = (proof.body.issued_at + 60 + 1) * 1000;
+    let deadline = (proof.body.issued_at + 300 + 1) * 1000;
     let prepared = kernel
         .prepare_dispatch_credentials(
             &request,
@@ -149,7 +182,10 @@ fn foreign_prepared_kernel_cannot_claim_another_kernels_dpop_operation() {
         .history
         .is_empty());
 }
-fn begin(kernel: &ChioKernel, request: &ToolCallRequest) -> DurableToolAdmission {
+pub(in crate::kernel::tests) fn begin(
+    kernel: &ChioKernel,
+    request: &ToolCallRequest,
+) -> DurableToolAdmission {
     let matching = resolve_required_matching_grants(
         &request.capability,
         &request.tool_name,

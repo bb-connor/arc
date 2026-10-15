@@ -35,6 +35,8 @@ arbitrary = { version = "1", features = ["derive"], optional = true }
 
 [dev-dependencies]
 async-trait = { workspace = true }
+chio-store-sqlite = { workspace = true }
+tempfile = { workspace = true }
 
 [features]
 otel = ["chio-kernel/otel"]

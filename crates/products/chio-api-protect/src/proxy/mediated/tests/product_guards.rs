@@ -9,6 +9,7 @@ fn product_default_guards_mediation_preserves_authority_policy_identity() {
             &signer,
             MediationBudget::Configured(Arc::new(InMemoryBudgetStore::new())),
             MediationPolicy {
+                dpop_replay_authority: None,
                 issuers: &[],
                 hash,
                 receipt_store: None,

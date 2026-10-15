@@ -14,7 +14,11 @@ use chio_core_types::capability::token::{
 };
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_core_types::ScopeAttenuation;
-use chio_kernel::admission_operation::DurableAdmissionMode;
+use chio_kernel::admission_operation::{
+    AdmissionDigest, AdmissionIdentifier, DurableAdmissionMode,
+};
+use chio_kernel::dpop::authority::{DpopReplayAuthority, DpopReplayAuthorityInput};
+use chio_kernel::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
 use chio_kernel::{ChioKernel, KernelConfig, ToolServerConnection};
 use chio_process::{ProcessLimits, ProcessRuntime};
 use chio_store_sqlite::{SqliteAuthorityStore, SqliteReceiptStore};
@@ -64,6 +68,21 @@ pub fn kernel(path: &Path, server: Box<dyn ToolServerConnection>) -> Result<Arc<
     kernel_with_payment(path, server, false)
 }
 
+pub fn kernel_with_dpop(
+    path: &Path,
+    server: Box<dyn ToolServerConnection>,
+) -> Result<Arc<ChioKernel>> {
+    kernel_with_artifacts_and_clock(
+        path,
+        server,
+        false,
+        false,
+        false,
+        true,
+        chio_test_support::clock::clock(),
+    )
+}
+
 pub fn kernel_with_payment(
     path: &Path,
     server: Box<dyn ToolServerConnection>,
@@ -85,6 +104,7 @@ pub fn kernel_with_artifacts(
         payment,
         nonce,
         supplemental,
+        false,
         chio_test_support::clock::clock(),
     )
 }
@@ -94,7 +114,7 @@ pub fn kernel_with_clock(
     server: Box<dyn ToolServerConnection>,
     clock: Arc<dyn chio_kernel::authority::Clock>,
 ) -> Result<Arc<ChioKernel>> {
-    kernel_with_artifacts_and_clock(path, server, false, false, false, clock)
+    kernel_with_artifacts_and_clock(path, server, false, false, false, false, clock)
 }
 
 fn kernel_with_artifacts_and_clock(
@@ -103,17 +123,22 @@ fn kernel_with_artifacts_and_clock(
     payment: bool,
     nonce: bool,
     supplemental: bool,
+    dpop: bool,
     clock: Arc<dyn chio_kernel::authority::Clock>,
 ) -> Result<Arc<ChioKernel>> {
     private_dir(path)?;
     let locks = path.join("locks");
     private_dir(&locks)?;
     let database = path.join("authority.db");
-    if !database.exists() {
+    let fresh_authority = !database.exists();
+    if fresh_authority {
         SqliteAuthorityStore::provision(&database, &locks)?;
     }
     let authority =
         SqliteAuthorityStore::open_serving_with_clock(&database, &locks, clock.clone())?;
+    let dpop_authority = dpop
+        .then(|| fixture_dpop_authority(&authority, clock.clone(), fresh_authority))
+        .transpose()?;
     let mut kernel = ChioKernel::new_with_clock(config(), clock);
     kernel.set_capability_trust_root(
         issuer().public_key(),
@@ -131,6 +156,9 @@ fn kernel_with_artifacts_and_clock(
         Arc::new(authority.tool_outcome_store()),
         authority.mutation_fence(),
     )?;
+    if let Some(dpop_authority) = dpop_authority {
+        kernel.set_operation_owned_dpop_authority(dpop_authority)?;
+    }
     kernel.configure_durable_admission(DurableAdmissionMode::All, false)?;
     kernel
         .set_governed_approval_policy("process-test-tenant".into(), vec![issuer().public_key()])?;
@@ -167,6 +195,67 @@ fn kernel_with_artifacts_and_clock(
     kernel.register_tool_server(server);
     kernel.reconcile_durable_admission_startup()?;
     Ok(Arc::new(kernel))
+}
+
+fn fixture_dpop_authority(
+    store: &SqliteAuthorityStore,
+    clock: Arc<dyn chio_kernel::authority::Clock>,
+    fresh: bool,
+) -> Result<DpopReplayAuthority> {
+    let operations = store.admission_operation_store();
+    let fence = store.mutation_fence();
+    let authority_id = AdmissionIdentifier::try_new("dpop_authority", "process-test-dpop")?;
+    let now = clock.unix_millis()?.get();
+    if !fresh {
+        let retained = operations
+            .load_dpop_replay_migration(&authority_id, &fence, now)?
+            .ok_or("process DPoP activation is missing after restart")?;
+        let authority = retained
+            .authority()
+            .ok_or("process DPoP authority is not activated")?;
+        return Ok(operations.load_dpop_replay_activation(authority, &fence, now)?);
+    }
+    let source = chio_kernel::dpop::DpopNonceStore::with_clock(
+        8,
+        8,
+        4096,
+        std::time::Duration::from_secs(3600),
+        clock,
+    )?;
+    let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {
+        dpop_authority_id: authority_id.clone(),
+        destination_authority_id: AdmissionIdentifier::try_new(
+            "destination",
+            fence.store_uuid.as_str(),
+        )?,
+    })?;
+    let source_id = AdmissionIdentifier::try_new("source_instance", snapshot.instance_id())?;
+    let pinned =
+        operations.expect_dpop_replay_source(&source_id, &authority_id, &source, &fence, now)?;
+    let imported = operations.import_dpop_replay_source(
+        &authority_id,
+        pinned.expectation_id(),
+        &source,
+        &fence,
+        now,
+    )?;
+    let authority = DpopReplayAuthority::new(DpopReplayAuthorityInput {
+        destination_store_uuid: AdmissionIdentifier::try_new(
+            "destination",
+            imported.snapshot().destination_authority_id(),
+        )?,
+        dpop_authority_id: authority_id,
+        expectation_id: AdmissionDigest::try_new(
+            "expectation",
+            imported.expectation_id().as_str(),
+        )?,
+        proof_ttl_secs: 300,
+        max_clock_skew_secs: 30,
+    })?;
+    assert!(operations
+        .activate_dpop_replay_source(&authority, &source, &fence, now)?
+        .is_active());
+    Ok(authority)
 }
 
 pub fn scope(tools: &[&str]) -> ChioScope {

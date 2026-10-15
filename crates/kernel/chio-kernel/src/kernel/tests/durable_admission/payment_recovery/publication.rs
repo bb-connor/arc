@@ -53,8 +53,8 @@ fn review_target_current_finding_status_withholds_resolved_output() -> TestResul
         .ok_or("original DPoP authority")?;
     request.dpop_proof = Some(crate::dpop::DpopProof::sign(
         crate::dpop::DpopProofBody {
-            schema: crate::dpop::authority::DPOP_AUTHORITY_SCHEMA.into(),
-            replay_authority: Some(authority),
+            schema: crate::dpop::DPOP_SCHEMA.into(),
+            replay_authority: authority,
             capability_id: request.capability.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),

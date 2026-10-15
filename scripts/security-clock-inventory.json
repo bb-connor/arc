@@ -9,7 +9,6 @@
     "crates/guards/chio-wasm-guards/src/host.rs::get_time_unix_secs": 1,
     "crates/guards/chio-wasm-guards/src/incident.rs::utc_timestamp": 1,
     "crates/kernel/chio-kernel/src/dpop.rs::signed_expiry_overrides_local_ttl_under_pressure_and_rejects_expired_input": 1,
-    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/budget_cross_currency.rs::cross_currency_reported_cost_attaches_oracle_evidence_and_converted_units": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::chio_runtime_admission_hook_denies_federated_call_before_dispatch_or_cosign": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/chio_runtime/admission_gates.rs::federated_origin_without_runtime_hook_or_context_fails_closed": 1,
@@ -25,11 +24,6 @@
     "crates/kernel/chio-kernel/src/kernel/tests/support.rs::unique_receipt_db_path": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary.rs::make_dpop_proof": 1,
     "crates/kernel/chio-kernel/src/kernel/tests/support_monetary_durability.rs::signed_nonce_for_request": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_after_local_ttl_is_rejected": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_within_ttl_rejected": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_wrong_agent_key_rejected": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::make_capability": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::make_proof_body": 1,
     "crates/kernel/chio-kernel/tests/durable_admission_sqlite.rs::now_unix_ms": 1,
     "crates/kernel/chio-kernel/tests/retention.rs::unique_db_path": 1,
     "crates/kernel/chio-process/src/mailboxes/mod.rs::now_ms": 1,
@@ -160,11 +154,6 @@
       "disposition": "fixture",
       "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
     },
-    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::inventory_preserves_every_retention_kind_owner_and_inclusive_horizon": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
-    },
     "crates/kernel/chio-kernel/src/kernel/mod.rs::current_unix_timestamp": {
       "occurrences": 1,
       "disposition": "migrated",
@@ -264,16 +253,6 @@
       "occurrences": 1,
       "disposition": "migrated",
       "contract": "Session uses the kernel-injected shared Clock and a shared fence across clones. Outage/regression rejects before anchor rotation, close or request tracking."
-    },
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_after_local_ttl_is_rejected": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
-    },
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_nonce_replay_within_ttl_rejected": {
-      "occurrences": 1,
-      "disposition": "fixture",
-      "contract": "Test/benchmark fixture wall time for expiry, replay, temporary path or store setup; no production call."
     },
     "crates/kernel/chio-kernel/tests/dpop.rs::dpop_wrong_agent_key_rejected": {
       "occurrences": 1,
@@ -1108,17 +1087,12 @@
     "crates/kernel/chio-kernel/src/authority/aggregate.rs::backend_capability_budget_preserves_its_exact_scope_and_limit::native-adapter": 1,
     "crates/kernel/chio-kernel/src/budget_store/in_memory.rs::default::native-adapter": 1,
     "crates/kernel/chio-kernel/src/dpop.rs::new_with_identity_byte_capacity::native-adapter": 1,
-    "crates/kernel/chio-kernel/src/dpop/authority/tests.rs::legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce::native-adapter": 1,
-    "crates/kernel/chio-kernel/src/dpop/authority/tests.rs::old_proofs_and_schema_downgrades_never_enter_the_durable_domain::native-adapter": 1,
     "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::source_clock_anomaly_and_poisoned_mutex_refuse_without_repair::native-adapter": 1,
-    "crates/kernel/chio-kernel/src/dpop/replay_source/tests.rs::unrepresentable_inventory_is_refused_without_reset_or_retirement::native-adapter": 1,
     "crates/kernel/chio-kernel/src/execution_nonce/store.rs::new::native-adapter": 1,
     "crates/kernel/chio-kernel/src/governed_approval_replay.rs::default::native-adapter": 1,
     "crates/kernel/chio-kernel/src/governed_approval_replay.rs::new::native-adapter": 1,
     "crates/kernel/chio-kernel/src/kernel/construction.rs::new::native-adapter": 1,
     "crates/kernel/chio-kernel/src/session.rs::new::native-adapter": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification::native-adapter": 1,
-    "crates/kernel/chio-kernel/tests/dpop.rs::dpop_oversized_identity_is_refused_before_signature_canonicalization::native-adapter": 1,
     "crates/kernel/chio-runtime-core/src/store/sqlite.rs::open::native-adapter": 1,
     "crates/platform/chio-control-plane/src/certify/helpers.rs::unix_now::native-adapter": 1,
     "crates/platform/chio-control-plane/src/evidence_export.rs::unix_now::native-adapter": 1,
@@ -1227,7 +1201,6 @@
     "crates/products/chio-cli/src/cli/dispatch/proof/archive.rs::create_proof_tempdir": 1,
     "crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs::runtime_swarm_loopback_temp_root": 1,
     "crates/products/chio-cli/src/cli/dispatch/proof/unit_tests.rs::agent_web_replay_test_env": 1,
-    "crates/products/chio-cli/src/cli/input/time.rs::millis::native-adapter": 1,
     "crates/products/chio-cli/src/cli/mcp/cage_policy.rs::cage_receipt_persistence": 1,
     "crates/products/chio-cli/src/cli/mcp/governed_sim.rs::cmd_mcp_governed_sim": 1,
     "crates/products/chio-cli/src/cli/mcp/payment_config.rs::invoke_with_cost": 1,
@@ -1388,6 +1361,7 @@
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated::native-adapter",
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked::native-adapter",
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs::import_relocated_checked_with_phase::native-adapter",
+    "crates/products/chio-cli/src/cli/input/time.rs::read::native-adapter",
     "crates/products/chio-cli/src/cli/process_host/state.rs::kernel::native-adapter",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open::native-adapter",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_existing::native-adapter",

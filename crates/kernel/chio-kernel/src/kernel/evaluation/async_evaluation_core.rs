@@ -742,7 +742,7 @@ impl ChioKernel {
                         return Err(error);
                     }
                     let receipt_metadata = self.merge_budget_receipt_metadata(
-                        runtime_metadata,
+                        error.rejection_metadata(runtime_metadata),
                         self.budget_backend_receipt_metadata()?,
                     );
                     if runtime_release_confirmed && durable_admission.is_some() {

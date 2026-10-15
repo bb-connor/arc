@@ -74,10 +74,7 @@ const EXTRACTED_IMPLEMENTATION_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation.rs",
-        symbols: &[
-            "DispatchCredentialReservation::commit_approval_marker",
-            "DispatchCredentialReservation::commit_dpop_marker",
-        ],
+        symbols: &["DispatchCredentialReservation::commit_approval_marker"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/credential_reservation/preparation.rs",

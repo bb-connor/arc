@@ -326,12 +326,19 @@ fn unrelated_client_messages_do_not_renew_the_reply_deadline() {
 pub(super) fn make_kernel_with_clock(
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> (ChioKernel, Keypair) {
+    make_kernel_with_clock_and_policy_hash(clock, "edge-policy".to_string())
+}
+
+pub(super) fn make_kernel_with_clock_and_policy_hash(
+    clock: Arc<dyn chio_security_types::clock::Clock>,
+    policy_hash: String,
+) -> (ChioKernel, Keypair) {
     let keypair = Keypair::generate();
     let config = KernelConfig {
         keypair: keypair.clone(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "edge-policy".to_string(),
+        policy_hash,
         allow_sampling: true,
         allow_sampling_tool_use: false,
         allow_elicitation: false,

@@ -182,7 +182,6 @@ impl DispatchCredentialReservation<'_> {
         if original.native_security_authority_binding().is_none()
             || admission.operation().state() != AdmissionOperationState::CapturePending
             || self.execution_nonce_id.is_some()
-            || self.dpop_key.is_some()
             || self.approval_key.is_some()
             || (selection.runtime_hook_installed && selection.runtime.is_none())
             || (selection.swarm_admission_required && !selection.runtime_enforces_swarm_authority)

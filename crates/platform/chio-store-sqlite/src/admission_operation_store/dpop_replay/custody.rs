@@ -4,7 +4,7 @@ use super::*;
 
 pub(in crate::admission_operation_store) fn require_active_authority(
     connection: &Connection,
-    expected: &DpopReplayAuthorityV1,
+    expected: &DpopReplayAuthority,
 ) -> Result<DpopReplayMigrationRecordV1, AdmissionOperationStoreError> {
     let record = super::integrity::verified_projection_records(connection)
         .map_err(map_owner_error)?

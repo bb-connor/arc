@@ -636,10 +636,12 @@ impl ChioKernel {
             let operation_owned_runtime = authority_profile.runtime().is_some();
             let operation_owned_approval =
                 self.governed_approval_authority.is_some() && request.approval_token.is_some();
-            let operation_owned_dpop = self.dpop_authority.is_some()
-                && matching_grants
-                    .iter()
-                    .any(|matching| matching.grant.dpop_required == Some(true));
+            let operation_owned_dpop = matching_grants
+                .iter()
+                .any(|matching| matching.grant.dpop_required == Some(true));
+            if operation_owned_dpop && self.dpop_authority.is_none() {
+                return Err(crate::dpop::DpopError::MissingAuthority.into());
+            }
             // Keep coverage, store requirements and retention on one decision.
             // A selected authority requires a bound admission path.
             let requires_authority_admission = native_security_selected

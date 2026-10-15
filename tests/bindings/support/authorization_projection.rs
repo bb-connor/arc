@@ -74,7 +74,14 @@ pub fn complete_wire_request() -> chio_kernel::ToolCallRequest {
     let proof = chio_kernel::dpop::DpopProof::sign(
         chio_kernel::dpop::DpopProofBody {
             schema: chio_kernel::dpop::DPOP_SCHEMA.to_string(),
-            replay_authority: None,
+            replay_authority: serde_json::from_value(serde_json::json!({
+                "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+                "dpop_authority_id": "projection-test-dpop",
+                "expectation_id": "a".repeat(64),
+                "proof_ttl_secs": 300,
+                "max_clock_skew_secs": 30
+            }))
+            .unwrap(),
             capability_id: capability.id.clone(),
             tool_server: "server-1".to_string(),
             tool_name: "tool-1".to_string(),

@@ -2,6 +2,7 @@ use super::*;
 use crate::admission_operation::AdmissionIdentifier;
 use crate::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
 use crate::dpop::*;
+use crate::replay_retention::tests::TestClock;
 use std::sync::{Arc, Barrier};
 use std::time::Duration;
 
@@ -19,7 +20,7 @@ fn snapshot(store: &DpopNonceStore) -> replay_source::DpopReplaySourceSnapshot {
 fn oversized_identity_is_rejected_by_every_writer_before_any_state_change() {
     let oversized = "secret-identity-".repeat(300);
     assert!(oversized.len() > MAX_DPOP_REPLAY_IDENTITY_PART_BYTES);
-    for bad_part in 0..3 {
+    for bad_part in 0..2 {
         let store =
             DpopNonceStore::new(8, Duration::ZERO).expect("positive replay store test capacities");
         let before = snapshot(&store);
@@ -33,27 +34,14 @@ fn oversized_identity_is_rejected_by_every_writer_before_any_state_change() {
         } else {
             "cap"
         };
-        let owner = if bad_part == 2 {
-            oversized.as_str()
-        } else {
-            "owner"
-        };
-        let mut results = vec![
-            store.reserve_for_dispatch_through(nonce, cap, u64::MAX, owner),
-            store.reserve_for_dispatch_until(nonce, cap, u64::MAX, owner),
-            store.rollback_dispatch_reservation(nonce, cap, owner),
-        ];
-        if bad_part < 2 {
-            results.extend([
-                store.check_and_insert(nonce, cap),
-                store.check_and_insert_until(nonce, cap, u64::MAX),
-                store.check_and_insert_through(nonce, cap, u64::MAX),
-            ]);
-        }
-        for result in results {
-            let error = result.unwrap_err().to_string();
-            assert!(error.contains("4096-byte limit"));
-            assert!(!error.contains("secret-identity"));
+        for result in [
+            store.check_and_insert(nonce, cap),
+            store.check_and_insert_until(nonce, cap, u64::MAX),
+            store.check_and_insert_through(nonce, cap, u64::MAX),
+        ] {
+            let error = result.unwrap_err();
+            assert!(matches!(error, KernelError::Dpop(DpopError::IdentityLimit)));
+            assert!(!error.to_string().contains("secret-identity"));
         }
         assert_eq!(snapshot(&store), before);
         assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
@@ -66,21 +54,19 @@ fn limits_measure_utf8_bytes_and_keep_identity_text_exact() {
         .expect("positive replay store test capacities");
     let boundary = "é".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES / 2);
     assert!(store
-        .reserve_for_dispatch_through(&boundary, "cap", u64::MAX, "owner")
+        .check_and_insert_through(&boundary, "cap", u64::MAX)
         .unwrap());
     assert!(!store
-        .reserve_for_dispatch_through(&boundary, "cap", u64::MAX, "other")
+        .check_and_insert_through(&boundary, "cap", u64::MAX)
         .unwrap());
-    assert!(store
-        .check_and_insert_through(&(boundary.clone() + "é"), "cap", u64::MAX)
-        .is_err());
-    assert!(!store
-        .rollback_dispatch_reservation(&boundary, "cap", "other")
-        .unwrap());
-    assert!(store
-        .rollback_dispatch_reservation(&boundary, "cap", "owner")
-        .unwrap());
-    assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
+    assert!(matches!(
+        store.check_and_insert_through(&(boundary.clone() + "é"), "cap", u64::MAX),
+        Err(KernelError::Dpop(DpopError::IdentityLimit))
+    ));
+    assert_eq!(
+        store.identity_byte_utilization().unwrap().0,
+        boundary.len() + 6
+    );
     assert!(store
         .check_and_insert_through("é", "cap", u64::MAX)
         .unwrap());
@@ -90,88 +76,66 @@ fn limits_measure_utf8_bytes_and_keep_identity_text_exact() {
     assert!(store
         .check_and_insert_through(" é ", "cap", u64::MAX)
         .unwrap());
-    assert_eq!(store.utilization().unwrap().0, 3);
+    assert_eq!(store.utilization().unwrap().0, 4);
 }
 
 #[test]
-fn byte_pressure_never_evicts_a_live_or_reserved_marker() {
-    for owned in [false, true] {
-        let owner = owned.then_some("owner");
-        let capacity = retained_bytes("nonce", "cap", owner).unwrap();
-        let store = DpopNonceStore::new_with_identity_byte_capacity(
-            8,
-            8,
-            capacity,
-            Duration::from_secs(60),
-        )
-        .expect("positive replay store test capacities");
-        if owned {
-            assert!(store
-                .reserve_for_dispatch_through("nonce", "cap", u64::MAX, "owner")
-                .unwrap());
-        } else {
-            assert!(store
-                .check_and_insert_through("nonce", "cap", u64::MAX)
-                .unwrap());
-        }
-        assert_eq!(
-            store.identity_byte_utilization().unwrap(),
-            (capacity, capacity)
-        );
-        assert!(store
-            .check_and_insert_through("other", "cap", u64::MAX)
-            .is_err());
-        assert!(!store
-            .check_and_insert_through("nonce", "cap", u64::MAX)
-            .unwrap());
-        assert_eq!(store.utilization().unwrap().0, 1);
-        assert_eq!(store.identity_byte_utilization().unwrap().0, capacity);
-        if owned {
-            assert!(!store
-                .rollback_dispatch_reservation("nonce", "cap", "wrong")
-                .unwrap());
-            assert!(store
-                .rollback_dispatch_reservation("nonce", "cap", "owner")
-                .unwrap());
-            assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
-            assert!(store
-                .check_and_insert_through("other", "cap", u64::MAX)
-                .unwrap());
-        }
-    }
+fn byte_pressure_never_evicts_a_live_marker() {
+    let capacity = retained_bytes("nonce", "cap").unwrap();
+    let store =
+        DpopNonceStore::new_with_identity_byte_capacity(8, 8, capacity, Duration::from_secs(60))
+            .expect("positive replay store test capacities");
+    assert!(store
+        .check_and_insert_through("nonce", "cap", u64::MAX)
+        .unwrap());
+    assert_eq!(
+        store.identity_byte_utilization().unwrap(),
+        (capacity, capacity)
+    );
+    assert!(matches!(
+        store.check_and_insert_through("other", "cap", u64::MAX),
+        Err(KernelError::Dpop(DpopError::IdentityCapacity))
+    ));
+    assert!(!store
+        .check_and_insert_through("nonce", "cap", u64::MAX)
+        .unwrap());
+    assert_eq!(store.utilization().unwrap().0, 1);
+    assert_eq!(store.identity_byte_utilization().unwrap().0, capacity);
 }
 
 #[test]
 fn expired_reclamation_and_shared_capability_cleanup_return_the_exact_charge() {
-    let store = DpopNonceStore::new_with_identity_byte_capacity(8, 8, 100, Duration::ZERO)
+    let clock = Arc::new(TestClock::new(100));
+    let store = DpopNonceStore::with_clock(8, 8, 100, Duration::from_secs(10), clock.clone())
         .expect("positive replay store test capacities");
     store.check_and_insert("expired", "cap").unwrap();
     assert_eq!(store.identity_byte_utilization().unwrap().0, 13);
-    store
-        .reserve_for_dispatch_through("a", "cap", u64::MAX, "owner")
-        .unwrap();
-    assert_eq!(store.identity_byte_utilization().unwrap().0, 12);
-    store
-        .reserve_for_dispatch_through("b", "cap", u64::MAX, "owner")
-        .unwrap();
-    assert_eq!(store.identity_byte_utilization().unwrap().0, 24);
-    store
-        .rollback_dispatch_reservation("a", "cap", "owner")
-        .unwrap();
-    assert_eq!(store.identity_byte_utilization().unwrap().0, 12);
+    clock.set(110, 10);
+    assert!(store.check_and_insert_until("a", "cap", 120).unwrap());
+    assert_eq!(store.identity_byte_utilization().unwrap().0, 7);
+    assert!(store.check_and_insert_until("b", "cap", 130).unwrap());
+    assert_eq!(store.identity_byte_utilization().unwrap().0, 14);
+    clock.set(120, 20);
+    assert!(matches!(
+        store.check_and_insert_until("elapsed", "trigger", 120),
+        Err(KernelError::Dpop(DpopError::Expired))
+    ));
+    assert_eq!(store.identity_byte_utilization().unwrap().0, 7);
     assert_eq!(
         store.inner.lock().unwrap().capability_counts.get("cap"),
         Some(&1)
     );
-    store
-        .rollback_dispatch_reservation("b", "cap", "owner")
-        .unwrap();
+    clock.set(130, 30);
+    assert!(matches!(
+        store.check_and_insert_until("elapsed", "trigger", 130),
+        Err(KernelError::Dpop(DpopError::Expired))
+    ));
     assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
     assert!(store.inner.lock().unwrap().capability_counts.is_empty());
 }
 
 #[test]
-fn concurrent_reservations_cannot_oversubscribe_the_byte_budget() {
+fn concurrent_insertions_cannot_oversubscribe_the_byte_budget() {
     let store = Arc::new(
         DpopNonceStore::new_with_identity_byte_capacity(8, 8, 8, Duration::from_secs(60))
             .expect("positive replay store test capacities"),

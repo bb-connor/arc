@@ -572,10 +572,10 @@ pub struct ChioKernel {
     pub(super) native_egress_checkpoint_hook: Option<super::NativeSecurityEgressCheckpointHook>,
     #[cfg(feature = "admission-test-support")]
     pub(super) native_capture_checkpoint_hook: Option<super::NativeSecurityCaptureCheckpointHook>,
-    /// Explicit compatibility escape for development fixtures that exercise the
-    /// legacy non-durable financial lifecycle. Production construction leaves
-    /// this false, so a financial hold cannot cross a connector boundary without
-    /// durable recovery coverage.
+    /// Unsafe opt-in for development fixtures that exercise the non-durable
+    /// financial lifecycle. Production construction leaves this false, so a
+    /// financial hold cannot cross a connector boundary without durable recovery
+    /// coverage.
     pub(super) unsafe_ephemeral_financial_dispatch: bool,
     /// Guards are stored behind `Arc` so a single guard can be cloned into a
     /// `spawn_blocking` task without moving the whole pipeline, letting the
@@ -683,15 +683,13 @@ pub struct ChioKernel {
     pub(super) checkpoint_seq_counter: AtomicU64,
     /// seq of the last receipt included in the previous checkpoint batch.
     pub(super) last_checkpoint_seq: AtomicU64,
-    /// Nonce replay store for DPoP proof verification. Required when any grant has dpop_required.
+    /// Volatile replay source retained for explicit retirement.
     pub(super) dpop_nonce_store: Option<dpop::DpopNonceStore>,
-    /// Configuration for DPoP proof verification TTLs and clock skew.
-    pub(super) dpop_config: Option<dpop::DpopConfig>,
-    /// Explicit activated durable domain. This never falls back to the legacy cache.
-    pub(super) dpop_authority: Option<dpop::authority::DpopReplayAuthorityV1>,
+    /// Independently selected and activated durable replay domain.
+    pub(super) dpop_authority: Option<dpop::authority::DpopReplayAuthority>,
     /// Execution-nonce config (TTL, capacity, strict-mode flag).
     /// When `None`, no nonce is minted on allow and strict verification is
-    /// disabled (compatibility deployments keep working).
+    /// disabled.
     pub(super) execution_nonce_config: Option<crate::execution_nonce::ExecutionNonceConfig>,
     /// Replay-prevention store for execution nonces. Shared with
     /// any tool server that delegates verification to the kernel. Boxed
@@ -732,9 +730,8 @@ pub struct ChioKernel {
     /// governed `MemoryWrite` action appends an entry after the allow
     /// receipt is signed, and every `MemoryRead` attaches the latest
     /// entry (or an `Unverified` marker) to its receipt as
-    /// `memory_provenance` evidence metadata. `None` keeps the kernel
-    /// backward-compatible: memory-shaped tool calls behave exactly as
-    /// they do without a provenance chain installed.
+    /// `memory_provenance` evidence metadata. With `None`, the kernel maintains
+    /// no memory-provenance chain and attaches no chain evidence to receipts.
     pub(super) memory_provenance: Option<Arc<dyn crate::memory_provenance::MemoryProvenanceStore>>,
     /// Cross-kernel federation peer set. When a request
     /// carries a `federated_origin_kernel_id` and that peer is pinned
@@ -828,8 +825,8 @@ pub struct ChioKernel {
     pub(super) rss_sampler: Option<RssSamplerHandle>,
     /// Receipt-writer liveness watchdog. Opt-in: the hosting edge spawns the
     /// poll task, which publishes the latest verdict into an `ArcSwap` the
-    /// pre-dispatch readiness gate reads. Absent watchdog leaves the verdict
-    /// `Unknown` and the gate behaves as before.
+    /// pre-dispatch readiness gate reads. An `Unknown` published verdict makes
+    /// the gate sample the installed store's writer liveness synchronously.
     pub(super) receipt_writer_watchdog:
         std::sync::Arc<receipt_writer_watchdog::ReceiptWriterWatchdogHandle>,
 }

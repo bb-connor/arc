@@ -59,7 +59,6 @@ impl ExecutionNonceCredential {
 pub(crate) struct DispatchCredentialReservation<'a> {
     kernel: &'a ChioKernel,
     reservation_id: String,
-    dpop_key: Option<(String, String)>,
     owned_dpop: Option<crate::admission_operation::dpop_claim::DpopReplayClaimReferenceV1>,
     execution_nonce_id: Option<String>,
     execution_nonce_present: bool,
@@ -81,7 +80,7 @@ impl DispatchCredentialReservation<'_> {
         // Keep owned reservations reversible until dispatch starts. Once the
         // server is polled, neither a dropped future nor a server-controlled
         // URL-elicitation result can prove that no side effect occurred. Drop
-        // therefore promotes approval and DPoP markers and leaves owned
+        // therefore promotes approval markers and leaves durable DPoP and
         // execution nonce reservations in their fail-closed state.
         self.rollback_on_drop = false;
         self.retain_on_drop = true;
@@ -98,7 +97,6 @@ impl DispatchCredentialReservation<'_> {
         self.rollback_on_drop = false;
         self.retain_on_drop = true;
         self.commit_approval_marker()?;
-        self.commit_dpop_marker()?;
         Ok(self.retention_disposition())
     }
 
@@ -116,7 +114,6 @@ impl DispatchCredentialReservation<'_> {
         self.rollback_on_drop = false;
         self.retain_on_drop = false;
         self.commit_approval_marker()?;
-        self.commit_dpop_marker()?;
         Ok(self.retention_disposition())
     }
 
@@ -128,27 +125,6 @@ impl DispatchCredentialReservation<'_> {
         } else {
             PaymentCredentialDisposition::NonePresent
         }
-    }
-
-    fn commit_dpop_marker(&mut self) -> Result<(), KernelError> {
-        let Some((nonce, capability_id)) = self.dpop_key.as_ref() else {
-            return Ok(());
-        };
-        let store = self
-            .kernel
-            .dpop_nonce_store
-            .as_ref()
-            .ok_or(crate::dpop::DpopError::MissingStore)?;
-        let committed = run_credential_store_operation(
-            &self.reservation_id,
-            "DPoP reservation commit",
-            || store.commit_dispatch_reservation(nonce, capability_id, &self.reservation_id),
-        )?;
-        if !committed {
-            return Err(crate::dpop::DpopError::ReservationOwnership.into());
-        }
-        self.dpop_key = None;
-        Ok(())
     }
 
     fn commit_approval_marker(&mut self) -> Result<(), KernelError> {
@@ -274,29 +250,6 @@ impl DispatchCredentialReservation<'_> {
             }
         }
 
-        if let Some((nonce, capability_id)) = self.dpop_key.take() {
-            let result = match self.kernel.dpop_nonce_store.as_ref() {
-                Some(store) => run_credential_store_operation(
-                    &self.reservation_id,
-                    "DPoP nonce reservation rollback",
-                    || {
-                        store.rollback_dispatch_reservation(
-                            &nonce,
-                            &capability_id,
-                            &self.reservation_id,
-                        )
-                    },
-                ),
-                None => Err(KernelError::Dpop(crate::dpop::DpopError::MissingStore)),
-            };
-            match result {
-                Ok(true) => {}
-                Ok(false) => failures
-                    .push("DPoP dispatch reservation was not owned during rollback".to_string()),
-                Err(error) => failures.push(error.to_string()),
-            }
-        }
-
         if failures.is_empty() {
             Ok(())
         } else {
@@ -315,13 +268,6 @@ impl Drop for DispatchCredentialReservation<'_> {
                 tracing::warn!(
                     reason = %redacted!(&error),
                     "governed dispatch credential retention failed while dropping an evaluation"
-                );
-            }
-            if let Err(error) = self.commit_dpop_marker() {
-                tracing::warn!(
-                    rejection_code = %error.report().code,
-                    reason = %redacted!(&error),
-                    "DPoP credential retention failed while dropping an evaluation"
                 );
             }
             return;

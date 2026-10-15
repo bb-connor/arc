@@ -2697,12 +2697,6 @@
       "schemaFile": "spec/schemas/chio-wire/v1/kernel/dpop_proof.schema.json"
     },
     {
-      "schema": "chio.dpop_proof.v2",
-      "artifactKind": "invocation_sender_proof",
-      "introducedBy": "inbound-authority-ap5",
-      "schemaFile": "spec/schemas/chio-wire/v1/kernel/dpop_proof.schema.json"
-    },
-    {
       "schema": "chio.recovery.observation.v1",
       "artifactKind": "recovery_observation",
       "introducedBy": "recovery-contracts",

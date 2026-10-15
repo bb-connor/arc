@@ -23,14 +23,12 @@
         "action_hash",
         "nonce",
         "issued_at",
-        "agent_key"
+        "agent_key",
+        "replay_authority"
       ],
       "properties": {
         "schema": {
-          "enum": [
-            "chio.dpop_proof.v1",
-            "chio.dpop_proof.v2"
-          ]
+          "const": "chio.dpop_proof.v1"
         },
         "replay_authority": {
           "type": "object",
@@ -96,30 +94,7 @@
         "agent_key": {
           "$ref": "../capability/governed-approval-token.schema.json#/$defs/governedApprovalPublicKey"
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "schema": {
-                "const": "chio.dpop_proof.v2"
-              }
-            }
-          },
-          "then": {
-            "required": [
-              "replay_authority"
-            ]
-          },
-          "else": {
-            "not": {
-              "required": [
-                "replay_authority"
-              ]
-            }
-          }
-        }
-      ]
+      }
     }
   }
 }

@@ -12,7 +12,7 @@ use fixture::Fixture;
 
 #[test]
 fn dispatch_deadline_cannot_outlive_a_shorter_signed_approval() -> TestResult {
-    let mut fixture = Fixture::new()?;
+    let mut fixture = Fixture::new_with_dpop()?;
     let mut body = fixture
         .request
         .approval_token
@@ -34,16 +34,16 @@ fn dispatch_deadline_cannot_outlive_a_shorter_signed_approval() -> TestResult {
     )?;
     assert_eq!(prepared.valid_until_unix_ms(None)?, expires * 1000);
     fixture.assert_no_writes()?;
-    // Legacy proof verification cannot manufacture a durable proof horizon.
-    assert!(matches!(fixture.prepare()?.valid_until_unix_ms(None),
-        Err(KernelError::DurableAdmission(detail))
-            if detail == "dispatch deadline requires operation-owned DPoP custody"));
+    assert_eq!(
+        fixture.prepare()?.valid_until_unix_ms(None)?,
+        expires * 1000
+    );
     Ok(())
 }
 
 #[test]
 fn oversized_dpop_identity_denies_before_other_credential_probes_or_mutations() -> TestResult {
-    let mut fixture = Fixture::new()?;
+    let mut fixture = Fixture::new_with_dpop()?;
     fixture
         .request
         .dpop_proof
@@ -61,47 +61,33 @@ fn oversized_dpop_identity_denies_before_other_credential_probes_or_mutations() 
 }
 
 #[test]
-fn retired_dpop_source_denies_preparation_before_other_credentials_mutate() -> TestResult {
-    use crate::dpop::replay_source::DpopReplaySourceBinding;
-    let fixture = Fixture::new()?;
-    let source = fixture.kernel.dpop_replay_source()?;
-    let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {
-        dpop_authority_id: crate::admission_operation::AdmissionIdentifier::try_new(
-            "authority",
-            "dpop",
-        )?,
-        destination_authority_id: crate::admission_operation::AdmissionIdentifier::try_new(
-            "destination",
-            "admission",
-        )?,
-    })?;
-    source.seal_exact(&snapshot)?;
-    assert!(fixture.prepare().is_err());
+fn prepared_dpop_evidence_requires_exact_admission_before_any_credential_mutates() -> TestResult {
+    let fixture = Fixture::new_with_dpop()?;
+    let prepared = fixture.prepare()?;
     fixture.assert_no_writes()?;
-    source.verify_exact(&snapshot)?;
+    assert!(
+        matches!(prepared.reserve(), Err(KernelError::DurableAdmission(reason)) if reason == "operation-owned credentials require their exact admission episode")
+    );
+    fixture.assert_no_writes()?;
     Ok(())
 }
 
 #[test]
-fn dpop_retirement_between_preparation_and_consumption_rejects_the_stale_plan() -> TestResult {
-    use crate::dpop::replay_source::DpopReplaySourceBinding;
+fn missing_dpop_authority_denies_before_other_credentials_mutate() -> TestResult {
     let fixture = Fixture::new()?;
-    let prepared = fixture.prepare()?;
-    let source = fixture.kernel.dpop_replay_source()?;
-    let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {
-        dpop_authority_id: crate::admission_operation::AdmissionIdentifier::try_new(
-            "authority",
-            "dpop",
-        )?,
-        destination_authority_id: crate::admission_operation::AdmissionIdentifier::try_new(
-            "destination",
-            "admission",
-        )?,
-    })?;
-    source.seal_exact(&snapshot)?;
-    assert!(prepared.reserve().is_err());
+    fixture.nonce.mode.store(2, Ordering::SeqCst);
+    let result = fixture.kernel.prepare_dispatch_credentials(
+        &fixture.request,
+        &fixture.request.capability,
+        true,
+        current_unix_timestamp(),
+        false,
+    );
+    assert!(matches!(
+        result,
+        Err(KernelError::Dpop(crate::dpop::DpopError::MissingAuthority))
+    ));
     fixture.assert_no_writes()?;
-    source.verify_exact(&snapshot)?;
     Ok(())
 }
 
@@ -114,7 +100,7 @@ fn prepared_credentials_and_dropped_plans_do_not_mutate_replay_stores() -> TestR
     fixture.assert_no_writes()?;
     let reservation = fixture.prepare()?.reserve()?;
     assert!(fixture.nonce_consumed()?);
-    assert_eq!(fixture.dpop_occupancy()?, 1);
+    assert_eq!(fixture.dpop_occupancy()?, 0);
     assert_eq!(fixture.writes(), (1, 0, 1, 0, 0));
     reservation.rollback_before_dispatch()?;
     assert!(!fixture.nonce_consumed()?);
@@ -135,14 +121,14 @@ fn competing_prepared_credentials_cannot_release_the_winning_reservation() -> Te
         .as_ref()
         .is_err_and(|error| error.to_string().contains("nonce replayed")));
     assert!(fixture.nonce_consumed()?);
-    assert_eq!(fixture.dpop_occupancy()?, 1);
+    assert_eq!(fixture.dpop_occupancy()?, 0);
     assert_eq!(fixture.writes(), (1, 0, 1, 0, 0));
     owner.commit()?;
     assert_eq!(fixture.writes(), (1, 0, 1, 1, 0));
     drop(owner);
     assert!(fixture.prepare()?.reserve().is_err());
     assert!(fixture.nonce_consumed()?);
-    assert_eq!(fixture.dpop_occupancy()?, 1);
+    assert_eq!(fixture.dpop_occupancy()?, 0);
     Ok(())
 }
 
@@ -258,7 +244,7 @@ fn caller_authorization_preparation_preserves_no_presented_nonce_and_required_ap
     let reservation = fixture.kernel.reserve_caller_authorization_credentials(
         &fixture.request,
         &fixture.request.capability,
-        true,
+        false,
         current_unix_timestamp(),
         true,
     )?;
@@ -266,16 +252,17 @@ fn caller_authorization_preparation_preserves_no_presented_nonce_and_required_ap
     reservation.rollback_before_dispatch()?;
     let before = fixture.writes();
     fixture.request.approval_token = None;
-    assert!(fixture
-        .kernel
-        .reserve_caller_authorization_credentials(
+    assert!(matches!(
+        fixture.kernel.reserve_caller_authorization_credentials(
             &fixture.request,
             &fixture.request.capability,
-            true,
+            false,
             current_unix_timestamp(),
             true,
-        )
-        .is_err());
+        ),
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "strict reserve-for-caller payment authorization requires a governed approval token"
+    ));
     assert_eq!(fixture.writes(), before);
     assert_eq!(fixture.dpop_occupancy()?, 0);
     Ok(())
