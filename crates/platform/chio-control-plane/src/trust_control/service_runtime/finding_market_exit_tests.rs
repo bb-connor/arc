@@ -610,6 +610,7 @@ fn market_state(
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
+        stop: TrustStop::for_authority(Some(&joint)),
         joint_authority_store: Some(joint),
         fiscal_runtime: None,
         budget_store: None,

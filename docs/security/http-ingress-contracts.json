@@ -1,7 +1,7 @@
 {
   "version": 1,
   "scope": "Framework request extraction, transport response decoding, non-JSON formats, and resolved shared-reader call sites. This supplements the direct serde census and never changes its raw-input baseline.",
-  "control_reader_sha256": "15e93e566ff6705b0f1dffa061e286fc055e1c2a02669990b9f37b6c1674f5dc",
+  "control_reader_sha256": "79fd885cbc5836591e5099cd6fce830572027b08aa61613f24e71da1f0e7fcf4",
   "requests": [
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/authority_handlers.rs",
@@ -1502,6 +1502,34 @@
       "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
       "semantics": "A node-local service-token request optionally raises the runtime snapshot quota without lowering it and schedules recovery. It is never forwarded. A quota increase is lost on restart and can wake either backoff; a retry without an increase wakes only resource backoff. Every rebuilt snapshot still authenticates its contents.",
       "source": "crates/platform/chio-control-plane/src/trust_control/receipt_snapshot_admin.rs"
+    },
+    {
+      "authentication": "Before body reads, json_ingress::authenticate calls validate_service_auth (the default Service arm). The handler repeats validate_service_auth after typed extraction. Tenant read tokens and missing, forged or non-Bearer credentials receive 401 without the body being polled.",
+      "disposition": "bounded-signed-json",
+      "format": "json",
+      "max_bytes": 16384,
+      "method": "POST",
+      "owner": "handle_emergency_resume",
+      "reader": "signed",
+      "request_type": "ResumeRequestBody",
+      "route": "EMERGENCY_RESUME_PATH",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "semantics": "A node-local service-token request resumes the kernel scope of this node's admission authority, naming the stopped head it expects. A moved head is refused with 409 and nothing changes; with a durable authority the resume is an appended chio.stop-epoch.v1 record.",
+      "source": "crates/platform/chio-control-plane/src/trust_control/stop_routes.rs"
+    },
+    {
+      "authentication": "Before body reads, json_ingress::authenticate calls validate_service_auth (the default Service arm). The handler repeats validate_service_auth after typed extraction. Tenant read tokens and missing, forged or non-Bearer credentials receive 401 without the body being polled.",
+      "disposition": "bounded-signed-json",
+      "format": "json",
+      "max_bytes": 16384,
+      "method": "POST",
+      "owner": "handle_emergency_stop",
+      "reader": "signed",
+      "request_type": "StopRequestBody",
+      "route": "EMERGENCY_STOP_PATH",
+      "router": "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs",
+      "semantics": "A node-local service-token request stops the kernel scope of this node's admission authority. With a durable authority the stop is an appended chio.stop-epoch.v1 record and the admission authority RPC refuses Begin until resume; the reason is bounded and validated by the stop control.",
+      "source": "crates/platform/chio-control-plane/src/trust_control/stop_routes.rs"
     }
   ],
   "other_input_files": {
@@ -1655,7 +1683,7 @@
   "router_compositions": {
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/router.rs": {
       "owner": "build_router",
-      "sha256": "4305e938c6857af540d2340447302592955362d1219d5a4829adc99d11839b5d"
+      "sha256": "2e2476d495c41396d14da649855bad622dfaf9e0dd9a215158766cafd19a8567"
     },
     "crates/platform/chio-control-plane/src/trust_control/frost/coordinator.rs": {
       "owner": "frost_coordinator_router",

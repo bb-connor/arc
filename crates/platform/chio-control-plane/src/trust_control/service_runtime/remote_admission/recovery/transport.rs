@@ -106,7 +106,8 @@ fn decode_recovery_response<T: DeserializeOwned>(
             let kind = match error.code {
                 AdmissionAuthorityErrorCode::Unavailable
                 | AdmissionAuthorityErrorCode::Unsupported
-                | AdmissionAuthorityErrorCode::Timeout => RemoteRecoveryFailureKind::Unavailable,
+                | AdmissionAuthorityErrorCode::Timeout
+                | AdmissionAuthorityErrorCode::Stopped => RemoteRecoveryFailureKind::Unavailable,
                 AdmissionAuthorityErrorCode::Fenced => RemoteRecoveryFailureKind::Fenced,
                 AdmissionAuthorityErrorCode::NotFound => RemoteRecoveryFailureKind::NotFound,
                 AdmissionAuthorityErrorCode::Conflict

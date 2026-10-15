@@ -491,9 +491,14 @@ impl FindingOperatorPurchaseExecutor {
         kernel
             .set_receipt_store_handle(self.receipt_store.clone())
             .map_err(execution_internal)?;
+        let operations = Arc::new(self.authority.admission_operation_store());
+        kernel.set_stop_control(chio_kernel::stop::StopControl::durable(
+            &operations,
+            self.authority.mutation_fence(),
+        ));
         kernel
             .set_durable_admission_store(
-                Arc::new(self.authority.admission_operation_store()),
+                operations,
                 Arc::new(self.authority.tool_outcome_store()),
                 self.authority.mutation_fence(),
             )

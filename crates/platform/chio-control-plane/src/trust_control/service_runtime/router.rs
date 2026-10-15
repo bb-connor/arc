@@ -406,6 +406,9 @@ pub(crate) fn build_router(state: TrustServiceState) -> Router {
             RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
             post(handle_receipt_query_snapshot_recovery),
         )
+        .route(EMERGENCY_STOP_PATH, post(handle_emergency_stop))
+        .route(EMERGENCY_RESUME_PATH, post(handle_emergency_resume))
+        .route(EMERGENCY_STATUS_PATH, get(handle_emergency_status))
         .route(RECEIPT_ANALYTICS_PATH, get(handle_receipt_analytics))
         .route(EVIDENCE_EXPORT_PATH, post(handle_evidence_export))
         .route(

@@ -66,6 +66,14 @@ fn handle_request(
             "joint admission authority cannot run with the legacy cluster coordinator",
         );
     }
+    if request.action == AdmissionAuthorityAction::Begin
+        && state.stop.control().heads().is_stopped()
+    {
+        return AdmissionAuthorityResponse::failure(
+            AdmissionAuthorityErrorCode::Stopped,
+            chio_kernel::EMERGENCY_STOP_DENY_REASON,
+        );
+    }
     let fence = authority.mutation_fence();
     if request.action != AdmissionAuthorityAction::Status
         && request.expected_fence.as_ref() != Some(&fence)

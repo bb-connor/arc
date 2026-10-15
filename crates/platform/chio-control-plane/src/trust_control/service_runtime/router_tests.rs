@@ -1,6 +1,8 @@
 #[path = "router_tests/compacted_replay_tests.rs"]
 mod compacted_replay_tests;
 
+#[path = "router_tests/emergency_stop_tests.rs"]
+mod emergency_stop_tests;
 #[cfg(target_os = "linux")]
 #[path = "router_tests/recovery_rpc_tests.rs"]
 mod recovery_rpc_tests;
@@ -79,6 +81,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
+        stop: TrustStop::process_local(),
         joint_authority_store: None,
         fiscal_runtime: None,
         budget_store: None,
