@@ -2581,6 +2581,7 @@ version = "0.1.0"
 dependencies = [
  "chio-core-types",
  "rs_merkle",
+ "rusqlite",
  "serde",
  "sha2 0.10.9",
  "thiserror 1.0.69",

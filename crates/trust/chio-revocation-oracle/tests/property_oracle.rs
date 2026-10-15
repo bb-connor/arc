@@ -40,12 +40,10 @@ proptest! {
     #[test]
     fn inclusion_proof_soundness(keys in distinct_keys_strategy()) {
         let mut oracle = InMemoryRevocationOracle::new();
-        let mut now: u64 = 10;
-        for k in &keys {
+        for (now, k) in (10_u64..).zip(keys.iter()) {
             oracle
                 .insert(k.clone(), now)
                 .map_err(|err| TestCaseError::fail(format!("insert failed: {err}")))?;
-            now += 1;
         }
 
         // Verify inclusion proofs for every leaf so that multi-leaf sibling paths

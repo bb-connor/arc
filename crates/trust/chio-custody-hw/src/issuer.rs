@@ -234,12 +234,10 @@ impl IssuerService {
     /// [`Self::with_revocation_oracle`] / [`Self::with_nonce_store`].
     ///
     /// Returns the issuer together with the shared durable revocation oracle.
-    /// The returned `Arc<SqliteCredentialRevocationOracle>` is the exact
-    /// instance wired into the issuer (cloned, not reopened), so an operator
-    /// revocation made through the handle is observed by `mint_capability`
-    /// immediately. Opening `revocation.sqlite3` through a second oracle would
-    /// not update this issuer's in-RAM cache. The nonce store stays
-    /// encapsulated.
+    /// The returned `Arc<SqliteCredentialRevocationOracle>` is the instance
+    /// wired into the issuer. Any handle on `revocation.sqlite3`, including
+    /// one opened by another process, records revocations the issuer observes
+    /// on its next mint. The nonce store stays encapsulated.
     ///
     /// Fail-closed: if either durable store cannot be opened (I/O fault,
     /// permission error, corrupt schema), this returns [`CustodyError`] and
@@ -255,16 +253,12 @@ impl IssuerService {
         ),
         CustodyError,
     > {
-        let revocation_path = dir.join("revocation.sqlite3");
         let nonce_path = dir.join("nonces.sqlite3");
-        let revocation_path = revocation_path.to_str().ok_or_else(|| {
-            CustodyError::Encoding("durable revocation store path is not valid UTF-8".into())
-        })?;
         let nonce_path = nonce_path.to_str().ok_or_else(|| {
             CustodyError::Encoding("durable nonce store path is not valid UTF-8".into())
         })?;
         let revocation = Arc::new(crate::revocation::SqliteCredentialRevocationOracle::open(
-            revocation_path,
+            &dir.join("revocation.sqlite3"),
         )?);
         let nonces = crate::nonce_store::SqlitePasskeyNonceStore::open(nonce_path)?;
         let issuer = self
