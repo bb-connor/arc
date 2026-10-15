@@ -319,20 +319,17 @@ pub enum CertificateVerificationScope {
 
 /// Result of certificate verification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CertificateVerificationResult {
     /// No corpus-authentication claim is inferred from deserialized coverage.
     pub verification_scope: CertificateVerificationScope,
     /// Whether the certificate signature is valid.
-    #[serde(alias = "certificateSignatureValid")]
     pub certificate_signature_valid: bool,
     /// Whether the body fields are internally consistent.
-    #[serde(alias = "bodyConsistent")]
     pub body_consistent: bool,
     /// Number of receipt signatures re-verified (full-bundle mode only).
-    #[serde(alias = "receiptsReverified")]
     pub receipts_reverified: u64,
     /// Number of receipt signature failures (full-bundle mode only).
-    #[serde(alias = "receiptFailures")]
     pub receipt_failures: u64,
     /// Overall pass/fail.
     pub passed: bool,
