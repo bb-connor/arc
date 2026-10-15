@@ -967,6 +967,7 @@ pub(crate) fn cmd_passport_status_resolve(
         let registry = load_passport_status_registry_for_admin(path)?;
         let mut resolution = registry.resolve(passport_id)?;
         resolution.source = Some(format!("registry:{}", path.display()));
+        chio_control_plane::passport_revocation::check_passport_revocation(path, &resolution)?;
         resolution
     };
 
@@ -1018,9 +1019,12 @@ pub(crate) fn cmd_passport_status_revoke(
             )?
     } else {
         let path = require_passport_status_registry_path(passport_statuses_file)?;
-        PassportStatusRegistry::update(path, |registry| {
-            registry.revoke(passport_id, reason, revoked_at)
-        })?
+        chio_control_plane::passport_revocation::revoke_passport_status(
+            path,
+            passport_id,
+            reason,
+            revoked_at,
+        )?
     };
 
     if json_output {

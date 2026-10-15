@@ -29,7 +29,7 @@ chio-finding-hosted-edge = { workspace = true }
 chio-finding-market-store-postgres = { workspace = true }
 chio-finding-verifier = { workspace = true }
 chio-finding-worker = { workspace = true }
-chio-revocation-oracle = { workspace = true }
+chio-revocation-oracle = { workspace = true, features = ["sqlite"] }
 chio-spec-validate = { workspace = true }
 chio-appraisal = { workspace = true }
 chio-commerce-order = { workspace = true }
