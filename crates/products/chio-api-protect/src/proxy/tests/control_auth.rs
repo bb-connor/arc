@@ -44,6 +44,9 @@ const CONTROL_ROUTES: &[(&str, &str)] = &[
     ("POST", "/v1/caller/start"),
     ("POST", "/v1/caller/report"),
     ("GET", "/metrics"),
+    ("POST", "/chio/emergency-stop"),
+    ("POST", "/chio/emergency-resume"),
+    ("GET", "/chio/emergency-status"),
 ];
 
 fn control_state(token: Option<&str>) -> Arc<ProxyState> {

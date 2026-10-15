@@ -224,12 +224,7 @@ fn durable_admission_stores(directory: &std::path::Path) -> DurableAdmissionStor
     chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks).test_unwrap();
     let authority =
         chio_store_sqlite::SqliteAuthorityStore::open_serving(&database, &locks).test_unwrap();
-    DurableAdmissionStores {
-        store: Arc::new(authority.admission_operation_store()),
-        outcome_store: Arc::new(authority.tool_outcome_store()),
-        fence: authority.mutation_fence(),
-        budget_store: Arc::new(authority.budget_store()),
-    }
+    DurableAdmissionStores::serving(&authority)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -285,6 +280,7 @@ fn mediated_test_state_with_durable_admission(
     );
     Arc::new(ProxyState {
         clock: clock::ProxyClock::default(),
+        stop: evaluator.stop_control().clone(),
         evaluator,
         signer_keypair: signer,
         upstream: "http://127.0.0.1:1".to_string(),

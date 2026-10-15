@@ -10,6 +10,7 @@ use chio_http_core::{
     HttpAuthorityEvaluation, HttpAuthorityInput, HttpAuthorityPolicy, HttpMethod, HttpReceipt,
     Verdict,
 };
+use chio_kernel::stop::StopControl;
 use chio_kernel::{ApprovalStore, ReceiptStore, RevocationStore, SignedExecutionNonce};
 use chio_openapi::PolicyDecision;
 use serde_json::Value;
@@ -63,6 +64,22 @@ pub(crate) struct DurableAdmissionStores {
     /// The authority's own budget store. Durable operations, their preflight
     /// holds and their executable holds live in one authority.
     pub(crate) budget_store: Arc<dyn chio_kernel::budget_store::BudgetStore>,
+    /// The stop control every kernel over this authority binds.
+    pub(crate) stop: StopControl,
+}
+
+impl DurableAdmissionStores {
+    pub(crate) fn serving(authority: &chio_store_sqlite::SqliteAuthorityStore) -> Self {
+        let store = Arc::new(authority.admission_operation_store());
+        let fence = authority.mutation_fence();
+        Self {
+            stop: StopControl::durable(&store, fence.clone()),
+            store,
+            outcome_store: Arc::new(authority.tool_outcome_store()),
+            fence,
+            budget_store: Arc::new(authority.budget_store()),
+        }
+    }
 }
 
 impl RequestEvaluator {
@@ -224,11 +241,9 @@ impl RequestEvaluator {
             builder = builder.revocation_store(store);
         }
         if let Some(durable) = durable_admission {
-            builder = builder.durable_admission_stores(
-                durable.store,
-                durable.outcome_store,
-                durable.fence,
-            );
+            builder = builder
+                .durable_admission_stores(durable.store, durable.outcome_store, durable.fence)
+                .stop_control(durable.stop);
         }
         let authority = builder.build(keypair, policy_hash)?;
 
@@ -267,6 +282,12 @@ impl RequestEvaluator {
     /// Health label for the embedded kernel's revocation backend.
     pub fn revocation_backend(&self) -> &'static str {
         self.revocation_backend
+    }
+
+    /// The stop control the embedded kernel enforces.
+    #[must_use]
+    pub fn stop_control(&self) -> &StopControl {
+        self.authority.stop_control()
     }
 
     #[cfg(test)]
@@ -604,12 +625,7 @@ mod tests {
             Vec::new(),
             Some(receipt_store),
             Some(revocation_store),
-            Some(DurableAdmissionStores {
-                store: Arc::new(authority.admission_operation_store()),
-                outcome_store: Arc::new(authority.tool_outcome_store()),
-                fence: authority.mutation_fence(),
-                budget_store: Arc::new(authority.budget_store()),
-            }),
+            Some(DurableAdmissionStores::serving(&authority)),
             false,
             Arc::new(chio_security_types::clock::SystemClock),
         )?
@@ -625,6 +641,103 @@ mod tests {
             0,
         )?;
         assert!(evaluated.verdict.is_allowed());
+        Ok(())
+    }
+
+    #[test]
+    fn a_durable_stop_survives_reopening_the_authority_and_denies_evaluation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use chio_kernel::stop::{
+            ResumeCommand, StopAuthorizer, StopCommand, StopEpochId, StopRequestPath,
+        };
+        let dir = tempfile::tempdir()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o700))?;
+        }
+        let authority_database = dir.path().join("authority.db");
+        let authority_locks = dir.path().join("authority-locks");
+        let mut lock_root_builder = std::fs::DirBuilder::new();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::DirBuilderExt;
+            lock_root_builder.mode(0o700);
+        }
+        lock_root_builder.create(&authority_locks)?;
+        chio_store_sqlite::SqliteAuthorityStore::provision(&authority_database, &authority_locks)?;
+        let clock = chio_security_types::clock::FixedClock::new(1_800_000_000);
+        let open = || -> Result<DurableAdmissionStores, Box<dyn std::error::Error>> {
+            let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+                &authority_database,
+                &authority_locks,
+                Arc::new(clock),
+            )?;
+            Ok(DurableAdmissionStores::serving(&authority))
+        };
+        let authorizer = || StopAuthorizer::shared_credential("api-protect-test");
+        {
+            let durable = open()?;
+            let stopped = durable.stop.stop(StopCommand {
+                reason: "incident".into(),
+                authorizer: authorizer(),
+                requested_via: StopRequestPath::OfflineCli,
+                allow_containment: false,
+            })?;
+            assert_eq!(stopped.durability, "durable");
+        }
+
+        let durable = open()?;
+        assert!(durable.stop.status().stopped);
+        let receipt_store: Arc<dyn chio_kernel::ReceiptStore> = Arc::new(
+            chio_store_sqlite::SqliteReceiptStore::open(dir.path().join("receipts.db"))?,
+        );
+        let revocation_store: Arc<dyn chio_kernel::RevocationStore> = Arc::new(
+            chio_store_sqlite::SqliteRevocationStore::open(dir.path().join("revocations.db"))?,
+        );
+        let evaluator = RequestEvaluator::new_with_durable_stores_and_admission(
+            registered_test_routes(),
+            Keypair::generate(),
+            chio_core_types::sha256_hex(b"test-policy"),
+            Arc::new(chio_kernel::InMemoryApprovalStore::new()),
+            Vec::new(),
+            Some(receipt_store),
+            Some(revocation_store),
+            Some(durable),
+            false,
+            Arc::new(clock),
+        )?
+        .with_anonymous_reads(true);
+        let evaluate = || {
+            evaluator.evaluate(
+                HttpMethod::Get,
+                "/pets",
+                &HashMap::new(),
+                &HashMap::new(),
+                None,
+                0,
+            )
+        };
+        assert!(matches!(
+            evaluate(),
+            Err(crate::error::ProtectError::Evaluation(reason))
+                if reason == chio_kernel::EMERGENCY_STOP_DENY_REASON
+        ));
+
+        let head = evaluator
+            .stop_control()
+            .status()
+            .head
+            .ok_or("stopped head")?;
+        evaluator.stop_control().resume(ResumeCommand {
+            expected_epoch: Some(StopEpochId {
+                chain_generation: head.chain_generation,
+                epoch: head.epoch,
+            }),
+            authorizer: authorizer(),
+            requested_via: StopRequestPath::OfflineCli,
+        })?;
+        assert!(evaluate()?.verdict.is_allowed());
         Ok(())
     }
 

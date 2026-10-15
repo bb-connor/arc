@@ -30,6 +30,9 @@ mod control_auth;
 #[path = "tests/control_containment.rs"]
 mod control_containment;
 
+#[path = "tests/stop_routes.rs"]
+mod stop_routes;
+
 use control_auth::{with_authenticated_control_peer, with_peer_addr, TEST_CONTROL_TOKEN};
 
 const PETSTORE_YAML: &str = r#"
@@ -225,6 +228,7 @@ fn test_state_with_receipt_db(
         .test_unwrap();
     Arc::new(ProxyState {
         clock: clock::ProxyClock::default(),
+        stop: evaluator.stop_control().clone(),
         evaluator,
         signer_keypair: keypair,
         upstream,

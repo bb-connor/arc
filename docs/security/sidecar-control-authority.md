@@ -32,7 +32,7 @@ operator does not need peer-address metadata.
 
 The gate covers all `/approvals` routes, both capability mint paths, capability
 release, validation and attenuation, operator receipt submission, reconciliation,
-and metrics. It runs before body decoding or store mutation. Reconciliation and
+metrics, and the emergency stop, resume and status routes. It runs before body decoding or store mutation. Reconciliation and
 the other control routes use the same gate. Denials retain HTTP 403 and
 `chio_control_forbidden`, with no credential values in the response or gate log.
 
@@ -134,7 +134,7 @@ default sidecar's mediated threshold execution remains disabled.
 
 ## Regression boundary
 
-`proxy::tests::control_auth` exercises the production Axum router across 18
+`proxy::tests::control_auth` exercises the production Axum router across 23
 control routes. It covers IPv4 and IPv6 loopback, unknown and remote peers,
 configuration failure, malformed and duplicate headers, forwarded-localhost
 spoofing, denial before decoding, unchanged pending/resolved approval state,

@@ -71,12 +71,7 @@ pub(super) fn open_durable_admission(
         &database, &lock_root, clock,
     )
     .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
-    Ok(DurableAdmissionStores {
-        store: Arc::new(authority.admission_operation_store()),
-        outcome_store: Arc::new(authority.tool_outcome_store()),
-        fence: authority.mutation_fence(),
-        budget_store: Arc::new(authority.budget_store()),
-    })
+    Ok(DurableAdmissionStores::serving(&authority))
 }
 
 /// Drain window for the proxy serve site, derived from the configured upstream
@@ -124,6 +119,8 @@ pub(crate) struct ToolReceiptLog {
 pub(crate) struct ProxyState {
     pub(crate) clock: clock::ProxyClock,
     pub(crate) evaluator: RequestEvaluator,
+    /// The stop control every kernel of this sidecar enforces.
+    pub(crate) stop: chio_kernel::stop::StopControl,
     pub(crate) signer_keypair: Keypair,
     pub(crate) upstream: String,
     pub(crate) http_client: reqwest::Client,
@@ -511,6 +508,7 @@ impl ProtectProxy {
         )
         .map_err(|error| ProtectError::Config(error.to_string()))?;
         let evaluator = evaluator.with_anonymous_reads(self.config.allow_anonymous_reads);
+        let stop = evaluator.stop_control().clone();
         let receipt_backend = evaluator.receipt_backend();
         let revocation_backend = evaluator.revocation_backend();
 
@@ -609,6 +607,7 @@ impl ProtectProxy {
                     payment_adapter,
                     Arc::new(clock.clone()),
                 )?;
+                kernel.set_stop_control(stop.clone());
                 if let Some(store) = revocation_store.as_ref() {
                     for capability_id in &revoked_capability_ids {
                         store
@@ -660,6 +659,7 @@ impl ProtectProxy {
 
         let state = Arc::new(ProxyState {
             clock,
+            stop,
             evaluator,
             signer_keypair: keypair,
             upstream: self.config.upstream.clone(),

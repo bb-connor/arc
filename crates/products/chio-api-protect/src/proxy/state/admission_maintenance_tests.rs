@@ -236,12 +236,7 @@ impl Fixture {
                 Arc::new(clock.clone()),
             )?,
         );
-        let durable = DurableAdmissionStores {
-            store: Arc::new(authority.admission_operation_store()),
-            outcome_store: Arc::new(authority.tool_outcome_store()),
-            fence: authority.mutation_fence(),
-            budget_store: Arc::new(authority.budget_store()),
-        };
+        let durable = DurableAdmissionStores::serving(&authority);
         let budget = durable.budget_store.clone();
         let signer = Keypair::from_seed(&[27; 32]);
         let trace = Arc::new(RailTrace::default());
@@ -291,6 +286,7 @@ impl Fixture {
         let contract = default_upstream_egress_contract("http://127.0.0.1:1")?;
         let state = Arc::new(ProxyState {
             clock,
+            stop: chio_kernel::stop::StopControl::process_local(),
             evaluator: RequestEvaluator::new_ephemeral_with_approval_store(
                 Vec::new(),
                 signer.clone(),

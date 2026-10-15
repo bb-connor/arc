@@ -94,6 +94,8 @@ mod sidecar;
 mod spec_authority;
 #[path = "proxy/state.rs"]
 mod state;
+#[path = "proxy/stop_routes.rs"]
+mod stop_routes;
 use request_ids::*;
 
 pub(crate) use self::approval::*;
@@ -110,6 +112,7 @@ pub(crate) use self::router::*;
 pub(crate) use self::scope_subset::*;
 pub(crate) use self::sidecar::*;
 pub(crate) use self::state::*;
+pub(crate) use self::stop_routes::*;
 
 pub use self::config::{ProtectConfig, DEFAULT_UPSTREAM_REQUEST_TIMEOUT};
 pub use self::state::ProtectProxy;

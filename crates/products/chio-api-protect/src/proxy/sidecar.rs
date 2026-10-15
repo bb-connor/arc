@@ -211,6 +211,9 @@ pub(crate) async fn sidecar_mint_handler(
     {
         return response;
     }
+    if state.stop.heads().is_stopped() {
+        return stopped_refusal();
+    }
     let (_parts, body) = request.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {
         Ok(bytes) => bytes,
@@ -513,6 +516,9 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
         require_sidecar_control_request(&request, state.sidecar_control_token.as_deref())
     {
         return response;
+    }
+    if state.stop.heads().is_stopped() {
+        return stopped_refusal();
     }
     let (_parts, body) = request.into_parts();
     let body_bytes = match axum::body::to_bytes(body, 1024 * 1024).await {

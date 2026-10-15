@@ -28,6 +28,9 @@ Every kernel a host constructs binds the same `StopHeads`:
   it attaches, before startup reconciliation runs;
 - the hosted MCP edge (`chio mcp serve-http`) binds one `StopControl` to every
   session kernel, whether or not durable admission is enabled;
+- the api-protect sidecar binds one `StopControl` to its HTTP authority kernel
+  and its mediation kernel, durable over the sidecar's admission authority when
+  a receipt database is configured;
 - a process host binds the one kernel it serves.
 
 A stop through any kernel or control surface of a host therefore reaches every
@@ -69,6 +72,12 @@ denial is a signed deny receipt whose identity disposition is `reusable` and
 whose `retryable_after_resume` is `true`: the same request id may be retried
 after resume.
 
+The api-protect sidecar's capability mint routes (`/v1/capabilities/mint` and
+`/v1/capabilities`) sign outside the kernel; they read the same heads and refuse
+with HTTP 503 and `kernel_stopped` while stopped. Its proxy path answers a
+request the stopped kernel refuses the same way, after the kernel signs the
+deny receipt.
+
 The recovery sweep, at startup and on each periodic batch, leaves a returned
 (`Finalizing`) operation untouched while a stop is in force: its output stays
 in durable custody, no recovery deferral is recorded, and a sweep or a replay
@@ -82,6 +91,7 @@ status on every control surface reports these operations as
 | Surface | Credential | Recorded authorizer |
 |---|---|---|
 | `POST /admin/emergency-stop`, `POST /admin/emergency-resume`, `GET /admin/emergency-status` on `chio mcp serve-http` | admin bearer token, compared in constant time | `SharedCredential` for `hosted-mcp:admin-token` |
+| `POST /chio/emergency-stop`, `POST /chio/emergency-resume`, `GET /chio/emergency-status` on the api-protect sidecar | sidecar control token, compared in constant time | `SharedCredential` for `api-protect:sidecar-control-token` |
 | process-host control socket (`control.sock` in the host state directory) | peer uid equal to the host's, plus the per-start `control.token` | `SharedCredential` for `process-host:control-socket` |
 | `chio process stop`, `resume`, `stop-status` | uses the control socket when the host serves; otherwise takes the host lease and appends offline | as above, or `process-host:offline-cli` |
 
@@ -97,6 +107,7 @@ in force:
 - tier-2 predicates inside the dispatch-commit and release transactions;
 - the stop-intent journal and the signing obligation, so a stop whose commit
   fails holds only in the process;
-- mounted routes on trust control and the api-protect sidecar, and stop checks
-  on issuance paths outside the kernel;
+- mounted routes on trust control, and stop checks on issuance paths outside
+  the kernel other than the api-protect sidecar's capability mint routes, which
+  refuse while stopped;
 - tenant and recovery scopes, restrict and relax, and two-person resume.
