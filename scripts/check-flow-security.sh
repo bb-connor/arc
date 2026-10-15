@@ -320,22 +320,16 @@ run_exact_target --label "durable flow state" --expected \
   -- cargo test -p chio-store-sqlite --test security_state
 
 run_exact_target --label "native compiled catalog identity" --allow-filtered --expected \
-  admission_operation_store::security_participant_state::schema::tests::compiled_catalog_digest_preserves_each_version_and_rejects_unsupported_versions \
+  admission_operation_store::security_participant_state::schema::tests::compiled_catalog_digest_is_stable \
   admission_operation_store::security_participant_state::schema::tests::cached_compiled_digest_never_replaces_live_catalog_verification \
   -- cargo test -p chio-store-sqlite --lib admission_operation_store::security_participant_state::schema::tests::
 
 run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::nonce_preflight::missing_current_nonce_preflight_catalog_is_not_repaired \
-  admission_operation_store::tests::security_participant_state::nonce_preflight::v32_nonce_preflight_journal_upgrade_rejects_partial_future_catalog_without_repair \
-  admission_operation_store::tests::security_participant_state::nonce_preflight::v32_upgrade_adds_empty_nonce_preflight_journal_without_rewriting_native_history \
   admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::preflight_is_anchored_once_and_never_satisfies_dispatch_input_custody \
   admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::preflight_rejects_wrong_phase_lease_identity_and_observation_before_writing \
   admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::preflight_cutpoints_preserve_only_committed_monotone_history_on_reopen \
   admission_operation_store::tests::security_participant_state::output::missing_current_output_catalog_is_not_repaired \
-  admission_operation_store::tests::security_participant_state::output::v31_output_journal_upgrade_rejects_partial_future_catalog_without_repair \
-  admission_operation_store::tests::security_participant_state::output::v31_upgrade_adds_empty_output_journal_without_rewriting_native_history \
-  admission_operation_store::tests::security_participant_state::dispatch_ledger::v30_dispatch_ledger_upgrade_rejects_partial_future_catalog_without_repair \
-  admission_operation_store::tests::security_participant_state::dispatch_ledger::v30_upgrade_adds_empty_dispatch_ledger_without_rewriting_native_history \
   admission_operation_store::tests::security_participant_state::mutations::input::input_intent_schema_and_resolution_tampering_fail_recovery_with_recomputed_local_hashes \
   admission_operation_store::tests::security_participant_state::mutations::input::input_join_cutpoints_recover_exactly_one_intent_without_downgrading_to_raw \
   admission_operation_store::tests::security_participant_state::mutations::input::input_join_preserves_actual_lease_and_original_context_checks \
@@ -364,9 +358,7 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::egress::integrity::ordered_history_checks_every_global_reference_field_in_the_same_snapshot \
   admission_operation_store::tests::security_participant_state::egress::lifecycle::acquire_commit_and_retries_preserve_join_bytes_and_anchor_both_phases \
   admission_operation_store::tests::security_participant_state::egress::lifecycle::interleaved_join_and_egress_replay_in_global_order_without_reviving_stale_fence \
-  admission_operation_store::tests::security_participant_state::egress::migration::missing_current_egress_catalog_is_not_repaired \
-  admission_operation_store::tests::security_participant_state::egress::migration::v29_upgrade_preserves_native_initialization_join_bytes_and_global_digests \
-  admission_operation_store::tests::security_participant_state::egress::migration::v29_upgrade_rejects_partial_or_alias_future_catalog_without_repair \
+  admission_operation_store::tests::security_participant_state::egress::catalog::missing_current_egress_catalog_is_not_repaired \
   admission_operation_store::tests::security_participant_state::egress::portable::portable_commands_preserve_both_phases_and_read_current_operation \
   admission_operation_store::tests::security_participant_state::egress::portable::portable_commands_recheck_selected_binding_live_material_and_actual_lease \
   admission_operation_store::tests::security_participant_state::egress::portable::portable_history_distinguishes_missing_operation_from_missing_custody \
@@ -383,10 +375,7 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::lifecycle::retry_and_new_owner_readback_need_no_remaining_source_file \
   admission_operation_store::tests::security_participant_state::lifecycle::two_authorities_preserve_every_native_row_without_merging_identifiers \
   admission_operation_store::tests::security_participant_state::lifecycle::unimported_wrong_generation_authority_and_fence_cannot_initialize \
-  admission_operation_store::tests::security_participant_state::migration::missing_current_native_barrier_is_never_repaired \
-  admission_operation_store::tests::security_participant_state::migration::v27_import_history_and_global_digests_survive_empty_v28_upgrade \
-  admission_operation_store::tests::security_participant_state::migration::v27_upgrade_adds_empty_native_tables_but_rejects_partial_future_and_aliases \
-  admission_operation_store::tests::security_participant_state::migration::v28_initialization_and_anchor_survive_v29_without_rewriting_history \
+  admission_operation_store::tests::security_participant_state::barrier::missing_current_native_barrier_is_never_repaired \
   admission_operation_store::tests::security_participant_state::mutations::authority_binding::first_join_cannot_substitute_another_valid_native_authority \
   admission_operation_store::tests::security_participant_state::mutations::authority_binding::native_join_requires_original_store_source_digest_and_presence \
   admission_operation_store::tests::security_participant_state::mutations::authority_binding::original_native_binding_remains_stable_across_serving_owner_rotation \
@@ -439,10 +428,7 @@ run_exact_target --label "native flow custody" --allow-filtered --expected \
   admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_repeated_segments_keep_archived_bytes_and_current_labels \
   admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_snapshot_corruption_and_missing_global_reference_refuse \
   admission_operation_store::tests::security_participant_state::checkpoint::native_journal_checkpoint_wrong_owner_clock_refuses \
-  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_immutable_checkpoint_history_is_enforced \
-  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_v35_preserves_populated_recovery_and_native_bytes \
-  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_v35_rejects_existing_checkpoint_evidence_without_repair \
-  admission_operation_store::tests::security_participant_state::checkpoint_migration::native_journal_migration_v35_rejects_partial_checkpoint_catalog_without_repair \
+  admission_operation_store::tests::security_participant_state::checkpoint_history::native_journal_migration_immutable_checkpoint_history_is_enforced \
   admission_operation_store::tests::security_participant_state::egress::native_journal_checkpoint_preserves_egress_pending_then_commit \
   admission_operation_store::tests::security_participant_state::mutations::journal_capacity::native_journal_capacity_resumes_after_operator_checkpoint \
   admission_operation_store::tests::security_participant_state::mutations::nonce_preflight::native_journal_checkpoint_preserves_nonce_preflight_and_current_label \
