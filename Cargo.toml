@@ -18,6 +18,7 @@ members = [
     # Portable active-defense security
     "crates/security/chio-security-types",
     "crates/security/chio-flow",
+    "crates/security/chio-semantic-contracts",
     "crates/security/chio-decoy",
     "crates/security/chio-quarantine",
     "crates/security/chio-keyring",
@@ -594,6 +595,7 @@ chio-selective-disclosure = { version = "=0.1.0", path = "crates/trust/chio-sele
 chio-settle = { version = "=0.1.0", path = "crates/economy/chio-settle" }
 chio-security-types = { version = "=0.1.0", path = "crates/security/chio-security-types" }
 chio-security-kernel = { version = "=0.1.0", path = "crates/security/chio-security-kernel" }
+chio-semantic-contracts = { version = "=0.1.0", path = "crates/security/chio-semantic-contracts" }
 chio-active-response-authority = { version = "=0.1.0", path = "crates/security/chio-active-response-authority" }
 chio-secure-ipc = { version = "=0.1.0", path = "crates/security/chio-secure-ipc" }
 chio-secret-broker = { version = "=0.1.0", path = "crates/security/chio-secret-broker" }

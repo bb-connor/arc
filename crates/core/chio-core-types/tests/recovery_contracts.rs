@@ -7,6 +7,7 @@ use chio_core_types::{
 use chio_security_types::recovery::{
     ContractError, RecoveryObservationV1, RecoveryProfileRequirementsV1, RecoveryTrajectoryV1,
 };
+use chio_semantic_contracts::{DependencyGraphV1, EffectContractV1};
 use serde::Deserialize;
 use serde_json::Value;
 use std::path::PathBuf;
@@ -49,6 +50,10 @@ fn shared_negative_recovery_vectors() -> Result {
             "trajectory" => {
                 decode_contract::<RecoveryTrajectoryV1>(vector.wire.as_bytes()).map(|_| ())
             }
+            "effect_contract" => {
+                decode_contract::<EffectContractV1>(vector.wire.as_bytes()).map(|_| ())
+            }
+            "graph" => decode_contract::<DependencyGraphV1>(vector.wire.as_bytes()).map(|_| ()),
             _ => return Err("unknown fixture contract".into()),
         };
         assert_eq!(result.is_ok(), vector.valid, "{}: {result:?}", vector.name);
@@ -69,7 +74,13 @@ fn schemas_share_structural_vectors_with_typed_reader() -> Result {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../../spec/schemas/chio-wire/v1/recovery");
     let mut resources = Vec::new();
-    for name in ["observation", "profile-requirements", "trajectory"] {
+    for name in [
+        "observation",
+        "profile-requirements",
+        "effect-contract",
+        "dependency-graph",
+        "trajectory",
+    ] {
         let schema: Value =
             serde_json::from_slice(&std::fs::read(root.join(format!("{name}.schema.json")))?)?;
         let id = schema["$id"]
@@ -87,6 +98,8 @@ fn schemas_share_structural_vectors_with_typed_reader() -> Result {
     for vector in corpus.vectors {
         let name = match vector.contract.as_str() {
             "profile" => "profile-requirements",
+            "effect_contract" => "effect-contract",
+            "graph" => "dependency-graph",
             name => name,
         };
         let schema: Value =

@@ -56376,6 +56376,1243 @@ pub mod recovery_decision_report_view {
         }
     }
 }
+pub mod recovery_dependency_graph {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`OpaqueId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OpaqueId(::std::string::String);
+    impl ::std::ops::Deref for OpaqueId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OpaqueId> for ::std::string::String {
+        fn from(value: OpaqueId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OpaqueId> for OpaqueId {
+        fn from(value: &OpaqueId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OpaqueId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OpaqueId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Operation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "native_admission_digest",
+    ///    "operation_id",
+    ///    "operation_version"
+    ///  ],
+    ///  "properties": {
+    ///    "native_admission_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "operation_version": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Operation {
+        pub native_admission_digest: RecoveryDigest32,
+        pub operation_id: OpaqueId,
+        pub operation_version: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Operation> for Operation {
+        fn from(value: &Operation) -> Self {
+            value.clone()
+        }
+    }
+    ///Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/dependency-graph.schema.json",
+    ///  "title": "Recovery dependency graph V1",
+    ///  "description": "Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "nodes",
+    ///    "schema",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "nodes": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "dependencies",
+    ///          "estimated_cost_units",
+    ///          "step_id",
+    ///          "template_id"
+    ///        ],
+    ///        "properties": {
+    ///          "dependencies": {
+    ///            "type": "array",
+    ///            "items": {
+    ///              "type": "string",
+    ///              "not": {
+    ///                "pattern": "[\\r\\n]"
+    ///              },
+    ///              "maxLength": 128,
+    ///              "minLength": 1,
+    ///              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///            },
+    ///            "maxItems": 16,
+    ///            "uniqueItems": true
+    ///          },
+    ///          "estimated_cost_units": {
+    ///            "type": "integer",
+    ///            "maximum": 9007199254740991.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "step_id": {
+    ///            "type": "string",
+    ///            "not": {
+    ///              "pattern": "[\\r\\n]"
+    ///            },
+    ///            "maxLength": 128,
+    ///            "minLength": 1,
+    ///            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///          },
+    ///          "template_id": {
+    ///            "type": "string",
+    ///            "not": {
+    ///              "pattern": "[\\r\\n]"
+    ///            },
+    ///            "maxLength": 128,
+    ///            "minLength": 1,
+    ///            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 16,
+    ///      "minItems": 1
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.recovery.dependency-graph.v1"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryDependencyGraphV1 {
+        pub nodes: ::std::vec::Vec<RecoveryDependencyGraphV1NodesItem>,
+        pub schema: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryDependencyGraphV1> for RecoveryDependencyGraphV1 {
+        fn from(value: &RecoveryDependencyGraphV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryDependencyGraphV1NodesItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "dependencies",
+    ///    "estimated_cost_units",
+    ///    "step_id",
+    ///    "template_id"
+    ///  ],
+    ///  "properties": {
+    ///    "dependencies": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "not": {
+    ///          "pattern": "[\\r\\n]"
+    ///        },
+    ///        "maxLength": 128,
+    ///        "minLength": 1,
+    ///        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///      },
+    ///      "maxItems": 16,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "estimated_cost_units": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 0.0
+    ///    },
+    ///    "step_id": {
+    ///      "type": "string",
+    ///      "not": {
+    ///        "pattern": "[\\r\\n]"
+    ///      },
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///    },
+    ///    "template_id": {
+    ///      "type": "string",
+    ///      "not": {
+    ///        "pattern": "[\\r\\n]"
+    ///      },
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryDependencyGraphV1NodesItem {
+        pub dependencies: Vec<RecoveryDependencyGraphV1NodesItemDependenciesItem>,
+        pub estimated_cost_units: i64,
+        pub step_id: RecoveryDependencyGraphV1NodesItemStepId,
+        pub template_id: RecoveryDependencyGraphV1NodesItemTemplateId,
+    }
+    impl ::std::convert::From<&RecoveryDependencyGraphV1NodesItem>
+        for RecoveryDependencyGraphV1NodesItem
+    {
+        fn from(value: &RecoveryDependencyGraphV1NodesItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryDependencyGraphV1NodesItemDependenciesItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RecoveryDependencyGraphV1NodesItemDependenciesItem(::std::string::String);
+    impl ::std::ops::Deref for RecoveryDependencyGraphV1NodesItemDependenciesItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDependencyGraphV1NodesItemDependenciesItem>
+        for ::std::string::String
+    {
+        fn from(value: RecoveryDependencyGraphV1NodesItemDependenciesItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDependencyGraphV1NodesItemDependenciesItem>
+        for RecoveryDependencyGraphV1NodesItemDependenciesItem
+    {
+        fn from(value: &RecoveryDependencyGraphV1NodesItemDependenciesItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RecoveryDependencyGraphV1NodesItemDependenciesItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RecoveryDependencyGraphV1NodesItemDependenciesItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for RecoveryDependencyGraphV1NodesItemDependenciesItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for RecoveryDependencyGraphV1NodesItemDependenciesItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RecoveryDependencyGraphV1NodesItemDependenciesItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`RecoveryDependencyGraphV1NodesItemStepId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RecoveryDependencyGraphV1NodesItemStepId(::std::string::String);
+    impl ::std::ops::Deref for RecoveryDependencyGraphV1NodesItemStepId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDependencyGraphV1NodesItemStepId> for ::std::string::String {
+        fn from(value: RecoveryDependencyGraphV1NodesItemStepId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDependencyGraphV1NodesItemStepId>
+        for RecoveryDependencyGraphV1NodesItemStepId
+    {
+        fn from(value: &RecoveryDependencyGraphV1NodesItemStepId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RecoveryDependencyGraphV1NodesItemStepId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RecoveryDependencyGraphV1NodesItemStepId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RecoveryDependencyGraphV1NodesItemStepId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RecoveryDependencyGraphV1NodesItemStepId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RecoveryDependencyGraphV1NodesItemStepId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`RecoveryDependencyGraphV1NodesItemTemplateId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RecoveryDependencyGraphV1NodesItemTemplateId(::std::string::String);
+    impl ::std::ops::Deref for RecoveryDependencyGraphV1NodesItemTemplateId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDependencyGraphV1NodesItemTemplateId> for ::std::string::String {
+        fn from(value: RecoveryDependencyGraphV1NodesItemTemplateId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDependencyGraphV1NodesItemTemplateId>
+        for RecoveryDependencyGraphV1NodesItemTemplateId
+    {
+        fn from(value: &RecoveryDependencyGraphV1NodesItemTemplateId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RecoveryDependencyGraphV1NodesItemTemplateId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RecoveryDependencyGraphV1NodesItemTemplateId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for RecoveryDependencyGraphV1NodesItemTemplateId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for RecoveryDependencyGraphV1NodesItemTemplateId
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RecoveryDependencyGraphV1NodesItemTemplateId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`RecoveryDigest32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery digest32",
+    ///  "type": "array",
+    ///  "items": {
+    ///    "title": "Recovery digest octet",
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct RecoveryDigest32(pub [u8; 32usize]);
+    impl ::std::ops::Deref for RecoveryDigest32 {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDigest32> for [u8; 32usize] {
+        fn from(value: RecoveryDigest32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDigest32> for RecoveryDigest32 {
+        fn from(value: &RecoveryDigest32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`RecoveryEffectAdmissionUnresolvedV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect admission unresolved V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "admission_intent",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "admission_intent": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "kind": {
+    ///      "const": "admission_unresolved"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAdmissionUnresolvedV1 {
+        pub admission_intent: OpaqueId,
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryEffectAdmissionUnresolvedV1>
+        for RecoveryEffectAdmissionUnresolvedV1
+    {
+        fn from(value: &RecoveryEffectAdmissionUnresolvedV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectAwaitingApprovalV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect awaiting approval V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "awaiting_approval"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAwaitingApprovalV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectAwaitingApprovalV1> for RecoveryEffectAwaitingApprovalV1 {
+        fn from(value: &RecoveryEffectAwaitingApprovalV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectAwaitingCallerReportV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect awaiting caller report V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "awaiting_caller_report"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAwaitingCallerReportV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectAwaitingCallerReportV1>
+        for RecoveryEffectAwaitingCallerReportV1
+    {
+        fn from(value: &RecoveryEffectAwaitingCallerReportV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectClosedBeforeEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect closed before effect V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "closure",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "closure": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "kind": {
+    ///      "const": "closed_before_effect"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectClosedBeforeEffectV1 {
+        pub closure: OpaqueId,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectClosedBeforeEffectV1>
+        for RecoveryEffectClosedBeforeEffectV1
+    {
+        fn from(value: &RecoveryEffectClosedBeforeEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectCompleteV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect complete V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effect_count",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "effect_count": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "kind": {
+    ///      "const": "complete"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectCompleteV1 {
+        pub effect_count: SafeInteger,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectCompleteV1> for RecoveryEffectCompleteV1 {
+        fn from(value: &RecoveryEffectCompleteV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectFailedAfterEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect failed after effect V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applied_effects",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "applied_effects": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "kind": {
+    ///      "const": "failed_after_effect"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectFailedAfterEffectV1 {
+        pub applied_effects: ::std::num::NonZeroU64,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectFailedAfterEffectV1>
+        for RecoveryEffectFailedAfterEffectV1
+    {
+        fn from(value: &RecoveryEffectFailedAfterEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectInFlightV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect in flight V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "in_flight"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectInFlightV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectInFlightV1> for RecoveryEffectInFlightV1 {
+        fn from(value: &RecoveryEffectInFlightV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectNeverAdmittedV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect never admitted V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "never_admitted"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectNeverAdmittedV1 {
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryEffectNeverAdmittedV1> for RecoveryEffectNeverAdmittedV1 {
+        fn from(value: &RecoveryEffectNeverAdmittedV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectPartialV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect partial V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applied_effects",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "applied_effects": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "kind": {
+    ///      "const": "partial"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectPartialV1 {
+        pub applied_effects: ::std::num::NonZeroU64,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectPartialV1> for RecoveryEffectPartialV1 {
+        fn from(value: &RecoveryEffectPartialV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectUnknownV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect unknown V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "unknown"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectUnknownV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectUnknownV1> for RecoveryEffectUnknownV1 {
+        fn from(value: &RecoveryEffectUnknownV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RefusalCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "invalid_evidence",
+    ///    "unsupported_profile",
+    ///    "stale_basis",
+    ///    "revoked",
+    ///    "expired",
+    ///    "budget_unavailable",
+    ///    "unknown_effect",
+    ///    "audience_denied",
+    ///    "resource_exhausted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RefusalCode {
+        #[serde(rename = "invalid_evidence")]
+        InvalidEvidence,
+        #[serde(rename = "unsupported_profile")]
+        UnsupportedProfile,
+        #[serde(rename = "stale_basis")]
+        StaleBasis,
+        #[serde(rename = "revoked")]
+        Revoked,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "budget_unavailable")]
+        BudgetUnavailable,
+        #[serde(rename = "unknown_effect")]
+        UnknownEffect,
+        #[serde(rename = "audience_denied")]
+        AudienceDenied,
+        #[serde(rename = "resource_exhausted")]
+        ResourceExhausted,
+    }
+    impl ::std::convert::From<&Self> for RefusalCode {
+        fn from(value: &RefusalCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RefusalCode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::InvalidEvidence => f.write_str("invalid_evidence"),
+                Self::UnsupportedProfile => f.write_str("unsupported_profile"),
+                Self::StaleBasis => f.write_str("stale_basis"),
+                Self::Revoked => f.write_str("revoked"),
+                Self::Expired => f.write_str("expired"),
+                Self::BudgetUnavailable => f.write_str("budget_unavailable"),
+                Self::UnknownEffect => f.write_str("unknown_effect"),
+                Self::AudienceDenied => f.write_str("audience_denied"),
+                Self::ResourceExhausted => f.write_str("resource_exhausted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RefusalCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "invalid_evidence" => Ok(Self::InvalidEvidence),
+                "unsupported_profile" => Ok(Self::UnsupportedProfile),
+                "stale_basis" => Ok(Self::StaleBasis),
+                "revoked" => Ok(Self::Revoked),
+                "expired" => Ok(Self::Expired),
+                "budget_unavailable" => Ok(Self::BudgetUnavailable),
+                "unknown_effect" => Ok(Self::UnknownEffect),
+                "audience_denied" => Ok(Self::AudienceDenied),
+                "resource_exhausted" => Ok(Self::ResourceExhausted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Scope`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authority_domain",
+    ///    "process_id",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "authority_domain": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "process_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Scope {
+        pub authority_domain: OpaqueId,
+        pub process_id: OpaqueId,
+        pub tenant_id: OpaqueId,
+    }
+    impl ::std::convert::From<&Scope> for Scope {
+        fn from(value: &Scope) -> Self {
+            value.clone()
+        }
+    }
+}
 pub mod recovery_disclosure_grant {
     /// Error types.
     pub mod error {
@@ -59181,6 +60418,1565 @@ pub mod recovery_disclosure_grant {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for SignedRecoveryGrantSignature {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
+pub mod recovery_effect_contract {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`OpaqueId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OpaqueId(::std::string::String);
+    impl ::std::ops::Deref for OpaqueId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OpaqueId> for ::std::string::String {
+        fn from(value: OpaqueId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OpaqueId> for OpaqueId {
+        fn from(value: &OpaqueId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OpaqueId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OpaqueId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Operation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "native_admission_digest",
+    ///    "operation_id",
+    ///    "operation_version"
+    ///  ],
+    ///  "properties": {
+    ///    "native_admission_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "operation_version": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Operation {
+        pub native_admission_digest: RecoveryDigest32,
+        pub operation_id: OpaqueId,
+        pub operation_version: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Operation> for Operation {
+        fn from(value: &Operation) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryDigest32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery digest32",
+    ///  "type": "array",
+    ///  "items": {
+    ///    "title": "Recovery digest octet",
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct RecoveryDigest32(pub [u8; 32usize]);
+    impl ::std::ops::Deref for RecoveryDigest32 {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDigest32> for [u8; 32usize] {
+        fn from(value: RecoveryDigest32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDigest32> for RecoveryDigest32 {
+        fn from(value: &RecoveryDigest32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`RecoveryEffectAdmissionUnresolvedV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect admission unresolved V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "admission_intent",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "admission_intent": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "kind": {
+    ///      "const": "admission_unresolved"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAdmissionUnresolvedV1 {
+        pub admission_intent: OpaqueId,
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryEffectAdmissionUnresolvedV1>
+        for RecoveryEffectAdmissionUnresolvedV1
+    {
+        fn from(value: &RecoveryEffectAdmissionUnresolvedV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectAwaitingApprovalV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect awaiting approval V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "awaiting_approval"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAwaitingApprovalV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectAwaitingApprovalV1> for RecoveryEffectAwaitingApprovalV1 {
+        fn from(value: &RecoveryEffectAwaitingApprovalV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectAwaitingCallerReportV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect awaiting caller report V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "awaiting_caller_report"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAwaitingCallerReportV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectAwaitingCallerReportV1>
+        for RecoveryEffectAwaitingCallerReportV1
+    {
+        fn from(value: &RecoveryEffectAwaitingCallerReportV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectClosedBeforeEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect closed before effect V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "closure",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "closure": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "kind": {
+    ///      "const": "closed_before_effect"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectClosedBeforeEffectV1 {
+        pub closure: OpaqueId,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectClosedBeforeEffectV1>
+        for RecoveryEffectClosedBeforeEffectV1
+    {
+        fn from(value: &RecoveryEffectClosedBeforeEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectCompleteV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect complete V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effect_count",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "effect_count": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "kind": {
+    ///      "const": "complete"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectCompleteV1 {
+        pub effect_count: SafeInteger,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectCompleteV1> for RecoveryEffectCompleteV1 {
+        fn from(value: &RecoveryEffectCompleteV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectFailedAfterEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect failed after effect V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applied_effects",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "applied_effects": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "kind": {
+    ///      "const": "failed_after_effect"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectFailedAfterEffectV1 {
+        pub applied_effects: ::std::num::NonZeroU64,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectFailedAfterEffectV1>
+        for RecoveryEffectFailedAfterEffectV1
+    {
+        fn from(value: &RecoveryEffectFailedAfterEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectInFlightV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect in flight V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "in_flight"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectInFlightV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectInFlightV1> for RecoveryEffectInFlightV1 {
+        fn from(value: &RecoveryEffectInFlightV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectNeverAdmittedV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect never admitted V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "never_admitted"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectNeverAdmittedV1 {
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryEffectNeverAdmittedV1> for RecoveryEffectNeverAdmittedV1 {
+        fn from(value: &RecoveryEffectNeverAdmittedV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectPartialV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect partial V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applied_effects",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "applied_effects": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "kind": {
+    ///      "const": "partial"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectPartialV1 {
+        pub applied_effects: ::std::num::NonZeroU64,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectPartialV1> for RecoveryEffectPartialV1 {
+        fn from(value: &RecoveryEffectPartialV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectUnknownV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect unknown V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "unknown"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectUnknownV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectUnknownV1> for RecoveryEffectUnknownV1 {
+        fn from(value: &RecoveryEffectUnknownV1) -> Self {
+            value.clone()
+        }
+    }
+    ///Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery profile requirements V1",
+    ///  "description": "Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "attachment_profile",
+    ///    "deployment_digest",
+    ///    "protocol_version",
+    ///    "required_features",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "attachment_profile": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "ordinary",
+    ///        "operation_owned_nonce"
+    ///      ]
+    ///    },
+    ///    "deployment_digest": {
+    ///      "title": "Recovery digest32",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "title": "Recovery digest octet",
+    ///        "type": "integer",
+    ///        "maximum": 255.0,
+    ///        "minimum": 0.0
+    ///      },
+    ///      "maxItems": 32,
+    ///      "minItems": 32
+    ///    },
+    ///    "protocol_version": {
+    ///      "const": 1
+    ///    },
+    ///    "required_features": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "enum": [
+    ///          "native_capture",
+    ///          "recovery_bound_grant",
+    ///          "exact_request_custody",
+    ///          "current_audience",
+    ///          "operation_owned_nonce"
+    ///        ]
+    ///      },
+    ///      "maxItems": 5,
+    ///      "minItems": 4,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.recovery.profile-requirements.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryProfileRequirementsV1 {
+        pub attachment_profile: RecoveryProfileRequirementsV1AttachmentProfile,
+        pub deployment_digest: [u8; 32usize],
+        pub protocol_version: ::serde_json::Value,
+        pub required_features: Vec<RecoveryProfileRequirementsV1RequiredFeaturesItem>,
+        pub schema: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryProfileRequirementsV1> for RecoveryProfileRequirementsV1 {
+        fn from(value: &RecoveryProfileRequirementsV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryProfileRequirementsV1AttachmentProfile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "ordinary",
+    ///    "operation_owned_nonce"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RecoveryProfileRequirementsV1AttachmentProfile {
+        #[serde(rename = "ordinary")]
+        Ordinary,
+        #[serde(rename = "operation_owned_nonce")]
+        OperationOwnedNonce,
+    }
+    impl ::std::convert::From<&Self> for RecoveryProfileRequirementsV1AttachmentProfile {
+        fn from(value: &RecoveryProfileRequirementsV1AttachmentProfile) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RecoveryProfileRequirementsV1AttachmentProfile {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Ordinary => f.write_str("ordinary"),
+                Self::OperationOwnedNonce => f.write_str("operation_owned_nonce"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RecoveryProfileRequirementsV1AttachmentProfile {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "ordinary" => Ok(Self::Ordinary),
+                "operation_owned_nonce" => Ok(Self::OperationOwnedNonce),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RecoveryProfileRequirementsV1AttachmentProfile {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for RecoveryProfileRequirementsV1AttachmentProfile
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for RecoveryProfileRequirementsV1AttachmentProfile
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`RecoveryProfileRequirementsV1RequiredFeaturesItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "native_capture",
+    ///    "recovery_bound_grant",
+    ///    "exact_request_custody",
+    ///    "current_audience",
+    ///    "operation_owned_nonce"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RecoveryProfileRequirementsV1RequiredFeaturesItem {
+        #[serde(rename = "native_capture")]
+        NativeCapture,
+        #[serde(rename = "recovery_bound_grant")]
+        RecoveryBoundGrant,
+        #[serde(rename = "exact_request_custody")]
+        ExactRequestCustody,
+        #[serde(rename = "current_audience")]
+        CurrentAudience,
+        #[serde(rename = "operation_owned_nonce")]
+        OperationOwnedNonce,
+    }
+    impl ::std::convert::From<&Self> for RecoveryProfileRequirementsV1RequiredFeaturesItem {
+        fn from(value: &RecoveryProfileRequirementsV1RequiredFeaturesItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RecoveryProfileRequirementsV1RequiredFeaturesItem {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::NativeCapture => f.write_str("native_capture"),
+                Self::RecoveryBoundGrant => f.write_str("recovery_bound_grant"),
+                Self::ExactRequestCustody => f.write_str("exact_request_custody"),
+                Self::CurrentAudience => f.write_str("current_audience"),
+                Self::OperationOwnedNonce => f.write_str("operation_owned_nonce"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RecoveryProfileRequirementsV1RequiredFeaturesItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "native_capture" => Ok(Self::NativeCapture),
+                "recovery_bound_grant" => Ok(Self::RecoveryBoundGrant),
+                "exact_request_custody" => Ok(Self::ExactRequestCustody),
+                "current_audience" => Ok(Self::CurrentAudience),
+                "operation_owned_nonce" => Ok(Self::OperationOwnedNonce),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RecoveryProfileRequirementsV1RequiredFeaturesItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for RecoveryProfileRequirementsV1RequiredFeaturesItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for RecoveryProfileRequirementsV1RequiredFeaturesItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`RefusalCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "invalid_evidence",
+    ///    "unsupported_profile",
+    ///    "stale_basis",
+    ///    "revoked",
+    ///    "expired",
+    ///    "budget_unavailable",
+    ///    "unknown_effect",
+    ///    "audience_denied",
+    ///    "resource_exhausted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RefusalCode {
+        #[serde(rename = "invalid_evidence")]
+        InvalidEvidence,
+        #[serde(rename = "unsupported_profile")]
+        UnsupportedProfile,
+        #[serde(rename = "stale_basis")]
+        StaleBasis,
+        #[serde(rename = "revoked")]
+        Revoked,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "budget_unavailable")]
+        BudgetUnavailable,
+        #[serde(rename = "unknown_effect")]
+        UnknownEffect,
+        #[serde(rename = "audience_denied")]
+        AudienceDenied,
+        #[serde(rename = "resource_exhausted")]
+        ResourceExhausted,
+    }
+    impl ::std::convert::From<&Self> for RefusalCode {
+        fn from(value: &RefusalCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RefusalCode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::InvalidEvidence => f.write_str("invalid_evidence"),
+                Self::UnsupportedProfile => f.write_str("unsupported_profile"),
+                Self::StaleBasis => f.write_str("stale_basis"),
+                Self::Revoked => f.write_str("revoked"),
+                Self::Expired => f.write_str("expired"),
+                Self::BudgetUnavailable => f.write_str("budget_unavailable"),
+                Self::UnknownEffect => f.write_str("unknown_effect"),
+                Self::AudienceDenied => f.write_str("audience_denied"),
+                Self::ResourceExhausted => f.write_str("resource_exhausted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RefusalCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "invalid_evidence" => Ok(Self::InvalidEvidence),
+                "unsupported_profile" => Ok(Self::UnsupportedProfile),
+                "stale_basis" => Ok(Self::StaleBasis),
+                "revoked" => Ok(Self::Revoked),
+                "expired" => Ok(Self::Expired),
+                "budget_unavailable" => Ok(Self::BudgetUnavailable),
+                "unknown_effect" => Ok(Self::UnknownEffect),
+                "audience_denied" => Ok(Self::AudienceDenied),
+                "resource_exhausted" => Ok(Self::ResourceExhausted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Scope`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authority_domain",
+    ///    "process_id",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "authority_domain": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "process_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Scope {
+        pub authority_domain: OpaqueId,
+        pub process_id: OpaqueId,
+        pub tenant_id: OpaqueId,
+    }
+    impl ::std::convert::From<&Scope> for Scope {
+        fn from(value: &Scope) -> Self {
+            value.clone()
+        }
+    }
+    ///`SemanticEffectContractV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/effect-contract.schema.json",
+    ///  "title": "Semantic effect contract V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "account_id",
+    ///    "deduplication",
+    ///    "effect_cardinality",
+    ///    "lookup_finality",
+    ///    "partial_settlement",
+    ///    "provider_id",
+    ///    "recovery_profile",
+    ///    "resource_id",
+    ///    "schema",
+    ///    "submission_identity",
+    ///    "transport_retry",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "account_id": {
+    ///      "type": "string",
+    ///      "not": {
+    ///        "pattern": "[\\r\\n]"
+    ///      },
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///    },
+    ///    "deduplication": {
+    ///      "const": "not_assumed"
+    ///    },
+    ///    "effect_cardinality": {
+    ///      "type": "integer",
+    ///      "maximum": 16.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "lookup_finality": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "unavailable",
+    ///        "exact_operation_authoritative_final"
+    ///      ]
+    ///    },
+    ///    "partial_settlement": {
+    ///      "const": "preserve_spent_identity"
+    ///    },
+    ///    "provider_id": {
+    ///      "type": "string",
+    ///      "not": {
+    ///        "pattern": "[\\r\\n]"
+    ///      },
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///    },
+    ///    "recovery_profile": {
+    ///      "title": "Recovery profile requirements V1",
+    ///      "description": "Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.",
+    ///      "type": "object",
+    ///      "required": [
+    ///        "attachment_profile",
+    ///        "deployment_digest",
+    ///        "protocol_version",
+    ///        "required_features",
+    ///        "schema"
+    ///      ],
+    ///      "properties": {
+    ///        "attachment_profile": {
+    ///          "type": "string",
+    ///          "enum": [
+    ///            "ordinary",
+    ///            "operation_owned_nonce"
+    ///          ]
+    ///        },
+    ///        "deployment_digest": {
+    ///          "title": "Recovery digest32",
+    ///          "type": "array",
+    ///          "items": {
+    ///            "title": "Recovery digest octet",
+    ///            "type": "integer",
+    ///            "maximum": 255.0,
+    ///            "minimum": 0.0
+    ///          },
+    ///          "maxItems": 32,
+    ///          "minItems": 32
+    ///        },
+    ///        "protocol_version": {
+    ///          "const": 1
+    ///        },
+    ///        "required_features": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "type": "string",
+    ///            "enum": [
+    ///              "native_capture",
+    ///              "recovery_bound_grant",
+    ///              "exact_request_custody",
+    ///              "current_audience",
+    ///              "operation_owned_nonce"
+    ///            ]
+    ///          },
+    ///          "maxItems": 5,
+    ///          "minItems": 4,
+    ///          "uniqueItems": true
+    ///        },
+    ///        "schema": {
+    ///          "const": "chio.recovery.profile-requirements.v1"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "resource_id": {
+    ///      "type": "string",
+    ///      "not": {
+    ///        "pattern": "[\\r\\n]"
+    ///      },
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.semantic.effect-contract.v1"
+    ///    },
+    ///    "submission_identity": {
+    ///      "const": "original_native_operation"
+    ///    },
+    ///    "transport_retry": {
+    ///      "const": "no_automatic_retries"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SemanticEffectContractV1 {
+        pub account_id: SemanticEffectContractV1AccountId,
+        pub deduplication: ::serde_json::Value,
+        pub effect_cardinality: ::std::num::NonZeroU64,
+        pub lookup_finality: SemanticEffectContractV1LookupFinality,
+        pub partial_settlement: ::serde_json::Value,
+        pub provider_id: SemanticEffectContractV1ProviderId,
+        pub recovery_profile: RecoveryProfileRequirementsV1,
+        pub resource_id: SemanticEffectContractV1ResourceId,
+        pub schema: ::serde_json::Value,
+        pub submission_identity: ::serde_json::Value,
+        pub transport_retry: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&SemanticEffectContractV1> for SemanticEffectContractV1 {
+        fn from(value: &SemanticEffectContractV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`SemanticEffectContractV1AccountId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SemanticEffectContractV1AccountId(::std::string::String);
+    impl ::std::ops::Deref for SemanticEffectContractV1AccountId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SemanticEffectContractV1AccountId> for ::std::string::String {
+        fn from(value: SemanticEffectContractV1AccountId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SemanticEffectContractV1AccountId>
+        for SemanticEffectContractV1AccountId
+    {
+        fn from(value: &SemanticEffectContractV1AccountId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SemanticEffectContractV1AccountId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SemanticEffectContractV1AccountId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SemanticEffectContractV1AccountId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SemanticEffectContractV1AccountId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SemanticEffectContractV1AccountId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SemanticEffectContractV1LookupFinality`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "unavailable",
+    ///    "exact_operation_authoritative_final"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum SemanticEffectContractV1LookupFinality {
+        #[serde(rename = "unavailable")]
+        Unavailable,
+        #[serde(rename = "exact_operation_authoritative_final")]
+        ExactOperationAuthoritativeFinal,
+    }
+    impl ::std::convert::From<&Self> for SemanticEffectContractV1LookupFinality {
+        fn from(value: &SemanticEffectContractV1LookupFinality) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for SemanticEffectContractV1LookupFinality {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Unavailable => f.write_str("unavailable"),
+                Self::ExactOperationAuthoritativeFinal => {
+                    f.write_str("exact_operation_authoritative_final")
+                }
+            }
+        }
+    }
+    impl ::std::str::FromStr for SemanticEffectContractV1LookupFinality {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "unavailable" => Ok(Self::Unavailable),
+                "exact_operation_authoritative_final" => Ok(Self::ExactOperationAuthoritativeFinal),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SemanticEffectContractV1LookupFinality {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SemanticEffectContractV1LookupFinality {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SemanticEffectContractV1LookupFinality {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`SemanticEffectContractV1ProviderId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SemanticEffectContractV1ProviderId(::std::string::String);
+    impl ::std::ops::Deref for SemanticEffectContractV1ProviderId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SemanticEffectContractV1ProviderId> for ::std::string::String {
+        fn from(value: SemanticEffectContractV1ProviderId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SemanticEffectContractV1ProviderId>
+        for SemanticEffectContractV1ProviderId
+    {
+        fn from(value: &SemanticEffectContractV1ProviderId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SemanticEffectContractV1ProviderId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SemanticEffectContractV1ProviderId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SemanticEffectContractV1ProviderId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SemanticEffectContractV1ProviderId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SemanticEffectContractV1ProviderId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SemanticEffectContractV1ResourceId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SemanticEffectContractV1ResourceId(::std::string::String);
+    impl ::std::ops::Deref for SemanticEffectContractV1ResourceId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SemanticEffectContractV1ResourceId> for ::std::string::String {
+        fn from(value: SemanticEffectContractV1ResourceId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SemanticEffectContractV1ResourceId>
+        for SemanticEffectContractV1ResourceId
+    {
+        fn from(value: &SemanticEffectContractV1ResourceId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SemanticEffectContractV1ResourceId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SemanticEffectContractV1ResourceId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SemanticEffectContractV1ResourceId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SemanticEffectContractV1ResourceId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SemanticEffectContractV1ResourceId {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -68729,1054 +71525,6 @@ pub mod recovery_policy_maintenance_view {
     impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
         fn from(value: [u8; 32usize]) -> Self {
             Self(value)
-        }
-    }
-    ///`SafeInteger`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "integer",
-    ///  "maximum": 9007199254740991.0,
-    ///  "minimum": 0.0
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct SafeInteger(pub i64);
-    impl ::std::ops::Deref for SafeInteger {
-        type Target = i64;
-        fn deref(&self) -> &i64 {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<SafeInteger> for i64 {
-        fn from(value: SafeInteger) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&SafeInteger> for SafeInteger {
-        fn from(value: &SafeInteger) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::From<i64> for SafeInteger {
-        fn from(value: i64) -> Self {
-            Self(value)
-        }
-    }
-    impl ::std::str::FromStr for SafeInteger {
-        type Err = <i64 as ::std::str::FromStr>::Err;
-        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
-            Ok(Self(value.parse()?))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for SafeInteger {
-        type Error = <i64 as ::std::str::FromStr>::Err;
-        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&String> for SafeInteger {
-        type Error = <i64 as ::std::str::FromStr>::Err;
-        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<String> for SafeInteger {
-        type Error = <i64 as ::std::str::FromStr>::Err;
-        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
-            value.parse()
-        }
-    }
-    impl ::std::fmt::Display for SafeInteger {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            self.0.fmt(f)
-        }
-    }
-    ///`Scope`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "authority_domain",
-    ///    "process_id",
-    ///    "tenant_id"
-    ///  ],
-    ///  "properties": {
-    ///    "authority_domain": {
-    ///      "$ref": "#/$defs/opaqueId"
-    ///    },
-    ///    "process_id": {
-    ///      "$ref": "#/$defs/opaqueId"
-    ///    },
-    ///    "tenant_id": {
-    ///      "$ref": "#/$defs/opaqueId"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Scope {
-        pub authority_domain: OpaqueId,
-        pub process_id: OpaqueId,
-        pub tenant_id: OpaqueId,
-    }
-    impl ::std::convert::From<&Scope> for Scope {
-        fn from(value: &Scope) -> Self {
-            value.clone()
-        }
-    }
-}
-pub mod recovery_profile_requirements {
-    /// Error types.
-    pub mod error {
-        /// Error from a `TryFrom` or `FromStr` implementation.
-        pub struct ConversionError(::std::borrow::Cow<'static, str>);
-        impl ::std::error::Error for ConversionError {}
-        impl ::std::fmt::Display for ConversionError {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
-                ::std::fmt::Display::fmt(&self.0, f)
-            }
-        }
-        impl ::std::fmt::Debug for ConversionError {
-            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
-                ::std::fmt::Debug::fmt(&self.0, f)
-            }
-        }
-        impl From<&'static str> for ConversionError {
-            fn from(value: &'static str) -> Self {
-                Self(value.into())
-            }
-        }
-        impl From<String> for ConversionError {
-            fn from(value: String) -> Self {
-                Self(value.into())
-            }
-        }
-    }
-    ///`OpaqueId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "not": {
-    ///    "pattern": "[\\r\\n]"
-    ///  },
-    ///  "maxLength": 128,
-    ///  "minLength": 1,
-    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct OpaqueId(::std::string::String);
-    impl ::std::ops::Deref for OpaqueId {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<OpaqueId> for ::std::string::String {
-        fn from(value: OpaqueId) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&OpaqueId> for OpaqueId {
-        fn from(value: &OpaqueId) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for OpaqueId {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 128usize {
-                return Err("longer than 128 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for OpaqueId {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for OpaqueId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for OpaqueId {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for OpaqueId {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`Operation`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "object",
-    ///  "required": [
-    ///    "native_admission_digest",
-    ///    "operation_id",
-    ///    "operation_version"
-    ///  ],
-    ///  "properties": {
-    ///    "native_admission_digest": {
-    ///      "$ref": "#/$defs/recoveryDigest32"
-    ///    },
-    ///    "operation_id": {
-    ///      "$ref": "#/$defs/opaqueId"
-    ///    },
-    ///    "operation_version": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 1.0
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct Operation {
-        pub native_admission_digest: RecoveryDigest32,
-        pub operation_id: OpaqueId,
-        pub operation_version: ::std::num::NonZeroU64,
-    }
-    impl ::std::convert::From<&Operation> for Operation {
-        fn from(value: &Operation) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryDigest32`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery digest32",
-    ///  "type": "array",
-    ///  "items": {
-    ///    "title": "Recovery digest octet",
-    ///    "type": "integer",
-    ///    "maximum": 255.0,
-    ///    "minimum": 0.0
-    ///  },
-    ///  "maxItems": 32,
-    ///  "minItems": 32
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(transparent)]
-    pub struct RecoveryDigest32(pub [u8; 32usize]);
-    impl ::std::ops::Deref for RecoveryDigest32 {
-        type Target = [u8; 32usize];
-        fn deref(&self) -> &[u8; 32usize] {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<RecoveryDigest32> for [u8; 32usize] {
-        fn from(value: RecoveryDigest32) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&RecoveryDigest32> for RecoveryDigest32 {
-        fn from(value: &RecoveryDigest32) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
-        fn from(value: [u8; 32usize]) -> Self {
-            Self(value)
-        }
-    }
-    ///`RecoveryEffectAdmissionUnresolvedV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect admission unresolved V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "admission_intent",
-    ///    "kind"
-    ///  ],
-    ///  "properties": {
-    ///    "admission_intent": {
-    ///      "$ref": "#/$defs/opaqueId"
-    ///    },
-    ///    "kind": {
-    ///      "const": "admission_unresolved"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectAdmissionUnresolvedV1 {
-        pub admission_intent: OpaqueId,
-        pub kind: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&RecoveryEffectAdmissionUnresolvedV1>
-        for RecoveryEffectAdmissionUnresolvedV1
-    {
-        fn from(value: &RecoveryEffectAdmissionUnresolvedV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectAwaitingApprovalV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect awaiting approval V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "awaiting_approval"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectAwaitingApprovalV1 {
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectAwaitingApprovalV1> for RecoveryEffectAwaitingApprovalV1 {
-        fn from(value: &RecoveryEffectAwaitingApprovalV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectAwaitingCallerReportV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect awaiting caller report V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "awaiting_caller_report"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectAwaitingCallerReportV1 {
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectAwaitingCallerReportV1>
-        for RecoveryEffectAwaitingCallerReportV1
-    {
-        fn from(value: &RecoveryEffectAwaitingCallerReportV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectClosedBeforeEffectV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect closed before effect V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "closure",
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "closure": {
-    ///      "$ref": "#/$defs/opaqueId"
-    ///    },
-    ///    "kind": {
-    ///      "const": "closed_before_effect"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectClosedBeforeEffectV1 {
-        pub closure: OpaqueId,
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectClosedBeforeEffectV1>
-        for RecoveryEffectClosedBeforeEffectV1
-    {
-        fn from(value: &RecoveryEffectClosedBeforeEffectV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectCompleteV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect complete V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "effect_count",
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "effect_count": {
-    ///      "$ref": "#/$defs/safeInteger"
-    ///    },
-    ///    "kind": {
-    ///      "const": "complete"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectCompleteV1 {
-        pub effect_count: SafeInteger,
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectCompleteV1> for RecoveryEffectCompleteV1 {
-        fn from(value: &RecoveryEffectCompleteV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectFailedAfterEffectV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect failed after effect V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "applied_effects",
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "applied_effects": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 1.0
-    ///    },
-    ///    "kind": {
-    ///      "const": "failed_after_effect"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectFailedAfterEffectV1 {
-        pub applied_effects: ::std::num::NonZeroU64,
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectFailedAfterEffectV1>
-        for RecoveryEffectFailedAfterEffectV1
-    {
-        fn from(value: &RecoveryEffectFailedAfterEffectV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectInFlightV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect in flight V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "in_flight"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectInFlightV1 {
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectInFlightV1> for RecoveryEffectInFlightV1 {
-        fn from(value: &RecoveryEffectInFlightV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectNeverAdmittedV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect never admitted V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "never_admitted"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectNeverAdmittedV1 {
-        pub kind: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&RecoveryEffectNeverAdmittedV1> for RecoveryEffectNeverAdmittedV1 {
-        fn from(value: &RecoveryEffectNeverAdmittedV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectPartialV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect partial V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "applied_effects",
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "applied_effects": {
-    ///      "type": "integer",
-    ///      "maximum": 9007199254740991.0,
-    ///      "minimum": 1.0
-    ///    },
-    ///    "kind": {
-    ///      "const": "partial"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectPartialV1 {
-        pub applied_effects: ::std::num::NonZeroU64,
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectPartialV1> for RecoveryEffectPartialV1 {
-        fn from(value: &RecoveryEffectPartialV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryEffectUnknownV1`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "title": "Recovery effect unknown V1",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "kind",
-    ///    "operation"
-    ///  ],
-    ///  "properties": {
-    ///    "kind": {
-    ///      "const": "unknown"
-    ///    },
-    ///    "operation": {
-    ///      "$ref": "#/$defs/operation"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryEffectUnknownV1 {
-        pub kind: ::serde_json::Value,
-        pub operation: Operation,
-    }
-    impl ::std::convert::From<&RecoveryEffectUnknownV1> for RecoveryEffectUnknownV1 {
-        fn from(value: &RecoveryEffectUnknownV1) -> Self {
-            value.clone()
-        }
-    }
-    ///Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/profile-requirements.schema.json",
-    ///  "title": "Recovery profile requirements V1",
-    ///  "description": "Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.",
-    ///  "type": "object",
-    ///  "required": [
-    ///    "attachment_profile",
-    ///    "deployment_digest",
-    ///    "protocol_version",
-    ///    "required_features",
-    ///    "schema"
-    ///  ],
-    ///  "properties": {
-    ///    "attachment_profile": {
-    ///      "type": "string",
-    ///      "enum": [
-    ///        "ordinary",
-    ///        "operation_owned_nonce"
-    ///      ]
-    ///    },
-    ///    "deployment_digest": {
-    ///      "title": "Recovery digest32",
-    ///      "type": "array",
-    ///      "items": {
-    ///        "title": "Recovery digest octet",
-    ///        "type": "integer",
-    ///        "maximum": 255.0,
-    ///        "minimum": 0.0
-    ///      },
-    ///      "maxItems": 32,
-    ///      "minItems": 32
-    ///    },
-    ///    "protocol_version": {
-    ///      "const": 1
-    ///    },
-    ///    "required_features": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "type": "string",
-    ///        "enum": [
-    ///          "native_capture",
-    ///          "recovery_bound_grant",
-    ///          "exact_request_custody",
-    ///          "current_audience",
-    ///          "operation_owned_nonce"
-    ///        ]
-    ///      },
-    ///      "maxItems": 5,
-    ///      "minItems": 4,
-    ///      "uniqueItems": true
-    ///    },
-    ///    "schema": {
-    ///      "const": "chio.recovery.profile-requirements.v1"
-    ///    }
-    ///  },
-    ///  "additionalProperties": false
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
-    #[serde(deny_unknown_fields)]
-    pub struct RecoveryProfileRequirementsV1 {
-        pub attachment_profile: RecoveryProfileRequirementsV1AttachmentProfile,
-        pub deployment_digest: [u8; 32usize],
-        pub protocol_version: ::serde_json::Value,
-        pub required_features: Vec<RecoveryProfileRequirementsV1RequiredFeaturesItem>,
-        pub schema: ::serde_json::Value,
-    }
-    impl ::std::convert::From<&RecoveryProfileRequirementsV1> for RecoveryProfileRequirementsV1 {
-        fn from(value: &RecoveryProfileRequirementsV1) -> Self {
-            value.clone()
-        }
-    }
-    ///`RecoveryProfileRequirementsV1AttachmentProfile`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "enum": [
-    ///    "ordinary",
-    ///    "operation_owned_nonce"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum RecoveryProfileRequirementsV1AttachmentProfile {
-        #[serde(rename = "ordinary")]
-        Ordinary,
-        #[serde(rename = "operation_owned_nonce")]
-        OperationOwnedNonce,
-    }
-    impl ::std::convert::From<&Self> for RecoveryProfileRequirementsV1AttachmentProfile {
-        fn from(value: &RecoveryProfileRequirementsV1AttachmentProfile) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for RecoveryProfileRequirementsV1AttachmentProfile {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::Ordinary => f.write_str("ordinary"),
-                Self::OperationOwnedNonce => f.write_str("operation_owned_nonce"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for RecoveryProfileRequirementsV1AttachmentProfile {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "ordinary" => Ok(Self::Ordinary),
-                "operation_owned_nonce" => Ok(Self::OperationOwnedNonce),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RecoveryProfileRequirementsV1AttachmentProfile {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String>
-        for RecoveryProfileRequirementsV1AttachmentProfile
-    {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String>
-        for RecoveryProfileRequirementsV1AttachmentProfile
-    {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///`RecoveryProfileRequirementsV1RequiredFeaturesItem`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "enum": [
-    ///    "native_capture",
-    ///    "recovery_bound_grant",
-    ///    "exact_request_custody",
-    ///    "current_audience",
-    ///    "operation_owned_nonce"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum RecoveryProfileRequirementsV1RequiredFeaturesItem {
-        #[serde(rename = "native_capture")]
-        NativeCapture,
-        #[serde(rename = "recovery_bound_grant")]
-        RecoveryBoundGrant,
-        #[serde(rename = "exact_request_custody")]
-        ExactRequestCustody,
-        #[serde(rename = "current_audience")]
-        CurrentAudience,
-        #[serde(rename = "operation_owned_nonce")]
-        OperationOwnedNonce,
-    }
-    impl ::std::convert::From<&Self> for RecoveryProfileRequirementsV1RequiredFeaturesItem {
-        fn from(value: &RecoveryProfileRequirementsV1RequiredFeaturesItem) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for RecoveryProfileRequirementsV1RequiredFeaturesItem {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::NativeCapture => f.write_str("native_capture"),
-                Self::RecoveryBoundGrant => f.write_str("recovery_bound_grant"),
-                Self::ExactRequestCustody => f.write_str("exact_request_custody"),
-                Self::CurrentAudience => f.write_str("current_audience"),
-                Self::OperationOwnedNonce => f.write_str("operation_owned_nonce"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for RecoveryProfileRequirementsV1RequiredFeaturesItem {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "native_capture" => Ok(Self::NativeCapture),
-                "recovery_bound_grant" => Ok(Self::RecoveryBoundGrant),
-                "exact_request_custody" => Ok(Self::ExactRequestCustody),
-                "current_audience" => Ok(Self::CurrentAudience),
-                "operation_owned_nonce" => Ok(Self::OperationOwnedNonce),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RecoveryProfileRequirementsV1RequiredFeaturesItem {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String>
-        for RecoveryProfileRequirementsV1RequiredFeaturesItem
-    {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String>
-        for RecoveryProfileRequirementsV1RequiredFeaturesItem
-    {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///`RefusalCode`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "enum": [
-    ///    "invalid_evidence",
-    ///    "unsupported_profile",
-    ///    "stale_basis",
-    ///    "revoked",
-    ///    "expired",
-    ///    "budget_unavailable",
-    ///    "unknown_effect",
-    ///    "audience_denied",
-    ///    "resource_exhausted"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum RefusalCode {
-        #[serde(rename = "invalid_evidence")]
-        InvalidEvidence,
-        #[serde(rename = "unsupported_profile")]
-        UnsupportedProfile,
-        #[serde(rename = "stale_basis")]
-        StaleBasis,
-        #[serde(rename = "revoked")]
-        Revoked,
-        #[serde(rename = "expired")]
-        Expired,
-        #[serde(rename = "budget_unavailable")]
-        BudgetUnavailable,
-        #[serde(rename = "unknown_effect")]
-        UnknownEffect,
-        #[serde(rename = "audience_denied")]
-        AudienceDenied,
-        #[serde(rename = "resource_exhausted")]
-        ResourceExhausted,
-    }
-    impl ::std::convert::From<&Self> for RefusalCode {
-        fn from(value: &RefusalCode) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for RefusalCode {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::InvalidEvidence => f.write_str("invalid_evidence"),
-                Self::UnsupportedProfile => f.write_str("unsupported_profile"),
-                Self::StaleBasis => f.write_str("stale_basis"),
-                Self::Revoked => f.write_str("revoked"),
-                Self::Expired => f.write_str("expired"),
-                Self::BudgetUnavailable => f.write_str("budget_unavailable"),
-                Self::UnknownEffect => f.write_str("unknown_effect"),
-                Self::AudienceDenied => f.write_str("audience_denied"),
-                Self::ResourceExhausted => f.write_str("resource_exhausted"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for RefusalCode {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "invalid_evidence" => Ok(Self::InvalidEvidence),
-                "unsupported_profile" => Ok(Self::UnsupportedProfile),
-                "stale_basis" => Ok(Self::StaleBasis),
-                "revoked" => Ok(Self::Revoked),
-                "expired" => Ok(Self::Expired),
-                "budget_unavailable" => Ok(Self::BudgetUnavailable),
-                "unknown_effect" => Ok(Self::UnknownEffect),
-                "audience_denied" => Ok(Self::AudienceDenied),
-                "resource_exhausted" => Ok(Self::ResourceExhausted),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RefusalCode {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for RefusalCode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for RefusalCode {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
         }
     }
     ///`SafeInteger`

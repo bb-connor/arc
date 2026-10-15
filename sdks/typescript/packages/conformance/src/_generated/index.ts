@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: a91416f117069c492d7bf982e8715fc66f18f4caaa87159845e387f2d40a0468
+// Schema SHA: 4779cd24377347decc62d09f64d0b58bc529b83dfd0c7e99dbf5c21f299a23f7
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -6568,6 +6568,10119 @@ export namespace Recovery_DecisionReport {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/dependency-graph.schema.json
+export namespace Recovery_DependencyGraph {
+  /**
+   * Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+   */
+  export interface RecoveryDependencyGraphV1 {
+    schema: "chio.recovery.dependency-graph.v1";
+    version: 1;
+    /**
+     * @minItems 1
+     * @maxItems 16
+     */
+    nodes:
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ]
+      | [
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          },
+          {
+            step_id: string;
+            template_id: string;
+            /**
+             * @maxItems 16
+             */
+            dependencies:
+              | []
+              | [string]
+              | [string, string]
+              | [string, string, string]
+              | [string, string, string, string]
+              | [string, string, string, string, string]
+              | [string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string]
+              | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ]
+              | [
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string,
+                  string
+                ];
+            estimated_cost_units: number;
+          }
+        ];
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/recovery/disclosure-grant.schema.json
 export namespace Recovery_DisclosureGrant {
   export type DisclosureGrant =
@@ -6737,6 +16850,152 @@ export namespace Recovery_DisclosureGrant {
     output_disposition: RecoveryDigest32;
     coverage_digest: RecoveryDigest32;
     isolation_epoch: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/recovery/effect-contract.schema.json
+export namespace Recovery_EffectContract {
+  /**
+   * Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.
+   */
+  export type RecoveryProfileRequirementsV1 = {
+    required_features?: {
+      [k: string]: unknown;
+    };
+  } & {
+    [k: string]: unknown;
+  } & {
+    protocol_version: 1;
+    deployment_digest: RecoveryDigest32;
+    attachment_profile: "ordinary" | "operation_owned_nonce";
+    /**
+     * @minItems 4
+     * @maxItems 5
+     */
+    required_features:
+      | [
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          )
+        ]
+      | [
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          ),
+          (
+            | "native_capture"
+            | "recovery_bound_grant"
+            | "exact_request_custody"
+            | "current_audience"
+            | "operation_owned_nonce"
+          )
+        ];
+    schema: "chio.recovery.profile-requirements.v1";
+  };
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type RecoveryDigest32 = [
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet
+  ];
+  export type RecoveryDigestOctet = number;
+
+  export interface SemanticEffectContractV1 {
+    schema: "chio.semantic.effect-contract.v1";
+    version: 1;
+    provider_id: string;
+    account_id: string;
+    resource_id: string;
+    effect_cardinality: number;
+    submission_identity: "original_native_operation";
+    transport_retry: "no_automatic_retries";
+    deduplication: "not_assumed";
+    lookup_finality: "unavailable" | "exact_operation_authoritative_final";
+    partial_settlement: "preserve_spent_identity";
+    recovery_profile: RecoveryProfileRequirementsV1;
   }
 }
 

@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 7d1a577dfa902333b9180308cd18f5856ced96180ba1fde1790a466714faa08c
+// Schema content SHA-256: 5256e0f1072b5f2ba07ef9bcc6fa1e849766536377899c486bd5ef45cc249f0c
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -1282,9 +1282,55 @@ const (
 	RecoveryDecisionReportViewDomainVersionN1 RecoveryDecisionReportViewDomainVersion = 1
 )
 
+// Defines values for RecoveryDependencyGraphSchema.
+const (
+	RecoveryDependencyGraphSchemaChioRecoveryDependencyGraphV1 RecoveryDependencyGraphSchema = "chio.recovery.dependency-graph.v1"
+)
+
+// Defines values for RecoveryDependencyGraphVersion.
+const (
+	RecoveryDependencyGraphVersionN1 RecoveryDependencyGraphVersion = 1
+)
+
 // Defines values for RecoveryDisclosureGrant1Kind.
 const (
 	RecoveryDisclosureGrant1KindRecovery RecoveryDisclosureGrant1Kind = "recovery"
+)
+
+// Defines values for RecoveryEffectContractDeduplication.
+const (
+	RecoveryEffectContractDeduplicationNotAssumed RecoveryEffectContractDeduplication = "not_assumed"
+)
+
+// Defines values for RecoveryEffectContractLookupFinality.
+const (
+	RecoveryEffectContractLookupFinalityExactOperationAuthoritativeFinal RecoveryEffectContractLookupFinality = "exact_operation_authoritative_final"
+	RecoveryEffectContractLookupFinalityUnavailable                      RecoveryEffectContractLookupFinality = "unavailable"
+)
+
+// Defines values for RecoveryEffectContractPartialSettlement.
+const (
+	RecoveryEffectContractPartialSettlementPreserveSpentIdentity RecoveryEffectContractPartialSettlement = "preserve_spent_identity"
+)
+
+// Defines values for RecoveryEffectContractSchema.
+const (
+	RecoveryEffectContractSchemaChioSemanticEffectContractV1 RecoveryEffectContractSchema = "chio.semantic.effect-contract.v1"
+)
+
+// Defines values for RecoveryEffectContractSubmissionIdentity.
+const (
+	RecoveryEffectContractSubmissionIdentityOriginalNativeOperation RecoveryEffectContractSubmissionIdentity = "original_native_operation"
+)
+
+// Defines values for RecoveryEffectContractTransportRetry.
+const (
+	RecoveryEffectContractTransportRetryNoAutomaticRetries RecoveryEffectContractTransportRetry = "no_automatic_retries"
+)
+
+// Defines values for RecoveryEffectContractVersion.
+const (
+	RecoveryEffectContractVersionN1 RecoveryEffectContractVersion = 1
 )
 
 // Defines values for RecoveryExplanationEvaluationAssessment.
@@ -8142,6 +8188,24 @@ type RecoveryDecisionReportViewScope struct {
 	TenantId        RecoveryDecisionReportViewOpaqueId `json:"tenant_id"`
 }
 
+// RecoveryDependencyGraph Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+type RecoveryDependencyGraph struct {
+	Nodes []struct {
+		Dependencies       []RecoveryObservationOpaqueId  `json:"dependencies"`
+		EstimatedCostUnits RecoveryObservationSafeInteger `json:"estimated_cost_units"`
+		StepId             RecoveryObservationOpaqueId    `json:"step_id"`
+		TemplateId         RecoveryObservationOpaqueId    `json:"template_id"`
+	} `json:"nodes"`
+	Schema  RecoveryDependencyGraphSchema  `json:"schema"`
+	Version RecoveryDependencyGraphVersion `json:"version"`
+}
+
+// RecoveryDependencyGraphSchema defines model for RecoveryDependencyGraph.Schema.
+type RecoveryDependencyGraphSchema string
+
+// RecoveryDependencyGraphVersion defines model for RecoveryDependencyGraph.Version.
+type RecoveryDependencyGraphVersion int64
+
 // RecoveryDisclosureGrant defines model for RecoveryDisclosureGrant.
 type RecoveryDisclosureGrant struct {
 	union json.RawMessage
@@ -8155,6 +8219,45 @@ type RecoveryDisclosureGrant1 struct {
 
 // RecoveryDisclosureGrant1Kind defines model for RecoveryDisclosureGrant.1.Kind.
 type RecoveryDisclosureGrant1Kind string
+
+// RecoveryEffectContract defines model for RecoveryEffectContract.
+type RecoveryEffectContract struct {
+	AccountId         RecoveryObservationOpaqueId             `json:"account_id"`
+	Deduplication     RecoveryEffectContractDeduplication     `json:"deduplication"`
+	EffectCardinality int64                                   `json:"effect_cardinality"`
+	LookupFinality    RecoveryEffectContractLookupFinality    `json:"lookup_finality"`
+	PartialSettlement RecoveryEffectContractPartialSettlement `json:"partial_settlement"`
+	ProviderId        RecoveryObservationOpaqueId             `json:"provider_id"`
+
+	// RecoveryProfile Operator requirements. Canonical feature order follows the listed vocabulary and is checked by Rust. A matching inventory is not live enforcement qualification.
+	RecoveryProfile    RecoveryProfileRequirements              `json:"recovery_profile"`
+	ResourceId         RecoveryObservationOpaqueId              `json:"resource_id"`
+	Schema             RecoveryEffectContractSchema             `json:"schema"`
+	SubmissionIdentity RecoveryEffectContractSubmissionIdentity `json:"submission_identity"`
+	TransportRetry     RecoveryEffectContractTransportRetry     `json:"transport_retry"`
+	Version            RecoveryEffectContractVersion            `json:"version"`
+}
+
+// RecoveryEffectContractDeduplication defines model for RecoveryEffectContract.Deduplication.
+type RecoveryEffectContractDeduplication string
+
+// RecoveryEffectContractLookupFinality defines model for RecoveryEffectContract.LookupFinality.
+type RecoveryEffectContractLookupFinality string
+
+// RecoveryEffectContractPartialSettlement defines model for RecoveryEffectContract.PartialSettlement.
+type RecoveryEffectContractPartialSettlement string
+
+// RecoveryEffectContractSchema defines model for RecoveryEffectContract.Schema.
+type RecoveryEffectContractSchema string
+
+// RecoveryEffectContractSubmissionIdentity defines model for RecoveryEffectContract.SubmissionIdentity.
+type RecoveryEffectContractSubmissionIdentity string
+
+// RecoveryEffectContractTransportRetry defines model for RecoveryEffectContract.TransportRetry.
+type RecoveryEffectContractTransportRetry string
+
+// RecoveryEffectContractVersion defines model for RecoveryEffectContract.Version.
+type RecoveryEffectContractVersion int64
 
 // RecoveryExplanationEvaluation defines model for RecoveryExplanationEvaluation.
 type RecoveryExplanationEvaluation struct {

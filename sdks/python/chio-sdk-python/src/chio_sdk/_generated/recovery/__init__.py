@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 36374ae1d7b7dc22790c1af5565d3c1addac0491ef3b254c573b3f259bd7dd4a
+# Schema sha256: 818babd8dc3bef326a877c05bdad3ccf17e06604c2797a6cd26d97a804eeefdd
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -32,7 +32,9 @@ from .confined_limits_schema import ArtifactInfluence, ArtifactRecipient, Artifa
 from .confined_return_evidence_schema import ArtifactInfluence, ArtifactRecipient, ArtifactReference, ArtifactSink, ArtifactSink13, ArtifactSink14, ArtifactSink15, ConfinedReturnEvidenceV1, ModelContext, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope
 from .decision_report_schema import Decision, DecisionReportV1, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope
 from .decision_report_view_schema import DecisionReportViewV1, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope
+from .dependency_graph_schema import Node, RecoveryDependencyGraphV1
 from .disclosure_grant_schema import DisclosureGrant, DisclosureGrant1
+from .effect_contract_schema import LookupFinality, SemanticEffectContractV1
 from .explanation_evaluation_schema import Assessment, Candidate, DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationEvaluationV1, RefusalCode, SafeInteger, Scope
 from .explanation_report_schema import DestinationId, Limits, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationReportV1, RefusalCode, SafeInteger, Scope
 from .explanation_request_schema import DestinationId, OpaqueId, Operation, RecoveryDigest32, RecoveryDigest32Item, RecoveryEffectAdmissionUnresolvedV1, RecoveryEffectAwaitingApprovalV1, RecoveryEffectAwaitingCallerReportV1, RecoveryEffectClosedBeforeEffectV1, RecoveryEffectCompleteV1, RecoveryEffectFailedAfterEffectV1, RecoveryEffectInFlightV1, RecoveryEffectNeverAdmittedV1, RecoveryEffectPartialV1, RecoveryEffectUnknownV1, RecoveryExplanationRequestV1, RefusalCode, SafeInteger, Scope
@@ -193,8 +195,10 @@ __all__ = [
     "LabeledCheckpointV1",
     "Latency",
     "Limits",
+    "LookupFinality",
     "ModelContext",
     "ModelContextV1",
+    "Node",
     "Obligations",
     "Obligations1",
     "Obligations10",
@@ -225,6 +229,7 @@ __all__ = [
     "RecoveryCommandResponseV1",
     "RecoveryCommandResultV1",
     "RecoveryCommandV1",
+    "RecoveryDependencyGraphV1",
     "RecoveryDigest32",
     "RecoveryDigest32Item",
     "RecoveryEffectAdmissionUnresolvedV1",
@@ -282,6 +287,7 @@ __all__ = [
     "SemanticChannel",
     "SemanticDeploymentV1",
     "SemanticDestination",
+    "SemanticEffectContractV1",
     "SemanticField",
     "SemanticInputVersion",
     "SemanticInvocationV1",

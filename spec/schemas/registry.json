@@ -2733,6 +2733,18 @@
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/profile-requirements.schema.json"
     },
     {
+      "schema": "chio.semantic.effect-contract.v1",
+      "artifactKind": "recovery_effect_contract",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/effect-contract.schema.json"
+    },
+    {
+      "schema": "chio.recovery.dependency-graph.v1",
+      "artifactKind": "recovery_dependency_graph",
+      "introducedBy": "recovery-contracts",
+      "schemaFile": "spec/schemas/chio-wire/v1/recovery/dependency-graph.schema.json"
+    },
+    {
       "schema": "chio.recovery.trajectory.v1",
       "artifactKind": "recovery_trajectory",
       "introducedBy": "recovery-contracts",
