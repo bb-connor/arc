@@ -2685,17 +2685,6 @@ symbol_sha256 = [
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
-rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v30.rs"
-rust_symbols = ["verify_pre_migration_schema"]
-normalized_sha256 = "f67cfc3c503bf213147e092be472ce8ca876d5db091c7ad4395270e29043ff78"
-symbol_sha256 = [
-  { symbol = "verify_pre_migration_schema", sha256 = "cbfb9cde0a3de76751402d5927ae25399d0e371717d851646d5a3bf788e6c974" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/security_state/native_mutation/sql_scope.rs"
 rust_symbols = ["SqlMutationScope::install","SqlMutationScope::finish","SqlMutationScope::clear","SqlMutationScope::drop","authorize","permits_native_table"]
 normalized_sha256 = "bdb25692b76716fa7fdbfe9057f160f5e07c11e16fcf4428e357b8cdc7329199"
@@ -3319,25 +3308,13 @@ symbol_sha256 = [
 model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
-rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v31.rs"
-rust_symbols = ["verify_pre_migration_schema"]
-normalized_sha256 = "2120ef15d0e0a460a57788ef24952097a9b77dcfdca7fdaa3f7c5bce695ddffc"
-symbol_sha256 = [
-  { symbol = "verify_pre_migration_schema", sha256 = "aeac51b99f0d6c6dd75833b94aaf27925a3bbe8c1996bc9f5db7fcbc23034381" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
-rust_symbols = ["initialize_admission_operation_schema","migrate_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "38cb1f2289dc609e642599b36a985d8bb0ad5e700ce4314550c49f43e18d3a66"
+rust_symbols = ["initialize_admission_operation_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
+normalized_sha256 = "600393b5bb22d9506bc3f7006026a05df98baa61a11f481f6ac6d5676b43d79c"
 symbol_sha256 = [
-  { symbol = "initialize_admission_operation_schema", sha256 = "3300140793f096b312bb38b8f914f620cf13e0e75b65ec2fac5c469079e6e69b" },
-  { symbol = "migrate_schema", sha256 = "2d512988a7d8f1923a17186ae73e3b775c26c484b714e9721315d6af35be80e1" },
-  { symbol = "verify_admission_operation_invariants", sha256 = "61209ce2fb9c62468baaf2798089bf6e2d8b48633c4663a17b1e9f97837b1e67" },
-  { symbol = "verify_admission_operation_schema", sha256 = "a668153da33e6b5518dd1de6053bf6e8de089238180a476ccc776ca27db6db5c" },
+  { symbol = "initialize_admission_operation_schema", sha256 = "be897df34155017039d2fada7d28460ce6066a45f80ae52ecf5e601b7dbf890c" },
+  { symbol = "verify_admission_operation_invariants", sha256 = "e63c5397b5640914f9b67ce9bdcf56e624959f1392f8a89de8aad55900bf576e" },
+  { symbol = "verify_admission_operation_schema", sha256 = "de79fa606f610563a0562aed2211835a119a6aa2884d339b24ab66b70cbeab86" },
   { symbol = "admission_operation_schema_catalog", sha256 = "4a8cba51f37d8fc12954a905486130a1e772b734099c64a6ee56cd23a8f239fb" },
 ]
 
@@ -3346,13 +3323,12 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs"
-rust_symbols = ["recorded_version", "digest_version", "expected", "verify_version"]
-normalized_sha256 = "e2353f25f3771a2d1764d463677449624c0c315ce98c9f7706670b631c6774bf"
+rust_symbols = ["digest", "expected", "verify"]
+normalized_sha256 = "21fce605754e281d59adab4f3650f35b2be1e46b5794dd79ff9c40b7f3690768"
 symbol_sha256 = [
-  { symbol = "recorded_version", sha256 = "2c5888e256f2cc2bdd71bf55f74105bad5945fcca331276a52219b735962cbed" },
-  { symbol = "digest_version", sha256 = "7c870a429ee25a6915150d2fc96ddecf7fade1a327d91a8b1b6c21c52240e6d0" },
-  { symbol = "expected", sha256 = "8d0bba92e02cdf38e31e65bf91585b85a95fc1759ab5b7c6194082a05515b886" },
-  { symbol = "verify_version", sha256 = "5f57ebc4e2f4bb9253efdd59a285f66510f338253a22e4ed1cf290f78186a993" },
+  { symbol = "digest", sha256 = "a2c33e6cae31e0a6e236166f5ca591c8cb98f7e55476a8b181a161c6f4ca2ab5" },
+  { symbol = "expected", sha256 = "74c44c0097fcef5ac3883b522806eb529cc4c2bc06b3549438dc48ac3ac08ebf" },
+  { symbol = "verify", sha256 = "3225822038fd4b1bf7976b876d75266a56b474cbacb5f235315650838dd8e37e" },
 ]
 
 [[mirror]]
@@ -3361,9 +3337,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store.rs"
 rust_symbols = ["ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION","SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch"]
-normalized_sha256 = "9ba5296696ff44cb22af7c3350686e93daf99d3635bbd8b728dbfb9ec4c402a1"
+normalized_sha256 = "61eeb78fb075bed6e485ba085df72765340a75b9e6131fb806263674ffd623b3"
 symbol_sha256 = [
-  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "d190b3ba42573786081eaa046c88b5107fa62d27400d585017d2bf62e41307d0" },
+  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "5e1a4cb44621deeb868936ff34547fd86266aceeca20d8caca4dcbd907c1b16d" },
   { symbol = "SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch", sha256 = "deaac50e9990fa4ae3b07274654b432549acbfd8ce86cd2b0a6cd1b4a6fea160" },
 ]
 
@@ -3851,9 +3827,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/nonce_preflight/integrity.rs"
 rust_symbols = ["verify_coverage"]
-normalized_sha256 = "df86e527b71a6134591fb415fd9f771223a7174aa1e93788ab74c72af3a20ecd"
+normalized_sha256 = "ce421f463d1774e750f44d8281667b77a8aa5f8ea5abefb6519b05af28ab6d97"
 symbol_sha256 = [
-  { symbol = "verify_coverage", sha256 = "3eab803a5589820f64bf82d37f83a6bd3c3ef483c65c51117412f49a622a5a88" },
+  { symbol = "verify_coverage", sha256 = "909479a519861e006cdb1613a17b020a843ef4537e066d2eda930b3ee3c75c95" },
 ]
 
 [[mirror]]
@@ -3866,17 +3842,6 @@ normalized_sha256 = "fa9d98c2c06b5d9b606d534be237749486554819ea30ca9e40d0c5f4d2c
 symbol_sha256 = [
   { symbol = "verify_rows", sha256 = "916180e96408fb82116dff55e3d8e905a66cfbfd7a74666ebd9835c935fdaf39" },
   { symbol = "apply_image", sha256 = "eebeed683c70bfec9296b9a4c975a36bd3d4a49e49d44dc9f66c28be5012f070" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
-rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v33.rs"
-rust_symbols = ["verify_pre_migration_schema"]
-normalized_sha256 = "80756d6c2669830b8e9b2be97e396aff9aa5f8713ffb41b5f3d17040f2640f53"
-symbol_sha256 = [
-  { symbol = "verify_pre_migration_schema", sha256 = "76d6b5956b0c20606bc140c2b4a69dcfac4e366c12a5295c25f5dbd4537ac627" },
 ]
 
 [[mirror]]
@@ -4190,7 +4155,7 @@ rust_symbols = [
   "projection_reference",
   "SqliteAdmissionOperationStore::checkpoint_history",
 ]
-normalized_sha256 = "acefbb5f3ca7a05fa0e99d6e0d49e38e1d423e458f26c98c7c8a170dce3f8b3b"
+normalized_sha256 = "f0a1e67b2def979b603eae6349f005f6b46b705aa2e55c6acfbca57bb6d02ef5"
 symbol_sha256 = [
   { symbol = "latest", sha256 = "8bcc883405de49f5006032dc3b69313c6309e7912dec81d7700f53ef07eb9adb" },
   { symbol = "floors", sha256 = "5ef170b97e751b4ef540cae25f77e85a034e0908a76e7f744a4e639864867d52" },
@@ -4198,7 +4163,7 @@ symbol_sha256 = [
   { symbol = "verify_all", sha256 = "5e139baa75ea4902803a1bc58fdd27e8f19d74d81575ec547523e18392f1defb" },
   { symbol = "verify_coverage", sha256 = "2c3a8815af1e9bfc4b221c111a6fed3af553098eabee3c0e69c6f38a5ff241f9" },
   { symbol = "projection_reference", sha256 = "1eaae3b9ecb1178fd24eac46ad6cba7ae5f91fd8740656e58d4f6ea3ec07543b" },
-  { symbol = "SqliteAdmissionOperationStore::checkpoint_history", sha256 = "ec9346f5739815d74007e36c7f167c80b68ee4cd4a9788e4af2ca81fdd1e8c3b" },
+  { symbol = "SqliteAdmissionOperationStore::checkpoint_history", sha256 = "f5d58efc6bf59a394ee90c78071a95f0df02b30ad58783466df2d5f5580e6785" },
 ]
 
 [[mirror]]
@@ -4309,13 +4274,11 @@ relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/checkpoint/schema.rs"
 rust_symbols = [
   "sql",
-  "require_absent",
   "verify_catalog",
 ]
-normalized_sha256 = "311b0243456d1d30d22a1c401358d976459f0667fbc1160b964fd4ce57aa4400"
+normalized_sha256 = "fe667bea4fef4e032dae25b4c65de328c6fa5b14d5b93f723f1a7593eeb26126"
 symbol_sha256 = [
   { symbol = "sql", sha256 = "9b9091a5ef9cc285f4e894be4efeb5ac2e5a7820658d1fd573e573bd75223a3a" },
-  { symbol = "require_absent", sha256 = "248a40cd5afcd392c8fc96246720013db5f7da74e1db1061357cfecbd5db83c6" },
   { symbol = "verify_catalog", sha256 = "9e34e60341d0fb6201e2aa167b15056853ac38df6fc1436659968badf7c47eb2" },
 ]
 
@@ -4392,34 +4355,6 @@ rust_symbols = [
 normalized_sha256 = "72729e456498ac3c613e2c889ab21910524a5acd9c188bb00852ca5aa5ae5d3f"
 symbol_sha256 = [
   { symbol = "verify_stored_terminal_projection_with_history", sha256 = "56f6fd273cf27566f864b68993ae2c647079d0e3d1b078cb61b2e9dd9ecb6b67" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
-rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v35.rs"
-rust_symbols = [
-  "verify_pre_migration_schema",
-  "migrate",
-]
-normalized_sha256 = "c9e8a41ab1d51c0b68c0109b6983276e967b5c0d681a933d694ffc105b1784e1"
-symbol_sha256 = [
-  { symbol = "verify_pre_migration_schema", sha256 = "8cd819816671f83537dd576c1293c14e7338a72bd713f98962b2cb67916de0ff" },
-  { symbol = "migrate", sha256 = "8db0bb2d8b32a392e3bb63f5d0370e1cbba7287a808286f39dcb28c25d02c1e2" },
-]
-
-[[mirror]]
-model_file = "formal/apalache/PostAdmissionDropGuard.tla"
-model_kind = "tla"
-relationship = "abstraction_anchor"
-rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema/migration_v36.rs"
-rust_symbols = [
-  "verify_pre_migration_schema",
-]
-normalized_sha256 = "7480121acf9d52d047011a3e55edfaf657e3e8fc13b1aab64f85293898a7401e"
-symbol_sha256 = [
-  { symbol = "verify_pre_migration_schema", sha256 = "5cb5a1ca79716a79c7adbcded4261728325aeefa60ca3daa4730d1718edba86f" },
 ]
 
 [[mirror]]

@@ -19,8 +19,6 @@ mod faults;
 mod kernel_routes;
 #[path = "claims/lifecycle.rs"]
 mod lifecycle;
-#[path = "claims/migration.rs"]
-pub(super) mod migration;
 #[path = "claims/preflight.rs"]
 mod preflight;
 

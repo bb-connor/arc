@@ -22,8 +22,6 @@ mod cutpoints;
 mod integrity;
 #[path = "governed_approval_replay/lifecycle.rs"]
 mod lifecycle;
-#[path = "governed_approval_replay/migration.rs"]
-mod migration;
 
 const SOURCE_ID: &str = "approval-source";
 const AUTHORITY_ID: &str = "approval-authority";
@@ -200,77 +198,4 @@ fn global_count(fixture: &Fixture) -> i64 {
             row.get(0)
         })
         .expect("global count")
-}
-
-/// Fixture shaping only. Never erase populated security history to downgrade.
-pub(super) fn remove_empty_v22_approval_tables(connection: &Connection) -> rusqlite::Result<()> {
-    remove_empty_v23_claim_tables(connection)?;
-    for table in TABLES {
-        let count: i64 =
-            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(
-            count, 0,
-            "historical fixture must contain no approval history"
-        );
-        connection.execute_batch(&format!("DROP TABLE {table};"))?;
-    }
-    Ok(())
-}
-
-/// Build a real predecessor catalog while preserving all admission history.
-/// Already shaped older catalogs are left intact, never upgraded by a fixture.
-fn remove_empty_v23_claim_tables(connection: &Connection) -> rusqlite::Result<()> {
-    super::dpop_replay::remove_empty_v24_tables(connection)?;
-    connection.execute_batch("PRAGMA foreign_keys = OFF; PRAGMA legacy_alter_table = ON")?;
-    for table in [
-        "governed_approval_replay_claim_releases",
-        "governed_approval_replay_claim_resources",
-        "governed_approval_replay_claim_episodes",
-    ] {
-        let exists: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = ?1)",
-            [table],
-            |row| row.get(0),
-        )?;
-        if !exists {
-            continue;
-        }
-        let count: i64 =
-            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(
-            count, 0,
-            "predecessor fixture cannot discard approval ownership"
-        );
-        connection.execute_batch(&format!("DROP TABLE {table}"))?;
-    }
-    let sql: String = connection.query_row(
-        "SELECT sql FROM sqlite_schema WHERE name = 'admission_operation_commits'",
-        [],
-        |row| row.get(0),
-    )?;
-    if sql.contains("'governed_approval_claim'") {
-        let count: i64 = connection.query_row("SELECT COUNT(*) FROM admission_operation_commits WHERE mutation_kind IN ('governed_approval_claim', 'governed_approval_release')", [], |row| row.get(0))?;
-        assert_eq!(
-            count, 0,
-            "predecessor fixture cannot discard approval commits"
-        );
-        connection.execute_batch(
-            "DROP TRIGGER admission_operation_commits_exact_lease;
-            DROP TRIGGER admission_operation_commits_immutable;
-            DROP TRIGGER admission_operation_commits_no_delete;
-            DROP INDEX admission_operation_commits_operation;
-            ALTER TABLE admission_operation_commits RENAME TO admission_commits_v23_fixture;",
-        )?;
-        let ddl = crate::admission_operation_store::schema::pre_approval_claim_schema_fixture();
-        connection.execute_batch(&ddl)?;
-        connection.execute_batch("DROP TRIGGER admission_operation_commits_exact_lease;
-            INSERT INTO admission_operation_commits SELECT * FROM admission_commits_v23_fixture ORDER BY commit_sequence;
-            DROP TABLE admission_commits_v23_fixture;")?;
-        connection.execute_batch(&ddl)?;
-    }
-    Ok(())
 }

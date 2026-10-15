@@ -7,10 +7,6 @@ use chio_kernel::receipt_store::AdmissionCallerDispatchCapture;
 const PAYLOAD: &[u8] =
     br#"{"schema":"chio.kernel-caller-context-test.v1","value":"private-context"}"#;
 
-fn ready() -> TestResult<NonceFixture> {
-    ready_with_transport("caller-report:test-server")
-}
-
 fn pending() -> TestResult<NonceFixture> {
     pending_with_transport("caller-report:test-server")
 }
@@ -499,104 +495,5 @@ fn caller_context_does_not_bypass_live_nonce_validation() -> TestResult {
         |row| row.get(0),
     )?;
     assert_eq!(count, 0);
-    Ok(())
-}
-
-fn mark_v17(fixture: &NonceFixture) -> TestResult {
-    let connection = Connection::open(&fixture.fixture.database)?;
-    crate::admission_operation_store::tests::runtime_replay::remove_empty_v19_runtime_tables(
-        &connection,
-    )?;
-    connection.execute_batch(
-        "DROP TABLE admission_operation_caller_contexts;
-         UPDATE chio_store_schema_versions SET version = 17 WHERE store_key = 'admission_operation';",
-    )?;
-    Ok(())
-}
-
-#[test]
-fn caller_context_migration_refuses_ambiguous_legacy_caller_reservations() -> TestResult {
-    assert_ambiguous_migration_refused(ready()?, false)
-}
-
-#[test]
-fn caller_context_migration_refuses_unversioned_legacy_callers() -> TestResult {
-    assert_ambiguous_migration_refused(ready()?, true)
-}
-
-#[test]
-fn caller_context_migration_refuses_legacy_compensation_as_proof_of_nonexecution() -> TestResult {
-    let fixture = pending()?;
-    lifecycle::release(&fixture)?;
-    let terminal = fixture
-        .fixture
-        .store
-        .commit_terminal_projection(&lifecycle::projection(&fixture)?)?;
-    assert_eq!(
-        terminal.state,
-        AdmissionOperationState::CompensatedBeforeDispatch
-    );
-    assert_ambiguous_migration_refused(fixture, false)
-}
-
-fn assert_ambiguous_migration_refused(fixture: NonceFixture, unversioned: bool) -> TestResult {
-    let database = fixture.fixture.database.clone();
-    mark_v17(&fixture)?;
-    if unversioned {
-        Connection::open(&database)?.execute(
-            "DELETE FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-            [],
-        )?;
-    }
-    drop(fixture.fixture.store);
-    drop(fixture.fixture.authority);
-    let error = match crate::test_authority::open_serving(&database, &fixture.fixture.lock_root) {
-        Ok(_) => return Err("ambiguous legacy caller was migrated without reconciliation".into()),
-        Err(error) => error,
-    };
-    assert!(
-        error
-            .to_string()
-            .contains("authoritative external-effect reconciliation"),
-        "{error}"
-    );
-    let version: Option<i64> = Connection::open(database)?.query_row(
-        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-        [],
-        |row| row.get(0),
-    ).optional()?;
-    assert_eq!(
-        version,
-        if unversioned { None } else { Some(17) },
-        "failed migration must not stamp a new version"
-    );
-    Ok(())
-}
-
-#[test]
-fn caller_context_migration_preserves_ordinary_nonce_history() -> TestResult {
-    let fixture = ready_with_transport("kernel-tool-server:test-server")?;
-    let before = fixture.operation.clone();
-    mark_v17(&fixture)?;
-    let fixture = lifecycle::reopen(fixture)?;
-    assert_eq!(fixture.operation, before);
-    assert!(fixture
-        .fixture
-        .store
-        .load_caller_dispatch_context(
-            fixture.operation.binding().operation_id(),
-            &fixture.fixture.fence,
-            now_ms()
-        )?
-        .is_none());
-    let version: i64 = Connection::open(&fixture.fixture.database)?.query_row(
-        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'admission_operation'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(
-        version,
-        i64::from(ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION)
-    );
     Ok(())
 }

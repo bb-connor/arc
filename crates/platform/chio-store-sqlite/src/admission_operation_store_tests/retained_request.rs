@@ -449,60 +449,6 @@ fn retained_request_decoder_is_bounded_strict_and_not_an_authenticator() -> Test
 }
 
 #[test]
-fn retained_request_v9_migration_preserves_legacy_commits_without_inventing_context() -> TestResult
-{
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        fence,
-        _clock,
-    } = fixture();
-    let (operation, request) = original(&fence)?;
-    store.begin(&operation, &fence, now_ms())?;
-    drop(store);
-    drop(authority);
-    let connection = Connection::open(&database)?;
-    let before: String = connection.query_row(
-        "SELECT chain_digest FROM admission_operation_commits WHERE mutation_kind = 'begin'",
-        [],
-        |row| row.get(0),
-    )?;
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
-    connection.execute_batch(
-        "DROP TABLE admission_operation_tool_requests;
-         DROP INDEX admission_operations_request_id;
-         UPDATE chio_store_schema_versions SET version = 9 WHERE store_key = 'admission_operation';",
-    )?;
-    drop(connection);
-    SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
-    let store = reopened.admission_operation_store();
-    let fence = reopened.mutation_fence();
-    let connection = Connection::open(&database)?;
-    let after: String = connection.query_row(
-        "SELECT chain_digest FROM admission_operation_commits WHERE mutation_kind = 'begin'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(before, after);
-    assert_eq!(
-        store.load_by_operation_id(operation.binding().operation_id())?,
-        Some(operation.clone())
-    );
-    assert!(store
-        .load_retained_tool_request(operation.binding().operation_id(), &fence, now_ms())?
-        .is_none());
-    let retry = AdmissionOperationV1::prepare(operation.binding().clone(), fence.owner_epoch)?;
-    assert!(store
-        .begin_with_retained_tool_request(&retry, &request, &fence, now_ms())
-        .is_err());
-    Ok(())
-}
-
-#[test]
 fn retained_request_orphan_is_rejected_at_restart() -> TestResult {
     let Fixture {
         _temp,
@@ -586,48 +532,5 @@ fn retained_request_lookup_rejects_ambiguous_namespaces_even_without_legacy_mate
         plan.contains("admission_operations_request_id"),
         "unindexed lookup: {plan}"
     );
-    Ok(())
-}
-
-#[test]
-fn retained_request_v10_migration_adds_bounded_lookup_and_preserves_original_bytes() -> TestResult {
-    let Fixture {
-        _temp,
-        database,
-        lock_root,
-        authority,
-        store,
-        fence,
-        _clock,
-    } = fixture();
-    let (operation, request) = original(&fence)?;
-    store.begin_with_retained_tool_request(&operation, &request, &fence, now_ms())?;
-    drop(store);
-    drop(authority);
-    let connection = Connection::open(&database)?;
-    super::runtime_replay::remove_empty_v19_runtime_tables(&connection)?;
-    connection.execute_batch(
-        "DROP INDEX admission_operations_request_id;
-         UPDATE chio_store_schema_versions SET version = 10 WHERE store_key = 'admission_operation';",
-    )?;
-    drop(connection);
-    SqliteAuthorityStore::provision(&database, &lock_root)?;
-    let reopened = crate::test_authority::open_serving(&database, &lock_root)?;
-    let current = reopened.admission_operation_store();
-    let fence = reopened.mutation_fence();
-    let (_, restored) = current
-        .load_unambiguous_retained_tool_request(operation.binding().request_id(), &fence, now_ms())?
-        .ok_or("missing migrated original")?;
-    assert_eq!(restored.canonical_bytes(), request.canonical_bytes());
-    let mut wrong_fence = fence.clone();
-    wrong_fence.owner_epoch += 1;
-    let missing = identifier("request", "absent");
-    assert!(matches!(
-        current.load_unambiguous_retained_tool_request(&missing, &wrong_fence, now_ms()),
-        Err(AdmissionOperationStoreError::Fenced)
-    ));
-    assert!(current
-        .load_unambiguous_retained_tool_request(&missing, &fence, now_ms())?
-        .is_none());
     Ok(())
 }

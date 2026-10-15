@@ -65,7 +65,7 @@ fn canonical_mutation_edits_and_missing_history_cannot_survive_owner_recovery() 
             )?;
         }
         connection.execute_batch(&native::schema::sql()?)?;
-        assert!(native::schema::verify_version(&connection, 29)?);
+        assert!(native::schema::verify(&connection)?);
         assert!(native::verify_coverage(&connection).is_err(), "{damage}");
         drop(connection);
         assert!(

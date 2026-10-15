@@ -23,8 +23,6 @@ mod failures;
 mod integrity;
 #[path = "dpop_replay/lifecycle.rs"]
 mod lifecycle;
-#[path = "dpop_replay/migration.rs"]
-mod migration;
 
 const AUTHORITY_ID: &str = "dpop-authority";
 const TABLES: [&str; 3] = [
@@ -200,26 +198,4 @@ fn global_count(fixture: &Fixture) -> i64 {
             row.get(0)
         })
         .expect("global count")
-}
-
-/// Fixture shaping only. Never discard populated security history to downgrade.
-pub(super) fn remove_empty_v24_tables(connection: &Connection) -> rusqlite::Result<()> {
-    activation::remove_empty_v25_activation(connection)?;
-    for table in TABLES {
-        let exists: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = ?1)",
-            [table],
-            |row| row.get(0),
-        )?;
-        if !exists {
-            continue;
-        }
-        let count: i64 =
-            connection.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-                row.get(0)
-            })?;
-        assert_eq!(count, 0, "predecessor fixture cannot discard DPoP history");
-        connection.execute_batch(&format!("DROP TABLE {table}"))?;
-    }
-    Ok(())
 }

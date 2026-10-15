@@ -9,8 +9,6 @@ use chio_kernel::BudgetStore;
 mod approval;
 #[path = "preflight/qualification.rs"]
 mod qualification;
-#[path = "preflight/recovery.rs"]
-mod recovery;
 
 pub(super) fn own_and_clean(
     fixture: &Fixture,

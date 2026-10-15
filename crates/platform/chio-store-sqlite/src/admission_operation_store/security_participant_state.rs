@@ -43,24 +43,6 @@ pub(crate) use integrity::projection_reference;
 pub(super) use integrity::{verify_archive_coverage, verify_coverage, verify_pristine};
 pub(super) use records::verify_all;
 
-pub(super) fn verify_predecessor(
-    connection: &Connection,
-) -> Result<(), AdmissionOperationStoreError> {
-    let records = records::verify_all_version(connection, 28)?;
-    let future: bool = connection
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM authority_global_commits
-         WHERE projection_kind = 'security_participant_state' AND projection_sequence != 1)",
-            [],
-            |row| row.get(0),
-        )
-        .map_err(sqlite_error)?;
-    if future {
-        return Err(invalid("pre-v29 native references contain mutations"));
-    }
-    integrity::verify_initializations(connection, &records).map_err(map_owner_error)
-}
-
 const PROJECTION_KIND: &str = "security_participant_state";
 const MUTATION_KIND: &str = "hydrate_security_participant_state";
 
@@ -259,41 +241,6 @@ fn observed_time(
 
 fn invalid(detail: impl std::fmt::Display) -> AdmissionOperationStoreError {
     invariant(format!("native security state: {detail}"))
-}
-
-/// Test-only construction of a genuine v28 initialization from its compiled
-/// predecessor schema. No existing history is rewritten into old evidence.
-#[cfg(test)]
-pub(crate) fn hydrate_predecessor_fixture(
-    store: &SqliteAdmissionOperationStore,
-    source: &SecurityParticipantMigrationRecord,
-    fence: &StoreMutationFence,
-    now: u64,
-) -> Result<SecurityParticipantStateInitialization, AdmissionOperationStoreError> {
-    let mut connection = store.connection()?;
-    let tx = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    if schema::recorded_version(&tx)? != 28 {
-        return Err(invalid("predecessor fixture is not v28"));
-    }
-    let record = records::new_with_catalog(source, now, fence, schema::digest_version(28)?)?;
-    storage::hydrate_at_version(&tx, source, 28)?;
-    records::insert(&tx, &record)?;
-    records::verify_all_version(&tx, 28)?;
-    store
-        .serving_owner
-        .append_global_commit(
-            &tx,
-            MUTATION_KIND,
-            PROJECTION_KIND,
-            record.authority.as_str(),
-            1,
-        )
-        .map_err(map_owner_error)?;
-    store.commit_write(tx)?;
-    store.sync_after_write(&connection)?;
-    Ok(record)
 }
 
 #[cfg(test)]

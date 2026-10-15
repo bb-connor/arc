@@ -128,32 +128,6 @@ pub(super) fn index_funded_share(
     Ok(())
 }
 
-/// Index every live or outcome-unknown operation that already funds a share.
-pub(super) fn backfill(transaction: &Transaction<'_>) -> Result<(), AdmissionOperationStoreError> {
-    let operation_ids = {
-        let mut statement = transaction
-            .prepare(
-                "SELECT operation_id FROM admission_operations
-                 WHERE terminal = 0 OR state = 'outcome_unknown_after_dispatch'
-                 ORDER BY operation_id",
-            )
-            .map_err(sqlite_error)?;
-        let operation_ids = statement
-            .query_map([], |row| row.get::<_, String>(0))
-            .map_err(sqlite_error)?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(sqlite_error)?;
-        operation_ids
-    };
-    for operation_id in operation_ids {
-        let operation_id = AdmissionOperationId::from_persisted(operation_id)?;
-        let stored = load_by_operation_id_tx(transaction, &operation_id)?
-            .ok_or_else(|| invariant("caller share backfill operation disappeared"))?;
-        index_funded_share(transaction, &stored.operation)?;
-    }
-    Ok(())
-}
-
 /// An indexed parent must match the retained request, and every operation
 /// that currently funds a share must be indexed.
 pub(super) fn verify_indexed(

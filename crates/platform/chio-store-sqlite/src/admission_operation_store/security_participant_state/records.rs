@@ -75,11 +75,8 @@ pub(super) fn insert(
     Ok(())
 }
 
-fn validate_bounds(
-    connection: &Connection,
-    version: i32,
-) -> Result<bool, AdmissionOperationStoreError> {
-    if !schema::verify_version(connection, version)? {
+fn validate_bounds(connection: &Connection) -> Result<bool, AdmissionOperationStoreError> {
+    if !schema::verify(connection)? {
         return Ok(false);
     }
     let (count, malformed): (i64, bool) = connection
@@ -120,7 +117,7 @@ pub(super) fn load_metadata(
     connection: &Connection,
     authority: &str,
 ) -> Result<Option<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
-    if !validate_bounds(connection, schema::recorded_version(connection)?)? {
+    if !validate_bounds(connection)? {
         return Ok(None);
     }
     load_bounded(connection, authority)
@@ -159,9 +156,7 @@ fn load_bounded(
             owner_epoch: u64::try_from(owner_epoch).map_err(invalid)?,
         },
     )?;
-    // The initialization catalog is historical evidence, not the current
-    // schema. A v29 migration must not rewrite a v28 initialization digest.
-    if schema != schema::digest_version(28)? && schema != schema::digest_version(29)? {
+    if schema != schema::digest()? {
         return Err(invalid("native initialization catalog digest is unknown"));
     }
     record.schema.clone_from(&schema);
@@ -204,14 +199,7 @@ fn load_bounded(
 pub(in crate::admission_operation_store) fn verify_all(
     connection: &Connection,
 ) -> Result<Vec<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
-    verify_all_version(connection, 29)
-}
-
-pub(super) fn verify_all_version(
-    connection: &Connection,
-    version: i32,
-) -> Result<Vec<SecurityParticipantStateInitialization>, AdmissionOperationStoreError> {
-    if !validate_bounds(connection, version)? {
+    if !validate_bounds(connection)? {
         return Ok(Vec::new());
     }
     storage::verify_no_orphans(connection)?;
@@ -226,14 +214,7 @@ pub(super) fn verify_all_version(
             let record = load_bounded(connection, &key)?
                 .ok_or_else(|| invalid("native initialization disappeared"))?;
             let source = security_participant_migration::load_imported_source(connection, &key)?;
-            if version == 28 {
-                if record.schema != schema::digest_version(28)? {
-                    return Err(invalid("v28 initialization has a future schema digest"));
-                }
-                storage::verify_rows(connection, &source)?;
-            } else {
-                super::history::verify_rows(connection, &source, &record)?;
-            }
+            super::history::verify_rows(connection, &source, &record)?;
             Ok(record)
         })
         .collect()
