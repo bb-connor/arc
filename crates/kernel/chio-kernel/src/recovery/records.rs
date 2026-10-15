@@ -55,7 +55,7 @@ pub enum RecoveryCommandError {
 pub struct RecoveryActorAssignment {
     pub subject: PublicKey,
     pub principal: PrincipalId,
-    pub permissions: BoundedList<RecoveryPermission, 16>,
+    pub permissions: BoundedList<RecoveryPermission, 17>,
     pub preview_clearance: InformationLabel,
 }
 

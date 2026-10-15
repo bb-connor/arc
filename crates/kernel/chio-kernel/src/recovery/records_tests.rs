@@ -207,3 +207,88 @@ fn quarantine_reason_accepts_only_frozen_verifier_or_signing_unavailability() ->
     );
     Ok(())
 }
+
+/// Every permission in declaration order, which is their derived sort order.
+const EVERY_PERMISSION: [RecoveryPermission; 17] = [
+    RecoveryPermission::Create,
+    RecoveryPermission::Inspect,
+    RecoveryPermission::Select,
+    RecoveryPermission::Approve,
+    RecoveryPermission::Resume,
+    RecoveryPermission::Cancel,
+    RecoveryPermission::Report,
+    RecoveryPermission::Settle,
+    RecoveryPermission::KnowledgeRead,
+    RecoveryPermission::KnowledgeWrite,
+    RecoveryPermission::KnowledgeAdopt,
+    RecoveryPermission::KnowledgeAdmin,
+    RecoveryPermission::ConfinedLaunch,
+    RecoveryPermission::ConfinedReturn,
+    RecoveryPermission::ConfinedCancel,
+    RecoveryPermission::Maintain,
+    RecoveryPermission::InspectExplanationGraph,
+];
+
+fn actor_assignment(
+    permissions: BoundedList<RecoveryPermission, 17>,
+) -> TestResult<RecoveryActorAssignment> {
+    let fixture = authority_fixture()?;
+    Ok(RecoveryActorAssignment {
+        subject: serde_json::from_value(fixture["coverage"][0]["authority_key"].clone())?,
+        principal: PrincipalId::new("principal:operator")?,
+        permissions,
+        preview_clearance: InformationLabel::bottom(),
+    })
+}
+
+#[test]
+fn one_actor_can_hold_every_recovery_permission() -> TestResult {
+    let assignment = actor_assignment(BoundedList::new(EVERY_PERMISSION.to_vec())?)?;
+    let distinct: std::collections::BTreeSet<_> =
+        assignment.permissions.as_slice().iter().copied().collect();
+    assert_eq!(distinct.len(), EVERY_PERMISSION.len());
+    assert!(assignment
+        .permissions
+        .as_slice()
+        .windows(2)
+        .all(|pair| pair[0] < pair[1]));
+    let wire = canonical_json_bytes(&assignment)?;
+    let decoded: RecoveryActorAssignment = decode_contract(&wire)?;
+    assert_eq!(decoded.permissions.as_slice(), EVERY_PERMISSION.as_slice());
+    assert_eq!(canonical_json_bytes(&decoded)?, wire);
+    let value: Value = serde_json::from_slice(&wire)?;
+    assert_eq!(value["permissions"][16], json!("inspect_explanation_graph"));
+    assert_eq!(
+        decoded.permissions.as_slice()[16].wire_name(),
+        "explanation.inspect"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_eighteenth_permission_is_refused_by_the_list_and_the_decoder() -> TestResult {
+    let mut eighteen = EVERY_PERMISSION.to_vec();
+    eighteen.push(RecoveryPermission::Create);
+    assert!(matches!(
+        BoundedList::new(eighteen).map(actor_assignment),
+        Err(ContractError::LimitExceeded)
+    ));
+    let assignment = actor_assignment(BoundedList::new(EVERY_PERMISSION.to_vec())?)?;
+    let mut value = serde_json::to_value(&assignment)?;
+    value["permissions"]
+        .as_array_mut()
+        .ok_or("permissions must be an array")?
+        .push(json!("create"));
+    let refused = serde_json::from_value::<RecoveryActorAssignment>(value.clone())
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(
+        refused.as_deref(),
+        Some(ContractError::LimitExceeded.to_string().as_str())
+    );
+    assert!(matches!(
+        decode_contract::<RecoveryActorAssignment>(&canonical_json_bytes(&value)?),
+        Err(ContractError::Malformed)
+    ));
+    Ok(())
+}
