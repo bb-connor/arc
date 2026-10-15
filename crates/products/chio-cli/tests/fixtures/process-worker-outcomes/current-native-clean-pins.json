@@ -1,7 +1,7 @@
 {
-  "runtime_id": "7a47fca7-a730-49bf-bc75-a4756bc13182",
   "launch_policy_signers": {
-    "erin-probe": "ecc60e6343bfd393dec998451ec9ef950fee4165503d0998900321d955e04515",
-    "frank-probe": "0be24455dd69be37f11ed9dfab750b4630771de42c560bd4f2e0c00ba2431e20"
-  }
+    "erin-probe": "d0a714afc5760a332f390bf92f9abbe515877e3c48f33234db8bc6923a1fffa1",
+    "frank-probe": "6bd70bf44259a6c280cde9dceccb42e219b60320cfc0c622a24f273d4798cbbd"
+  },
+  "runtime_id": "360892c1-b40f-4c65-bcaf-f360e0947f34"
 }

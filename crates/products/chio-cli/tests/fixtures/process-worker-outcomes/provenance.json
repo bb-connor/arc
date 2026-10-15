@@ -1,28 +1,166 @@
 {
   "current-native-budget": {
-    "runtime_source": "a86d5f781691a472674fe3fafa1fb4d8dffed529",
-    "runtime_binary_sha256": "1d82c6dfc79dd83edcb60f828d9eb9051ab036909006977b6c83d3642ab4337b",
-    "cage_init_sha256": "4ad2e6b42eba27873a79cec87de95b0808ccad535c768d3a0f274cece5a13943",
-    "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
-    "runtime_id": "de64a4dd-6070-4699-a45a-3e7b6bb19bf0",
+    "runtime_source": "fe6192b768dd1f529e9056ac7e17c5c7dc1e7042",
+    "runtime_binary_sha256": "3e1fb9a8c66666c622dd68c981a12ae7a5fa92e57926b79da935cc30697d8aae",
+    "cage_init_sha256": "c08e404e9bfc427883c8f55ac42b8d0d8f53a03791af3fd9c1003caa72dda999",
+    "probe_sha256": "e8567700fcefbb15506192acfec9a74cb24c3b307eb577eb3b9827f2e5691845",
+    "discovery_binary_sha256": "ae0c179e46005f4a6601066a754d560ec4627805d71ec0d1134147ca256dfcdd",
+    "runtime_id": "f778bc1e-4490-480a-82e2-e8bad7353c17",
     "campaign": "examples/reference-swarm/qualify-process-budget.py",
-    "sha256": "871a89e06a80c7f60ed95903944d7753884b3ef4bb186db69717b78e4f904dc9",
+    "campaign_sha256": "ceec0310538496c79e06d3f7d8b858dfd1052be14ee4d317f438e7bf060ac089",
+    "worker_image_id": "sha256:bb76d63990149dde5366c438657e69b11c9a63ed4b965659f8149acf70bb6d0f",
+    "worker_base": "python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72",
+    "worker_dockerfile_sha256": "f627a633fcc0c1d0d7b8706de143b4b4bf2653161cbc2570f9305b97eb48f10b",
+    "sha256": "6157c031723b8850b826fb7a25cce72eecda8ae3c976e78fb9c77e473720a025",
+    "kernel_pub_sha256": "915d5f171622ccf069a6d48180a8bc0192fd2307785954608386349981deeade",
+    "pins_sha256": "ea1d8b6f82f65ff8499616869bbc2216ecd7977f13a73a6af8bc3080650021d0",
     "private_keys_exported": false,
     "retrospective_observation": true,
+    "retrospective_observation_basis": "Post-run or recovery readback/export of original signed retained evidence.",
+    "runtime_qualification": false,
+    "repository_installation": false,
     "m5_acceptance_complete": false,
-    "capture": "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement; CARGO_TARGET_DIR=<target>/static-pie cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement; docker build --platform linux/amd64 --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 -f examples/reference-swarm/QualificationWorker.Dockerfile -t chio-process-qualification .; python3 examples/reference-swarm/qualify-process-budget.py --chio <chio> --cage-init <chio-cage-init> --probe <enforcement-probe> --worker-image <image id> --output <dir>/campaign --receipt-rollback-anchor-root <private directory under /dev/shm, held by an open session>; chio process attest-outcomes --state <dir>/campaign/state --plan <dir>/campaign/run-plan.json --out outcomes.json; fixture = outcomes.json; kernel.pub = <dir>/campaign/state/authority.db.kernel.pub; pins = runtime_id plus each server's launch_policy_signer"
+    "capture_commands": [
+      {
+        "name": "budget-campaign",
+        "argv": [
+          "/usr/bin/python3",
+          "/home/ubuntu/v1pr-pv1/arc/examples/reference-swarm/qualify-process-budget.py",
+          "--chio",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio",
+          "--cage-init",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio-cage-init",
+          "--probe",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/enforcement-probe",
+          "--worker-image",
+          "sha256:bb76d63990149dde5366c438657e69b11c9a63ed4b965659f8149acf70bb6d0f",
+          "--output",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/budget/campaign",
+          "--receipt-rollback-anchor-root",
+          "/dev/shm/codex2-pv1-fe6192b768/budget"
+        ]
+      },
+      {
+        "name": "budget-attest-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio",
+          "process",
+          "attest-outcomes",
+          "--state",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/budget/campaign/state",
+          "--plan",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/budget/campaign/run-plan.json",
+          "--out",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/budget/outcomes.json"
+        ]
+      },
+      {
+        "name": "budget-verify-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio",
+          "process",
+          "verify-outcomes",
+          "--artifact",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/budget/outcomes.json",
+          "--trusted-kernel-pubkey",
+          "/home/ubuntu/v1pr-pv1-pins/capture-fe6192b768/budget/kernel.pub",
+          "--runtime-id",
+          "f778bc1e-4490-480a-82e2-e8bad7353c17",
+          "--trusted-launch-policy-signer",
+          "alice-probe=5348d34cbd7e00b098f7db857bd915178e090b1dc172d482ef2bfd29d4a44434",
+          "--trusted-launch-policy-signer",
+          "bob-probe=011d470921244b2f553cd879afd2f2550792b5f94beb00d60cc02ab39d1b9fac",
+          "--trusted-launch-policy-signer",
+          "carol-probe=e8efcc4b0044a1a083e1216124a965b70fd25169e05b87ac5e68d48a824f7ed6",
+          "--trusted-launch-policy-signer",
+          "dave-probe=98fc8a7f95dabdab1f8c39048b27a4dd541209b79a542ad675582ddc3324f0ab"
+        ]
+      }
+    ],
+    "capture_public_manifest_sha256": "9c758e39e392b1143e87a14afc54821014c4881d2bb9091f613637b7e1d8635d",
+    "capture_public_audit_sha256": "697a47102eea1ce7f8662501e2205964a0dcf7b9e80f3482138f78b1bbd8ffbb",
+    "capture_private_manifest_sha256": "c97322762e10543a20e875c058573e084de9c7f10cc08ae4c1501d5101735635",
+    "capture_config_sha256": "6d53be371bb3d43989b1960ea086763fc497bedd4d4b4c8819c86b6725bb97e7",
+    "capture_terminal_sha256": "5a8113dc18bff21244b9161d353dd5a16c18b9a7b3a4e8191bce8e84dec2e563"
   },
   "current-native-clean": {
-    "runtime_source": "a86d5f781691a472674fe3fafa1fb4d8dffed529",
-    "runtime_binary_sha256": "1d82c6dfc79dd83edcb60f828d9eb9051ab036909006977b6c83d3642ab4337b",
-    "cage_init_sha256": "4ad2e6b42eba27873a79cec87de95b0808ccad535c768d3a0f274cece5a13943",
-    "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
-    "runtime_id": "7a47fca7-a730-49bf-bc75-a4756bc13182",
+    "runtime_source": "fe6192b768dd1f529e9056ac7e17c5c7dc1e7042",
+    "runtime_binary_sha256": "3e1fb9a8c66666c622dd68c981a12ae7a5fa92e57926b79da935cc30697d8aae",
+    "cage_init_sha256": "c08e404e9bfc427883c8f55ac42b8d0d8f53a03791af3fd9c1003caa72dda999",
+    "probe_sha256": "e8567700fcefbb15506192acfec9a74cb24c3b307eb577eb3b9827f2e5691845",
+    "discovery_binary_sha256": "ae0c179e46005f4a6601066a754d560ec4627805d71ec0d1134147ca256dfcdd",
+    "runtime_id": "360892c1-b40f-4c65-bcaf-f360e0947f34",
     "campaign": "examples/reference-swarm/qualify-process-clean-exit.py",
-    "sha256": "eebde56740c38a776ffdd7cb895d93c2f33b53f2923a5d7259ba874d6fb959a8",
+    "campaign_sha256": "922c1c3c381e8a1247ca73b21ebf63eca7b7178f7a3be1e3adb0bf96ba482053",
+    "worker_image_id": "sha256:bb76d63990149dde5366c438657e69b11c9a63ed4b965659f8149acf70bb6d0f",
+    "worker_base": "python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72",
+    "worker_dockerfile_sha256": "f627a633fcc0c1d0d7b8706de143b4b4bf2653161cbc2570f9305b97eb48f10b",
+    "sha256": "62aa8056f5fc331b4ec060b159ddc432f8eb9edcd6c6c9452e55c1d18b9d10ad",
+    "kernel_pub_sha256": "c97fb4ab382488ae2e3ee3e19913c0e51e0903beaac4fe470a5ff45d520d95d3",
+    "pins_sha256": "ce6b8eec08b23a65967c3981bc532f4acafc96dac51e62853ed196c4a26c32ab",
     "private_keys_exported": false,
     "retrospective_observation": true,
+    "retrospective_observation_basis": "Post-run or recovery readback/export of original signed retained evidence.",
+    "runtime_qualification": false,
+    "repository_installation": false,
     "m5_acceptance_complete": false,
-    "capture": "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement; CARGO_TARGET_DIR=<target>/static-pie cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement; docker build --platform linux/amd64 --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 -f examples/reference-swarm/QualificationWorker.Dockerfile -t chio-process-qualification .; python3 examples/reference-swarm/qualify-process-clean-exit.py --chio <chio> --cage-init <chio-cage-init> --probe <enforcement-probe> --worker-image <image id> --output <dir>/campaign --receipt-rollback-anchor-root <private directory under /dev/shm, held by an open session>; chio process attest-outcomes --state <dir>/campaign/state --plan <dir>/campaign/run-plan.json --out outcomes.json; fixture = outcomes.json; kernel.pub = <dir>/campaign/state/authority.db.kernel.pub; pins = runtime_id plus each server's launch_policy_signer"
+    "capture_commands": [
+      {
+        "name": "clean-campaign",
+        "argv": [
+          "/usr/bin/python3",
+          "/home/ubuntu/v1pr-pv1/arc/examples/reference-swarm/qualify-process-clean-exit.py",
+          "--chio",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio",
+          "--cage-init",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio-cage-init",
+          "--probe",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/enforcement-probe",
+          "--worker-image",
+          "sha256:bb76d63990149dde5366c438657e69b11c9a63ed4b965659f8149acf70bb6d0f",
+          "--output",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/clean/campaign",
+          "--receipt-rollback-anchor-root",
+          "/dev/shm/codex2-pv1-fe6192b768/clean"
+        ]
+      },
+      {
+        "name": "clean-attest-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio",
+          "process",
+          "attest-outcomes",
+          "--state",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/clean/campaign/state",
+          "--plan",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/clean/campaign/run-plan.json",
+          "--out",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/clean/outcomes.json"
+        ]
+      },
+      {
+        "name": "clean-verify-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/bin/chio",
+          "process",
+          "verify-outcomes",
+          "--artifact",
+          "/home/ubuntu/v1pr-pv1-out/capture-fe6192b768/clean/outcomes.json",
+          "--trusted-kernel-pubkey",
+          "/home/ubuntu/v1pr-pv1-pins/capture-fe6192b768/clean/kernel.pub",
+          "--runtime-id",
+          "360892c1-b40f-4c65-bcaf-f360e0947f34",
+          "--trusted-launch-policy-signer",
+          "erin-probe=d0a714afc5760a332f390bf92f9abbe515877e3c48f33234db8bc6923a1fffa1",
+          "--trusted-launch-policy-signer",
+          "frank-probe=6bd70bf44259a6c280cde9dceccb42e219b60320cfc0c622a24f273d4798cbbd"
+        ]
+      }
+    ],
+    "capture_public_manifest_sha256": "9c758e39e392b1143e87a14afc54821014c4881d2bb9091f613637b7e1d8635d",
+    "capture_public_audit_sha256": "697a47102eea1ce7f8662501e2205964a0dcf7b9e80f3482138f78b1bbd8ffbb",
+    "capture_private_manifest_sha256": "c97322762e10543a20e875c058573e084de9c7f10cc08ae4c1501d5101735635",
+    "capture_config_sha256": "6d53be371bb3d43989b1960ea086763fc497bedd4d4b4c8819c86b6725bb97e7",
+    "capture_terminal_sha256": "5a8113dc18bff21244b9161d353dd5a16c18b9a7b3a4e8191bce8e84dec2e563"
   }
 }
