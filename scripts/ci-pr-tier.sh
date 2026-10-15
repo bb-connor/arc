@@ -24,6 +24,7 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 ./scripts/check-workspace-layering.sh
 python3 scripts/check-review-slices.py
 bash scripts/tests/check-sidecar-docker-context.test.sh
+bash scripts/tests/chio-trust-serve.test.sh
 bash scripts/tests/check-sidecar-image-workflow.test.sh
 python3 scripts/check-rust-public-surface.py
 bash scripts/tests/check-rust-public-surface.test.sh

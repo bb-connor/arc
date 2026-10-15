@@ -87,7 +87,8 @@ RUN apk add --no-cache ca-certificates libgcc libstdc++ tini \
  && addgroup -S -g 10001 chio \
  && adduser  -S -u 10001 -G chio -h /home/chio -s /sbin/nologin chio \
  && mkdir -p /var/lib/chio /opt/chio \
- && chown -R chio:chio /var/lib/chio /opt/chio /home/chio
+ && chown -R chio:chio /var/lib/chio /opt/chio /home/chio \
+ && chmod 0700 /var/lib/chio
 COPY --from=rust-builder /chio /usr/local/bin/chio
 RUN chmod 0755 /usr/local/bin/chio
 
@@ -103,9 +104,10 @@ CMD ["--help"]
 FROM chio AS chio-trust-demo
 WORKDIR /opt/chio
 COPY --from=dashboard-builder --chown=chio:chio /workspace/crates/products/chio-cli/dashboard/dist ./dashboard/dist
+COPY --chown=root:root --chmod=0555 deploy/docker/chio-trust-serve.sh /usr/local/bin/chio-trust-serve
 EXPOSE 8940
-ENTRYPOINT []
-CMD ["/bin/sh", "-lc", "exec /sbin/tini -- /usr/local/bin/chio --receipt-db /var/lib/chio/receipts.sqlite --authority-db /var/lib/chio/authority.sqlite --session-db /var/lib/chio/trust-sessions.sqlite trust serve --listen 0.0.0.0:8940 --service-token \"${CHIO_SERVICE_TOKEN:-demo-control-token}\" --authority-workload-token \"${CHIO_AUTHORITY_WORKLOAD_TOKEN:-demo-workload-token}\""]
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["/usr/local/bin/chio-trust-serve"]
 
 FROM chio AS chio-mcp-demo
 USER root

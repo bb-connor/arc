@@ -8,6 +8,7 @@ services:
       dockerfile: deploy/docker/Dockerfile
       target: chio-trust-demo
     environment:
+      CHIO_DEMO: "1"
       CHIO_SERVICE_TOKEN: ${CHIO_SERVICE_TOKEN:-demo-control-token}
       CHIO_AUTHORITY_WORKLOAD_TOKEN: ${CHIO_WORKLOAD_TOKEN:-demo-workload-token}
     ports:
