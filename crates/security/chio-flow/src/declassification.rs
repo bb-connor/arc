@@ -313,12 +313,14 @@ pub fn verify_declassification(
 
 /// Verify a recovery grant before the common one-shot declassification checks.
 ///
-/// `expected` is the binding the host selected from its authenticated workflow
-/// record, and `coverage` comes from [`crate::verify_recovery_coverage`] over
+/// `expected` is the binding the host derives from its authenticated workflow
+/// record, reviewed action, approval and native isolation epoch, and
+/// `coverage` comes from [`crate::verify_recovery_coverage`] over
 /// independently selected inputs. Neither is taken from the presented grant.
 /// The grant must equal `expected` in every binding field, match the reviewed
-/// context and validity window of `coverage`, and then pass every ordinary
-/// declassification check against the recovery grant signature.
+/// approval, action and validity window of `coverage` on its own, and then
+/// pass every ordinary declassification check against the recovery grant
+/// signature.
 pub fn verify_recovery_declassification(
     grant: &SignedRecoveryGrant,
     request: &DeclassificationVerificationRequest,

@@ -1,9 +1,26 @@
 //! Exact conjunctive recovery coverage under operator-installed assignments.
 //!
-//! Trust boundary: the approval intent, authorization requirements, source
-//! basis, assignments and verification time are expected inputs. The host
-//! selects them from its own authenticated workflow and operator state. They
-//! are never taken from an incoming grant, attestation or retained digest.
+//! Trust boundary: the approval intent, authorization requirements, reviewed
+//! action, source basis, assignments and verification time are expected
+//! inputs. The host selects them from its own authenticated workflow and
+//! operator state. They are never taken from an incoming grant, attestation or
+//! retained digest.
+//!
+//! Authority follows the installed assignments. Each attestation is admitted
+//! only through the assignment of its issuer, which names one principal, one
+//! key and the obligations that principal may release. Principals and issuers
+//! are unique within a bundle. An operator may install one key in several
+//! assignments, but reusing that key never creates an assignment the operator
+//! did not install, so a repeated signature cannot add an approver.
+//!
+//! Verification work is charged per attestation before its key, principal and
+//! signature checks and before obligation allocation: 32 units, plus 3 per
+//! attested obligation, plus the size of the assigned obligation set. The
+//! cumulative charge must not exceed `MAX_RECOVERY_VERIFICATION_WORK`.
+//!
+//! The coverage digest is the `AuthorityCoverage` domain digest of the
+//! canonical signed attestations ordered by principal, then issuer. Principals
+//! are unique, so the digest is independent of presentation order.
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
@@ -15,9 +32,10 @@ use chio_core_types::PublicKey;
 use chio_security_types::flow::{InformationLabel, PrincipalId};
 use chio_security_types::ports::Digest32;
 use chio_security_types::recovery::{
-    ApprovalIntentV1, AuthorityObligationV1, AuthorityScopeDigest, AuthorizationRequirementsV1,
-    BasisDigest, CoverageDigest, IssuerId, NonEmptyBoundedList, MAX_RECOVERY_APPROVAL_ATTESTATIONS,
-    MAX_RECOVERY_OBLIGATIONS, MAX_RECOVERY_VERIFICATION_WORK, MAX_RECOVERY_WIRE_BYTES,
+    ActionIntentV1, ApprovalIntentV1, AuthorityObligationV1, AuthorityScopeDigest,
+    AuthorizationRequirementsV1, BasisDigest, CoverageDigest, IssuerId, NonEmptyBoundedList,
+    MAX_RECOVERY_APPROVAL_ATTESTATIONS, MAX_RECOVERY_OBLIGATIONS, MAX_RECOVERY_VERIFICATION_WORK,
+    MAX_RECOVERY_WIRE_BYTES,
 };
 
 use crate::DeclassificationError;
@@ -39,8 +57,11 @@ impl core::fmt::Debug for RecoveryAuthorityAssignment {
     }
 }
 
-/// Verified conjunctive coverage of one reviewed recovery disclosure. It is
-/// evidence for one grant check, not an execution owner or a consumed grant.
+/// Verified conjunctive coverage of one reviewed recovery action. It is
+/// evidence that may be borrowed for grant checks within its validity window.
+/// It is not an execution owner or a consumed grant: one-shot use comes from
+/// the declassification use store, and single issuance per challenge belongs
+/// to the native issuer.
 ///
 /// Only [`verify_recovery_coverage`] constructs it. A retained digest cannot
 /// become verified coverage:
@@ -60,12 +81,17 @@ impl core::fmt::Debug for RecoveryAuthorityAssignment {
 /// }
 /// ```
 ///
-/// Its fields are private to this crate:
-/// ```compile_fail
+/// Its fields are private to this crate, even when every field is supplied:
+/// ```compile_fail,E0451
 /// use chio_flow::VerifiedRecoveryCoverage;
 /// use chio_security_types::recovery::CoverageDigest;
+/// use std::collections::BTreeSet;
 /// fn forge(digest: CoverageDigest) -> VerifiedRecoveryCoverage {
-///     VerifiedRecoveryCoverage { digest }
+///     VerifiedRecoveryCoverage {
+///         digest,
+///         obligations: BTreeSet::new(),
+///         binding: loop {},
+///     }
 /// }
 /// ```
 ///
@@ -87,6 +113,7 @@ pub struct VerifiedRecoveryCoverage {
 /// and cannot supply any of these values.
 struct VerifiedCoverageBinding {
     approval: ApprovalIntentV1,
+    action: ActionIntentV1,
     source_label_hash: Digest32,
     target_label: InformationLabel,
     authority_scope: AuthorityScopeDigest,
@@ -108,8 +135,11 @@ impl VerifiedRecoveryCoverage {
 
     /// The grant must fall inside the coverage validity window and repeat the
     /// reviewed scope, action, requirements, approval, challenge, offer, plan,
-    /// issuer scope, recipient, purpose and labels. Its expiry cannot exceed
-    /// the coverage expiry.
+    /// issuer scope, recipient, purpose and labels. Its workflow, step,
+    /// continuation, request, policy, contract, isolation lineage, output
+    /// disposition and capability must be those of the authenticated action.
+    /// Its expiry cannot exceed the coverage expiry. The isolation epoch is
+    /// bound only by the caller's expected binding.
     pub(crate) fn verify_grant_binding(
         &self,
         grant: &RecoveryGrantBody,
@@ -124,6 +154,7 @@ impl VerifiedRecoveryCoverage {
         }
         let actual = &grant.recovery;
         let approval = &bound.approval;
+        let action = &bound.action;
         let claims = &grant.claims;
         if actual.coverage_digest != self.digest
             || actual.authority_domain != approval.scope.authority_domain
@@ -136,6 +167,16 @@ impl VerifiedRecoveryCoverage {
             || actual.selected_offer != approval.offer
             || actual.approved_plan != approval.plan
             || actual.authority_scope != bound.authority_scope
+            || actual.workflow_id != action.workflow_id
+            || actual.step_id != action.step_id
+            || actual.continuation_id != action.continuation_id
+            || actual.request_namespace != action.request_namespace
+            || actual.request_id != action.request_id
+            || actual.policy_digest != action.policy_digest
+            || actual.contract_digest != action.contract_digest
+            || actual.isolation_lineage != action.isolation_lineage
+            || actual.output_disposition != action.output_disposition
+            || claims.capability_id() != &action.capability_id
             || claims.destination_id() != &approval.recipient
             || claims.purpose() != &approval.purpose
             || claims.source_label_hash() != bound.source_label_hash
@@ -154,7 +195,9 @@ impl VerifiedRecoveryCoverage {
 /// Derive every confidentiality restriction removed by one exact downgrade.
 /// Labels carry owners and compartments only, so the result contains owner
 /// and compartment releases. Integrity endorsement and user acceptance are
-/// distinct obligations and never disclosure authority.
+/// distinct obligations and never disclosure authority. A downgrade that
+/// would require more than `MAX_RECOVERY_OBLIGATIONS` releases refuses with
+/// `InvalidTarget`.
 pub fn required_recovery_disclosure_obligations(
     source: &InformationLabel,
     target: &InformationLabel,
@@ -195,14 +238,18 @@ pub fn required_recovery_disclosure_obligations(
         .map_err(|_| DeclassificationError::InvalidTarget)
 }
 
-/// Verify one approval bundle at the current trusted time. Every attestation
-/// binds the same review, action, requirements and source basis. Each issuer
-/// must match an operator assignment for its principal, key and obligations,
-/// and the union of attested obligations must equal the derived disclosure
-/// obligations exactly.
+/// Verify one approval bundle at the current trusted time. The approval must
+/// name the `ActionIntent` digest of the exact reviewed action, and that
+/// action must embed these requirements, the approval scope, this source
+/// basis and the requirements issuer scope. Every attestation binds the same
+/// review, action, requirements and source basis. Each issuer must match an
+/// operator assignment for its principal, key and obligations, and the union
+/// of attested obligations must equal the derived disclosure obligations
+/// exactly.
 pub fn verify_recovery_coverage(
     approval: &ApprovalIntentV1,
     requirements: &AuthorizationRequirementsV1,
+    action: &ActionIntentV1,
     basis: BasisDigest,
     attestations: &NonEmptyBoundedList<
         SignedAuthorityCoverageAttestationV1,
@@ -214,6 +261,7 @@ pub fn verify_recovery_coverage(
     verify_coverage(
         approval,
         requirements,
+        action,
         basis,
         attestations,
         assignments,
@@ -222,13 +270,14 @@ pub fn verify_recovery_coverage(
 }
 
 /// Verify a retained bundle of the same current format at its preparation
-/// time. The caller authenticates that time and the retained assignments
-/// independently. Every cryptographic, assignment, scope and work check still
-/// runs. The result is the coverage digest only, never verified coverage or
-/// live authority.
+/// time. The caller authenticates that time, the retained action and the
+/// retained assignments independently. Every action, cryptographic,
+/// assignment, scope and work check still runs. The result is the coverage
+/// digest only, never verified coverage or live authority.
 pub fn verify_retained_recovery_coverage_digest(
     approval: &ApprovalIntentV1,
     requirements: &AuthorizationRequirementsV1,
+    action: &ActionIntentV1,
     basis: BasisDigest,
     attestations: &NonEmptyBoundedList<
         SignedAuthorityCoverageAttestationV1,
@@ -240,6 +289,7 @@ pub fn verify_retained_recovery_coverage_digest(
     verify_coverage(
         approval,
         requirements,
+        action,
         basis,
         attestations,
         assignments,
@@ -273,6 +323,7 @@ fn charge_attestation(
 fn verify_coverage(
     approval: &ApprovalIntentV1,
     requirements: &AuthorizationRequirementsV1,
+    action: &ActionIntentV1,
     basis: BasisDigest,
     attestations: &NonEmptyBoundedList<
         SignedAuthorityCoverageAttestationV1,
@@ -297,6 +348,22 @@ fn verify_coverage(
         != RecoveryDigestDomain::AuthorizationRequirements
             .digest(&canonical_requirements)
             .as_bytes()
+    {
+        return Err(DeclassificationError::BindingMismatch);
+    }
+    let canonical_action =
+        CanonicalBytes::new(action).map_err(|_| DeclassificationError::InvalidGrant)?;
+    if canonical_action.as_bytes().len() > MAX_RECOVERY_WIRE_BYTES {
+        return Err(DeclassificationError::InvalidGrant);
+    }
+    if approval.action_intent.as_bytes()
+        != RecoveryDigestDomain::ActionIntent
+            .digest(&canonical_action)
+            .as_bytes()
+        || action.authorization_requirements != *requirements
+        || action.scope != approval.scope
+        || action.basis != basis
+        || action.authority_scope != requirements.issuer_scope
     {
         return Err(DeclassificationError::BindingMismatch);
     }
@@ -406,6 +473,7 @@ fn verify_coverage(
         obligations: covered,
         binding: VerifiedCoverageBinding {
             approval: approval.clone(),
+            action: action.clone(),
             source_label_hash: crate::information_label_hash(&requirements.source_label)?,
             target_label: requirements.admitted_target.clone(),
             authority_scope: requirements.issuer_scope,

@@ -4,7 +4,9 @@ use chio_core_types::recovery::{
 };
 use chio_core_types::{canonical_json_bytes, Keypair};
 use chio_flow::*;
-use chio_security_types::flow::{DeclassificationPurpose, InformationLabel, PrincipalId};
+use chio_security_types::flow::{
+    Compartment, DeclassificationPurpose, InformationLabel, PrincipalId,
+};
 use chio_security_types::ports::{CanonicalBody, DestinationId, RecordId};
 use chio_security_types::recovery::*;
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,6 +30,93 @@ fn requirements_digest(
     ))
 }
 
+fn action_digest(action: &ActionIntentV1) -> Result<IntentDigest> {
+    Ok(IntentDigest::from_bytes(
+        *RecoveryDigestDomain::ActionIntent
+            .digest(&CanonicalBytes::new(action)?)
+            .as_bytes(),
+    ))
+}
+
+/// The binding a host derives from its own reviewed action, approval, coverage
+/// and native isolation epoch, independent of any presented grant.
+fn expected_binding(
+    action: &ActionIntentV1,
+    approval: &ApprovalIntentV1,
+    coverage: CoverageDigest,
+    isolation_epoch: SafeInteger,
+) -> RecoveryGrantBindingV1 {
+    RecoveryGrantBindingV1 {
+        schema: RecoveryGrantBindingSchema::V1,
+        version: VersionV1,
+        authority_domain: action.scope.authority_domain.clone(),
+        workflow_id: action.workflow_id.clone(),
+        step_id: action.step_id.clone(),
+        continuation_id: action.continuation_id.clone(),
+        process_id: action.scope.process_id.clone(),
+        request_namespace: action.request_namespace,
+        request_id: action.request_id.clone(),
+        action_intent: approval.action_intent,
+        authorization_requirements: approval.authorization_requirements,
+        selected_offer: approval.offer,
+        approved_plan: approval.plan,
+        policy_digest: action.policy_digest,
+        contract_digest: action.contract_digest,
+        authority_scope: action.authority_scope,
+        isolation_lineage: action.isolation_lineage.clone(),
+        isolation_epoch,
+        output_disposition: action.output_disposition,
+        coverage_digest: coverage,
+        approval_intent: approval.approval_intent.clone(),
+        challenge: approval.challenge.clone(),
+    }
+}
+
+fn corpus_coverage(
+    corpus: &serde_json::Value,
+) -> Result<(
+    ApprovalIntentV1,
+    AuthorizationRequirementsV1,
+    ActionIntentV1,
+    VerifiedRecoveryCoverage,
+    u64,
+)> {
+    let requirements: AuthorizationRequirementsV1 =
+        serde_json::from_value(corpus["requirements"].clone())?;
+    let approval: ApprovalIntentV1 = serde_json::from_value(corpus["approval_intent"].clone())?;
+    let action: ActionIntentV1 = serde_json::from_value(corpus["action"].clone())?;
+    let proof: Signed = serde_json::from_value(corpus["coverage"][0].clone())?;
+    let assignments = BTreeMap::from([(
+        proof.body().issuer_id.clone(),
+        RecoveryAuthorityAssignment {
+            principal: proof.body().principal.clone(),
+            key: proof.authority_key().clone(),
+            obligations: proof
+                .body()
+                .obligations
+                .as_slice()
+                .iter()
+                .cloned()
+                .collect(),
+        },
+    )]);
+    let now = approval
+        .issued_at_unix_ms
+        .get()
+        .checked_add(1)
+        .ok_or("approval fixture timestamp overflow")?;
+    let coverage = verify_recovery_coverage(
+        &approval,
+        &requirements,
+        &action,
+        action.basis,
+        &NonEmptyBoundedList::new(vec![proof])?,
+        &assignments,
+        now,
+    )?;
+    Ok((approval, requirements, action, coverage, now))
+}
+
 fn key(seed: usize, base: u8) -> Result<Keypair> {
     let seed = u8::try_from(seed)?
         .checked_add(base)
@@ -38,6 +127,7 @@ fn key(seed: usize, base: u8) -> Result<Keypair> {
 struct Fixture {
     approval: ApprovalIntentV1,
     requirements: AuthorizationRequirementsV1,
+    action: ActionIntentV1,
     basis: BasisDigest,
     proofs: Vec<Signed>,
     assignments: BTreeMap<IssuerId, RecoveryAuthorityAssignment>,
@@ -67,7 +157,9 @@ impl Fixture {
         Ok(fixture)
     }
 
-    /// Requirements over `source` downgraded to the bottom label, with no attestations.
+    /// Requirements over `source` downgraded to the bottom label and the
+    /// reviewed action embedding them, with no attestations. The action keeps
+    /// isolation epoch zero, which v1 actions permit.
     fn empty(source: InformationLabel) -> Result<Self> {
         let scope = RecoveryScopeV1 {
             authority_domain: AuthorityDomainId::new("authority")?,
@@ -91,13 +183,20 @@ impl Fixture {
             validity_ceiling_unix_ms: SafeInteger::new(200_000)?,
             attachment_profile: RecoveryAttachmentProfile::Ordinary,
         };
+        let basis = BasisDigest::from_bytes([8; 32]);
+        let mut action: ActionIntentV1 = serde_json::from_value(corpus()?["action"].clone())?;
+        action.scope = scope.clone();
+        action.authorization_requirements = requirements.clone();
+        action.basis = basis;
+        action.authority_scope = requirements.issuer_scope;
+        action.isolation_epoch = SafeInteger::ZERO;
         let approval = ApprovalIntentV1 {
             schema: ApprovalIntentSchema::V1,
             version: VersionV1,
             scope,
             approval_intent: ApprovalIntentRef::new("approval")?,
             challenge: ChallengeId::new("challenge")?,
-            action_intent: IntentDigest::from_bytes([4; 32]),
+            action_intent: action_digest(&action)?,
             authorization_requirements: requirements_digest(&requirements)?,
             offer: OfferDigest::from_bytes([5; 32]),
             plan: PlanDigest::from_bytes([6; 32]),
@@ -112,7 +211,8 @@ impl Fixture {
         Ok(Self {
             approval,
             requirements,
-            basis: BasisDigest::from_bytes([8; 32]),
+            action,
+            basis,
             proofs: Vec::new(),
             assignments: BTreeMap::new(),
             keys: Vec::new(),
@@ -175,6 +275,30 @@ impl Fixture {
         })
     }
 
+    /// Embed the current requirements in the action and recompute the approval
+    /// digests over them.
+    fn rebind_requirements(&mut self) -> Result {
+        self.action.authorization_requirements = self.requirements.clone();
+        self.approval.authorization_requirements = requirements_digest(&self.requirements)?;
+        self.approval.action_intent = action_digest(&self.action)?;
+        Ok(())
+    }
+
+    /// Recompute the approval action digest and re-sign every attestation over
+    /// the current approval, keeping issuers, principals and obligations.
+    fn reapprove_action(&mut self) -> Result {
+        self.approval.action_intent = action_digest(&self.action)?;
+        let mut proofs = Vec::new();
+        for (proof, key) in self.proofs.iter().zip(&self.keys) {
+            let mut body = proof.body().clone();
+            body.action_intent = self.approval.action_intent;
+            body.authorization_requirements = self.approval.authorization_requirements;
+            proofs.push(Signed::sign(body, key)?);
+        }
+        self.proofs = proofs;
+        Ok(())
+    }
+
     /// Attestation `index` covers the obligations selected by `cover`.
     fn attest_all(&mut self, attestations: usize, cover: impl Fn(usize) -> Vec<usize>) -> Result {
         let obligations = self.requirements.obligations.as_slice().to_vec();
@@ -202,6 +326,7 @@ impl Fixture {
         verify_recovery_coverage(
             &self.approval,
             &self.requirements,
+            &self.action,
             self.basis,
             &proofs,
             &self.assignments,
@@ -450,7 +575,7 @@ fn requirements_cannot_declare_endorsement_or_acceptance_as_disclosure() -> Resu
         declared.push(extra);
         f.requirements.obligations = NonEmptyBoundedList::new(declared)?;
         f.approval.obligations = f.requirements.obligations.clone();
-        f.approval.authorization_requirements = requirements_digest(&f.requirements)?;
+        f.rebind_requirements()?;
         assert_eq!(
             f.verify(f.proofs.clone(), 150_000).err(),
             Some(DeclassificationError::BindingMismatch)
@@ -463,38 +588,7 @@ fn requirements_cannot_declare_endorsement_or_acceptance_as_disclosure() -> Resu
 fn recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts() -> Result {
     let fixture = corpus()?;
     let grant: SignedRecoveryGrant = serde_json::from_value(fixture["grant"].clone())?;
-    let requirements: AuthorizationRequirementsV1 =
-        serde_json::from_value(fixture["requirements"].clone())?;
-    let approval: ApprovalIntentV1 = serde_json::from_value(fixture["approval_intent"].clone())?;
-    let action: ActionIntentV1 = serde_json::from_value(fixture["action"].clone())?;
-    let proof: Signed = serde_json::from_value(fixture["coverage"][0].clone())?;
-    let assignments = BTreeMap::from([(
-        proof.body().issuer_id.clone(),
-        RecoveryAuthorityAssignment {
-            principal: proof.body().principal.clone(),
-            key: proof.authority_key().clone(),
-            obligations: proof
-                .body()
-                .obligations
-                .as_slice()
-                .iter()
-                .cloned()
-                .collect(),
-        },
-    )]);
-    let now = approval
-        .issued_at_unix_ms
-        .get()
-        .checked_add(1)
-        .ok_or("approval fixture timestamp overflow")?;
-    let coverage = verify_recovery_coverage(
-        &approval,
-        &requirements,
-        action.basis,
-        &NonEmptyBoundedList::new(vec![proof])?,
-        &assignments,
-        now,
-    )?;
+    let (approval, requirements, action, coverage, now) = corpus_coverage(&fixture)?;
     let claims = &grant.body().claims;
     let request = corpus_request(
         &fixture,
@@ -503,7 +597,12 @@ fn recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts() -> Resul
         now,
         grant.authority_key().clone(),
     )?;
-    let expected = grant.body().recovery.clone();
+    let expected = expected_binding(&action, &approval, coverage.digest(), SafeInteger::new(1)?);
+    assert_eq!(
+        grant.body().recovery,
+        expected,
+        "the corpus grant carries the independently derived binding"
+    );
     let mut premature = request.clone();
     premature.now_unix_ms = claims
         .issued_at_unix_seconds()
@@ -594,14 +693,7 @@ fn recovery_all_resigned_grant_binding_fields_refuse_foreign_contexts() -> Resul
 fn matching_digest_or_signature_alone_cannot_substitute_for_verified_coverage() -> Result {
     let fixture = corpus()?;
     let grant: SignedRecoveryGrant = serde_json::from_value(fixture["grant"].clone())?;
-    let requirements: AuthorizationRequirementsV1 =
-        serde_json::from_value(fixture["requirements"].clone())?;
-    let approval: ApprovalIntentV1 = serde_json::from_value(fixture["approval_intent"].clone())?;
-    let now = approval
-        .issued_at_unix_ms
-        .get()
-        .checked_add(1)
-        .ok_or("approval fixture timestamp overflow")?;
+    let (approval, requirements, action, coverage, now) = corpus_coverage(&fixture)?;
     let request = corpus_request(
         &fixture,
         &grant,
@@ -611,7 +703,12 @@ fn matching_digest_or_signature_alone_cannot_substitute_for_verified_coverage() 
     )?;
     let foreign = Fixture::new()?;
     let foreign = foreign.verify(foreign.proofs.clone(), 150_000)?;
-    let expected = grant.body().recovery.clone();
+    let expected = expected_binding(&action, &approval, coverage.digest(), SafeInteger::new(1)?);
+    assert_eq!(
+        verify_recovery_declassification(&grant, &request, &expected, &coverage).err(),
+        None,
+        "positive control with the independently derived binding"
+    );
     assert_eq!(
         verify_recovery_declassification(&grant, &request, &expected, &foreign).err(),
         Some(DeclassificationError::BindingMismatch),
@@ -637,8 +734,9 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
     f.requirements.obligations =
         required_recovery_disclosure_obligations(&f.requirements.source_label, &target)?;
     f.approval.obligations = f.requirements.obligations.clone();
-    f.approval.authorization_requirements = requirements_digest(&f.requirements)?;
+    f.rebind_requirements()?;
     let mut proof = f.proofs[0].body().clone();
+    proof.action_intent = f.approval.action_intent;
     proof.authorization_requirements = f.approval.authorization_requirements;
     proof.obligations = f.requirements.obligations.clone();
     f.proofs = vec![Signed::sign(proof, &f.keys[0])?];
@@ -654,18 +752,14 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
     body["claims"]["purpose"] = serde_json::to_value(&f.approval.purpose)?;
     body["claims"]["issued_at_unix_seconds"] = serde_json::json!(100);
     body["claims"]["expires_at_unix_seconds"] = serde_json::json!(160);
-    body["recovery"]["authority_domain"] =
-        serde_json::to_value(&f.approval.scope.authority_domain)?;
-    body["recovery"]["process_id"] = serde_json::to_value(&f.approval.scope.process_id)?;
-    body["recovery"]["action_intent"] = serde_json::to_value(f.approval.action_intent)?;
-    body["recovery"]["authorization_requirements"] =
-        serde_json::to_value(f.approval.authorization_requirements)?;
-    body["recovery"]["approval_intent"] = serde_json::to_value(&f.approval.approval_intent)?;
-    body["recovery"]["challenge"] = serde_json::to_value(&f.approval.challenge)?;
-    body["recovery"]["selected_offer"] = serde_json::to_value(f.approval.offer)?;
-    body["recovery"]["approved_plan"] = serde_json::to_value(f.approval.plan)?;
-    body["recovery"]["authority_scope"] = serde_json::to_value(f.requirements.issuer_scope)?;
-    body["recovery"]["coverage_digest"] = serde_json::to_value(coverage.digest())?;
+    body["claims"]["capability_id"] = serde_json::to_value(&f.action.capability_id)?;
+    let expected = expected_binding(
+        &f.action,
+        &f.approval,
+        coverage.digest(),
+        SafeInteger::new(1)?,
+    );
+    body["recovery"] = serde_json::to_value(&expected)?;
     let key = Keypair::from_seed(&[143; 32]);
     let grant = SignedRecoveryGrant::sign(serde_json::from_value(body.clone())?, &key)?;
     let request = corpus_request(
@@ -676,9 +770,22 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
         key.public_key(),
     )?;
     assert_eq!(
-        verify_recovery_declassification(&grant, &request, &grant.body().recovery, &coverage).err(),
+        verify_recovery_declassification(&grant, &request, &expected, &coverage).err(),
         None,
-        "positive narrowed coverage control"
+        "positive narrowed coverage control with a positive native epoch over a zero-epoch action"
+    );
+    let mut epoch = body.clone();
+    epoch["recovery"]["isolation_epoch"] = serde_json::json!(2);
+    let epoch = SignedRecoveryGrant::sign(serde_json::from_value(epoch)?, &key)?;
+    assert_eq!(
+        verify_recovery_declassification(&epoch, &request, &epoch.body().recovery, &coverage).err(),
+        None,
+        "coverage leaves the isolation epoch to the expected binding"
+    );
+    assert_eq!(
+        verify_recovery_declassification(&epoch, &request, &expected, &coverage).err(),
+        Some(DeclassificationError::BindingMismatch),
+        "the expected binding selects the native isolation epoch"
     );
     for field in [
         "target_label",
@@ -691,10 +798,22 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
         "authority_scope",
         "authority_domain",
         "process_id",
+        "workflow_id",
+        "step_id",
+        "continuation_id",
+        "request_namespace",
+        "request_id",
+        "policy_digest",
+        "contract_digest",
+        "isolation_lineage",
+        "output_disposition",
+        "capability_id",
     ] {
         let mut changed = body.clone();
         if field == "target_label" {
             changed["claims"][field] = serde_json::to_value(InformationLabel::bottom())?;
+        } else if field == "capability_id" {
+            changed["claims"][field] = serde_json::json!("foreign-capability");
         } else {
             let value = &changed["recovery"][field];
             changed["recovery"][field] = if value.is_array() {
@@ -708,16 +827,23 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
             changed.verify_signature()?,
             "the negative must retain trusted cryptography"
         );
+        let echoed = corpus_request(
+            &fixture,
+            &changed,
+            f.requirements.source_label.clone(),
+            150_000,
+            key.public_key(),
+        )?;
         assert_eq!(
             verify_recovery_declassification(
                 &changed,
-                &request,
+                &echoed,
                 &changed.body().recovery,
                 &coverage
             )
             .err(),
             Some(DeclassificationError::BindingMismatch),
-            "coverage must independently bind {field}",
+            "coverage must bind {field} even when the expected binding and request echo the mutant",
         );
     }
     let mut later = body;
@@ -727,15 +853,159 @@ fn recovery_grants_cannot_widen_or_substitute_independently_verified_coverage() 
     let mut after_coverage = request;
     after_coverage.now_unix_ms = 200_000;
     assert_eq!(
-        verify_recovery_declassification(
-            &later,
-            &after_coverage,
-            &later.body().recovery,
-            &coverage,
-        )
-        .err(),
+        verify_recovery_declassification(&later, &after_coverage, &expected, &coverage).err(),
         Some(DeclassificationError::Expired),
         "verified coverage keeps its own validity window under a later trusted grant"
+    );
+    Ok(())
+}
+
+/// Coverage over the fixture after `mutate` changes the reviewed action and the
+/// approval and attestations are recomputed and re-signed over that action.
+fn reapproved(
+    mutate: impl FnOnce(&mut ActionIntentV1) -> Result,
+) -> Result<Option<DeclassificationError>> {
+    let mut f = Fixture::new()?;
+    mutate(&mut f.action)?;
+    f.reapprove_action()?;
+    Ok(f.verify(f.proofs.clone(), 150_000).err())
+}
+
+#[test]
+fn coverage_requires_the_exact_reviewed_action() -> Result {
+    assert_eq!(
+        reapproved(|_| Ok(()))?,
+        None,
+        "recomputing and re-signing an unchanged action verifies"
+    );
+
+    let mut unreviewed = Fixture::new()?;
+    unreviewed.action.workflow_id = WorkflowId::new("foreign-workflow")?;
+    assert_eq!(
+        unreviewed.verify(unreviewed.proofs.clone(), 150_000).err(),
+        Some(DeclassificationError::BindingMismatch),
+        "the approval must name the digest of the presented action"
+    );
+
+    assert_eq!(
+        reapproved(|action| {
+            action.authorization_requirements.validity_ceiling_unix_ms = SafeInteger::new(190_000)?;
+            Ok(())
+        })?,
+        Some(DeclassificationError::BindingMismatch),
+        "the action must embed the independently selected requirements"
+    );
+    assert_eq!(
+        reapproved(|action| {
+            action.scope.process_id = ProcessId::new("foreign-process")?;
+            Ok(())
+        })?,
+        Some(DeclassificationError::BindingMismatch),
+        "the action scope must be the approval scope"
+    );
+    assert_eq!(
+        reapproved(|action| {
+            action.basis = BasisDigest::from_bytes([9; 32]);
+            Ok(())
+        })?,
+        Some(DeclassificationError::BindingMismatch),
+        "the action basis must be the independently selected basis"
+    );
+    assert_eq!(
+        reapproved(|action| {
+            action.authority_scope = AuthorityScopeDigest::from_bytes([9; 32]);
+            Ok(())
+        })?,
+        Some(DeclassificationError::BindingMismatch),
+        "the action authority scope must be the requirements issuer scope"
+    );
+    assert_eq!(
+        reapproved(|action| {
+            action.isolation_epoch = SafeInteger::new(7)?;
+            action.semantic_request = SemanticRequestDigest::from_bytes([9; 32]);
+            Ok(())
+        })?,
+        None,
+        "fields reviewed only through the action digest verify once re-approved"
+    );
+    Ok(())
+}
+
+#[test]
+fn disclosure_obligations_refuse_above_the_obligation_bound() -> Result {
+    let owners = (0..MAX_RECOVERY_OBLIGATIONS)
+        .map(|index| {
+            let owner = PrincipalId::new(format!("owner:{index:02}"))?;
+            Ok((owner.clone(), BTreeSet::from([owner])))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    let at_bound = InformationLabel::try_known(owners.clone(), BTreeSet::new())?;
+    assert_eq!(
+        required_recovery_disclosure_obligations(&at_bound, &InformationLabel::bottom())?
+            .as_slice()
+            .len(),
+        MAX_RECOVERY_OBLIGATIONS
+    );
+    let over =
+        InformationLabel::try_known(owners, BTreeSet::from([Compartment::new("restricted")?]))?;
+    assert_eq!(
+        required_recovery_disclosure_obligations(&over, &InformationLabel::bottom()).err(),
+        Some(DeclassificationError::InvalidTarget),
+        "65 required releases refuse with the existing InvalidTarget contract"
+    );
+    Ok(())
+}
+
+#[test]
+fn multi_attestation_coverage_digest_matches_the_golden_value() -> Result {
+    let fixture = corpus()?;
+    let requirements: AuthorizationRequirementsV1 =
+        serde_json::from_value(fixture["requirements"].clone())?;
+    let approval: ApprovalIntentV1 = serde_json::from_value(fixture["approval_intent"].clone())?;
+    let action: ActionIntentV1 = serde_json::from_value(fixture["action"].clone())?;
+    let template: Signed = serde_json::from_value(fixture["coverage"][0].clone())?;
+    let mut proofs = Vec::new();
+    let mut assignments = BTreeMap::new();
+    for (index, name) in ["approver:a", "approver:b", "approver:c"]
+        .into_iter()
+        .enumerate()
+    {
+        let key = key(index, 61)?;
+        let mut body = template.body().clone();
+        body.issuer_id = IssuerId::new(&format!("issuer:{name}"))?;
+        body.principal = PrincipalId::new(name)?;
+        assignments.insert(
+            body.issuer_id.clone(),
+            RecoveryAuthorityAssignment {
+                principal: body.principal.clone(),
+                key: key.public_key(),
+                obligations: body.obligations.as_slice().iter().cloned().collect(),
+            },
+        );
+        proofs.push(Signed::sign(body, &key)?);
+    }
+    proofs.reverse();
+    let now = approval
+        .issued_at_unix_ms
+        .get()
+        .checked_add(1)
+        .ok_or("approval fixture timestamp overflow")?;
+    let coverage = verify_recovery_coverage(
+        &approval,
+        &requirements,
+        &action,
+        action.basis,
+        &NonEmptyBoundedList::new(proofs)?,
+        &assignments,
+        now,
+    )?;
+    assert_eq!(
+        coverage.digest(),
+        CoverageDigest::from_bytes([
+            114, 237, 7, 15, 116, 153, 82, 45, 127, 154, 124, 229, 120, 103, 106, 248, 107, 236,
+            199, 157, 45, 56, 86, 205, 121, 126, 44, 202, 19, 28, 166, 147,
+        ]),
+        "three corpus-bound attestations ordered by principal, then issuer"
     );
     Ok(())
 }

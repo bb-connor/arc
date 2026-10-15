@@ -15,12 +15,21 @@ use chio_security_types::{flow::PrincipalId, recovery::*, InformationLabel};
 use std::collections::{BTreeMap, BTreeSet};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+fn action_digest(action: &ActionIntentV1) -> Result<IntentDigest, Box<dyn std::error::Error>> {
+    Ok(IntentDigest::from_bytes(
+        *RecoveryDigestDomain::ActionIntent
+            .digest(&CanonicalBytes::new(action)?)
+            .as_bytes(),
+    ))
+}
 type Attestations =
     NonEmptyBoundedList<SignedAuthorityCoverageAttestationV1, MAX_RECOVERY_APPROVAL_ATTESTATIONS>;
 
 struct Retained {
     approval: ApprovalIntentV1,
     requirements: AuthorizationRequirementsV1,
+    action: ActionIntentV1,
     basis: BasisDigest,
     proofs: Vec<SignedAuthorityCoverageAttestationV1>,
     assignments: BTreeMap<IssuerId, RecoveryAuthorityAssignment>,
@@ -28,7 +37,8 @@ struct Retained {
 }
 
 /// A current-format bundle of `owners` single-owner attestations over the
-/// current corpus approval, retained for verification at preparation time.
+/// current corpus approval and its reviewed action, retained for verification
+/// at preparation time.
 fn retained(owners: usize) -> Result<Retained, Box<dyn std::error::Error>> {
     let corpus: serde_json::Value = serde_json::from_str(include_str!(
         "../../../../spec/vectors/recovery/v1/authority-positive.json"
@@ -55,6 +65,10 @@ fn retained(owners: usize) -> Result<Retained, Box<dyn std::error::Error>> {
             .as_bytes(),
     );
     let basis = BasisDigest::from_bytes([8; 32]);
+    let mut action: ActionIntentV1 = serde_json::from_value(corpus["action"].clone())?;
+    action.authorization_requirements = requirements.clone();
+    action.basis = basis;
+    approval.action_intent = action_digest(&action)?;
     let mut assignments = BTreeMap::new();
     let mut proofs = Vec::new();
     let mut keys = Vec::new();
@@ -97,6 +111,7 @@ fn retained(owners: usize) -> Result<Retained, Box<dyn std::error::Error>> {
     Ok(Retained {
         approval,
         requirements,
+        action,
         basis,
         proofs,
         assignments,
@@ -114,6 +129,7 @@ impl Retained {
         verify_retained_recovery_coverage_digest(
             &self.approval,
             &self.requirements,
+            &self.action,
             self.basis,
             proofs,
             assignments,
@@ -146,6 +162,7 @@ fn retained_coverage_verifies_at_preparation_time_and_returns_only_a_digest() ->
     let fresh = verify_recovery_coverage(
         &bundle.approval,
         &bundle.requirements,
+        &bundle.action,
         bundle.basis,
         &proofs,
         &bundle.assignments,
@@ -160,6 +177,7 @@ fn retained_coverage_verifies_at_preparation_time_and_returns_only_a_digest() ->
         verify_recovery_coverage(
             &bundle.approval,
             &bundle.requirements,
+            &bundle.action,
             bundle.basis,
             &proofs,
             &bundle.assignments,
@@ -183,6 +201,7 @@ fn retained_coverage_verifies_at_preparation_time_and_returns_only_a_digest() ->
         ))?;
         serde_json::from_value(corpus["grant"]["body"].clone())?
     };
+    grant.recovery.action_intent = bundle.approval.action_intent;
     grant.recovery.authorization_requirements = bundle.approval.authorization_requirements;
     grant.recovery.coverage_digest = expected;
     grant.claims = {
@@ -206,7 +225,7 @@ fn retained_coverage_verifies_at_preparation_time_and_returns_only_a_digest() ->
 }
 
 #[test]
-fn retained_coverage_keeps_every_binding_assignment_and_signature_check() -> TestResult {
+fn retained_coverage_keeps_every_action_binding_assignment_and_signature_check() -> TestResult {
     let bundle = retained(MAX_RECOVERY_APPROVAL_ATTESTATIONS)?;
     let prepared_at = bundle
         .approval
@@ -231,6 +250,38 @@ fn retained_coverage_keeps_every_binding_assignment_and_signature_check() -> Tes
     );
 
     let proofs = Attestations::new(bundle.proofs.clone())?;
+    let mut foreign_action = bundle.action.clone();
+    foreign_action.request_id = RequestId::new("foreign-request")?;
+    assert_eq!(
+        verify_retained_recovery_coverage_digest(
+            &bundle.approval,
+            &bundle.requirements,
+            &foreign_action,
+            bundle.basis,
+            &proofs,
+            &bundle.assignments,
+            prepared_at,
+        )
+        .err(),
+        Some(DeclassificationError::BindingMismatch),
+        "a retained bundle verifies only against the action its approval names"
+    );
+    let mut foreign_basis = bundle.action.clone();
+    foreign_basis.basis = BasisDigest::from_bytes([9; 32]);
+    assert_eq!(
+        verify_retained_recovery_coverage_digest(
+            &bundle.approval,
+            &bundle.requirements,
+            &foreign_basis,
+            bundle.basis,
+            &proofs,
+            &bundle.assignments,
+            prepared_at,
+        )
+        .err(),
+        Some(DeclassificationError::BindingMismatch),
+        "a retained action must carry the independently selected basis"
+    );
     let unassigned: BTreeMap<_, _> = bundle
         .assignments
         .iter()
