@@ -24,12 +24,14 @@ mod classification;
 mod declassification;
 mod engine;
 mod lattice;
+mod recovery_authority;
 
 #[cfg(any(feature = "std", test))]
 pub use classification::{CategoryLabelMap, ClassificationMappingError, VerifiedClassification};
 pub use declassification::{
-    canonical_request_hash, information_label_hash, verify_declassification, DeclassificationError,
-    DeclassificationVerificationRequest, VerifiedDeclassification,
+    canonical_request_hash, information_label_hash, verify_declassification,
+    verify_recovery_declassification, DeclassificationError, DeclassificationVerificationRequest,
+    VerifiedDeclassification,
 };
 #[cfg(any(feature = "std", test))]
 pub use declassification::{ConsumedDeclassification, DeclassificationDispatchOutcome};
@@ -42,3 +44,8 @@ pub use engine::{
     FlowAdmission, FlowDenial, PreparedFlowAdmission, ResolvedFlowRequest,
 };
 pub use lattice::{authorize_egress, EgressDenial, InformationFlowLattice, LatticeError};
+pub use recovery_authority::{
+    required_recovery_disclosure_obligations, verify_recovery_coverage,
+    verify_retained_recovery_coverage_digest, RecoveryAuthorityAssignment,
+    VerifiedRecoveryCoverage,
+};
