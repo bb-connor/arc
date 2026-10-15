@@ -33,6 +33,22 @@ fn known_signed_artifact_schemas_are_supported() {
 }
 
 #[test]
+fn agent_web_envelope_registry_accepts_v1_and_refuses_v2() {
+    chio_core_types::validate_signed_artifact_schema("chio.agent-web-proof-envelope.v1")
+        .expect("the scope-bound envelope schema is supported");
+    let error =
+        chio_core_types::validate_signed_artifact_schema("chio.agent-web-proof-envelope.v2")
+            .expect_err("unsupported envelope schema must be refused");
+    let chio_core_types::Error::CanonicalJson(message) = error else {
+        panic!("expected an unsupported schema error, got {error}");
+    };
+    assert_eq!(
+        message,
+        "unsupported signed-artifact schema: chio.agent-web-proof-envelope.v2"
+    );
+}
+
+#[test]
 fn economic_continuity_schemas_are_registered() {
     for (schema, artifact_kind) in [
         ("chio.economy.resource-head.v1", "economic_resource_head"),

@@ -185,9 +185,13 @@ fn verifier_refuses_unsupported_envelope_schema() {
 #[test]
 fn verifier_refuses_unsupported_envelope_payload_schema() {
     let mut bundle = agent_web_bundle(AgentWebCase::Valid);
-    replace_agent_web_envelope_artifact(&mut bundle, "standard-webhooks-envelope.json", |envelope| {
-        envelope["schema"] = json!("chio.agent-web-proof-envelope.v2");
-    });
+    replace_agent_web_envelope_artifact(
+        &mut bundle,
+        "standard-webhooks-envelope.json",
+        |envelope| {
+            envelope["schema"] = json!("chio.agent-web-proof-envelope.v2");
+        },
+    );
 
     let error = verify_agent_web_interop(&bundle)
         .test_expect_err("the graph schema cannot authorize an unsupported envelope payload");
@@ -195,6 +199,38 @@ fn verifier_refuses_unsupported_envelope_payload_schema() {
     assert_eq!(
         error.to_string(),
         "invalid Agent Web artifact standard-webhooks-envelope.json: unsupported schema: chio.agent-web-proof-envelope.v2"
+    );
+}
+
+#[test]
+fn verifier_refuses_envelope_without_passport_scope() {
+    let mut bundle = agent_web_bundle(AgentWebCase::Valid);
+    replace_agent_web_envelope_artifact(
+        &mut bundle,
+        "standard-webhooks-envelope.json",
+        |envelope| {
+            envelope
+                .as_object_mut()
+                .test_expect("proof envelope is an object")
+                .remove("agent_web_passport_scope_sha256");
+        },
+    );
+
+    let error = verify_agent_web_interop(&bundle)
+        .test_expect_err("an unscoped envelope must fail structural validation");
+    let chio_transaction_passport::TransactionPassportError::Input(input) = error else {
+        panic!("expected a structural decoding error, got {error}");
+    };
+    assert_eq!(
+        input.code(),
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
+    let source = std::error::Error::source(&input)
+        .and_then(std::error::Error::source)
+        .test_expect("decoding error retains its source");
+    assert_eq!(
+        source.to_string(),
+        "missing field `agent_web_passport_scope_sha256`"
     );
 }
 
