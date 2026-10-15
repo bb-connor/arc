@@ -1296,7 +1296,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `ad21de4144f5858a55d5eb504bb3bd3e6eae3e38f87b083255ebecfa919dd0d6`
+- Input digest: `cebee9279f3fa4913bcba99366795cdbdb355b6f733ce9310c2c101814b1cd79`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
