@@ -122,3 +122,236 @@ fn claim_rows_reject_replacement_mutation_and_unbounded_fields() -> TestResult {
     }
     Ok(())
 }
+
+const HEX64: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const PADDING: usize = 1 << 20;
+
+enum Probe {
+    Text(String),
+    Blob(Vec<u8>),
+}
+
+fn table_items(table_sql: &str) -> Vec<String> {
+    let Some(open) = table_sql.find('(') else {
+        return Vec::new();
+    };
+    let mut depth = 0usize;
+    let mut quoted = false;
+    let mut start = open + 1;
+    let mut items = Vec::new();
+    for (offset, ch) in table_sql[open..].char_indices() {
+        let index = open + offset;
+        match ch {
+            '\'' => quoted = !quoted,
+            '(' if !quoted => depth += 1,
+            ')' if !quoted => {
+                depth -= 1;
+                if depth == 0 {
+                    items.push(table_sql[start..index].trim().to_owned());
+                    break;
+                }
+            }
+            ',' if !quoted && depth == 1 => {
+                items.push(table_sql[start..index].trim().to_owned());
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    items
+}
+
+fn bounded_columns(catalog: &Connection) -> rusqlite::Result<Vec<(String, String, String, bool)>> {
+    let mut statement = catalog.prepare(
+        "SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND sql IS NOT NULL ORDER BY name",
+    )?;
+    let tables = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut columns = Vec::new();
+    for (table, sql) in tables {
+        let strict = sql.trim_end().ends_with("STRICT") || sql.contains(") STRICT");
+        for item in table_items(&sql) {
+            let mut words = item.split_whitespace();
+            let (Some(name), Some(kind)) = (words.next(), words.next()) else {
+                continue;
+            };
+            if matches!(kind, "TEXT" | "BLOB") && item.contains(&format!("length({name})")) {
+                columns.push((table.clone(), name.to_owned(), item.clone(), strict));
+            }
+        }
+    }
+    Ok(columns)
+}
+
+fn is_bound_refusal(result: &rusqlite::Result<usize>) -> bool {
+    matches!(
+        result,
+        Err(rusqlite::Error::SqliteFailure(error, Some(_)))
+            if error.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_CHECK
+                || error.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_DATATYPE
+    )
+}
+
+fn probe_table(definition: &str, strict: bool, encoding: &str) -> rusqlite::Result<Connection> {
+    let probe = Connection::open_in_memory()?;
+    let suffix = if strict { " STRICT" } else { "" };
+    probe.execute_batch(&format!(
+        "PRAGMA encoding = '{encoding}'; PRAGMA foreign_keys = OFF;\n         CREATE TABLE probe ({definition}){suffix};"
+    ))?;
+    Ok(probe)
+}
+
+fn accepted(definition: &str, strict: bool) -> rusqlite::Result<Option<Probe>> {
+    let probe = probe_table(definition, strict, "UTF-8")?;
+    let texts = [
+        HEX64.to_owned(),
+        "a".to_owned(),
+        "1".to_owned(),
+        "operation".to_owned(),
+        "0".repeat(64),
+    ];
+    for text in texts {
+        if probe
+            .execute("INSERT INTO probe VALUES (?1)", [&text])
+            .is_ok()
+        {
+            return Ok(Some(Probe::Text(text)));
+        }
+    }
+    for len in [1, 16, 32, 64] {
+        if probe
+            .execute("INSERT INTO probe VALUES (?1)", [vec![1_u8; len]])
+            .is_ok()
+        {
+            return Ok(Some(Probe::Blob(vec![1; len])));
+        }
+    }
+    Ok(None)
+}
+
+#[test]
+fn bounded_admission_columns_refuse_nul_and_malformed_text() -> TestResult {
+    let catalog = Connection::open_in_memory()?;
+    catalog.execute_batch(&admission_operation_schema_sql()?)?;
+    let columns = bounded_columns(&catalog)?;
+    assert!(columns.len() > 150, "{} bounded columns", columns.len());
+    let mut unprobed = Vec::new();
+    for (table, column, definition, strict) in &columns {
+        let label = format!("{table}.{column}");
+        let Some(valid) = accepted(definition, *strict)? else {
+            unprobed.push(label);
+            continue;
+        };
+        for encoding in ["UTF-8", "UTF-16le"] {
+            let probe = probe_table(definition, *strict, encoding)?;
+            match &valid {
+                Probe::Text(text) => {
+                    assert_eq!(
+                        probe.execute("INSERT INTO probe VALUES (?1)", [text])?,
+                        1,
+                        "{label}"
+                    );
+                    let padded = format!("{text}\0{}", "a".repeat(PADDING));
+                    let refused = probe.execute("INSERT INTO probe VALUES (?1)", [&padded]);
+                    assert!(
+                        is_bound_refusal(&refused),
+                        "{label} {encoding}: {refused:?}"
+                    );
+                    let mut in_width = text[..text.len() - 1].to_owned();
+                    in_width.push('\0');
+                    let refused = probe.execute("INSERT INTO probe VALUES (?1)", [&in_width]);
+                    assert!(
+                        is_bound_refusal(&refused),
+                        "{label} {encoding}: {refused:?}"
+                    );
+                    if encoding == "UTF-8" {
+                        let mut malformed = text.as_bytes().to_vec();
+                        malformed.extend(std::iter::repeat_n(0x80_u8, PADDING));
+                        let refused = probe
+                            .execute("INSERT INTO probe VALUES (CAST(?1 AS TEXT))", [malformed]);
+                        assert!(is_bound_refusal(&refused), "{label} malformed: {refused:?}");
+                    }
+                }
+                Probe::Blob(bytes) => {
+                    assert_eq!(
+                        probe.execute("INSERT INTO probe VALUES (?1)", [bytes])?,
+                        1,
+                        "{label}"
+                    );
+                    let as_text = format!("{}\0{}", "a".repeat(bytes.len()), "a".repeat(PADDING));
+                    let refused = probe.execute("INSERT INTO probe VALUES (?1)", [&as_text]);
+                    assert!(
+                        is_bound_refusal(&refused),
+                        "{label} {encoding}: {refused:?}"
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        unprobed.is_empty(),
+        "no accepted probe value for {unprobed:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn every_bounded_admission_text_column_carries_the_nul_guard() -> TestResult {
+    let catalog = Connection::open_in_memory()?;
+    catalog.execute_batch(&admission_operation_schema_sql()?)?;
+    let mut statement = catalog
+        .prepare("SELECT name, sql FROM sqlite_schema WHERE type = 'table' AND sql IS NOT NULL")?;
+    let tables = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for (table, sql) in tables {
+        assert!(
+            !sql.contains("length(CAST("),
+            "{table} bounds bytes in the database encoding"
+        );
+        for item in table_items(&sql) {
+            let mut words = item.split_whitespace();
+            let (Some(name), Some("TEXT")) = (words.next(), words.next()) else {
+                continue;
+            };
+            if sql.contains(&format!("length({name})")) {
+                assert!(
+                    sql.contains(&format!("instr({name}, char(0)) = 0")),
+                    "{table}.{name} is length-bounded without a NUL guard"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn commit_observed_clock_is_required() -> TestResult {
+    let catalog = Connection::open_in_memory()?;
+    catalog.execute_batch(&admission_operation_schema_sql()?)?;
+    let sql: String = catalog.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'admission_operation_commits'",
+        [],
+        |row| row.get(0),
+    )?;
+    let definition = table_items(&sql)
+        .into_iter()
+        .find(|item| item.starts_with("observed_at_unix_ms "))
+        .ok_or("observed_at_unix_ms is not defined")?;
+    let probe = probe_table(&definition, false, "UTF-8")?;
+    assert_eq!(probe.execute("INSERT INTO probe VALUES (1)", [])?, 1);
+    let error = probe
+        .execute("INSERT INTO probe VALUES (NULL)", [])
+        .err()
+        .ok_or("a commit without an observed clock was stored")?;
+    assert_eq!(
+        error.to_string(),
+        "NOT NULL constraint failed: probe.observed_at_unix_ms"
+    );
+    Ok(())
+}

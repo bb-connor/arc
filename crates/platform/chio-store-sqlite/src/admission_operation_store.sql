@@ -1545,7 +1545,7 @@ CREATE TABLE IF NOT EXISTS credit_exposure_reservations (
     reserved_resource_fence INTEGER NOT NULL CHECK (
         reserved_resource_fence BETWEEN 1 AND 9007199254740991
     ),
-    reservation_json BLOB NOT NULL CHECK (length(reservation_json) > 0),
+    reservation_json BLOB NOT NULL CHECK (typeof(reservation_json) = 'blob' AND length(reservation_json) > 0),
     reserved_at_unix_ms INTEGER NOT NULL CHECK (
         reserved_at_unix_ms BETWEEN 1 AND 9007199254740991
     ),
@@ -1623,7 +1623,7 @@ CREATE TABLE IF NOT EXISTS credit_exposure_terminal_transitions (
     obligation_id TEXT,
     account_version INTEGER NOT NULL CHECK (account_version BETWEEN 1 AND 9007199254740991),
     resource_fence INTEGER NOT NULL CHECK (resource_fence BETWEEN 1 AND 9007199254740991),
-    transition_json BLOB NOT NULL CHECK (length(transition_json) > 0),
+    transition_json BLOB NOT NULL CHECK (typeof(transition_json) = 'blob' AND length(transition_json) > 0),
     transitioned_at_unix_ms INTEGER NOT NULL CHECK (
         transitioned_at_unix_ms BETWEEN 1 AND 9007199254740991
     ),
