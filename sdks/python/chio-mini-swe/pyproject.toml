@@ -18,7 +18,7 @@ chio-mini-swe = "chio_mini_swe.operator:main"
 chio-mini-swe-repository = "chio_mini_swe.repository:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8,<9", "ruff>=0.5"]
+dev = ["pytest>=9.0.3,<10", "ruff>=0.5"]
 
 [tool.uv.sources]
 chio-process = { path = "../chio-process" }
