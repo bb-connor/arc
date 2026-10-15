@@ -190,6 +190,7 @@ redacted_debug!(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::string::ToString;
 
     #[test]
     fn grant_binding_requires_a_positive_epoch_and_actions_keep_epoch_zero(
