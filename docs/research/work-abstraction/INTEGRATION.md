@@ -6,7 +6,7 @@ This is the source contract for WORK-W1.0. The public Work client, owner service
 
 | Input | Exact commit | Scope |
 | --- | --- | --- |
-| Inspected main | `391e71864fdc92de5d1794c10bf9ad2496570ef9` | Existing native kernel, process, serving-owner, manifest and treaty APIs |
+| Inspected main | `a520638fa064faa58223feb625a9d8b306b1ea7e` | Existing native kernel, process, serving-owner, manifest and treaty APIs |
 | Remaining work source | `cafdc970e4f89bddf810647e4228a605ed9f498a` ([#1173](https://github.com/bb-connor/arc/pull/1173)) | F1 funded-work example source; D1 and additive S1 are on inspected main |
 | Pending recovery | `4b9229dca4329141ba3c929264ef71aee12e37c6` ([#1179](https://github.com/bb-connor/arc/pull/1179)) | Exact process reservation/origin, semantic, knowledge and confined-return interfaces; unqualified integration input |
 

@@ -1062,10 +1062,10 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/dispatch/runtime_admission.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/dispatch/runtime_admission.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=1130db3a8caed722b8a550248017a5ef4906a4afc89fa347002af8729522f29a, rust_symbols=ChioKernel::configured_runtime_participant_binding,ChioKernel::run_runtime_admission_hook)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/dispatch/security_pre_dispatch.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/dispatch/security_pre_dispatch.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=bb28d73845341a5915d02705316c14ece1c5fbbdcc7b229bd36af9e1ffca18be, rust_symbols=derive_security_dispatch_commitment_id,security_pre_dispatch_denial,ChioKernel::run_security_pre_dispatch_hook)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation.rs->formal/apalache/KernelTransitionCancelSafe.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation.rs` -> `formal/apalache/KernelTransitionCancelSafe.tla` (model_kind=tla, normalized_sha256=3c74bce288788ec9c4ff1db7ae5c1cd3bc2e893c3e100259d1c8976819baa2b6, rust_symbols=PostEffectObligation::enter)
-- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=d035b04e4ee2f08738d1f9cfde8912a80583385969dce2fe7df852133c946e5c, rust_symbols=PostEffectError,PostEffectError::at,PostEffectInputs,PostEffectObligation,Discharged,Delivery,PostEffectObligation::enter,PostEffectObligation::nested_receipt_sinks,PostEffectObligation::commit_terminal_receipt,PostEffectObligation::fail,PostEffectObligation::buffer,PostEffectObligation::drop,Discharged::deliver,Discharged::drop,run_post_effect)
+- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=9c7c011f5d1510bbb11d679ebe9e77fae304f08396af57363bb8815090250a57, rust_symbols=PostEffectError,PostEffectError::at,PostEffectInputs,PostEffectObligation,Discharged,Delivery,PostEffectObligation::enter,PostEffectObligation::nested_receipt_sinks,PostEffectObligation::commit_terminal_receipt,PostEffectObligation::fail,PostEffectObligation::buffer,PostEffectObligation::drop,Discharged::deliver,Discharged::drop,run_post_effect)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation.rs->formal/apalache/ReceiptBeforeAllow.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation.rs` -> `formal/apalache/ReceiptBeforeAllow.tla` (model_kind=tla, normalized_sha256=20158136929f1ed1ff158fa617af851ae249023ebd5815ceeabffb9958fbfe7e, rust_symbols=PostEffectObligation::commit_terminal_receipt,Discharged::deliver)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation.rs->formal/tla/RevocationPropagation.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation.rs` -> `formal/tla/RevocationPropagation.tla` (model_kind=tla, normalized_sha256=d198f2aca1629fc849d043e8ab77a5c97cbe60737b501473d883b3dda24c4774, rust_symbols=PostEffectObligation::commit_terminal_receipt)
-- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation/post_effect.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation/post_effect.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=8696d2c6f4ea42c017199f11f46e3fc287e5271b1a2e5f678ad44962de0c6ea0, rust_symbols=run,flush_children,record_durable_return,prepare_ordinary)
+- `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation/post_effect.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation/post_effect.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=9662fcea73299b0b8684cd5c0d7e32886b2da05d81b94e147f88773b5a34ab33, rust_symbols=run,flush_children,record_durable_return,prepare_ordinary)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation/preparation.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation/preparation.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=40aa968c4819e4f804c2d5473ec60af85df48825b4fa4061fe346bb821f24cb3, rust_symbols=PreparedFaultReceipt::observe_fault_timestamp,PreparedFaultReceipt::observe_economics,PreparedFaultReceipt::observe_payment_result,retain_bounded_reference,DischargeBinding,DischargeBinding::validate_receipt,PreparedPostEffect,PostEffectPreparation,ChioKernel::prepare_post_effect,fault_response)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation/publication.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation/publication.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=c12b8726a40a246f538976c130505a15c8d2f398ff78c169542ad529b9c667d0, rust_symbols=ReceiptAppendFailure,ReceiptCommit)
 - `formal/proof-manifest.toml::mirror::crates/kernel/chio-kernel/src/kernel/effect_obligation/recovery.rs->formal/apalache/MonotoneLogApalache.tla` (`manual_mirror`, `abstraction_anchor`): `crates/kernel/chio-kernel/src/kernel/effect_obligation/recovery.rs` -> `formal/apalache/MonotoneLogApalache.tla` (model_kind=tla, normalized_sha256=1a1c38f7d8993cec5bb46e23cf34089bf106d377175129f10406604bceb4d21f, rust_symbols=EvidenceRecoveryResources::flush_locked,EvidenceRecoveryResources::resolve_submitted,EvidenceRecoveryResources::project)
@@ -1301,7 +1301,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `85379ea855508e7ea2658aaed0c5666cd54397b456ee3a76cc5704b58672ee8f`
+- Input digest: `5f7dc14e5a3653e0d086b33475e2961249f0a49053f75e05fa718ca94e546cc8`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1312,7 +1312,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `ca35873e230f172eb9d581c4b5fbbba9709aaa135181d332064a48afaee0aebf`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `fe5a82ddeea721b32e03077eec5938624349bd193019c012ae64075535900760`
+- `Cargo.lock`: `835c5d5d3fdc99e283502b2e99a8414eaa10862217e3bdc380f92d59f4a3c00b`
 - `Cargo.toml`: `f056415355918634a4a695621264b1865328ccaf710c7141ae6d3a7a20f59bae`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
@@ -1324,7 +1324,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `audits/mutation/per-crate-configs/chio-weights.toml`: `8851bcc823e192ef10d705097257daf8a0ed03a466ead6c1ea11eff467e1e3ce`
 - `cargo-metadata://workspace-packages`: `cbc035b38b0351a2ec449753aba6710417b626060392b743860b4ba3304884de`
 - `crates/core/chio-core-types/Cargo.toml`: `dca53058102ab5c8c85268ce3f23ac4a46831eb47f13505d98c0ac748aa87b63`
-- `crates/core/chio-core-types/src/_generated/chio_wire_v1.rs`: `840b339361aa8a030257c3f26852f39b251e4fe2acb1d1fabf80842f5560155e`
+- `crates/core/chio-core-types/src/_generated/chio_wire_v1.rs`: `1327d2bb68b13f45006cf7b3d5e023dae4ee9a3e07f7ab580cddfee49ec4eee8`
 - `crates/core/chio-core-types/src/_generated/mod.rs`: `7381c7c83a14860b6f132d386cd87d56ea0c390a866d1d0b3073aab185684990`
 - `crates/core/chio-core-types/src/canonical.rs`: `482225f52887027149349a790e3e9110948239b7a4d19f248ef7f169da93dd4e`
 - `crates/core/chio-core-types/src/canonical/secret.rs`: `c68abb55c99f3007df5662c508dc2d84c4375b5eaa09f2efd36c3b1f565fe7f4`
@@ -1419,7 +1419,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/core/chio-core-types/src/session/resources.rs`: `f6661165db13a1c349b04a11091fe8e80b075bee3e17483a2b9328e63dc98824`
 - `crates/core/chio-core-types/src/session/session_op.rs`: `1cef65971d083f73ff35e554abfb92b27df32996147f51574abfeb3828eb550e`
 - `crates/core/chio-core-types/src/session/tests.rs`: `61077a48ed8858f44100e003fcdc543511f20fd9a20ca3e2668798470872e432`
-- `crates/core/chio-core-types/src/signed_artifact.rs`: `a1b27ca7845f7ea938bf3dd7ed9f1f17407166be2c4615f9fc4405f534d4a9ed`
+- `crates/core/chio-core-types/src/signed_artifact.rs`: `946f764ac63dee682f3a2554d2e66ef5a96012cf9c54b2c3a014752ffae2f422`
 - `crates/core/chio-core-types/src/signer_binding.rs`: `d65a36dad3af1bc242bb3b59f5f78472c4b57f7ca159a02e15aa82ad2e7ddc73`
 - `crates/core/chio-core-types/src/store_fence.rs`: `642a8b51a3674b0146d4522e42bf1776534af7cede7a7ee8d0cce33d05863c82`
 - `crates/core/chio-core-types/src/wire_text.rs`: `053c6b60bf760efcc526f96b4a5c2652900242c973ee62e9d14b2f1857200954`
@@ -1560,7 +1560,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `7cd9d6b1170ec5d83081ddc67f1cab2505db91b7c03e6f4b717625f50e5f371c`
+- `formal/proof-manifest.toml`: `329cd59a8eb7b20103d256290c3ff9e9f35e8d1122c18b9bb789249819993cf6`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `60b49af814071bb16f3e027749b26fb9c86d032a00bb022aa0719b6d15c7506f`
@@ -1584,7 +1584,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `b3569c8aedf4d8175cc9809fbe052198acad8d6cf18f6ebff6a0248759e1f465`
 - `fuzz/target-map.toml`: `d51f046241b1f125ea8e93e51a40e6411b3b8ed5444c7fd93d72aad7ff036f26`
-- `git-worktree://rust-files`: `f3b69eeb3fdb24e8d2c9107c51ad472f7165105a4f5b74c49afd88cd01336ed7`
+- `git-worktree://rust-files`: `616f5ac5a16bba536dd942ca8a3a86b511eb4128b445383ca7026c3a3022839f`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

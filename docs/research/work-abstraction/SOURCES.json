@@ -3,7 +3,7 @@
   "scope": "source inventory; runtime qualification pending",
   "sources": {
     "main": {
-      "commit": "391e71864fdc92de5d1794c10bf9ad2496570ef9",
+      "commit": "a520638fa064faa58223feb625a9d8b306b1ea7e",
       "status": "inspected_main",
       "files": [
         {
