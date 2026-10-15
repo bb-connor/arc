@@ -311,6 +311,28 @@ Rules:
   queued behind it on that session fail without dispatch. Clients **MUST NOT**
   treat that error as proof that the effect did not occur.
 
+### 3.3.1 Retrying A Broken POST
+
+A `tools/call` whose POST breaks before its response arrives has an unknown
+outcome at the client. `_meta.chioRequestId` names the call's request identity
+and binds it to one admission operation.
+
+- On a session with a session credential, a retry with the same
+  `chioRequestId` returns the original call's persisted outcome and never
+  dispatches the tool again. If that outcome could not be persisted, the call
+  stays fenced and the retry is refused with `409 Conflict`.
+- On a durable session without a session credential, a retry with the same
+  `chioRequestId` never dispatches the tool again. It is refused, as a
+  duplicate request lineage in the same session and as a conflict with the
+  retained admission operation from another session. The refusal is not
+  evidence that the effect did not occur; the original call's signed receipt
+  is its outcome record.
+- A request without `chioRequestId` receives a fresh request identity, so a
+  retry dispatches the tool again.
+- A client that needs retry safety for a side-effecting tool **MUST** send
+  `_meta.chioRequestId`. Without one, a client **MUST** treat a broken POST as
+  outcome unknown and **MUST NOT** retry it blindly.
+
 ### 3.4 Version Negotiation
 
 The machine-readable negotiation artifact for the shipped stack is:
