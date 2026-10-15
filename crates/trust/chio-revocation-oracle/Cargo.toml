@@ -16,10 +16,13 @@ chio-core-types = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 rs_merkle = { workspace = true }
+rusqlite = { workspace = true, optional = true }
 sha2 = { workspace = true }
 
 [features]
 default = []
+# Durable SQLite-backed oracle (`SqliteRevocationOracle`).
+sqlite = ["dep:rusqlite"]
 # Acceptance gate: enables the 3-tier swarm e2e test which
 # wires this crate's signed-epoch-root path through the federation
 # gossip push queue into a `chio-kernel-core::RevocationView` cache.
@@ -35,6 +38,8 @@ proptest = { workspace = true }
 chio-federation = { workspace = true }
 chio-kernel-core = { workspace = true }
 serde_json = { workspace = true }
+rusqlite = { workspace = true }
+tempfile = { workspace = true }
 
 [[bench]]
 name = "oracle_throughput"

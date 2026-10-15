@@ -52,6 +52,7 @@ dev-fixtures = []
 # default (see the `default` feature); disable default features to fall back to the
 # in-memory stores for unit tests and single-process integration tests.
 sqlite-store = [
+    "chio-revocation-oracle/sqlite",
     "dep:chio-file-custody",
     "dep:chio-sqlite-file-identity",
     "dep:rusqlite",

@@ -443,229 +443,104 @@ impl CredentialRevocationOracle for InMemoryCredentialRevocationOracle {
 
 #[cfg(feature = "sqlite-store")]
 mod sqlite {
-    //! Durable, transactional [`CredentialRevocationOracle`] backed by
-    //! SQLite.
+    //! Durable [`CredentialRevocationOracle`] over
+    //! [`chio_revocation_oracle::SqliteRevocationOracle`].
     //!
-    //! The sparse-Merkle oracle is a pure function of the ORDERED set of
-    //! inserted leaves, so durability does not require persisting the
-    //! Merkle layers: we persist the leaf insertions (subject + the
-    //! `now_unix_ms` they were inserted with + a monotone insertion
-    //! sequence) plus the dependency edges, and rebuild the in-memory
-    //! [`super::CascadeState`] by replaying the leaves in sequence order on
-    //! open. The rebuilt epoch root is byte-identical to the pre-restart
-    //! root, so `is_revoked` and the epoch root survive an issuer restart.
-    //!
-    //! The in-RAM `CascadeState` is a write-through cache: reads
-    //! (`is_revoked`, `current_epoch_root`) are served from RAM in O(1);
-    //! mutations STAGE the cascade against a scratch clone, persist the new
-    //! leaves and edges inside a SINGLE SQLite transaction, and only swap
-    //! the cache in after the transaction commits. A persistence failure
-    //! rolls back the transaction AND drops the staged cache, so the
-    //! durable store and the in-RAM root advance together or not at all.
-    //!
-    //! Re-uses the rusqlite version pinned by the workspace (the same
-    //! version chio-store-sqlite uses) and owns its own connection so
-    //! callers do not take a build-time dependency on the full
-    //! chio-store-sqlite crate just to persist the cascade.
+    //! Revocation leaves live in the durable oracle. The dependency edges
+    //! live beside them in the same database, and every cascade inserts its
+    //! edge and its leaves inside one oracle transaction, so they commit
+    //! together or not at all. Reads go through the oracle, which observes
+    //! revocations committed by any handle on the same file.
 
-    use std::sync::Mutex;
+    use std::path::Path;
 
-    use chio_revocation_oracle::RevocationOracle;
-    use rusqlite::{params, Connection, OpenFlags};
+    use chio_revocation_oracle::{
+        RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
+    };
+    use rusqlite::{params, Connection};
 
-    use super::{key_for, validate_subject, CascadeState, CredentialRevocationOracle, EpochRoot};
+    use super::{key_for, validate_subject, CredentialRevocationOracle, EpochRoot};
     use crate::error::CustodyError;
 
-    /// Durable [`CredentialRevocationOracle`] backed by a single SQLite
-    /// connection.
+    const EDGES_SCHEMA: &str = "
+        CREATE TABLE IF NOT EXISTS chio_custody_revocation_edges (
+            parent TEXT NOT NULL CHECK (
+                typeof(parent) = 'text'
+                AND length(parent) BETWEEN 1 AND 4096
+                AND octet_length(parent) <= 16384
+                AND instr(parent, char(0)) = 0
+            ),
+            dependent TEXT NOT NULL CHECK (
+                typeof(dependent) = 'text'
+                AND length(dependent) BETWEEN 1 AND 4096
+                AND octet_length(dependent) <= 16384
+                AND instr(dependent, char(0)) = 0
+            ),
+            PRIMARY KEY (parent, dependent),
+            CHECK (parent <> dependent)
+        ) WITHOUT ROWID, STRICT;";
+
+    /// Durable credential revocation cascade.
     pub struct SqliteCredentialRevocationOracle {
-        conn: Mutex<Connection>,
-        /// Write-through in-RAM cache of the persisted leaf set + edges.
-        /// Guarded by the SAME mutex discipline as the connection so a
-        /// revocation and its `is_revoked` consultation stay consistent.
-        cache: Mutex<CascadeState>,
+        oracle: SqliteRevocationOracle,
     }
 
     impl SqliteCredentialRevocationOracle {
-        /// Open or create a durable revocation oracle at `path`, rebuilding
-        /// the cascade state from any previously-persisted leaves and edges.
-        pub fn open(path: &str) -> Result<Self, CustodyError> {
-            let flags = OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_CREATE;
-            let conn = Connection::open_with_flags(path, flags).map_err(|err| {
-                CustodyError::Encoding(format!("sqlite open {path} failed: {err}"))
-            })?;
-            Self::with_connection(conn)
+        /// Opens (creating if absent) the cascade database at `path`.
+        pub fn open(path: &Path) -> Result<Self, CustodyError> {
+            Self::from_oracle(SqliteRevocationOracle::open(path).map_err(storage)?)
         }
 
-        /// Open an in-memory SQLite-backed oracle. Used by tests; a fresh
-        /// in-memory connection has no prior state to rebuild.
+        /// Opens a private in-memory cascade.
         pub fn open_in_memory() -> Result<Self, CustodyError> {
-            let conn = Connection::open_in_memory()
-                .map_err(|err| CustodyError::Encoding(format!("sqlite mem open: {err}")))?;
-            Self::with_connection(conn)
+            Self::from_oracle(SqliteRevocationOracle::open_in_memory().map_err(storage)?)
         }
 
-        fn with_connection(conn: Connection) -> Result<Self, CustodyError> {
-            conn.execute_batch(
-                "PRAGMA journal_mode = WAL;
-                 PRAGMA synchronous = FULL;
-                 PRAGMA busy_timeout = 5000;
-                 CREATE TABLE IF NOT EXISTS chio_custody_revocation_leaves (
-                    seq INTEGER PRIMARY KEY AUTOINCREMENT,
-                    subject TEXT NOT NULL UNIQUE,
-                    now_unix_ms INTEGER NOT NULL
-                 );
-                 CREATE TABLE IF NOT EXISTS chio_custody_revocation_edges (
-                    parent TEXT NOT NULL,
-                    dependent TEXT NOT NULL,
-                    PRIMARY KEY (parent, dependent)
-                 ) WITHOUT ROWID;",
-            )
-            .map_err(|err| CustodyError::Encoding(format!("sqlite schema init: {err}")))?;
-
-            let cache = Self::rebuild_cache(&conn)?;
-            Ok(Self {
-                conn: Mutex::new(conn),
-                cache: Mutex::new(cache),
-            })
+        fn from_oracle(oracle: SqliteRevocationOracle) -> Result<Self, CustodyError> {
+            oracle
+                .transact(0, |txn| Ok(txn.connection().execute_batch(EDGES_SCHEMA)?))
+                .map_err(storage)?;
+            Ok(Self { oracle })
         }
+    }
 
-        /// Rebuild the in-RAM cascade by replaying persisted leaves (in
-        /// insertion-sequence order, so the Merkle root is reproduced) and
-        /// edges. WAL durability means a committed leaf is replayed here on
-        /// the next open, giving the round-trip-across-reopen guarantee.
-        fn rebuild_cache(conn: &Connection) -> Result<CascadeState, CustodyError> {
-            let mut state = CascadeState::empty();
+    fn storage(error: SqliteRevocationOracleError) -> CustodyError {
+        CustodyError::Encoding(format!("durable revocation oracle: {error}"))
+    }
 
-            // Edges first so a replayed leaf insertion can see the adjacency
-            // (order is immaterial for edges; they carry no Merkle state).
-            {
-                let mut stmt = conn
-                    .prepare("SELECT parent, dependent FROM chio_custody_revocation_edges")
-                    .map_err(|err| {
-                        CustodyError::Encoding(format!("sqlite prepare edges: {err}"))
-                    })?;
-                let rows = stmt
-                    .query_map([], |row| {
-                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-                    })
-                    .map_err(|err| CustodyError::Encoding(format!("sqlite query edges: {err}")))?;
-                for row in rows {
-                    let (parent, dependent) = row
-                        .map_err(|err| CustodyError::Encoding(format!("sqlite edge row: {err}")))?;
-                    state
-                        .dependents
-                        .entry(parent)
-                        .or_default()
-                        .insert(dependent);
-                }
-            }
-
-            // Replay leaves strictly in insertion-sequence order so the
-            // rebuilt sparse-Merkle layers (and the epoch root) match the
-            // pre-restart state exactly.
-            let mut stmt = conn
-                .prepare(
-                    "SELECT subject, now_unix_ms FROM chio_custody_revocation_leaves ORDER BY seq ASC",
-                )
-                .map_err(|err| CustodyError::Encoding(format!("sqlite prepare leaves: {err}")))?;
-            let rows = stmt
-                .query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
-                })
-                .map_err(|err| CustodyError::Encoding(format!("sqlite query leaves: {err}")))?;
-            for row in rows {
-                let (subject, now_unix_ms) =
-                    row.map_err(|err| CustodyError::Encoding(format!("sqlite leaf row: {err}")))?;
-                let now_unix_ms = u64::try_from(now_unix_ms).map_err(|err| {
-                    CustodyError::Encoding(format!("sqlite leaf now_unix_ms overflow: {err}"))
-                })?;
-                state
-                    .oracle
-                    .insert(key_for(&subject), now_unix_ms)
-                    .map_err(|err| {
-                        CustodyError::Encoding(format!(
-                            "sparse-merkle revocation oracle replay insert failed: {err}"
-                        ))
-                    })?;
-            }
-
-            Ok(state)
+    /// Every subject reachable from `root` through the recorded edges, root
+    /// first and the rest in byte order. Cycles terminate because the
+    /// recursive union keeps each subject once.
+    fn closure(connection: &Connection, root: &str) -> Result<Vec<String>, rusqlite::Error> {
+        let mut statement = connection.prepare_cached(
+            "WITH RECURSIVE reach(subject) AS (
+                SELECT ?1
+                UNION
+                SELECT edge.dependent
+                FROM chio_custody_revocation_edges AS edge
+                JOIN reach ON edge.parent = reach.subject
+             )
+             SELECT subject FROM reach WHERE subject <> ?1 ORDER BY subject",
+        )?;
+        let mut subjects = vec![root.to_owned()];
+        for subject in statement.query_map(params![root], |row| row.get::<_, String>(0))? {
+            subjects.push(subject?);
         }
+        Ok(subjects)
+    }
 
-        fn lock_conn(&self) -> Result<std::sync::MutexGuard<'_, Connection>, CustodyError> {
-            self.conn.lock().map_err(|err| {
-                CustodyError::Encoding(format!("sqlite revocation conn mutex poisoned: {err}"))
-            })
+    fn cascade(
+        txn: &mut RevocationTransaction<'_>,
+        root: &str,
+    ) -> Result<(), SqliteRevocationOracleError> {
+        for subject in closure(txn.connection(), root)? {
+            txn.revoke(&key_for(&subject))?;
         }
-
-        fn lock_cache(&self) -> Result<std::sync::MutexGuard<'_, CascadeState>, CustodyError> {
-            self.cache.lock().map_err(|err| {
-                CustodyError::Encoding(format!("sqlite revocation cache mutex poisoned: {err}"))
-            })
-        }
-
-        /// Test-only fault injection: drop the leaves table so the NEXT leaf
-        /// insert fails while the edges table still accepts writes. Lets the
-        /// atomicity test force a failure mid-`persist_edge_and_leaves` (edge
-        /// insert succeeds, leaf insert fails) to prove the whole batch rolls
-        /// back rather than leaving the edge stranded on disk.
-        #[cfg(test)]
-        fn drop_leaves_table_for_test(&self) -> Result<(), CustodyError> {
-            let conn = self.lock_conn()?;
-            conn.execute_batch("DROP TABLE chio_custody_revocation_leaves")
-                .map_err(|err| CustodyError::Encoding(format!("drop leaves: {err}")))
-        }
-
-        /// Test-only: count persisted edges matching `(parent, dependent)`.
-        ///
-        /// Uses explicit `match`/`panic!` rather than `expect`: the crate
-        /// forbids `clippy::expect_used` crate-wide (test config included).
-        #[cfg(test)]
-        fn persisted_edge_count(&self, parent: &str, dependent: &str) -> i64 {
-            let conn = match self.lock_conn() {
-                Ok(c) => c,
-                Err(e) => panic!("lock conn: {e}"),
-            };
-            match conn.query_row(
-                "SELECT COUNT(*) FROM chio_custody_revocation_edges
-                 WHERE parent = ?1 AND dependent = ?2",
-                rusqlite::params![parent, dependent],
-                |row| row.get::<_, i64>(0),
-            ) {
-                Ok(n) => n,
-                Err(e) => panic!("count edges: {e}"),
-            }
-        }
-
-        /// Test-only: count persisted leaves for `subject`.
-        ///
-        /// Uses explicit `match`/`panic!` rather than `expect`: the crate
-        /// forbids `clippy::expect_used` crate-wide (test config included).
-        #[cfg(test)]
-        fn persisted_leaf_count(&self, subject: &str) -> i64 {
-            let conn = match self.lock_conn() {
-                Ok(c) => c,
-                Err(e) => panic!("lock conn: {e}"),
-            };
-            match conn.query_row(
-                "SELECT COUNT(*) FROM chio_custody_revocation_leaves WHERE subject = ?1",
-                rusqlite::params![subject],
-                |row| row.get::<_, i64>(0),
-            ) {
-                Ok(n) => n,
-                Err(e) => panic!("count leaves: {e}"),
-            }
-        }
+        Ok(())
     }
 
     impl CredentialRevocationOracle for SqliteCredentialRevocationOracle {
         fn register_dependency(&self, parent: &str, dependent: &str) -> Result<(), CustodyError> {
-            // Reject subjects the oracle would later refuse BEFORE staging or
-            // persisting the edge: an un-revocable subject would otherwise be
-            // recorded durably and wedge a future revoke_credential cascade
-            // with no edge-removal API to undo it (permanently blocking the
-            // kill switch for that subtree).
             validate_subject("dependency parent", parent)?;
             validate_subject("dependency dependent", dependent)?;
             if parent == dependent {
@@ -673,48 +548,19 @@ mod sqlite {
                     "revocation dependency parent and dependent must differ".into(),
                 ));
             }
-            // Take both locks for the whole mutation so a concurrent
-            // is_revoked never observes the edge persisted but not cached
-            // (or vice versa). Connection lock first, then cache, in a fixed
-            // order to avoid lock-ordering hazards.
-            let conn = self.lock_conn()?;
-            let mut cache = self.lock_cache()?;
-
-            // Stage the (possibly empty) immediate cascade the new edge
-            // triggers when the parent is already revoked. Staging mutates
-            // nothing durable; it only computes the scratch oracle + the new
-            // leaf set so the commit below is a single atomic write.
-            let already_revoked_parent = cache.oracle.contains(&key_for(parent));
-            let staged = if already_revoked_parent {
-                Some(cache.stage_cascade(dependent, 0)?)
-            } else {
-                None
-            };
-
-            // Persist the edge AND any newly-revoked cascade leaves inside a
-            // SINGLE `BEGIN IMMEDIATE` transaction so the edge and the leaves
-            // commit together or not at all. `rebuild_cache` replays only
-            // persisted leaves and does not re-run the late-child cascade on
-            // reopen, so an edge persisted without its cascade leaf would let
-            // a child registered under a revoked parent outlive that parent.
-            // The in-RAM cache is mutated ONLY after COMMIT succeeds, so on any
-            // error the rollback leaves the durable store and the cache
-            // byte-identical to their pre-call state.
-            let staged_subjects: &[String] = match &staged {
-                Some((_, new_subjects)) => new_subjects,
-                None => &[],
-            };
-            persist_edge_and_leaves(&conn, parent, dependent, staged_subjects, 0)?;
-
-            // Commit succeeded: now (and only now) advance the in-RAM cache.
-            if let Some((staged_oracle, _)) = staged {
-                cache.oracle = staged_oracle;
-            }
-            cache
-                .dependents
-                .entry(parent.to_string())
-                .or_default()
-                .insert(dependent.to_string());
+            self.oracle
+                .transact(0, |txn| {
+                    txn.connection().execute(
+                        "INSERT OR IGNORE INTO chio_custody_revocation_edges (parent, dependent)
+                         VALUES (?1, ?2)",
+                        params![parent, dependent],
+                    )?;
+                    if txn.is_revoked(&key_for(parent)) {
+                        cascade(txn, dependent)?;
+                    }
+                    Ok(())
+                })
+                .map_err(storage)?;
             Ok(())
         }
 
@@ -723,375 +569,137 @@ mod sqlite {
             credential_id: &str,
             now_unix_ms: u64,
         ) -> Result<EpochRoot, CustodyError> {
-            let conn = self.lock_conn()?;
-            let mut cache = self.lock_cache()?;
-
-            // Stage the full transitive cascade against a scratch clone
-            // BEFORE touching the durable store. If staging fails (an
-            // un-insertable leaf) we return early and neither the durable
-            // store nor the cache is mutated.
-            let (staged_oracle, new_subjects) = cache.stage_cascade(credential_id, now_unix_ms)?;
-
-            // Persist the new leaves in one transaction, then commit the
-            // staged oracle into the cache. The leaf set and the rebuilt
-            // Merkle root advance together or not at all.
-            persist_new_leaves(&conn, &new_subjects, now_unix_ms)?;
-            cache.oracle = staged_oracle;
-            Ok(cache.oracle.epoch_root())
+            let ((), root) = self
+                .oracle
+                .transact(now_unix_ms, |txn| cascade(txn, credential_id))
+                .map_err(storage)?;
+            Ok(root)
         }
 
         fn is_revoked(&self, credential_id: &str) -> Result<bool, CustodyError> {
-            Ok(self.lock_cache()?.oracle.contains(&key_for(credential_id)))
+            self.oracle
+                .is_revoked(&key_for(credential_id))
+                .map_err(storage)
         }
 
         fn revoked_closure(&self, credential_id: &str) -> Result<Vec<String>, CustodyError> {
-            Ok(self.lock_cache()?.closure(credential_id))
+            self.oracle
+                .read(|connection| Ok(closure(connection, credential_id)?))
+                .map_err(storage)
         }
 
         fn current_epoch_root(&self) -> Result<EpochRoot, CustodyError> {
-            Ok(self.lock_cache()?.oracle.epoch_root())
+            self.oracle.current_epoch_root().map_err(storage)
         }
-    }
-
-    /// Persist a dependency `edge` AND any `new_subjects` cascade leaves it
-    /// triggers inside ONE `BEGIN IMMEDIATE` transaction so the edge and the
-    /// leaves advance together or not at all. On any statement error the
-    /// whole batch rolls back, leaving neither the edge nor the leaves on
-    /// disk; the caller therefore mutates the in-RAM cache only after this
-    /// returns `Ok(())`. This is the durable analogue of the single-txn
-    /// staging used by `revoke_credential`: it closes the atomicity gap
-    /// where an edge committed in its own autocommit statement could outlive
-    /// a failed leaf persist and silently fail open on the kill switch
-    /// (`rebuild_cache` replays only persisted leaves and does NOT re-run
-    /// the late-child cascade on reopen).
-    fn persist_edge_and_leaves(
-        conn: &Connection,
-        parent: &str,
-        dependent: &str,
-        new_subjects: &[String],
-        now_unix_ms: u64,
-    ) -> Result<(), CustodyError> {
-        let now_unix_ms = i64::try_from(now_unix_ms)
-            .map_err(|err| CustodyError::Encoding(format!("now_unix_ms overflow: {err}")))?;
-        conn.execute_batch("BEGIN IMMEDIATE")
-            .map_err(|err| CustodyError::Encoding(format!("sqlite begin: {err}")))?;
-
-        // Edge first, then the cascade leaves; either everything in this
-        // transaction lands or nothing does. A closure lets us roll back on
-        // the first error without repeating the cleanup at every `?`.
-        let result = (|| -> Result<(), CustodyError> {
-            conn.execute(
-                "INSERT OR IGNORE INTO chio_custody_revocation_edges (parent, dependent)
-                 VALUES (?1, ?2)",
-                params![parent, dependent],
-            )
-            .map_err(|err| CustodyError::Encoding(format!("sqlite insert edge: {err}")))?;
-
-            for subject in new_subjects {
-                conn.execute(
-                    "INSERT OR IGNORE INTO chio_custody_revocation_leaves (subject, now_unix_ms)
-                     VALUES (?1, ?2)",
-                    params![subject, now_unix_ms],
-                )
-                .map_err(|err| CustodyError::Encoding(format!("sqlite insert leaf: {err}")))?;
-            }
-            Ok(())
-        })();
-
-        if let Err(err) = result {
-            // Roll back the whole batch on any error so neither the edge nor
-            // any partial leaf is persisted.
-            let _ = conn.execute_batch("ROLLBACK");
-            return Err(err);
-        }
-
-        conn.execute_batch("COMMIT")
-            .map_err(|err| CustodyError::Encoding(format!("sqlite commit: {err}")))?;
-        Ok(())
-    }
-
-    /// Persist `subjects` as new revocation leaves inside one SQLite
-    /// transaction. `INSERT OR IGNORE` keeps the write idempotent against
-    /// an operator retry; the unique `subject` constraint and the
-    /// AUTOINCREMENT `seq` give a stable replay order on the next open.
-    fn persist_new_leaves(
-        conn: &Connection,
-        subjects: &[String],
-        now_unix_ms: u64,
-    ) -> Result<(), CustodyError> {
-        if subjects.is_empty() {
-            return Ok(());
-        }
-        let now_unix_ms = i64::try_from(now_unix_ms)
-            .map_err(|err| CustodyError::Encoding(format!("now_unix_ms overflow: {err}")))?;
-        conn.execute_batch("BEGIN IMMEDIATE")
-            .map_err(|err| CustodyError::Encoding(format!("sqlite begin: {err}")))?;
-        for subject in subjects {
-            let res = conn.execute(
-                "INSERT OR IGNORE INTO chio_custody_revocation_leaves (subject, now_unix_ms)
-                 VALUES (?1, ?2)",
-                params![subject, now_unix_ms],
-            );
-            if let Err(err) = res {
-                // Roll back the whole batch on any error so no partial
-                // revocation is persisted.
-                let _ = conn.execute_batch("ROLLBACK");
-                return Err(CustodyError::Encoding(format!("sqlite insert leaf: {err}")));
-            }
-        }
-        conn.execute_batch("COMMIT")
-            .map_err(|err| CustodyError::Encoding(format!("sqlite commit: {err}")))?;
-        Ok(())
     }
 
     #[cfg(test)]
     mod tests {
-        use std::time::{SystemTime, UNIX_EPOCH};
-
         use super::SqliteCredentialRevocationOracle;
         use crate::error::CustodyError;
         use crate::revocation::CredentialRevocationOracle;
 
-        fn unique_db_path(prefix: &str) -> std::path::PathBuf {
-            let nonce = match SystemTime::now().duration_since(UNIX_EPOCH) {
-                Ok(d) => d.as_nanos(),
-                Err(e) => panic!("clock before epoch: {e}"),
-            };
-            std::env::temp_dir().join(format!("{prefix}-{nonce}.sqlite3"))
-        }
+        type TestResult = Result<(), Box<dyn std::error::Error>>;
 
         #[test]
-        fn durable_revocation_round_trips_across_reopen() {
-            let path = unique_db_path("chio-custody-rev");
-            let path_str = match path.to_str() {
-                Some(s) => s.to_string(),
-                None => panic!("temp path not utf-8"),
-            };
-            {
-                let oracle = match SqliteCredentialRevocationOracle::open(&path_str) {
-                    Ok(o) => o,
-                    Err(e) => panic!("open: {e}"),
-                };
-                if let Err(e) = oracle.register_dependency("parent", "child") {
-                    panic!("register: {e}");
-                }
-                if let Err(e) = oracle.revoke_credential("parent", 1_000) {
-                    panic!("revoke: {e}");
-                }
-            }
-
-            // Reopen from disk: the persisted cascade must rebuild so the
-            // parent AND the transitively-revoked child are still revoked,
-            // and the epoch root matches the pre-restart root.
-            let reopened = match SqliteCredentialRevocationOracle::open(&path_str) {
-                Ok(o) => o,
-                Err(e) => panic!("reopen: {e}"),
-            };
-            match reopened.is_revoked("parent") {
-                Ok(b) => assert!(b, "parent must survive a reopen"),
-                Err(e) => panic!("is_revoked parent: {e}"),
-            }
-            match reopened.is_revoked("child") {
-                Ok(b) => assert!(b, "transitively-revoked child must survive a reopen"),
-                Err(e) => panic!("is_revoked child: {e}"),
-            }
-            match reopened.is_revoked("unrelated") {
-                Ok(b) => assert!(!b, "an unrelated subject must not be revoked"),
-                Err(e) => panic!("is_revoked unrelated: {e}"),
-            }
-
-            let _ = std::fs::remove_file(&path);
-            let _ = std::fs::remove_file(format!("{path_str}-wal"));
-            let _ = std::fs::remove_file(format!("{path_str}-shm"));
-        }
-
-        #[test]
-        fn durable_epoch_root_is_stable_across_reopen() {
-            let path = unique_db_path("chio-custody-rev-root");
-            let path_str = match path.to_str() {
-                Some(s) => s.to_string(),
-                None => panic!("temp path not utf-8"),
-            };
+        fn durable_cascade_and_root_survive_a_reopen() -> TestResult {
+            let dir = tempfile::tempdir()?;
+            let path = dir.path().join("revocation.sqlite3");
             let root_before = {
-                let oracle = match SqliteCredentialRevocationOracle::open(&path_str) {
-                    Ok(o) => o,
-                    Err(e) => panic!("open: {e}"),
-                };
-                if let Err(e) = oracle.register_dependency("a", "b") {
-                    panic!("register a->b: {e}");
-                }
-                if let Err(e) = oracle.register_dependency("b", "c") {
-                    panic!("register b->c: {e}");
-                }
-                match oracle.revoke_credential("a", 5_000) {
-                    Ok(r) => r,
-                    Err(e) => panic!("revoke a: {e}"),
-                }
+                let oracle = SqliteCredentialRevocationOracle::open(&path)?;
+                oracle.register_dependency("a", "b")?;
+                oracle.register_dependency("b", "c")?;
+                oracle.revoke_credential("a", 5_000)?
             };
-
-            let reopened = match SqliteCredentialRevocationOracle::open(&path_str) {
-                Ok(o) => o,
-                Err(e) => panic!("reopen: {e}"),
-            };
-            let root_after = match reopened.current_epoch_root() {
-                Ok(r) => r,
-                Err(e) => panic!("epoch root after reopen: {e}"),
-            };
-            assert_eq!(
-                root_before, root_after,
-                "the rebuilt epoch root must be byte-identical after a reopen"
-            );
-
-            let _ = std::fs::remove_file(&path);
-            let _ = std::fs::remove_file(format!("{path_str}-wal"));
-            let _ = std::fs::remove_file(format!("{path_str}-shm"));
+            let reopened = SqliteCredentialRevocationOracle::open(&path)?;
+            for subject in ["a", "b", "c"] {
+                assert!(reopened.is_revoked(subject)?, "{subject}");
+            }
+            assert!(!reopened.is_revoked("unrelated")?);
+            assert_eq!(reopened.current_epoch_root()?, root_before);
+            assert_eq!(reopened.revoked_closure("a")?, ["a", "b", "c"]);
+            Ok(())
         }
 
         #[test]
-        fn durable_register_dependency_rejects_invalid_subject_before_staging() {
-            // An un-revocable subject (" " is structurally invalid for the
-            // sparse-Merkle oracle) must be rejected at registration BEFORE it
-            // is persisted as an edge, so it can never wedge a later durable
-            // cascade. A clean sibling edge plus the root must still revoke.
-            let oracle = match SqliteCredentialRevocationOracle::open_in_memory() {
-                Ok(o) => o,
-                Err(e) => panic!("open mem: {e}"),
-            };
-            if let Err(e) = oracle.register_dependency("root", "good") {
-                panic!("register good: {e}");
-            }
-            let bad = oracle.register_dependency("root", " ");
-            assert!(
-                matches!(bad, Err(CustodyError::Encoding(_))),
-                "an un-revocable dependent must be rejected before staging"
-            );
-
-            // No bad edge was recorded, so the root cascade still commits and
-            // is observable for the good sibling.
-            if let Err(e) = oracle.revoke_credential("root", 1_000) {
-                panic!("revoke root after rejected edge must succeed: {e}");
-            }
-            match oracle.is_revoked("root") {
-                Ok(b) => assert!(b, "root must be revocable after the bad edge was rejected"),
-                Err(e) => panic!("is_revoked root: {e}"),
-            }
-            match oracle.is_revoked("good") {
-                Ok(b) => assert!(b, "the good sibling must cascade after a clean revoke"),
-                Err(e) => panic!("is_revoked good: {e}"),
-            }
+        fn a_second_handle_observes_a_revocation_without_reopening() -> TestResult {
+            let dir = tempfile::tempdir()?;
+            let path = dir.path().join("revocation.sqlite3");
+            let door = SqliteCredentialRevocationOracle::open(&path)?;
+            assert!(!door.is_revoked("cred")?);
+            let operator = SqliteCredentialRevocationOracle::open(&path)?;
+            let root = operator.revoke_credential("cred", 1_000)?;
+            assert!(door.is_revoked("cred")?);
+            assert_eq!(door.current_epoch_root()?, root);
+            Ok(())
         }
 
         #[test]
-        fn durable_double_revoke_is_idempotent_and_epoch_stable() {
-            let oracle = match SqliteCredentialRevocationOracle::open_in_memory() {
-                Ok(o) => o,
-                Err(e) => panic!("open mem: {e}"),
-            };
-            let r1 = match oracle.revoke_credential("cred", 1_000) {
-                Ok(r) => r,
-                Err(e) => panic!("first revoke: {e}"),
-            };
-            let r2 = match oracle.revoke_credential("cred", 2_000) {
-                Ok(r) => r,
-                Err(e) => panic!("second revoke: {e}"),
-            };
-            assert_eq!(
-                r1, r2,
-                "double revoke must be epoch-stable in the durable store"
-            );
+        fn a_child_registered_under_a_revoked_parent_is_revoked() -> TestResult {
+            let oracle = SqliteCredentialRevocationOracle::open_in_memory()?;
+            oracle.revoke_credential("parent", 1_000)?;
+            oracle.register_dependency("parent", "late-child")?;
+            assert!(oracle.is_revoked("late-child")?);
+            Ok(())
         }
 
         #[test]
-        fn durable_register_dependency_is_atomic_on_midpersist_failure() {
-            // When a late child is registered under an ALREADY-revoked
-            // parent, the edge insert and the cascade-leaf insert MUST commit
-            // together or not at all. On reopen `rebuild_cache` replays only
-            // persisted leaves and does NOT re-run the late-child cascade, so
-            // a lone edge would let the child outlive its revoked parent.
-            //
-            // We force a failure MID-`persist_edge_and_leaves` (edge insert
-            // succeeds, leaf insert fails) by dropping the leaves table after
-            // the parent is revoked, then assert NO partial edge/leaf landed
-            // on disk and the in-RAM cache is consistent.
-            let path = unique_db_path("chio-custody-rev-atomic");
-            let path_str = match path.to_str() {
-                Some(s) => s.to_string(),
-                None => panic!("temp path not utf-8"),
-            };
+        fn invalid_and_self_dependencies_are_refused() -> TestResult {
+            let oracle = SqliteCredentialRevocationOracle::open_in_memory()?;
+            oracle.register_dependency("root", "good")?;
+            assert!(matches!(
+                oracle.register_dependency("root", " "),
+                Err(CustodyError::Encoding(_))
+            ));
+            assert!(matches!(
+                oracle.register_dependency("root", "root"),
+                Err(CustodyError::Encoding(_))
+            ));
+            oracle.revoke_credential("root", 1_000)?;
+            assert!(oracle.is_revoked("good")?);
+            Ok(())
+        }
 
-            let oracle = match SqliteCredentialRevocationOracle::open(&path_str) {
-                Ok(o) => o,
-                Err(e) => panic!("open: {e}"),
-            };
-            if let Err(e) = oracle.revoke_credential("parent", 1_000) {
-                panic!("revoke parent: {e}");
-            }
+        #[test]
+        fn double_revoke_is_idempotent_and_epoch_stable() -> TestResult {
+            let oracle = SqliteCredentialRevocationOracle::open_in_memory()?;
+            let first = oracle.revoke_credential("cred", 1_000)?;
+            let second = oracle.revoke_credential("cred", 2_000)?;
+            assert_eq!(first, second);
+            Ok(())
+        }
 
-            // Fault injection: drop the leaves table so the cascade leaf for
-            // the late child cannot persist, while the edges table still
-            // accepts the edge insert. This reproduces the exact ordering the
-            // bug depended on (edge OK, leaf fails).
-            if let Err(e) = oracle.drop_leaves_table_for_test() {
-                panic!("drop leaves: {e}");
-            }
+        #[test]
+        fn an_edge_and_its_cascade_leaf_commit_together() -> TestResult {
+            let dir = tempfile::tempdir()?;
+            let path = dir.path().join("revocation.sqlite3");
+            let oracle = SqliteCredentialRevocationOracle::open(&path)?;
+            oracle.revoke_credential("parent", 1_000)?;
+            let raw = rusqlite::Connection::open(&path)?;
+            raw.execute_batch(
+                "CREATE TRIGGER refuse_late_child BEFORE INSERT ON chio_revocation_oracle_leaves
+                 WHEN NEW.subject = 'late-child'
+                 BEGIN SELECT RAISE(ABORT, 'injected leaf failure'); END;",
+            )?;
 
-            let res = oracle.register_dependency("parent", "late-child");
-            assert!(
-                matches!(res, Err(CustodyError::Encoding(_))),
-                "a leaf-persist failure must fail register_dependency"
-            );
+            assert!(matches!(
+                oracle.register_dependency("parent", "late-child"),
+                Err(CustodyError::Encoding(_))
+            ));
+            let edges: i64 = raw.query_row(
+                "SELECT count(*) FROM chio_custody_revocation_edges WHERE dependent = 'late-child'",
+                [],
+                |row| row.get(0),
+            )?;
+            assert_eq!(edges, 0);
+            assert!(!oracle.is_revoked("late-child")?);
 
-            // On-disk atomicity: the edge must have rolled back with the leaf,
-            // so NO partial edge is persisted (the edges table is intact).
-            assert_eq!(
-                oracle.persisted_edge_count("parent", "late-child"),
-                0,
-                "the edge must roll back with the failed leaf insert: no partial edge on disk"
-            );
-
-            // In-RAM consistency: the cache must not have advanced (the late
-            // child is not revoked and the dependents edge is not recorded),
-            // because the cache is mutated only after COMMIT.
-            match oracle.is_revoked("late-child") {
-                Ok(b) => assert!(
-                    !b,
-                    "late-child must not be revoked in RAM after a rolled-back register"
-                ),
-                Err(e) => panic!("is_revoked late-child: {e}"),
-            }
-
+            raw.execute_batch("DROP TRIGGER refuse_late_child")?;
             drop(oracle);
-
-            // Reopen from disk: the late child must NOT be revoked, proving no
-            // stranded edge replays a cascade and that the kill switch did not
-            // fail open across a restart. (The dropped leaves table is
-            // re-created empty on open; we assert on the edge, which is the
-            // durable artifact whose orphaning caused the fail-open.)
-            let reopened = match SqliteCredentialRevocationOracle::open(&path_str) {
-                Ok(o) => o,
-                Err(e) => panic!("reopen: {e}"),
-            };
-            assert_eq!(
-                reopened.persisted_edge_count("parent", "late-child"),
-                0,
-                "no orphan edge may survive the reopen"
-            );
-            assert_eq!(
-                reopened.persisted_leaf_count("late-child"),
-                0,
-                "no orphan leaf may survive the reopen"
-            );
-            match reopened.is_revoked("late-child") {
-                Ok(b) => assert!(
-                    !b,
-                    "late-child must not be revoked after reopen (kill switch must not fail open)"
-                ),
-                Err(e) => panic!("is_revoked late-child after reopen: {e}"),
-            }
-
-            let _ = std::fs::remove_file(&path);
-            let _ = std::fs::remove_file(format!("{path_str}-wal"));
-            let _ = std::fs::remove_file(format!("{path_str}-shm"));
+            let reopened = SqliteCredentialRevocationOracle::open(&path)?;
+            assert!(!reopened.is_revoked("late-child")?);
+            assert!(reopened.is_revoked("parent")?);
+            Ok(())
         }
     }
 }

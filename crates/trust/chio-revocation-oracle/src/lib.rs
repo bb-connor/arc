@@ -9,6 +9,8 @@ pub mod freshness;
 pub mod passport_bridge;
 pub mod signer;
 pub mod sparse_merkle;
+#[cfg(feature = "sqlite")]
+pub mod sqlite;
 
 pub use api::{
     EpochNonce, EpochRoot, InclusionProof, NonInclusionProof, Result, RevocationKey,
@@ -29,10 +31,16 @@ pub use finding_status_sparse::{
 };
 pub use freshness::{verify_fresh_epoch_root, FreshnessConfig};
 pub use passport_bridge::{
-    apply_passport_revocation, PassportRevocationBridgeError, PassportRevocationEvent,
+    apply_passport_revocation, passport_revocation_key, PassportRevocationBridgeError,
+    PassportRevocationEvent, PASSPORT_REVOCATION_NONCE,
 };
 pub use signer::{
     Ed25519RootSigner, Ed25519RootVerifier, EpochRootSigner, EpochRootVerifier, ALGORITHM_ED25519,
     DOMAIN_SEPARATION_CONTEXT,
 };
 pub use sparse_merkle::InMemoryRevocationOracle;
+#[cfg(feature = "sqlite")]
+pub use sqlite::{
+    RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
+    MAX_REVOCATION_SUBJECT_BYTES, SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION,
+};

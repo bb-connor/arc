@@ -1,0 +1,374 @@
+//! Durable sparse-Merkle revocation oracle backed by SQLite.
+//!
+//! The sparse-Merkle oracle is a pure function of the ordered sequence of
+//! inserted leaves, so the database stores that sequence (subject, epoch
+//! nonce and insertion time, ordered by a monotone sequence number) and every
+//! handle rebuilds the same tree by replay. A handle consults the database
+//! before each read and each write, so revocations committed through another
+//! handle or process on the same file are observed without a restart.
+//!
+//! Writes run inside one `BEGIN IMMEDIATE` transaction: the handle replays any
+//! leaves committed by peers, stages the new leaves against a copy of the
+//! tree, persists them, commits, and only then publishes the staged tree. A
+//! failure rolls back and leaves both the database and the handle unchanged.
+//!
+//! The schema is versioned. A database without this oracle's stamp, or with
+//! any other version, is refused.
+
+use std::path::Path;
+use std::sync::{Mutex, MutexGuard};
+
+use rusqlite::{
+    params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
+};
+
+use crate::api::{
+    EpochNonce, EpochRoot, InclusionProof, NonInclusionProof, RevocationKey, RevocationOracle,
+    RevocationOracleError, SubjectId,
+};
+use crate::sparse_merkle::InMemoryRevocationOracle;
+
+/// Schema version written by and accepted by this oracle.
+pub const SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION: i64 = 1;
+
+/// Largest accepted subject, in UTF-8 bytes.
+pub const MAX_REVOCATION_SUBJECT_BYTES: usize = 4096;
+
+const SCHEMA: &str = "
+CREATE TABLE chio_revocation_oracle_meta (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1)
+) STRICT;
+CREATE TABLE chio_revocation_oracle_leaves (
+    seq INTEGER PRIMARY KEY AUTOINCREMENT,
+    subject TEXT NOT NULL CHECK (
+        typeof(subject) = 'text'
+        AND length(subject) BETWEEN 1 AND 4096
+        AND octet_length(subject) <= 16384
+        AND instr(subject, char(0)) = 0
+    ),
+    epoch_nonce BLOB NOT NULL
+        CHECK (typeof(epoch_nonce) = 'blob' AND length(epoch_nonce) = 8),
+    inserted_at_unix_ms BLOB NOT NULL
+        CHECK (typeof(inserted_at_unix_ms) = 'blob' AND length(inserted_at_unix_ms) = 8),
+    UNIQUE (subject, epoch_nonce)
+) STRICT;
+";
+
+/// Failures of the durable oracle. Every error leaves the database and the
+/// handle's published tree unchanged.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum SqliteRevocationOracleError {
+    #[error("revocation oracle database is not stamped by this oracle")]
+    UnstampedDatabase,
+    #[error("unsupported revocation oracle schema version {0}")]
+    UnsupportedSchema(i64),
+    #[error("revocation oracle record is corrupt: {0}")]
+    CorruptRecord(String),
+    #[error("revocation subject exceeds {MAX_REVOCATION_SUBJECT_BYTES} bytes")]
+    SubjectTooLong,
+    #[error("revocation oracle state lock is poisoned")]
+    Poisoned,
+    #[error(transparent)]
+    Oracle(#[from] RevocationOracleError),
+    #[error("revocation oracle storage failed: {0}")]
+    Storage(String),
+}
+
+impl From<rusqlite::Error> for SqliteRevocationOracleError {
+    fn from(error: rusqlite::Error) -> Self {
+        Self::Storage(error.to_string())
+    }
+}
+
+type Result<T> = core::result::Result<T, SqliteRevocationOracleError>;
+
+/// The replayed tree and the last sequence number it includes.
+#[derive(Clone)]
+struct Replayed {
+    oracle: InMemoryRevocationOracle,
+    seq: i64,
+}
+
+/// Durable sparse-Merkle revocation oracle.
+pub struct SqliteRevocationOracle {
+    connection: Mutex<Connection>,
+    replayed: Mutex<Replayed>,
+}
+
+impl SqliteRevocationOracle {
+    /// Opens (creating if absent) the oracle database at `path`.
+    pub fn open(path: &Path) -> Result<Self> {
+        let flags = OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX;
+        Self::with_connection(Connection::open_with_flags(path, flags)?)
+    }
+
+    /// Opens a private in-memory oracle database.
+    pub fn open_in_memory() -> Result<Self> {
+        Self::with_connection(Connection::open_in_memory()?)
+    }
+
+    fn with_connection(mut connection: Connection) -> Result<Self> {
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL;
+             PRAGMA synchronous = FULL;
+             PRAGMA foreign_keys = ON;
+             PRAGMA busy_timeout = 5000;",
+        )?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        initialize(&transaction)?;
+        transaction.commit()?;
+        let replayed = Replayed {
+            oracle: InMemoryRevocationOracle::new(),
+            seq: 0,
+        };
+        let replayed = catch_up(&connection, replayed)?;
+        Ok(Self {
+            connection: Mutex::new(connection),
+            replayed: Mutex::new(replayed),
+        })
+    }
+
+    fn lock_connection(&self) -> Result<MutexGuard<'_, Connection>> {
+        self.connection
+            .lock()
+            .map_err(|_| SqliteRevocationOracleError::Poisoned)
+    }
+
+    fn lock_replayed(&self) -> Result<MutexGuard<'_, Replayed>> {
+        self.replayed
+            .lock()
+            .map_err(|_| SqliteRevocationOracleError::Poisoned)
+    }
+
+    /// The tree including every leaf committed to the database so far.
+    fn current(&self) -> Result<InMemoryRevocationOracle> {
+        let connection = self.lock_connection()?;
+        let mut replayed = self.lock_replayed()?;
+        let caught_up = catch_up(&connection, replayed.clone())?;
+        *replayed = caught_up;
+        Ok(replayed.oracle.clone())
+    }
+
+    /// Runs `body` inside one immediate transaction over the current tree.
+    /// Keys the body revokes are persisted and published only if the body
+    /// and the commit succeed. The transaction is also available to the body
+    /// for state an owner keeps beside the oracle in the same database.
+    pub fn transact<T>(
+        &self,
+        now_unix_ms: u64,
+        body: impl FnOnce(&mut RevocationTransaction<'_>) -> Result<T>,
+    ) -> Result<(T, EpochRoot)> {
+        let mut connection = self.lock_connection()?;
+        let mut replayed = self.lock_replayed()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let base = catch_up(&transaction, replayed.clone())?;
+        let mut staged = RevocationTransaction {
+            connection: &transaction,
+            oracle: base.oracle.clone(),
+            seq: base.seq,
+            now_unix_ms,
+        };
+        let value = body(&mut staged)?;
+        let published = Replayed {
+            oracle: staged.oracle,
+            seq: staged.seq,
+        };
+        transaction.commit()?;
+        let root = published.oracle.epoch_root();
+        *replayed = published;
+        Ok((value, root))
+    }
+
+    /// Runs `body` against the connection, for owner state kept in the same
+    /// database. Writes belong in [`Self::transact`].
+    pub fn read<T>(&self, body: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+        let connection = self.lock_connection()?;
+        body(&connection)
+    }
+
+    /// Revokes `key`, or returns [`RevocationOracleError::AlreadyRevoked`].
+    pub fn revoke(&self, key: RevocationKey, now_unix_ms: u64) -> Result<EpochRoot> {
+        let (inserted, root) = self.transact(now_unix_ms, |txn| txn.revoke(&key))?;
+        if inserted {
+            Ok(root)
+        } else {
+            Err(RevocationOracleError::AlreadyRevoked.into())
+        }
+    }
+
+    pub fn is_revoked(&self, key: &RevocationKey) -> Result<bool> {
+        Ok(self.current()?.contains(key))
+    }
+
+    pub fn current_epoch_root(&self) -> Result<EpochRoot> {
+        Ok(self.current()?.epoch_root())
+    }
+
+    pub fn prove_inclusion(&self, key: &RevocationKey) -> Result<InclusionProof> {
+        Ok(self.current()?.inclusion_proof(key)?)
+    }
+
+    pub fn prove_non_inclusion(
+        &self,
+        key: RevocationKey,
+        now_unix_ms: u64,
+    ) -> Result<NonInclusionProof> {
+        Ok(self.current()?.non_inclusion_proof(key, now_unix_ms)?)
+    }
+}
+
+/// The trait surface. `contains` reports a key as revoked whenever the
+/// database cannot be read, so a storage fault never admits a revoked key.
+impl RevocationOracle for SqliteRevocationOracle {
+    fn insert(&mut self, key: RevocationKey, now_unix_ms: u64) -> crate::api::Result<EpochRoot> {
+        self.revoke(key, now_unix_ms).map_err(to_oracle_error)
+    }
+
+    fn contains(&self, key: &RevocationKey) -> bool {
+        self.is_revoked(key).unwrap_or(true)
+    }
+
+    fn epoch_root(&self) -> EpochRoot {
+        match self.current() {
+            Ok(oracle) => oracle.epoch_root(),
+            Err(_) => match self.lock_replayed() {
+                Ok(replayed) => replayed.oracle.epoch_root(),
+                Err(_) => InMemoryRevocationOracle::new().epoch_root(),
+            },
+        }
+    }
+
+    fn inclusion_proof(&self, key: &RevocationKey) -> crate::api::Result<InclusionProof> {
+        self.prove_inclusion(key).map_err(to_oracle_error)
+    }
+
+    fn non_inclusion_proof(
+        &self,
+        key: RevocationKey,
+        now_unix_ms: u64,
+    ) -> crate::api::Result<NonInclusionProof> {
+        self.prove_non_inclusion(key, now_unix_ms)
+            .map_err(to_oracle_error)
+    }
+}
+
+fn to_oracle_error(error: SqliteRevocationOracleError) -> RevocationOracleError {
+    match error {
+        SqliteRevocationOracleError::Oracle(inner) => inner,
+        other => RevocationOracleError::Serialization(other.to_string()),
+    }
+}
+
+/// One write transaction over the oracle.
+pub struct RevocationTransaction<'t> {
+    connection: &'t Connection,
+    oracle: InMemoryRevocationOracle,
+    seq: i64,
+    now_unix_ms: u64,
+}
+
+impl RevocationTransaction<'_> {
+    /// The open transaction, for owner state kept in the same database.
+    #[must_use]
+    pub fn connection(&self) -> &Connection {
+        self.connection
+    }
+
+    pub fn is_revoked(&self, key: &RevocationKey) -> bool {
+        self.oracle.contains(key)
+    }
+
+    /// Revokes `key` within the transaction. Returns `false` when the key is
+    /// already revoked.
+    pub fn revoke(&mut self, key: &RevocationKey) -> Result<bool> {
+        if self.oracle.contains(key) {
+            return Ok(false);
+        }
+        if key.subject_id.as_str().len() > MAX_REVOCATION_SUBJECT_BYTES {
+            return Err(SqliteRevocationOracleError::SubjectTooLong);
+        }
+        self.oracle.insert(key.clone(), self.now_unix_ms)?;
+        self.connection.execute(
+            "INSERT INTO chio_revocation_oracle_leaves
+                (subject, epoch_nonce, inserted_at_unix_ms)
+             VALUES (?1, ?2, ?3)",
+            params![
+                key.subject_id.as_str(),
+                key.epoch_nonce.get().to_be_bytes().as_slice(),
+                self.now_unix_ms.to_be_bytes().as_slice()
+            ],
+        )?;
+        self.seq = self.connection.last_insert_rowid();
+        Ok(true)
+    }
+}
+
+fn initialize(transaction: &Transaction<'_>) -> Result<()> {
+    let stamped = transaction.query_row(
+        "SELECT count(*) FROM sqlite_schema
+             WHERE type = 'table' AND name = 'chio_revocation_oracle_meta'",
+        [],
+        |row| row.get::<_, i64>(0),
+    )? == 1;
+    if stamped {
+        let version = transaction
+            .query_row(
+                "SELECT schema_version FROM chio_revocation_oracle_meta WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .ok_or(SqliteRevocationOracleError::UnstampedDatabase)?;
+        if version != SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION {
+            return Err(SqliteRevocationOracleError::UnsupportedSchema(version));
+        }
+        return Ok(());
+    }
+    let tables = transaction.query_row(
+        "SELECT count(*) FROM sqlite_schema
+         WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+        [],
+        |row| row.get::<_, i64>(0),
+    )?;
+    if tables != 0 {
+        return Err(SqliteRevocationOracleError::UnstampedDatabase);
+    }
+    transaction.execute_batch(SCHEMA)?;
+    transaction.execute(
+        "INSERT INTO chio_revocation_oracle_meta (singleton, schema_version) VALUES (1, ?1)",
+        params![SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION],
+    )?;
+    Ok(())
+}
+
+/// Replays every leaf committed after `replayed.seq`, in sequence order.
+fn catch_up(connection: &Connection, mut replayed: Replayed) -> Result<Replayed> {
+    let mut statement = connection.prepare_cached(
+        "SELECT seq, subject, epoch_nonce, inserted_at_unix_ms
+         FROM chio_revocation_oracle_leaves WHERE seq > ?1 ORDER BY seq ASC",
+    )?;
+    let mut rows = statement.query(params![replayed.seq])?;
+    while let Some(row) = rows.next()? {
+        let seq: i64 = row.get(0)?;
+        let subject: String = row.get(1)?;
+        let nonce: Vec<u8> = row.get(2)?;
+        let inserted_at: Vec<u8> = row.get(3)?;
+        let corrupt = || SqliteRevocationOracleError::CorruptRecord(format!("leaf {seq}"));
+        let nonce: [u8; 8] = nonce.try_into().map_err(|_| corrupt())?;
+        let inserted_at: [u8; 8] = inserted_at.try_into().map_err(|_| corrupt())?;
+        let inserted_at = u64::from_be_bytes(inserted_at);
+        let key = RevocationKey::new(
+            SubjectId::new(subject),
+            EpochNonce::new(u64::from_be_bytes(nonce)),
+        );
+        replayed
+            .oracle
+            .insert(key, inserted_at)
+            .map_err(|_| corrupt())?;
+        replayed.seq = seq;
+    }
+    Ok(replayed)
+}

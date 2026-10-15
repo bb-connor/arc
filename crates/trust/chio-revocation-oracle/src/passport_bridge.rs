@@ -38,15 +38,20 @@
 
 use crate::api::{EpochNonce, EpochRoot, RevocationKey, RevocationOracle, SubjectId};
 
-/// Schema-derived nonce salt for passport-revocation events. Combined
-/// with the passport's `revoked_at` (which the credentials side validates
-/// to be non-zero for any record in `Revoked` state) this produces a
-/// stable, replay-resistant `EpochNonce` for the same passport: a record
-/// re-emitted with a different `revoked_at` will produce a different
-/// nonce, while a re-emit of the same record (same passport-id +
-/// `revoked_at`) maps to the same key and is rejected fail-closed by
-/// [`apply_passport_revocation`] as `AlreadyApplied`.
-const PASSPORT_REVOCATION_NONCE_SALT: u64 = 0x705F_7050_7252_7600;
+/// Epoch nonce of every passport revocation leaf. It separates passport
+/// leaves from other subjects that share the oracle.
+pub const PASSPORT_REVOCATION_NONCE: u64 = 0x705F_7050_7252_7600;
+
+/// The oracle key that records the revocation of `passport_id`. A passport is
+/// revoked at most once, so the key names the passport alone and a verifier
+/// can look it up from the presented passport.
+#[must_use]
+pub fn passport_revocation_key(passport_id: &str) -> RevocationKey {
+    RevocationKey::new(
+        SubjectId::from(passport_id),
+        EpochNonce::new(PASSPORT_REVOCATION_NONCE),
+    )
+}
 
 /// Bridge value emitted when a passport flips to `Revoked`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,11 +108,7 @@ impl PassportRevocationEvent {
     /// `AlreadyRevoked`, surfaced through
     /// [`PassportRevocationBridgeError::AlreadyApplied`]).
     pub fn to_revocation_key(&self) -> RevocationKey {
-        let nonce_value = PASSPORT_REVOCATION_NONCE_SALT ^ self.revoked_at_unix_ms;
-        RevocationKey::new(
-            SubjectId::from(self.subject.clone()),
-            EpochNonce::new(nonce_value),
-        )
+        passport_revocation_key(&self.passport_id)
     }
 }
 
@@ -264,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn different_revoked_at_yields_different_key() {
+    fn the_key_names_the_passport_not_the_revocation_time() {
         let event_a = PassportRevocationEvent::new(
             "passport-7",
             "did:chio:subject-7",
@@ -279,7 +280,19 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_ne!(event_a.to_revocation_key(), event_b.to_revocation_key());
+        let other = PassportRevocationEvent::new(
+            "passport-8",
+            "did:chio:subject-7",
+            1_700_000_000_500,
+            None,
+        )
+        .unwrap();
+        assert_eq!(event_a.to_revocation_key(), event_b.to_revocation_key());
+        assert_eq!(
+            event_a.to_revocation_key(),
+            passport_revocation_key("passport-7")
+        );
+        assert_ne!(event_a.to_revocation_key(), other.to_revocation_key());
     }
 
     #[test]
