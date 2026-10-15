@@ -5200,6 +5200,10 @@
       "path": "crates/security/chio-flow/src/declassification.rs"
     },
     {
+      "type": "VerifiedRecoveryCoverage",
+      "path": "crates/security/chio-flow/src/recovery_authority.rs"
+    },
+    {
       "type": "ConsumedDeclassification",
       "path": "crates/security/chio-flow/src/declassification.rs"
     },
@@ -22066,7 +22070,9 @@
     ],
     "crates/security/chio-flow/src/declassification.rs": [
       "canonical_request_hash::original-json-reader::UntrustedJsonText",
-      "verify_declassification::shared-reader::crates/security/chio-flow/src/declassification.rs::canonical_request_hash"
+      "verify_common_declassification::shared-reader::crates/security/chio-flow/src/declassification.rs::canonical_request_hash",
+      "verify_declassification::shared-reader::crates/security/chio-flow/src/declassification.rs::verify_common_declassification",
+      "verify_recovery_declassification::shared-reader::crates/security/chio-flow/src/declassification.rs::verify_common_declassification"
     ],
     "crates/security/chio-keyring/src/checkpoint.rs": [
       "from_canonical_bytes#1::shared-reader::crates/security/chio-keyring/src/lib.rs::from_bounded_json",

@@ -45,8 +45,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 - `verify_declassification` checks signed grant bindings and a strict label
   downgrade. With `std`, consumption delegates one-shot state to
   `DeclassificationUseStore` and rejects an already consumed result.
+- `verify_recovery_coverage` authenticates the reviewed action and requires
+  exact conjunctive owner and compartment coverage under operator-installed
+  issuer assignments. Fresh and retained verification share a 16-attestation
+  bound and a 64-obligation bound. Retained verification returns a digest only.
+- `verify_recovery_declassification` checks the grant against the authenticated
+  action, verified coverage and independently selected native binding before
+  applying every ordinary declassification check.
 - `prepare_egress_fence` requires matching flow keys and persisted joined taint
   before producing a request bound to the persisted context generation.
+
+## Recovery authority
+
+The host supplies the authenticated action, approval, authorization requirements,
+source basis, issuer assignments and trusted time. It selects the expected grant
+binding from native workflow state. Incoming grants and attestations cannot
+supply these expected inputs.
+
+`VerifiedRecoveryCoverage` is reusable verification evidence within its validity
+window. It does not consume a grant or reserve native execution. The retained
+verifier checks the same v1 bundle at an independently authenticated preparation
+time and returns only `CoverageDigest`. Callers still enforce fresh authority,
+consume the grant and retain its outcome through the native owners.
 
 ## Status
 
