@@ -4,7 +4,7 @@ set -euo pipefail
 # Generate Go bindings from the Chio guard WIT contract.
 #
 # Prerequisites:
-#   - Go 1.24+ (for `go tool` directive)
+#   - Go 1.26.9+ (for `go tool` directive)
 #   - wit-bindgen-go (installed via `go get -tool go.bytecodealliance.org/cmd/wit-bindgen-go`)
 #   - wkg (install: cargo install wkg)
 #

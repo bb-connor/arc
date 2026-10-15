@@ -6,7 +6,7 @@ set -euo pipefail
 # Full pipeline: wit-bindgen-go -> TinyGo wasip2 -> wasi-virt -> component
 #
 # Prerequisites:
-#   - Go 1.24+ with wit-bindgen-go tool dependency
+#   - Go 1.26.9+ with wit-bindgen-go tool dependency
 #   - TinyGo 0.34+ (install: brew install tinygo)
 #   - wasi-virt (install: cargo install --git https://github.com/bytecodealliance/wasi-virt)
 #   - wasm-tools (install: cargo install --locked wasm-tools@1.225.0)

@@ -1,10 +1,10 @@
 module hello-chi
 
-go 1.21
+go 1.26.9
 
 require (
 	github.com/backbay-labs/chio/sdks/go/chio-go-http v0.0.0
-	github.com/go-chi/chi/v5 v5.2.3
+	github.com/go-chi/chi/v5 v5.5.0
 )
 
 require (

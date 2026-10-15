@@ -4,7 +4,7 @@
 # Stage 1: build the manager binary with the module-compatible Go toolchain.
 # Stage 2: ship a distroless static image running as non-root user 65532.
 
-ARG GO_VERSION=1.22
+ARG GO_VERSION=1.26.9
 FROM golang:${GO_VERSION} AS builder
 
 WORKDIR /workspace
