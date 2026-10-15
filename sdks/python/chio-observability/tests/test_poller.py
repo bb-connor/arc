@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 from chio_sdk.models import ChioReceipt
-from conftest import build_receipt
+from conftest import build_receipt, hex_id
 
 from chio_observability import (
     ChioObservabilityConfigError,
@@ -86,8 +86,8 @@ class TestPollOnce:
             interval_seconds=1.0,
         )
         new = await poller.poll_once()
-        assert [r.id for r in new] == ["r1"]
-        assert [r.id for r in bridge.published] == ["r1"]
+        assert [r.id for r in new] == [hex_id("r1")]
+        assert [r.id for r in bridge.published] == [hex_id("r1")]
 
     async def test_async_source_is_awaited(self) -> None:
         bridge = RecordingBridge()
@@ -102,7 +102,7 @@ class TestPollOnce:
             interval_seconds=1.0,
         )
         new = await poller.poll_once()
-        assert [r.id for r in new] == ["r1"]
+        assert [r.id for r in new] == [hex_id("r1")]
 
     async def test_duplicates_are_deduped_across_polls(self) -> None:
         bridge = RecordingBridge()
@@ -121,7 +121,7 @@ class TestPollOnce:
         await poller.poll_once()
         await poller.poll_once()
         await poller.poll_once()
-        assert [r.id for r in bridge.published] == ["r1", "r2"]
+        assert [r.id for r in bridge.published] == [hex_id("r1"), hex_id("r2")]
 
     async def test_bridge_error_is_routed_to_on_error(self) -> None:
         bridge = RecordingBridge(fail=True)
@@ -189,11 +189,11 @@ class TestPollOnce:
         # it is treated as new and republished.
         await poller.poll_once()
         assert [r.id for r in bridge.published] == [
-            "r0",
-            "r1",
-            "r2",
-            "r3",
-            "r0",
+            hex_id("r0"),
+            hex_id("r1"),
+            hex_id("r2"),
+            hex_id("r3"),
+            hex_id("r0"),
         ]
 
 

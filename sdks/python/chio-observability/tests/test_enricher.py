@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from chio_sdk.models import ChioReceipt
-from conftest import build_receipt
+from conftest import build_receipt, hex_id
 
 from chio_observability import ReceiptEnricher
 
@@ -33,7 +33,7 @@ class TestEnrichAllowReceipt:
         self, allow_receipt: ChioReceipt
     ) -> None:
         payload = ReceiptEnricher().enrich(allow_receipt)
-        assert payload.metadata["chio.receipt_id"] == "rcpt_001"
+        assert payload.metadata["chio.receipt_id"] == hex_id("rcpt_001")
         assert payload.metadata["chio.capability_id"] == "cap-abc"
         assert payload.metadata["chio.tool_name"] == "search"
         assert payload.metadata["chio.policy_hash"] == "b" * 64

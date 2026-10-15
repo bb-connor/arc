@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from autogen import ConversableAgent
 from chio_sdk.models import (
     ChioScope,
     Operation,
@@ -16,7 +17,6 @@ from chio_sdk.testing import (
     allow_all,
     deny_all,
 )
-from autogen import ConversableAgent
 
 from chio_autogen import ChioAutogenConfigError, ChioFunctionRegistry, ChioToolError
 
@@ -321,10 +321,11 @@ class TestCapabilityRebind:
             subject="agent:lead",
             scope=_scope_for_tools("search", "write"),
         )
-        narrow = await chio.attenuate_capability(
-            broad, new_scope=_scope_for_tools("search")
+        narrow = await _mint_token(
+            chio,
+            subject="agent:lead",
+            scope=_scope_for_tools("search"),
         )
-        chio._tokens[narrow.id] = narrow  # type: ignore[attr-defined]
 
         agent = _make_agent("lead")
         registry = ChioFunctionRegistry(

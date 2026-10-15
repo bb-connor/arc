@@ -135,6 +135,7 @@ class TestCapabilityTokenConformance:
 
     def test_token_roundtrip_preserves_fields(self) -> None:
         token = CapabilityToken(
+            schema="chio.capability.v1",
             id="tok-rt",
             issuer="a" * 64,
             subject="b" * 64,

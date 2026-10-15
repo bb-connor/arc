@@ -23,6 +23,11 @@ def _param_hash(params: dict[str, Any]) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
+def hex_id(label: str) -> str:
+    """Deterministic 64-hex receipt id for a readable test label."""
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
 def build_receipt(
     *,
     receipt_id: str = "rcpt_001",
@@ -43,7 +48,7 @@ def build_receipt(
     params = parameters if parameters is not None else {"q": "hello"}
     actual_decision = Decision.allow() if decision is _DEFAULT_DECISION else decision
     return ChioReceipt(
-        id=receipt_id,
+        id=hex_id(receipt_id),
         timestamp=timestamp,
         capability_id=capability_id,
         tool_server=tool_server,

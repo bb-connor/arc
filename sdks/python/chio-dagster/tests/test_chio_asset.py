@@ -14,6 +14,7 @@ string annotations produced by PEP 563. Tests that annotate ``context``
 with :class:`dagster.AssetExecutionContext` must keep eager annotations.
 """
 
+import hashlib
 from typing import Any
 
 from chio_sdk.models import ChioReceipt, ChioScope, Operation, ToolCallAction, ToolGrant
@@ -48,23 +49,26 @@ def _ephemeral_instance() -> DagsterInstance:
 class _DecisionlessReceiptClient:
     async def evaluate_tool_call(self, **kwargs: Any) -> ChioReceipt:
         return ChioReceipt(
-            id="mock-trace-receipt",
+            id=hashlib.sha256(b"mock-trace-receipt").hexdigest(),
             timestamp=1_700_000_000,
             capability_id=str(kwargs["capability_id"]),
             tool_server=str(kwargs["tool_server"]),
             tool_name=str(kwargs["tool_name"]),
-            action=ToolCallAction(parameters=dict(kwargs["parameters"]), parameter_hash="hash"),
+            action=ToolCallAction(
+                parameters=dict(kwargs["parameters"]),
+                parameter_hash=hashlib.sha256(b"parameters").hexdigest(),
+            ),
             decision=None,
             receipt_kind="trace_observation",
             boundary_class="detect_only",
-            observation_outcome="observed_allow",
-            tool_origin="provider_reported",
-            redaction_mode="metadata_only",
-            content_hash="content",
-            policy_hash="policy",
+            observation_outcome="observed",
+            tool_origin="host_executed_provider_reported",
+            redaction_mode="summary",
+            content_hash=hashlib.sha256(b"content").hexdigest(),
+            policy_hash=hashlib.sha256(b"policy").hexdigest(),
             trust_level="verified",
-            kernel_key="kernel",
-            signature="signature",
+            kernel_key=hashlib.sha256(b"kernel").hexdigest(),
+            signature=hashlib.sha512(b"signature").hexdigest(),
         )
 
     async def close(self) -> None:
