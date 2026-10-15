@@ -5,7 +5,7 @@ cd "$(dirname "$0")/../.."
 runner="scripts/check-consumer-boundaries.sh"
 test -x "${runner}"
 bash -n "${runner}"
-test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 8
+test "$(grep -c '^  [a-z].* \\$' "${runner}")" -eq 16
 test "$(grep -c '^run_case ' "${runner}")" -eq 23
 test "$(grep -c '^run_target ' "${runner}")" -eq 2
 grep -Fq 'run_target "stdio MCP early profile rejection" mcp_serve_rejects_flow_before_store_acquisition_and_launch_policy_loading cargo test -p chio-cli --test mcp_startup_security' "${runner}"

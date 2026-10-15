@@ -68,6 +68,7 @@ run_exact_target --label "sealed decoy registry API" --expected \
 
 run_exact_target --label "decoy registry key rotation" --expected \
   overlap_opens_legacy_private_public_and_marker_lookups_and_writes_active \
+  private_envelope_without_key_version_is_refused \
   shared_index_key_continues_to_the_matching_legacy_encryption_version \
   unknown_version_overlap_expiry_and_tenant_boundaries_fail_closed \
   -- cargo test -p chio-decoy --test registry_key_rotation
