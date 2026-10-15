@@ -1,0 +1,9 @@
+# braces resolves to the path fork third_party/npm/braces/braces-3.0.4-chio.1.tgz
+# through the package.json override. bun records a file: dependency's version
+# as its path, which OSV cannot compare, so it reports the fork as affected.
+
+[[PackageOverrides]]
+name = "braces"
+ecosystem = "npm"
+vulnerability.ignore = true
+reason = "braces is the repaired path fork third_party/npm/braces/braces-3.0.4-chio.1.tgz (GHSA-vfj7-8cjw-p6xm, GHSA-grv7-fg5c-xmjg); bun records its version as the file path, so OSV cannot match it"
