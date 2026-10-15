@@ -146,13 +146,15 @@ impl ContractClientBuilder {
 
 /// Build a contract-backed reqwest client builder. [`send_with_contract`]
 /// manually follows redirects after validating each hop and stripping
-/// sensitive headers on cross-origin hops.
+/// sensitive headers on cross-origin hops. Protocol refusals never trigger
+/// automatic transport retries.
 pub fn client_builder_with_contract(contract: &HttpEgressContract) -> ContractClientBuilder {
     ContractClientBuilder {
         inner: reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .redirect(reqwest::redirect::Policy::none())
             .no_proxy()
+            .retry(reqwest::retry::never())
             .dns_resolver(Arc::new(ContractDnsResolver::new(contract.clone()))),
     }
 }
@@ -389,3 +391,7 @@ mod producer_tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tests/single_attempt.rs"]
+mod single_attempt_tests;
