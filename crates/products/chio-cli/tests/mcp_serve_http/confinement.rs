@@ -94,11 +94,24 @@ fn mcp_serve_http_adapted_server_call_binds_its_verified_cage_launch() {
             .expect("trusted cage receipt signer"),
     )
     .expect("decode trusted cage receipt signer");
-    let kernel =
-        chio_control_plane::load_existing_authority_keypair(&dir.join("remote-authority.seed"))
-            .expect("load serving authority")
-            .public_key();
+    let admission =
+        chio_control_plane::durable_admission_sidecar_path(&default_session_db_path(&dir, listen))
+            .expect("durable admission database path");
+    let mut kernel_seed = admission.into_os_string();
+    kernel_seed.push(".kernel.seed");
+    let kernel = chio_control_plane::load_existing_authority_keypair(Path::new(&kernel_seed))
+        .expect("load the receipt-signing kernel key")
+        .public_key();
 
+    assert_eq!(tool.kernel_key, kernel, "tool receipt signer");
+    assert!(tool.verify_signature().expect("verify tool receipt"));
+    let launch_bytes = chio_core::canonical_json_bytes(&launch).expect("canonical launch receipt");
+    assert_eq!(
+        reference["receipt_sha256"],
+        json!(chio_core::sha256_hex(&launch_bytes))
+    );
+    assert_eq!(launch.tool_server, tool.tool_server);
+    assert_eq!(launch.kernel_key, launch_signer, "launch receipt signer");
     assert_eq!(
         render_tool_confinement(&tool, Some(&launch), &kernel, &launch_signer),
         ConfinementDisclosure::Confined(ConfinementBackendKind::LinuxCage)
