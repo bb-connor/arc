@@ -17,11 +17,25 @@
       "wire": "{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
     },
     {
+      "name": "one-submission-effect-contract",
+      "contract": "effect_contract",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"account_id\":\"account-a\",\"deduplication\":\"not_assumed\",\"effect_cardinality\":1,\"lookup_finality\":\"exact_operation_authoritative_final\",\"partial_settlement\":\"preserve_spent_identity\",\"provider_id\":\"provider-a\",\"recovery_profile\":{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"},\"resource_id\":\"issue-a\",\"schema\":\"chio.semantic.effect-contract.v1\",\"submission_identity\":\"original_native_operation\",\"transport_retry\":\"no_automatic_retries\",\"version\":1}"
+    },
+    {
       "name": "effects-authority-knowledge-trajectory",
       "contract": "trajectory",
       "valid": true,
       "schema_valid": true,
       "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[{\"expected\":{\"consumed_authority\":1,\"effect_count\":1,\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"process_request_digest\":[4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],\"remaining_budget\":9},\"observation\":{\"continuation_id\":\"continuation-a\",\"control\":\"cancel_requested\",\"effect\":{\"kind\":\"unknown\",\"operation\":{\"native_admission_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"operation_id\":\"operation-original\",\"operation_version\":1}},\"knowledge_digest\":[5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5],\"release\":{\"kind\":\"not_available\"},\"revision\":2,\"schema\":\"chio.recovery.observation.v1\",\"scope\":{\"authority_domain\":\"authority-a\",\"process_id\":\"process-a\",\"tenant_id\":\"tenant-a\"},\"step_id\":\"step-a\",\"version\":1,\"workflow_id\":\"workflow-a\"}}],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "causal-graph",
+      "contract": "graph",
+      "valid": true,
+      "schema_valid": true,
+      "wire": "{\"nodes\":[{\"dependencies\":[],\"estimated_cost_units\":1,\"step_id\":\"step-a\",\"template_id\":\"read\"},{\"dependencies\":[\"step-a\"],\"estimated_cost_units\":2,\"step_id\":\"step-b\",\"template_id\":\"disclose\"}],\"schema\":\"chio.recovery.dependency-graph.v1\",\"version\":1}"
     },
     {
       "name": "bad-version-2",
@@ -180,6 +194,20 @@
       "wire": "{\"attachment_profile\":\"operation_owned_nonce\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"}"
     },
     {
+      "name": "hidden-transport-retry",
+      "contract": "effect_contract",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"account_id\":\"account-a\",\"deduplication\":\"not_assumed\",\"effect_cardinality\":1,\"lookup_finality\":\"exact_operation_authoritative_final\",\"partial_settlement\":\"preserve_spent_identity\",\"provider_id\":\"provider-a\",\"recovery_profile\":{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"},\"resource_id\":\"issue-a\",\"schema\":\"chio.semantic.effect-contract.v1\",\"submission_identity\":\"original_native_operation\",\"transport_retry\":\"automatic\",\"version\":1}"
+    },
+    {
+      "name": "zero-effect-cardinality",
+      "contract": "effect_contract",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"account_id\":\"account-a\",\"deduplication\":\"not_assumed\",\"effect_cardinality\":0,\"lookup_finality\":\"exact_operation_authoritative_final\",\"partial_settlement\":\"preserve_spent_identity\",\"provider_id\":\"provider-a\",\"recovery_profile\":{\"attachment_profile\":\"ordinary\",\"deployment_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"protocol_version\":1,\"required_features\":[\"native_capture\",\"recovery_bound_grant\",\"exact_request_custody\",\"current_audience\"],\"schema\":\"chio.recovery.profile-requirements.v1\"},\"resource_id\":\"issue-a\",\"schema\":\"chio.semantic.effect-contract.v1\",\"submission_identity\":\"original_native_operation\",\"transport_retry\":\"no_automatic_retries\",\"version\":1}"
+    },
+    {
       "name": "trajectory-missing-effect_count",
       "contract": "trajectory",
       "valid": false,
@@ -227,6 +255,13 @@
       "valid": false,
       "schema_valid": false,
       "wire": "{\"contract_digest\":[2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2],\"deterministic_time\":100,\"frames\":[],\"policy_digest\":[3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3],\"profile_digest\":[9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9],\"schema\":\"chio.recovery.trajectory.v1\",\"source_digest\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],\"version\":1}"
+    },
+    {
+      "name": "overlong-dependency-list",
+      "contract": "graph",
+      "valid": false,
+      "schema_valid": false,
+      "wire": "{\"nodes\":[{\"dependencies\":[],\"estimated_cost_units\":1,\"step_id\":\"step-a\",\"template_id\":\"read\"},{\"dependencies\":[\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\",\"step-a\"],\"estimated_cost_units\":2,\"step_id\":\"step-b\",\"template_id\":\"disclose\"}],\"schema\":\"chio.recovery.dependency-graph.v1\",\"version\":1}"
     },
     {
       "name": "wrong-authority_domain",

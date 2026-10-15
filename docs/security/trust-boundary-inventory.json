@@ -2435,6 +2435,13 @@
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/canonical.rs::from_str::Deserializer::from_str",
     "crates/core/chio-core-types/src/canonical.rs::write_canonical::custom_deserialize",
     "crates/core/chio-core-types/src/canonical/signed_json.rs::parse::custom_deserialize",
@@ -6023,6 +6030,13 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -7106,6 +7120,9 @@
     "crates/security/chio-security-types/src/recovery/profile.rs": [
       "attachment_profile::custom_deserialize"
     ],
+    "crates/security/chio-semantic-contracts/src/effect.rs": [
+      "recovery_profile::custom_deserialize"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
       "require_canonical_json::from_slice"
     ]
@@ -7128,7 +7145,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 779
+          "instances": 786
         }
       ]
     },
@@ -12208,6 +12225,22 @@
     "crates/security/chio-security-types/src/recovery/profile.rs": {
       "kind": "typed-field-deserializer",
       "contract": "Profile requirements validate ordering and baseline features through their constructor after an outer original-byte reader.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/security/chio-semantic-contracts/src/effect.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Effect contracts decode through a closed wire shape and validate submission, retry and finality rules before construction, after an outer original-byte reader. Validation proves no provider fact.",
       "readers": [
         {
           "reader": "deserialize",
