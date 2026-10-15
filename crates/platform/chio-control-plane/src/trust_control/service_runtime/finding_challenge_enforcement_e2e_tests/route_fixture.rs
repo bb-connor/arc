@@ -47,7 +47,7 @@ pub(super) fn challenge_route_state(
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
-        stop: TrustStop::for_authority(Some(&deployment._authority)),
+        stop: crate::trust_control::TrustStop::for_authority(Some(&deployment._authority)),
         joint_authority_store: Some(Arc::clone(&deployment._authority)),
         fiscal_runtime: None,
         budget_store: None,
