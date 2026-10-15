@@ -189,17 +189,15 @@ fn agent_web_interop_rejects_openapi_without_proof_envelope_profile() {
 fn agent_web_interop_rejects_openapi_profile_from_another_envelope_version() {
     let mut bundle = agent_web_bundle(AgentWebCase::OpenApiProjection);
     mutate_openapi_subject_and_bound_receipt(&mut bundle, |subject| {
-        subject["x_chio_proof_envelope_profile"] = json!("chio.agent-web-proof-envelope.v1");
+        subject["x_chio_proof_envelope_profile"] = json!("chio.agent-web-proof-envelope.v2");
     });
 
     let error = verify_agent_web_interop(&bundle)
         .test_expect_err("OpenAPI profile must match its proof-envelope version");
 
-    assert!(
-        error
-            .to_string()
-            .contains("OpenAPI proof-envelope profile mismatch"),
-        "{error}"
+    assert_eq!(
+        error.to_string(),
+        "Agent Web claim failed: OpenAPI proof-envelope profile mismatch"
     );
 }
 
