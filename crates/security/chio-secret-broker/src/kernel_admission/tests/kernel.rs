@@ -364,16 +364,20 @@ fn registered_composite_execution(
                 )?;
             }
         }
-        let denied = kernel.evaluate_tool_call_blocking(&original)?;
-        assert_eq!(denied.verdict, Verdict::Deny);
+        let conflict = kernel.evaluate_tool_call_blocking(&original);
         assert_eq!(effects.load(Ordering::SeqCst), 0);
-        assert_eq!(
-            registrar
-                .operations
-                .lock()
-                .map_err(|_| "registration lock")?
-                .len(),
-            1
+        let operations = registrar
+            .operations
+            .lock()
+            .map_err(|_| "registration lock")?
+            .clone();
+        let [operation] = operations.as_slice() else {
+            return Err(format!("expected one registration, found {}", operations.len()).into());
+        };
+        let expected = format!("request id conflicts with retained operation {operation}");
+        assert!(
+            matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+            "{conflict:?}"
         );
         assert!(authority
             .budget_store()
