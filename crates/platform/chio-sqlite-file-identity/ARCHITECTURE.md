@@ -4,7 +4,7 @@
 
 The public surface contains `SqliteFileIdentity`,
 `SqliteFileIdentityInspectionError`, `inspect_main_database_file_identity`,
-the compatibility wrapper `main_database_file_identity`,
+`main_database_file_identity`,
 `main_database_available_bytes`, and `SqliteAvailableSpaceError`.
 `SqliteFileIdentity` copies three `u64` fields: device, inode, and link count.
 The caller owns the connection and keeps it borrowed throughout inspection.
@@ -52,8 +52,8 @@ directly to one syscall. `inspect_main_database_file_identity` passes it to
 On syscall success, `descriptor_file_identity` copies the device, inode, and
 link count into the result. On failure it retains `std::io::Error` as the
 `Io` variant and exposes it through `Error::source`. Validation failures carry
-a diagnostic string and have no underlying error source. The compatibility
-wrapper converts the typed error with `to_string`.
+a diagnostic string and have no underlying error source.
+`main_database_file_identity` converts the typed error with `to_string`.
 
 `main_database_available_bytes` uses the same `main_database_descriptor`, so
 every check above applies, and keeps its refusal as the `Identity` variant.
