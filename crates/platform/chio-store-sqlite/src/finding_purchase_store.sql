@@ -1,29 +1,33 @@
 CREATE TABLE IF NOT EXISTS purchase_reservations (
     reservation_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(reservation_id) BETWEEN 1 AND 512),
+        CHECK (typeof(reservation_id) = 'text' AND length(reservation_id) BETWEEN 1 AND 512 AND instr(reservation_id, char(0)) = 0),
     purchase_intent_id TEXT NOT NULL UNIQUE
-        CHECK (length(purchase_intent_id) BETWEEN 1 AND 512),
+        CHECK (typeof(purchase_intent_id) = 'text' AND length(purchase_intent_id) BETWEEN 1 AND 512 AND instr(purchase_intent_id, char(0)) = 0),
     authoritative_payment_operation_id TEXT NOT NULL UNIQUE
-        CHECK (length(authoritative_payment_operation_id) BETWEEN 1 AND 512),
+        CHECK (typeof(authoritative_payment_operation_id) = 'text' AND length(authoritative_payment_operation_id) BETWEEN 1 AND 512 AND instr(authoritative_payment_operation_id, char(0)) = 0),
     payer_hex TEXT NOT NULL
-        CHECK (length(payer_hex) = 64 AND payer_hex NOT GLOB '*[^0-9a-f]*'),
-    agent_id TEXT NOT NULL CHECK (length(agent_id) BETWEEN 1 AND 512),
+        CHECK (typeof(payer_hex) = 'text' AND length(payer_hex) = 64 AND instr(payer_hex, char(0)) = 0 AND payer_hex NOT GLOB '*[^0-9a-f]*'),
+    agent_id TEXT NOT NULL CHECK (typeof(agent_id) = 'text' AND length(agent_id) BETWEEN 1 AND 512 AND instr(agent_id, char(0)) = 0),
     finding_id TEXT NOT NULL
-        CHECK (length(finding_id) = 64 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     bid_envelope_sha256 TEXT NOT NULL CHECK (
-        length(bid_envelope_sha256) = 64
+        typeof(bid_envelope_sha256) = 'text'
+        AND length(bid_envelope_sha256) = 64
+        AND instr(bid_envelope_sha256, char(0)) = 0
         AND bid_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     ask_digest TEXT NOT NULL
-        CHECK (length(ask_digest) = 64 AND ask_digest NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(ask_digest) = 'text' AND length(ask_digest) = 64 AND instr(ask_digest, char(0)) = 0 AND ask_digest NOT GLOB '*[^0-9a-f]*'),
     admission_envelope_sha256 TEXT NOT NULL CHECK (
-        length(admission_envelope_sha256) = 64
+        typeof(admission_envelope_sha256) = 'text'
+        AND length(admission_envelope_sha256) = 64
+        AND instr(admission_envelope_sha256, char(0)) = 0
         AND admission_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     amount_units INTEGER NOT NULL CHECK (amount_units > 0),
     currency TEXT NOT NULL
-        CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
     expires_at INTEGER NOT NULL CHECK (expires_at > 0),
     state TEXT NOT NULL CHECK (
         state IN ('open', 'slot_reserved', 'consumed', 'released', 'expired')
@@ -77,33 +81,37 @@ END;
 
 CREATE TABLE IF NOT EXISTS public_purchase_requests (
     request_id TEXT NOT NULL PRIMARY KEY CHECK (
-        length(request_id) = 64 AND request_id NOT GLOB '*[^0-9a-f]*'
+        typeof(request_id) = 'text'
+        AND length(request_id) = 64 AND instr(request_id, char(0)) = 0 AND request_id NOT GLOB '*[^0-9a-f]*'
     ),
     reservation_id TEXT NOT NULL UNIQUE
         REFERENCES purchase_reservations(reservation_id),
     finding_id TEXT NOT NULL CHECK (
-        length(finding_id) = 64 AND finding_id NOT GLOB '*[^0-9a-f]*'
+        typeof(finding_id) = 'text'
+        AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'
     ),
     requested_payer TEXT CHECK (
-        requested_payer IS NULL OR length(requested_payer) BETWEEN 1 AND 512
+        requested_payer IS NULL OR length(requested_payer) BETWEEN 1 AND 512 AND instr(requested_payer, char(0)) = 0
     ),
-    resolved_payer TEXT NOT NULL CHECK (length(resolved_payer) BETWEEN 1 AND 512),
+    resolved_payer TEXT NOT NULL CHECK (typeof(resolved_payer) = 'text' AND length(resolved_payer) BETWEEN 1 AND 512 AND instr(resolved_payer, char(0)) = 0),
     payer_hex TEXT NOT NULL CHECK (
-        length(payer_hex) = 64 AND payer_hex NOT GLOB '*[^0-9a-f]*'
+        typeof(payer_hex) = 'text'
+        AND length(payer_hex) = 64 AND instr(payer_hex, char(0)) = 0 AND payer_hex NOT GLOB '*[^0-9a-f]*'
     ),
     max_price_units INTEGER NOT NULL CHECK (max_price_units > 0),
     currency TEXT NOT NULL CHECK (
-        length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'
+        typeof(currency) = 'text'
+        AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'
     ),
     deadline_secs INTEGER CHECK (deadline_secs IS NULL OR deadline_secs > 0),
     terminal_kind TEXT CHECK (
         terminal_kind IS NULL OR terminal_kind IN ('purchase_record', 'failed_delivery')
     ),
     terminal_id TEXT CHECK (
-        terminal_id IS NULL OR length(terminal_id) BETWEEN 1 AND 512
+        terminal_id IS NULL OR length(terminal_id) BETWEEN 1 AND 512 AND instr(terminal_id, char(0)) = 0
     ),
     receipt_id TEXT CHECK (
-        receipt_id IS NULL OR length(receipt_id) BETWEEN 1 AND 512
+        receipt_id IS NULL OR length(receipt_id) BETWEEN 1 AND 512 AND instr(receipt_id, char(0)) = 0
     ),
     bound_at INTEGER NOT NULL CHECK (bound_at > 0),
     CHECK (
@@ -154,7 +162,7 @@ CREATE TABLE IF NOT EXISTS purchase_capture_intents (
     reservation_id TEXT NOT NULL PRIMARY KEY
         REFERENCES purchase_reservations(reservation_id),
     authoritative_payment_operation_id TEXT NOT NULL UNIQUE
-        CHECK (length(authoritative_payment_operation_id) BETWEEN 1 AND 512),
+        CHECK (typeof(authoritative_payment_operation_id) = 'text' AND length(authoritative_payment_operation_id) BETWEEN 1 AND 512 AND instr(authoritative_payment_operation_id, char(0)) = 0),
     marked_at INTEGER NOT NULL CHECK (marked_at > 0)
 );
 
@@ -174,7 +182,9 @@ CREATE TABLE IF NOT EXISTS purchase_payout_bindings (
     reservation_id TEXT NOT NULL PRIMARY KEY
         REFERENCES purchase_reservations(reservation_id),
     destination TEXT NOT NULL CHECK (
-        length(destination) = 42
+        typeof(destination) = 'text'
+        AND length(destination) = 42
+        AND instr(destination, char(0)) = 0
         AND substr(destination, 1, 2) = '0x'
         AND substr(destination, 3) NOT GLOB '*[^0-9a-f]*'
         AND destination <> '0x0000000000000000000000000000000000000000'
@@ -195,14 +205,14 @@ END;
 
 CREATE TABLE IF NOT EXISTS seller_exposure_encumbrances (
     encumbrance_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(encumbrance_id) BETWEEN 1 AND 512),
+        CHECK (typeof(encumbrance_id) = 'text' AND length(encumbrance_id) BETWEEN 1 AND 512 AND instr(encumbrance_id, char(0)) = 0),
     allocation_id TEXT NOT NULL
-        CHECK (length(allocation_id) = 64 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(allocation_id) = 'text' AND length(allocation_id) = 64 AND instr(allocation_id, char(0)) = 0 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
     reservation_id TEXT NOT NULL UNIQUE
         REFERENCES purchase_reservations(reservation_id),
     amount_units INTEGER NOT NULL CHECK (amount_units > 0),
     currency TEXT NOT NULL
-        CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
     state TEXT NOT NULL CHECK (state IN ('open', 'released', 'retained')),
     retention_expires_at INTEGER
         CHECK (retention_expires_at IS NULL OR retention_expires_at > 0),
@@ -240,7 +250,7 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS pending_purchase_slots (
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     slot_ordinal INTEGER NOT NULL CHECK (slot_ordinal > 0),
     reservation_id TEXT NOT NULL UNIQUE
         REFERENCES purchase_reservations(reservation_id),
@@ -281,7 +291,7 @@ BEGIN
 END;
 
 CREATE TABLE IF NOT EXISTS listing_sales_blocks (
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     block_ordinal INTEGER NOT NULL CHECK (block_ordinal > 0),
     state TEXT NOT NULL CHECK (state IN ('blocked', 'lifted')),
     blocked_at INTEGER NOT NULL CHECK (blocked_at > 0),
@@ -320,7 +330,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS purchase_records (
     purchase_key TEXT NOT NULL PRIMARY KEY
-        CHECK (length(purchase_key) = 64 AND purchase_key NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(purchase_key) = 'text' AND length(purchase_key) = 64 AND instr(purchase_key, char(0)) = 0 AND purchase_key NOT GLOB '*[^0-9a-f]*'),
     reservation_id TEXT NOT NULL UNIQUE
         REFERENCES purchase_reservations(reservation_id),
     record_json BLOB NOT NULL CHECK (
@@ -328,9 +338,9 @@ CREATE TABLE IF NOT EXISTS purchase_records (
         AND length(record_json) BETWEEN 1 AND 262144
     ),
     record_sha256 TEXT NOT NULL
-        CHECK (length(record_sha256) = 64 AND record_sha256 NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(record_sha256) = 'text' AND length(record_sha256) = 64 AND instr(record_sha256, char(0)) = 0 AND record_sha256 NOT GLOB '*[^0-9a-f]*'),
     delivery_receipt_id TEXT NOT NULL
-        CHECK (length(delivery_receipt_id) BETWEEN 1 AND 512),
+        CHECK (typeof(delivery_receipt_id) = 'text' AND length(delivery_receipt_id) BETWEEN 1 AND 512 AND instr(delivery_receipt_id, char(0)) = 0),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0)
 );
 
@@ -348,7 +358,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS failed_delivery_records (
     failed_delivery_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(failed_delivery_id) BETWEEN 1 AND 512),
+        CHECK (typeof(failed_delivery_id) = 'text' AND length(failed_delivery_id) BETWEEN 1 AND 512 AND instr(failed_delivery_id, char(0)) = 0),
     reservation_id TEXT NOT NULL UNIQUE
         REFERENCES purchase_reservations(reservation_id),
     record_json BLOB NOT NULL CHECK (
@@ -356,9 +366,9 @@ CREATE TABLE IF NOT EXISTS failed_delivery_records (
         AND length(record_json) BETWEEN 1 AND 262144
     ),
     record_sha256 TEXT NOT NULL
-        CHECK (length(record_sha256) = 64 AND record_sha256 NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(record_sha256) = 'text' AND length(record_sha256) = 64 AND instr(record_sha256, char(0)) = 0 AND record_sha256 NOT GLOB '*[^0-9a-f]*'),
     deny_receipt_id TEXT NOT NULL
-        CHECK (length(deny_receipt_id) BETWEEN 1 AND 512),
+        CHECK (typeof(deny_receipt_id) = 'text' AND length(deny_receipt_id) BETWEEN 1 AND 512 AND instr(deny_receipt_id, char(0)) = 0),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0)
 );
 
@@ -376,7 +386,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS payout_destinations (
     allocation_id TEXT NOT NULL
-        CHECK (length(allocation_id) = 64 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(allocation_id) = 'text' AND length(allocation_id) = 64 AND instr(allocation_id, char(0)) = 0 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
     destination TEXT NOT NULL,
     slot_index INTEGER NOT NULL CHECK (slot_index BETWEEN 0 AND 15),
     admitted_at INTEGER NOT NULL CHECK (admitted_at > 0),
@@ -384,6 +394,7 @@ CREATE TABLE IF NOT EXISTS payout_destinations (
     CHECK (
         slot_index BETWEEN 0 AND 15
         AND length(destination) = 42
+        AND instr(destination, char(0)) = 0
         AND substr(destination, 1, 2) = '0x'
         AND substr(destination, 3) NOT GLOB '*[^0-9a-f]*'
     )

@@ -1,43 +1,48 @@
 CREATE TABLE IF NOT EXISTS economic_state_stages (
     batch_id TEXT PRIMARY KEY CHECK (
-        length(batch_id) = 64 AND batch_id NOT GLOB '*[^0-9a-f]*'
+        length(batch_id) = 64 AND instr(batch_id, char(0)) = 0 AND batch_id NOT GLOB '*[^0-9a-f]*'
     ),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
     checkpoint_digest TEXT NOT NULL CHECK (
-        length(checkpoint_digest) = 64
+        typeof(checkpoint_digest) = 'text'
+        AND length(checkpoint_digest) = 64
+        AND instr(checkpoint_digest, char(0)) = 0
         AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    base_view_json BLOB NOT NULL CHECK (length(base_view_json) BETWEEN 1 AND 4194304),
-    batch_json BLOB NOT NULL CHECK (length(batch_json) BETWEEN 1 AND 1048576),
+    base_view_json BLOB NOT NULL CHECK (typeof(base_view_json) = 'blob' AND length(base_view_json) BETWEEN 1 AND 4194304),
+    batch_json BLOB NOT NULL CHECK (typeof(batch_json) = 'blob' AND length(batch_json) BETWEEN 1 AND 1048576),
     committed_view_json BLOB CHECK (
-        committed_view_json IS NULL OR length(committed_view_json) BETWEEN 1 AND 4194304
+        committed_view_json IS NULL OR typeof(committed_view_json) = 'blob' AND length(committed_view_json) BETWEEN 1 AND 4194304
     ),
     operation_binding_json BLOB CHECK (
-        operation_binding_json IS NULL OR length(operation_binding_json) BETWEEN 1 AND 65536
+        operation_binding_json IS NULL OR typeof(operation_binding_json) = 'blob' AND length(operation_binding_json) BETWEEN 1 AND 65536
     ),
     descriptor_kind TEXT CHECK (
-        descriptor_kind IS NULL OR length(descriptor_kind) BETWEEN 1 AND 128
+        descriptor_kind IS NULL OR length(descriptor_kind) BETWEEN 1 AND 128 AND instr(descriptor_kind, char(0)) = 0
     ),
     descriptor_key TEXT CHECK (
-        descriptor_key IS NULL OR length(descriptor_key) BETWEEN 1 AND 2048
+        descriptor_key IS NULL OR length(descriptor_key) BETWEEN 1 AND 2048 AND instr(descriptor_key, char(0)) = 0
     ),
     descriptor_digest TEXT CHECK (
         descriptor_digest IS NULL OR (
             length(descriptor_digest) = 64
+            AND instr(descriptor_digest, char(0)) = 0
             AND descriptor_digest NOT GLOB '*[^0-9a-f]*'
         )
     ),
     descriptor_json BLOB CHECK (
-        descriptor_json IS NULL OR length(descriptor_json) BETWEEN 1 AND 4194304
+        descriptor_json IS NULL OR typeof(descriptor_json) = 'blob' AND length(descriptor_json) BETWEEN 1 AND 4194304
     ),
     status TEXT NOT NULL CHECK (status IN (
         'db_staged', 'economic_anchor_advanced', 'db_finalized',
         'discarded', 'quarantined'
     )),
-    reason TEXT CHECK (reason IS NULL OR length(reason) BETWEEN 1 AND 4096),
+    reason TEXT CHECK (reason IS NULL OR length(reason) BETWEEN 1 AND 4096 AND instr(reason, char(0)) = 0),
     stage_version INTEGER NOT NULL CHECK (stage_version > 0),
     snapshot_digest TEXT NOT NULL CHECK (
-        length(snapshot_digest) = 64
+        typeof(snapshot_digest) = 'text'
+        AND length(snapshot_digest) = 64
+        AND instr(snapshot_digest, char(0)) = 0
         AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
     ),
     created_at_unix_ms INTEGER NOT NULL CHECK (created_at_unix_ms > 0),
@@ -69,14 +74,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS economic_state_stages_descriptor_identity
 CREATE TABLE IF NOT EXISTS economic_state_stage_heads (
     batch_id TEXT NOT NULL,
     resource_key_digest TEXT NOT NULL CHECK (
-        length(resource_key_digest) = 64
+        typeof(resource_key_digest) = 'text'
+        AND length(resource_key_digest) = 64
+        AND instr(resource_key_digest, char(0)) = 0
         AND resource_key_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    resource_key_json BLOB NOT NULL CHECK (length(resource_key_json) BETWEEN 1 AND 4096),
+    resource_key_json BLOB NOT NULL CHECK (typeof(resource_key_json) = 'blob' AND length(resource_key_json) BETWEEN 1 AND 4096),
     head_digest TEXT NOT NULL CHECK (
-        length(head_digest) = 64 AND head_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(head_digest) = 'text'
+        AND length(head_digest) = 64 AND instr(head_digest, char(0)) = 0 AND head_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    head_json BLOB NOT NULL CHECK (length(head_json) BETWEEN 1 AND 1048576),
+    head_json BLOB NOT NULL CHECK (typeof(head_json) = 'blob' AND length(head_json) BETWEEN 1 AND 1048576),
     PRIMARY KEY (batch_id, resource_key_digest),
     UNIQUE (batch_id, resource_key_json),
     FOREIGN KEY (batch_id) REFERENCES economic_state_stages(batch_id)
@@ -85,16 +93,20 @@ CREATE TABLE IF NOT EXISTS economic_state_stage_heads (
 CREATE TABLE IF NOT EXISTS economic_state_heads (
     resource_key_digest TEXT PRIMARY KEY CHECK (
         length(resource_key_digest) = 64
+        AND instr(resource_key_digest, char(0)) = 0
         AND resource_key_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    resource_key_json BLOB NOT NULL UNIQUE CHECK (length(resource_key_json) BETWEEN 1 AND 4096),
+    resource_key_json BLOB NOT NULL UNIQUE CHECK (typeof(resource_key_json) = 'blob' AND length(resource_key_json) BETWEEN 1 AND 4096),
     head_digest TEXT NOT NULL CHECK (
-        length(head_digest) = 64 AND head_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(head_digest) = 'text'
+        AND length(head_digest) = 64 AND instr(head_digest, char(0)) = 0 AND head_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    head_json BLOB NOT NULL CHECK (length(head_json) BETWEEN 1 AND 1048576),
+    head_json BLOB NOT NULL CHECK (typeof(head_json) = 'blob' AND length(head_json) BETWEEN 1 AND 1048576),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
     checkpoint_digest TEXT NOT NULL CHECK (
-        length(checkpoint_digest) = 64
+        typeof(checkpoint_digest) = 'text'
+        AND length(checkpoint_digest) = 64
+        AND instr(checkpoint_digest, char(0)) = 0
         AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     source_batch_id TEXT NOT NULL,
@@ -110,15 +122,21 @@ CREATE TABLE IF NOT EXISTS economic_state_stage_commits (
         'discarded', 'quarantined'
     )),
     snapshot_digest TEXT NOT NULL CHECK (
-        length(snapshot_digest) = 64
+        typeof(snapshot_digest) = 'text'
+        AND length(snapshot_digest) = 64
+        AND instr(snapshot_digest, char(0)) = 0
         AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_commit_digest TEXT NOT NULL CHECK (
-        length(previous_commit_digest) = 64
+        typeof(previous_commit_digest) = 'text'
+        AND length(previous_commit_digest) = 64
+        AND instr(previous_commit_digest, char(0)) = 0
         AND previous_commit_digest NOT GLOB '*[^0-9a-f]*'
     ),
     commit_digest TEXT NOT NULL CHECK (
-        length(commit_digest) = 64
+        typeof(commit_digest) = 'text'
+        AND length(commit_digest) = 64
+        AND instr(commit_digest, char(0)) = 0
         AND commit_digest NOT GLOB '*[^0-9a-f]*'
     ),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),

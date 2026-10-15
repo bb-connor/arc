@@ -252,7 +252,7 @@ impl SqliteCallerExecutionLedger {
             let existing: Option<(Vec<u8>, String)> = tx.query_row(
                 "SELECT
                     CASE WHEN typeof(authorization) = 'blob' AND length(authorization) BETWEEN 1 AND 32768 THEN authorization END,
-                    CASE WHEN typeof(claim_id) = 'text' AND length(CAST(claim_id AS BLOB)) = 36 THEN claim_id END
+                    CASE WHEN typeof(claim_id) = 'text' AND length(claim_id) = 36 AND instr(claim_id, char(0)) = 0 THEN claim_id END
                  FROM caller_executor_claims WHERE operation_id = ?1",
                 params![operation_id], |row| Ok((row.get(0)?, row.get(1)?)),
             ).optional().map_err(storage)?;

@@ -1,16 +1,18 @@
 CREATE TABLE IF NOT EXISTS finding_recovery_issuances (
     recovery_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(recovery_id) = 64 AND recovery_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(recovery_id) = 'text' AND length(recovery_id) = 64 AND instr(recovery_id, char(0)) = 0 AND recovery_id NOT GLOB '*[^0-9a-f]*'),
     finding_id TEXT NOT NULL
-        CHECK (length(finding_id) = 64 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     original_capability_id TEXT NOT NULL
-        CHECK (length(original_capability_id) BETWEEN 1 AND 512),
+        CHECK (typeof(original_capability_id) = 'text' AND length(original_capability_id) BETWEEN 1 AND 512 AND instr(original_capability_id, char(0)) = 0),
     original_delivery_receipt_id TEXT NOT NULL
-        CHECK (length(original_delivery_receipt_id) BETWEEN 1 AND 512),
+        CHECK (typeof(original_delivery_receipt_id) = 'text' AND length(original_delivery_receipt_id) BETWEEN 1 AND 512 AND instr(original_delivery_receipt_id, char(0)) = 0),
     purchase_key TEXT NOT NULL REFERENCES purchase_records(purchase_key),
     original_subject_key_hex TEXT NOT NULL CHECK (
-        length(original_subject_key_hex) = 64
+        typeof(original_subject_key_hex) = 'text'
+        AND length(original_subject_key_hex) = 64
+        AND instr(original_subject_key_hex, char(0)) = 0
         AND original_subject_key_hex NOT GLOB '*[^0-9a-f]*'
     ),
     max_recoveries INTEGER NOT NULL CHECK (max_recoveries BETWEEN 1 AND 8),
@@ -31,7 +33,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS finding_recovery_attempts (
     recovery_id TEXT NOT NULL REFERENCES finding_recovery_issuances(recovery_id),
-    request_id TEXT NOT NULL CHECK (length(request_id) BETWEEN 1 AND 512),
+    request_id TEXT NOT NULL CHECK (typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND instr(request_id, char(0)) = 0),
     attempt_ordinal INTEGER NOT NULL CHECK (attempt_ordinal > 0),
     reserved_at INTEGER NOT NULL CHECK (reserved_at > 0),
     PRIMARY KEY (recovery_id, request_id),
@@ -52,12 +54,12 @@ END;
 
 CREATE TABLE IF NOT EXISTS finding_recovery_receipt_lineage (
     recovery_receipt_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(recovery_receipt_id) BETWEEN 1 AND 512),
+        CHECK (typeof(recovery_receipt_id) = 'text' AND length(recovery_receipt_id) BETWEEN 1 AND 512 AND instr(recovery_receipt_id, char(0)) = 0),
     recovery_id TEXT NOT NULL REFERENCES finding_recovery_issuances(recovery_id),
     original_delivery_receipt_id TEXT NOT NULL
-        CHECK (length(original_delivery_receipt_id) BETWEEN 1 AND 512),
+        CHECK (typeof(original_delivery_receipt_id) = 'text' AND length(original_delivery_receipt_id) BETWEEN 1 AND 512 AND instr(original_delivery_receipt_id, char(0)) = 0),
     purchase_key TEXT NOT NULL
-        CHECK (length(purchase_key) = 64 AND purchase_key NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(purchase_key) = 'text' AND length(purchase_key) = 64 AND instr(purchase_key, char(0)) = 0 AND purchase_key NOT GLOB '*[^0-9a-f]*'),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0)
 );
 

@@ -1,11 +1,13 @@
 CREATE TABLE IF NOT EXISTS challenges (
     challenge_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(challenge_id) BETWEEN 1 AND 512),
+        CHECK (typeof(challenge_id) = 'text' AND length(challenge_id) BETWEEN 1 AND 512 AND instr(challenge_id, char(0)) = 0),
     finding_id TEXT NOT NULL
-        CHECK (length(finding_id) = 64 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     challenge_envelope_sha256 TEXT NOT NULL UNIQUE CHECK (
-        length(challenge_envelope_sha256) = 64
+        typeof(challenge_envelope_sha256) = 'text'
+        AND length(challenge_envelope_sha256) = 64
+        AND instr(challenge_envelope_sha256, char(0)) = 0
         AND challenge_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     authorization_branch TEXT NOT NULL CHECK (
@@ -20,6 +22,7 @@ CREATE TABLE IF NOT EXISTS challenges (
         challenger_hex IS NULL
         OR (
             length(challenger_hex) = 64
+            AND instr(challenger_hex, char(0)) = 0
             AND challenger_hex NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -35,6 +38,7 @@ CREATE TABLE IF NOT EXISTS challenges (
         outcome_envelope_sha256 IS NULL
         OR (
             length(outcome_envelope_sha256) = 64
+            AND instr(outcome_envelope_sha256, char(0)) = 0
             AND outcome_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -59,7 +63,8 @@ CREATE TABLE IF NOT EXISTS finding_challenge_submissions (
     challenge_envelope_sha256 TEXT NOT NULL PRIMARY KEY REFERENCES challenges(challenge_envelope_sha256),
     challenge_id TEXT NOT NULL UNIQUE REFERENCES challenges(challenge_id),
     challenge_envelope_json BLOB NOT NULL CHECK (
-        length(challenge_envelope_json) BETWEEN 1 AND 1048576
+        typeof(challenge_envelope_json) = 'blob'
+        AND length(challenge_envelope_json) BETWEEN 1 AND 1048576
     ),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0)
 );
@@ -119,12 +124,15 @@ END;
 -- evaluation.
 CREATE TABLE IF NOT EXISTS finding_challenge_outcomes (
     outcome_envelope_sha256 TEXT NOT NULL PRIMARY KEY CHECK (
-        length(outcome_envelope_sha256) = 64
+        typeof(outcome_envelope_sha256) = 'text'
+        AND length(outcome_envelope_sha256) = 64
+        AND instr(outcome_envelope_sha256, char(0)) = 0
         AND outcome_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     challenge_id TEXT NOT NULL REFERENCES challenges(challenge_id),
     outcome_envelope_json BLOB NOT NULL CHECK (
-        length(outcome_envelope_json) BETWEEN 1 AND 1048576
+        typeof(outcome_envelope_json) = 'blob'
+        AND length(outcome_envelope_json) BETWEEN 1 AND 1048576
     ),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0),
     UNIQUE (challenge_id, outcome_envelope_sha256)
@@ -147,21 +155,23 @@ END;
 
 CREATE TABLE IF NOT EXISTS dispute_lock_reservations (
     lock_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(lock_id) BETWEEN 1 AND 512),
+        CHECK (typeof(lock_id) = 'text' AND length(lock_id) BETWEEN 1 AND 512 AND instr(lock_id, char(0)) = 0),
     challenge_id TEXT NOT NULL UNIQUE REFERENCES challenges(challenge_id),
     owner_hex TEXT NOT NULL
-        CHECK (length(owner_hex) = 64 AND owner_hex NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(owner_hex) = 'text' AND length(owner_hex) = 64 AND instr(owner_hex, char(0)) = 0 AND owner_hex NOT GLOB '*[^0-9a-f]*'),
     schedule_envelope_sha256 TEXT NOT NULL CHECK (
-        length(schedule_envelope_sha256) = 64
+        typeof(schedule_envelope_sha256) = 'text'
+        AND length(schedule_envelope_sha256) = 64
+        AND instr(schedule_envelope_sha256, char(0)) = 0
         AND schedule_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     amount_units INTEGER NOT NULL CHECK (amount_units > 0),
     currency TEXT NOT NULL
-        CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
     pool_principal_id TEXT NOT NULL
-        CHECK (length(pool_principal_id) BETWEEN 1 AND 512),
+        CHECK (typeof(pool_principal_id) = 'text' AND length(pool_principal_id) BETWEEN 1 AND 512 AND instr(pool_principal_id, char(0)) = 0),
     pool_rail_destination TEXT NOT NULL
-        CHECK (length(pool_rail_destination) BETWEEN 1 AND 512),
+        CHECK (typeof(pool_rail_destination) = 'text' AND length(pool_rail_destination) BETWEEN 1 AND 512 AND instr(pool_rail_destination, char(0)) = 0),
     pool_authority_epoch INTEGER NOT NULL CHECK (pool_authority_epoch > 0),
     expires_at INTEGER NOT NULL CHECK (expires_at > 0),
     locked_at INTEGER NOT NULL CHECK (locked_at > 0),
@@ -182,22 +192,24 @@ END;
 
 CREATE TABLE IF NOT EXISTS dispute_locks (
     lock_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(lock_id) BETWEEN 1 AND 512),
+        CHECK (typeof(lock_id) = 'text' AND length(lock_id) BETWEEN 1 AND 512 AND instr(lock_id, char(0)) = 0),
     challenge_id TEXT NOT NULL UNIQUE REFERENCES challenges(challenge_id),
     owner_hex TEXT NOT NULL
-        CHECK (length(owner_hex) = 64 AND owner_hex NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(owner_hex) = 'text' AND length(owner_hex) = 64 AND instr(owner_hex, char(0)) = 0 AND owner_hex NOT GLOB '*[^0-9a-f]*'),
     bond_class TEXT NOT NULL CHECK (bond_class = 'dispute'),
     schedule_envelope_sha256 TEXT NOT NULL CHECK (
-        length(schedule_envelope_sha256) = 64
+        typeof(schedule_envelope_sha256) = 'text'
+        AND length(schedule_envelope_sha256) = 64
+        AND instr(schedule_envelope_sha256, char(0)) = 0
         AND schedule_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     amount_units INTEGER NOT NULL CHECK (amount_units > 0),
     currency TEXT NOT NULL
-        CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
     pool_principal_id TEXT NOT NULL
-        CHECK (length(pool_principal_id) BETWEEN 1 AND 512),
+        CHECK (typeof(pool_principal_id) = 'text' AND length(pool_principal_id) BETWEEN 1 AND 512 AND instr(pool_principal_id, char(0)) = 0),
     pool_rail_destination TEXT NOT NULL
-        CHECK (length(pool_rail_destination) BETWEEN 1 AND 512),
+        CHECK (typeof(pool_rail_destination) = 'text' AND length(pool_rail_destination) BETWEEN 1 AND 512 AND instr(pool_rail_destination, char(0)) = 0),
     pool_authority_epoch INTEGER NOT NULL CHECK (pool_authority_epoch > 0),
     expires_at INTEGER NOT NULL CHECK (expires_at > 0),
     state TEXT NOT NULL CHECK (state IN ('locked', 'returned', 'forfeited')),
@@ -241,24 +253,27 @@ END;
 
 CREATE TABLE IF NOT EXISTS liability_heads (
     liability_key TEXT NOT NULL PRIMARY KEY CHECK (
-        length(liability_key) = 64 AND liability_key NOT GLOB '*[^0-9a-f]*'
+        typeof(liability_key) = 'text'
+        AND length(liability_key) = 64 AND instr(liability_key, char(0)) = 0 AND liability_key NOT GLOB '*[^0-9a-f]*'
     ),
     defect_key TEXT NOT NULL
-        CHECK (length(defect_key) = 64 AND defect_key NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(defect_key) = 'text' AND length(defect_key) = 64 AND instr(defect_key, char(0)) = 0 AND defect_key NOT GLOB '*[^0-9a-f]*'),
     finding_id TEXT NOT NULL
-        CHECK (length(finding_id) = 64 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     allocation_id TEXT NOT NULL CHECK (
-        length(allocation_id) = 64 AND allocation_id NOT GLOB '*[^0-9a-f]*'
+        typeof(allocation_id) = 'text'
+        AND length(allocation_id) = 64 AND instr(allocation_id, char(0)) = 0 AND allocation_id NOT GLOB '*[^0-9a-f]*'
     ),
     seller_hex TEXT NOT NULL CHECK (
-        length(seller_hex) = 64 AND seller_hex NOT GLOB '*[^0-9a-f]*'
+        typeof(seller_hex) = 'text'
+        AND length(seller_hex) = 64 AND instr(seller_hex, char(0)) = 0 AND seller_hex NOT GLOB '*[^0-9a-f]*'
     ),
-    venue_id TEXT NOT NULL CHECK (length(venue_id) BETWEEN 1 AND 512),
-    chain_id TEXT NOT NULL CHECK (length(chain_id) BETWEEN 1 AND 512),
+    venue_id TEXT NOT NULL CHECK (typeof(venue_id) = 'text' AND length(venue_id) BETWEEN 1 AND 512 AND instr(venue_id, char(0)) = 0),
+    chain_id TEXT NOT NULL CHECK (typeof(chain_id) = 'text' AND length(chain_id) BETWEEN 1 AND 512 AND instr(chain_id, char(0)) = 0),
     vault_contract TEXT NOT NULL
-        CHECK (length(vault_contract) BETWEEN 1 AND 512),
-    vault_id TEXT NOT NULL CHECK (length(vault_id) BETWEEN 1 AND 512),
+        CHECK (typeof(vault_contract) = 'text' AND length(vault_contract) BETWEEN 1 AND 512 AND instr(vault_contract, char(0)) = 0),
+    vault_id TEXT NOT NULL CHECK (typeof(vault_id) = 'text' AND length(vault_id) BETWEEN 1 AND 512 AND instr(vault_id, char(0)) = 0),
     state TEXT NOT NULL CHECK (
         state IN (
             'open', 'upheld_pending_claims', 'pending_appeal', 'finalizing',
@@ -282,17 +297,17 @@ CREATE TABLE IF NOT EXISTS liability_heads (
     ),
     appeal_terms_envelope_sha256 TEXT CHECK (
         appeal_terms_envelope_sha256 IS NULL
-        OR (length(appeal_terms_envelope_sha256) = 64
+        OR (length(appeal_terms_envelope_sha256) = 64 AND instr(appeal_terms_envelope_sha256, char(0)) = 0
             AND appeal_terms_envelope_sha256 NOT GLOB '*[^0-9a-f]*')
     ),
     snapshot_digest TEXT CHECK (
         snapshot_digest IS NULL
-        OR (length(snapshot_digest) = 64
+        OR (length(snapshot_digest) = 64 AND instr(snapshot_digest, char(0)) = 0
             AND snapshot_digest NOT GLOB '*[^0-9a-f]*')
     ),
     allocation_digest TEXT CHECK (
         allocation_digest IS NULL
-        OR (length(allocation_digest) = 64
+        OR (length(allocation_digest) = 64 AND instr(allocation_digest, char(0)) = 0
             AND allocation_digest NOT GLOB '*[^0-9a-f]*')
     ),
     publication_pending INTEGER NOT NULL
@@ -398,10 +413,13 @@ CREATE TABLE IF NOT EXISTS finding_finalizing_authorizations (
     liability_key TEXT NOT NULL PRIMARY KEY
         REFERENCES liability_heads(liability_key),
     authorization_json BLOB NOT NULL CHECK (
-        length(authorization_json) BETWEEN 1 AND 4194304
+        typeof(authorization_json) = 'blob'
+        AND length(authorization_json) BETWEEN 1 AND 4194304
     ),
     authorization_sha256 TEXT NOT NULL CHECK (
-        length(authorization_sha256) = 64
+        typeof(authorization_sha256) = 'text'
+        AND length(authorization_sha256) = 64
+        AND instr(authorization_sha256, char(0)) = 0
         AND authorization_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0)
@@ -424,14 +442,19 @@ CREATE TABLE IF NOT EXISTS finding_finalizing_authorization_refreshes (
         REFERENCES finding_finalizing_authorizations(liability_key),
     refresh_ordinal INTEGER NOT NULL CHECK (refresh_ordinal > 0),
     previous_authorization_sha256 TEXT NOT NULL CHECK (
-        length(previous_authorization_sha256) = 64
+        typeof(previous_authorization_sha256) = 'text'
+        AND length(previous_authorization_sha256) = 64
+        AND instr(previous_authorization_sha256, char(0)) = 0
         AND previous_authorization_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     authorization_json BLOB NOT NULL CHECK (
-        length(authorization_json) BETWEEN 1 AND 4194304
+        typeof(authorization_json) = 'blob'
+        AND length(authorization_json) BETWEEN 1 AND 4194304
     ),
     authorization_sha256 TEXT NOT NULL CHECK (
-        length(authorization_sha256) = 64
+        typeof(authorization_sha256) = 'text'
+        AND length(authorization_sha256) = 64
+        AND instr(authorization_sha256, char(0)) = 0
         AND authorization_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0),
@@ -453,13 +476,13 @@ END;
 
 CREATE TABLE IF NOT EXISTS governance_case_index (
     case_id TEXT NOT NULL PRIMARY KEY
-        CHECK (length(case_id) BETWEEN 1 AND 512),
+        CHECK (typeof(case_id) = 'text' AND length(case_id) BETWEEN 1 AND 512 AND instr(case_id, char(0)) = 0),
     finding_id TEXT NOT NULL
-        CHECK (length(finding_id) = 64 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (length(listing_id) BETWEEN 1 AND 512),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
     liability_key TEXT NOT NULL REFERENCES liability_heads(liability_key),
     case_kind TEXT NOT NULL CHECK (case_kind IN ('sanction', 'appeal')),
-    case_state TEXT NOT NULL CHECK (length(case_state) BETWEEN 1 AND 64),
+    case_state TEXT NOT NULL CHECK (typeof(case_state) = 'text' AND length(case_state) BETWEEN 1 AND 64 AND instr(case_state, char(0)) = 0),
     appeal_of_case_id TEXT REFERENCES governance_case_index(case_id),
     supersedes_case_id TEXT REFERENCES governance_case_index(case_id),
     superseded_by_case_id TEXT REFERENCES governance_case_index(case_id),
@@ -512,16 +535,19 @@ CREATE TABLE IF NOT EXISTS claim_snapshots (
         REFERENCES liability_heads(liability_key),
     cutoff_slot INTEGER NOT NULL CHECK (cutoff_slot >= 0),
     snapshot_digest TEXT NOT NULL CHECK (
-        length(snapshot_digest) = 64 AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(snapshot_digest) = 'text'
+        AND length(snapshot_digest) = 64 AND instr(snapshot_digest, char(0)) = 0 AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
     ),
     allocation_digest TEXT NOT NULL CHECK (
-        length(allocation_digest) = 64
+        typeof(allocation_digest) = 'text'
+        AND length(allocation_digest) = 64
+        AND instr(allocation_digest, char(0)) = 0
         AND allocation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     total_realized_spend_units INTEGER NOT NULL
         CHECK (total_realized_spend_units >= 0),
     currency TEXT NOT NULL
-        CHECK (length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
     buyer_pool_units INTEGER NOT NULL CHECK (buyer_pool_units >= 0),
     community_fund_units INTEGER NOT NULL CHECK (community_fund_units >= 0),
     sealed_at INTEGER NOT NULL CHECK (sealed_at > 0),
@@ -544,7 +570,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS effect_intents (
     intent_key TEXT NOT NULL PRIMARY KEY
-        CHECK (length(intent_key) = 64 AND intent_key NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(intent_key) = 'text' AND length(intent_key) = 64 AND instr(intent_key, char(0)) = 0 AND intent_key NOT GLOB '*[^0-9a-f]*'),
     liability_key TEXT REFERENCES liability_heads(liability_key),
     kind TEXT NOT NULL CHECK (
         kind IN (
@@ -553,7 +579,8 @@ CREATE TABLE IF NOT EXISTS effect_intents (
         )
     ),
     intent_digest TEXT NOT NULL CHECK (
-        length(intent_digest) = 64 AND intent_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(intent_digest) = 'text'
+        AND length(intent_digest) = 64 AND instr(intent_digest, char(0)) = 0 AND intent_digest NOT GLOB '*[^0-9a-f]*'
     ),
     settlement_required INTEGER NOT NULL CHECK (settlement_required IN (0, 1)),
     state TEXT NOT NULL CHECK (
@@ -613,16 +640,22 @@ CREATE TABLE IF NOT EXISTS finding_seller_impairment_reconciliations (
     intent_key TEXT NOT NULL PRIMARY KEY REFERENCES effect_intents(intent_key),
     liability_key TEXT NOT NULL REFERENCES liability_heads(liability_key),
     intent_digest TEXT NOT NULL CHECK (
-        length(intent_digest) = 64
+        typeof(intent_digest) = 'text'
+        AND length(intent_digest) = 64
+        AND instr(intent_digest, char(0)) = 0
         AND intent_digest NOT GLOB '*[^0-9a-f]*'
     ),
     tx_hash TEXT NOT NULL CHECK (
-        length(tx_hash) = 66
+        typeof(tx_hash) = 'text'
+        AND length(tx_hash) = 66
+        AND instr(tx_hash, char(0)) = 0
         AND substr(tx_hash, 1, 2) = '0x'
         AND substr(tx_hash, 3) NOT GLOB '*[^0-9a-f]*'
     ),
     reconciliation_sha256 TEXT NOT NULL CHECK (
-        length(reconciliation_sha256) = 64
+        typeof(reconciliation_sha256) = 'text'
+        AND length(reconciliation_sha256) = 64
+        AND instr(reconciliation_sha256, char(0)) = 0
         AND reconciliation_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0)
@@ -662,12 +695,16 @@ CREATE TABLE IF NOT EXISTS effect_root_bindings (
     intent_key TEXT NOT NULL PRIMARY KEY REFERENCES effect_intents(intent_key),
     liability_key TEXT NOT NULL REFERENCES liability_heads(liability_key),
     merkle_root TEXT NOT NULL CHECK (
-        length(merkle_root) = 66
+        typeof(merkle_root) = 'text'
+        AND length(merkle_root) = 66
+        AND instr(merkle_root, char(0)) = 0
         AND substr(merkle_root, 1, 2) = '0x'
         AND substr(merkle_root, 3) NOT GLOB '*[^0-9a-f]*'
     ),
     evidence_hash TEXT NOT NULL CHECK (
-        length(evidence_hash) = 66
+        typeof(evidence_hash) = 'text'
+        AND length(evidence_hash) = 66
+        AND instr(evidence_hash, char(0)) = 0
         AND substr(evidence_hash, 1, 2) = '0x'
         AND substr(evidence_hash, 3) NOT GLOB '*[^0-9a-f]*'
     ),
@@ -727,23 +764,31 @@ CREATE TABLE IF NOT EXISTS effect_root_bindings_refreshes (
     refresh_ordinal INTEGER NOT NULL CHECK (refresh_ordinal > 0),
     liability_key TEXT NOT NULL REFERENCES liability_heads(liability_key),
     previous_merkle_root TEXT NOT NULL CHECK (
-        length(previous_merkle_root) = 66
+        typeof(previous_merkle_root) = 'text'
+        AND length(previous_merkle_root) = 66
+        AND instr(previous_merkle_root, char(0)) = 0
         AND substr(previous_merkle_root, 1, 2) = '0x'
         AND substr(previous_merkle_root, 3) NOT GLOB '*[^0-9a-f]*'
     ),
     previous_evidence_hash TEXT NOT NULL CHECK (
-        length(previous_evidence_hash) = 66
+        typeof(previous_evidence_hash) = 'text'
+        AND length(previous_evidence_hash) = 66
+        AND instr(previous_evidence_hash, char(0)) = 0
         AND substr(previous_evidence_hash, 1, 2) = '0x'
         AND substr(previous_evidence_hash, 3) NOT GLOB '*[^0-9a-f]*'
     ),
     previous_bound_at INTEGER NOT NULL CHECK (previous_bound_at > 0),
     merkle_root TEXT NOT NULL CHECK (
-        length(merkle_root) = 66
+        typeof(merkle_root) = 'text'
+        AND length(merkle_root) = 66
+        AND instr(merkle_root, char(0)) = 0
         AND substr(merkle_root, 1, 2) = '0x'
         AND substr(merkle_root, 3) NOT GLOB '*[^0-9a-f]*'
     ),
     evidence_hash TEXT NOT NULL CHECK (
-        length(evidence_hash) = 66
+        typeof(evidence_hash) = 'text'
+        AND length(evidence_hash) = 66
+        AND instr(evidence_hash, char(0)) = 0
         AND substr(evidence_hash, 1, 2) = '0x'
         AND substr(evidence_hash, 3) NOT GLOB '*[^0-9a-f]*'
     ),
@@ -811,15 +856,21 @@ CREATE TABLE IF NOT EXISTS finding_challenge_projection_commits (
     projection_sequence INTEGER PRIMARY KEY CHECK (projection_sequence > 0),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind = 'finding_challenge_write'),
     snapshot_digest TEXT NOT NULL CHECK (
-        length(snapshot_digest) = 64
+        typeof(snapshot_digest) = 'text'
+        AND length(snapshot_digest) = 64
+        AND instr(snapshot_digest, char(0)) = 0
         AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_commit_digest TEXT NOT NULL CHECK (
-        length(previous_commit_digest) = 64
+        typeof(previous_commit_digest) = 'text'
+        AND length(previous_commit_digest) = 64
+        AND instr(previous_commit_digest, char(0)) = 0
         AND previous_commit_digest NOT GLOB '*[^0-9a-f]*'
     ),
     commit_digest TEXT NOT NULL UNIQUE CHECK (
-        length(commit_digest) = 64
+        typeof(commit_digest) = 'text'
+        AND length(commit_digest) = 64
+        AND instr(commit_digest, char(0)) = 0
         AND commit_digest NOT GLOB '*[^0-9a-f]*'
     )
 );

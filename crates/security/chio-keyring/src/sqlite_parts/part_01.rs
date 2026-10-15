@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS keyring_policy_binding (
 CREATE TABLE IF NOT EXISTS key_events (
     sequence INTEGER PRIMARY KEY,
     event_id TEXT NOT NULL UNIQUE,
-    canonical_envelope BLOB NOT NULL CHECK (length(canonical_envelope) <= 1048576),
+    canonical_envelope BLOB NOT NULL CHECK (typeof(canonical_envelope) = 'blob' AND length(canonical_envelope) <= 1048576),
     envelope_hash TEXT NOT NULL,
     leaf_hash TEXT NOT NULL,
     operation TEXT NOT NULL
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS key_checkpoints (
     checkpoint_hash TEXT NOT NULL UNIQUE,
     tree_size INTEGER NOT NULL CHECK (tree_size > 0),
     root_hash TEXT NOT NULL,
-    canonical_body BLOB NOT NULL CHECK (length(canonical_body) <= 1048576),
+    canonical_body BLOB NOT NULL CHECK (typeof(canonical_body) = 'blob' AND length(canonical_body) <= 1048576),
     operator_key_id TEXT NOT NULL,
     operator_algorithm TEXT NOT NULL,
     operator_signature TEXT NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS key_checkpoint_witnesses (
 CREATE TABLE IF NOT EXISTS key_activations (
     event_id TEXT PRIMARY KEY,
     signing_epoch INTEGER NOT NULL UNIQUE CHECK (signing_epoch > 0),
-    canonical_activation BLOB NOT NULL CHECK (length(canonical_activation) <= 1048576)
+    canonical_activation BLOB NOT NULL CHECK (typeof(canonical_activation) = 'blob' AND length(canonical_activation) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS key_enterprise_receipts (
     receipt_id TEXT PRIMARY KEY,
@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS key_enterprise_receipts (
     event_id TEXT NOT NULL,
     event_sequence INTEGER NOT NULL CHECK (event_sequence >= 0),
     stage TEXT NOT NULL CHECK (stage IN ('pending', 'active')),
-    canonical_envelope BLOB NOT NULL CHECK (length(canonical_envelope) <= 1048576),
+    canonical_envelope BLOB NOT NULL CHECK (typeof(canonical_envelope) = 'blob' AND length(canonical_envelope) <= 1048576),
     UNIQUE (transaction_id, stage),
     FOREIGN KEY (event_id) REFERENCES key_events(event_id)
 );
@@ -93,11 +93,11 @@ CREATE TABLE IF NOT EXISTS key_artifact_signatures (
     artifact_hash TEXT PRIMARY KEY,
     key_id TEXT NOT NULL,
     signing_epoch INTEGER NOT NULL CHECK (signing_epoch >= 0),
-    canonical_signature BLOB NOT NULL CHECK (length(canonical_signature) <= 1048576)
+    canonical_signature BLOB NOT NULL CHECK (typeof(canonical_signature) = 'blob' AND length(canonical_signature) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS key_artifact_time_anchors (
     artifact_hash TEXT PRIMARY KEY,
-    canonical_anchor BLOB NOT NULL CHECK (length(canonical_anchor) <= 1048576),
+    canonical_anchor BLOB NOT NULL CHECK (typeof(canonical_anchor) = 'blob' AND length(canonical_anchor) <= 1048576),
     FOREIGN KEY (artifact_hash) REFERENCES key_artifact_signatures(artifact_hash) ON DELETE CASCADE
 );
 CREATE TRIGGER IF NOT EXISTS key_artifact_signatures_no_update

@@ -1041,7 +1041,7 @@ fn outbox_schema_sql() -> String {
                  CREATE TABLE IF NOT EXISTS {OUTBOX_TABLE} (
                     idempotency_key TEXT PRIMARY KEY NOT NULL,
                     command_json BLOB NOT NULL,
-                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
+                    command_hash BLOB NOT NULL CHECK(typeof(command_hash) = 'blob' AND length(command_hash) = 32),
                     status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
                     attempts INTEGER NOT NULL CHECK(attempts >= 0),
                     next_attempt_at_unix_ms INTEGER NOT NULL CHECK(next_attempt_at_unix_ms >= 0),
@@ -1054,8 +1054,8 @@ fn outbox_schema_sql() -> String {
                  CREATE TABLE IF NOT EXISTS {BACKEND_DELIVERY_TABLE} (
                     idempotency_key TEXT NOT NULL
                         REFERENCES {OUTBOX_TABLE}(idempotency_key),
-                    backend_name TEXT NOT NULL CHECK(length(backend_name) > 0),
-                    command_hash BLOB NOT NULL CHECK(length(command_hash) = 32),
+                    backend_name TEXT NOT NULL CHECK(typeof(backend_name) = 'text' AND length(backend_name) > 0 AND instr(backend_name, char(0)) = 0),
+                    command_hash BLOB NOT NULL CHECK(typeof(command_hash) = 'blob' AND length(command_hash) = 32),
                     status TEXT NOT NULL CHECK(status IN ('pending', 'delivered')),
                     attempts INTEGER NOT NULL CHECK(attempts > 0),
                     delivered_at_unix_ms INTEGER,
@@ -1297,6 +1297,37 @@ mod tests {
 
     fn record(value: &str) -> RecordId {
         RecordId::new(value).unwrap_or_else(|error| panic!("record id: {error}"))
+    }
+
+    #[test]
+    fn outbox_command_hash_refuses_nul_padded_text() -> Result<(), Box<dyn std::error::Error>> {
+        let connection = Connection::open_in_memory()?;
+        connection.execute_batch(&outbox_schema_sql())?;
+        let insert = format!(
+            "INSERT INTO {OUTBOX_TABLE} (idempotency_key, command_json, command_hash, status, \
+             attempts, next_attempt_at_unix_ms) VALUES ('key', x'7b7d', ?1, 'pending', 0, 0)"
+        );
+        let padded = connection.execute(
+            &insert,
+            [rusqlite::types::Value::Text(format!(
+                "{}\0{}",
+                "a".repeat(32),
+                "a".repeat(1 << 20)
+            ))],
+        );
+        assert!(
+            matches!(
+                &padded,
+                Err(rusqlite::Error::SqliteFailure(error, Some(_)))
+                    if error.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_CHECK
+            ),
+            "{padded:?}"
+        );
+        assert_eq!(
+            connection.execute(&insert, [rusqlite::types::Value::Blob(vec![1; 32])])?,
+            1
+        );
+        Ok(())
     }
 
     #[test]

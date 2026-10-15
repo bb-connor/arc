@@ -20,7 +20,7 @@ const CHECKPOINT_TABLE_SQL: &str = r#"
                 statement_json TEXT NOT NULL,
                 signature TEXT NOT NULL,
                 kernel_key TEXT NOT NULL,
-                previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
+                previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
             );
             CREATE INDEX IF NOT EXISTS idx_kernel_checkpoints_batch_end
                 ON kernel_checkpoints(batch_end_seq);
@@ -36,7 +36,7 @@ const CHECKPOINT_PROJECTION_TABLES_SQL: &str = r#"
                 merkle_root TEXT NOT NULL,
                 issued_at INTEGER NOT NULL,
                 kernel_key TEXT NOT NULL,
-                previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')),
+                previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')),
                 statement_json TEXT NOT NULL,
                 signature TEXT NOT NULL
             );
@@ -50,7 +50,7 @@ const CHECKPOINT_PROJECTION_TABLES_SQL: &str = r#"
                     REFERENCES checkpoint_tree_heads(checkpoint_seq) ON DELETE CASCADE,
                 witness_checkpoint_seq INTEGER PRIMARY KEY
                     REFERENCES checkpoint_tree_heads(checkpoint_seq) ON DELETE CASCADE,
-                previous_checkpoint_sha256 TEXT NOT NULL CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')),
+                previous_checkpoint_sha256 TEXT NOT NULL CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')),
                 witnessed_at INTEGER NOT NULL,
                 witness_statement_json TEXT NOT NULL
             );
@@ -69,7 +69,7 @@ const CHECKPOINT_PROJECTION_TABLES_SQL: &str = r#"
                 log_tree_size INTEGER NOT NULL,
                 entry_start_seq INTEGER NOT NULL,
                 entry_end_seq INTEGER NOT NULL,
-                previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
+                previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
             );
             CREATE INDEX IF NOT EXISTS idx_checkpoint_publication_metadata_published_at
                 ON checkpoint_publication_metadata(published_at);

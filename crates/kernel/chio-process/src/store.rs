@@ -15,6 +15,8 @@ mod children;
 mod credentials;
 mod nonces;
 mod prepared;
+#[cfg(test)]
+mod schema_bounds_tests;
 
 pub(crate) const JOURNAL_VERSION: u32 = 1;
 

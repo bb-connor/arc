@@ -33,17 +33,17 @@ CREATE TABLE IF NOT EXISTS settle_attempts (
     row_version          INTEGER NOT NULL CHECK (row_version >= 0),
     lease_owner          TEXT CHECK (
                             lease_owner IS NULL OR
-                            (length(lease_owner) BETWEEN 1 AND 128)
+                            (length(lease_owner) BETWEEN 1 AND 128 AND instr(lease_owner, char(0)) = 0)
                          ),
     lease_token          TEXT CHECK (
                             lease_token IS NULL OR
-                            (length(lease_token) BETWEEN 1 AND 128)
+                            (length(lease_token) BETWEEN 1 AND 128 AND instr(lease_token, char(0)) = 0)
                          ),
     lease_until_ms       INTEGER CHECK (lease_until_ms IS NULL OR lease_until_ms >= 0),
     reason_code          TEXT,
     reason_detail_sha256 BLOB CHECK (
                             reason_detail_sha256 IS NULL OR
-                            length(reason_detail_sha256) = 32
+                            typeof(reason_detail_sha256) = 'blob' AND length(reason_detail_sha256) = 32
                          ),
     updated_at_ms        INTEGER NOT NULL CHECK (updated_at_ms >= 0),
     CHECK ((lease_owner IS NULL AND lease_token IS NULL AND lease_until_ms IS NULL) OR

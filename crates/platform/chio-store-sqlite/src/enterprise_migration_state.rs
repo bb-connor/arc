@@ -23,11 +23,11 @@ const NO_UPDATE_TRIGGER_NAME: &str = "enterprise_migration_transitions_no_update
 const NO_DELETE_TRIGGER_NAME: &str = "enterprise_migration_transitions_no_delete";
 const RETIRED_TABLE_NAME: &str = "enterprise_migration_state";
 
-const CREATE_TABLE_SQL: &str = r#"
+pub(crate) const CREATE_TABLE_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS enterprise_migration_transitions (
-    deployment_id TEXT NOT NULL CHECK (length(deployment_id) > 0 AND length(deployment_id) <= 256),
+    deployment_id TEXT NOT NULL CHECK (length(deployment_id) > 0 AND instr(deployment_id, char(0)) = 0 AND length(deployment_id) <= 256),
     scope_kind TEXT NOT NULL CHECK (scope_kind IN ('deployment', 'provider', 'tool_server')),
-    scope_id TEXT NOT NULL CHECK (length(scope_id) > 0 AND length(scope_id) <= 256),
+    scope_id TEXT NOT NULL CHECK (length(scope_id) > 0 AND instr(scope_id, char(0)) = 0 AND length(scope_id) <= 256),
     control TEXT NOT NULL CHECK (control IN ('key_log_verification', 'broker_credential_custody', 'broker_quota_enforcement', 'cage_enforcement')),
     signature_domain TEXT NOT NULL CHECK (signature_domain = 'chio.enterprise-migration-transition.v1'),
     schema_version INTEGER NOT NULL CHECK (schema_version = 1),
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS enterprise_migration_transitions (
     authorization_digest BLOB NOT NULL CHECK (length(authorization_digest) = 32 AND authorization_digest <> zeroblob(32)),
     intent_digest BLOB NOT NULL CHECK (length(intent_digest) = 32 AND intent_digest <> zeroblob(32)),
     trusted_at_unix_ms INTEGER NOT NULL CHECK (trusted_at_unix_ms > 0),
-    signer_public_key TEXT NOT NULL CHECK (length(signer_public_key) > 0 AND length(signer_public_key) <= 8192),
-    signature TEXT NOT NULL CHECK (length(signature) > 0 AND length(signature) <= 16384),
+    signer_public_key TEXT NOT NULL CHECK (length(signer_public_key) > 0 AND instr(signer_public_key, char(0)) = 0 AND length(signer_public_key) <= 8192),
+    signature TEXT NOT NULL CHECK (length(signature) > 0 AND instr(signature, char(0)) = 0 AND length(signature) <= 16384),
     transition_digest BLOB NOT NULL CHECK (length(transition_digest) = 32 AND transition_digest <> zeroblob(32)),
     PRIMARY KEY (deployment_id, scope_kind, scope_id, control),
     CHECK (

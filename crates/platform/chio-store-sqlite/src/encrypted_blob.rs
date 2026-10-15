@@ -444,7 +444,7 @@ impl SqliteEncryptedBlobStore {
             CREATE TABLE IF NOT EXISTS chio_encrypted_blobs (
                 blob_id TEXT PRIMARY KEY,
                 tenant_id TEXT NOT NULL,
-                nonce BLOB NOT NULL CHECK(length(nonce) = 12),
+                nonce BLOB NOT NULL CHECK(typeof(nonce) = 'blob' AND length(nonce) = 12),
                 ciphertext BLOB NOT NULL,
                 created_at INTEGER NOT NULL
             );
@@ -455,7 +455,7 @@ impl SqliteEncryptedBlobStore {
             CREATE TABLE IF NOT EXISTS chio_encrypted_blob_references (
                 namespace TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
-                reference_key BLOB NOT NULL CHECK(length(reference_key) = 32),
+                reference_key BLOB NOT NULL CHECK(typeof(reference_key) = 'blob' AND length(reference_key) = 32),
                 blob_id TEXT NOT NULL,
                 enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
                 PRIMARY KEY (namespace, tenant_id, reference_key),
@@ -474,7 +474,7 @@ impl SqliteEncryptedBlobStore {
                 ),
                 namespace TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
-                reference_key BLOB NOT NULL CHECK(length(reference_key) = 32),
+                reference_key BLOB NOT NULL CHECK(typeof(reference_key) = 'blob' AND length(reference_key) = 32),
                 result_blob_id TEXT,
                 applied_at INTEGER NOT NULL CHECK(applied_at >= 0)
             );

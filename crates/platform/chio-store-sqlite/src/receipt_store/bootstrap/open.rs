@@ -669,7 +669,7 @@ impl SqliteReceiptStore {
                 cost_currency TEXT CHECK (
                     cost_currency IS NULL OR (
                         typeof(cost_currency) = 'text' AND
-                        length(cost_currency) = 3 AND
+                        length(cost_currency) = 3 AND instr(cost_currency, char(0)) = 0 AND
                         cost_currency NOT GLOB '*[^A-Z]*'
                     )
                 ),

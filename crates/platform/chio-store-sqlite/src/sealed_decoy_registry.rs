@@ -321,7 +321,7 @@ fn validate_durable_path(path: &Path) -> PortResult<()> {
     Ok(())
 }
 
-const SEALED_DECOY_SCHEMA_SQL: &str = r#"
+pub(crate) const SEALED_DECOY_SCHEMA_SQL: &str = r#"
             PRAGMA journal_mode = WAL;
             PRAGMA synchronous = FULL;
             PRAGMA busy_timeout = 5000;
@@ -329,7 +329,7 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
             PRAGMA trusted_schema = OFF;
 
             CREATE TABLE IF NOT EXISTS sealed_decoy_records_v1 (
-                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256),
+                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256 AND instr(tenant_id, char(0)) = 0),
                 artifact_token BLOB NOT NULL
                     CHECK (typeof(artifact_token) = 'blob' AND length(artifact_token) = 32),
                 public_ref_token BLOB
@@ -372,7 +372,7 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
                 WHERE public_ref_token IS NOT NULL;
 
             CREATE TABLE IF NOT EXISTS sealed_decoy_operation_owners_v1 (
-                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256),
+                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256 AND instr(tenant_id, char(0)) = 0),
                 operation_token BLOB NOT NULL CHECK (
                     typeof(operation_token) = 'blob' AND length(operation_token) = 32
                 ),
@@ -387,7 +387,7 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
             ) STRICT, WITHOUT ROWID;
 
             CREATE TABLE IF NOT EXISTS sealed_decoy_transitions_v1 (
-                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256),
+                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256 AND instr(tenant_id, char(0)) = 0),
                 transition_token BLOB NOT NULL CHECK (
                     typeof(transition_token) = 'blob' AND length(transition_token) = 32
                 ),
@@ -459,10 +459,10 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
             ) STRICT, WITHOUT ROWID;
 
             CREATE TABLE IF NOT EXISTS watermark_sequence_heads_v1 (
-                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256),
-                application_id TEXT NOT NULL CHECK (length(application_id) BETWEEN 1 AND 256),
-                session_id TEXT NOT NULL CHECK (length(session_id) BETWEEN 1 AND 256),
-                tool_id TEXT NOT NULL CHECK (length(tool_id) BETWEEN 1 AND 256),
+                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256 AND instr(tenant_id, char(0)) = 0),
+                application_id TEXT NOT NULL CHECK (length(application_id) BETWEEN 1 AND 256 AND instr(application_id, char(0)) = 0),
+                session_id TEXT NOT NULL CHECK (length(session_id) BETWEEN 1 AND 256 AND instr(session_id, char(0)) = 0),
+                tool_id TEXT NOT NULL CHECK (length(tool_id) BETWEEN 1 AND 256 AND instr(tool_id, char(0)) = 0),
                 public_ref_token BLOB NOT NULL CHECK (
                     typeof(public_ref_token) = 'blob' AND length(public_ref_token) = 32
                 ),
@@ -477,14 +477,14 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
             ) STRICT, WITHOUT ROWID;
 
             CREATE TABLE IF NOT EXISTS watermark_sequence_operations_v1 (
-                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256),
-                operation_id TEXT NOT NULL CHECK (length(operation_id) BETWEEN 1 AND 256),
+                tenant_id TEXT NOT NULL CHECK (length(tenant_id) BETWEEN 1 AND 256 AND instr(tenant_id, char(0)) = 0),
+                operation_id TEXT NOT NULL CHECK (length(operation_id) BETWEEN 1 AND 256 AND instr(operation_id, char(0)) = 0),
                 request_hash BLOB NOT NULL CHECK (
                     typeof(request_hash) = 'blob' AND length(request_hash) = 32
                 ),
-                application_id TEXT NOT NULL CHECK (length(application_id) BETWEEN 1 AND 256),
-                session_id TEXT NOT NULL CHECK (length(session_id) BETWEEN 1 AND 256),
-                tool_id TEXT NOT NULL CHECK (length(tool_id) BETWEEN 1 AND 256),
+                application_id TEXT NOT NULL CHECK (length(application_id) BETWEEN 1 AND 256 AND instr(application_id, char(0)) = 0),
+                session_id TEXT NOT NULL CHECK (length(session_id) BETWEEN 1 AND 256 AND instr(session_id, char(0)) = 0),
+                tool_id TEXT NOT NULL CHECK (length(tool_id) BETWEEN 1 AND 256 AND instr(tool_id, char(0)) = 0),
                 public_ref_token BLOB NOT NULL CHECK (
                     typeof(public_ref_token) = 'blob' AND length(public_ref_token) = 32
                 ),
@@ -508,13 +508,15 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
             CREATE TABLE IF NOT EXISTS watermark_observations_v1 (
                 source_tenant_id TEXT NOT NULL CHECK (
                     length(source_tenant_id) BETWEEN 1 AND 256
+                    AND instr(source_tenant_id, char(0)) = 0
                 ),
                 public_ref_token BLOB NOT NULL CHECK (
                     typeof(public_ref_token) = 'blob' AND length(public_ref_token) = 32
                 ),
-                observation_id TEXT NOT NULL CHECK (length(observation_id) BETWEEN 1 AND 256),
+                observation_id TEXT NOT NULL CHECK (length(observation_id) BETWEEN 1 AND 256 AND instr(observation_id, char(0)) = 0),
                 observing_tenant_id TEXT NOT NULL CHECK (
                     length(observing_tenant_id) BETWEEN 1 AND 256
+                    AND instr(observing_tenant_id, char(0)) = 0
                 ),
                 payload_digest BLOB NOT NULL CHECK (
                     typeof(payload_digest) = 'blob' AND length(payload_digest) = 32
@@ -522,7 +524,7 @@ const SEALED_DECOY_SCHEMA_SQL: &str = r#"
                 token_digest BLOB NOT NULL CHECK (
                     typeof(token_digest) = 'blob' AND length(token_digest) = 32
                 ),
-                evidence_ref TEXT NOT NULL CHECK (length(evidence_ref) BETWEEN 1 AND 256),
+                evidence_ref TEXT NOT NULL CHECK (length(evidence_ref) BETWEEN 1 AND 256 AND instr(evidence_ref, char(0)) = 0),
                 observed_at_unix_ms INTEGER NOT NULL CHECK (observed_at_unix_ms >= 0),
                 PRIMARY KEY (source_tenant_id, public_ref_token, observation_id)
             ) STRICT, WITHOUT ROWID;

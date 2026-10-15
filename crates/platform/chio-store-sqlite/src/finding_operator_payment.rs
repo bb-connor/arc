@@ -43,14 +43,14 @@ const SCHEMA_ANCHORS: &[&str] = &[
     "chio_finding_operator_payments",
 ];
 const SCHEMA_TABLES: &[&str] = &["chio_finding_operator_payments"];
-const SCHEMA: &str = r#"
+pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_operator_payments (
     authorization_id TEXT PRIMARY KEY,
     reference TEXT NOT NULL UNIQUE,
     payer TEXT NOT NULL,
     payee TEXT NOT NULL,
     amount_units INTEGER NOT NULL CHECK(amount_units > 0),
-    currency TEXT NOT NULL CHECK(length(currency) = 3),
+    currency TEXT NOT NULL CHECK(typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0),
     governed_intent_id TEXT,
     governed_intent_hash TEXT,
     state TEXT NOT NULL CHECK(state IN ('held', 'captured', 'released', 'refunded')),
