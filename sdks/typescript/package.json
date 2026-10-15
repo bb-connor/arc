@@ -56,11 +56,15 @@
     "compression": "1.8.2",
     "proxy-addr": "2.0.8",
     "shell-quote": "1.11.0",
-    "source-map-js": "1.2.2"
+    "source-map-js": "1.2.2",
+    "braces": "$braces",
+    "node-forge": "$node-forge"
   },
   "devDependencies": {
     "next": "15.5.27",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "braces": "file:../../third_party/npm/braces/braces-3.0.4-chio.1.tgz",
+    "node-forge": "file:../../third_party/npm/node-forge/node-forge-1.4.1-chio.1.tgz"
   }
 }
