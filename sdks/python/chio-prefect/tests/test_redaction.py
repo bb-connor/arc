@@ -706,7 +706,12 @@ class TestForwardingTablePassthroughHelper:
             "omitted": True,
             "byte_count": len(b"KW_BODY"),
         }
-        assert params["args"][0] == "/tmp/x"
+        # Both positional slots are claimed by kwargs, so the positional
+        # values are ambiguous and both are omitted.
+        assert params["args"][0] == {
+            "omitted": True,
+            "byte_count": len(b"/tmp/x"),
+        }
         assert params["args"][1] == {
             "omitted": True,
             "byte_count": len(b"POSITIONAL_BODY"),
@@ -1081,26 +1086,23 @@ class TestArityOverflowFailClosed:
         assert params["args"][1].get("omitted") is True
         assert "user_field" not in params["args"][1]
 
-    def test_legit_stub_still_skipped_post_tightening(self) -> None:
-        """Companion to ``test_user_dict_with_omitted_key_still_redacted``:
-        an exact stub fingerprint
-        ``{"omitted": True, "byte_count": <int>}`` must continue to be
-        skipped so the kwonly-protected double-redaction regression
-        (3231244182) stays closed.
-        """
+    def test_stub_shaped_value_is_redacted_like_any_body(self) -> None:
+        """A caller value shaped like an omission stub gets no passthrough."""
         from chio_prefect.decorators import _task_parameters
 
         def write(path: str) -> str:
             return ""
 
         policy = RedactionPolicy.chio_default()
-        legit_stub = {"omitted": True, "byte_count": 42}
+        stub_shaped = {"omitted": True, "byte_count": 42}
         params = _task_parameters(
-            ("/tmp", legit_stub),
+            ("/tmp", stub_shaped),
             {},
             "chio_file_write",
             policy,
             fn=write,
         )
-        # The exact stub passes through unchanged (byte_count preserved).
-        assert params["args"][1] == {"omitted": True, "byte_count": 42}
+        assert params["args"][1] == {
+            "omitted": True,
+            "byte_count": len(str(stub_shaped).encode("utf-8")),
+        }

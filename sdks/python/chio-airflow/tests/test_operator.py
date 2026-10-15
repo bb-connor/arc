@@ -8,6 +8,7 @@ XCom-push logic without a scheduler. The sidecar is mocked via
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pytest
@@ -152,7 +153,7 @@ class TestAllowPath:
 
         ti = ctx["ti"]
         pushed = dict(ti.pushed)
-        assert pushed[XCOM_RECEIPT_ID_KEY].startswith("mock-r-")
+        assert re.fullmatch(r"[0-9a-f]{64}", pushed[XCOM_RECEIPT_ID_KEY])
         assert pushed[XCOM_CAPABILITY_KEY] == "cap-1"
         assert pushed[XCOM_SCOPE_KEY] is not None
 
@@ -162,6 +163,7 @@ class TestAllowPath:
         op = ChioOperator(
             inner_operator=inner,
             capability_id="cap-1",
+            tool_server="srv",
             chio_client=chio,
         )
         assert op.task_id == "chio_inner-t"
@@ -173,6 +175,7 @@ class TestAllowPath:
         op = ChioOperator(
             inner_operator=inner,
             capability_id="cap-1",
+            tool_server="srv",
             chio_client=chio,
         )
         with pytest.raises(RuntimeError, match="inner blew up"):
@@ -247,11 +250,19 @@ class TestConfigurationErrors:
     def test_missing_capability_id_raises_config_error(self) -> None:
         inner = _EchoOperator(value=1)
         with pytest.raises(ChioAirflowConfigError, match="capability_id"):
-            ChioOperator(inner_operator=inner, capability_id="")
+            ChioOperator(inner_operator=inner, capability_id="", tool_server="srv")
+
+    def test_missing_tool_server_raises_config_error(self) -> None:
+        inner = _EchoOperator(value=1)
+        with pytest.raises(
+            ChioAirflowConfigError,
+            match="^ChioOperator requires a tool_server for sidecar evaluation$",
+        ):
+            ChioOperator(inner_operator=inner, capability_id="cap-1", tool_server="")
 
     def test_missing_inner_operator_raises_config_error(self) -> None:
         with pytest.raises(ChioAirflowConfigError, match="inner_operator"):
-            ChioOperator(inner_operator=None, capability_id="cap-1")  # type: ignore[arg-type]
+            ChioOperator(inner_operator=None, capability_id="cap-1", tool_server="srv")  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -281,11 +292,13 @@ class TestPolicyEnforcement:
         search_op = ChioOperator(
             inner_operator=search_inner,
             capability_id="cap-1",
+            tool_server="srv",
             chio_client=chio,
         )
         write_op = ChioOperator(
             inner_operator=write_inner,
             capability_id="cap-1",
+            tool_server="srv",
             chio_client=chio,
         )
 

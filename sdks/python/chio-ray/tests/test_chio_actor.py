@@ -12,12 +12,14 @@ identical under the real scheduler but the fake keeps the suite fast.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from typing import Any
 
 import pytest
 import ray
-from chio_sdk.models import ChioScope, CapabilityToken, Operation, ToolGrant
+from chio_sdk.errors import ChioDeniedError
+from chio_sdk.models import CapabilityToken, ChioScope, Operation, ToolGrant
 from chio_sdk.testing import MockChioClient, MockVerdict, allow_all
 
 from chio_ray import ChioActor, ChioRayConfigError, ChioRayError, StandingGrant, requires
@@ -47,13 +49,14 @@ def _local_token(
 ) -> CapabilityToken:
     now = int(time.time())
     return CapabilityToken(
+        schema="chio.capability.v1",
         id=token_id,
-        issuer="test-issuer",
-        subject=subject,
+        issuer=hashlib.sha256(b"test-issuer").hexdigest(),
+        subject=hashlib.sha256(subject.encode("utf-8")).hexdigest(),
         scope=scope,
         issued_at=now,
         expires_at=now + 3600,
-        signature="test-signature",
+        signature=hashlib.sha512(b"test-signature").hexdigest(),
     )
 
 
@@ -332,7 +335,7 @@ class TestConstruction:
 
 
 class TestAttenuation:
-    async def test_attenuate_child_grant_is_subset_of_parent(self) -> None:
+    async def test_attenuate_fails_closed_without_subject_signer(self) -> None:
         chio = allow_all()
         parent_token = _local_token(
             _scope_for_tools("search", "browse"), token_id="tok-parent"
@@ -340,11 +343,9 @@ class TestAttenuation:
         parent_grant = StandingGrant(token=parent_token, tool_server="srv")
 
         child_scope = _scope_for_tools("search")
-        child_grant = await parent_grant.attenuate(chio, new_scope=child_scope)
-
-        assert child_grant.scope.is_subset_of(parent_grant.scope)
-        assert child_grant.metadata["parent_capability_id"] == parent_grant.capability_id
-        assert child_grant.tool_server == "srv"
+        with pytest.raises(ChioDeniedError) as denied:
+            await parent_grant.attenuate(chio, new_scope=child_scope)
+        assert denied.value.reason_code == "chio_attenuation_requires_subject_signer"
 
     async def test_attenuate_broader_scope_rejected(self) -> None:
         chio = allow_all()

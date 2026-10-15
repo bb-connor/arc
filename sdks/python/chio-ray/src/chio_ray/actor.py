@@ -390,8 +390,8 @@ def _merge_standing_grants(
         all_tool_grants.extend(g.scope.grants)
     merged_scope = ChioScope(
         grants=_dedupe_tool_grants(all_tool_grants),
-        resource_grants=[r for g in grant_list for r in g.scope.resource_grants],
-        prompt_grants=[p for g in grant_list for p in g.scope.prompt_grants],
+        resource_grants=[r for g in grant_list for r in g.scope.resource_grants or []],
+        prompt_grants=[p for g in grant_list for p in g.scope.prompt_grants or []],
     )
 
     primary = grant_list[0]

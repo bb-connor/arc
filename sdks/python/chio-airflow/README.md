@@ -155,6 +155,7 @@ from chio_airflow import ChioOperator, chio_task
 ChioOperator(
     inner_operator=PythonOperator(task_id="t", python_callable=lambda: 1),
     capability_id="cap-1",
+    tool_server="srv",
     chio_client=allow_all(),
 )
 

@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from chio_sdk.models import ChioReceipt
+from conftest import hex_id
 
 from chio_observability import (
     ChioObservabilityConfigError,
@@ -107,7 +108,7 @@ class TestPublishAllow:
         fake = FakeLangFuseClient()
         bridge = LangFuseBridge(client=fake)
         span_kwargs = bridge.publish(allow_receipt)
-        assert span_kwargs["metadata"]["chio.receipt_id"] == "rcpt_001"
+        assert span_kwargs["metadata"]["chio.receipt_id"] == hex_id("rcpt_001")
         assert span_kwargs["metadata"]["chio.capability_id"] == "cap-abc"
 
 
@@ -174,7 +175,7 @@ class TestErrorHandling:
         with pytest.raises(ChioObservabilityError) as exc_info:
             bridge.publish(allow_receipt)
         assert exc_info.value.backend == "langfuse"
-        assert exc_info.value.receipt_id == "rcpt_001"
+        assert exc_info.value.receipt_id == hex_id("rcpt_001")
 
     def test_trace_failure_raises_observability_error(
         self, allow_receipt: ChioReceipt

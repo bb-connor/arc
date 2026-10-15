@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 from typing import Any
 
@@ -28,13 +29,14 @@ def _scope_for_tools(*tool_names: str, server_id: str = "srv") -> ChioScope:
 def _local_token(scope: ChioScope, *, token_id: str = "tok-1") -> CapabilityToken:
     now = int(time.time())
     return CapabilityToken(
+        schema="chio.capability.v1",
         id=token_id,
-        issuer="test-issuer",
-        subject="agent:tester",
+        issuer=hashlib.sha256(b"test-issuer").hexdigest(),
+        subject=hashlib.sha256(b"agent:tester").hexdigest(),
         scope=scope,
         issued_at=now,
         expires_at=now + 3600,
-        signature="test-signature",
+        signature=hashlib.sha512(b"test-signature").hexdigest(),
     )
 
 
@@ -244,12 +246,16 @@ class TestChioRemoteRedaction:
 
         params = _eval_calls(chio)[0].parameters
         forwarded_blob = json.dumps(params)
-        # Neither side leaks: the positional body and the keyword body
-        # are both replaced by the omission stub.
+        # Neither side leaks.
         assert "POSITIONAL_BODY" not in forwarded_blob
         assert "KW_BODY" not in forwarded_blob
         assert "/etc/passwd" in forwarded_blob  # path is not a body field
-        assert params["args"][0] == "/tmp/x"
+        # Both positional slots are claimed by kwargs, so the positional
+        # values are ambiguous and both are omitted.
+        assert params["args"][0] == {
+            "omitted": True,
+            "byte_count": len(b"/tmp/x"),
+        }
         assert params["args"][1] == {
             "omitted": True,
             "byte_count": len(b"POSITIONAL_BODY"),

@@ -70,9 +70,8 @@ class ChioOperator(BaseOperator):
         to do. Declarative: the kernel side enforces. Published to
         XCom so downstream tasks can reason about the allowed surface.
     tool_server:
-        Chio tool server id. When unset, the sidecar evaluates against
-        the implicit empty server; teams with a real server topology
-        should always pass it.
+        Chio tool server id. Required: a receipt names a non-empty tool
+        server.
     tool_name:
         Chio tool name to use for evaluation. Defaults to the
         operator's ``task_id`` so the sidecar can correlate verdicts
@@ -117,7 +116,7 @@ class ChioOperator(BaseOperator):
         inner_operator: BaseOperator,
         capability_id: str,
         scope: ChioScope | None = None,
-        tool_server: str = "",
+        tool_server: str,
         tool_name: str | None = None,
         sidecar_url: str | None = None,
         chio_client: ChioClientLike | None = None,
@@ -132,6 +131,10 @@ class ChioOperator(BaseOperator):
         if not capability_id:
             raise ChioAirflowConfigError(
                 "ChioOperator requires a capability_id for sidecar evaluation"
+            )
+        if not tool_server:
+            raise ChioAirflowConfigError(
+                "ChioOperator requires a tool_server for sidecar evaluation"
             )
 
         resolved_task_id = task_id or f"chio_{inner_operator.task_id}"

@@ -10,6 +10,7 @@ Both are properties of the inner wrapper, so we test it at that level.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 from unittest.mock import patch
 
@@ -119,7 +120,7 @@ class TestAllowPath:
         assert evaluate_calls[0].parameters == {"args": [21], "kwargs": {}}
 
         pushed = dict(ti.pushed)
-        assert pushed[XCOM_RECEIPT_ID_KEY].startswith("mock-r-")
+        assert re.fullmatch(r"[0-9a-f]{64}", pushed[XCOM_RECEIPT_ID_KEY])
         assert pushed[XCOM_CAPABILITY_KEY] == "cap-1"
         assert pushed[XCOM_SCOPE_KEY] is not None
 

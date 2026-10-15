@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from chio_sdk.models import ChioReceipt
+from conftest import hex_id
 
 from chio_observability import (
     ChioObservabilityConfigError,
@@ -96,7 +97,7 @@ class TestPublishAllow:
         fake = FakeLangSmithClient()
         bridge = LangSmithBridge(client=fake, project="demo")
         request = bridge.publish(allow_receipt)
-        assert request["extra"]["metadata"]["chio.receipt_id"] == "rcpt_001"
+        assert request["extra"]["metadata"]["chio.receipt_id"] == hex_id("rcpt_001")
         assert request["extra"]["metadata"]["chio.capability_id"] == "cap-abc"
 
     def test_client_receives_request(self, allow_receipt: ChioReceipt) -> None:
@@ -153,7 +154,7 @@ class TestPublishErrors:
             bridge.publish(allow_receipt)
         err = exc_info.value
         assert err.backend == "langsmith"
-        assert err.receipt_id == "rcpt_001"
+        assert err.receipt_id == hex_id("rcpt_001")
         assert err.tool_name == "search"
 
     def test_tool_result_reaches_outputs(self, allow_receipt: ChioReceipt) -> None:
