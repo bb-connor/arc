@@ -262,11 +262,11 @@ mod tests {
     #[test]
     fn yaml_round_trip_disabled() {
         let cfg = WeightsCardConfig::disabled();
-        let s = match serde_yml::to_string(&cfg) {
+        let s = match yaml_serde::to_string(&cfg) {
             Ok(s) => s,
             Err(e) => panic!("serialize must succeed: {e}"),
         };
-        let again: WeightsCardConfig = match serde_yml::from_str(&s) {
+        let again: WeightsCardConfig = match yaml_serde::from_str(&s) {
             Ok(c) => c,
             Err(e) => panic!("deserialize must succeed: {e}"),
         };
@@ -276,11 +276,11 @@ mod tests {
     #[test]
     fn yaml_round_trip_required_with_pin() {
         let cfg = WeightsCardConfig::required_with_pin("issuer/.*");
-        let s = match serde_yml::to_string(&cfg) {
+        let s = match yaml_serde::to_string(&cfg) {
             Ok(s) => s,
             Err(e) => panic!("serialize must succeed: {e}"),
         };
-        let again: WeightsCardConfig = match serde_yml::from_str(&s) {
+        let again: WeightsCardConfig = match yaml_serde::from_str(&s) {
             Ok(c) => c,
             Err(e) => panic!("deserialize must succeed: {e}"),
         };
@@ -293,13 +293,13 @@ mod tests {
             mode: WeightsCardRequired::Required,
             ..WeightsCardConfig::default()
         };
-        let s = match serde_yml::to_string(&cfg.mode) {
+        let s = match yaml_serde::to_string(&cfg.mode) {
             Ok(s) => s.trim().to_string(),
             Err(e) => panic!("serialize must succeed: {e}"),
         };
         assert_eq!(s, "required");
         cfg.mode = WeightsCardRequired::RequiredWithPin;
-        let s = match serde_yml::to_string(&cfg.mode) {
+        let s = match yaml_serde::to_string(&cfg.mode) {
             Ok(s) => s.trim().to_string(),
             Err(e) => panic!("serialize must succeed: {e}"),
         };

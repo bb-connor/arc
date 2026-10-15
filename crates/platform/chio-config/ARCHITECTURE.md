@@ -27,7 +27,7 @@ entrypoints.
 
 `load_from_file` uses `fs::read_to_string`, then delegates to
 `load_from_str`. The string loader interpolates environment tokens, screens
-tab syntax, decodes YAML with `serde_yml`, and validates the typed result.
+tab syntax, decodes YAML with `yaml_serde`, and validates the typed result.
 Missing environment variables without defaults fail before parsing. Literal
 tabs inside quoted strings, comments, or block scalar bodies remain
 accepted.
@@ -51,7 +51,7 @@ has no bounded-read contract.
 
 ## Dependencies
 
-`serde` and `serde_yml` decode YAML. `regex` recognizes interpolation
+`serde` and `yaml_serde` decode YAML. `regex` recognizes interpolation
 syntax. `chio-core` supplies key material and `chio-kernel` supplies runtime
 configuration, deadlines, retention, and memory budgets. `thiserror`
 preserves separate I/O, interpolation, parse, validation, and

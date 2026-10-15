@@ -29,7 +29,7 @@ pub(crate) fn decode(input: &[u8]) -> crate::Result<Value> {
         nodes: MAX_NODES,
         bytes: MAX_OPENAPI_BYTES,
     };
-    let mut documents = serde_yaml::Deserializer::from_slice(input);
+    let mut documents = yaml_serde::Deserializer::from_slice(input);
     let document = documents.next().ok_or(crate::OpenApiError::EmptyDocument)?;
     let value = Seed {
         budget: &mut budget,

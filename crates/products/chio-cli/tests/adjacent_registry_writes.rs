@@ -94,7 +94,7 @@ fn local_policy_create_upsert_and_delete_observe_cross_process_busy_then_progres
     fs::write(&input, serde_json::to_vec(&unrelated)?)?;
     fs::write(
         &raw,
-        serde_yml::to_string(&PassportVerifierPolicy::default())?,
+        yaml_serde::to_string(&PassportVerifierPolicy::default())?,
     )?;
     let create = [
         "--json",

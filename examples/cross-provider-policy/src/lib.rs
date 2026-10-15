@@ -118,7 +118,7 @@ pub enum DemoError {
     ParsePolicy {
         path: PathBuf,
         #[source]
-        source: serde_yml::Error,
+        source: yaml_serde::Error,
     },
     #[error("policy {policy_id} does not allow required tool {tool}")]
     ToolNotAllowed { policy_id: String, tool: String },
@@ -266,7 +266,7 @@ fn load_policy(path: &Path) -> Result<DemoPolicy, DemoError> {
         path: path.to_path_buf(),
         source,
     })?;
-    serde_yml::from_str(&text).map_err(|source| DemoError::ParsePolicy {
+    yaml_serde::from_str(&text).map_err(|source| DemoError::ParsePolicy {
         path: path.to_path_buf(),
         source,
     })
@@ -515,7 +515,7 @@ mod tests {
 
     #[test]
     fn validate_policy_rejects_padded_required_tool() {
-        let policy = match serde_yml::from_str::<DemoPolicy>(
+        let policy = match yaml_serde::from_str::<DemoPolicy>(
             r#"
 name: cross-provider-policy-demo
 rules:

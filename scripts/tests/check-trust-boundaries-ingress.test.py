@@ -62,7 +62,7 @@ class IngressCensusCalibration(unittest.TestCase):
     def test_non_json_formats_and_aliases_are_recorded(self):
         path = "crates/platform/demo/src/config.rs"
         code = """
-        use serde_yaml as yaml;
+        use yaml_serde as yaml;
         use toml::from_str as parse_toml;
         fn yaml() { yaml::from_slice(bytes); }
         fn toml() { parse_toml(text); }

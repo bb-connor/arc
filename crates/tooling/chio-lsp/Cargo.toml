@@ -18,7 +18,7 @@ path = "src/main.rs"
 [dependencies]
 chio-errors = { workspace = true }
 dashmap = { workspace = true }
-serde_yml = { workspace = true }
+yaml_serde = { workspace = true }
 tokio = { workspace = true }
 tower-lsp = { workspace = true }
 

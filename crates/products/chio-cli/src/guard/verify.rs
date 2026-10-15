@@ -159,7 +159,7 @@ pub(crate) fn cmd_guard_test(
                 fixture_path.display()
             ))
         })?;
-        let fixtures: Vec<TestFixture> = serde_yml::from_str(&yaml_content).map_err(|e| {
+        let fixtures: Vec<TestFixture> = yaml_serde::from_str(&yaml_content).map_err(|e| {
             guard_yaml_error(format!(
                 "failed to parse fixture file {}: {e}",
                 fixture_path.display()

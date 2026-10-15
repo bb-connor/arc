@@ -156,7 +156,7 @@ fn load_fixtures(relative_path: &str) -> Vec<TestFixture> {
     );
     let content = std::fs::read_to_string(&path)
         .unwrap_or_else(|e| panic!("Failed to read fixture file {path}: {e}"));
-    serde_yml::from_str(&content)
+    yaml_serde::from_str(&content)
         .unwrap_or_else(|e| panic!("Failed to parse fixture file {path}: {e}"))
 }
 

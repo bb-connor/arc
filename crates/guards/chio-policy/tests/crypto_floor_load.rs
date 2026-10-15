@@ -86,13 +86,13 @@ fn yaml_round_trip_each_variant() {
         (CryptoFloor::AllowHybrid, "allow_hybrid"),
         (CryptoFloor::PqRequired, "pq_required"),
     ] {
-        let yaml = serde_yml::to_string(&variant).unwrap();
+        let yaml = yaml_serde::to_string(&variant).unwrap();
         assert!(
             yaml.contains(expected),
             "variant {variant:?} should serialize to {expected}, got {yaml}"
         );
         let yaml_quoted = format!("\"{expected}\"\n");
-        let parsed: CryptoFloor = serde_yml::from_str(&yaml_quoted).unwrap();
+        let parsed: CryptoFloor = yaml_serde::from_str(&yaml_quoted).unwrap();
         assert_eq!(parsed, variant);
     }
 }
@@ -102,7 +102,7 @@ fn unknown_string_rejected_at_parse() {
     // Unknown floor strings must fail at parse rather than silently
     // defaulting to `allow_classical`. Threat model row
     // `pq_signature_downgrade` depends on this.
-    let result: Result<CryptoFloor, _> = serde_yml::from_str("\"none\"");
+    let result: Result<CryptoFloor, _> = yaml_serde::from_str("\"none\"");
     assert!(
         result.is_err(),
         "unknown crypto_floor variant must reject at parse"

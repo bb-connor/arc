@@ -28,7 +28,7 @@ chio-kernel-browser = { path = "../../../kernel/chio-kernel-browser" }
 chio-test-support = { path = "../../chio-test-support" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_yaml = "0.9"
+yaml_serde = "0.10.7"
 thiserror = "1"
 toml = "0.8"
 async-trait = "0.1"

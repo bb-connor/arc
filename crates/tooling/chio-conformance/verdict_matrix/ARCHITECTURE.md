@@ -41,7 +41,7 @@ dependency of any shipped binary.
   those files opens the module tree with `#[path = "../src/lib.rs"] mod
   verdict_matrix;` instead of a crate dependency edge, so the source compiles
   as a module inside `chio-conformance`'s own test binaries and resolves
-  `chio_core`, `chio_kernel`, `chio_kernel_browser`, `serde_yaml`, and
+  `chio_core`, `chio_kernel`, `chio_kernel_browser`, `yaml_serde`, and
   `async-trait` from `chio-conformance`'s `[dependencies]`/`[dev-dependencies]`
   rather than this crate's.
 - Because the same `tests/*.rs` files also live under this crate's own
@@ -113,7 +113,7 @@ Standalone workspace (`verdict_matrix/Cargo.toml`): `chio-core` (aliased to
 for `ChioKernel` and the `ToolServerConnection`/`Guard`/`PostInvocationHook`
 traits the reference driver implements against; `chio-kernel-browser`
 (declared here but only actually used from `tests/verdict_matrix_cross_language.rs`,
-not from `src/`); `serde`/`serde_json`/`serde_yaml`/`toml` for scenario,
+not from `src/`); `serde`/`serde_json`/`yaml_serde`/`toml` for scenario,
 manifest, and reason-registry parsing; `thiserror` for error enums;
 `async-trait` for the async `ToolServerConnection` impl.
 

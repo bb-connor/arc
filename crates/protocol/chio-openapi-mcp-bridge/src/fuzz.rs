@@ -17,7 +17,7 @@
 //!
 //! `chio-openapi-mcp-bridge` ingests untrusted bytes (operator-supplied
 //! OpenAPI specs at runtime), so this target catches parse-path panics and
-//! allocator regressions in the `serde_json` / `serde_yaml` -> `OpenApiSpec`
+//! allocator regressions in the `serde_json` / `yaml_serde` -> `OpenApiSpec`
 //! -> manifest-validate chain.
 
 use crate::{BridgeConfig, OpenApiMcpBridge};

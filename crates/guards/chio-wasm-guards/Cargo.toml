@@ -47,14 +47,14 @@ hex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 libc = { workspace = true }
-serde_yml = { workspace = true }
+yaml_serde = { workspace = true }
 sha2 = { workspace = true }
 thiserror = { workspace = true }
 notify = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 wasmparser = { version = "0.221", optional = true }
-wasmtime = { version = "48.0.4", optional = true }
+wasmtime = { version = "48.0.6", optional = true }
 pollster = { version = "0.4", optional = true }
 # `arbitrary` is gated behind the `fuzz` feature so production builds stay
 # free of fuzz instrumentation. Pulled in by

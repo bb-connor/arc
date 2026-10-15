@@ -841,7 +841,7 @@ pub fn load_keyring_runtime_composition_with_clock(
         .read()
         .map_err(|cause| CliError::cli_other_error(cause.to_string()))?;
     let config_bytes = fs::read(config_path)?;
-    let config: KeyringRuntimeConfig = serde_yml::from_slice(&config_bytes)?;
+    let config: KeyringRuntimeConfig = yaml_serde::from_slice(&config_bytes)?;
     if config.schema != "chio.keyring.runtime-config.v1" {
         return Err(CliError::cli_other_error(
             "unsupported keyring runtime configuration schema".to_string(),

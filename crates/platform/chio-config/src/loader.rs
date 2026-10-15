@@ -27,7 +27,7 @@ pub fn load_from_str(yaml: &str) -> Result<ChioConfig, ConfigError> {
     let interpolated = interpolate_for_loader(yaml)?;
     reject_yaml_tabs(&interpolated)?;
     let config: ChioConfig =
-        serde_yml::from_str(&interpolated).map_err(|e| ConfigError::Parse(e.to_string()))?;
+        yaml_serde::from_str(&interpolated).map_err(|e| ConfigError::Parse(e.to_string()))?;
     validate(&config)?;
     Ok(config)
 }
@@ -400,8 +400,8 @@ wasm_guards:
     }
 
     /// Regression: confirm the underlying YAML parser refuses
-    /// "billion-laughs" alias-expansion bombs. `serde_yml` uses
-    /// `libyml`, which caps alias repetitions; if the limit is ever
+    /// "billion-laughs" alias-expansion bombs. `yaml_serde` uses
+    /// `libyaml-rs`, which caps alias repetitions; if the limit is ever
     /// removed, malicious `chio.yaml` content could exhaust memory
     /// before reaching `deny_unknown_fields`.
     #[test]

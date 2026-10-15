@@ -44,7 +44,7 @@ pub enum OpenApiError {
 
     /// The input is not valid YAML.
     #[error("urn:chio:error:transport:invalid-request-shape")]
-    InvalidYaml(#[from] serde_yaml::Error),
+    InvalidYaml(#[from] yaml_serde::Error),
 
     /// The OpenAPI spec is missing a required field.
     #[error("urn:chio:error:transport:invalid-request-shape")]

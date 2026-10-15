@@ -208,7 +208,7 @@ fn test_fixture_yaml_deserializes() {
   deny_reason_contains: "restricted"
 "#;
 
-    let fixtures: Vec<TestFixture> = serde_yml::from_str(yaml).unwrap();
+    let fixtures: Vec<TestFixture> = yaml_serde::from_str(yaml).unwrap();
     assert_eq!(fixtures.len(), 2);
 
     // First fixture: allow
@@ -258,10 +258,10 @@ fn test_fixture_expected_verdict_values() {
   expected_verdict: deny
 "#;
 
-    let allow_fixtures: Vec<TestFixture> = serde_yml::from_str(allow_yaml).unwrap();
+    let allow_fixtures: Vec<TestFixture> = yaml_serde::from_str(allow_yaml).unwrap();
     assert_eq!(allow_fixtures[0].expected_verdict, "allow");
 
-    let deny_fixtures: Vec<TestFixture> = serde_yml::from_str(deny_yaml).unwrap();
+    let deny_fixtures: Vec<TestFixture> = yaml_serde::from_str(deny_yaml).unwrap();
     assert_eq!(deny_fixtures[0].expected_verdict, "deny");
 }
 
@@ -287,7 +287,7 @@ fn test_fixture_all_guard_request_fields() {
   expected_verdict: allow
 "#;
 
-    let fixtures: Vec<TestFixture> = serde_yml::from_str(yaml).unwrap();
+    let fixtures: Vec<TestFixture> = yaml_serde::from_str(yaml).unwrap();
     assert_eq!(fixtures.len(), 1);
     let req = &fixtures[0].request;
     assert_eq!(req.tool_name, "write_file");
@@ -519,7 +519,7 @@ wasm_sha256: "deadbeef"
         "extracted manifest should contain wasm_path"
     );
     // The wasm_path in the extracted manifest should point to the local filename
-    let parsed: serde_yml::Value = serde_yml::from_str(&extracted_manifest_content).unwrap();
+    let parsed: yaml_serde::Value = yaml_serde::from_str(&extracted_manifest_content).unwrap();
     let wasm_path_val = parsed.get("wasm_path").unwrap();
     assert_eq!(
         wasm_path_val.as_str().unwrap(),

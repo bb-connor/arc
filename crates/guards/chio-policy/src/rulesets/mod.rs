@@ -104,7 +104,7 @@ pub enum RulesetError {
     Parse {
         name: String,
         #[source]
-        source: serde_yml::Error,
+        source: yaml_serde::Error,
     },
     #[error("failed to compile built-in ruleset {name}: {source}")]
     Compile {

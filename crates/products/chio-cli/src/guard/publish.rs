@@ -98,7 +98,7 @@ pub(super) fn guard_publish_preflight(
     let manifest_path = project_dir.join("guard-manifest.yaml");
     let manifest_content = fs::read_to_string(&manifest_path)
         .map_err(|e| guard_io_error(format!("failed to read {}: {e}", manifest_path.display())))?;
-    let manifest: GuardManifest = serde_yml::from_str(&manifest_content)
+    let manifest: GuardManifest = yaml_serde::from_str(&manifest_content)
         .map_err(|e| guard_yaml_error(format!("failed to parse guard-manifest.yaml: {e}")))?;
 
     let wit_world = manifest.wit_world.as_deref().unwrap_or(GUARD_WIT_WORLD);

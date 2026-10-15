@@ -7,8 +7,8 @@
 //! optional `policy:` key. Diagnostics carry
 //! `urn:chio:error:guard:denied`.
 
-use serde_yml::Value;
 use tower_lsp::lsp_types::{Diagnostic, DiagnosticSeverity};
+use yaml_serde::Value;
 
 use super::diagnostic_with_urn;
 
@@ -27,7 +27,7 @@ pub fn validate(text: &str) -> Vec<Diagnostic> {
         )];
     }
 
-    let doc: Value = match serde_yml::from_str(text) {
+    let doc: Value = match yaml_serde::from_str(text) {
         Ok(v) => v,
         Err(err) => {
             let (line, column) = err

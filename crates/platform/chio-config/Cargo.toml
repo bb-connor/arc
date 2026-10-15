@@ -22,7 +22,7 @@ fuzz = ["dep:arbitrary"]
 chio-core = { workspace = true }
 chio-kernel = { workspace = true }
 serde = { workspace = true }
-serde_yml = { workspace = true }
+yaml_serde = { workspace = true }
 thiserror = { workspace = true }
 regex = "1"
 arbitrary = { version = "1", features = ["derive"], optional = true }

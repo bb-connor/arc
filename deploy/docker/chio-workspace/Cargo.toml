@@ -150,8 +150,7 @@ serde = { version = "1", features = ["derive"] }
 # JSON re-verify: canonical signing bytes are reproducible only if a reloaded
 # float yields the exact bits that were signed.
 serde_json = { version = "1", features = ["float_roundtrip"] }
-serde_yaml = "0.9"
-serde_yml = { package = "serde_yaml_ng", version = "0.10.0" }
+yaml_serde = "0.10.7"
 tokio = { version = "1", features = ["full"] }
 thiserror = "1"
 miette = { version = "7.6.0", features = ["fancy"] }

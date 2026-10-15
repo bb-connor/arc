@@ -12,7 +12,7 @@
 //!
 //! 1. `${VAR}` and `${VAR:-default}` interpolation
 //!    ([`crate::interpolation::interpolate`]).
-//! 2. YAML deserialization with `serde_yml` plus `deny_unknown_fields`
+//! 2. YAML deserialization with `yaml_serde` plus `deny_unknown_fields`
 //!    ([`crate::schema::ChioConfig`]).
 //! 3. Post-deserialization validation
 //!    ([`crate::validation::validate`]).
@@ -21,7 +21,7 @@
 //! the loader still ingests untrusted bytes from disk (`chio.yaml`),
 //! environment variables (interpolation), and embedded config strings.
 //! This target catches parse-path panics and allocator regressions in the
-//! `serde_yml` -> `ChioConfig` -> `validate` chain rather than security
+//! `yaml_serde` -> `ChioConfig` -> `validate` chain rather than security
 //! regressions.
 
 use crate::loader::load_from_str;
@@ -29,9 +29,9 @@ use crate::loader::load_from_str;
 /// Drive arbitrary bytes through the `chio-config` YAML-loader trust boundary.
 ///
 /// Bytes are first decoded as UTF-8 (non-UTF-8 inputs are silently dropped,
-/// mirroring the `serde_yml` contract that operates on `&str`). The decoded
+/// mirroring the `yaml_serde` contract that operates on `&str`). The decoded
 /// text is then handed to `load_from_str`, which performs environment-variable
-/// interpolation, `serde_yml` deserialization with `deny_unknown_fields`, and
+/// interpolation, `yaml_serde` deserialization with `deny_unknown_fields`, and
 /// post-deserialization validation.
 ///
 /// Every error variant is silently consumed: the trust-boundary contract

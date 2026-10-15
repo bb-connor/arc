@@ -62,34 +62,34 @@ pub struct HushSpec {
 
 impl HushSpec {
     /// Parse a HushSpec document from a YAML string.
-    pub fn parse(yaml: &str) -> Result<Self, serde_yml::Error> {
+    pub fn parse(yaml: &str) -> Result<Self, yaml_serde::Error> {
         if has_non_mapping_document_start(yaml) {
-            return Err(<serde_yml::Error as serde::de::Error>::custom(
+            return Err(<yaml_serde::Error as serde::de::Error>::custom(
                 "YAML policy must start with a mapping",
             ));
         }
         if has_unclosed_double_quoted_value_scalar(yaml) {
-            return Err(<serde_yml::Error as serde::de::Error>::custom(
+            return Err(<yaml_serde::Error as serde::de::Error>::custom(
                 "YAML contains an unterminated double-quoted scalar",
             ));
         }
         if has_libyml_scalar_join_overflow_risk(yaml) {
-            return Err(<serde_yml::Error as serde::de::Error>::custom(
+            return Err(<yaml_serde::Error as serde::de::Error>::custom(
                 "YAML contains an unsupported scalar whitespace run",
             ));
         }
 
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| serde_yml::from_str(yaml)))
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| yaml_serde::from_str(yaml)))
             .unwrap_or_else(|_| {
-                Err(<serde_yml::Error as serde::de::Error>::custom(
+                Err(<yaml_serde::Error as serde::de::Error>::custom(
                     "YAML parser panicked while parsing policy",
                 ))
             })
     }
 
     /// Serialize this spec to a YAML string.
-    pub fn to_yaml(&self) -> Result<String, serde_yml::Error> {
-        serde_yml::to_string(self)
+    pub fn to_yaml(&self) -> Result<String, yaml_serde::Error> {
+        yaml_serde::to_string(self)
     }
 }
 
