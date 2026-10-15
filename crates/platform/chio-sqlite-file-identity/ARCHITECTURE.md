@@ -2,10 +2,13 @@
 
 ## Responsibility and boundary
 
-The public surface contains `SqliteFileIdentity`,
+The file inspection surface contains `SqliteFileIdentity`,
 `SqliteFileIdentityInspectionError`, `inspect_main_database_file_identity`,
 `main_database_file_identity`,
-`main_database_available_bytes`, and `SqliteAvailableSpaceError`.
+`main_database_available_bytes`, `SqliteAvailableSpaceError`, and
+`main_database_write_geometry` with `SqliteWriteGeometryData`,
+`SqliteWriteGeometryError`, `SqliteGeometryFileControl`, and
+`SqliteGeometryMethod`.
 `SqliteFileIdentity` copies three `u64` fields: device, inode, and link count.
 The caller owns the connection and keeps it borrowed throughout inspection.
 
@@ -13,14 +16,17 @@ The crate owns the narrow unsafe boundary needed to inspect SQLite's actual
 main-file descriptor. Store callers combine that result with filesystem
 custody checks. This crate does not validate ownership, permissions, regular
 file type, expected identity, or a required link count. It neither acquires
-serving locks nor retains a descriptor beyond the call. Available space is
-data: the crate reserves no space and grants no write capacity.
+serving locks nor retains a descriptor beyond the call. Available space and
+write geometry are data: the crate reserves no space and grants no write
+capacity or writer authority.
 
 ## Structure and dependencies
 
 Descriptor extraction, identity inspection, and their tests live in
 `src/lib.rs`. `src/available_space.rs` and `src/available_space/tests.rs` hold
-the available-space inspection and its tests. Unix-only code imports SQLite
+the available-space inspection and its tests. `src/write_geometry.rs` and
+`src/write_geometry/tests.rs` hold the write geometry observation and its
+tests. Unix-only code imports SQLite
 FFI and defines `BundledUnixFilePrefix`, a C-layout copy of the audited prefix
 containing method, VFS, inode-information, and descriptor fields. The non-Unix
 implementations return a validation refusal.
@@ -63,6 +69,23 @@ It passes the borrowed descriptor to `fstatvfs` and keeps a syscall failure as
 refuses with `ZeroFragmentSize` and a product beyond `u64` with
 `CapacityOverflow`; zero available blocks returns zero. Both arithmetic
 variants have no error source.
+
+`main_database_write_geometry` first calls
+`inspect_main_database_file_identity` and keeps its refusal as the `Identity`
+variant, so the same supported, live, bundled Unix main descriptor is required.
+It then calls `sqlite3_file_control` on `main` with
+`SQLITE_FCNTL_RESERVE_BYTES` and -1. SQLite reports the larger of the
+requested and actual reserve and changes nothing for a value outside
+`0..=255`. It then takes `SQLITE_FCNTL_VFS_POINTER` and, last,
+`SQLITE_FCNTL_FILE_POINTER`. A non-`SQLITE_OK` status is kept in `FileControl`
+with its control, and a null pointer is `NullPointer`. The file's public
+`xSectorSize` and `xDeviceCharacteristics` methods are called with no SQLite
+call between `FILE_POINTER` and those reads, and no pointer is retained,
+because SQLite may replace the main file during a later operation on the
+connection. The VFS name is copied from the registered VFS. The sector size must be a power of two in `32..=65536`, the range
+SQLite's pager uses without clamping; device flags must be nonnegative; and
+`powersafe_overwrite` tests `SQLITE_IOCAP_POWERSAFE_OVERWRITE` from
+`rusqlite::ffi`. A nonzero reserve in `0..=255` is reported unchanged.
 
 ## Trust and invariants
 
@@ -147,6 +170,11 @@ tests check successful inspection and the actual `EBADF` source of `fstat` and
 `fstatvfs` on an invalid descriptor. Arithmetic tests check the exact product,
 zero available blocks, and the `ZeroFragmentSize` and `CapacityOverflow`
 refusals.
+
+Write-geometry tests observe an actual file inside a write transaction and
+then commit a write, report a pending reserve of 32 bytes on repeated queries
+without changing it, refuse a memory database through the identity guard, and
+check the reserve, sector-size, and device-flag validation boundaries.
 
 Lock-preservation tests start an exclusive transaction in DELETE journal mode,
 inspect identity through both public APIs and available space, and launch a
