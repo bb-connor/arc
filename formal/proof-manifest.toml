@@ -3647,9 +3647,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs"
 rust_symbols = ["verify_swarm_authority_reference_from_store"]
-normalized_sha256 = "72167fa2d2109d34d3886572ae2e944322da5935287d9b07243f0ace9c3b462f"
+normalized_sha256 = "0e2bbfc0c764a940d8af6e8719e9b9aaa4bae5e72760bc61de6dc5d2ac22c665"
 symbol_sha256 = [
-  { symbol = "verify_swarm_authority_reference_from_store", sha256 = "9ab0a3a29ea630dc6ec1ff8570b8846736ac7227ffd307b6a29976e499c61f21" },
+  { symbol = "verify_swarm_authority_reference_from_store", sha256 = "473f59c17434e84da4b426d6ebe6a62da34599598f0343d6cb3ed2b681b54e8b" },
 ]
 
 [[mirror]]
