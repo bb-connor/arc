@@ -14,6 +14,8 @@ pub(crate) struct TrustServiceState {
     /// authority was injected. Configured database paths alone never enable the
     /// structured authority surface.
     pub(crate) joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
+    /// The kernel-scope stop, durable on the joint authority when present.
+    pub(crate) stop: TrustStop,
     pub(crate) fiscal_runtime: Option<Arc<TrustFiscalRuntime>>,
     pub(crate) budget_store: Option<Arc<SqliteBudgetStore>>,
     pub(crate) revocation_store: Option<Arc<SqliteRevocationStore>>,

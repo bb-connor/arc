@@ -240,6 +240,7 @@ async fn serve_async_inner(
         config,
         authority_keyring,
         authority_keyring_seed_path,
+        stop: TrustStop::for_authority(joint_authority_store.as_ref()),
         joint_authority_store,
         fiscal_runtime,
         budget_store,

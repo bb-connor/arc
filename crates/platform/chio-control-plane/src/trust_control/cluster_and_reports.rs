@@ -85,6 +85,7 @@ mod cluster_and_reports_tests {
             config,
             authority_keyring: None,
             authority_keyring_seed_path: None,
+            stop: TrustStop::process_local(),
             joint_authority_store: None,
             fiscal_runtime: None,
             budget_store,

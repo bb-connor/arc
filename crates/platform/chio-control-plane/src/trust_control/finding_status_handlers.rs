@@ -962,6 +962,7 @@ fn service_state(
         },
         authority_keyring: None,
         authority_keyring_seed_path: None,
+        stop: TrustStop::for_authority(Some(&authority)),
         joint_authority_store: Some(authority),
         fiscal_runtime: None,
         budget_store: None,

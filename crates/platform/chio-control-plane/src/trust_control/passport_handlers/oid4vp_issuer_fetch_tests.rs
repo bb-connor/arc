@@ -121,6 +121,7 @@ fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustService
         config,
         authority_keyring: None,
         authority_keyring_seed_path: None,
+        stop: TrustStop::process_local(),
         joint_authority_store: None,
         fiscal_runtime: None,
         budget_store: None,

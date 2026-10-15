@@ -104,6 +104,8 @@ pub(crate) enum AdmissionAuthorityErrorCode {
     OutcomeUnknown,
     Unsupported,
     Timeout,
+    /// The authority's kernel scope is stopped; retry after resume.
+    Stopped,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -1090,7 +1090,9 @@ fn operation_error(error: RemoteAdmissionError) -> AdmissionOperationStoreError 
             AdmissionAuthorityErrorCode::OutcomeUnknown => {
                 AdmissionOperationStoreError::OutcomeUnknown(error.message)
             }
-            AdmissionAuthorityErrorCode::Unavailable | AdmissionAuthorityErrorCode::Timeout => {
+            AdmissionAuthorityErrorCode::Unavailable
+            | AdmissionAuthorityErrorCode::Timeout
+            | AdmissionAuthorityErrorCode::Stopped => {
                 AdmissionOperationStoreError::Unavailable(error.message)
             }
             _ => AdmissionOperationStoreError::Invariant(error.message),
@@ -1109,7 +1111,9 @@ fn capture_error(error: RemoteAdmissionError) -> AdmissionCaptureError {
             AdmissionAuthorityErrorCode::OutcomeUnknown => {
                 AdmissionCaptureError::OutcomeUnknown(error.message)
             }
-            AdmissionAuthorityErrorCode::Unavailable | AdmissionAuthorityErrorCode::Timeout => {
+            AdmissionAuthorityErrorCode::Unavailable
+            | AdmissionAuthorityErrorCode::Timeout
+            | AdmissionAuthorityErrorCode::Stopped => {
                 AdmissionCaptureError::Unavailable(error.message)
             }
             _ => AdmissionCaptureError::Invariant(error.message),
@@ -1126,7 +1130,9 @@ fn authorization_error(error: RemoteAdmissionError) -> AdmissionBudgetAuthorizat
             AdmissionAuthorityErrorCode::OutcomeUnknown => {
                 AdmissionBudgetAuthorizationError::OutcomeUnknown(error.message)
             }
-            AdmissionAuthorityErrorCode::Unavailable | AdmissionAuthorityErrorCode::Timeout => {
+            AdmissionAuthorityErrorCode::Unavailable
+            | AdmissionAuthorityErrorCode::Timeout
+            | AdmissionAuthorityErrorCode::Stopped => {
                 AdmissionBudgetAuthorizationError::Unavailable(error.message)
             }
             _ => AdmissionBudgetAuthorizationError::Invariant(error.message),
@@ -1150,7 +1156,9 @@ fn payment_journal_error(error: RemoteAdmissionError) -> AdmissionPaymentJournal
             AdmissionAuthorityErrorCode::OutcomeUnknown => {
                 AdmissionPaymentJournalError::OutcomeUnknown(error.message)
             }
-            AdmissionAuthorityErrorCode::Unavailable | AdmissionAuthorityErrorCode::Timeout => {
+            AdmissionAuthorityErrorCode::Unavailable
+            | AdmissionAuthorityErrorCode::Timeout
+            | AdmissionAuthorityErrorCode::Stopped => {
                 AdmissionPaymentJournalError::Unavailable(error.message)
             }
             _ => AdmissionPaymentJournalError::Invariant(error.message),

@@ -376,6 +376,8 @@ mod risk_finance_handlers;
 pub mod service_runtime;
 #[path = "trust_control/service_types.rs"]
 mod service_types;
+#[path = "trust_control/stop_routes.rs"]
+mod stop_routes;
 #[path = "trust_control/underwriting_and_support.rs"]
 mod underwriting_and_support;
 
@@ -427,4 +429,8 @@ pub(crate) use self::receipt_snapshot_admin::{
     handle_receipt_query_snapshot_recovery, RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,
 };
 pub(crate) use self::risk_finance_handlers::*;
+pub(crate) use self::stop_routes::{
+    handle_emergency_resume, handle_emergency_status, handle_emergency_stop, TrustStop,
+    EMERGENCY_RESUME_PATH, EMERGENCY_STATUS_PATH, EMERGENCY_STOP_PATH,
+};
 pub use self::underwriting_and_support::*;
