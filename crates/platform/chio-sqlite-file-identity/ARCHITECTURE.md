@@ -17,7 +17,8 @@ main-file descriptor. Store callers combine that result with filesystem
 custody checks. This crate does not validate ownership, permissions, regular
 file type, expected identity, or a required link count. It neither acquires
 serving locks nor retains a descriptor beyond the call. Available space and
-write geometry are data: the crate reserves no space and grants no writer authority.
+write geometry are data: the crate reserves no space and grants no write
+capacity or writer authority.
 
 ## Structure and dependencies
 
@@ -169,6 +170,11 @@ tests check successful inspection and the actual `EBADF` source of `fstat` and
 `fstatvfs` on an invalid descriptor. Arithmetic tests check the exact product,
 zero available blocks, and the `ZeroFragmentSize` and `CapacityOverflow`
 refusals.
+
+Write-geometry tests observe an actual file inside a write transaction and
+then commit a write, report a pending reserve of 32 bytes on repeated queries
+without changing it, refuse a memory database through the identity guard, and
+check the reserve, sector-size, and device-flag validation boundaries.
 
 Lock-preservation tests start an exclusive transaction in DELETE journal mode,
 inspect identity through both public APIs and available space, and launch a

@@ -48,7 +48,6 @@ inspection borrows it synchronously and returns a copied `SqliteFileIdentity`.
   and a product beyond `u64` with `CapacityOverflow`.
 - `SqliteAvailableSpaceError` keeps the descriptor refusal as `Identity`, the
   `fstatvfs` failure as `Io`, and exposes both through `Error::source`.
-
 - `main_database_write_geometry` first runs the same identity inspection, then
   queries `SQLITE_FCNTL_RESERVE_BYTES` with -1, which reports the current or
   pending reserved bytes without changing them, and reads the main file's
@@ -63,7 +62,8 @@ Callers must validate owner, permissions, regular-file type, expected identity,
 and acceptable link count. A successful inspection can report an unlinked
 file with link count zero. It performs no custody acquisition, migration,
 transaction, synchronization, or rollback protection. Available space and
-write geometry are observations: they reserve no space and grant no writer authority.
+write geometry are observations: they reserve no space and grant no write
+capacity or writer authority.
 
 ## Write frame prices
 
