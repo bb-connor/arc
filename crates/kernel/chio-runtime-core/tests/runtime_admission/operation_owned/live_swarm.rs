@@ -2,6 +2,9 @@
 //! claiming that future workers or their join have already completed.
 use super::*;
 
+#[path = "live_swarm/evolution.rs"]
+mod evolution;
+
 #[test]
 fn live_swarm_without_future_results_uses_durable_continuation_custody() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);

@@ -247,6 +247,14 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
             .cloned())
     }
 
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        _graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.swarm_authority_bundle(task_graph_id)
+    }
+
     fn consume_destructive_lease(
         &self,
         lease_id: &str,
