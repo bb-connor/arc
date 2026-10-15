@@ -24,7 +24,7 @@ fn transaction(
 
 #[test]
 fn independent_transactions_retain_separate_commit_costs() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let first = SqliteTreeWriteShapeData::record(None, 16_384, 1)?;
     let second = SqliteTreeWriteShapeData::record(Some(16_384), 16_384, 1)?;
     let first_price = price_transaction_write_shape(&profile, &transaction(vec![first.clone()])?)?;
@@ -38,7 +38,7 @@ fn independent_transactions_retain_separate_commit_costs() -> Result<(), String>
 
 #[test]
 fn same_size_rewrites_retain_old_images_and_every_history_write() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(512, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(512, 0, 0)?;
     let price = |mutations| -> Result<SqliteTransactionWritePriceData, String> {
         price_transaction_write_shape(
             &profile,
@@ -56,7 +56,7 @@ fn same_size_rewrites_retain_old_images_and_every_history_write() -> Result<(), 
 
 #[test]
 fn an_initially_absent_repeated_row_keeps_its_intermediate_existing_image() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let price = |tree| price_transaction_write_shape(&profile, &transaction(vec![tree])?);
     let inserted_then_rewritten = price(SqliteTreeWriteShapeData::record(None, 1_048_576, 2)?)?;
     let already_existing = price(SqliteTreeWriteShapeData::record(
@@ -78,7 +78,7 @@ fn an_initially_absent_repeated_row_keeps_its_intermediate_existing_image() -> R
 
 #[test]
 fn page_bounded_rewrites_price_the_file_not_every_balance_walk() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let rows = 4096;
     let bytes = 8 * 1024 * 1024;
     let shape = transaction(vec![SqliteTreeWriteShapeData::same_key_rewrites(
@@ -127,7 +127,7 @@ fn page_bounded_rewrites_price_the_file_not_every_balance_walk() -> Result<(), S
 
 #[test]
 fn split_same_key_rewrites_price_measured_growing_rows_exactly() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let rows = 4096;
     let bytes = 8 * 1024 * 1024;
     let price = |growing: u64| {
@@ -264,12 +264,12 @@ fn malformed_geometry_and_exhausted_record_counts_refuse() -> Result<(), String>
         (0, 0),
     ] {
         refused(
-            SqliteFramePriceProfileData::checked(page_size, reserved),
+            SqliteFramePriceProfileData::checked(page_size, reserved, 0),
             UNSUPPORTED_GEOMETRY,
         );
     }
     for page_size in [512, 1024, 4096, 65_536] {
-        SqliteFramePriceProfileData::checked(page_size, 0)?;
+        SqliteFramePriceProfileData::checked(page_size, 0, 0)?;
     }
     refused(
         SqliteTreeWriteShapeData::record(Some(0), 1024, 1),
@@ -283,7 +283,7 @@ fn malformed_geometry_and_exhausted_record_counts_refuse() -> Result<(), String>
         SqliteTreeWriteShapeData::record(None, 0, 1),
         LOST_RECORD_BOUND,
     );
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     refused(
         profile.price_frames(0),
         "SQLite transaction frame bound is empty",
@@ -307,15 +307,15 @@ fn malformed_geometry_and_exhausted_record_counts_refuse() -> Result<(), String>
 fn every_calculator_descriptor_is_its_exact_v1_identity() {
     assert_eq!(
         write_price_algorithm_descriptor(),
-        "chio.sqlite.transaction-frame-price.v1; bundled3.51.3; depth20; balance6; newwalk1; existingwalk3; allocation_or_free2; frame24; header32; FULL_sector65536; reserved0; before_or_intermediate_overflow; ambiguous_new_rewrites_existing_cost; explicit_fresh_insertions; independent_transactions"
+        "chio.sqlite.transaction-frame-price.v1; bundled3.51.3; depth20; balance6; newwalk1; existingwalk3; allocation_or_free2; frame24; header32; FULL_sector65536; reserved0; auto_vacuum_none; before_or_intermediate_overflow; ambiguous_new_rewrites_existing_cost; explicit_fresh_insertions; independent_transactions"
     );
     assert_eq!(
         SqliteTransactionWriteShapeData::page_bounded_descriptor(),
-        "chio.sqlite.page-bounded-frame-price.v1; bundled3.51.3; same_key_rewrite_one_balance_walk; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; dirty_pages_at_most_file_pages_with_cache_spill_off; growth=balance_plus_overflow_allocations+lock_byte_page; independent_transactions"
+        "chio.sqlite.page-bounded-frame-price.v1; bundled3.51.3; auto_vacuum_none; same_key_rewrite_one_balance_walk; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; dirty_pages_at_most_file_pages_with_cache_spill_off; growth=balance_plus_overflow_allocations+lock_byte_page; independent_transactions"
     );
     assert_eq!(
         SqliteTransactionWriteShapeData::split_same_key_rewrites_descriptor(),
-        "chio.sqlite.split-same-key-frame-price.v1; bundled3.51.3; recipe_proves_new_record_identical_except_generation_column; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; same_width_in_place_no_allocation_dirties_only_differing_pages; growing_drop_insert_cascade; balance_level7_children_nb_plus_2_parent_freelist_trunk; growth2_pages_per_level_plus_per_row_overflow_slack; same_width_one_image_set_plus_row_slack; growing_old_and_new_images; zero_and_one_special_encodings; class_floor_measured_at_preparation; independent_transactions"
+        "chio.sqlite.split-same-key-frame-price.v1; bundled3.51.3; auto_vacuum_none; recipe_proves_new_record_identical_except_generation_column; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; same_width_in_place_no_allocation_dirties_only_differing_pages; growing_drop_insert_cascade; balance_level7_children_nb_plus_2_parent_freelist_trunk; growth2_pages_per_level_plus_per_row_overflow_slack; same_width_one_image_set_plus_row_slack; growing_old_and_new_images; zero_and_one_special_encodings; class_floor_measured_at_preparation; independent_transactions"
     );
     assert_eq!(
         SqliteTransactionWriteShapeData::no_spill_descriptor(),
@@ -325,7 +325,7 @@ fn every_calculator_descriptor_is_its_exact_v1_identity() {
 
 #[test]
 fn an_observed_root_leaf_is_priced_only_without_spilling() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let shape = transaction(vec![SqliteTreeWriteShapeData::observed_root_leaf()])?;
     // Page one, the final original freelist trunk, one slack frame and the
     // single root page.
@@ -391,7 +391,7 @@ fn retained_rows_bound_the_cursor_up_to_the_maximum_depth() -> Result<(), String
     ] {
         assert_eq!(levels(rows)?, expected, "rows {rows}");
     }
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let price = |tree| price_transaction_write_shape(&profile, &transaction(vec![tree])?);
     let unbounded = price(SqliteTreeWriteShapeData::fresh_insertions(64, 1)?)?;
     let bounded =
@@ -406,7 +406,7 @@ fn retained_rows_bound_the_cursor_up_to_the_maximum_depth() -> Result<(), String
 
 #[test]
 fn a_singleton_record_must_fit_its_fixed_root() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(512, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(512, 0, 0)?;
     let fits = transaction(vec![SqliteTreeWriteShapeData::singleton_root(412, 3)?])?;
     assert_eq!(
         price_transaction_write_shape(&profile, &fits)?,
@@ -430,7 +430,7 @@ fn a_singleton_record_must_fit_its_fixed_root() -> Result<(), String> {
 
 #[test]
 fn every_price_and_growth_sum_refuses_exhaustion() -> Result<(), String> {
-    let profile = SqliteFramePriceProfileData::checked(4096, 0)?;
+    let profile = SqliteFramePriceProfileData::checked(4096, 0, 0)?;
     let walks = transaction(vec![SqliteTreeWriteShapeData::same_key_rewrites(
         u64::MAX,
         1,
@@ -467,5 +467,25 @@ fn every_price_and_growth_sum_refuses_exhaustion() -> Result<(), String> {
     );
     // The frame count fits, but its byte product does not.
     refused(profile.price_frames(u64::MAX / 4120), PRODUCT_EXHAUSTED);
+    Ok(())
+}
+
+#[test]
+fn frame_profiles_require_auto_vacuum_none_after_geometry() -> Result<(), String> {
+    let refusal = "SQLite frame price requires auto-vacuum NONE";
+    for page_size in [512, 4096, 65_536] {
+        SqliteFramePriceProfileData::checked(page_size, 0, 0)?;
+    }
+    for mode in [1, 2, 3, u64::MAX] {
+        refused(SqliteFramePriceProfileData::checked(4096, 0, mode), refusal);
+        refused(
+            SqliteFramePriceProfileData::checked(1000, 0, mode),
+            UNSUPPORTED_GEOMETRY,
+        );
+        refused(
+            SqliteFramePriceProfileData::checked(4096, 32, mode),
+            UNSUPPORTED_GEOMETRY,
+        );
+    }
     Ok(())
 }

@@ -30,10 +30,18 @@ const SPLIT_NEW_PAGES_PER_LEVEL: u64 = 2;
 /// A singleton record must fit its fixed root after the largest page
 /// header, page one's 100-byte database header.
 const PAGE_ONE_HEADER_BYTES: u64 = 100;
+/// `PRAGMA auto_vacuum` value of NONE.
+const AUTO_VACUUM_NONE: u64 = 0;
 
-/// Mathematical inputs for the pinned bundled SQLite frame calculation.
-/// The owning adapter separately verifies its actual file, UTF-8 row codec,
-/// FULL WAL, auto-vacuum policy, source cut, and complete writer catalog.
+/// Mathematical inputs for the pinned bundled SQLite frame calculation: page
+/// geometry and the observed `auto_vacuum` mode, which must be NONE (0).
+/// Every price and page-growth bound holds only for that mode; pointer-map
+/// pages, commit-time page relocation and incremental vacuum are outside
+/// every term. These inputs are unauthenticated data. The owning adapter
+/// reads them from its verified actual file before selecting any price, and
+/// separately verifies FULL WAL, the source cut, the complete writer catalog
+/// and stored-row byte bounds in the file's authenticated text encoding. The
+/// calculator takes byte counts and is encoding agnostic.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SqliteFramePriceProfileData {
     page_size: u64,
@@ -41,13 +49,17 @@ pub struct SqliteFramePriceProfileData {
 
 impl SqliteFramePriceProfileData {
     /// Refuses every page size other than a power of two from 512 to 65536
-    /// bytes, and every nonzero reserved region.
-    pub fn checked(page_size: u64, reserved_bytes: u64) -> Result<Self, String> {
+    /// bytes and every nonzero reserved region, then every `auto_vacuum`
+    /// mode other than NONE (0), including FULL (1) and INCREMENTAL (2).
+    pub fn checked(page_size: u64, reserved_bytes: u64, auto_vacuum: u64) -> Result<Self, String> {
         if !(512..=65_536).contains(&page_size)
             || !page_size.is_power_of_two()
             || reserved_bytes != 0
         {
             return Err("SQLite frame price geometry is unsupported".to_owned());
+        }
+        if auto_vacuum != AUTO_VACUUM_NONE {
+            return Err("SQLite frame price requires auto-vacuum NONE".to_owned());
         }
         Ok(Self { page_size })
     }
@@ -89,6 +101,8 @@ enum TreeKindData {
 }
 
 /// One table or index tree, including every repeated actual producer mutation.
+/// Every attempted producer mutation counts, including writes a statement or
+/// savepoint rollback later discards; discarded writes earn no credit.
 /// Each mutable index is a distinct descriptor. WITHOUT ROWID primary keys
 /// belong to the table tree and must not be counted as an extra index.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -346,14 +360,14 @@ impl SqliteTransactionWriteShapeData {
     /// with `price_within_pages` or a same-key rewrite shape binds this beside
     /// `write_price_algorithm_descriptor`.
     pub fn page_bounded_descriptor() -> &'static str {
-        "chio.sqlite.page-bounded-frame-price.v1; bundled3.51.3; same_key_rewrite_one_balance_walk; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; dirty_pages_at_most_file_pages_with_cache_spill_off; growth=balance_plus_overflow_allocations+lock_byte_page; independent_transactions"
+        "chio.sqlite.page-bounded-frame-price.v1; bundled3.51.3; auto_vacuum_none; same_key_rewrite_one_balance_walk; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; dirty_pages_at_most_file_pages_with_cache_spill_off; growth=balance_plus_overflow_allocations+lock_byte_page; independent_transactions"
     }
 
     /// Identity of the split same-key rewrite price. A source recipe that
     /// prices a fan-out with `same_key_rewrites_class_split` binds this beside
     /// `write_price_algorithm_descriptor` and the page-bounded descriptor.
     pub fn split_same_key_rewrites_descriptor() -> &'static str {
-        "chio.sqlite.split-same-key-frame-price.v1; bundled3.51.3; recipe_proves_new_record_identical_except_generation_column; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; same_width_in_place_no_allocation_dirties_only_differing_pages; growing_drop_insert_cascade; balance_level7_children_nb_plus_2_parent_freelist_trunk; growth2_pages_per_level_plus_per_row_overflow_slack; same_width_one_image_set_plus_row_slack; growing_old_and_new_images; zero_and_one_special_encodings; class_floor_measured_at_preparation; independent_transactions"
+        "chio.sqlite.split-same-key-frame-price.v1; bundled3.51.3; auto_vacuum_none; recipe_proves_new_record_identical_except_generation_column; recipe_proves_unchanged_key_no_rewritten_column_index_no_fk_delete_reinsert; same_width_in_place_no_allocation_dirties_only_differing_pages; growing_drop_insert_cascade; balance_level7_children_nb_plus_2_parent_freelist_trunk; growth2_pages_per_level_plus_per_row_overflow_slack; same_width_one_image_set_plus_row_slack; growing_old_and_new_images; zero_and_one_special_encodings; class_floor_measured_at_preparation; independent_transactions"
     }
 
     /// A no-spill transaction with auto-vacuum disabled writes each dirty
@@ -465,7 +479,7 @@ impl SqliteTransactionWritePriceData {
 /// Calculator identity to bind into the actual source profile. It identifies
 /// the bound, not a supported producer or a funded loan.
 pub fn write_price_algorithm_descriptor() -> &'static str {
-    "chio.sqlite.transaction-frame-price.v1; bundled3.51.3; depth20; balance6; newwalk1; existingwalk3; allocation_or_free2; frame24; header32; FULL_sector65536; reserved0; before_or_intermediate_overflow; ambiguous_new_rewrites_existing_cost; explicit_fresh_insertions; independent_transactions"
+    "chio.sqlite.transaction-frame-price.v1; bundled3.51.3; depth20; balance6; newwalk1; existingwalk3; allocation_or_free2; frame24; header32; FULL_sector65536; reserved0; auto_vacuum_none; before_or_intermediate_overflow; ambiguous_new_rewrites_existing_cost; explicit_fresh_insertions; independent_transactions"
 }
 
 /// Payload bytes one overflow page carries: `usableSize - 4`.

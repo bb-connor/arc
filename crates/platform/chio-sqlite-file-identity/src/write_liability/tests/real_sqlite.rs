@@ -26,6 +26,20 @@ fn open_flow_contexts(
     Ok(connection)
 }
 
+/// The frame profile of `connection`'s actual file, with its queried
+/// `auto_vacuum` mode.
+fn observed_profile(
+    connection: &rusqlite::Connection,
+    page_size: u64,
+) -> Result<SqliteFramePriceProfileData, Box<dyn std::error::Error>> {
+    let mode: i64 = connection.query_row("PRAGMA auto_vacuum", [], |row| row.get(0))?;
+    Ok(SqliteFramePriceProfileData::checked(
+        page_size,
+        0,
+        u64::try_from(mode)?,
+    )?)
+}
+
 fn page_count(connection: &rusqlite::Connection) -> Result<u64, Box<dyn std::error::Error>> {
     Ok(u64::try_from(connection.query_row(
         "PRAGMA page_count",
@@ -125,7 +139,7 @@ fn no_spill_price_preserves_overflow_and_freelist_writes() -> TestResult {
                 )?;
             }
             tx.commit()?;
-            let profile = SqliteFramePriceProfileData::checked(page_size, 0)?;
+            let profile = observed_profile(&connection, page_size)?;
             let shape = SqliteTransactionWriteShapeData::checked(vec![
                 SqliteTreeWriteShapeData::fresh_insertions(131072 + 32, 32)?
                     .within_retained_rows(64)?,
@@ -176,7 +190,7 @@ fn real_width_growing_rewrites_stay_within_the_page_bounded_price() -> TestResul
         drop(insert);
         connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
         let current = page_count(&connection)?;
-        let profile = SqliteFramePriceProfileData::checked(page_size, 0)?;
+        let profile = observed_profile(&connection, page_size)?;
         // Every record, before and after, encodes in at most 160 bytes.
         let shape = SqliteTransactionWriteShapeData::checked(vec![
             SqliteTreeWriteShapeData::same_key_rewrites(ROWS, ROWS * 160)?,
@@ -223,7 +237,7 @@ fn real_same_width_rewrites_stay_within_the_split_price() -> TestResult {
     }
     drop(insert);
     connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
-    let profile = SqliteFramePriceProfileData::checked(PAGE, 0)?;
+    let profile = observed_profile(&connection, PAGE)?;
     let row_bytes = ROWS * 1600;
     let split = |growing: u64| {
         SqliteTransactionWriteShapeData::checked(vec![
@@ -286,7 +300,7 @@ fn real_spilled_generation_rewrites_stay_within_the_split_and_same_key_prices() 
     }
     drop(insert);
     connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
-    let profile = SqliteFramePriceProfileData::checked(PAGE, 0)?;
+    let profile = observed_profile(&connection, PAGE)?;
     // Every row's session alone spills past one 508-byte chain page, and
     // every record encodes in at most 1100 bytes at any generation.
     let row_bytes = ROWS * 1100;
@@ -421,12 +435,12 @@ fn a_self_referencing_foreign_key_turns_an_equal_size_rewrite_into_delete_and_re
     // Generations 3 and 2 share the one-byte serial class, so every record
     // keeps its exact encoded size.
     assert_eq!(width(3)?, width(2)?);
-    let profile = SqliteFramePriceProfileData::checked(PAGE, 0)?;
     let mut measured = Vec::new();
     for foreign_keys in [false, true] {
         let directory = tempfile::tempdir()?;
         let path = directory.path().join("self_referencing.sqlite3");
         let connection = open_self_referencing(&path, foreign_keys)?;
+        let profile = observed_profile(&connection, PAGE)?;
         let enabled: i64 = connection.query_row("PRAGMA foreign_keys", [], |row| row.get(0))?;
         assert_eq!(enabled, i64::from(u8::from(foreign_keys)));
         assert_eq!(generations_equal_to(&connection, 3)?, 64);
@@ -584,7 +598,7 @@ fn real_per_row_overflow_rounding_needs_the_per_row_image_slack() -> TestResult 
 
     assert!(width(2)? < width(128)?);
     let total = ROWS * after_payload;
-    let profile = SqliteFramePriceProfileData::checked(PAGE, 0)?;
+    let profile = observed_profile(&connection, PAGE)?;
     let shape = SqliteTransactionWriteShapeData::checked(vec![
         SqliteTreeWriteShapeData::same_key_rewrites_class_split(ROWS, total, ROWS)?,
     ])?;
@@ -621,5 +635,33 @@ fn real_per_row_overflow_rounding_needs_the_per_row_image_slack() -> TestResult 
     // priced per-row slack covers them.
     assert!(pages > total.div_ceil(payload));
     assert!(pages <= total.div_ceil(payload) + ROWS);
+    Ok(())
+}
+
+/// The profile accepts only the `auto_vacuum` mode queried from the actual
+/// file: NONE prices, FULL and INCREMENTAL refuse before any price exists.
+#[test]
+fn queried_auto_vacuum_mode_selects_or_refuses_the_frame_profile() -> TestResult {
+    for (setting, mode) in [("NONE", 0_i64), ("FULL", 1), ("INCREMENTAL", 2)] {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("vacuum.sqlite3");
+        let connection = rusqlite::Connection::open(&path)?;
+        connection.execute_batch(&format!(
+            "PRAGMA page_size = 4096; PRAGMA auto_vacuum = {setting};
+             PRAGMA journal_mode = WAL;
+             CREATE TABLE vacuumed (id INTEGER PRIMARY KEY, body BLOB NOT NULL);"
+        ))?;
+        let queried: i64 = connection.query_row("PRAGMA auto_vacuum", [], |row| row.get(0))?;
+        assert_eq!(queried, mode, "auto_vacuum {setting}");
+        match (mode, observed_profile(&connection, 4096)) {
+            (0, Ok(_)) => {}
+            (_, Err(error))
+                if mode != 0
+                    && error.to_string() == "SQLite frame price requires auto-vacuum NONE" => {}
+            (_, other) => {
+                return Err(format!("auto_vacuum {setting} produced {other:?}").into());
+            }
+        }
+    }
     Ok(())
 }
