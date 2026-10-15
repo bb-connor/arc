@@ -2633,9 +2633,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history/lease.rs"
 rust_symbols = ["LeaseHistory::validate_operation"]
-normalized_sha256 = "a8f5723910df52b70fc5c07d2218d5e17773c649484788519894bc41dae09683"
+normalized_sha256 = "cc3e1c4306231db4a6e35665b892824a962d669d5dd5c29528b1478d417b76b3"
 symbol_sha256 = [
-  { symbol = "LeaseHistory::validate_operation", sha256 = "837706358975806da23b5bc2c58ca48672b654fb0846739ee6f5cfcb7e1c6a34" },
+  { symbol = "LeaseHistory::validate_operation", sha256 = "cb176f898b73d2b299402febb01830ac7620c94d38e3bf2e0db026ea2213e704" },
 ]
 
 [[mirror]]
@@ -2983,7 +2983,7 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs"
 rust_symbols = ["Record","FORMAT","INPUT_FORMAT","MAX_RECORD_BYTES","Record::join_record","Record::input_record","Record::bytes","Record::digest","Record::validate","Record::insert","format","load","head","load_for_operation"]
-normalized_sha256 = "3afeebeab282170cf95cca44250594f1d1c8a22620f091b66f140b19e4dbb160"
+normalized_sha256 = "50cbe91884c3f3d325476ccb5d47f700ba85d6fa9017d73de02f02af132d5096"
 symbol_sha256 = [
   { symbol = "Record", sha256 = "069a9c682eafec02ac99481b79ad763f5d0b5d4456789b539b38d7b73a5e4617" },
   { symbol = "FORMAT", sha256 = "1d499af20c0d3463a84cd55e3b54116ae024a6f52c0a66e879140abbbf96f30a" },
@@ -2996,9 +2996,9 @@ symbol_sha256 = [
   { symbol = "Record::validate", sha256 = "78f0d0718787655a737d0031a9570a0a8e63f492f37881c318688e9c289eb930" },
   { symbol = "Record::insert", sha256 = "3a46c0b7266f6cdf262534f1b6fd0febb97090c471ee85e1d40d03d48234b4a4" },
   { symbol = "format", sha256 = "850b37895d3d49e6d30ce5d397d637918b98b157b593f1dac90c5edb1a3270b1" },
-  { symbol = "load", sha256 = "07580e8a6b4440b20b8001914c6979d4a6486984c0b6ef6c29509e505303db4c" },
+  { symbol = "load", sha256 = "9d9db10decf0fcb6c27c69489a4d7fb67a161460a2fe61feae437b0f798d5cab" },
   { symbol = "head", sha256 = "6f7bdc15aac78900c674807d2bdfedd776c7fe926df563d7b52bc46ac44d27ce" },
-  { symbol = "load_for_operation", sha256 = "0694f5ada9b4f65cf1d36e84da281fd5e9dc7f2a112274554b7129fb0147d8f9" },
+  { symbol = "load_for_operation", sha256 = "d32e19f7acf3d3b047597ed4670ab710376d0f32b1e43c1c93f029de41588fc0" },
 ]
 
 # Signed-expiry standalone nonce custody replaced the deferred legacy path.
@@ -3084,11 +3084,11 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_dispatch.rs"
 rust_symbols = ["verify_native_security_dispatch_tx","verify_dispatch_capture_owner_tx","verify_native_dispatch_capture_owner_tx"]
-normalized_sha256 = "9fa92d062489537d8cf7a4f94c0862f12fac682de8d69603ebe3f82f8c38c9b2"
+normalized_sha256 = "e0d8417c6b5c41a2e7250b1c7129c62d119f48bed52eb209e0d314a0d3dc728b"
 symbol_sha256 = [
   { symbol = "verify_native_security_dispatch_tx", sha256 = "3173fe66f2f15c0c4123eac4bbf9be2ad0d751a2e2b2c2346df27510bb7596ba" },
   { symbol = "verify_dispatch_capture_owner_tx", sha256 = "007e5e173cb023f422876c78107b49f0e4dd6c9c044edcd3be7b7ced703eaed6" },
-  { symbol = "verify_native_dispatch_capture_owner_tx", sha256 = "1a981878ae1da95a795f1a1871e0b4dff416aa79637281ef0893e9b9a5a4b296" },
+  { symbol = "verify_native_dispatch_capture_owner_tx", sha256 = "749aafad564a186ce7b0a09900e55e8f43d40269573f61c2fff0338715ed6f52" },
 ]
 
 [[mirror]]
@@ -3248,13 +3248,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/storage.rs"
 rust_symbols = ["current_operation","load","verify_coverage","verify_reference","verify_all"]
-normalized_sha256 = "7bf393b403d2505e26786cfd947440683cec2a436bae899756fe5b3eb3c23e9a"
+normalized_sha256 = "a3b46418ea11db78a06860898b496f5a00ab930af3fd6e7cfa6181d1c17a4de9"
 symbol_sha256 = [
   { symbol = "current_operation", sha256 = "453457352380eff7afdb8f32dd9dbe6d7861009e36a724c694f78018e2e3f92f" },
-  { symbol = "load", sha256 = "239d8823ddaf9a9851a82c3c74c12f26e9ec3a0acc1aab6c8ff51b899dcf1d44" },
+  { symbol = "load", sha256 = "50dca3a60dcdf03f0140b263c391bbdbd6693cb8da3e9ac54778b6b4fb23f0d1" },
   { symbol = "verify_coverage", sha256 = "57b5a7d6800bb8489978915d549b6b3fe41fad1a5fde95f52f3f50e93fba2ef8" },
   { symbol = "verify_reference", sha256 = "e56836a9101e1a44fa371da73115080b7bc6379c53a8d303be9c7751f6fccef4" },
-  { symbol = "verify_all", sha256 = "c19192f162fc47511bf11d315ad26a3058640153520d3e74e295435b149383a2" },
+  { symbol = "verify_all", sha256 = "f9a31a75bc6bbba956c0da18198074754116c28b327d8679084aca3aec9daed6" },
 ]
 
 [[mirror]]
@@ -4174,14 +4174,14 @@ rust_symbols = [
   "latest",
   "verify_reference",
 ]
-normalized_sha256 = "acf2bc1496c5862028b2ab8048194c6907aa1fbe0171659766beac13103518f0"
+normalized_sha256 = "272554ea13643b9314baf6ffcebe7d9e99df310665aefcfe3c92f531ecefee44"
 symbol_sha256 = [
   { symbol = "FORMAT", sha256 = "0f51d5e826eca281f8f8cdf553a7dc3063d4c33e910f9cbf1de2c99c83487c00" },
   { symbol = "DELTA_FORMAT", sha256 = "5f9949236468aab917bca411a378a5e2734bc0276806af681a38eac8106e9d8e" },
   { symbol = "Record", sha256 = "854baa05328e046655ee9dbc200e55d262777b14381355b42b735453454d6041" },
   { symbol = "Record::format", sha256 = "6bfa1dacf2b8d14bd4d90075723ebe98f17369af6ed38bbf4aa92f41edca613f" },
   { symbol = "Record::bytes", sha256 = "767444cf60f94e9aeb6a435821ebe57b27830f4d9ad10c39deb237150e4185db" },
-  { symbol = "Record::validate", sha256 = "83361ac0c0ba1a0f027ca4eebe221ee6191ae7728163493ff76f85be0845c5f7" },
+  { symbol = "Record::validate", sha256 = "46eb842a9f7f4f8e59230454263afc522cf36d79e3bfa300d98e5e67c77ca5ff" },
   { symbol = "load_local", sha256 = "ee1321314380a1957314bbf3fa2c866a76fe2bd1c00778cb96ed515fda99e593" },
   { symbol = "latest", sha256 = "23da581fe619ddb1d558888864c2264a1ce42764aa5649b81a3d340314c76cd4" },
   { symbol = "verify_reference", sha256 = "3aaa49caed13e1996bc0297d80a5fad9cce7da7d87949e07f1559cae479921ec" },

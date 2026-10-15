@@ -1,23 +1,21 @@
 use super::*;
 
 #[test]
-fn observed_clock_is_authenticated_and_cannot_be_removed_or_forged() -> AnchoredTestResult {
-    for replacement in ["NULL", "observed_at_unix_ms + 1"] {
-        let fixture = fixture();
-        let operation = prepared_operation(
-            &fixture.fence,
-            AdmissionOperationKind::ToolDispatch,
-            "tamper-clock",
-            "tamper-cap",
-        );
-        fixture.store.begin(&operation, &fixture.fence, now_ms())?;
-        let connection = fixture.store.connection()?;
-        connection.execute_batch("DROP TRIGGER admission_operation_commits_immutable;")?;
-        connection.execute_batch(&format!(
-            "UPDATE admission_operation_commits SET observed_at_unix_ms = {replacement};"
-        ))?;
-        assert!(verify_admission_commit_chain(&connection).is_err());
-    }
+fn observed_clock_is_authenticated_and_cannot_be_forged() -> AnchoredTestResult {
+    let fixture = fixture();
+    let operation = prepared_operation(
+        &fixture.fence,
+        AdmissionOperationKind::ToolDispatch,
+        "tamper-clock",
+        "tamper-cap",
+    );
+    fixture.store.begin(&operation, &fixture.fence, now_ms())?;
+    let connection = fixture.store.connection()?;
+    connection.execute_batch("DROP TRIGGER admission_operation_commits_immutable;")?;
+    connection.execute_batch(
+        "UPDATE admission_operation_commits SET observed_at_unix_ms = observed_at_unix_ms + 1;",
+    )?;
+    assert!(verify_admission_commit_chain(&connection).is_err());
     Ok(())
 }
 

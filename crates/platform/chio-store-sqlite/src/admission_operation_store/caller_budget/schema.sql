@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS admission_operation_caller_shares (
         CHECK (parent_kind IN ('delegated', 'root', 'unresolved')),
     parent_capability_id TEXT CHECK (
         parent_capability_id IS NULL
-        OR length(CAST(parent_capability_id AS BLOB)) BETWEEN 1 AND 512
+        OR (length(parent_capability_id) BETWEEN 1 AND 512 AND octet_length(parent_capability_id) <= 2048 AND instr(parent_capability_id, char(0)) = 0)
     ),
     CHECK ((parent_kind = 'delegated') = (parent_capability_id IS NOT NULL))
 );

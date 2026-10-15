@@ -3097,22 +3097,22 @@
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
       "owner": "load",
-      "sha256": "3616a18da83b9264111488912746a61533a3536fb65f7196a983e79d73de0c19",
+      "sha256": "c3bd5ca5b6b4c39b069e3325c0bcfc615716ed2d021b035e444e9968e4f2400b",
       "tables": [
         "security_participant_state_mutations"
       ],
-      "sql": "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216 AND length(CAST(mutation_digest AS BLOB)) = 64 AND length(CAST(operation_id AS BLOB)) BETWEEN 1 AND 512 AND length(CAST(tenant_id AS BLOB)) BETWEEN 1 AND 512 AND length(CAST(transition_id AS BLOB)) BETWEEN 1 AND 512 THEN canonical_record END FROM security_participant_state_mutations WHERE security_authority_id = ?1 AND sequence = ?2",
+      "sql": "SELECT CASE WHEN typeof(canonical_record) = 'blob' AND length(canonical_record) BETWEEN 1 AND 16777216 AND typeof(mutation_digest) = 'text' AND length(mutation_digest) = 64 AND instr(mutation_digest, char(0)) = 0 AND typeof(operation_id) = 'text' AND length(operation_id) BETWEEN 1 AND 512 AND octet_length(operation_id) <= 2048 AND instr(operation_id, char(0)) = 0 AND typeof(tenant_id) = 'text' AND length(tenant_id) BETWEEN 1 AND 512 AND octet_length(tenant_id) <= 2048 AND instr(tenant_id, char(0)) = 0 AND typeof(transition_id) = 'text' AND length(transition_id) BETWEEN 1 AND 512 AND octet_length(transition_id) <= 2048 AND instr(transition_id, char(0)) = 0 THEN canonical_record END FROM security_participant_state_mutations WHERE security_authority_id = ?1 AND sequence = ?2",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/history.rs",
       "owner": "load_for_operation",
-      "sha256": "5f2f5daec8dff3556de63d2180576f10b42618d9b47775d0488fb77acac9be0d",
+      "sha256": "92b5d2a6c5a8a0f8584efcfd970108b47d4b4f961e29c88afa88aa2c97817cf5",
       "tables": [
         "security_participant_state_mutations"
       ],
-      "sql": "SELECT CASE WHEN length(CAST(security_authority_id AS BLOB)) BETWEEN 1 AND 512 THEN security_authority_id END, sequence FROM security_participant_state_mutations WHERE operation_id = ?1",
+      "sql": "SELECT CASE WHEN typeof(security_authority_id) = 'text' AND length(security_authority_id) BETWEEN 1 AND 512 AND octet_length(security_authority_id) <= 2048 AND instr(security_authority_id, char(0)) = 0 THEN security_authority_id END, sequence FROM security_participant_state_mutations WHERE operation_id = ?1",
       "principal": "kernel-admission",
       "contract": "Internal fenced admission/accounting state; this statement is not a tenant-facing lookup."
     },

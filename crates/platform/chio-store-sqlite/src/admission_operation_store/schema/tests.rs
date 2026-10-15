@@ -122,3 +122,28 @@ fn claim_rows_reject_replacement_mutation_and_unbounded_fields() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn commit_observed_clock_is_required() -> TestResult {
+    let catalog = Connection::open_in_memory()?;
+    catalog.execute_batch(&admission_operation_schema_sql()?)?;
+    let sql: String = catalog.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'admission_operation_commits'",
+        [],
+        |row| row.get(0),
+    )?;
+    let definition = crate::text_bounds_tests::column_definition(&sql, "observed_at_unix_ms")
+        .ok_or("observed_at_unix_ms is not defined")?;
+    let probe = Connection::open_in_memory()?;
+    probe.execute_batch(&format!("CREATE TABLE probe ({definition});"))?;
+    assert_eq!(probe.execute("INSERT INTO probe VALUES (1)", [])?, 1);
+    let error = probe
+        .execute("INSERT INTO probe VALUES (NULL)", [])
+        .err()
+        .ok_or("a commit without an observed clock was stored")?;
+    assert_eq!(
+        error.to_string(),
+        "NOT NULL constraint failed: probe.observed_at_unix_ms"
+    );
+    Ok(())
+}

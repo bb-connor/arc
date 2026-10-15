@@ -3,46 +3,46 @@
 CREATE TABLE IF NOT EXISTS dpop_replay_migration_expectations (
     dpop_authority_id TEXT NOT NULL PRIMARY KEY CHECK (
         typeof(dpop_authority_id) = 'text'
-        AND length(CAST(dpop_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(dpop_authority_id) = 'text' AND length(dpop_authority_id) BETWEEN 1 AND 512 AND octet_length(dpop_authority_id) <= 2048 AND instr(dpop_authority_id, char(0)) = 0
     ),
     source_instance_id TEXT NOT NULL UNIQUE CHECK (
         typeof(source_instance_id) = 'text'
-        AND length(CAST(source_instance_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(source_instance_id) = 'text' AND length(source_instance_id) BETWEEN 1 AND 512 AND octet_length(source_instance_id) <= 2048 AND instr(source_instance_id, char(0)) = 0
     ),
     expectation_id TEXT NOT NULL UNIQUE CHECK (
         typeof(expectation_id) = 'text'
-        AND length(CAST(expectation_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(expectation_id) = 'text' AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     destination_store_uuid TEXT NOT NULL CHECK (destination_store_uuid <> ''),
     canonical_source BLOB NOT NULL CHECK (
         typeof(canonical_source) = 'blob'
-        AND length(canonical_source) BETWEEN 1 AND 16777216
+        AND typeof(canonical_source) = 'blob' AND length(canonical_source) BETWEEN 1 AND 16777216
     ),
     inventory_sha256 TEXT NOT NULL CHECK (
-        length(inventory_sha256) = 64 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
+        typeof(inventory_sha256) = 'text' AND length(inventory_sha256) = 64 AND instr(inventory_sha256, char(0)) = 0 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     expectation_digest TEXT NOT NULL CHECK (
-        length(expectation_digest) = 64 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(expectation_digest) = 'text' AND length(expectation_digest) = 64 AND instr(expectation_digest, char(0)) = 0 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
     )
 ) WITHOUT ROWID;
 
 CREATE TABLE IF NOT EXISTS dpop_replay_migration_events (
     dpop_authority_id TEXT NOT NULL CHECK (
         typeof(dpop_authority_id) = 'text'
-        AND length(CAST(dpop_authority_id AS BLOB)) BETWEEN 1 AND 512
+        AND typeof(dpop_authority_id) = 'text' AND length(dpop_authority_id) BETWEEN 1 AND 512 AND octet_length(dpop_authority_id) <= 2048 AND instr(dpop_authority_id, char(0)) = 0
     ),
     sequence INTEGER NOT NULL CHECK (typeof(sequence) = 'integer' AND sequence BETWEEN 1 AND 3),
     mutation_kind TEXT NOT NULL CHECK (mutation_kind IN (
         'expect_dpop_replay_source', 'import_dpop_replay_source', 'activate_dpop_replay_source'
     )),
     expectation_digest TEXT NOT NULL CHECK (
-        length(expectation_digest) = 64 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(expectation_digest) = 'text' AND length(expectation_digest) = 64 AND instr(expectation_digest, char(0)) = 0 AND expectation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     inventory_sha256 TEXT NOT NULL CHECK (
-        length(inventory_sha256) = 64 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
+        typeof(inventory_sha256) = 'text' AND length(inventory_sha256) = 64 AND instr(inventory_sha256, char(0)) = 0 AND inventory_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     event_digest TEXT NOT NULL CHECK (
-        length(event_digest) = 64 AND event_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(event_digest) = 'text' AND length(event_digest) = 64 AND instr(event_digest, char(0)) = 0 AND event_digest NOT GLOB '*[^0-9a-f]*'
     ),
     observed_at_unix_ms INTEGER NOT NULL CHECK (
         typeof(observed_at_unix_ms) = 'integer'
@@ -67,19 +67,19 @@ CREATE TABLE IF NOT EXISTS dpop_replay_migration_events (
 
 CREATE TABLE IF NOT EXISTS dpop_replay_legacy_tombstones (
     dpop_authority_id TEXT NOT NULL CHECK (
-        typeof(dpop_authority_id) = 'text' AND length(CAST(dpop_authority_id AS BLOB)) BETWEEN 1 AND 512
+        typeof(dpop_authority_id) = 'text' AND length(dpop_authority_id) BETWEEN 1 AND 512 AND octet_length(dpop_authority_id) <= 2048 AND instr(dpop_authority_id, char(0)) = 0
     ),
     capability_id TEXT NOT NULL CHECK (
-        typeof(capability_id) = 'text' AND length(CAST(capability_id AS BLOB)) BETWEEN 0 AND 4096
+        typeof(capability_id) = 'text' AND length(capability_id) BETWEEN 0 AND 4096 AND octet_length(capability_id) <= 16384 AND instr(capability_id, char(0)) = 0
     ),
     nonce TEXT NOT NULL CHECK (
-        typeof(nonce) = 'text' AND length(CAST(nonce AS BLOB)) BETWEEN 0 AND 4096
+        typeof(nonce) = 'text' AND length(nonce) BETWEEN 0 AND 4096 AND octet_length(nonce) <= 16384 AND instr(nonce, char(0)) = 0
     ),
     source_instance_id TEXT NOT NULL CHECK (
-        typeof(source_instance_id) = 'text' AND length(CAST(source_instance_id AS BLOB)) BETWEEN 1 AND 512
+        typeof(source_instance_id) = 'text' AND length(source_instance_id) BETWEEN 1 AND 512 AND octet_length(source_instance_id) <= 2048 AND instr(source_instance_id, char(0)) = 0
     ),
     expectation_id TEXT NOT NULL CHECK (
-        typeof(expectation_id) = 'text' AND length(CAST(expectation_id AS BLOB)) BETWEEN 1 AND 512
+        typeof(expectation_id) = 'text' AND length(expectation_id) BETWEEN 1 AND 512 AND octet_length(expectation_id) <= 2048 AND instr(expectation_id, char(0)) = 0
     ),
     canonical_marker BLOB NOT NULL CHECK (
         typeof(canonical_marker) = 'blob' AND length(canonical_marker) BETWEEN 1 AND 131072

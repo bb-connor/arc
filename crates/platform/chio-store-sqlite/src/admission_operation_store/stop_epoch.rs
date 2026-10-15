@@ -19,12 +19,12 @@ CREATE TABLE IF NOT EXISTS admission_operation_stop_epochs (
     chain_generation INTEGER NOT NULL CHECK (chain_generation >= 1),
     epoch INTEGER NOT NULL CHECK (epoch >= 1),
     record_digest TEXT NOT NULL CHECK (
-        length(record_digest) = 64 AND record_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_digest TEXT NOT NULL CHECK (
-        length(previous_digest) = 64 AND previous_digest NOT GLOB '*[^0-9a-f]*'
+        typeof(previous_digest) = 'text' AND length(previous_digest) = 64 AND instr(previous_digest, char(0)) = 0 AND previous_digest NOT GLOB '*[^0-9a-f]*'
     ),
-    payload BLOB NOT NULL CHECK (length(payload) BETWEEN 1 AND 4096),
+    payload BLOB NOT NULL CHECK (typeof(payload) = 'blob' AND length(payload) BETWEEN 1 AND 4096),
     PRIMARY KEY (scope_key, chain_generation, epoch)
 );
 
@@ -44,8 +44,8 @@ CREATE TABLE IF NOT EXISTS admission_operation_stop_notes (
     scope_key TEXT NOT NULL CHECK (scope_key IN ('kernel')),
     chain_generation INTEGER NOT NULL CHECK (chain_generation >= 1),
     epoch INTEGER NOT NULL CHECK (epoch >= 1),
-    salt TEXT NOT NULL CHECK (length(salt) = 64 AND salt NOT GLOB '*[^0-9a-f]*'),
-    redacted_text TEXT NOT NULL CHECK (length(CAST(redacted_text AS BLOB)) <= 1024),
+    salt TEXT NOT NULL CHECK (typeof(salt) = 'text' AND length(salt) = 64 AND instr(salt, char(0)) = 0 AND salt NOT GLOB '*[^0-9a-f]*'),
+    redacted_text TEXT NOT NULL CHECK (typeof(redacted_text) = 'text' AND length(redacted_text) <= 1024 AND octet_length(redacted_text) <= 4096 AND instr(redacted_text, char(0)) = 0),
     PRIMARY KEY (scope_key, chain_generation, epoch)
 );
 "#;
