@@ -3,7 +3,7 @@ use crate::recovery::vector_test_fixture::{authority_fixture, seed_wire, TestRes
 use chio_core_types::{canonical_json_bytes, recovery::decode_contract};
 use serde_json::{json, Value};
 
-/// Typed canonical workflow over the REC-0a vector. Serde omits skipped
+/// Typed canonical workflow over the signed v1 vector. Serde omits skipped
 /// `None` fields, so the wire is re-serialized through the typed record before
 /// `decode_contract` compares canonical bytes.
 fn workflow_wire() -> TestResult<Value> {

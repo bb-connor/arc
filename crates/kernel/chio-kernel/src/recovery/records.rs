@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 pub const MAX_RECOVERY_WORKFLOWS: usize = 64;
 pub const MAX_RECOVERY_COMMANDS: usize = 4096;
-/// Native protected-record payload bound. The REC-0a wire codec has lower
+/// Native protected-record payload bound. The public wire codec has lower
 /// limits, so `decode_contract` is not the native record reader.
 pub const MAX_RECOVERY_RECORD_BYTES: usize = 262_144;
 pub const MAX_RECOVERY_REVIEW_MS: u64 = 900_000;
