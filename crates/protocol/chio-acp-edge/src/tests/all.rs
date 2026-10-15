@@ -1066,39 +1066,20 @@ mod tests {
         tool_name: &str,
         arguments: &Value,
         nonce: &str,
-    ) -> dpop::DpopProof {
-        dpop_proof_for_request_issued_at(
-            agent,
-            capability,
-            server_id,
-            tool_name,
-            arguments,
-            nonce,
-            current_unix_timestamp(),
-        )
-    }
-
-    fn dpop_proof_for_request_issued_at(
-        agent: &Keypair,
-        capability: &CapabilityToken,
-        server_id: &str,
-        tool_name: &str,
-        arguments: &Value,
-        nonce: &str,
-        issued_at: u64,
+        authority: &dpop::authority::DpopReplayAuthority,
     ) -> dpop::DpopProof {
         let args_bytes = chio_core::canonical::canonical_json_bytes(arguments)
             .test_expect("arguments should serialize to canonical JSON");
         let action_hash = chio_core::crypto::sha256_hex(&args_bytes);
         let body = dpop::DpopProofBody {
-            replay_authority: None,
+            replay_authority: authority.clone(),
             schema: dpop::DPOP_SCHEMA.to_string(),
             capability_id: capability.id.clone(),
             tool_server: server_id.to_string(),
             tool_name: tool_name.to_string(),
             action_hash,
             nonce: nonce.to_string(),
-            issued_at,
+            issued_at: current_unix_timestamp(),
             agent_key: agent.public_key(),
         };
         dpop::DpopProof::sign(body, agent).test_expect("DPoP proof should sign")
@@ -3404,9 +3385,9 @@ mod tests {
         assert!(response.local_error().is_some());
     }
 
-    #[path = "original_input.rs"]
-    mod original_input;
     #[path = "document_input.rs"]
     mod document_input;
+    #[path = "original_input.rs"]
+    mod original_input;
     include!("config_and_serde.rs");
 }

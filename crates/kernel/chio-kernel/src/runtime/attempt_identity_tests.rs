@@ -69,7 +69,7 @@ fn fully_populated_request() -> Result<ToolCallRequest, Box<dyn std::error::Erro
         dpop_proof: Some(DpopProof::sign(
             DpopProofBody {
                 schema: DPOP_SCHEMA.into(),
-                replay_authority: None,
+                replay_authority: crate::dpop::test_authority(),
                 capability_id: "capability-identity".into(),
                 tool_server: "server-identity".into(),
                 tool_name: "tool-identity".into(),

@@ -113,7 +113,7 @@ fn kg2_build_kernel_follows_both_import_paths_and_retains_receipt_evidence() -> 
     let admission = crate::DurableAdmissionRuntime::open(&root.path().join("admission.db"))?;
     let receipt_signer = admission.kernel_keypair();
     let mut kernel = crate::build_kernel(crate::policy::load_policy(&policy)?, &receipt_signer);
-    admission.attach(&mut kernel)?;
+    admission.attach(&mut kernel, None)?;
     let fault = Arc::new(FaultClock {
         failed: AtomicBool::new(false),
         inner: chio_test_support::clock::clock(),

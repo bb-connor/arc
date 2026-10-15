@@ -84,8 +84,11 @@ bool valid_authority(const DpopReplayAuthority& authority) {
          authority.max_clock_skew_secs <= 300;
 }
 
-Result<DpopProof> sign_proof(const DpopSignParams& params, const DpopReplayAuthority* authority) {
-  if (authority && !valid_authority(*authority)) {
+}  // namespace
+
+Result<DpopProof> sign_dpop_proof(const DpopSignParams& params,
+                                const DpopReplayAuthority& authority) {
+  if (!valid_authority(authority)) {
     return Result<DpopProof>::failure(Error{ErrorCode::Protocol, "invalid durable DPoP authority"});
   }
   auto canonical_args = invariants::canonicalize_json(params.action_args_json);
@@ -110,8 +113,8 @@ Result<DpopProof> sign_proof(const DpopSignParams& params, const DpopReplayAutho
 
   const auto nonce = params.nonce.empty() ? detail::random_hex(16) : params.nonce;
   const auto issued_at = params.issued_at == 0 ? now_unix_secs() : params.issued_at;
-  if (authority && (issued_at > 9007199254740ULL - authority->proof_ttl_secs ||
-                    nonce.size() > 4096 || params.capability_id.size() > 4096)) {
+  if (issued_at > 9007199254740ULL - authority.proof_ttl_secs ||
+      nonce.size() > 4096 || params.capability_id.size() > 4096) {
     return Result<DpopProof>::failure(Error{ErrorCode::Protocol, "durable DPoP identity or clock bound exceeded"});
   }
 
@@ -121,16 +124,14 @@ Result<DpopProof> sign_proof(const DpopSignParams& params, const DpopReplayAutho
        << "\"agent_key\":" << detail::quote(agent_key) << ","
        << "\"capability_id\":" << detail::quote(params.capability_id) << ","
        << "\"issued_at\":" << issued_at << ","
-       << "\"nonce\":" << detail::quote(nonce) << ",";
-  if (authority) {
-    body << "\"replay_authority\":{"
-         << "\"destination_store_uuid\":" << detail::quote(authority->destination_store_uuid) << ","
-         << "\"dpop_authority_id\":" << detail::quote(authority->dpop_authority_id) << ","
-         << "\"expectation_id\":" << detail::quote(authority->expectation_id) << ","
-         << "\"max_clock_skew_secs\":" << authority->max_clock_skew_secs << ","
-         << "\"proof_ttl_secs\":" << authority->proof_ttl_secs << "},";
-  }
-  body << "\"schema\":" << detail::quote(authority ? "chio.dpop_proof.v2" : "chio.dpop_proof.v1") << ","
+       << "\"nonce\":" << detail::quote(nonce) << ","
+       << "\"replay_authority\":{"
+       << "\"destination_store_uuid\":" << detail::quote(authority.destination_store_uuid) << ","
+       << "\"dpop_authority_id\":" << detail::quote(authority.dpop_authority_id) << ","
+       << "\"expectation_id\":" << detail::quote(authority.expectation_id) << ","
+       << "\"max_clock_skew_secs\":" << authority.max_clock_skew_secs << ","
+       << "\"proof_ttl_secs\":" << authority.proof_ttl_secs << "},"
+       << "\"schema\":" << detail::quote("chio.dpop_proof.v1") << ","
        << "\"tool_name\":" << detail::quote(params.tool_name) << ","
        << "\"tool_server\":" << detail::quote(params.tool_server) << "}";
 
@@ -145,17 +146,6 @@ Result<DpopProof> sign_proof(const DpopSignParams& params, const DpopReplayAutho
   }
 
   return Result<DpopProof>::success(DpopProof{body.str(), signature});
-}
-
-}  // namespace
-
-Result<DpopProof> sign_dpop_proof(const DpopSignParams& params) {
-  return sign_proof(params, nullptr);
-}
-
-Result<DpopProof> sign_authority_dpop_proof(const DpopSignParams& params,
-                                          const DpopReplayAuthority& authority) {
-  return sign_proof(params, &authority);
 }
 
 }  // namespace chio

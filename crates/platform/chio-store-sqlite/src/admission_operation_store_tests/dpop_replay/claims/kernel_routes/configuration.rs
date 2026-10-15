@@ -30,7 +30,7 @@ fn configuring_a_domain_requires_prior_activation_and_cannot_change_it() -> Anch
         "serving selection never reopens the retired source"
     );
     let replacement =
-        DpopReplayAuthorityV1::new(chio_kernel::dpop::authority::DpopReplayAuthorityInputV1 {
+        DpopReplayAuthority::new(chio_kernel::dpop::authority::DpopReplayAuthorityInput {
             destination_store_uuid: domain.destination_store_uuid().clone(),
             dpop_authority_id: domain.dpop_authority_id().clone(),
             expectation_id: domain.expectation_id().clone(),

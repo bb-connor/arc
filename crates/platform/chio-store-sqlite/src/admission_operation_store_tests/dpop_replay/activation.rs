@@ -1,10 +1,10 @@
 use super::*;
-use chio_kernel::dpop::authority::{DpopReplayAuthorityInputV1, DpopReplayAuthorityV1};
+use chio_kernel::dpop::authority::{DpopReplayAuthority, DpopReplayAuthorityInput};
 
 pub(super) fn domain(
     record: &DpopReplayMigrationRecordV1,
-) -> AnchoredTestResult<DpopReplayAuthorityV1> {
-    Ok(DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+) -> AnchoredTestResult<DpopReplayAuthority> {
+    Ok(DpopReplayAuthority::new(DpopReplayAuthorityInput {
         destination_store_uuid: identifier(
             "destination",
             record.snapshot().destination_authority_id(),
@@ -19,7 +19,7 @@ pub(super) fn domain(
 fn activate(
     fixture: &Fixture,
     source: &dyn DpopReplaySourcePort,
-    domain: &DpopReplayAuthorityV1,
+    domain: &DpopReplayAuthority,
 ) -> Result<DpopReplayMigrationRecordV1, AdmissionOperationStoreError> {
     fixture
         .store
@@ -125,7 +125,7 @@ fn activation_rejects_wrong_generation_stale_owner_and_policy_replacement() -> A
     let domain = domain(&imported)?;
     let mut wrong: serde_json::Value = serde_json::to_value(&domain)?;
     wrong["expectation_id"] = "b".repeat(64).into();
-    let wrong: DpopReplayAuthorityV1 = serde_json::from_value(wrong)?;
+    let wrong: DpopReplayAuthority = serde_json::from_value(wrong)?;
     let calls = source.calls().len();
     assert!(activate(&fixture, &source, &wrong).is_err());
     let mut stale = fixture.fence.clone();

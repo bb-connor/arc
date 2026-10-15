@@ -16,11 +16,12 @@ JSON, SHA-256, Ed25519 signing, and signed Chio artifact verification.
 - `chio::ReceiptQueryClient` for receipt query API calls.
 - `chio::invariants::*` for canonical JSON, SHA-256, Ed25519, capability,
   receipt, and manifest verification.
-- `chio::DpopProof` and `chio::sign_dpop_proof` for Chio DPoP request proofs.
-- `chio::sign_authority_dpop_proof` for the explicit v2 durable proof domain.
-  It signs an independently configured `DpopReplayAuthority`, not a caller's
-  claim of activation. Legacy v1 verifiers reject this profile, and signing
-  does not reserve a nonce or authorize execution.
+- `chio::DpopProof` and `chio::sign_dpop_proof(params, authority)` for
+  `chio.dpop_proof.v1` request proofs. The required `DpopReplayAuthority`
+  binds the independently configured destination, generation and freshness
+  policy. Obtain it from authenticated configuration. `DpopProofBuilder`
+  requires the same authority in its constructor. Signing does not prove
+  activation, reserve a replay nonce or authorize execution.
 - `chio::http::Evaluator` and HTTP request models for `spec/HTTP-SUBSTRATE.md`.
 
 ## Build

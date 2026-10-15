@@ -34,8 +34,7 @@ use chio_control_plane::trust_control::{
 };
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair};
 use chio_store_sqlite::{
-    FindingDisputeLockDisposition,
-    FindingOperatorBundleStoreError, SqliteAuthorityStore,
+    FindingDisputeLockDisposition, FindingOperatorBundleStoreError, SqliteAuthorityStore,
     SqliteFindingOperatorBundleStore, SqliteFindingOperatorPaymentAdapter,
     SqliteFindingPayloadStore, SqliteReceiptStore, TenantId, TenantKey,
 };
@@ -64,6 +63,7 @@ const SELLER_SUBMISSION_RESERVED_ENTRIES: u64 =
 const SELLER_RETRACTION_JOB_SCHEMA: &str = "chio.finding.seller-retraction-job.v1";
 const SELLER_PACKAGE_COMMAND_TIMEOUT: Duration = Duration::from_secs(330);
 const SELLER_ADMISSION_COMMAND_TIMEOUT: Duration = Duration::from_secs(300);
+const DPOP_AUTHORITY_ID: &str = "finding-operator-dpop";
 const INIT_COMPLETE_FILE: &str = "operator-init-complete.json";
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
@@ -952,6 +952,24 @@ pub(super) fn cmd_finding_operator_init(
     let paths = ResolvedOperatorPaths::new(directory, &profile.paths);
     SqliteAuthorityStore::provision(&paths.authority_database, &paths.authority_lock_root)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+    {
+        let clock = crate::cli::input::time::clock();
+        let authority = SqliteAuthorityStore::open_serving_with_clock(
+            &paths.authority_database,
+            &paths.authority_lock_root,
+            Arc::clone(&clock),
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        chio_control_plane::initialize_local_dpop_authority(
+            &authority,
+            &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "dpop_authority",
+                DPOP_AUTHORITY_ID,
+            )?,
+            &chio_kernel::DpopConfig::default(),
+            clock,
+        )?;
+    }
     initialize_operator_database(&paths.operator_database)?;
     SqliteReceiptStore::open(&paths.receipt_database)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
@@ -995,10 +1013,27 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
     set_operator_umask();
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
+    let clock = crate::cli::input::time::clock();
     let authority = Arc::new(
-        SqliteAuthorityStore::open_serving(&paths.authority_database, &paths.authority_lock_root)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        SqliteAuthorityStore::open_serving_with_clock(
+            &paths.authority_database,
+            &paths.authority_lock_root,
+            Arc::clone(&clock),
+        )
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?,
     );
+    let dpop_authority = {
+        chio_control_plane::load_local_dpop_authority(
+            &authority,
+            &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "dpop_authority",
+                DPOP_AUTHORITY_ID,
+            )?,
+            clock
+                .read()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?,
+        )?
+    };
     let resolver = Arc::new(
         FindingOperatorAuthorityStatusResolver::new(
             profile.market.authority_status.clone(),
@@ -1011,6 +1046,7 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
     let executor = Arc::new(
         FindingOperatorPurchaseExecutor::new(
             FindingOperatorPurchaseStorage {
+                dpop_authority,
                 authority: authority.clone(),
                 operator_db_path: paths.operator_database.clone(),
                 receipt_db_path: paths.receipt_database.clone(),

@@ -312,8 +312,8 @@ fn dpop_profile_removal_distinguishes_selected_authority_from_configuration() {
         }));
         if !selected {
             kernel.dpop_authority = Some(
-                crate::dpop::authority::DpopReplayAuthorityV1::new(
-                    crate::dpop::authority::DpopReplayAuthorityInputV1 {
+                crate::dpop::authority::DpopReplayAuthority::new(
+                    crate::dpop::authority::DpopReplayAuthorityInput {
                         destination_store_uuid: AdmissionIdentifier::try_new(
                             "store",
                             "11111111-1111-4111-8111-111111111111",

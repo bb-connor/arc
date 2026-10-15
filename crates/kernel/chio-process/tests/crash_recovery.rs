@@ -265,26 +265,31 @@ async fn subprocess_worker() -> Result {
     };
     let dir = PathBuf::from(dir);
     let phase = std::env::var("CHIO_PROCESS_TEST_PHASE")?;
-    let kernel = support::kernel_with_artifacts(
-        &dir,
-        Box::new(AppendServer {
-            path: dir.join("external.log"),
-            crash_after_effect: phase.starts_with("crash-artifact-")
-                || matches!(
-                    phase.as_str(),
-                    "crash-in-tool"
-                        | "crash-in-read"
-                        | "crash-granted-read"
-                        | "crash-known-read"
-                        | "crash-repeated-read"
-                        | "crash-quota-read"
-                        | "crash-monetary-read"
-                ),
-        }),
-        phase.ends_with("monetary-read"),
-        phase.ends_with("artifact-nonce"),
-        phase.ends_with("artifact-supplemental"),
-    )?;
+    let server = Box::new(AppendServer {
+        path: dir.join("external.log"),
+        crash_after_effect: phase.starts_with("crash-artifact-")
+            || matches!(
+                phase.as_str(),
+                "crash-in-tool"
+                    | "crash-in-read"
+                    | "crash-granted-read"
+                    | "crash-known-read"
+                    | "crash-repeated-read"
+                    | "crash-quota-read"
+                    | "crash-monetary-read"
+            ),
+    });
+    let kernel = if phase.ends_with("artifact-dpop") {
+        support::kernel_with_dpop(&dir, server)?
+    } else {
+        support::kernel_with_artifacts(
+            &dir,
+            server,
+            phase.ends_with("monetary-read"),
+            phase.ends_with("artifact-nonce"),
+            phase.ends_with("artifact-supplemental"),
+        )?
+    };
     let runtime = ProcessRuntime::open(dir.join("process.db"), kernel.clone())?;
     // The recovering host relaunches its tools: the same logical call is
     // re-presented with a different native launch receipt.
@@ -309,7 +314,10 @@ async fn subprocess_worker() -> Result {
                 request.dpop_proof = Some(chio_kernel::dpop::DpopProof::sign(
                     chio_kernel::dpop::DpopProofBody {
                         schema: chio_kernel::dpop::DPOP_SCHEMA.into(),
-                        replay_authority: None,
+                        replay_authority: kernel
+                            .operation_owned_dpop_authority()
+                            .cloned()
+                            .ok_or("missing activated process DPoP authority")?,
                         capability_id: request.capability.id.clone(),
                         tool_server: "tools".into(),
                         tool_name: "read".into(),
@@ -361,6 +369,19 @@ async fn subprocess_worker() -> Result {
         } else {
             serde_json::from_slice(&std::fs::read(&request_path)?)?
         };
+        if phase.ends_with("dpop") {
+            assert_eq!(
+                &request
+                    .dpop_proof
+                    .as_ref()
+                    .ok_or("missing retained DPoP proof")?
+                    .body
+                    .replay_authority,
+                kernel
+                    .operation_owned_dpop_authority()
+                    .ok_or("missing activated process DPoP authority")?
+            );
+        }
         let response = runtime.invoke("root", "peek", &request).await?;
         assert!(
             !first,

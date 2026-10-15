@@ -2,9 +2,8 @@ use super::*;
 #[path = "claims/dispatch_snapshot.rs"]
 mod dispatch_snapshot;
 use chio_kernel::admission_operation::dpop_claim::*;
-use chio_kernel::dpop::authority::{
-    verify_authority_dpop_proof_stateless, DpopReplayAuthorityV1, DPOP_AUTHORITY_SCHEMA,
-};
+use chio_kernel::dpop::authority::DpopReplayAuthority;
+use chio_kernel::dpop::{verify_dpop_proof_stateless, DPOP_SCHEMA};
 use chio_kernel::dpop::{DpopProof, DpopProofBody};
 
 #[path = "claims/budget.rs"]
@@ -22,11 +21,11 @@ mod lifecycle;
 #[path = "claims/preflight.rs"]
 mod preflight;
 
-fn activate(fixture: &Fixture, source: &Source) -> AnchoredTestResult<DpopReplayAuthorityV1> {
+fn activate(fixture: &Fixture, source: &Source) -> AnchoredTestResult<DpopReplayAuthority> {
     let imported = import(fixture, source, &pin(fixture, source)?)?;
     let original = super::activation::domain(&imported)?;
     let authority =
-        DpopReplayAuthorityV1::new(chio_kernel::dpop::authority::DpopReplayAuthorityInputV1 {
+        DpopReplayAuthority::new(chio_kernel::dpop::authority::DpopReplayAuthorityInput {
             destination_store_uuid: original.destination_store_uuid().clone(),
             dpop_authority_id: original.dpop_authority_id().clone(),
             expectation_id: original.expectation_id().clone(),
@@ -42,7 +41,7 @@ fn activate(fixture: &Fixture, source: &Source) -> AnchoredTestResult<DpopReplay
 
 fn setup(
     fixture: &Fixture,
-    authority: &DpopReplayAuthorityV1,
+    authority: &DpopReplayAuthority,
     name: &str,
     nonce: &str,
     phase: DpopReplayClaimPhase,
@@ -77,8 +76,8 @@ fn setup(
     let action_hash = sha256_hex(&canonical_json_bytes(&request.arguments)?);
     let proof = DpopProof::sign(
         DpopProofBody {
-            schema: DPOP_AUTHORITY_SCHEMA.into(),
-            replay_authority: Some(authority.clone()),
+            schema: DPOP_SCHEMA.into(),
+            replay_authority: authority.clone(),
             capability_id: request.capability.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),
@@ -89,7 +88,7 @@ fn setup(
         },
         &key,
     )?;
-    let credential = DpopReplayCredentialV1::from_verified(verify_authority_dpop_proof_stateless(
+    let credential = DpopReplayCredentialV1::from_verified(verify_dpop_proof_stateless(
         &proof,
         &request.capability,
         &request.server_id,

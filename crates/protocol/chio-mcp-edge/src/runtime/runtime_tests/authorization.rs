@@ -1,4 +1,5 @@
 use super::*;
+use crate::dpop_authority::ActivatedDpopAuthority;
 
 #[cfg(test)]
 mod authorization_projection {
@@ -277,15 +278,13 @@ fn restored_mcp_authorization_profile_is_exact_and_legacy_sessions_do_not_upgrad
 
 #[test]
 fn inbound_authority_mcp_proof_reaches_session_dispatch() {
-    use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA};
-    let (mut kernel, _) = make_kernel();
+    use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+    let (mut kernel, _) = protocol_boundaries::make_kernel_with_clock_and_policy_hash(
+        chio_test_support::clock::clock(),
+        chio_core::sha256_hex(b"mcp-dpop-policy"),
+    );
     let agent = Keypair::generate();
-    kernel
-        .set_dpop_store(
-            DpopNonceStore::new(32, std::time::Duration::from_secs(300)).unwrap(),
-            DpopConfig::default(),
-        )
-        .unwrap();
+    let authority = ActivatedDpopAuthority::install(&mut kernel, 300, 30).unwrap();
     let mut scope = issue_capabilities(&kernel, &agent)[0].scope.clone();
     for grant in &mut scope.grants {
         grant.dpop_required = Some(true);
@@ -297,7 +296,7 @@ fn inbound_authority_mcp_proof_reaches_session_dispatch() {
     let proof = DpopProof::sign(
         DpopProofBody {
             schema: DPOP_SCHEMA.into(),
-            replay_authority: None,
+            replay_authority: authority.domain.clone(),
             capability_id: capability.id.clone(),
             tool_server: "srv".into(),
             tool_name: "read_file".into(),

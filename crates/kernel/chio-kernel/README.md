@@ -6,6 +6,14 @@ dispatches registered connections, and signs and records decisions. Portable
 verification primitives come from `chio-kernel-core`; hosts supply connections,
 trusted authority configuration, guards, and durable storage.
 
+A DPoP-required grant needs the signed `chio.dpop_proof.v1` authority binding and
+an independently configured, activated durable replay authority. Install that
+authority with `ChioKernel::set_operation_owned_dpop_authority`; proof construction
+can read the selected descriptor through `operation_owned_dpop_authority`.
+`verify_dpop_proof_stateless` requires the expected authority explicitly and
+returns cryptographic evidence. Dispatch separately acquires its exact durable
+replay claim. Installing a volatile replay source enables source retirement only.
+
 ## Usage
 
 This offline example constructs the primary kernel API with strict persistence

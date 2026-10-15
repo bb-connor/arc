@@ -142,7 +142,7 @@ fn build_kernel_with_admission_db(
     configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)
         .expect("configure receipt store for session test");
     durable_admission
-        .attach(&mut kernel)
+        .attach(&mut kernel, None)
         .expect("attach durable admission runtime");
     kernel
 }
@@ -1864,9 +1864,25 @@ guards:
 
 #[test]
 fn inbound_authority_native_session_preserves_proof_and_authenticated_subject() {
-    let policy = policy::parse_policy("kernel:\n  allow_ephemeral_receipt_log: true\n  allow_ephemeral_revocation_store: true\n  durable_admission_mode: off\n  allow_unsafe_durable_admission_off: true\n").unwrap();
-    let kp = Keypair::generate();
-    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &kp);
+    let policy =
+        policy::parse_policy("kernel:\n  allow_ephemeral_revocation_store: true\n").unwrap();
+    let database = unique_db_path("native-dpop-authority");
+    let runtime = chio_control_plane::DurableAdmissionRuntime::open(&database).unwrap();
+    let mut kernel = build_kernel(load_test_policy_runtime(&policy), &runtime.kernel_keypair());
+    let domain = chio_control_plane::initialize_local_dpop_authority(
+        &runtime.local_authority_store().unwrap(),
+        &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+            "dpop_authority",
+            "native-dpop",
+        )
+        .unwrap(),
+        &chio_kernel::DpopConfig::default(),
+        kernel.authority_clock(),
+    )
+    .unwrap();
+    let receipts = unique_db_path("native-dpop-receipts");
+    configure_receipt_store(&mut kernel, Some(&receipts), None, None).unwrap();
+    runtime.attach(&mut kernel, Some(&domain)).unwrap();
     kernel.register_tool_server(Box::new(StubToolServer {
         id: "proof-srv".into(),
     }));
@@ -1888,7 +1904,7 @@ fn inbound_authority_native_session_preserves_proof_and_authenticated_subject() 
     let proof = chio_kernel::dpop::DpopProof::sign(
         chio_kernel::dpop::DpopProofBody {
             schema: chio_kernel::DPOP_SCHEMA.into(),
-            replay_authority: None,
+            replay_authority: domain,
             capability_id: cap.id.clone(),
             tool_server: "proof-srv".into(),
             tool_name: "read_file".into(),
@@ -1896,7 +1912,11 @@ fn inbound_authority_native_session_preserves_proof_and_authenticated_subject() 
                 &chio_core::canonical::canonical_json_bytes(&arguments).unwrap(),
             ),
             nonce: "native-proof".into(),
-            issued_at: kernel.authority_clock_reading().unwrap().unix_millis().as_secs(),
+            issued_at: kernel
+                .authority_clock_reading()
+                .unwrap()
+                .unix_millis()
+                .as_secs(),
             agent_key: agent.public_key(),
         },
         &agent,

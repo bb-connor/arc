@@ -19,6 +19,10 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(test)]
+#[path = "../../../../tests/bindings/support/dpop_authority.rs"]
+mod dpop_authority;
+
 mod request_error;
 pub use request_error::{AcpField, AcpFieldViolation, AcpRequestError};
 

@@ -203,6 +203,7 @@ impl FindingPurchaseExecutor for RoutedPurchaseExecutor {
         let capability = exchange.ask.body.token_offer.clone();
         let reveal = reveal_request_at(
             &RevealRequestInputs {
+                authority: &self.authority,
                 request_id: &request.request_id,
                 capability: &capability,
                 buyer: &self.buyer,

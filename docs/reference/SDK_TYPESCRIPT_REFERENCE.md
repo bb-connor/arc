@@ -40,7 +40,7 @@ Concrete error classes:
 ```typescript
 class DpopSignError extends ChioError {
   // code: "dpop_sign_error"
-  // Thrown when agentSeedHex is invalid or Ed25519 signing fails.
+  // Thrown when authority, proof bounds, seed or signing is invalid.
 }
 
 class QueryError extends ChioError {
@@ -60,50 +60,74 @@ class TransportError extends ChioError {
 
 ## signDpopProof
 
-Signs a DPoP proof for a single tool invocation. The proof body is serialized as RFC 8785 canonical JSON before signing, ensuring compatibility with `chio-kernel`'s `verify_dpop_proof`.
+Signs a `chio.dpop_proof.v1` proof for a single tool invocation. The required
+`replayAuthority` parameter binds the destination, source generation and
+freshness policy into the signed body. Supply it through authenticated
+configuration, independently of any proof being verified. Signing does not
+establish activation, reserve a replay nonce or authorize execution.
 
 ```typescript
 import { signDpopProof } from "@chio-protocol/sdk";
 
 interface SignDpopProofParams {
-  capabilityId: string;   // token ID of the capability being used
-  toolServer: string;     // server_id of the target tool server
-  toolName: string;       // name of the tool being invoked
-  actionArgs: unknown;    // the tool arguments (will be canonicalized + SHA-256'd)
-  agentSeedHex: string;   // hex-encoded 32-byte Ed25519 seed (private key seed)
-  nonce?: string;         // default: 16 random bytes hex-encoded
-  issuedAt?: number;      // default: Math.floor(Date.now() / 1000)
+  capabilityId: string;
+  toolServer: string;
+  toolName: string;
+  actionArgs: unknown;
+  agentSeedHex: string;
+  replayAuthority: DpopReplayAuthority;
+  nonce?: string;
+  issuedAt?: number;
 }
 
-interface DpopProof {
-  body: DpopProofBody;
-  signature: string;      // hex-encoded Ed25519 signature over canonical JSON of body
+interface DpopReplayAuthority {
+  destination_store_uuid: string;
+  dpop_authority_id: string;
+  expectation_id: string;
+  proof_ttl_secs: number;
+  max_clock_skew_secs: number;
 }
 ```
 
-Usage:
+`nonce` defaults to 16 random bytes encoded as hexadecimal. `issuedAt` defaults
+to the current Unix time in seconds. The seed is a 32-byte Ed25519 private key
+seed encoded as hexadecimal. The returned proof has `body` and `signature`
+fields; the signature covers the complete RFC 8785 canonical JSON body,
+including its required `replay_authority` field.
+
+The application supplies its authenticated replay authority to the signer:
 
 ```typescript
-const proof = signDpopProof({
-  capabilityId: "cap-abc123",
-  toolServer: "filesystem",
-  toolName: "read_file",
-  actionArgs: { path: "/app/config.json" },
-  agentSeedHex: process.env.AGENT_SEED_HEX!,
-});
-
-// Attach proof to your invocation request
-const request = {
-  capability_id: "cap-abc123",
-  tool_name: "read_file",
-  arguments: { path: "/app/config.json" },
-  dpop_proof: proof,
-};
+function signReadFile(
+  replayAuthority: DpopReplayAuthority,
+  agentSeedHex: string,
+) {
+  return signDpopProof({
+    capabilityId: "cap-abc123",
+    toolServer: "filesystem",
+    toolName: "read_file",
+    actionArgs: { path: "/app/config.json" },
+    agentSeedHex,
+    replayAuthority,
+  });
+}
 ```
 
-The `action_hash` in the proof body is the SHA-256 hex of the canonical JSON of `actionArgs`. It must match what the kernel derives from the same arguments.
+Attach the returned proof as the invocation's `dpop_proof`. The `action_hash`
+is the SHA-256 hex of the canonical JSON of `actionArgs`; it must match the
+kernel's hash of the same arguments.
 
-Throws `DpopSignError` if `agentSeedHex` is invalid or signing fails.
+Missing, null, partial and unknown authority fields are rejected. The
+`destination_store_uuid` must be canonical, lowercase and non-nil;
+`dpop_authority_id` must be nonempty, unpadded and free of control characters,
+with a 512-byte UTF-8 limit; `expectation_id` must be 64 lowercase hexadecimal
+characters. The TTL must be an integer between 1 and 3,600 seconds, and clock
+skew an integer between 0 and 300 seconds. The issue time must be a nonnegative
+integer whose sum with the TTL is at most `9007199254740`. Nonce and capability
+ID are each limited to 4,096 UTF-8 bytes.
+
+Throws `DpopSignError` when authority validation, proof bounds, seed validation
+or signing fails.
 
 ## ReceiptQueryClient
 

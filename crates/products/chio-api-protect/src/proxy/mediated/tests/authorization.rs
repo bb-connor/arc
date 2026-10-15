@@ -576,11 +576,11 @@ async fn mediated_governed_direct_token_rejected_without_payment_adapter() {
 async fn mediated_dpop_capability_requires_valid_proof() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-    let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
-    let cap = issue_dpop_capability(&kernel, &agent, "cost-srv", "compute", 100, "USD");
+    let fixture = DpopFixture::new(signer.clone());
+    let kernel = issuing_kernel(&signer, fixture.budget.clone(), &[]);
+    let cap = issue_dpop_capability(&kernel, &agent, "cost-srv", "compute");
     let cap_value = serde_json::to_value(&cap).unwrap();
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = fixture.state.clone();
     let params = serde_json::json!({ "invoice": "inv-1" });
 
     // Without a DPoP proof, a dpop_required grant is DENIED
@@ -599,7 +599,14 @@ async fn mediated_dpop_capability_requires_valid_proof() {
 
     // With a valid DPoP proof bound to the exact call, the mediation kernel's
     // installed DPoP state verifies it and the grant is AUTHORIZED.
-    let proof = dpop_proof_for(&agent, &cap, "cost-srv", "compute", &params);
+    let proof = dpop_proof_for(
+        &agent,
+        &cap,
+        "cost-srv",
+        "compute",
+        &params,
+        &fixture.domain,
+    );
     let dpop_body = serde_json::json!({
         "capability": cap_value,
         "tool_server": "cost-srv",
@@ -619,20 +626,24 @@ async fn mediated_dpop_capability_requires_valid_proof() {
 async fn mediated_dpop_proof_replay_is_rejected_across_requests() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
-    let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
-    let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
-    // max_total (1000) far exceeds a single reservation (100), so the second
-    // request cannot be denied for budget: the only reason to reject it is a
-    // DPoP replay store that persists across requests. That persistence only
-    // holds if a single kernel is reused for the process lifetime.
-    let cap =
-        issue_dpop_capability_with_total(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+    let fixture = DpopFixture::new(signer.clone());
+    let kernel = issuing_kernel(&signer, fixture.budget.clone(), &[]);
+    // Ten invocations are available, so a second call cannot exhaust the budget.
+    // Only the operation-owned DPoP replay claim should refuse the reused proof.
+    let cap = issue_dpop_capability(&kernel, &agent, "cost-srv", "compute");
     let cap_value = serde_json::to_value(&cap).unwrap();
-    let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
+    let state = fixture.state.clone();
     let params = serde_json::json!({ "invoice": "inv-1" });
 
     // A single DPoP proof, presented twice under distinct request ids.
-    let proof = dpop_proof_for(&agent, &cap, "cost-srv", "compute", &params);
+    let proof = dpop_proof_for(
+        &agent,
+        &cap,
+        "cost-srv",
+        "compute",
+        &params,
+        &fixture.domain,
+    );
     let first_body = serde_json::json!({
         "capability": cap_value,
         "tool_server": "cost-srv",
@@ -658,7 +669,7 @@ async fn mediated_dpop_proof_replay_is_rejected_across_requests() {
     let (_, second) = post_evaluate(Arc::clone(&state), &second_body).await;
     assert_eq!(
         second["status"], "deny",
-        "replaying the DPoP proof must be rejected by the shared kernel's persistent nonce store"
+        "replaying the DPoP proof must be rejected by the durable operation-owned replay claim"
     );
 }
 
@@ -1158,6 +1169,7 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -1167,7 +1179,6 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         control_token: Some("token".to_string()),
         budget_db: Some(db.to_string_lossy().to_string()),
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -1239,6 +1250,7 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
         Some(MEDIATED_CONTROL_TOKEN.to_string()),
         None,
         true,
+        None,
         None,
         None,
     );

@@ -27,7 +27,8 @@ The ordinary service entrypoint supplies none of the finding executors.
 | `lib.rs` | Kernel guard ordering, store selection, capability authority selection, default issuance, and seed lifecycle helpers. |
 | `policy/loader.rs`, `policy/types.rs` | Chio YAML and HushSpec materialization, source/runtime identity, kernel options, and issuance policies. |
 | `issuance/authority.rs`, `issuance/scope.rs` | Policy-backed authority wrappers, issued-token validation, reputation ceilings, and runtime-assurance constraints. |
-| `durable_admission.rs` | Serving-owner provisioning, bound kernel identity, shared admission/outcome/budget/revocation ports, and startup reconciliation. |
+| `durable_admission.rs` | Serving-owner provisioning, bound kernel identity, shared admission/outcome/budget/revocation ports, configured DPoP activation validation, and startup reconciliation. |
+| `dpop_runtime.rs` | Explicit local replay-authority initialization and readback of an existing activated authority. |
 | `security.rs` and `security/` | Active-defense composition, dispatch and issuance adapters, response execution, scheduling, and readiness. |
 | `trust_control/config_and_public.rs` | Blocking service entrypoints and explicit finding-runtime installation with path and fence checks. |
 | `trust_control/service_runtime/init.rs`, `router.rs` | Startup owners, bounded lanes, router construction, listener hygiene, and shutdown drain. |
@@ -50,8 +51,9 @@ Referenced threat-intelligence pattern bytes contribute to policy identity.
 `parse_policy` only parses Chio YAML and validates its kernel configuration;
 callers use the loader for full runtime materialization.
 
-`build_kernel_with_clock` carries the supplied authority clock into the kernel,
-installs a default DPoP store, and applies durable/swarm admission settings.
+`build_kernel_with_clock` carries the supplied authority clock into the kernel
+and applies durable/swarm admission settings. DPoP requires a configured
+descriptor and matching activation in the attached durable authority.
 It installs the default pre-invocation guards before the configured pipeline.
 For active defense, the security pre-invocation guards come first. The
 post-invocation order is raw-output security hooks, configured hooks, default
@@ -69,7 +71,11 @@ secrets and invalid endpoints.
 For joint admission, `DurableAdmissionRuntime::open` provisions a private
 serving-owner lock root and filesystem database, loads its kernel seed, and
 binds that signing identity to durable state. `attach` installs operation and
-outcome stores, shares the joint budget/revocation ports, and reconciles startup.
+outcome stores and shares the joint budget/revocation ports. It validates an
+optional configured DPoP descriptor against the active store before startup
+reconciliation. `initialize_local_dpop_authority` provisions that authority
+only during explicit deployment initialization; `load_local_dpop_authority`
+requires an existing active record with its retained source generation.
 `validate_durable_admission_participant_paths` rejects separate budget or
 revocation databases when durable admission is enabled. Callers must invoke
 that configuration validator when assembling the corresponding CLI options.

@@ -499,22 +499,33 @@ Lean cross-references (informational; the script does not enforce these):
   connects every committed Aeneas production function to ordinary-value
   semantics or directly to the bounded reservation-ledger model. Concrete
   runtime store linkage remains outside the ledger equivalence theorem.
-- The DPoP freshness and nonce helpers reach signed runtime boundaries through
-  `DpopNonceStore::check_and_insert_through` for the direct verifier and
-  `DpopNonceStore::reserve_for_dispatch_through` from
-  `ChioKernel::reserve_admitted_dispatch_credentials` for kernel dispatch. Both paths
-  retain live nonce markers through the proof's inclusive signed horizon and
-  deny at capacity. Clock behavior, mutex integrity, and marker storage remain
-  runtime qualification boundaries. The process-instance replay source seal
-  additionally fences all legacy mutations and is checked during kernel DPoP
-  preparation/revalidation. Its canonical inventory, retirement races and
-  missing-source refusal are runtime test obligations, not consequences of the
-  pure freshness or nonce predicate proofs. Durable DPoP migration and ownership
-  remain outside this mapping's qualification claim.
-  The Rust and remote MCP sender paths additionally share bounded replay identity
-  validation. Retained-byte accounting, its contention/reclamation invariants and
-  the remote sender's signed-horizon retention are runtime regressions; the pure
-  nonce predicate alone does not qualify memory bounds or writer routing.
+- The DPoP freshness predicate reaches signed proof verification through
+  `chio_kernel::dpop::verify_dpop_proof_stateless`, reexported from
+  `dpop/authority.rs`. The verifier requires an exact signed authority descriptor
+  matching the independently selected domain and applies that domain's bounded
+  freshness policy to trusted Unix seconds. Its `VerifiedDpopReplayProof` result
+  is non-consuming evidence; activation and replay custody require separate
+  checks. The unchanged scalar freshness predicate does not establish the
+  caller's authority selection or clock trust.
+  Kernel preparation and revalidation verify the selected authority's activation
+  against the fenced durable store and sample the durable runtime's trusted
+  clock. Preparation produces an origin-bound credential; admission acquires
+  its exact operation-owned DPoP claim before dispatch. Pre-dispatch rollback
+  requests release through the claim's exact reference. The operation's dispatch
+  commit determines its retained disposition. These checks preserve the existing
+  aggregate lease disposition and revocation gate without adding model state.
+  The models do not prove domain activation, durable claim exclusivity, SQL
+  atomicity, recovery liveness or the physical replay store's retention bounds.
+  This mapping also does not establish reachability for arbitrary DPoP-refusal
+  receipt traces in the revocation model.
+  The process-instance replay source is retained for explicit retirement, with
+  its seal fencing subsequent source mutations. Kernel DPoP verification reads
+  activated durable authority instead of consulting that retired source.
+  Source inventories, retirement races and refusal behavior remain runtime test
+  obligations. The independent remote MCP sender path shares bounded replay
+  identity validation; its custody and signed-horizon retention require separate
+  qualification. The pure nonce predicate does not qualify retained-byte
+  accounting, contention/reclamation invariants or writer routing.
 - `Chio.Proofs.ReservationLedger.ledger_conservation` and
   `Chio.Proofs.ReservationLedger.ledger_terminal_unique` in
   `formal/lean4/Chio/Chio/Proofs/ReservationLedger.lean` prove the pure

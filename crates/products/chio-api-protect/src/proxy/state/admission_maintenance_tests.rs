@@ -264,6 +264,7 @@ impl Fixture {
             &signer,
             super::super::MediationBudget::Durable(durable),
             super::super::mediated::MediationPolicy {
+                dpop_replay_authority: None,
                 issuers: &[],
                 hash: policy_hash,
                 receipt_store: Some(Arc::new(authority.admission_operation_store())),

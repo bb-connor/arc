@@ -20,7 +20,6 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
         let Self {
             kernel,
             input,
-            dpop_proof,
             dpop_credential,
             execution_nonce,
             durable_nonce_presented,
@@ -30,14 +29,12 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
         let mut reservation = DispatchCredentialReservation {
             kernel,
             reservation_id: uuid::Uuid::now_v7().as_hyphenated().to_string(),
-            dpop_key: None,
             execution_nonce_id: None,
             execution_nonce_present: execution_nonce.is_some() || durable_nonce_presented,
             approval_key: None,
             owned_approval,
             owned_dpop,
-            credentials_present: dpop_proof.is_some()
-                || dpop_credential.is_some()
+            credentials_present: dpop_credential.is_some()
                 || execution_nonce.is_some()
                 || durable_nonce_presented
                 || approval_intent_hash.is_some(),
@@ -46,42 +43,6 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
         };
 
         let result = (|| {
-            if let Some(proof) = dpop_proof {
-                let store = kernel
-                    .dpop_nonce_store
-                    .as_ref()
-                    .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingStore))?;
-                let config = kernel.dpop_config.as_ref().ok_or(KernelError::Dpop(
-                    crate::dpop::DpopError::MissingConfiguration,
-                ))?;
-                reservation.dpop_key =
-                    Some((proof.body.nonce.clone(), proof.body.capability_id.clone()));
-                let valid_through = proof
-                    .body
-                    .issued_at
-                    .checked_add(config.proof_ttl_secs)
-                    .ok_or(KernelError::Dpop(crate::dpop::DpopError::WindowOverflow))?;
-                match run_credential_store_operation(
-                    &reservation.reservation_id,
-                    "DPoP nonce reservation",
-                    || {
-                        store.reserve_for_dispatch_through(
-                            &proof.body.nonce,
-                            &proof.body.capability_id,
-                            valid_through,
-                            &reservation.reservation_id,
-                        )
-                    },
-                ) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        reservation.dpop_key = None;
-                        return Err(crate::dpop::DpopError::Replayed.into());
-                    }
-                    Err(error) => return Err(error),
-                }
-            }
-
             if let Some(validated) = execution_nonce {
                 let presented = validated.signed();
                 let store = kernel.execution_nonce_store.as_deref().ok_or_else(|| {
