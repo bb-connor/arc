@@ -1535,10 +1535,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/participants.rs"
 rust_symbols = ["FrozenDispatchParticipants", "FrozenDispatchParticipants::from_operation", "FrozenDispatchParticipants::validate", "FrozenDispatchParticipants::bind_native_dispatch"]
-normalized_sha256 = "ca98a33478371da7e47f67926f7845100523255d48354550776ab54dbd62ab2c"
+normalized_sha256 = "cc93839e5f41512e02de01fe8651ca8a1bad512055bbf3298cc89355716a58db"
 symbol_sha256 = [
   { symbol = "FrozenDispatchParticipants", sha256 = "39e0ec7b161b8ee20a846095b42ce8894bc0b510ffa0fcdd05e07cd0c1553eba" },
-  { symbol = "FrozenDispatchParticipants::from_operation", sha256 = "283edfc84c26d2ff5b4b07f7e51c943bf61016ea6fb7997d7d29af7ce9f2264f" },
+  { symbol = "FrozenDispatchParticipants::from_operation", sha256 = "39f0884517d55fd19a9c7895d0cf321b5d645346b8a4a6d0d1582a0c7acd6422" },
   { symbol = "FrozenDispatchParticipants::validate", sha256 = "4afd769d3f66bd4bb4a3202352baef3cb9209d61f62c7c3cc8e7f8fed1f7b404" },
   { symbol = "FrozenDispatchParticipants::bind_native_dispatch", sha256 = "dd9705e2ced14b1f1d751cec0b9ceb7e5794254d18acfda6e3075a59ad76e7fc" },
 ]
@@ -1570,10 +1570,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs"
 rust_symbols = ["ChioKernel::capture_and_commit_durable_dispatch","ChioKernel::begin_durable_tool_admission_for_transport","ChioKernel::native_security_authority_binding","immutable_tool_admission_request_hash"]
-normalized_sha256 = "ce245d951305fb3f58287b195885d6520239d8d2d24422f3cfb96144e89cceb4"
+normalized_sha256 = "cdf4c197a409bc5be185254b13ada3299240cf02a81f750a6bb569689f25524b"
 symbol_sha256 = [
   { symbol = "ChioKernel::capture_and_commit_durable_dispatch", sha256 = "2635594043d1fe8f02fd56099d3bc52b2277aae6f4b921210ca7af647dbaaf2d" },
-  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "3170c76a57603783edc4aa341fe64f90a095d8b58d0676afdd34adf7548b655c" },
+  { symbol = "ChioKernel::begin_durable_tool_admission_for_transport", sha256 = "d46f42b0bb13661993ddb97283c44dd7b2a0594cace3840f4b36d142b5d44f72" },
   { symbol = "ChioKernel::native_security_authority_binding", sha256 = "db50adade9669310b59adce0cd240a97fa3daa22ed31d8cb4278576b74cefcb2" },
   { symbol = "immutable_tool_admission_request_hash", sha256 = "678ac274242c7d7f08e9ca066756c0addec8afedf0b8e0b0bcccd66798d067fe" },
 ]
@@ -4434,9 +4434,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recove
 rust_symbols = [
   "ChioKernel::recover_one_admission",
 ]
-normalized_sha256 = "011f071b8f9990e9a3a7f33a6f06b9a13f9a07f3f431fbcb265be394a44e9f5b"
+normalized_sha256 = "43679e0e568855b9da0ba16d69ab490b8b4e0efa0421021d0c8839ff39887f72"
 symbol_sha256 = [
-  { symbol = "ChioKernel::recover_one_admission", sha256 = "49fbee5df069bfa0d9dd074e4a08b5f03bcf445778b8736914e5ce7080ac6b5e" },
+  { symbol = "ChioKernel::recover_one_admission", sha256 = "ff6a7befa29f919e3d2b802319750814dcf5af408efb08fd00a1c1712f7ca7a2" },
 ]
 
 # V02 implementation drift anchors only. The live-ledger model does not prove

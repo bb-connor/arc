@@ -49,6 +49,7 @@ fn fixture() -> TestResult<Fixture> {
             budget_hold_id: identifier("hold")?,
             dispatch_commit: AdmissionDispatchCommitBindingV1 {
                 committed_version: 9,
+                dispatch_launch: Default::default(),
                 coordinator_lease_id: identifier("coordinator")?,
                 coordinator_lease_epoch: 3,
                 store_fence: StoreMutationFence {

@@ -9,7 +9,10 @@ impl SqliteAdmissionOperationStore {
         now: u64,
     ) -> Result<AdmissionCommandResult, AdmissionOperationStoreError> {
         if command.next_state() != Some(AdmissionOperationState::CapturePending)
-            || !command.attachments().is_empty()
+            || !command
+                .attachments()
+                .iter()
+                .all(|attachment| matches!(attachment, AdmissionAttachment::DispatchLaunch(_)))
             || command.last_error().is_some()
             || command.terminal_replay().is_some()
         {

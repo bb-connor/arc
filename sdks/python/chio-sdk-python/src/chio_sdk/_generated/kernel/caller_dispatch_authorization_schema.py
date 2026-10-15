@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10
+# Schema sha256: 76d7fa85798af8c0fa0bf76f068a5e8c2e5d4c46d4b3bd275c8adb3e4185cecf
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Literal
 
 from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+from pydantic import BaseModel as DispatchLaunchBaseModel
 
 from pydantic import ConfigDict, Field, RootModel, conint, constr
 
@@ -43,6 +44,39 @@ class CallerDigest(RootModel[constr(pattern=r"^[0-9a-f]{64}$")]):
 
 class CallerPositiveInteger(RootModel[conint(strict=True, ge=1, le=9007199254740991)]):
     root: conint(strict=True, ge=1, le=9007199254740991)
+
+
+class NativeLaunch(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    receipt_id: CallerDigest
+    receipt_sha256: CallerDigest
+
+
+class LaunchRef(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    record_id: CallerDigest
+    record_sha256: CallerDigest
+
+
+class WorkerProfile(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    kind: Literal["container"]
+    launch_attempt: conint(strict=True, ge=1, le=4294967295)
+    launch_ref: LaunchRef
+
+
+class CallerDispatchLaunch(DispatchLaunchBaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    native_launch: NativeLaunch | None = Field(...)
+    worker_profile: WorkerProfile | None = Field(...)
 
 
 class CallerPublicKey(
@@ -112,6 +146,7 @@ class DispatchCommit(BaseModel):
     coordinator_lease_epoch: CallerPositiveInteger
     store_fence: StoreFence
     provider_attempt: ProviderAttempt
+    dispatch_launch: CallerDispatchLaunch
 
 
 class Committed(BaseModel):

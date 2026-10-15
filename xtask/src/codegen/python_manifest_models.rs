@@ -15,7 +15,7 @@ pub(super) fn harden(root: &Path) -> Result<(), XtaskError> {
         ("security/signed_tool_manifest_v1_schema.py", 1, true),
         ("kernel/execution_nonce_schema.py", 3, true),
         ("kernel/combined_capture_metadata_schema.py", 2, true),
-        ("kernel/caller_dispatch_authorization_schema.py", 8, true),
+        ("kernel/caller_dispatch_authorization_schema.py", 12, true),
         // A delivery report must retain explicit null output and cost values.
         ("kernel/caller_delivery_report_schema.py", 3, false),
         ("capability/aggregate_invocation_budget_schema.py", 2, true),

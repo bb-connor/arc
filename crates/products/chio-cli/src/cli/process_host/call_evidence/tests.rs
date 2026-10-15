@@ -4,16 +4,17 @@ use chio_core::{
     crypto::Keypair,
     receipt::{body::ChioReceiptBody, decision::ToolCallAction},
 };
-use chio_kernel::admission_operation::{
-    expected_dispatch_committed_version, AdmissionCompensationStatus, AdmissionIdentifier,
-    AdmissionOperationBindingInputV1, AdmissionOperationV1, AdmissionParticipantRequirements, AdmissionReceiptSchema,
-    AdmissionRequestBindingV1, AuthenticatedRequestNamespace, SideEffectClass, StoreMutationFence,
-};
 use chio_kernel::admission_operation::runtime_participant::{
     RuntimeParticipantClaimHistoryV1, RuntimeParticipantClaimIntentInput,
     RuntimeParticipantClaimIntentV1, RuntimeParticipantResourceV1,
 };
 use chio_kernel::admission_operation::RuntimeReplayParticipantKind;
+use chio_kernel::admission_operation::{
+    expected_dispatch_committed_version, AdmissionCompensationStatus, AdmissionIdentifier,
+    AdmissionOperationBindingInputV1, AdmissionOperationV1, AdmissionParticipantRequirements,
+    AdmissionReceiptSchema, AdmissionRequestBindingV1, AuthenticatedRequestNamespace,
+    SideEffectClass, StoreMutationFence,
+};
 
 const RUNTIME: &str = "714d3643-e7f7-42f9-95b5-6a3a0d734ce8";
 const OBSERVED_AT: u64 = 1_700_000_000_000;
@@ -70,6 +71,21 @@ fn assert_incident_observation_rejected(
     Ok(())
 }
 
+fn assert_incident_dispatch_commit_refused(
+    artifact: &str,
+    public_key: &str,
+) -> Result<(), CliError> {
+    let key = PublicKey::from_hex(public_key.trim()).map_err(error)?;
+    let signed = crate::receipt_verify::verify_original_receipt(artifact, &key)?;
+    assert_eq!(
+        serde_json::from_value::<Evidence>(signed.action.parameters.clone())
+            .err()
+            .map(|failure| failure.to_string()),
+        Some("missing field `dispatch_launch`".to_owned()),
+    );
+    Ok(())
+}
+
 #[test]
 fn issued_denial_incident_artifact_is_rejected() -> Result<(), CliError> {
     assert_incident_observation_rejected(
@@ -83,8 +99,8 @@ fn issued_denial_incident_artifact_is_rejected() -> Result<(), CliError> {
 }
 
 #[test]
-fn interrupted_incident_artifact_is_rejected() -> Result<(), CliError> {
-    assert_incident_observation_rejected(
+fn interrupted_incident_dispatch_commit_without_its_launch_is_refused() -> Result<(), CliError> {
+    assert_incident_dispatch_commit_refused(
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/interrupted.json"
@@ -93,13 +109,12 @@ fn interrupted_incident_artifact_is_rejected() -> Result<(), CliError> {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/interrupted-kernel.pub"
         )),
-        UNKNOWN_ERROR,
     )
 }
 
 #[test]
-fn unknown_incident_artifact_is_rejected() -> Result<(), CliError> {
-    assert_incident_observation_rejected(
+fn unknown_incident_dispatch_commit_without_its_launch_is_refused() -> Result<(), CliError> {
+    assert_incident_dispatch_commit_refused(
         include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/unknown.json"
@@ -108,7 +123,6 @@ fn unknown_incident_artifact_is_rejected() -> Result<(), CliError> {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/process-call-observation/kernel.pub"
         )),
-        UNKNOWN_ERROR,
     )
 }
 
@@ -136,8 +150,8 @@ impl SemanticRefusal {
             &key,
         )
         .map_err(error)?;
-        let action = ToolCallAction::from_parameters(json!({"message": "refused"}))
-            .map_err(error)?;
+        let action =
+            ToolCallAction::from_parameters(json!({"message": "refused"})).map_err(error)?;
         let requirements = AdmissionParticipantRequirements {
             broker_attempt: true,
             budget_capture: true,
@@ -181,6 +195,7 @@ impl SemanticRefusal {
                 .map_err(error)?;
         let dispatch_commit = if state == AdmissionOperationState::OutcomeUnknownAfterDispatch {
             Some(AdmissionDispatchCommitBindingV1 {
+                dispatch_launch: Default::default(),
                 committed_version: expected_dispatch_committed_version(
                     AdmissionOperationKind::ToolDispatch,
                     requirements,
@@ -190,12 +205,14 @@ impl SemanticRefusal {
                 coordinator_lease_id: coordinator_lease_id.clone(),
                 coordinator_lease_epoch: 1,
                 store_fence: fence.clone(),
-                provider_attempt: Some(chio_core_types::provider_attempt::ProviderAttemptBindingV1 {
-                    operation_id: binding.operation_id().as_str().into(),
-                    attempt_id: "semantic-attempt".into(),
-                    transport_id: "kernel-tool-server:semantic-server".into(),
-                    transport_key_epoch: 1,
-                }),
+                provider_attempt: Some(
+                    chio_core_types::provider_attempt::ProviderAttemptBindingV1 {
+                        operation_id: binding.operation_id().as_str().into(),
+                        attempt_id: "semantic-attempt".into(),
+                        transport_id: "kernel-tool-server:semantic-server".into(),
+                        transport_key_epoch: 1,
+                    },
+                ),
             })
         } else {
             None
@@ -267,8 +284,11 @@ impl SemanticRefusal {
             terminal_replay: Some(AdmissionTerminalReplay::Receipt {
                 receipt_id: AdmissionIdentifier::try_new("receipt_id", call.id.clone())
                     .map_err(error)?,
-                projection_digest: AdmissionDigest::try_new("projection_digest", hash(&projection)?)
-                    .map_err(error)?,
+                projection_digest: AdmissionDigest::try_new(
+                    "projection_digest",
+                    hash(&projection)?,
+                )
+                .map_err(error)?,
             }),
             execution_nonce_issuance_digest: None,
             history: Vec::new(),
@@ -455,11 +475,12 @@ fn semantic_refusals_reject_foreign_tenants_and_operation_projections() -> Resul
         fixture.assert_rejected(PROJECTION_ERROR);
         for field in ["projected_operation_version", "request_binding_hash"] {
             let mut fixture = SemanticRefusal::new(state, kernel_denial())?;
-            fixture.metadata()?["admission_operation"][field] = if field == "projected_operation_version" {
-                json!(999)
-            } else {
-                json!("0".repeat(64))
-            };
+            fixture.metadata()?["admission_operation"][field] =
+                if field == "projected_operation_version" {
+                    json!(999)
+                } else {
+                    json!("0".repeat(64))
+                };
             fixture.resign()?;
             fixture.assert_rejected(PROJECTION_ERROR);
         }
@@ -473,25 +494,35 @@ fn semantic_refusals_reject_foreign_tenants_and_operation_projections() -> Resul
 
 impl SemanticRefusal {
     fn with_runtime(reference_in_receipt: bool) -> Result<Self, CliError> {
-        let mut fixture = Self::new(AdmissionOperationState::OutcomeUnknownAfterDispatch, kernel_denial())?;
-        let binding = AdmissionOperationBindingV1::from_persisted(fixture.operation.binding.clone())
-            .map_err(error)?;
+        let mut fixture = Self::new(
+            AdmissionOperationState::OutcomeUnknownAfterDispatch,
+            kernel_denial(),
+        )?;
+        let binding =
+            AdmissionOperationBindingV1::from_persisted(fixture.operation.binding.clone())
+                .map_err(error)?;
         let operation = AdmissionOperationV1::prepare(binding.clone(), 1)
-            .map_err(error)?.to_persisted();
+            .map_err(error)?
+            .to_persisted();
         let intent = RuntimeParticipantClaimIntentV1::new(RuntimeParticipantClaimIntentInput {
-            episode_id: AdmissionIdentifier::try_new("episode_id", "semantic-episode").map_err(error)?,
-            runtime_authority_id: AdmissionIdentifier::try_new("runtime_authority_id", RUNTIME).map_err(error)?,
-            expectation_id: AdmissionIdentifier::try_new("expectation_id", "semantic-generation").map_err(error)?,
+            episode_id: AdmissionIdentifier::try_new("episode_id", "semantic-episode")
+                .map_err(error)?,
+            runtime_authority_id: AdmissionIdentifier::try_new("runtime_authority_id", RUNTIME)
+                .map_err(error)?,
+            expectation_id: AdmissionIdentifier::try_new("expectation_id", "semantic-generation")
+                .map_err(error)?,
             request_binding_hash: binding.request_binding_hash().clone(),
             grant_index: 0,
             phase: RuntimeParticipantPhase::Dispatch,
             plan_digest: AdmissionDigest::try_new("plan_digest", "c".repeat(64)).map_err(error)?,
             resources: vec![RuntimeParticipantResourceV1::new(
                 RuntimeReplayParticipantKind::SwarmContinuation,
-                AdmissionIdentifier::try_new("resource_id", "semantic-continuation").map_err(error)?,
+                AdmissionIdentifier::try_new("resource_id", "semantic-continuation")
+                    .map_err(error)?,
                 AdmissionDigest::try_new("artifact_digest", "d".repeat(64)).map_err(error)?,
             )],
-        }).map_err(error)?;
+        })
+        .map_err(error)?;
         let claim = json!({
             "schema": "chio.runtime-participant-claim.v1",
             "operationId": binding.operation_id(),
@@ -500,10 +531,16 @@ impl SemanticRefusal {
             "recordedAtUnixMs": OBSERVED_AT,
         });
         let reference = RuntimeParticipantClaimReferenceV1::new(
-            binding.operation_id().clone(), intent.episode_id().clone(),
-            AdmissionDigest::try_new("claim_digest", hash(&(
-                "chio.runtime-participant-claim-commit.v1", (&claim, &operation),
-            ))?).map_err(error)?,
+            binding.operation_id().clone(),
+            intent.episode_id().clone(),
+            AdmissionDigest::try_new(
+                "claim_digest",
+                hash(&(
+                    "chio.runtime-participant-claim-commit.v1",
+                    (&claim, &operation),
+                ))?,
+            )
+            .map_err(error)?,
         );
         if reference_in_receipt {
             fixture.metadata()?["chio_runtime"] = json!({"operation_owned_replay": {
@@ -515,10 +552,12 @@ impl SemanticRefusal {
         }
         let evidence = RuntimeParticipantClaimEvidenceV1 {
             history: RuntimeParticipantClaimHistoryV1 {
-                reference, intent,
+                reference,
+                intent,
                 disposition: RuntimeParticipantDisposition::RetainedAfterDispatchCommit,
             },
-            claim, operation,
+            claim,
+            operation,
         };
         evidence.verify().map_err(error)?;
         fixture.operation.history.push(evidence);
@@ -526,12 +565,20 @@ impl SemanticRefusal {
     }
 
     fn verify_runtime(&self) -> Result<(), CliError> {
-        verify_operation(Some(&self.operation), &self.call, &self.cap, RUNTIME, OBSERVED_AT)
+        verify_operation(
+            Some(&self.operation),
+            &self.call,
+            &self.cap,
+            RUNTIME,
+            OBSERVED_AT,
+        )
     }
 
     fn assert_runtime_rejected(&self, expected: &str) {
-        assert_eq!(self.verify_runtime().map_err(|failure| failure.to_string()),
-            Err(error(expected).to_string()));
+        assert_eq!(
+            self.verify_runtime().map_err(|failure| failure.to_string()),
+            Err(error(expected).to_string())
+        );
     }
 }
 
@@ -546,34 +593,45 @@ fn canonical_unknown_receipts_retain_live_and_recovery_custody() -> Result<(), C
 }
 
 #[test]
-fn canonical_unknown_receipts_reject_missing_duplicate_and_substituted_history() -> Result<(), CliError> {
+fn canonical_unknown_receipts_reject_missing_duplicate_and_substituted_history(
+) -> Result<(), CliError> {
     for reference_in_receipt in [false, true] {
         let mut fixture = SemanticRefusal::with_runtime(reference_in_receipt)?;
         fixture.operation.history.clear();
-        fixture.assert_runtime_rejected("call continuation custody is missing or contradicts dispatch");
+        fixture.assert_runtime_rejected(
+            "call continuation custody is missing or contradicts dispatch",
+        );
         let mut fixture = SemanticRefusal::with_runtime(reference_in_receipt)?;
-        fixture.operation.history.push(fixture.operation.history[0].clone());
+        fixture
+            .operation
+            .history
+            .push(fixture.operation.history[0].clone());
         fixture.assert_runtime_rejected("substituted or duplicate continuation episode");
         let mut fixture = SemanticRefusal::with_runtime(reference_in_receipt)?;
         fixture.operation.history[0].claim["intent"]["expectationId"] = json!("foreign-generation");
         fixture.assert_runtime_rejected("admission operation invariant failed: runtime claim commitment differs from its history");
     }
     let mut fixture = SemanticRefusal::with_runtime(true)?;
-    fixture.operation.history[0].history.disposition = RuntimeParticipantDisposition::ReleasedBeforeDispatch;
+    fixture.operation.history[0].history.disposition =
+        RuntimeParticipantDisposition::ReleasedBeforeDispatch;
     fixture.assert_runtime_rejected("retained continuation contradicts dispatch custody");
     Ok(())
 }
 
 #[test]
-fn canonical_unknown_receipts_reject_substituted_signed_custody_references() -> Result<(), CliError> {
+fn canonical_unknown_receipts_reject_substituted_signed_custody_references() -> Result<(), CliError>
+{
     for field in ["plan_sha256", "resources_sha256"] {
         let mut fixture = SemanticRefusal::with_runtime(true)?;
-        fixture.metadata()?["chio_runtime"]["operation_owned_replay"][field] = json!("0".repeat(64));
+        fixture.metadata()?["chio_runtime"]["operation_owned_replay"][field] =
+            json!("0".repeat(64));
         fixture.resign()?;
-        fixture.assert_runtime_rejected("retained continuation differs from original signed receipt");
+        fixture
+            .assert_runtime_rejected("retained continuation differs from original signed receipt");
     }
     let mut fixture = SemanticRefusal::with_runtime(true)?;
-    fixture.metadata()?["chio_runtime"]["operation_owned_replay"]["reference"]["claimDigest"] = json!("0".repeat(64));
+    fixture.metadata()?["chio_runtime"]["operation_owned_replay"]["reference"]["claimDigest"] =
+        json!("0".repeat(64));
     fixture.resign()?;
     fixture.assert_runtime_rejected("unreferenced continuation episode remains live");
     Ok(())

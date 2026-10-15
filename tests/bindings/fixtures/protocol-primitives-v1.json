@@ -230,6 +230,10 @@
                 "attempt_id": "fixture-attempt",
                 "transport_id": "caller-report:fixture",
                 "transport_key_epoch": 1
+              },
+              "dispatch_launch": {
+                "native_launch": null,
+                "worker_profile": null
               }
             }
           },
@@ -280,6 +284,10 @@
                 "attempt_id": "fixture-attempt",
                 "transport_id": "caller-report:fixture",
                 "transport_key_epoch": 1
+              },
+              "dispatch_launch": {
+                "native_launch": null,
+                "worker_profile": null
               }
             }
           },

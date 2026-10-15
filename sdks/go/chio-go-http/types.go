@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 779db776163563a84e4e3a7f6fe2a6ffe577f1235d0ebb3b7126f5192373a7c6
+// Schema content SHA-256: 070f6ddd37d8898e219a16b9234ef13087898d0f784980a0e9c5fc1f741c12c5
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -351,6 +351,11 @@ const (
 	KernelCallerDispatchAuthorizationAuthorizationSchemaChioCallerDispatchAuthorizationV1 KernelCallerDispatchAuthorizationAuthorizationSchema = "chio.caller-dispatch-authorization.v1"
 )
 
+// Defines values for KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKind.
+const (
+	KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKindContainer KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKind = "container"
+)
+
 // Defines values for KernelCapabilityListType.
 const (
 	KernelCapabilityListTypeCapabilityList KernelCapabilityListType = "capability_list"
@@ -552,6 +557,11 @@ const (
 // Defines values for ReceiptAdmissionMetadataSchema.
 const (
 	ReceiptAdmissionMetadataSchemaChioAdmissionReceiptV1 ReceiptAdmissionMetadataSchema = "chio.admission-receipt.v1"
+)
+
+// Defines values for ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind.
+const (
+	ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKindContainer ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind = "container"
 )
 
 // Defines values for ReceiptDeliveryContractResult.
@@ -5597,7 +5607,8 @@ type KernelCallerDispatchAuthorization struct {
 				CoordinatorLeaseEpoch KernelCallerDispatchAuthorizationCallerPositiveInteger `json:"coordinator_lease_epoch"`
 
 				// CoordinatorLeaseId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
-				CoordinatorLeaseId KernelCallerDispatchAuthorizationCallerIdentifier `json:"coordinator_lease_id"`
+				CoordinatorLeaseId KernelCallerDispatchAuthorizationCallerIdentifier     `json:"coordinator_lease_id"`
+				DispatchLaunch     KernelCallerDispatchAuthorizationCallerDispatchLaunch `json:"dispatch_launch"`
 				ProviderAttempt    struct {
 					// AttemptId The kernel additionally bounds UTF-8 bytes and rejects control characters and surrounding whitespace.
 					AttemptId         KernelCallerDispatchAuthorizationCallerIdentifier      `json:"attempt_id"`
@@ -5651,6 +5662,25 @@ type KernelCallerDispatchAuthorizationAuthorizationSchema string
 
 // KernelCallerDispatchAuthorizationCallerDigest defines model for KernelCallerDispatchAuthorizationCallerDigest.
 type KernelCallerDispatchAuthorizationCallerDigest = string
+
+// KernelCallerDispatchAuthorizationCallerDispatchLaunch defines model for KernelCallerDispatchAuthorizationCallerDispatchLaunch.
+type KernelCallerDispatchAuthorizationCallerDispatchLaunch struct {
+	NativeLaunch *struct {
+		ReceiptId     KernelCallerDispatchAuthorizationCallerDigest `json:"receipt_id"`
+		ReceiptSha256 KernelCallerDispatchAuthorizationCallerDigest `json:"receipt_sha256"`
+	} `json:"native_launch"`
+	WorkerProfile *struct {
+		Kind          KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKind `json:"kind"`
+		LaunchAttempt int64                                                                  `json:"launch_attempt"`
+		LaunchRef     struct {
+			RecordId     KernelCallerDispatchAuthorizationCallerDigest `json:"record_id"`
+			RecordSha256 KernelCallerDispatchAuthorizationCallerDigest `json:"record_sha256"`
+		} `json:"launch_ref"`
+	} `json:"worker_profile"`
+}
+
+// KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKind defines model for KernelCallerDispatchAuthorizationCallerDispatchLaunch.WorkerProfile.Kind.
+type KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKind string
 
 // KernelCallerDispatchAuthorizationCallerExecutor defines model for KernelCallerDispatchAuthorizationCallerExecutor.
 type KernelCallerDispatchAuthorizationCallerExecutor struct {
@@ -6128,9 +6158,29 @@ type ReceiptAdmissionMetadataDispatchCommit struct {
 	CommittedVersion      ReceiptAdmissionMetadataPositiveIJsonInteger `json:"committed_version"`
 	CoordinatorLeaseEpoch ReceiptAdmissionMetadataPositiveIJsonInteger `json:"coordinator_lease_epoch"`
 	CoordinatorLeaseId    ReceiptAdmissionMetadataIdentifier           `json:"coordinator_lease_id"`
+	DispatchLaunch        ReceiptAdmissionMetadataDispatchLaunch       `json:"dispatch_launch"`
 	ProviderAttempt       ReceiptAdmissionMetadataProviderAttempt      `json:"provider_attempt"`
 	StoreFence            ReceiptAdmissionMetadataStoreFence           `json:"store_fence"`
 }
+
+// ReceiptAdmissionMetadataDispatchLaunch defines model for ReceiptAdmissionMetadataDispatchLaunch.
+type ReceiptAdmissionMetadataDispatchLaunch struct {
+	NativeLaunch *struct {
+		ReceiptId     ReceiptAdmissionMetadataDigest `json:"receipt_id"`
+		ReceiptSha256 ReceiptAdmissionMetadataDigest `json:"receipt_sha256"`
+	} `json:"native_launch"`
+	WorkerProfile *struct {
+		Kind          ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind `json:"kind"`
+		LaunchAttempt int64                                                   `json:"launch_attempt"`
+		LaunchRef     struct {
+			RecordId     ReceiptAdmissionMetadataDigest `json:"record_id"`
+			RecordSha256 ReceiptAdmissionMetadataDigest `json:"record_sha256"`
+		} `json:"launch_ref"`
+	} `json:"worker_profile"`
+}
+
+// ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind defines model for ReceiptAdmissionMetadataDispatchLaunch.WorkerProfile.Kind.
+type ReceiptAdmissionMetadataDispatchLaunchWorkerProfileKind string
 
 // ReceiptAdmissionMetadataIdentifier defines model for ReceiptAdmissionMetadataIdentifier.
 type ReceiptAdmissionMetadataIdentifier = string

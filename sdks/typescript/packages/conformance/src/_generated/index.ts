@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 4c780acc4488b2a8f84cd6218b125d7881cb5c7da78497e80ed323952d5bdeea
+// Schema SHA: 85bac48aa7d92d2bd890ced3196f35f556b972ea9b407528e0092895d16c04d4
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -1521,6 +1521,7 @@ export namespace Kernel_CallerDispatchAuthorization {
             transport_id: string;
             transport_key_epoch: CallerPositiveInteger;
           };
+          dispatch_launch: CallerDispatchLaunch;
         };
       };
       not_before_unix_ms: CallerPositiveInteger;
@@ -1532,6 +1533,20 @@ export namespace Kernel_CallerDispatchAuthorization {
     executor_id: CallerIdentifier;
     public_key: CallerPublicKey;
     key_epoch: CallerPositiveInteger;
+  }
+  export interface CallerDispatchLaunch {
+    native_launch: null | {
+      receipt_id: CallerDigest;
+      receipt_sha256: CallerDigest;
+    };
+    worker_profile: null | {
+      kind: "container";
+      launch_attempt: number;
+      launch_ref: {
+        record_id: CallerDigest;
+        record_sha256: CallerDigest;
+      };
+    };
   }
 }
 
@@ -2677,12 +2692,27 @@ export namespace Receipt_AdmissionMetadata {
     coordinator_lease_epoch: PositiveIJsonInteger;
     store_fence: StoreFence;
     provider_attempt: null | ProviderAttempt;
+    dispatch_launch: DispatchLaunch;
   }
   export interface ProviderAttempt {
     operation_id: Digest;
     attempt_id: Identifier;
     transport_id: Identifier;
     transport_key_epoch: PositiveIJsonInteger;
+  }
+  export interface DispatchLaunch {
+    native_launch: null | {
+      receipt_id: Digest;
+      receipt_sha256: Digest;
+    };
+    worker_profile: null | {
+      kind: "container";
+      launch_attempt: number;
+      launch_ref: {
+        record_id: Digest;
+        record_sha256: Digest;
+      };
+    };
   }
 }
 

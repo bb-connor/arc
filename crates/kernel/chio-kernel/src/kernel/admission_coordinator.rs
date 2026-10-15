@@ -384,6 +384,9 @@ pub(crate) struct DurableToolAdmission {
     issued_nonce: Option<crate::admission_operation::AdmissionExecutionNonceReservationV1>,
     /// Owned preflight participant when the operation already carries one.
     nonce_preflight: Option<crate::admission_operation::AdmissionNoncePreflightRecoveryV1>,
+    /// Launch evidence of the attempt presenting this admission. It is
+    /// attached when that attempt prepares dispatch capture.
+    attempt_launch: crate::admission_operation::AdmissionDispatchLaunchV1,
     /// Excludes overlapping evaluation/recovery, but grants no store authority.
     /// Drop last so exclusion outlives every field of this live admission.
     _live_owner: Option<crate::admission_operation::AdmissionLiveOperation>,
@@ -404,6 +407,15 @@ impl DurableToolAdmission {
 }
 
 impl DurableToolAdmission {
+    /// The presenting attempt's launch evidence, recorded with dispatch
+    /// capture preparation so the dispatch commitment names it.
+    pub(super) fn dispatch_launch_attachments(&self) -> Vec<AdmissionAttachment> {
+        (self.attempt_launch != crate::admission_operation::AdmissionDispatchLaunchV1::default())
+            .then(|| AdmissionAttachment::DispatchLaunch(self.attempt_launch.clone()))
+            .into_iter()
+            .collect()
+    }
+
     pub(crate) fn operation(&self) -> &AdmissionOperationV1 {
         &self.operation
     }
@@ -583,6 +595,11 @@ impl ChioKernel {
                 })
                 .transpose()?
                 .filter(|metadata| !metadata.is_empty());
+            let attempt_launch =
+                crate::admission_operation::AdmissionDispatchLaunchV1::from_admitted_metadata(
+                    admitted_receipt_metadata,
+                )
+                .map_err(|error| KernelError::InvalidReceiptMetadata(error.to_string()))?;
             self.validate_security_invocation_context_binding(request, security_context, None)?;
             let security_binding = self.admission_security_binding(security_context)?;
             let aggregate_quota =
@@ -970,6 +987,7 @@ impl ChioKernel {
                 drop(mutation_guard);
                 return Ok(Some(DurableToolAdmission {
                     _live_owner: Some(live_owner),
+                    attempt_launch: attempt_launch.clone(),
                     operation,
                     aggregate_quota,
                     supplemental_quota,
@@ -1131,6 +1149,7 @@ impl ChioKernel {
                         }
                         return Ok(Some(DurableToolAdmission {
                             _live_owner: Some(live_owner),
+                            attempt_launch: attempt_launch.clone(),
                             operation,
                             aggregate_quota,
                             supplemental_quota,
@@ -1146,6 +1165,7 @@ impl ChioKernel {
                 self.load_durable_nonce_preflight(&operation, trusted_now_unix_ms)?;
             Ok(Some(DurableToolAdmission {
                 _live_owner: Some(live_owner),
+                attempt_launch: attempt_launch.clone(),
                 operation,
                 aggregate_quota,
                 supplemental_quota,
@@ -1640,7 +1660,7 @@ impl ChioKernel {
         if admission.operation.state() == AdmissionOperationState::ReadyToDispatch {
             admission.operation = self.apply_admission_command(
                 admission.operation.clone(),
-                Vec::new(),
+                admission.dispatch_launch_attachments(),
                 AdmissionOperationState::CapturePending,
                 trusted_now_unix_ms,
             )?;

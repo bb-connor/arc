@@ -8,6 +8,7 @@ mod authority_profile;
 mod caller_budget;
 mod caller_dispatch_context;
 mod capture;
+mod dispatch_launch;
 pub mod dpop_claim;
 mod execution_nonce;
 pub mod governed_approval_claim;
@@ -41,6 +42,8 @@ pub use authority_profile::{AdmissionAuthorityProfileV1, AdmissionAuthoritySelec
 pub use caller_budget::AdmissionCallerBudgetShare;
 pub use caller_dispatch_context::AdmissionCallerDispatchContextV1;
 pub use capture::*;
+pub use dispatch_launch::AdmissionDispatchLaunchV1;
+pub(crate) use dispatch_launch::{is_native_launch, is_worker_profile};
 pub use execution_nonce::{
     verify_operation_execution_nonce_at, AdmissionExecutionNonceReservationV1,
     OPERATION_EXECUTION_NONCE_SCHEMA,
@@ -214,6 +217,8 @@ pub enum AdmissionOperationError {
     InvalidEconomicMutationBinding,
     #[error("state transition requires attachment {field}")]
     MissingParticipantAttachment { field: &'static str },
+    #[error("{entry} dispatch launch evidence is malformed")]
+    InvalidDispatchLaunch { entry: &'static str },
     #[error("admission participant requirements are inconsistent")]
     InvalidParticipantRequirements,
     #[error("request binding hash does not cover its immutable request and requirements")]
@@ -331,6 +336,7 @@ pub struct AdmissionDispatchCommitBindingV1 {
     pub coordinator_lease_epoch: u64,
     pub store_fence: StoreMutationFence,
     pub provider_attempt: Option<ProviderAttemptBindingV1>,
+    pub dispatch_launch: AdmissionDispatchLaunchV1,
 }
 
 impl<'de> Deserialize<'de> for AdmissionDispatchCommitBindingV1 {
@@ -346,6 +352,7 @@ impl<'de> Deserialize<'de> for AdmissionDispatchCommitBindingV1 {
             coordinator_lease_epoch: u64,
             store_fence: StoreMutationFence,
             provider_attempt: Option<ProviderAttemptBindingV1>,
+            dispatch_launch: AdmissionDispatchLaunchV1,
         }
         let value = Persisted::deserialize(deserializer)?;
         let binding = Self {
@@ -354,6 +361,7 @@ impl<'de> Deserialize<'de> for AdmissionDispatchCommitBindingV1 {
             coordinator_lease_epoch: value.coordinator_lease_epoch,
             store_fence: value.store_fence,
             provider_attempt: value.provider_attempt,
+            dispatch_launch: value.dispatch_launch,
         };
         binding.validate().map_err(serde::de::Error::custom)?;
         Ok(binding)
@@ -394,6 +402,7 @@ pub enum AdmissionAttachment {
     GovernedApprovalLedgerDigest(AdmissionDigest),
     DpopReplayLedgerDigest(AdmissionDigest),
     NativeDispatchLedgerDigest(AdmissionDigest),
+    DispatchLaunch(AdmissionDispatchLaunchV1),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -418,6 +427,7 @@ pub(crate) enum AdmissionAttachmentKind {
     GovernedApprovalLedger,
     DpopReplayLedger,
     NativeDispatchLedger,
+    DispatchLaunch,
 }
 
 impl AdmissionAttachment {
@@ -457,6 +467,7 @@ impl AdmissionAttachment {
             }
             Self::DpopReplayLedgerDigest(_) => AdmissionAttachmentKind::DpopReplayLedger,
             Self::NativeDispatchLedgerDigest(_) => AdmissionAttachmentKind::NativeDispatchLedger,
+            Self::DispatchLaunch(_) => AdmissionAttachmentKind::DispatchLaunch,
         }
     }
 
@@ -486,6 +497,7 @@ impl AdmissionAttachment {
             Self::GovernedApprovalLedgerDigest(_) => "governed_approval_ledger_digest",
             Self::DpopReplayLedgerDigest(_) => "dpop_replay_ledger_digest",
             Self::NativeDispatchLedgerDigest(_) => "native_dispatch_ledger_digest",
+            Self::DispatchLaunch(_) => "dispatch_launch",
         }
     }
 }
@@ -513,6 +525,7 @@ impl AdmissionAttachmentKind {
             Self::GovernedApprovalLedger => 17,
             Self::DpopReplayLedger => 18,
             Self::NativeDispatchLedger => 19,
+            Self::DispatchLaunch => 20,
         }
     }
 }
@@ -891,6 +904,15 @@ impl AdmissionOperationV1 {
         }
     }
 
+    /// Launch evidence of the attempt that prepared dispatch capture.
+    #[must_use]
+    pub fn dispatch_launch_attachment(&self) -> Option<&AdmissionDispatchLaunchV1> {
+        match self.attachment(AdmissionAttachmentKind::DispatchLaunch) {
+            Some(AdmissionAttachment::DispatchLaunch(launch)) => Some(launch),
+            _ => None,
+        }
+    }
+
     /// Preparation history bound by dedicated atomic native budget capture.
     /// Neither this digest nor its journal authorizes execution or recovery use.
     pub fn native_dispatch_ledger_digest(&self) -> Option<&AdmissionDigest> {
@@ -1127,6 +1149,10 @@ impl AdmissionOperationV1 {
                         coordinator_lease_epoch: command.recovery_lease.coordinator_lease_epoch(),
                         store_fence: command.recovery_lease.store_fence().clone(),
                         provider_attempt,
+                        dispatch_launch: updated
+                            .dispatch_launch_attachment()
+                            .cloned()
+                            .unwrap_or_default(),
                     });
                 }
                 updated.terminal_replay.clone_from(&command.terminal_replay);

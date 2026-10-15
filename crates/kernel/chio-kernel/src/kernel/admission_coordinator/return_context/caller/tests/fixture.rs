@@ -196,6 +196,7 @@ pub(super) fn fixture() -> TestResult<Fixture> {
     }
     request.execution_nonce = Some(nonce.signed_nonce().clone());
     let admission = DurableToolAdmission {
+        attempt_launch: crate::admission_operation::AdmissionDispatchLaunchV1::default(),
         _live_owner: None,
         operation,
         retained_request: Some(original),

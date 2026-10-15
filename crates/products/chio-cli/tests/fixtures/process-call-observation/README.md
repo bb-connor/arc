@@ -18,3 +18,6 @@ exact continuation commitment. The later store observation retains the unknown
 operation and incident. `interrupted-kernel.pub` and
 `interrupted-provenance.json` identify the public verification inputs. Neither
 fixture claims an unknown external outcome became a completed tool result.
+
+Both retained operations carry dispatch commitments without
+`dispatch_launch`, so decoding either signed observation is refused.

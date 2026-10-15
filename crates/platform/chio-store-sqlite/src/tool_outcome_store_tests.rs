@@ -731,7 +731,7 @@ fn compaction_page_partial_byte_progress_preserves_its_resume_cursor() {
     let limits = ToolOutcomeCompactionLimits {
         // The same ceiling includes the original payload plus qualified
         // request/operation/evaluation/projection/receipt verification reads.
-        max_payload_bytes: one_payload_size * 12,
+        max_payload_bytes: one_payload_size * 13,
         ..ToolOutcomeCompactionLimits::default()
     };
     let mut cursor = None;

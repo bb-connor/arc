@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10
+# Schema sha256: 76d7fa85798af8c0fa0bf76f068a5e8c2e5d4c46d4b3bd275c8adb3e4185cecf
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 from .caller_delivery_report_schema import ChioSignedCallerDeliveryReport, RealizedCost, Report
-from .caller_dispatch_authorization_schema import Authorization, CallerDigest, CallerExecutor, CallerIdentifier, CallerPositiveInteger, CallerPublicKey, CallerSignature, ChioSignedCallerDispatchAuthorization, Committed, DispatchCommit, Invocation, ProviderAttempt, StoreFence
+from .caller_dispatch_authorization_schema import Authorization, CallerDigest, CallerDispatchLaunch, CallerExecutor, CallerIdentifier, CallerPositiveInteger, CallerPublicKey, CallerSignature, ChioSignedCallerDispatchAuthorization, Committed, DispatchCommit, Invocation, LaunchRef, NativeLaunch, ProviderAttempt, StoreFence, WorkerProfile
 from .capability_list_schema import ChioKernelmessageCapabilityList
 from .capability_revoked_schema import ChioKernelmessageCapabilityRevoked
 from .combined_capture_metadata_schema import ChioCombinedAdmissionCaptureMetadata, QuotaKey
@@ -26,6 +26,7 @@ __all__ = [
     "Body",
     "BoundTo",
     "CallerDigest",
+    "CallerDispatchLaunch",
     "CallerExecutor",
     "CallerIdentifier",
     "CallerPositiveInteger",
@@ -51,6 +52,8 @@ __all__ = [
     "Error13",
     "Error9",
     "Invocation",
+    "LaunchRef",
+    "NativeLaunch",
     "Nonce",
     "ProviderAttempt",
     "QuotaKey",
@@ -64,4 +67,5 @@ __all__ = [
     "Result6",
     "Schema",
     "StoreFence",
+    "WorkerProfile",
 ]
