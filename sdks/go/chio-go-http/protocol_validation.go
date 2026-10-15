@@ -122,6 +122,11 @@ func checkProtocolShape(value any, shape reflect.Type) error {
 				}
 				continue
 			}
+			// Only these required caller launch fields have nullable schema branches.
+			if item == nil && shape == reflect.TypeOf(KernelCallerDispatchAuthorizationCallerDispatchLaunch{}) &&
+				(name == "native_launch" || name == "worker_profile") {
+				continue
+			}
 			if err := checkProtocolShape(item, field.Type); err != nil {
 				return err
 			}

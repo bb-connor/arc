@@ -36,6 +36,7 @@ from chio_sdk._generated.kernel.caller_delivery_report_schema import (
 )
 from chio_sdk._generated.kernel.caller_dispatch_authorization_schema import (
     ChioSignedCallerDispatchAuthorization,
+    Authorization as CallerDispatchAuthorizationBody,
 )
 from chio_sdk.errors import (
     ChioConnectionError,
@@ -71,10 +72,15 @@ def _jsonable(obj: Any) -> Any:
         return _jsonable(
             obj.model_dump(
                 mode="json",
-                # Required nullable fields are part of the signed caller report.
-                # Preserve the established omission contract for other models.
+                # Signed caller artifacts retain their required nullable fields.
                 exclude_none=not isinstance(
-                    obj, (ChioSignedCallerDeliveryReport, CallerDeliveryReportBody)
+                    obj,
+                    (
+                        ChioSignedCallerDeliveryReport,
+                        CallerDeliveryReportBody,
+                        ChioSignedCallerDispatchAuthorization,
+                        CallerDispatchAuthorizationBody,
+                    ),
                 ),
                 by_alias=True,
             )

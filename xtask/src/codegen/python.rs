@@ -19,6 +19,9 @@ mod root_models;
 #[path = "python_manifest_models.rs"]
 mod manifest_models;
 
+#[path = "python_dispatch_launch_models.rs"]
+mod dispatch_launch_models;
+
 /// Pinned tool spec for the Python codegen target. Reflected in
 /// `[python]` in `xtask/codegen-tools.lock.toml`. Bumping this is a
 /// spec-affecting change and must regenerate every `_generated/*.py` byte.
@@ -137,6 +140,7 @@ fn build_python_file_header(schema_digest: &str) -> String {
 fn harden_python_generated_models(root_dir: &Path) -> Result<(), XtaskError> {
     root_models::harden(root_dir)?;
     manifest_models::harden(root_dir)?;
+    dispatch_launch_models::harden(root_dir)?;
     harden_python_jsonrpc_response(&root_dir.join("jsonrpc").join("response_schema.py"))?;
     harden_python_receipt_record(&root_dir.join("receipt").join("record_schema.py"))?;
     harden_python_provenance_verdict_link(

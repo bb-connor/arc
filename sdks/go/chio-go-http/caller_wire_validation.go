@@ -40,7 +40,37 @@ func (a *KernelCallerDispatchAuthorization) UnmarshalJSON(data []byte) error {
 		commit.StoreFence.OwnerEpoch, commit.ProviderAttempt.TransportKeyEpoch); err != nil {
 		return err
 	}
+	if err := checkCallerDispatchLaunch(commit.DispatchLaunch); err != nil {
+		return err
+	}
 	*a = KernelCallerDispatchAuthorization(decoded)
+	return nil
+}
+
+func isCallerLaunchDigest(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for index := 0; index < len(value); index++ {
+		byteValue := value[index]
+		if !(byteValue >= '0' && byteValue <= '9' || byteValue >= 'a' && byteValue <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func checkCallerDispatchLaunch(launch KernelCallerDispatchAuthorizationCallerDispatchLaunch) error {
+	if native := launch.NativeLaunch; native != nil &&
+		(!isCallerLaunchDigest(native.ReceiptId) || !isCallerLaunchDigest(native.ReceiptSha256)) {
+		return fmt.Errorf("invalid caller native launch domain")
+	}
+	if worker := launch.WorkerProfile; worker != nil &&
+		(worker.Kind != KernelCallerDispatchAuthorizationCallerDispatchLaunchWorkerProfileKindContainer ||
+			worker.LaunchAttempt < 1 || worker.LaunchAttempt > 4294967295 ||
+			!isCallerLaunchDigest(worker.LaunchRef.RecordId) || !isCallerLaunchDigest(worker.LaunchRef.RecordSha256)) {
+		return fmt.Errorf("invalid caller worker profile domain")
+	}
 	return nil
 }
 
