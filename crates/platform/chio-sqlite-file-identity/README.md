@@ -37,8 +37,8 @@ inspection borrows it synchronously and returns a copied `SqliteFileIdentity`.
 - Missing main files, unavailable pointers, and unsupported VFS/platform
   paths return errors. Non-Unix inspection always refuses.
 - `SqliteFileIdentityInspectionError` separates syscall I/O failure from
-  validation refusal. `main_database_file_identity` preserves the compatibility
-  API by converting either error to its diagnostic string.
+  validation refusal. `main_database_file_identity` returns either error as
+  its diagnostic string.
 - `main_database_available_bytes` validates the same borrowed descriptor, then
   calls `fstatvfs` on it and returns `f_bavail * f_frsize` as checked `u64`
   bytes. It never reopens or stats the database path, so a renamed, replaced,
