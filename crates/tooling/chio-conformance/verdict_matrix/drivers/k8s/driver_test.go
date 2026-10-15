@@ -76,30 +76,50 @@ func TestRunDriverReportsUnsupportedWithoutSidecar(t *testing.T) {
 
 func TestRunDriverRecordsFailWhenSidecarIsSetButUnreachable(t *testing.T) {
 	// A sidecar URL pointing at a closed port must surface as fail, never a
-	// silent skip: a set-but-broken sidecar cannot pass.
+	// silent skip: a set-but-broken sidecar cannot pass. Capability and
+	// revocation scenarios stay unsupported because the relay cannot build a
+	// signed CapabilityToken.
 	root, err := repoRoot()
 	if err != nil {
 		t.Skipf("not running inside the chio repository: %v", err)
 	}
 	scenarioRoot := root + "/crates/tooling/chio-conformance/verdict_matrix/scenarios"
+	scenarios, err := loadScenarios(scenarioRoot)
+	if err != nil {
+		t.Fatalf("loadScenarios failed: %v", err)
+	}
 	r, err := runDriver(scenarioRoot, "http://127.0.0.1:1")
 	if err != nil {
 		t.Fatalf("runDriver failed: %v", err)
 	}
-	if r.Total == 0 {
-		t.Fatal("expected scenarios to load from the corpus")
+	if r.Total == 0 || r.Total != len(scenarios) {
+		t.Fatalf("total = %d, want %d loaded scenarios", r.Total, len(scenarios))
 	}
-	if r.Unsupported != 0 {
-		t.Fatalf("unsupported = %d, want 0", r.Unsupported)
+	unsupported := 0
+	for i, o := range r.Outcomes {
+		category := scenarios[i].Category
+		if category == "capability" || category == "revocation" {
+			unsupported++
+			if o.Status != "unsupported" {
+				t.Fatalf("%s (%s) status = %q, want unsupported", o.ScenarioID, category, o.Status)
+			}
+			if !strings.Contains(o.Diagnostic, "signed CapabilityToken") {
+				t.Fatalf("%s diagnostic %q must name the missing signed CapabilityToken", o.ScenarioID, o.Diagnostic)
+			}
+			continue
+		}
+		if o.Status != "fail" {
+			t.Fatalf("%s (%s) status = %q, want fail", o.ScenarioID, category, o.Status)
+		}
 	}
 	if r.Passed != 0 {
 		t.Fatalf("passed = %d, want 0", r.Passed)
 	}
-	if r.Failed != r.Total {
-		t.Fatalf("failed = %d, want %d", r.Failed, r.Total)
+	if r.Unsupported != unsupported {
+		t.Fatalf("unsupported = %d, want %d", r.Unsupported, unsupported)
 	}
-	if r.Outcomes[0].Status != "fail" {
-		t.Fatalf("first outcome status = %q, want fail", r.Outcomes[0].Status)
+	if r.Failed != r.Total-unsupported || r.Failed == 0 {
+		t.Fatalf("failed = %d, want %d (> 0)", r.Failed, r.Total-unsupported)
 	}
 }
 
