@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 818babd8dc3bef326a877c05bdad3ccf17e06604c2797a6cd26d97a804eeefdd
+# Schema sha256: 420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -30,7 +30,7 @@ class Node(BaseModel):
 
 class RecoveryDependencyGraphV1(BaseModel):
     """
-    Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+    Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, total cost and the shared work budget.
     """
 
     model_config = ConfigDict(

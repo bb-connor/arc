@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 818babd8dc3bef326a877c05bdad3ccf17e06604c2797a6cd26d97a804eeefdd
+# Schema sha256: 420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -29,7 +29,7 @@ from pydantic_core import core_schema
 #: SHA-256 of the lexicographically sorted concatenation of every
 #: ``spec/schemas/chio-wire/v1/**/*.schema.json`` byte stream that was
 #: fed into datamodel-code-generator at build time.
-SCHEMA_SHA256 = "818babd8dc3bef326a877c05bdad3ccf17e06604c2797a6cd26d97a804eeefdd"
+SCHEMA_SHA256 = "420d6d33bf1e07cccb9265dd8a14b791cc92336cf63a49dc16da093ac0270a10"
 
 from .agent import Body as AgentBody, Body5, Body6, BoundToolInvocationBinding, ChioAgentmessageHeartbeat, ChioAgentmessageListCapabilities, ChioAgentmessageToolCallRequest, ChioGovernedActiveResponseIntentBody, ChioGovernedTransactionIntent, MaxAmount, OrderedEffect
 from .anchor import Body as AnchorBody, CheckpointId, ChioAnchorBatchV1, Inclusion, Kind as AnchorKind, Witness, WitnessReceipt, WitnessState, WitnessState1, WitnessState2, WitnessState3

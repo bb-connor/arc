@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 4779cd24377347decc62d09f64d0b58bc529b83dfd0c7e99dbf5c21f299a23f7
+// Schema SHA: 4c780acc4488b2a8f84cd6218b125d7881cb5c7da78497e80ed323952d5bdeea
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -6571,7 +6571,7 @@ export namespace Recovery_DecisionReport {
 // Source: spec/schemas/chio-wire/v1/recovery/dependency-graph.schema.json
 export namespace Recovery_DependencyGraph {
   /**
-   * Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+   * Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, total cost and the shared work budget.
    */
   export interface RecoveryDependencyGraphV1 {
     schema: "chio.recovery.dependency-graph.v1";

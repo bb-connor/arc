@@ -1,8 +1,11 @@
+//! Explicit single-submission effect metadata for one provider resource.
 use chio_security_types::recovery::{
     ContractError, ProviderAccountId, ProviderId, ProviderResourceId,
     RecoveryProfileRequirementsV1, SafeInteger, VersionV1,
 };
 use serde::{Deserialize, Serialize};
+
+pub const MAX_EFFECT_CARDINALITY: u64 = 16;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EffectContractSchema {
@@ -36,8 +39,10 @@ pub enum PartialSettlementPolicy {
     PreserveSpentIdentity,
 }
 
-/// Single-submission effect contract. Provider-deduplicated resubmission requires a
-/// separately qualified version; metadata cannot enable generic retry middleware.
+/// One submission under the original native operation, with automatic retries
+/// disabled and no provider deduplication assumed. Provider-deduplicated
+/// resubmission is a different contract; this metadata cannot enable retry
+/// middleware.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct EffectContractV1 {
     schema: EffectContractSchema,
@@ -70,7 +75,9 @@ pub struct EffectContractInput {
     pub partial_settlement: PartialSettlementPolicy,
     pub recovery_profile: RecoveryProfileRequirementsV1,
 }
+
 impl EffectContractV1 {
+    /// Refuses `LimitExceeded` unless the effect cardinality is 1 to 16.
     pub fn new(input: EffectContractInput) -> Result<Self, ContractError> {
         let EffectContractInput {
             schema,
@@ -86,7 +93,7 @@ impl EffectContractV1 {
             partial_settlement,
             recovery_profile,
         } = input;
-        if !(1..=16).contains(&effect_cardinality.get()) {
+        if !(1..=MAX_EFFECT_CARDINALITY).contains(&effect_cardinality.get()) {
             return Err(ContractError::LimitExceeded);
         }
         Ok(Self {
@@ -114,6 +121,7 @@ impl EffectContractV1 {
         &self.recovery_profile
     }
 }
+
 impl<'de> Deserialize<'de> for EffectContractV1 {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         Self::new(EffectContractInput::deserialize(d)?).map_err(serde::de::Error::custom)

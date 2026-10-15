@@ -1,10 +1,20 @@
-//! Bounded descriptions of selector precedence, never native execution authority.
+//! The resolved precedence of package and operator selectors for one route.
+use crate::work::units;
 use crate::VerificationBudget;
 use alloc::{collections::BTreeSet, vec::Vec};
-use chio_security_types::{flow::InformationLabel, recovery::*, semantic::*};
+use chio_security_types::flow::InformationLabel;
+use chio_security_types::recovery::{
+    BoundedList, CanonicalPayloadDigest, ContractError, NonEmptyBoundedList, SafeInteger,
+    SemanticDestinationId, SemanticFactId, SemanticFieldId, SemanticOperationId,
+    SemanticPackageDigest, SemanticRegistryDigest,
+};
+use chio_security_types::semantic::{
+    SemanticChannelRuleV1, SemanticOperationContractV1, SemanticPrerequisiteRequirementV1,
+    SemanticReviewedOverrideV1, SemanticRouteV1, SemanticSelectorV1, SemanticWithheldStatusV1,
+};
 use serde::{Deserialize, Serialize};
 
-/// Every use still requires independently fresh capability, policy, flow,
+/// Every use requires independently fresh capability, policy, flow,
 /// actor, ACL and reservation checks inside the owning native transaction.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -12,6 +22,7 @@ pub enum SemanticNativeCeilingRequirementV1 {
     FreshNativeAdmission,
 }
 
+/// A package selector that remains in force, with its index in the contract.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SemanticAppliedSelectorV1 {
@@ -19,8 +30,11 @@ pub struct SemanticAppliedSelectorV1 {
     pub selector: SemanticSelectorV1,
 }
 
-/// Resolved contract data describes what was matched. It cannot be submitted
-/// as an endorsement, reservation, capability or native capture witness.
+/// The effective constraints of one route: package selectors still applied,
+/// reviewed overrides with their reasons and fixtures, and operator selectors,
+/// which always apply. Resolved contract data describes what matched; it
+/// cannot be submitted as an endorsement, reservation, capability or native
+/// capture witness.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResolvedSemanticConstraintsV1 {
@@ -52,6 +66,11 @@ impl core::fmt::Debug for ResolvedSemanticConstraintsV1 {
 
 /// Recompute precedence from the exact selected route and contract. Authority
 /// verification remains with the caller; this pure function only returns data.
+///
+/// Refusals: `BindingMismatch` when the route names another operation,
+/// implementation or schema, when the destination is not routed, or when an
+/// override names an absent selector; `DuplicateIdentity` for a selector
+/// overridden twice; `WorkBudgetExceeded` on exhaustion.
 pub fn resolve_semantic_constraints(
     registry: SemanticRegistryDigest,
     route: &SemanticRouteV1,
@@ -67,10 +86,7 @@ pub fn resolve_semantic_constraints(
     {
         return Err(ContractError::BindingMismatch);
     }
-    budget.charge(
-        u32::try_from(route.destinations.as_slice().len())
-            .map_err(|_| ContractError::LimitExceeded)?,
-    )?;
+    budget.charge(units(&[route.destinations.as_slice().len()])?)?;
     let destination = route
         .destinations
         .as_slice()
@@ -101,10 +117,7 @@ pub fn resolve_semantic_constraints(
             });
         }
     }
-    budget.charge(
-        u32::try_from(route.operator_selectors.as_slice().len())
-            .map_err(|_| ContractError::LimitExceeded)?,
-    )?;
+    budget.charge(units(&[route.operator_selectors.as_slice().len()])?)?;
     Ok(ResolvedSemanticConstraintsV1 {
         registry,
         package: route.package,

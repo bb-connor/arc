@@ -9,8 +9,8 @@ repository.workspace = true
 publish = false
 
 [dependencies]
-chio-core-types = { workspace = true, default-features = false }
-chio-security-types = { workspace = true, default-features = false }
+chio-core-types = { version = "=0.1.0", path = "../../core/chio-core-types", default-features = false }
+chio-security-types = { workspace = true }
 serde = { version = "1", default-features = false, features = ["derive", "alloc"] }
 
 [features]

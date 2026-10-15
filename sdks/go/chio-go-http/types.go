@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 5256e0f1072b5f2ba07ef9bcc6fa1e849766536377899c486bd5ef45cc249f0c
+// Schema content SHA-256: 779db776163563a84e4e3a7f6fe2a6ffe577f1235d0ebb3b7126f5192373a7c6
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -8188,7 +8188,7 @@ type RecoveryDecisionReportViewScope struct {
 	TenantId        RecoveryDecisionReportViewOpaqueId `json:"tenant_id"`
 }
 
-// RecoveryDependencyGraph Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+// RecoveryDependencyGraph Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, total cost and the shared work budget.
 type RecoveryDependencyGraph struct {
 	Nodes []struct {
 		Dependencies       []RecoveryObservationOpaqueId  `json:"dependencies"`

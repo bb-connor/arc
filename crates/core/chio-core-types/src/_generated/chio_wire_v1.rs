@@ -56532,7 +56532,7 @@ pub mod recovery_dependency_graph {
             value.clone()
         }
     }
-    ///Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.
+    ///Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, total cost and the shared work budget.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -56540,7 +56540,7 @@ pub mod recovery_dependency_graph {
     ///{
     ///  "$id": "https://chio.world/schemas/chio-wire/v1/recovery/dependency-graph.schema.json",
     ///  "title": "Recovery dependency graph V1",
-    ///  "description": "Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.",
+    ///  "description": "Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, total cost and the shared work budget.",
     ///  "type": "object",
     ///  "required": [
     ///    "nodes",

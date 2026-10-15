@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio.world/schemas/chio-wire/v1/recovery/dependency-graph.schema.json",
   "title": "Recovery dependency graph V1",
-  "description": "Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, cost and shared work budget.",
+  "description": "Symbolic graph only. Rust verifies canonical dependency order, unique steps, dependency closure, cycles, total cost and the shared work budget.",
   "type": "object",
   "additionalProperties": false,
   "required": [

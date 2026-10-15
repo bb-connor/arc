@@ -40,7 +40,7 @@ fn generated_recovery_models_preserve_every_positive_field() {
                 generated::recovery_trajectory::RecoveryObservationV1,
             >(wire),
             "profile" => assert_generated_round_trip::<
-                generated::recovery_profile_requirements::RecoveryProfileRequirementsV1,
+                generated::recovery_effect_contract::RecoveryProfileRequirementsV1,
             >(wire),
             "effect_contract" => assert_generated_round_trip::<
                 generated::recovery_effect_contract::SemanticEffectContractV1,

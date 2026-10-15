@@ -1,10 +1,45 @@
-//! Deterministic test fixture shared by pure and native semantic acceptance.
-use chio_core_types::{recovery::*, Keypair};
-use chio_security_types::{flow::InformationLabel, recovery::*, semantic::*};
-use chio_semantic_contracts::ExposedSemanticToolV1;
-type FixtureResult<T> = Result<T, Box<dyn std::error::Error>>;
+//! A signed support deployment with one package, one route and one
+//! invocation.
+use chio_core_types::recovery::{
+    semantic_action_digest, semantic_content_digest, semantic_key_digest, semantic_package_digest,
+    semantic_plan_digest, semantic_registry_digest, SemanticInvocationV1,
+    SignedScopedEndorsementV1, SignedSemanticAudienceV1, SignedSemanticDeploymentV1,
+    SignedSemanticPackageV1,
+};
+use chio_core_types::Keypair;
+use chio_security_types::flow::InformationLabel;
+use chio_security_types::recovery::{
+    ArtifactVersionId, AuthorityDomainId, BoundedList, CanonicalPayloadDigest,
+    CapabilityBodyDigest, ContractError, EvidenceRef, NonEmptyBoundedList, ProcessId,
+    ProtectedText, ProviderAccountId, ProviderId, ProviderResourceId, RecoveryScopeV1,
+    RecoveryTenantId, RequestId, RequestNamespaceDigest, SafeInteger, SemanticDestinationId,
+    SemanticFactId, SemanticFieldId, SemanticOperationId, SemanticPackageId, StepId, VersionV1,
+};
+use chio_security_types::semantic::{
+    ScopedEndorsementV1, SemanticAclCursorV1, SemanticAclPaginationV1, SemanticActionV1,
+    SemanticAudienceCompletenessV1, SemanticAudienceObservationV1, SemanticChannelRuleV1,
+    SemanticChannelV1, SemanticDeploymentV1, SemanticDestinationV1, SemanticEndorsementTargetV1,
+    SemanticFieldV1, SemanticInputVersionV1, SemanticInvocationSchemaV1,
+    SemanticNativeSourceBasisV1, SemanticOperationContractV1, SemanticOperationKindV1,
+    SemanticOutputDispositionV1, SemanticPackageV1, SemanticPayloadV1, SemanticPlanInputV1,
+    SemanticPlanStepV1, SemanticPlanV1, SemanticRouteV1, SemanticSelectorV1, SemanticValueV1,
+    SemanticWithheldStatusV1,
+};
+use chio_semantic_contracts::{
+    compile_semantic_registry, verify_semantic_invocation, CompiledSemanticRegistryV1,
+    ExposedSemanticToolV1, SemanticInvocationExpectationV1, VerificationBudget,
+    VerifiedSemanticInvocationV1,
+};
+
+pub type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+/// The action is issued at this instant and stays valid for 50 seconds.
+pub const NOW: u64 = 1000;
+pub const VERIFY_AT: u64 = NOW + 1;
+pub const VALID_UNTIL: u64 = NOW + 50_000;
 
 pub struct SemanticFixture {
+    pub scope: RecoveryScopeV1,
     pub publisher: Keypair,
     pub operator: Keypair,
     pub resolver: Keypair,
@@ -19,25 +54,17 @@ pub struct SemanticFixture {
     pub plan: SemanticPlanV1,
     pub invocation: SemanticInvocationV1,
 }
-pub fn semantic_fixture(
-    scope: RecoveryScopeV1,
-    now: u64,
-    label: InformationLabel,
-    kind: SemanticOperationKindV1,
-) -> FixtureResult<SemanticFixture> {
-    let publisher = Keypair::from_seed(&[210; 32]);
-    let operator = Keypair::from_seed(&[211; 32]);
-    let resolver = Keypair::from_seed(&[212; 32]);
-    let endorser = Keypair::from_seed(&[213; 32]);
-    let annotator = Keypair::from_seed(&[214; 32]);
-    let transformer = Keypair::from_seed(&[215; 32]);
-    let prerequisite = Keypair::from_seed(&[216; 32]);
-    let required = if kind == SemanticOperationKindV1::IssueWrite {
-        vec![SemanticFactId::new("customer-instructions-reviewed")?]
-    } else {
-        vec![]
-    };
-    let channels = [
+
+pub fn scope() -> Result<RecoveryScopeV1, ContractError> {
+    Ok(RecoveryScopeV1 {
+        authority_domain: AuthorityDomainId::new("authority")?,
+        tenant_id: RecoveryTenantId::new("tenant")?,
+        process_id: ProcessId::new("root")?,
+    })
+}
+
+pub fn channels() -> Vec<SemanticChannelRuleV1> {
+    [
         SemanticChannelV1::Input,
         SemanticChannelV1::Success,
         SemanticChannelV1::Error,
@@ -58,14 +85,39 @@ pub fn semantic_fixture(
         channel,
         enabled: index < 4,
     })
-    .collect();
+    .collect()
+}
+
+pub fn text(value: &str) -> Result<SemanticValueV1, ContractError> {
+    Ok(SemanticValueV1::Text {
+        value: ProtectedText::new(value)?,
+    })
+}
+
+pub fn semantic_fixture(
+    label: InformationLabel,
+    kind: SemanticOperationKindV1,
+) -> TestResult<SemanticFixture> {
+    let scope = scope()?;
+    let publisher = Keypair::from_seed(&[210; 32]);
+    let operator = Keypair::from_seed(&[211; 32]);
+    let resolver = Keypair::from_seed(&[212; 32]);
+    let endorser = Keypair::from_seed(&[213; 32]);
+    let annotator = Keypair::from_seed(&[214; 32]);
+    let transformer = Keypair::from_seed(&[215; 32]);
+    let prerequisite = Keypair::from_seed(&[216; 32]);
+    let required = if kind == SemanticOperationKindV1::IssueWrite {
+        vec![SemanticFactId::new("customer-instructions-reviewed")?]
+    } else {
+        vec![]
+    };
     let contract = SemanticOperationContractV1 {
         operation: SemanticOperationId::new("support-remedy")?,
         kind,
         input_schema: CanonicalPayloadDigest::from_bytes([1; 32]),
         output_schema: CanonicalPayloadDigest::from_bytes([2; 32]),
         implementation: CanonicalPayloadDigest::from_bytes([3; 32]),
-        channels: NonEmptyBoundedList::new(channels)?,
+        channels: NonEmptyBoundedList::new(channels())?,
         input_fields: BoundedList::new(vec![
             SemanticFieldId::new("title")?,
             SemanticFieldId::new("body")?,
@@ -150,15 +202,11 @@ pub fn semantic_fixture(
         fields: NonEmptyBoundedList::new(vec![
             SemanticFieldV1 {
                 field: SemanticFieldId::new("title")?,
-                value: SemanticValueV1::Text {
-                    value: ProtectedText::new("support ticket")?,
-                },
+                value: text("support ticket")?,
             },
             SemanticFieldV1 {
                 field: SemanticFieldId::new("body")?,
-                value: SemanticValueV1::Text {
-                    value: ProtectedText::new("private-canary")?,
-                },
+                value: text("private-canary")?,
             },
         ])?,
     };
@@ -214,8 +262,8 @@ pub fn semantic_fixture(
         plan: semantic_plan_digest(&plan)?,
         step,
         output: SemanticOutputDispositionV1::ReturnValue,
-        issued_at_unix_ms: SafeInteger::new(now)?,
-        valid_until_unix_ms: SafeInteger::new(now + 50_000)?,
+        issued_at_unix_ms: SafeInteger::new(NOW)?,
+        valid_until_unix_ms: SafeInteger::new(VALID_UNTIL)?,
     };
     let audience = SignedSemanticAudienceV1::sign(
         SemanticAudienceObservationV1 {
@@ -234,8 +282,8 @@ pub fn semantic_fixture(
                 pages_expected: SafeInteger::new(1)?,
                 cursor: SemanticAclCursorV1::Complete,
             },
-            observed_at_unix_ms: SafeInteger::new(now)?,
-            valid_until_unix_ms: SafeInteger::new(now + 50_000)?,
+            observed_at_unix_ms: SafeInteger::new(NOW)?,
+            valid_until_unix_ms: SafeInteger::new(VALID_UNTIL)?,
         },
         &resolver,
     )?;
@@ -246,7 +294,7 @@ pub fn semantic_fixture(
             ScopedEndorsementV1 {
                 domain_version: VersionV1,
                 evidence: EvidenceRef::new("endorsement-a")?,
-                scope,
+                scope: scope.clone(),
                 target: SemanticEndorsementTargetV1::ExactAction {
                     action: semantic_action_digest(&action)?,
                 },
@@ -270,8 +318,8 @@ pub fn semantic_fixture(
         transformation: None,
         prerequisites: BoundedList::new(vec![])?,
     };
-
     Ok(SemanticFixture {
+        scope,
         publisher,
         operator,
         resolver,
@@ -286,4 +334,139 @@ pub fn semantic_fixture(
         plan,
         invocation,
     })
+}
+
+impl SemanticFixture {
+    pub fn compile_with(
+        &self,
+        expected_scope: &RecoveryScopeV1,
+        exposed: &[ExposedSemanticToolV1],
+    ) -> Result<CompiledSemanticRegistryV1, ContractError> {
+        compile_semantic_registry(
+            &self.deployment,
+            expected_scope,
+            core::slice::from_ref(&self.package),
+            &self.operator.public_key(),
+            &[self.publisher.public_key()],
+            exposed,
+            &mut VerificationBudget::new(4096)?,
+        )
+    }
+
+    pub fn compiled(&self) -> Result<CompiledSemanticRegistryV1, ContractError> {
+        self.compile_with(&self.scope, core::slice::from_ref(&self.exposed))
+    }
+
+    pub fn expectation(&self, now: u64) -> SemanticInvocationExpectationV1<'static> {
+        SemanticInvocationExpectationV1 {
+            server: "server-a",
+            tool: "send",
+            request_id: "request-a",
+            request_namespace: self.invocation.action.request_namespace,
+            capability: self.invocation.action.capability,
+            request_semantics: self.invocation.action.request_semantics,
+            source_label: bottom(),
+            externally_influenced: false,
+            influence: self.invocation.action.influence,
+            native_disclosure_target: None,
+            now_unix_ms: now,
+        }
+    }
+
+    pub fn verify_with(
+        &self,
+        invocation: &SemanticInvocationV1,
+        expected: &SemanticInvocationExpectationV1<'_>,
+    ) -> Result<VerifiedSemanticInvocationV1, ContractError> {
+        verify_semantic_invocation(
+            &self.compiled()?,
+            invocation,
+            expected,
+            &mut VerificationBudget::new(4096)?,
+        )
+    }
+
+    pub fn verify(
+        &self,
+        invocation: &SemanticInvocationV1,
+        now: u64,
+    ) -> Result<VerifiedSemanticInvocationV1, ContractError> {
+        self.verify_with(invocation, &self.expectation(now))
+    }
+
+    /// Re-sign the deployment after `edit` changes its only route, and bind
+    /// the fixture action and endorsement to the new registry.
+    pub fn rebind_route(&mut self, edit: impl FnOnce(&mut SemanticRouteV1)) -> TestResult {
+        let mut deployment = self.deployment.body().clone();
+        let mut route = only(deployment.routes.as_slice())?.clone();
+        edit(&mut route);
+        deployment.routes = NonEmptyBoundedList::new(vec![route])?;
+        self.deployment = SignedSemanticDeploymentV1::sign(deployment, &self.operator)?;
+        self.refresh_action()
+    }
+
+    /// Re-sign the package after `edit` changes its only operation, then route
+    /// the deployment to the new package digest.
+    pub fn rebind_operation(
+        &mut self,
+        edit: impl FnOnce(&mut SemanticOperationContractV1),
+    ) -> TestResult {
+        let mut package = self.package.body().clone();
+        let mut operation = only(package.operations.as_slice())?.clone();
+        edit(&mut operation);
+        package.operations = NonEmptyBoundedList::new(vec![operation])?;
+        self.package = SignedSemanticPackageV1::sign(package, &self.publisher)?;
+        let digest = semantic_package_digest(self.package.body())?;
+        let mut deployment = self.deployment.body().clone();
+        deployment.packages = NonEmptyBoundedList::new(vec![digest])?;
+        self.deployment = SignedSemanticDeploymentV1::sign(deployment, &self.operator)?;
+        self.rebind_route(|route| route.package = digest)
+    }
+
+    /// Re-sign the audience observation after `edit`.
+    pub fn rebind_audience(
+        &mut self,
+        edit: impl FnOnce(&mut SemanticAudienceObservationV1),
+    ) -> TestResult {
+        let mut audience = self.invocation.audience.body().clone();
+        edit(&mut audience);
+        self.invocation.audience = SignedSemanticAudienceV1::sign(audience, &self.resolver)?;
+        Ok(())
+    }
+
+    /// Point the action at the current registry and re-endorse it.
+    pub fn refresh_action(&mut self) -> TestResult {
+        self.invocation.action.registry = semantic_registry_digest(self.deployment.body())?;
+        let mut invocation = self.invocation.clone();
+        self.endorse(&mut invocation)?;
+        self.invocation = invocation;
+        Ok(())
+    }
+
+    /// Re-sign every endorsement of `invocation` for its current action.
+    pub fn endorse(&self, invocation: &mut SemanticInvocationV1) -> TestResult {
+        let mut endorsements = Vec::new();
+        for endorsement in invocation.endorsements.as_slice() {
+            let mut body = endorsement.body().clone();
+            body.target = SemanticEndorsementTargetV1::ExactAction {
+                action: semantic_action_digest(&invocation.action)?,
+            };
+            body.influence = invocation.action.influence;
+            endorsements.push(SignedScopedEndorsementV1::sign(body, &self.endorser)?);
+        }
+        invocation.endorsements = BoundedList::new(endorsements)?;
+        Ok(())
+    }
+}
+
+pub fn only<T>(items: &[T]) -> TestResult<&T> {
+    match items {
+        [item] => Ok(item),
+        _ => Err("expected exactly one fixture item".into()),
+    }
+}
+
+fn bottom() -> &'static InformationLabel {
+    static BOTTOM: std::sync::OnceLock<InformationLabel> = std::sync::OnceLock::new();
+    BOTTOM.get_or_init(InformationLabel::bottom)
 }
