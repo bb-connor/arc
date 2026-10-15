@@ -783,7 +783,7 @@ pub(super) fn create_archive_schema(
             cost_currency TEXT CHECK (
                 cost_currency IS NULL OR (
                     typeof(cost_currency) = 'text' AND
-                    length(cost_currency) = 3 AND
+                    length(cost_currency) = 3 AND instr(cost_currency, char(0)) = 0 AND octet_length(cost_currency) <= 12 AND
                     cost_currency NOT GLOB '*[^A-Z]*'
                 )
             ),
@@ -815,7 +815,7 @@ pub(super) fn create_archive_schema(
             tree_size INTEGER NOT NULL, merkle_root TEXT NOT NULL,
             issued_at INTEGER NOT NULL, statement_json TEXT NOT NULL,
             signature TEXT NOT NULL, kernel_key TEXT NOT NULL,
-            previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
+            previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND octet_length(previous_checkpoint_sha256) <= 256 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
         );
         CREATE TABLE IF NOT EXISTS archive.capability_lineage (
             capability_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL,
@@ -867,18 +867,18 @@ pub(super) fn create_archive_schema(
             checkpoint_seq INTEGER PRIMARY KEY, batch_start_seq INTEGER NOT NULL,
             batch_end_seq INTEGER NOT NULL, tree_size INTEGER NOT NULL,
             merkle_root TEXT NOT NULL, issued_at INTEGER NOT NULL, kernel_key TEXT NOT NULL,
-            previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')), statement_json TEXT NOT NULL, signature TEXT NOT NULL
+            previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND octet_length(previous_checkpoint_sha256) <= 256 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')), statement_json TEXT NOT NULL, signature TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_predecessor_witnesses (
             predecessor_checkpoint_seq INTEGER NOT NULL, witness_checkpoint_seq INTEGER PRIMARY KEY,
-            previous_checkpoint_sha256 TEXT NOT NULL CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')), witnessed_at INTEGER NOT NULL,
+            previous_checkpoint_sha256 TEXT NOT NULL CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND octet_length(previous_checkpoint_sha256) <= 256 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*')), witnessed_at INTEGER NOT NULL,
             witness_statement_json TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_publication_metadata (
             checkpoint_seq INTEGER PRIMARY KEY, publication_schema TEXT NOT NULL,
             merkle_root TEXT NOT NULL, published_at INTEGER NOT NULL, kernel_key TEXT NOT NULL,
             log_tree_size INTEGER NOT NULL, entry_start_seq INTEGER NOT NULL,
-            entry_end_seq INTEGER NOT NULL, previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
+            entry_end_seq INTEGER NOT NULL, previous_checkpoint_sha256 TEXT CHECK (previous_checkpoint_sha256 IS NULL OR (typeof(previous_checkpoint_sha256) = 'text' AND length(previous_checkpoint_sha256) = 64 AND instr(previous_checkpoint_sha256, char(0)) = 0 AND octet_length(previous_checkpoint_sha256) <= 256 AND previous_checkpoint_sha256 NOT GLOB '*[^0-9a-f]*'))
         );
         CREATE TABLE IF NOT EXISTS archive.checkpoint_publication_trust_anchor_bindings (
             checkpoint_seq INTEGER PRIMARY KEY, binding_json TEXT NOT NULL

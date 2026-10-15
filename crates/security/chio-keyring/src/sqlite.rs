@@ -6,6 +6,9 @@ mod synchronization;
 pub use synchronization::KeyLogSyncSnapshot;
 
 #[cfg(test)]
+#[path = "sqlite/canonical_bounds_tests.rs"]
+mod canonical_bounds_tests;
+#[cfg(test)]
 #[path = "sqlite/synchronization_tests.rs"]
 mod synchronization_tests;
 

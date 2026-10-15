@@ -14,7 +14,7 @@ use crate::{
 
 pub const CHECKPOINT_EQUIVOCATION_SCHEMA: &str = "chio.key-log.equivocation.v1";
 
-const WITNESS_SCHEMA: &str = r#"
+pub(crate) const WITNESS_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS keyring_policy_binding (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     witness_roster_binding TEXT NOT NULL,
@@ -25,24 +25,24 @@ CREATE TABLE IF NOT EXISTS keyring_policy_binding (
 );
 CREATE TABLE IF NOT EXISTS witness_events (
     sequence INTEGER PRIMARY KEY,
-    canonical_envelope BLOB NOT NULL CHECK (length(canonical_envelope) <= 1048576)
+    canonical_envelope BLOB NOT NULL CHECK (typeof(canonical_envelope) = 'blob' AND length(canonical_envelope) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS witness_checkpoints (
     checkpoint_sequence INTEGER PRIMARY KEY,
     tree_size INTEGER NOT NULL UNIQUE,
     checkpoint_hash TEXT NOT NULL UNIQUE,
     root_hash TEXT NOT NULL,
-    canonical_checkpoint BLOB NOT NULL CHECK (length(canonical_checkpoint) <= 1048576)
+    canonical_checkpoint BLOB NOT NULL CHECK (typeof(canonical_checkpoint) = 'blob' AND length(canonical_checkpoint) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS witness_activation_commits (
     signing_epoch INTEGER PRIMARY KEY,
-    canonical_commit BLOB NOT NULL CHECK (length(canonical_commit) <= 1048576)
+    canonical_commit BLOB NOT NULL CHECK (typeof(canonical_commit) = 'blob' AND length(canonical_commit) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS witness_decisions (
     checkpoint_sequence INTEGER PRIMARY KEY,
     tree_size INTEGER NOT NULL UNIQUE,
     checkpoint_hash TEXT NOT NULL UNIQUE,
-    canonical_signature BLOB NOT NULL CHECK (length(canonical_signature) <= 1048576)
+    canonical_signature BLOB NOT NULL CHECK (typeof(canonical_signature) = 'blob' AND length(canonical_signature) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS witness_pin (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -54,14 +54,14 @@ CREATE TABLE IF NOT EXISTS witness_pin (
 );
 CREATE TABLE IF NOT EXISTS witness_conflicts (
     conflict_hash TEXT PRIMARY KEY,
-    canonical_evidence BLOB NOT NULL CHECK (length(canonical_evidence) <= 1048576)
+    canonical_evidence BLOB NOT NULL CHECK (typeof(canonical_evidence) = 'blob' AND length(canonical_evidence) <= 1048576)
 );
 CREATE TABLE IF NOT EXISTS witness_gossip (
     checkpoint_hash TEXT NOT NULL,
     witness_id TEXT NOT NULL,
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence >= 0),
     tree_size INTEGER NOT NULL CHECK (tree_size > 0),
-    canonical_gossip BLOB NOT NULL CHECK (length(canonical_gossip) <= 1048576),
+    canonical_gossip BLOB NOT NULL CHECK (typeof(canonical_gossip) = 'blob' AND length(canonical_gossip) <= 1048576),
     PRIMARY KEY (checkpoint_hash, witness_id)
 );
 "#;

@@ -198,16 +198,16 @@ impl SqliteApprovalStore {
                 token_id TEXT NOT NULL,
                 parameter_hash TEXT NOT NULL,
                 token_digest TEXT
-                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*')),
+                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND instr(token_digest, char(0)) = 0 AND octet_length(token_digest) <= 256 AND token_digest NOT GLOB '*[^0-9a-f]*')),
                 consumed_at INTEGER NOT NULL,
                 PRIMARY KEY (token_id, parameter_hash)
             );
 
             CREATE TABLE IF NOT EXISTS chio_hitl_operation_reservations (
                 operation_id TEXT PRIMARY KEY
-                    CHECK (length(operation_id) = 64 AND operation_id NOT GLOB '*[^0-9a-f]*'),
+                    CHECK (length(operation_id) = 64 AND instr(operation_id, char(0)) = 0 AND octet_length(operation_id) <= 256 AND operation_id NOT GLOB '*[^0-9a-f]*'),
                 approval_set_hash TEXT NOT NULL UNIQUE
-                    CHECK (length(approval_set_hash) = 64 AND approval_set_hash NOT GLOB '*[^0-9a-f]*'),
+                    CHECK (typeof(approval_set_hash) = 'text' AND length(approval_set_hash) = 64 AND instr(approval_set_hash, char(0)) = 0 AND octet_length(approval_set_hash) <= 256 AND approval_set_hash NOT GLOB '*[^0-9a-f]*'),
                 members_json TEXT NOT NULL
                     CHECK (length(CAST(members_json AS BLOB)) BETWEEN 2 AND 262144),
                 proposal_deadline INTEGER NOT NULL CHECK (proposal_deadline > 0),
@@ -218,7 +218,7 @@ impl SqliteApprovalStore {
                 token_id TEXT PRIMARY KEY
                     CHECK (length(CAST(token_id AS BLOB)) BETWEEN 1 AND 512 AND instr(token_id, char(0)) = 0),
                 token_digest TEXT NOT NULL UNIQUE
-                    CHECK (length(token_digest) = 64 AND token_digest NOT GLOB '*[^0-9a-f]*'),
+                    CHECK (typeof(token_digest) = 'text' AND length(token_digest) = 64 AND instr(token_digest, char(0)) = 0 AND octet_length(token_digest) <= 256 AND token_digest NOT GLOB '*[^0-9a-f]*'),
                 operation_id TEXT NOT NULL REFERENCES chio_hitl_operation_reservations(operation_id),
                 position INTEGER NOT NULL CHECK (position >= 0),
                 UNIQUE (operation_id, position)

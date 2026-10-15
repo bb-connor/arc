@@ -55,10 +55,10 @@ const SCHEMA_TABLES: &[&str] = &[
     "chio_finding_operator_purchase_jobs",
     "chio_finding_operator_seller_artifact_capacity",
 ];
-const SCHEMA: &str = r#"
+pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_operator_bundles (
     finding_id TEXT PRIMARY KEY,
-    bundle_sha256 TEXT NOT NULL CHECK(length(bundle_sha256) = 64),
+    bundle_sha256 TEXT NOT NULL CHECK(typeof(bundle_sha256) = 'text' AND length(bundle_sha256) = 64 AND instr(bundle_sha256, char(0)) = 0 AND octet_length(bundle_sha256) <= 256),
     bundle_json BLOB NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_bundle_artifacts (
             'market_terms'
         )
     ),
-    envelope_sha256 TEXT NOT NULL CHECK(length(envelope_sha256) = 64),
+    envelope_sha256 TEXT NOT NULL CHECK(typeof(envelope_sha256) = 'text' AND length(envelope_sha256) = 64 AND instr(envelope_sha256, char(0)) = 0 AND octet_length(envelope_sha256) <= 256),
     finding_id TEXT NOT NULL,
     PRIMARY KEY (artifact_kind, envelope_sha256, finding_id),
     FOREIGN KEY (finding_id)
@@ -86,9 +86,9 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_artifact_authority_policies (
     artifact_kind TEXT NOT NULL CHECK(
         artifact_kind IN ('admission', 'verifier_profile')
     ),
-    envelope_sha256 TEXT NOT NULL CHECK(length(envelope_sha256) = 64),
+    envelope_sha256 TEXT NOT NULL CHECK(typeof(envelope_sha256) = 'text' AND length(envelope_sha256) = 64 AND instr(envelope_sha256, char(0)) = 0 AND octet_length(envelope_sha256) <= 256),
     finding_id TEXT NOT NULL,
-    policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256) = 64),
+    policy_sha256 TEXT NOT NULL CHECK(typeof(policy_sha256) = 'text' AND length(policy_sha256) = 64 AND instr(policy_sha256, char(0)) = 0 AND octet_length(policy_sha256) <= 256),
     policy_json BLOB NOT NULL,
     PRIMARY KEY (artifact_kind, envelope_sha256, finding_id),
     FOREIGN KEY (artifact_kind, envelope_sha256, finding_id)
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_retained_challenge_policies (
         )
     ),
     artifact_envelope_sha256 TEXT NOT NULL
-        CHECK(length(artifact_envelope_sha256) = 64),
+        CHECK(typeof(artifact_envelope_sha256) = 'text' AND length(artifact_envelope_sha256) = 64 AND instr(artifact_envelope_sha256, char(0)) = 0 AND octet_length(artifact_envelope_sha256) <= 256),
     policy_role TEXT NOT NULL CHECK(
         policy_role IN (
             'governance',
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_retained_challenge_policies (
             'randomness_witness'
         )
     ),
-    policy_sha256 TEXT NOT NULL CHECK(length(policy_sha256) = 64),
+    policy_sha256 TEXT NOT NULL CHECK(typeof(policy_sha256) = 'text' AND length(policy_sha256) = 64 AND instr(policy_sha256, char(0)) = 0 AND octet_length(policy_sha256) <= 256),
     policy_json BLOB NOT NULL,
     created_at INTEGER NOT NULL,
     PRIMARY KEY (artifact_kind, artifact_envelope_sha256, policy_role)
@@ -129,8 +129,8 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_retained_challenge_policies (
 
 CREATE TABLE IF NOT EXISTS chio_finding_operator_audit_rounds (
     epoch_envelope_sha256 TEXT PRIMARY KEY
-        CHECK(length(epoch_envelope_sha256) = 64),
-    round_sha256 TEXT NOT NULL CHECK(length(round_sha256) = 64),
+        CHECK(length(epoch_envelope_sha256) = 64 AND instr(epoch_envelope_sha256, char(0)) = 0 AND octet_length(epoch_envelope_sha256) <= 256),
+    round_sha256 TEXT NOT NULL CHECK(typeof(round_sha256) = 'text' AND length(round_sha256) = 64 AND instr(round_sha256, char(0)) = 0 AND octet_length(round_sha256) <= 256),
     round_json BLOB NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -138,8 +138,8 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_audit_rounds (
 CREATE TABLE IF NOT EXISTS chio_finding_operator_terminals (
     request_id TEXT PRIMARY KEY,
     principal_id TEXT NOT NULL,
-    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
-    result_sha256 TEXT NOT NULL CHECK(length(result_sha256) = 64),
+    request_sha256 TEXT NOT NULL CHECK(typeof(request_sha256) = 'text' AND length(request_sha256) = 64 AND instr(request_sha256, char(0)) = 0 AND octet_length(request_sha256) <= 256),
+    result_sha256 TEXT NOT NULL CHECK(typeof(result_sha256) = 'text' AND length(result_sha256) = 64 AND instr(result_sha256, char(0)) = 0 AND octet_length(result_sha256) <= 256),
     result_json BLOB NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -147,14 +147,14 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_terminals (
 CREATE TABLE IF NOT EXISTS chio_finding_operator_terminal_capacity (
     request_id TEXT PRIMARY KEY,
     principal_id TEXT NOT NULL,
-    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
+    request_sha256 TEXT NOT NULL CHECK(typeof(request_sha256) = 'text' AND length(request_sha256) = 64 AND instr(request_sha256, char(0)) = 0 AND octet_length(request_sha256) <= 256),
     reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes > 0),
     created_at INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS chio_finding_operator_proofs (
     finding_id TEXT PRIMARY KEY,
-    proof_sha256 TEXT NOT NULL CHECK(length(proof_sha256) = 64),
+    proof_sha256 TEXT NOT NULL CHECK(typeof(proof_sha256) = 'text' AND length(proof_sha256) = 64 AND instr(proof_sha256, char(0)) = 0 AND octet_length(proof_sha256) <= 256),
     proof_json BLOB NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -162,8 +162,8 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_proofs (
 CREATE TABLE IF NOT EXISTS chio_finding_operator_purchase_jobs (
     request_id TEXT PRIMARY KEY,
     principal_id TEXT NOT NULL,
-    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
-    job_sha256 TEXT NOT NULL CHECK(length(job_sha256) = 64),
+    request_sha256 TEXT NOT NULL CHECK(typeof(request_sha256) = 'text' AND length(request_sha256) = 64 AND instr(request_sha256, char(0)) = 0 AND octet_length(request_sha256) <= 256),
+    job_sha256 TEXT NOT NULL CHECK(typeof(job_sha256) = 'text' AND length(job_sha256) = 64 AND instr(job_sha256, char(0)) = 0 AND octet_length(job_sha256) <= 256),
     job_json BLOB NOT NULL,
     created_at INTEGER NOT NULL
 );
@@ -171,14 +171,14 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_purchase_jobs (
 CREATE TABLE IF NOT EXISTS chio_finding_operator_seller_artifact_capacity (
     request_id TEXT PRIMARY KEY,
     principal_id TEXT NOT NULL,
-    request_sha256 TEXT NOT NULL CHECK(length(request_sha256) = 64),
+    request_sha256 TEXT NOT NULL CHECK(typeof(request_sha256) = 'text' AND length(request_sha256) = 64 AND instr(request_sha256, char(0)) = 0 AND octet_length(request_sha256) <= 256),
     reserved_bytes INTEGER NOT NULL CHECK(reserved_bytes >= 0),
     committed_finding_id TEXT,
     created_at INTEGER NOT NULL,
     CHECK(
         (reserved_bytes > 0 AND committed_finding_id IS NULL)
         OR
-        (reserved_bytes = 0 AND length(committed_finding_id) = 64)
+        (reserved_bytes = 0 AND length(committed_finding_id) = 64 AND instr(committed_finding_id, char(0)) = 0 AND octet_length(committed_finding_id) <= 256)
     )
 );
 "#;

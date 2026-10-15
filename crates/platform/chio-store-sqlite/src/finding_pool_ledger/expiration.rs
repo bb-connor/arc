@@ -20,6 +20,7 @@ pub(super) fn expired_unclaimed_reservations(
                    AND state = 'reserved' AND claimed_at_unix_ms IS NULL \
                    AND claim_deadline_unix_ms <> '' \
                    AND claim_deadline_unix_ms NOT GLOB '*[^0-9]*' \
+                   AND instr(claim_deadline_unix_ms, char(0)) = 0 \
                    AND (length(claim_deadline_unix_ms) < length(?3) \
                         OR (length(claim_deadline_unix_ms) = length(?3) \
                             AND claim_deadline_unix_ms <= ?3))",
@@ -59,6 +60,7 @@ pub(super) fn expired_unclaimed_reservations(
                AND claimed_at_unix_ms IS NULL \
                AND claim_deadline_unix_ms <> '' \
                AND claim_deadline_unix_ms NOT GLOB '*[^0-9]*' \
+               AND instr(claim_deadline_unix_ms, char(0)) = 0 \
                AND (length(claim_deadline_unix_ms) < length(?2) \
                     OR (length(claim_deadline_unix_ms) = length(?2) \
                         AND claim_deadline_unix_ms <= ?2)) \
@@ -172,6 +174,7 @@ mod tests {
                AND claimed_at_unix_ms IS NULL \
                AND claim_deadline_unix_ms <> '' \
                AND claim_deadline_unix_ms NOT GLOB '*[^0-9]*' \
+               AND instr(claim_deadline_unix_ms, char(0)) = 0 \
                AND (length(claim_deadline_unix_ms) < length(?2) \
                     OR (length(claim_deadline_unix_ms) = length(?2) \
                         AND claim_deadline_unix_ms <= ?2)) \
