@@ -15,14 +15,16 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "next": "15.5.24",
+    "next": "15.5.28",
     "react": "19.0.0-rc-66855b96-20241106",
     "react-dom": "19.0.0-rc-66855b96-20241106"
   },
   "overrides": {
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "js-yaml": "4.3.2",
-    "postcss": "8.5.26"
+    "postcss": "8.5.26",
+    "source-map-js": "1.2.2",
+    "braces": "file:../../../third_party/npm/braces/braces-3.0.4-chio.1.tgz"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
@@ -30,7 +32,7 @@
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "eslint": "9.39.5",
-    "eslint-config-next": "15.5.24",
+    "eslint-config-next": "15.5.28",
     "typescript": "5.7.2"
   }
 }
