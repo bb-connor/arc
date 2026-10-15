@@ -665,3 +665,64 @@ fn queried_auto_vacuum_mode_selects_or_refuses_the_frame_profile() -> TestResult
     }
     Ok(())
 }
+
+/// Pointer-map pages require a mode-specific allocation bound.
+#[test]
+fn auto_vacuum_pointer_maps_exceed_the_non_vacuum_growth_bound() -> TestResult {
+    const PAGE: u64 = 512;
+    const BODY: u64 = 16 * 1024 * 1024;
+    let shape = SqliteTransactionWriteShapeData::checked(vec![
+        SqliteTreeWriteShapeData::fresh_insertions(BODY + 64, 1)?,
+    ])?;
+    let mut non_vacuum_growth = None;
+    for mode in [0_u64, 1, 2] {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("pointer-maps.sqlite3");
+        let connection = rusqlite::Connection::open(path)?;
+        connection.execute_batch(&format!(
+            "PRAGMA page_size = 512; PRAGMA auto_vacuum = {mode};
+             CREATE TABLE items (id INTEGER PRIMARY KEY, body BLOB NOT NULL) STRICT;
+             PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;
+             PRAGMA cache_spill = OFF; PRAGMA wal_autocheckpoint = 0;
+             PRAGMA wal_checkpoint(TRUNCATE);"
+        ))?;
+        let observed_mode: u64 =
+            connection.query_row("PRAGMA auto_vacuum", [], |row| row.get(0))?;
+        let observed_page: u64 = connection.query_row("PRAGMA page_size", [], |row| row.get(0))?;
+        assert_eq!(observed_mode, mode);
+        assert_eq!(observed_page, PAGE);
+        let profile = SqliteFramePriceProfileData::checked(observed_page, 0, observed_mode);
+        let bound = if mode == 0 {
+            let bound = shape.maximum_page_growth(&profile?)?;
+            non_vacuum_growth = Some(bound);
+            bound
+        } else {
+            assert_eq!(
+                profile,
+                Err("SQLite frame price requires auto-vacuum NONE".to_owned())
+            );
+            non_vacuum_growth.ok_or("the NONE growth control is absent")?
+        };
+        let before = page_count(&connection)?;
+        connection.execute("INSERT INTO items VALUES (1, zeroblob(?1))", [BODY])?;
+        let after = page_count(&connection)?;
+        let record_payload: u64 = connection.query_row(
+            "SELECT sum(payload) FROM dbstat WHERE name = 'items'",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(record_payload, BODY + 6);
+        let growth = after
+            .checked_sub(before)
+            .ok_or("the insert shortened its file")?;
+        if mode == 0 {
+            assert!(growth <= bound, "{growth} NONE pages exceed {bound}");
+        } else {
+            assert!(
+                growth > bound,
+                "{growth} auto-vacuum pages did not exceed the NONE bound {bound}"
+            );
+        }
+    }
+    Ok(())
+}
