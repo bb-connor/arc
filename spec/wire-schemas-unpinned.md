@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-200 of 609 identifier constants in the security crates are unpinned.
+199 of 609 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (66)
 
@@ -131,7 +131,7 @@ since been pinned is removed by the next `--update`.
 
 - `crates/kernel/chio-kernel-core/src/passport_verify.rs:46` `PORTABLE_PASSPORT_SCHEMA` = `chio.portable-agent-passport.v1`
 
-## crates/platform/chio-control-plane (39)
+## crates/platform/chio-control-plane (38)
 
 - `crates/platform/chio-control-plane/src/certify/schema.rs:7` `CERTIFICATION_PUBLIC_SEARCH_SCHEMA` = `chio.certify.search.v1`
 - `crates/platform/chio-control-plane/src/certify/schema.rs:8` `CERTIFICATION_PUBLIC_TRANSPARENCY_SCHEMA` = `chio.certify.transparency.v1`
@@ -170,7 +170,6 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs:27` `FINDING_VOLUNTARY_RETRACTION_RECEIPT_SCHEMA` = `chio.finding.voluntary-retraction-receipt.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:70` `VERIFIED_FIX_DRAFT_SCHEMA` = `chio.finding.verified-fix-draft.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:72` `VERIFIED_FIX_PAYLOAD_SCHEMA` = `chio.finding.verified-fix-payload.v1`
-- `crates/platform/chio-control-plane/src/trust_control/service_types/admission_authority.rs:27` `ADMISSION_AUTHORITY_REQUEST_SCHEMA` = `chio.admission-authority-request.v1`
 - `crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs:4` `STRUCTURED_BUDGET_RESPONSE_SCHEMA` = `chio.structured-budget-response.v1`
 
 ## crates/platform/chio-store-sqlite (17)
