@@ -105,7 +105,7 @@ class WorkerProfile(BaseModel):
         extra="forbid",
     )
     kind: Literal["container"]
-    launch_attempt: conint(ge=1, le=4294967295)
+    launch_attempt: conint(strict=True, ge=1, le=4294967295)
     launch_ref: LaunchRef
 
 
@@ -113,8 +113,8 @@ class DispatchLaunch(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    native_launch: NativeLaunch | None = None
-    worker_profile: WorkerProfile | None = None
+    native_launch: NativeLaunch | None = Field(...)
+    worker_profile: WorkerProfile | None = Field(...)
 
 
 class DispatchCommit(BaseModel):

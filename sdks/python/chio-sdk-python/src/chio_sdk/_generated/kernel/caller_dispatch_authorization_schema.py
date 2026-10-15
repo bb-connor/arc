@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Literal
 
 from chio_sdk._manifest_wire import SecurityWireModel as BaseModel
+from pydantic import BaseModel as DispatchLaunchBaseModel
 
 from pydantic import ConfigDict, Field, RootModel, conint, constr
 
@@ -70,12 +71,12 @@ class WorkerProfile(BaseModel):
     launch_ref: LaunchRef
 
 
-class CallerDispatchLaunch(BaseModel):
+class CallerDispatchLaunch(DispatchLaunchBaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    native_launch: NativeLaunch | None = None
-    worker_profile: WorkerProfile | None = None
+    native_launch: NativeLaunch | None = Field(...)
+    worker_profile: WorkerProfile | None = Field(...)
 
 
 class CallerPublicKey(
