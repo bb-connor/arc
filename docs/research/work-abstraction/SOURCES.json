@@ -3,16 +3,16 @@
   "scope": "source inventory; runtime qualification pending",
   "sources": {
     "main": {
-      "commit": "bd6c10ac8405ceede5dc1525bb568af3e368df93",
+      "commit": "a520638fa064faa58223feb625a9d8b306b1ea7e",
       "status": "inspected_main",
       "files": [
         {
           "path": "Cargo.toml",
-          "sha256": "8ca68537318bf69310e4549b78c530d7e4947e985d9a9352ccba1db59908e637"
+          "sha256": "f056415355918634a4a695621264b1865328ccaf710c7141ae6d3a7a20f59bae"
         },
         {
           "path": "crates/core/chio-core-types/src/capability/governance.rs",
-          "sha256": "7a94c0dce74a68447a793a69ffffe0d6545cc830f978554fd0209d18ac6e764b"
+          "sha256": "0918d171c3a364e055027d498b03e695129fed4d512b617373de12c393795fa9"
         },
         {
           "path": "crates/core/chio-core/Cargo.toml",
@@ -32,7 +32,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation.rs",
-          "sha256": "35df267c1c5f0706e4be07bb236e5badf325d8a3d45dfdc7338bcfdd366148f2"
+          "sha256": "b74905964dd17f5183ec13ffee4fdb0d8a95fc6c57bcbd7fbc0b938006cc09d8"
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs",
@@ -40,7 +40,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/identity.rs",
-          "sha256": "cdef9817b2e8491e3f5d4546d74ef7776b756a17f7e773fb46b34cda617fd3b9"
+          "sha256": "21693a59074388b95b17a26c537621da00a48468b7e8ccca300c338c8541b3d8"
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs",
@@ -52,7 +52,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/retained_request.rs",
-          "sha256": "3a9280c78ea554607f4f037539add38ffc91c1d804d701419290c0f2e90288ad"
+          "sha256": "35d98f9fc463341597214cacb649cc6596335548abd187e26f5367c01eb04e74"
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/store.rs",
@@ -72,7 +72,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/kernel/admission_coordinator/recovery.rs",
-          "sha256": "1ecd3bfc09555260efc18d4da71625e2c4f67c87101565932df34e3c504180e1"
+          "sha256": "7b829649c6bee2fe5b4280c074340009a36671f23d75e6b3d1f85c260de6c836"
         },
         {
           "path": "crates/kernel/chio-kernel/src/kernel/dispatch/security_pre_dispatch.rs",
@@ -80,11 +80,11 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs",
-          "sha256": "46ce872bcae7106a8fea913c063cd6bca2b076b8345399c284617e532646a7af"
+          "sha256": "e5df8617d2d09b456fb695d244a642d1d1702d095b4e22e70350d31205898148"
         },
         {
           "path": "crates/kernel/chio-kernel/src/runtime.rs",
-          "sha256": "aaa50f602291ffa845e0e6c8d30b548b66641b1b35042db621c4dad788bb7bc3"
+          "sha256": "ee75c71af0a5e54ea44207781b1050247e7db48d3c159448edd230cd9f6c447f"
         },
         {
           "path": "crates/kernel/chio-process/Cargo.toml",
@@ -92,7 +92,7 @@
         },
         {
           "path": "crates/kernel/chio-process/src/lib.rs",
-          "sha256": "5d663d56ba296d16adaefab596aa3e0fdfbbee9533cd6fe1a6e69f298a7cdcfa"
+          "sha256": "b908431bb14039edce2922a1b08c99bbc09724be4be1cf3033ad5232654206b6"
         },
         {
           "path": "crates/kernel/chio-process/src/registry.rs",
@@ -104,7 +104,7 @@
         },
         {
           "path": "crates/kernel/chio-process/src/types.rs",
-          "sha256": "93c9bcc1f8dbd2f3a39c53bb4c06de2e87090b147e923e7e36b4494354f2f5d3"
+          "sha256": "60229866c0f1841c64c47d3b085624a2cfd8b38944115ac61525887940150487"
         },
         {
           "path": "crates/kernel/chio-process/src/worker.rs",
@@ -128,11 +128,11 @@
         },
         {
           "path": "crates/kernel/chio-runtime-core/src/hash.rs",
-          "sha256": "e4724c8ff5be3c5186a7042f282012d28f4c9eff8c450f8943b9a1e97a3c388d"
+          "sha256": "736d61f2c4146d86d66157dbe7076c4c912fec2df88b0891051294cc126b931f"
         },
         {
           "path": "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs",
-          "sha256": "dbb96618724289d7792e158af10e66a85caf86b410ef9566d7114d4f1862a4a3"
+          "sha256": "13940d9b1b501e177458d467e9bb68c4bad9125386564054cafd7015a8c20cda"
         },
         {
           "path": "crates/kernel/chio-runtime-core/src/treaty.rs",
@@ -144,7 +144,7 @@
         },
         {
           "path": "crates/kernel/chio-runtime-core/src/types.rs",
-          "sha256": "4402db3ecbbed9e4e332714b4fd0674268379bd867563c11de24ebf8ed1a9e45"
+          "sha256": "64e5eb8d4726327440563c19599c117c9293efb066030028eb0b213911ac848b"
         },
         {
           "path": "crates/kernel/chio-runtime/Cargo.toml",
@@ -152,7 +152,11 @@
         },
         {
           "path": "crates/kernel/chio-runtime/src/stores.rs",
-          "sha256": "f7d55f7191d410f83ea28a9aa31a8846b228bd4c1da003e037fbbe58bac1e583"
+          "sha256": "15d6fa4020689dbacb11cde7578fba189c87dad76640bf534b6c7357dfc7bafd"
+        },
+        {
+          "path": "crates/kernel/chio-swarm-authority/src/evolution.rs",
+          "sha256": "3608ecf021ed17f0c0d80a93b7d31619992da84d39705bd042dee05871f42a26"
         },
         {
           "path": "crates/kernel/chio-swarm-authority/src/types.rs",
@@ -164,11 +168,11 @@
         },
         {
           "path": "crates/platform/chio-control-plane/Cargo.toml",
-          "sha256": "cf2507089b7ff0b08a4fcb8c3bc3d20444d9f94d308ef0050efa5124d4401074"
+          "sha256": "70b195919fc38f18f5c9bab5c6836838497c2bebece5031392f569da37d576e7"
         },
         {
           "path": "crates/platform/chio-control-plane/src/durable_admission.rs",
-          "sha256": "7f850ced094ff76d8dd4e64a4159095fd40e50ab1553810a18d9f0911f06b7ca"
+          "sha256": "d3f915528ee4a2d51fea9dacdf3399fa5a197de32330ec968f443287298f0c0d"
         },
         {
           "path": "crates/platform/chio-control-plane/src/security/adapters/flow_dispatch.rs",
@@ -200,7 +204,7 @@
         },
         {
           "path": "crates/platform/chio-store-sqlite/src/authority.rs",
-          "sha256": "80937fa8904ea4d5393f98a7b55cf64123a61a091da217778a201ad657a42531"
+          "sha256": "7d77f2f4b52c78c59ef3f447aba49b18f7b2576327919345a684eaacc2ea8225"
         },
         {
           "path": "crates/platform/chio-store-sqlite/src/serving_owner.rs",
@@ -208,15 +212,23 @@
         },
         {
           "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
-          "sha256": "53d7b05c0540c1d772ff855d6ec3517bd28fcb4946722fe13c6834be1cc5718a"
+          "sha256": "74c3aef6a394eb1489ce25c8338bd7f827e338f51ebb4324454d9d365121c0d3"
         },
         {
           "path": "crates/platform/chio-workflow/Cargo.toml",
-          "sha256": "2e2c10c5180d125be471e4b495a31d1cf88c79f0d3ca2485dfdb2f3495ba5dae"
+          "sha256": "a0e56be0934d3f12cd99923d6ac07228a98e355f53d15c568919a429028b2860"
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
+          "sha256": "43340f33181b2bc8ea7c0088988805c659b458356f56e84f8f7f9b89e49f9a31"
+        },
+        {
+          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
+          "sha256": "7dfba215960633f60ecc3fb0f6cec601d64ac8155eac8a9bbcef5009b54751d3"
         },
         {
           "path": "crates/platform/chio-workflow/src/lib.rs",
-          "sha256": "cfa5682b3514ec663bf0260bb8c7a857d50abf63e058396e5a97f44039321bf0"
+          "sha256": "3f1856e8a1446246be969d943bafc376f2befba5206320e558696ffa070b34ac"
         },
         {
           "path": "crates/security/chio-flow/src/declassification.rs",
@@ -225,6 +237,38 @@
         {
           "path": "crates/trust/chio-federation/src/treaty.rs",
           "sha256": "b97b74f5210300fa9dd9466e3551612f983ac03049acaccb5343ab7281e02cfa"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-beta-convergence.md",
+          "sha256": "8643a09b3c8e14c994ad07dbfe9f9a39714104011638ec739e0da36d8e4e0e31"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-developer-surface.md",
+          "sha256": "dabf3839854a315a325190f4d000ef4cbd083b45fae540e4cc8cb5a50d23ea57"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-owner-services.md",
+          "sha256": "7539c5a76e96de5c9cf7adce61ba696c643a495a34ef189eb7c23107a5be0130"
+        },
+        {
+          "path": "docs/superpowers/plans/2026-10-03-work-runtime.md",
+          "sha256": "9b5878ed44783afeaa61a83f2f36fa0e7ca18d362a57a4775efff9cfb40095ff"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-agentic-work-kernel-design.md",
+          "sha256": "db9f48001bed3b35c14116c31e3f28534188c70c73256d44fe3d1229b8b21f80"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-work-developer-surface-design.md",
+          "sha256": "3407a3b85b1ca444f24d3227104d02b8697d812557f41d895244cf10deb8b448"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-work-owner-services-design.md",
+          "sha256": "39713a6c04a5675bcce86260e0c7749384d80a6c0f6d8bf191a6fe805c42f1f3"
+        },
+        {
+          "path": "docs/superpowers/specs/2026-10-03-work-runtime-design.md",
+          "sha256": "2002ab9daa685615cbd5fde4d4e4bbf552c076476579ac8ce1d1fbad9a31ee50"
         },
         {
           "path": "rust-toolchain.toml",
@@ -236,54 +280,6 @@
       "commit": "cafdc970e4f89bddf810647e4228a605ed9f498a",
       "status": "pending_integration",
       "files": [
-        {
-          "path": "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs",
-          "sha256": "2c581bf561f968079e0f72f5cb82fbe997375866845690a92bfaaa31868bfde6"
-        },
-        {
-          "path": "crates/kernel/chio-swarm-authority/src/evolution.rs",
-          "sha256": "65651ce4677cbce965d1507eb6170eb6dbc3e13414ca1d744d504a035908300b"
-        },
-        {
-          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
-          "sha256": "59d789c09f90678e19e935e4a628b207caf21495591e0a4773f84055737bd050"
-        },
-        {
-          "path": "crates/platform/chio-workflow/src/delegation/types.rs",
-          "sha256": "71526dcda6247c35ac6b2a27e6f1822ca897a6ed954a50045a083a0fedecdf16"
-        },
-        {
-          "path": "docs/superpowers/plans/2026-10-03-work-beta-convergence.md",
-          "sha256": "4d61ead4eb437bf0ad5e0cb6449e70ec9dab2b8c0926aa8a856fc220005fdd67"
-        },
-        {
-          "path": "docs/superpowers/plans/2026-10-03-work-developer-surface.md",
-          "sha256": "1b84c98a3cdce6332889d0f399f1103d2c22faaf1b3f57bc2c0cba366fb694db"
-        },
-        {
-          "path": "docs/superpowers/plans/2026-10-03-work-owner-services.md",
-          "sha256": "988a60a210b09cc0f18a49780c4a35058b5049c302ad745681df6e9afa3bc8fc"
-        },
-        {
-          "path": "docs/superpowers/plans/2026-10-03-work-runtime.md",
-          "sha256": "2b4ad1ccde8e3678172b5f5e3db56e0c66de91541836cc5ae31f7451dc273b63"
-        },
-        {
-          "path": "docs/superpowers/specs/2026-10-03-agentic-work-kernel-design.md",
-          "sha256": "b0de296289a927a86650fc862b44ec2e0afee286aafb397d6f494801de28f427"
-        },
-        {
-          "path": "docs/superpowers/specs/2026-10-03-work-developer-surface-design.md",
-          "sha256": "d20577e1c40ec1dc23c078be05bb1821fbd39394b0d6d54bd5c448f4abac1457"
-        },
-        {
-          "path": "docs/superpowers/specs/2026-10-03-work-owner-services-design.md",
-          "sha256": "89c297de8afd6a2e690b3f8806e2076454b78a31c3e044a10c1ca0ffffd09ba7"
-        },
-        {
-          "path": "docs/superpowers/specs/2026-10-03-work-runtime-design.md",
-          "sha256": "a29835efff9cdb68ad9dd17536732fbe6de11e6c22f260e5d69f6c0afc07b4e0"
-        },
         {
           "path": "examples/federated-work/src/common.rs",
           "sha256": "590f2d34781e6a8f6bb3da59dc175fb9875b1c2ee4059b1257e2e01b8ef2e356"

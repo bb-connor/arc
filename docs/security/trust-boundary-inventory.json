@@ -1269,7 +1269,7 @@
     "crates/kernel/chio-runtime-core/src/serde_io.rs::signed_runtime_verifier_trust_bundle_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/store/json_file.rs::read_json_store::from_wire",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs::bundle::from_wire",
-    "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::load_swarm_authority_bundle::from_wire",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::decode_bundle::from_wire",
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs::treaty_runtime_artifact::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::governance_ladder_manifest_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::ladder_intersection_from_json::from_wire",
@@ -14071,7 +14071,7 @@
       "contract": "Original bytes pass a bounded shared signed JSON reader before typed use. Existing canonical-equality, signature, trusted-key, policy, identity, expiry and replay checks remain separate and mandatory. Parsing does not authenticate a DTO. Admission/swarm bundles check indexed identity and retained digest; treaty payload checks retained digest on readback.",
       "migrations": [
         [
-          "load_swarm_authority_bundle",
+          "decode_bundle",
           "bounded signed JSON",
           "64 * 1024 * 1024"
         ]
@@ -16632,7 +16632,7 @@
     "crates/kernel/chio-runtime-core/src/serde_io.rs::signed_runtime_verifier_trust_bundle_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/store/json_file.rs::read_json_store::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/store/sqlite/admission_replay.rs::bundle::from_wire#1::decode_signed",
-    "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::load_swarm_authority_bundle::from_wire#1::decode_signed",
+    "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::decode_bundle::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs::treaty_runtime_artifact::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::governance_ladder_manifest_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::ladder_intersection_from_json::from_wire#1::decode_signed",
@@ -17747,7 +17747,10 @@
       "bundle::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs": [
-      "load_swarm_authority_bundle::original-json-reader::UntrustedJsonText"
+      "decode_bundle::original-json-reader::UntrustedJsonText",
+      "extend_swarm_authority_bundle::shared-reader::crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::decode_bundle",
+      "load_swarm_authority_bundle::shared-reader::crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::decode_bundle",
+      "load_swarm_authority_bundle_for_graph::shared-reader::crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs::decode_bundle"
     ],
     "crates/kernel/chio-runtime-core/src/store/sqlite/treaty_artifacts.rs": [
       "treaty_runtime_artifact::original-json-reader::UntrustedJsonText"

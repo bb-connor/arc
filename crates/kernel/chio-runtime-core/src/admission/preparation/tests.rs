@@ -81,6 +81,15 @@ struct CallbackCountingStore {
 }
 
 impl RuntimeAdmissionStore for CallbackCountingStore {
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        _graph_sha256: &str,
+    ) -> Result<Option<chio_swarm_authority::SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.calls.fetch_add(1, Ordering::SeqCst);
+        self.swarm_authority_bundle(task_graph_id)
+    }
+
     fn bundle(&self, id: &str) -> Result<Option<RuntimeAdmissionBundle>, ChioRuntimeError> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         self.inner.bundle(id)

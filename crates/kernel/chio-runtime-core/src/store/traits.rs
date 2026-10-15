@@ -68,6 +68,15 @@ pub trait RuntimeAdmissionStore: Send + Sync {
         Ok(None)
     }
 
+    /// Resolve the bundle whose task graph has `graph_sha256`. A store without
+    /// that retained version returns its current head, and admission then
+    /// rejects the reference mismatch.
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError>;
+
     fn consume_destructive_lease(
         &self,
         lease_id: &str,
@@ -241,6 +250,15 @@ impl RuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
         task_graph_id: &str,
     ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
         self.admission_store.swarm_authority_bundle(task_graph_id)
+    }
+
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.admission_store
+            .swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
     }
 
     fn consume_destructive_lease(

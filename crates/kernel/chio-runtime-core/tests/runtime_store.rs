@@ -31,6 +31,14 @@ struct StoreWithoutTreatyContinuationSupport {
 }
 
 impl RuntimeAdmissionStore for StoreWithoutTreatyContinuationSupport {
+    fn swarm_authority_bundle_for_graph(
+        &self,
+        task_graph_id: &str,
+        _graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.swarm_authority_bundle(task_graph_id)
+    }
+
     fn bundle(
         &self,
         admission_id: &str,
