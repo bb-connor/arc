@@ -1009,10 +1009,7 @@ pub(crate) fn sign_agent_web_envelope_with_key(envelope: &mut Value, keypair: &K
     sign_agent_web_envelope_value(envelope, keypair, &public_key);
 }
 
-pub(crate) fn relabel_agent_web_envelopes(
-    bundle: &mut AgentWebInteropBundle,
-    schema: &str,
-) {
+pub(crate) fn relabel_agent_web_envelopes(bundle: &mut AgentWebInteropBundle, schema: &str) {
     let sidecar_keypair = agent_web_fixture_sidecar_keypair();
     let sidecar_public_key = sidecar_keypair.public_key().to_hex();
     let mut graph: Value = serde_json::from_slice(&bundle.evidence_graph_bytes)
