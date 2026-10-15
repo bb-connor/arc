@@ -92,6 +92,7 @@ pub(crate) fn verify_admission_operation_invariants(
 ) -> Result<(), AdmissionOperationStoreError> {
     verify_admission_operation_schema(connection)?;
     super::recovery_records::verify_local_history(connection)?;
+    super::recovery_deployment::verify_planning_allocations(connection)?;
 
     verify_operation_data(connection)?;
     super::caller_budget::verify_ownership(connection)?;

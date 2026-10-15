@@ -7124,10 +7124,14 @@
       "recovery_profile::custom_deserialize"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
+      "decode_payload::from_slice",
       "require_canonical_json::from_slice"
     ],
     "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": [
       "schema::custom_deserialize"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs": [
+      "require_canonical_payload::from_slice"
     ]
   },
   "decoder_file_contracts": {
@@ -7821,22 +7825,6 @@
           ],
           "checked": true,
           "instances": 2
-        }
-      ]
-    },
-    "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": {
-      "kind": "reviewed-signed-owner",
-      "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
-      "readers": [
-        {
-          "reader": "deserialize",
-          "decoders": [
-            "custom_deserialize"
-          ],
-          "apis": [
-            "serde::Deserializer"
-          ],
-          "checked": true
         }
       ]
     },
@@ -12275,10 +12263,52 @@
     },
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": {
       "kind": "durable-internal-state",
-      "contract": "Decodes protected recovery payloads selected only as BLOBs within 1..262144 bytes during mandatory store-open local history verification. Each current record must hold exact canonical JSON, a bounded canonical identity, and a record digest equal to its authenticated latest event; global coverage is a separate mandatory open check. Signed authority and semantic validation remain with the owning consumer.",
+      "contract": "Decodes protected recovery payloads selected only as BLOBs within 1..262144 bytes. The shared reader authenticates each current record against its latest local event, exact canonical JSON and bounded canonical identity. Store-open planning reads follow mandatory local history verification; global coverage completes before a serving store is returned. Live mutations read within the current fenced owning transaction. Typed payload decoding requires byte-identical canonical re-encoding. Retained local or global ownership forbids a pristine absence claim. Signed authority and semantic validation remain with the owning consumer.",
       "readers": [
         {
+          "reader": "decode_payload",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "canonical_json_bytes+original_equality"
+          ],
+          "checked": true
+        },
+        {
           "reader": "require_canonical_json",
+          "decoders": [
+            "from_slice"
+          ],
+          "apis": [
+            "canonical_json_bytes+original_equality"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-kernel/src/admission_operation/dispatch_launch.rs": {
+      "kind": "reviewed-signed-owner",
+      "contract": "Custom deserializers validate bounded identity, digest or operation fields in a typed value. They are not original-byte readers; the containing original-byte owner must run its constrained JSON contract first.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs": {
+      "kind": "durable-internal-state",
+      "contract": "Validates canonical JSON bytes for a protected record write after the private writer checks its nonempty 262144-byte ceiling, bounded key and canonical scope digest. The caller holds the store's fenced owning transaction. Persistence retains the record digest, local event and global recovery commit atomically. The writer cannot mint native workflow identity. Canonical payload validation grants no actor, capture, dispatch or funding authority.",
+      "readers": [
+        {
+          "reader": "require_canonical_payload",
           "decoders": [
             "from_slice"
           ],
@@ -19580,13 +19610,54 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery/status.rs": [
       "load::original-json-reader::UntrustedJsonText"
     ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment.rs": [
+      "configure_recovery_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/history.rs::preserve_installation",
+      "configure_recovery_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::save_planned",
+      "configure_recovery_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "configure_recovery_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup/context.rs::register_native_setup_context",
+      "current_deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/history.rs": [
+      "preserve_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment.rs::current_deployment",
+      "preserve_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/history.rs::retain",
+      "preserve_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/history.rs::retain",
+      "preserve_installation::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "retain::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::save_planned",
+      "retain::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs": [
+      "inventory::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "load::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::peek",
+      "peek::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "persist_budget::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs::persist_protected_record",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::inventory",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::inventory",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::load",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::load",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::load",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::load",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::peek",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::persist_budget",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::persist_budget",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "save_planned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs::persist_protected_record",
+      "verify_planning_allocations::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::inventory",
+      "verify_planning_allocations::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::load",
+      "verify_planning_allocations::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::load",
+      "verify_planning_allocations::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
+    ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/history.rs": [
       "verify_current_records::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::verify_present_record",
       "verify_local_history::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/history.rs::verify_current_records"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs": [
       "authenticate::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::require_canonical_json",
+      "load_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::authenticate",
       "verify_present_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::authenticate"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs": [
+      "persist_protected_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "persist_protected_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs::require_canonical_payload"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/retained_request.rs": [
       "begin_retaining_tool_request::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::begin_prepared_operation_tx",
@@ -19626,6 +19697,7 @@
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_replay/records.rs::verify_all_records",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/governed_approval_claim/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery.rs::verify_all",
+      "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_deployment/planning.rs::verify_planning_allocations",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/history.rs::verify_local_history",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/runtime_participant/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_schema",
@@ -19923,6 +19995,18 @@
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::encode_retained_security_values",
       "verify_rows::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::retained_security_columns",
       "visit_archive::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::decode_retained_security_row"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs": [
+      "authenticated_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "save_setup_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
+      "save_setup_record::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs::persist_protected_record"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/setup/context.rs": [
+      "mark_tenant_required::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs::authenticated_record",
+      "mark_tenant_required::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs::save_setup_record",
+      "register_native_setup_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs::authenticated_record",
+      "register_native_setup_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup.rs::save_setup_record",
+      "register_native_setup_context::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/setup/context.rs::mark_tenant_required"
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/store.rs": [
       "apply_in_transaction::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::load_by_operation_id_tx",

@@ -92,6 +92,8 @@ mod obligation;
 mod participant;
 mod projection;
 mod recovery;
+mod recovery_deployment;
+mod recovery_resources;
 pub(crate) use recovery::verify_outcome_recovery_status;
 mod recovery_records;
 pub(crate) use recovery_records::{
@@ -109,6 +111,7 @@ pub(crate) use security_dispatch::verify_dispatch_capture_owner_tx;
 pub(crate) use security_dispatch::verify_native_dispatch_capture_owner_tx;
 mod security_participant_migration;
 mod security_participant_state;
+mod setup;
 pub(crate) use security_participant_state::checkpoint::projection_reference as security_participant_checkpoint_projection_reference;
 pub(crate) use security_participant_state::dispatch_ledger::projection_reference as native_dispatch_ledger_projection_reference;
 pub(crate) use security_participant_state::dispatch_ledger::{

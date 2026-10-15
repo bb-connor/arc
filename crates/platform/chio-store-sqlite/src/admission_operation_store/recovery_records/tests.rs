@@ -7,6 +7,8 @@ mod malformed_text;
 mod metadata_bounds;
 mod present_records;
 mod production_store;
+mod read_cost;
+mod runtime_records;
 mod sqlite_errors;
 mod stored_bounds;
 mod stored_values;

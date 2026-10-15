@@ -198,6 +198,8 @@ fn fresh_store_creates_the_recovery_catalog_and_reopens_unchanged() -> TestResul
         ("table", "admission_operation_recovery_events"),
         ("trigger", "admission_operation_recovery_records_no_delete"),
         ("trigger", "admission_operation_recovery_records_no_replace"),
+        ("trigger", "admission_operation_recovery_history_insert"),
+        ("trigger", "admission_operation_recovery_history_immutable"),
         ("table", "admission_operation_recovery_deferrals"),
     ] {
         let present: bool = raw.query_row(
@@ -261,6 +263,14 @@ fn omitted_or_misbound_recovery_catalog_objects_refuse_without_rewriting() -> Te
         "DROP INDEX admission_operation_recovery_scope;",
         "DROP TRIGGER admission_operation_recovery_records_no_delete;",
         "DROP TRIGGER admission_operation_recovery_records_no_replace;",
+        "DROP TRIGGER admission_operation_recovery_history_insert;",
+        "DROP TRIGGER admission_operation_recovery_history_immutable;",
+        "DROP TRIGGER admission_operation_recovery_history_immutable;
+         CREATE TRIGGER admission_operation_recovery_history_immutable
+         BEFORE UPDATE ON admission_operation_recovery_events
+         BEGIN
+             SELECT RAISE(ABORT, 'historical deployment is immutable');
+         END;",
         "DROP TRIGGER admission_operation_recovery_records_no_delete;
          CREATE TRIGGER admission_operation_recovery_records_no_delete
          BEFORE DELETE ON admission_operation_recovery_events
