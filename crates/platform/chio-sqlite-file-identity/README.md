@@ -54,6 +54,58 @@ file with link count zero. It performs no custody acquisition, migration,
 transaction, synchronization, or rollback protection. Available space is an
 observation only: it reserves no space and grants no write capacity.
 
+## Write frame prices
+
+`price_transaction_write_shape` bounds the WAL frames, WAL bytes and
+overlapping disk bytes of one committed transaction from its tree write
+shapes and a checked page-size profile, including FULL commit padding.
+`price_without_spill`, `price_within_pages` and `maximum_page_growth` give
+the no-spill price, the page-ceiling price and the most pages one transaction
+can append. Each calculator has a v1 descriptor that the owning recipe binds.
+
+The shapes are data and cannot inspect a connection. The owning recipe
+proves each shape's premise against the actual catalog before choosing its
+price, and otherwise prices a valid conservative shape:
+
+- distinct fresh keys for insertions;
+- for same-key rewrites, a real unchanged-key overwrite: no secondary or
+  partial index over a rewritten column, and no foreign-key delete and
+  reinsert (a rewritten column that is a child key of a foreign key into the
+  same table, or a parent key with an ON UPDATE action). Foreign keys, which
+  the bundled build enables by default, may stay enabled when the catalog
+  and the changed columns prove both cases absent;
+- for a split rewrite, every same-key premise plus a generation-only change;
+- every attempted producer mutation, including writes a statement or
+  savepoint rollback later discards, with no credit for discarded writes;
+- stored-row byte bounds in the file's authenticated text encoding; the
+  calculator takes byte counts and is encoding agnostic;
+- the connection settings each price assumes.
+
+`SqliteFramePriceProfileData::checked` takes the page size, the reserved
+bytes and the observed `auto_vacuum` mode, and refuses every mode other than
+NONE (0). Every price and page-growth bound shares that validated profile:
+pointer-map pages, commit-time page relocation and incremental vacuum are
+outside every term. The owning adapter reads the mode from its verified
+actual file before selecting any price.
+
+Trigger effects belong to the complete writer catalog. Prices perform no I/O,
+reserve no storage and grant no write authority.
+
+## Write capacity amounts
+
+`require_physical_write_capacity` checks a priced write against this file's
+pending WAL and remaining debts, plus the disk debt of other files on the
+same volume. Intake requires current WAL below 64 MiB, total WAL below
+128 MiB, and a 128 MiB disk floor. Prepaid progress requires total WAL below
+128 MiB and a 16 MiB disk floor. Equality at either WAL threshold refuses;
+exact coverage of the disk floor and all debts succeeds. Every sum and
+amount operation is checked.
+
+Amounts and the intake/progress selector are data. Callers authenticate file
+identity, the complete debt inventory and prepaid purpose, and hold the
+required writer ownership while observing capacity and committing. This
+function performs no I/O, allocates no reserve and grants no write authority.
+
 ## Status
 
 Implemented for the pinned bundled SQLite Unix file layout. The runtime

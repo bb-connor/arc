@@ -10,8 +10,18 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod available_space;
+mod write_capacity;
+mod write_liability;
 
 pub use available_space::{main_database_available_bytes, SqliteAvailableSpaceError};
+pub use write_capacity::{
+    require_physical_write_capacity, write_capacity_policy_descriptor,
+    SqlitePhysicalDebtAmountData, SqliteWriteCapacityStageData,
+};
+pub use write_liability::{
+    price_transaction_write_shape, write_price_algorithm_descriptor, SqliteFramePriceProfileData,
+    SqliteTransactionWritePriceData, SqliteTransactionWriteShapeData, SqliteTreeWriteShapeData,
+};
 
 #[cfg(unix)]
 use std::ffi::{c_int, c_void, CStr};

@@ -85,6 +85,56 @@ remain observable. Custody callers must compare against their expected
 identity and reject the link counts and permissions their contract forbids.
 This observation supplies no crash-durability or rollback guarantee.
 
+## Write frame prices
+
+`src/write_liability.rs` derives checked frame bounds from the pinned bundled
+SQLite 3.51.3: a cursor depth of `BTCURSOR_MAX_DEPTH` (20), `balance_nonroot`
+neighbors (`NB` 3, `apNew[NB+2]`), 24-byte frame and 32-byte WAL headers,
+FULL commit padding to at most a 65536-byte sector, `usableSize - 4` overflow
+payload and the lock-byte page an append skips. A new record walks the tree
+once; a possibly existing record, or a repeated write of an absent key, walks
+it three times and keeps its old and intermediate overflow images. Same-key
+rewrites walk once each and charge one old and one new image set bounded by the
+larger image of every row; they hold only for a real unchanged-key overwrite,
+with no secondary or partial index over a rewritten column and no
+foreign-key delete and reinsert (`sqlite3FkRequired` returning 2). A split
+rewrite inherits those premises, charges in-place overwrites for same-width
+rows and the full cascade plus doubled images for growing rows. The
+no-spill price writes each dirty page once and adds page one, the final
+original freelist trunk and one slack frame. `src/write_liability/tests.rs`
+asserts exact refusals and arithmetic, and `src/write_liability/tests/real_sqlite.rs` measures
+real WAL frames and page growth against the prices, controls the foreign-key
+delete and reinsert path, and stores a per-row overflow rounding workload.
+
+Every price and page-growth bound requires `auto_vacuum` NONE: the profile
+refuses any other observed mode, because pointer-map pages, commit-time page
+relocation and incremental vacuum are outside every term. Shapes count every
+attempted producer mutation, including writes a statement or savepoint
+rollback discards, and take stored-row byte counts in the file's
+authenticated text encoding.
+
+These are data calculations. They do not authenticate the caller, the shape's
+premises or the connection settings, and they reserve no WAL or disk.
+
+## Managed write capacity
+
+`src/write_capacity.rs` owns checked WAL/disk byte amounts and the v1 capacity
+policy. `src/write_capacity/tests.rs` exercises exact boundary and arithmetic
+refusals. Debt amounts require disk bytes to cover WAL bytes. Arithmetic
+validates both operands and the result; overflow and underflow refuse.
+
+For pending WAL P, current write C, remaining debt D and other same-volume
+disk debts O, intake requires P + C.wal < 64 MiB. Both stages require
+P + C.wal + D.wal < 128 MiB. Available disk must be at least
+C.disk + D.disk + sum(O.disk) plus 128 MiB for intake or 16 MiB for prepaid
+progress. Other files' WAL bytes never consume this file's WAL limit.
+
+The owning store supplies authenticated observations and binds the descriptor
+into its financing profile. The arithmetic does not authenticate debt, select
+a prepaid purpose, price physical writes, synchronize writers or reserve
+storage. Physical pricing and native funding remain responsibilities of
+their respective owners.
+
 ## Verification
 
 Unix tests compare the observed identity with filesystem metadata, replace
