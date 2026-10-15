@@ -1,6 +1,6 @@
 module github.com/backbay-labs/chio/sdks/go/chio-go-http
 
-go 1.21
+go 1.26.9
 
 require (
 	github.com/google/uuid v1.6.0

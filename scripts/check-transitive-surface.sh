@@ -202,8 +202,8 @@ if [[ "${install_deps}" == "1" ]]; then
     "httpx>=0.28,<1" \
     "pure25519>=0.0.1" \
     "pydantic>=2.5,<3" \
-    "pytest>=8,<9" \
-    "pytest-asyncio>=0.23,<1" \
+    "pytest>=9.0.3,<10" \
+    "pytest-asyncio>=1.1,<2" \
     "pytest-django>=4.5,<5" \
     "respx>=0.21,<1"
 fi

@@ -20,7 +20,7 @@ at the signed receipt.
 go get github.com/backbay-labs/chio/sdks/go/chio-go-http
 ```
 
-Requires Go 1.21 or newer and a running Chio sidecar (defaults to
+Requires Go 1.26.9 or newer and a running Chio sidecar (defaults to
 `http://127.0.0.1:9090`).
 
 ## Quickstart

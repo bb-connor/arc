@@ -46,7 +46,7 @@ OAPI_CODEGEN_VERSION="v2.4.1"
 
 # --- preflight --------------------------------------------------------------
 if ! command -v go >/dev/null 2>&1; then
-  echo "regen-types.sh: 'go' is required on PATH (Go 1.21+); install Go and re-run" >&2
+  echo "regen-types.sh: 'go' is required on PATH (Go 1.26.9+); install Go and re-run" >&2
   exit 2
 fi
 
