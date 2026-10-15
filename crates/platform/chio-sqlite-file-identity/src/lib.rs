@@ -11,12 +11,17 @@
 
 mod available_space;
 mod write_capacity;
+mod write_geometry;
 mod write_liability;
 
 pub use available_space::{main_database_available_bytes, SqliteAvailableSpaceError};
 pub use write_capacity::{
     require_physical_write_capacity, write_capacity_policy_descriptor,
     SqlitePhysicalDebtAmountData, SqliteWriteCapacityStageData,
+};
+pub use write_geometry::{
+    main_database_write_geometry, SqliteGeometryFileControl, SqliteGeometryMethod,
+    SqliteWriteGeometryData, SqliteWriteGeometryError,
 };
 pub use write_liability::{
     price_transaction_write_shape, write_price_algorithm_descriptor, SqliteFramePriceProfileData,

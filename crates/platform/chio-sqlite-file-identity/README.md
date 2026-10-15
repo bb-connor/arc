@@ -1,7 +1,8 @@
 # chio-sqlite-file-identity
 
 Inspect the device, inode, and link count of the exact main-database descriptor
-held by a `rusqlite::Connection`, and the space available on its filesystem.
+held by a `rusqlite::Connection`, the space available on its filesystem, and
+its SQLite write geometry.
 Chio store custody checks use this identity to compare SQLite's opened file
 with a separately retained filesystem identity.
 
@@ -48,11 +49,21 @@ inspection borrows it synchronously and returns a copied `SqliteFileIdentity`.
 - `SqliteAvailableSpaceError` keeps the descriptor refusal as `Identity`, the
   `fstatvfs` failure as `Io`, and exposes both through `Error::source`.
 
+- `main_database_write_geometry` first runs the same identity inspection, then
+  queries `SQLITE_FCNTL_RESERVE_BYTES` with -1, which reports the current or
+  pending reserved bytes without changing them, and reads the main file's
+  public `xSectorSize` and `xDeviceCharacteristics` and its VFS name. It
+  refuses a reserve outside `0..=255`, a sector size that is not a power of two
+  in `32..=65536`, negative device flags, and a missing or non-UTF-8 VFS name.
+  A nonzero reserve is reported, not refused; pricing decides whether it is
+  supported. `SqliteWriteGeometryError` keeps the identity refusal as its
+  source and records the failed file control and its SQLite status.
+
 Callers must validate owner, permissions, regular-file type, expected identity,
 and acceptable link count. A successful inspection can report an unlinked
 file with link count zero. It performs no custody acquisition, migration,
-transaction, synchronization, or rollback protection. Available space is an
-observation only: it reserves no space and grants no write capacity.
+transaction, synchronization, or rollback protection. Available space and
+write geometry are observations: they reserve no space and grant no writer authority.
 
 ## Write frame prices
 
@@ -113,7 +124,8 @@ checks require a VFS name beginning with `unix`; callers must preserve the
 workspace's bundled-build assumption. Tests cover descriptor identity and
 available space after path replacement and unlink, in-memory refusal, typed
 errors, available-space arithmetic, and lock preservation against a competing
-process. This crate declares no Cargo features.
+process. Geometry tests cover an actual file, pending reserved bytes, and
+validation boundaries. This crate declares no Cargo features.
 
 ## Related
 
