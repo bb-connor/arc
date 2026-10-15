@@ -3,8 +3,8 @@
 ## Responsibility and boundary
 
 The crate owns label comparisons, taint joins, classification-result binding,
-and declassification-grant validation. `InformationFlowLattice` implements the
-security-types label order. `authorize_egress` evaluates one destination.
+and declassification-grant validation, including recovery authority coverage.
+`InformationFlowLattice` implements the security-types label order. `authorize_egress` evaluates one destination.
 `prepare_pre_invocation` produces `PreparedFlowAdmission`; its public admission
 contains a `FlowJoinRequest` and an optional `EgressFencePlan`.
 
@@ -22,6 +22,8 @@ admission calculation alone installs no network control or durable taint.
   exposes immutable `VerifiedClassification` evidence when `std` is enabled.
 - `declassification.rs` hashes canonical request and label representations,
   verifies signed grants, and records one-shot consumption and dispatch outcomes.
+- `recovery_authority.rs` authenticates reviewed actions and conjunctive issuer
+  coverage, then binds recovery grants to that verified context.
 
 The default library is `no_std` with `alloc`. Classification, post-invocation
 processing, and store-backed grant consumption require `std`. Grant verification
@@ -62,6 +64,32 @@ signature and validity window. Policy and manifest must permit the purpose;
 the target must be a strict downgrade. Pre-invocation preparation rechecks
 current bindings, authority membership, purposes, and time.
 
+Recovery verification recomputes the canonical action and requirements digests
+and checks the action's scope, source basis and embedded requirements against
+independently selected inputs. The grant must match the action-derived binding,
+approval, coverage window and native expected binding. The native isolation
+epoch is selected independently because an unsigned action may carry epoch zero.
+
+Coverage requires exactly the owner and compartment releases derived from the
+source-to-target restriction change. Endorsement and user acceptance are distinct
+authority classes. Each attestation must bind the same action, review, challenge,
+requirements, scope and basis, and match an operator-installed issuer, principal,
+key and obligation assignment. Duplicate principals or issuers refuse. A key
+confers no assignments by itself; the operator determines which principals and
+obligations each issuer may represent.
+
+The coverage digest uses the `AuthorityCoverage` domain over canonical signed
+attestations ordered by principal, then issuer. At most 16 attestations and 64
+obligations are admitted. Before each signature and per-obligation allocation,
+checked arithmetic charges 32 work units per attestation, 3 per attested obligation
+and one per assigned obligation. Cumulative work above 4096 refuses.
+
+Verified coverage may be reused within its validity window; it provides no
+one-shot execution authority. Retained verification uses the same bounded v1
+shape at an independently authenticated preparation time and returns only a
+digest. Native materialization, authority freshness and grant consumption remain
+caller responsibilities.
+
 `CategoryLabelMap` holds at most 256 categories and disallows `Top` mappings.
 Classification verification hashes the actual payload and checks classifier
 identity/version, result bindings, confidence, and exactly one finding location.
@@ -81,9 +109,12 @@ path lookup after strict decoding. `proptest` generates lattice test cases.
 
 ## Verification
 
-Unit tests in the four modules cover lattice laws, label overflow, classification
+Unit tests cover lattice laws, label overflow, classification
 locations and rebinding, grant tampering and replay, and fence/state mismatch.
-Run `cargo test -p chio-flow --lib` for the default surface and
+Recovery integration tests cover conjunctive coverage, action and grant binding,
+retained-time verification, bounded work and exact refusal errors. Compile-fail
+doctests check that retained digests and wire data cannot forge coverage.
+Run `cargo test -p chio-flow` for the default surface and
 `cargo test -p chio-flow --features std` for the standard-library composition.
 The README example uses default-feature `authorize_egress` and joins only.
 
