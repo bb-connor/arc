@@ -102,7 +102,7 @@ fn session_certificate_real_store_count_and_original_byte_exhaustion_never_retur
     let connection = Connection::open(&path).test_unwrap();
     let bytes: i64 = connection
         .query_row(
-            "SELECT SUM(length(CAST(raw_json AS BLOB))) FROM claim_receipt_log_entries",
+            "SELECT SUM(octet_length(raw_json)) FROM claim_receipt_log_entries",
             [],
             |row| row.get(0),
         )

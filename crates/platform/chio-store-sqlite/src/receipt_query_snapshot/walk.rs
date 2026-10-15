@@ -397,8 +397,8 @@ fn read_claim_range(
 ) -> Result<Vec<ClaimRow>, CopyError> {
     let step_rows = i64::try_from(limits.step_rows.max(1)).unwrap_or(i64::MAX);
     let mut sizes = connection.prepare_cached(
-        "SELECT entry_seq, length(CAST(raw_json AS BLOB)) + length(CAST(receipt_id AS BLOB))
-                + length(CAST(receipt_kind AS BLOB))
+        "SELECT entry_seq, octet_length(raw_json) + octet_length(receipt_id)
+                + octet_length(receipt_kind)
          FROM claim_receipt_log_entries
          WHERE entry_seq >= ?1 AND entry_seq <= ?2 ORDER BY entry_seq LIMIT ?3",
     )?;
@@ -862,9 +862,9 @@ fn checkpoint_row_sizes(
 ) -> Result<Vec<(i64, i64, u64)>, ReceiptStoreError> {
     let mut statement = connection.prepare(
         "SELECT checkpoint_seq, batch_end_seq,
-                length(CAST(merkle_root AS BLOB)) + length(CAST(statement_json AS BLOB))
-                + length(CAST(signature AS BLOB)) + length(CAST(kernel_key AS BLOB))
-                + COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0)
+                octet_length(merkle_root) + octet_length(statement_json)
+                + octet_length(signature) + octet_length(kernel_key)
+                + COALESCE(octet_length(previous_checkpoint_sha256), 0)
          FROM kernel_checkpoints WHERE checkpoint_seq >= ?1 AND checkpoint_seq <= ?2
          ORDER BY checkpoint_seq ASC",
     )?;
@@ -1295,12 +1295,12 @@ pub(super) fn copy_lineage(
     let sizes = (|| -> Result<Vec<(i64, u64)>, ReceiptStoreError> {
         let mut statement = transaction.prepare_cached(
             "SELECT rowid,
-                    length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
-                    + length(CAST(issuer_key AS BLOB)) + length(CAST(grants_json AS BLOB))
-                    + COALESCE(length(CAST(parent_capability_id AS BLOB)), 0)
-                    + COALESCE(length(CAST(federated_parent_capability_id AS BLOB)), 0)
-                    + COALESCE(length(CAST(provenance AS BLOB)), 0)
-                    + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0)
+                    octet_length(capability_id) + octet_length(subject_key)
+                    + octet_length(issuer_key) + octet_length(grants_json)
+                    + COALESCE(octet_length(parent_capability_id), 0)
+                    + COALESCE(octet_length(federated_parent_capability_id), 0)
+                    + COALESCE(octet_length(provenance), 0)
+                    + COALESCE(octet_length(signed_capability_json), 0)
              FROM capability_lineage WHERE rowid > ?1 AND rowid <= ?2 ORDER BY rowid LIMIT ?3",
         )?;
         let rows = statement.query_map(params![after, through, limit], |row| {
@@ -1363,13 +1363,13 @@ fn lineage_row_bytes(
 ) -> Result<Option<(u64, u64)>, ReceiptStoreError> {
     let bytes: Option<(i64, i64)> = connection
         .prepare_cached(
-            "SELECT length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB))
-                    + length(CAST(issuer_key AS BLOB)) + length(CAST(grants_json AS BLOB))
-                    + COALESCE(length(CAST(parent_capability_id AS BLOB)), 0)
-                    + COALESCE(length(CAST(federated_parent_capability_id AS BLOB)), 0)
-                    + COALESCE(length(CAST(provenance AS BLOB)), 0)
-                    + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0),
-                    length(CAST(subject_key AS BLOB))
+            "SELECT octet_length(capability_id) + octet_length(subject_key)
+                    + octet_length(issuer_key) + octet_length(grants_json)
+                    + COALESCE(octet_length(parent_capability_id), 0)
+                    + COALESCE(octet_length(federated_parent_capability_id), 0)
+                    + COALESCE(octet_length(provenance), 0)
+                    + COALESCE(octet_length(signed_capability_json), 0),
+                    octet_length(subject_key)
              FROM capability_lineage WHERE capability_id = ?1",
         )?
         .query_row([capability_id], |row| Ok((row.get(0)?, row.get(1)?)))

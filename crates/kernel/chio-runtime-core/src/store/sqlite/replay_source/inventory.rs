@@ -42,12 +42,12 @@ pub(super) fn read_inventory(
             .query_row(
                 &format!(
                     "SELECT COUNT(*), COALESCE(SUM(
-                        length(CAST({resource} AS BLOB))
-                        + length(CAST(admission_id AS BLOB))), 0),
+                        octet_length({resource})
+                        + octet_length(admission_id)), 0),
                      COALESCE(SUM(CASE WHEN
                         typeof({resource}) <> 'text' OR typeof(admission_id) <> 'text'
-                        OR length(CAST({resource} AS BLOB)) NOT BETWEEN 1 AND 512
-                        OR length(CAST(admission_id AS BLOB)) NOT BETWEEN 1 AND 512
+                        OR octet_length({resource}) NOT BETWEEN 1 AND 512
+                        OR octet_length(admission_id) NOT BETWEEN 1 AND 512
                      THEN 1 ELSE 0 END), 0) FROM {table}"
                 ),
                 [],

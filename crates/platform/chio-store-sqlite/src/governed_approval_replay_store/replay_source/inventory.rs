@@ -11,18 +11,18 @@ pub(super) fn read(connection: &Connection) -> Result<Inventory, Error> {
     // NULLs in primary-key text remain possible in malformed legacy schemas;
     // the exact schema check is a separate prerequisite, not a substitute here.
     let (count, bytes, invalid_rows): (i64, i64, i64) = connection.query_row(
-        "SELECT COUNT(*), COALESCE(SUM(length(CAST(subject_id AS BLOB))
-            + length(CAST(request_id AS BLOB)) + length(CAST(intent_hash AS BLOB))
-            + COALESCE(length(CAST(dispatch_reservation_id AS BLOB)), 0)), 0),
+        "SELECT COUNT(*), COALESCE(SUM(octet_length(subject_id)
+            + octet_length(request_id) + octet_length(intent_hash)
+            + COALESCE(octet_length(dispatch_reservation_id), 0)), 0),
             COALESCE(SUM(CASE WHEN typeof(subject_id) = 'text'
                 AND typeof(request_id) = 'text' AND typeof(intent_hash) = 'text'
                 AND typeof(expires_at) = 'integer' AND expires_at >= 0
-                AND length(CAST(subject_id AS BLOB)) BETWEEN 1 AND 512
-                AND length(CAST(request_id AS BLOB)) BETWEEN 1 AND 512
-                AND length(CAST(intent_hash AS BLOB)) BETWEEN 1 AND 512
+                AND octet_length(subject_id) BETWEEN 1 AND 512
+                AND octet_length(request_id) BETWEEN 1 AND 512
+                AND octet_length(intent_hash) BETWEEN 1 AND 512
                 AND (dispatch_reservation_id IS NULL OR
                     (typeof(dispatch_reservation_id) = 'text'
-                    AND length(CAST(dispatch_reservation_id AS BLOB)) BETWEEN 1 AND 512))
+                    AND octet_length(dispatch_reservation_id) BETWEEN 1 AND 512))
                 THEN 0 ELSE 1 END), 0)
          FROM chio_governed_approval_replay_entries",
         [],

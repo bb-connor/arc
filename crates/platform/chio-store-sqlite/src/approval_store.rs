@@ -209,14 +209,14 @@ impl SqliteApprovalStore {
                 approval_set_hash TEXT NOT NULL UNIQUE
                     CHECK (typeof(approval_set_hash) = 'text' AND length(approval_set_hash) = 64 AND instr(approval_set_hash, char(0)) = 0 AND octet_length(approval_set_hash) <= 256 AND approval_set_hash NOT GLOB '*[^0-9a-f]*'),
                 members_json TEXT NOT NULL
-                    CHECK (length(CAST(members_json AS BLOB)) BETWEEN 2 AND 262144),
+                    CHECK (octet_length(members_json) BETWEEN 2 AND 262144),
                 proposal_deadline INTEGER NOT NULL CHECK (proposal_deadline > 0),
                 state TEXT NOT NULL CHECK (state IN ('reserved', 'committed', 'cancelled'))
             );
 
             CREATE TABLE IF NOT EXISTS chio_hitl_operation_reservation_tokens (
                 token_id TEXT PRIMARY KEY
-                    CHECK (length(CAST(token_id AS BLOB)) BETWEEN 1 AND 512 AND instr(token_id, char(0)) = 0),
+                    CHECK (octet_length(token_id) BETWEEN 1 AND 512 AND instr(token_id, char(0)) = 0),
                 token_digest TEXT NOT NULL UNIQUE
                     CHECK (typeof(token_digest) = 'text' AND length(token_digest) = 64 AND instr(token_digest, char(0)) = 0 AND octet_length(token_digest) <= 256 AND token_digest NOT GLOB '*[^0-9a-f]*'),
                 operation_id TEXT NOT NULL REFERENCES chio_hitl_operation_reservations(operation_id),
@@ -481,7 +481,7 @@ impl ApprovalStore for SqliteApprovalStore {
         // Pull pending record inside the tx to avoid TOCTOU races.
         let pending: Option<(String, String, String)> = tx
             .query_row(
-                "SELECT policy_id, parameter_hash, CASE WHEN typeof(payload) = 'text' AND length(CAST(payload AS BLOB)) <= 1048576 THEN payload ELSE NULL END FROM chio_hitl_pending WHERE approval_id = ?1",
+                "SELECT policy_id, parameter_hash, CASE WHEN typeof(payload) = 'text' AND octet_length(payload) <= 1048576 THEN payload ELSE NULL END FROM chio_hitl_pending WHERE approval_id = ?1",
                 params![id],
                 |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
             )
@@ -675,7 +675,7 @@ impl ApprovalStore for SqliteApprovalStore {
                     }
                 };
                 let artifacts: Option<(String, String)> = conn.query_row(
-                    "SELECT CASE WHEN length(CAST(request_json AS BLOB)) <= 1048576 THEN request_json ELSE NULL END, CASE WHEN length(CAST(token_json AS BLOB)) <= 1048576 THEN token_json ELSE NULL END FROM chio_hitl_decision_artifacts WHERE approval_id = ?1",
+                    "SELECT CASE WHEN octet_length(request_json) <= 1048576 THEN request_json ELSE NULL END, CASE WHEN octet_length(token_json) <= 1048576 THEN token_json ELSE NULL END FROM chio_hitl_decision_artifacts WHERE approval_id = ?1",
                     params![id], |row| Ok((row.get(0)?, row.get(1)?)),
                 ).optional().map_err(|error| ApprovalStoreError::Backend(format!("load decision artifacts: {error}")))?;
                 let (request, token) = match artifacts {

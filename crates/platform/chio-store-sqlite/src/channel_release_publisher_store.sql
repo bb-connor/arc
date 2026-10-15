@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
     transaction_hash TEXT,
     failure_detail TEXT CHECK (
         failure_detail IS NULL
-        OR length(CAST(failure_detail AS BLOB)) BETWEEN 1 AND 4096
+        OR octet_length(failure_detail) BETWEEN 1 AND 4096
     ),
     record_version INTEGER NOT NULL CHECK (record_version > 0),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),

@@ -234,7 +234,7 @@ fn copy_children(
                     (true, Some(archive)) => archive,
                     _ => live,
                 };
-                let found: Option<(bool, i64)> = source.query_row("SELECT receipt_kind = 'child_receipt', length(CAST(raw_json AS BLOB)) FROM claim_receipt_log_entries WHERE entry_seq = ?1", [row.entry_seq], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
+                let found: Option<(bool, i64)> = source.query_row("SELECT receipt_kind = 'child_receipt', octet_length(raw_json) FROM claim_receipt_log_entries WHERE entry_seq = ?1", [row.entry_seq], |r| Ok((r.get(0)?, r.get(1)?))).optional()?;
                 let Some((true, length)) = found else {
                     return Err(invalid(format!(
                         "authenticated child claim entry {} is missing or changed",
@@ -304,7 +304,7 @@ pub(super) fn checkpoints(
             }
         };
         let checkpoint = live_read(lease, |live| {
-            let length: Option<i64> = live.query_row("SELECT length(CAST(merkle_root AS BLOB)) + length(CAST(statement_json AS BLOB)) + length(CAST(signature AS BLOB)) + length(CAST(kernel_key AS BLOB)) + COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0) FROM kernel_checkpoints WHERE checkpoint_seq = ?1", [seq], |row| row.get(0)).optional()?;
+            let length: Option<i64> = live.query_row("SELECT octet_length(merkle_root) + octet_length(statement_json) + octet_length(signature) + octet_length(kernel_key) + COALESCE(octet_length(previous_checkpoint_sha256), 0) FROM kernel_checkpoints WHERE checkpoint_seq = ?1", [seq], |row| row.get(0)).optional()?;
             let length = length
                 .ok_or_else(|| invalid(format!("authenticated checkpoint {seq} is missing")))?;
             bytes.preflight(crate::receipt_store::sqlite_u64(
@@ -334,12 +334,12 @@ pub(super) fn checkpoints(
             ..CheckpointTransparencySummary::default()
         };
         let enriched = live_read(lease, |live| {
-            let core_bytes: Option<i64> = live.query_row("SELECT length(CAST(publication_schema AS BLOB)) + length(CAST(merkle_root AS BLOB)) + length(CAST(kernel_key AS BLOB)) + COALESCE(length(CAST(previous_checkpoint_sha256 AS BLOB)), 0) FROM checkpoint_publication_metadata WHERE checkpoint_seq = ?1", [crate::integer::checked::<_, i64>(publication.checkpoint_seq)?], |row| row.get(0)).optional()?;
+            let core_bytes: Option<i64> = live.query_row("SELECT octet_length(publication_schema) + octet_length(merkle_root) + octet_length(kernel_key) + COALESCE(octet_length(previous_checkpoint_sha256), 0) FROM checkpoint_publication_metadata WHERE checkpoint_seq = ?1", [crate::integer::checked::<_, i64>(publication.checkpoint_seq)?], |row| row.get(0)).optional()?;
             let core_bytes = core_bytes
                 .map(|n| crate::receipt_store::sqlite_u64(n, "publication metadata bytes"))
                 .transpose()?
                 .unwrap_or(0);
-            let binding_bytes: Option<i64> = live.query_row("SELECT length(CAST(binding_json AS BLOB)) FROM checkpoint_publication_trust_anchor_bindings WHERE checkpoint_seq = ?1", [crate::integer::checked::<_, i64>(publication.checkpoint_seq)?], |row| row.get(0)).optional()?;
+            let binding_bytes: Option<i64> = live.query_row("SELECT octet_length(binding_json) FROM checkpoint_publication_trust_anchor_bindings WHERE checkpoint_seq = ?1", [crate::integer::checked::<_, i64>(publication.checkpoint_seq)?], |row| row.get(0)).optional()?;
             let binding_bytes = binding_bytes
                 .map(|n| crate::receipt_store::sqlite_u64(n, "publication binding bytes"))
                 .transpose()?
@@ -357,7 +357,7 @@ pub(super) fn checkpoints(
 }
 
 const LINEAGE_COLUMNS: &str = "capability_id, subject_key, issuer_key, issued_at, expires_at, grants_json, delegation_depth, parent_capability_id, federated_parent_capability_id, provenance, signed_capability_json";
-const LINEAGE_BYTES: &str = "length(CAST(capability_id AS BLOB)) + length(CAST(subject_key AS BLOB)) + length(CAST(issuer_key AS BLOB)) + length(CAST(grants_json AS BLOB)) + COALESCE(length(CAST(parent_capability_id AS BLOB)), 0) + COALESCE(length(CAST(federated_parent_capability_id AS BLOB)), 0) + COALESCE(length(CAST(provenance AS BLOB)), 0) + COALESCE(length(CAST(signed_capability_json AS BLOB)), 0)";
+const LINEAGE_BYTES: &str = "octet_length(capability_id) + octet_length(subject_key) + octet_length(issuer_key) + octet_length(grants_json) + COALESCE(octet_length(parent_capability_id), 0) + COALESCE(octet_length(federated_parent_capability_id), 0) + COALESCE(octet_length(provenance), 0) + COALESCE(octet_length(signed_capability_json), 0)";
 
 pub(super) fn lineage(
     lease: &Lease<'_>,
@@ -483,7 +483,7 @@ impl LineageSource {
     fn extra_bytes(self) -> &'static str {
         match self {
             Self::Local(_) => "",
-            Self::Shared(_) => "length(CAST(share_id AS BLOB)) + ",
+            Self::Shared(_) => "octet_length(share_id) + ",
         }
     }
 }
