@@ -27,6 +27,7 @@ use chio_security_types::recovery::RecoveryScopeV1;
 ///     serde_json::from_str(wire)
 /// }
 /// ```
+#[derive(Clone)]
 pub struct RecoveryOriginalRequestScope {
     scope: RecoveryScopeV1,
     namespace: RequestNamespaceDigest,

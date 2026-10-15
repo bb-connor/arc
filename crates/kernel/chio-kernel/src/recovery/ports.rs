@@ -6,8 +6,7 @@ use chio_security_types::recovery::*;
 
 /// Only the kernel's full capability verifier and current operator assignment
 /// lookup may construct this actor. It grants scoped control, never tool
-/// dispatch. No constructor exists until that verifier is integrated, so no
-/// `RecoveryAuthorityPort` caller exists yet.
+/// dispatch.
 ///
 /// ```
 /// use chio_kernel::recovery::{AuthenticatedRecoveryActor, RecoveryPermission};

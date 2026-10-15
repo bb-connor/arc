@@ -1,4 +1,4 @@
-//! Shared synthetic REC-0a vector fixtures for recovery unit tests.
+//! Signed v1 vector fixtures for recovery unit tests.
 use crate::ToolCallRequest;
 use chio_security_types::recovery::RecoveryScopeV1;
 use serde_json::Value;
@@ -11,11 +11,7 @@ pub(super) fn authority_fixture() -> TestResult<Value> {
     ))?)
 }
 
-/// The vector request with its recovery `declassification_grant` removed.
-/// Main's `ToolCallRequest.declassification_grant` is still the ordinary
-/// `SignedDeclassificationGrant`, so this seed cannot carry the recovery grant
-/// variant. Delete this removal and re-derive every seed digest when
-/// `ToolCallRequest` adopts `SignedDisclosureGrant`.
+/// The ordinary request seed excludes recovery grant material.
 pub(super) fn seed_wire() -> TestResult<Value> {
     let mut seed = authority_fixture()?["request"].clone();
     seed.as_object_mut()
