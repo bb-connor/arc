@@ -11,6 +11,8 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[path = "protocol_refusal/call_completion.rs"]
 mod call_completion;
+#[path = "protocol_refusal/notification_lag.rs"]
+mod notification_lag;
 #[path = "protocol_refusal/projection_original.rs"]
 mod projection_original;
 #[path = "protocol_refusal/reservation_original.rs"]

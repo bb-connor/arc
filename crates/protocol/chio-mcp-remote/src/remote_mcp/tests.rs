@@ -1185,6 +1185,7 @@ fn restored_ready_session_preserves_lifecycle_and_requires_store_lease() {
         event_tx,
         retained_notification_events,
         next_event_id,
+        resync_catalogs: Vec::new(),
         session_db_path: Some(PathBuf::from("unused-session-store.sqlite3")),
         approval_redemption: None,
         session_store_lease: None,

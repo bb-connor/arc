@@ -57,6 +57,7 @@ impl RemoteSession {
             worker_serving_closed: tokio::sync::watch::channel(false).0,
             notification_stream_attached: Arc::new(AtomicBool::new(false)),
             next_event_id: init.next_event_id,
+            resync_catalogs: init.resync_catalogs,
             session_db_path: init.session_db_path,
             approval_redemption: init.approval_redemption,
             session_store_lease: init.session_store_lease,

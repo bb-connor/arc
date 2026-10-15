@@ -294,6 +294,7 @@ async fn restored_transport_obeys_original_deadline_and_stops_even_if_fencing_fa
                 event_tx,
                 retained_notification_events: Arc::new(StdMutex::new(VecDeque::new())),
                 next_event_id: Arc::new(AtomicU64::new(0)),
+                resync_catalogs: Vec::new(),
                 session_db_path: Some(path.clone()),
                 approval_redemption: None,
                 session_store_lease: Some(lease.clone()),

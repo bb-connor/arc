@@ -493,6 +493,11 @@ impl RemoteSessionFactory {
             event_tx,
             retained_notification_events,
             next_event_id,
+            resync_catalogs: crate::notification_window::declared_resync_catalogs(
+                self.config.tools_list_changed || upstream_capabilities.tools_list_changed,
+                upstream_capabilities.resources_list_changed,
+                upstream_capabilities.prompts_list_changed,
+            ),
             session_db_path: self.config.session_db_path.clone(),
             approval_redemption,
             session_store_lease: self.session_store_lease.clone(),
@@ -732,6 +737,11 @@ impl RemoteSessionFactory {
             event_tx,
             retained_notification_events,
             next_event_id,
+            resync_catalogs: crate::notification_window::declared_resync_catalogs(
+                self.config.tools_list_changed || upstream_capabilities.tools_list_changed,
+                upstream_capabilities.resources_list_changed,
+                upstream_capabilities.prompts_list_changed,
+            ),
             session_db_path: self.config.session_db_path.clone(),
             approval_redemption,
             session_store_lease: self.session_store_lease.clone(),

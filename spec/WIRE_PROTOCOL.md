@@ -271,6 +271,18 @@ Established-session rules:
 - Notification replay uses the `Last-Event-ID` request header.
 - Event identifiers are encoded as `{session_id}-{sequence}`.
 - Replay requests outside the retained event window fail with `409 Conflict`.
+- The retained window holds the 256 most recent session notifications. A newer
+  `list_changed` for a catalog, or `resources/updated` for a URI, replaces the
+  older retained notification with the same meaning.
+- A GET stream that falls behind the session's notifications stays attached
+  and receives every notification the retained window still holds, in event
+  order. When the window no longer holds every notification after the stream's
+  position, the stream then receives one `list_changed` per catalog the session
+  declared, one `notifications/resources/updated` per subscribed resource, and
+  a `notifications/message` warning naming the skipped count. A client **MUST**
+  treat these as re-read instructions. After three consecutive such passes the
+  stream ends with the SSE event `chio-resync-required`, and the client
+  reconnects.
 - Event sequences are monotonic across a session restore. A restored session
   starts above every sequence an earlier incarnation issued, so a cursor from
   before the restore fails with `409 Conflict` instead of naming a new event.

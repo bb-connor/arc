@@ -131,6 +131,7 @@ mod tests {
             event_tx,
             retained_notification_events: Arc::new(StdMutex::new(VecDeque::new())),
             next_event_id: Arc::new(AtomicU64::new(0)),
+            resync_catalogs: Vec::new(),
             session_db_path: None,
             approval_redemption: None,
             session_store_lease: None,

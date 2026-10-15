@@ -115,7 +115,7 @@ const MCP_PROTOCOL_VERSION_HEADER: &str = "mcp-protocol-version";
 const CHIO_RESPONSE_MODE_HEADER: &str = "x-chio-mcp-response-mode";
 const CHIO_TOOL_STREAMING_CAPABILITY_KEY: &str = "chioToolStreaming";
 const DEFAULT_STREAM_RETRY_MILLIS: u64 = 1_000;
-const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 64;
+const DEFAULT_NOTIFICATION_REPLAY_WINDOW: usize = 256;
 const DEFAULT_SHARED_NOTIFICATION_POLL_MILLIS: u64 = 25;
 const DEFAULT_ADMIN_LIST_LIMIT: usize = 50;
 const MAX_ADMIN_LIST_LIMIT: usize = 200;
@@ -738,6 +738,8 @@ struct RemoteSession {
     worker_serving_closed: tokio::sync::watch::Sender<bool>,
     notification_stream_attached: Arc<AtomicBool>,
     next_event_id: Arc<AtomicU64>,
+    /// The `list_changed` notifications this session declared, in resync order.
+    resync_catalogs: Vec<&'static str>,
     session_db_path: Option<PathBuf>,
     approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,
@@ -784,6 +786,7 @@ struct RemoteSessionInit {
     event_tx: broadcast::Sender<RemoteSessionEvent>,
     retained_notification_events: Arc<StdMutex<VecDeque<RetainedRemoteSessionEvent>>>,
     next_event_id: Arc<AtomicU64>,
+    resync_catalogs: Vec<&'static str>,
     session_db_path: Option<PathBuf>,
     approval_redemption: Option<remote_mcp_approvals::ApprovalRedemption>,
     session_store_lease: Option<Arc<RemoteSessionStoreLifecycleLease>>,

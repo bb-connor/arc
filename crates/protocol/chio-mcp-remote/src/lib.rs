@@ -29,6 +29,8 @@ mod remote_mcp_approval_policy;
 pub use remote_mcp_approval_policy::RemoteApprovalConfig;
 #[path = "remote_mcp/http_body.rs"]
 mod http_body;
+#[path = "remote_mcp/notification_window.rs"]
+mod notification_window;
 #[path = "remote_mcp/post_completion.rs"]
 mod post_completion;
 #[path = "remote_mcp/protocol_refusal_http.rs"]

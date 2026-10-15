@@ -831,8 +831,8 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
         .and_then(|value| value.to_str().ok());
     // Subscribe before snapshotting the bounded retained window. Events already
     // in both routes are emitted once using their unchanged sequence identity.
-    let mut event_rx = session.subscribe();
-    let (mut delivered_through, replay_events) =
+    let event_rx = session.subscribe();
+    let (delivered_through, replay_events) =
         match session.replay_notifications_after(last_event_id) {
             Ok(result) => result,
             Err(response) => return response,
@@ -851,47 +851,17 @@ async fn handle_get(State(state): State<RemoteAppState>, request: Request) -> Re
             "an MCP GET notification stream is already active for this session",
         );
     }
-    let session_for_stream = session.clone();
     let attachment = NotificationStreamAttachment {
         session: session.clone(),
     };
-    let stream = stream! {
-        let _attachment = attachment;
-        if let Some(id) = priming_event_id {
-            yield Ok::<Event, Infallible>(Event::default().id(id)
-                .retry(std::time::Duration::from_millis(DEFAULT_STREAM_RETRY_MILLIS)).data(""));
-        }
-        for event in replay_events {
-            if *session_for_stream.worker_serving_closed.borrow() { break; }
-            delivered_through = delivered_through.max(event.seq);
-            let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
-            yield Ok::<Event, Infallible>(Event::default().id(event.event_id).data(data));
-        }
-        loop {
-            match session_worker::receive(&session_for_stream, &mut event_rx).await {
-                Ok(event) => {
-                    if !event.kind.is_session_owned() || event.seq <= delivered_through { continue; }
-                    delivered_through = event.seq;
-                    let data = serde_json::to_string(&event.message).unwrap_or_else(|_| "null".to_string());
-                    yield Ok::<Event, Infallible>(Event::default().id(event.event_id).data(data));
-                }
-                Err(error) => {
-                    warn!(error = %error, session_id = %session_for_stream.session_id,
-                        "remote GET session output ended or was lost");
-                    session_worker::close(&state, &session_for_stream).await;
-                    break;
-                }
-            }
-        }
+    let source =
+        notification_window::GetNotificationSource::new(session, event_rx, delivered_through, replay_events);
+    let mode = if last_event_id.is_some() {
+        "get_sse_replay"
+    } else {
+        "get_sse_live"
     };
-    response_with_mode(
-        Sse::new(stream).into_response(),
-        if last_event_id.is_some() {
-            "get_sse_replay"
-        } else {
-            "get_sse_live"
-        },
-    )
+    notification_window::get_response(state, attachment, source, priming_event_id, mode)
 }
 
 async fn handle_protected_resource_metadata(State(state): State<RemoteAppState>) -> Response {

@@ -42,9 +42,6 @@ impl BroadcastJsonRpcWriter {
     }
 
     pub(super) fn next_event(&self, message: Value) -> std::io::Result<RemoteSessionEvent> {
-        let next =
-            crate::clock::next_counter(&self.next_event_id).map_err(std::io::Error::other)?;
-        let event_id = format!("{}-{next}", self.session_id);
         let generation = self
             .response_context
             .request_generation()
@@ -54,18 +51,26 @@ impl BroadcastJsonRpcWriter {
             RemoteSessionEventKind::RequestCorrelated => generation,
             _ => None,
         };
+        // Sequence allocation and retention share the window lock, so the
+        // retained window is in sequence order for every producer.
+        let mut retained = self
+            .retained_notification_events
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let next =
+            crate::clock::next_counter(&self.next_event_id).map_err(std::io::Error::other)?;
+        let event_id = format!("{}-{next}", self.session_id);
         if kind.is_session_owned() {
-            if let Ok(mut retained) = self.retained_notification_events.lock() {
-                retained.push_back(RetainedRemoteSessionEvent {
+            crate::notification_window::retain(
+                &mut retained,
+                RetainedRemoteSessionEvent {
                     seq: next,
                     event_id: event_id.clone(),
                     message: message.clone(),
-                });
-                while retained.len() > DEFAULT_NOTIFICATION_REPLAY_WINDOW {
-                    retained.pop_front();
-                }
-            }
+                },
+            );
         }
+        drop(retained);
 
         Ok(RemoteSessionEvent {
             seq: next,
