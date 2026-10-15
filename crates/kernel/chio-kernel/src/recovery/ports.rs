@@ -199,6 +199,10 @@ pub trait RecoveryAuthorityPort: Send + Sync {
         now: u64,
     ) -> Result<RecoveryDeploymentV1, AdmissionOperationStoreError>;
     /// Accept one command and retain its exact workflow generation.
+    /// Creating a workflow requires the original Process port. Its absence
+    /// refuses with Invariant("recovery original process authority is absent")
+    /// before any reservation or write. Settled command replay uses retained
+    /// authenticated origin and does not require a live Process port.
     fn command_with_selection(
         &self,
         actor: &AuthenticatedRecoveryActor,

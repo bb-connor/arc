@@ -3,15 +3,14 @@ use std::sync::Arc;
 
 use chio_core::crypto::{sha256_hex, Keypair};
 use chio_kernel::admission_operation::{
-    AdmissionIdentifier, AdmissionOperationStore, AdmissionReplayKey,
-    AuthenticatedRequestNamespace, DurableAdmissionMode,
+    AdmissionOperationStore, AdmissionReplayKey, DurableAdmissionMode,
 };
 use chio_kernel::recovery::RecoveryOriginalRequestError;
 use chio_kernel::{
     ChioKernel, KernelConfig, ToolCallRequest, DEFAULT_CHECKPOINT_BATCH_SIZE,
     DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
-use chio_security_types::recovery::{AuthorityDomainId, RecoveryScopeV1};
+use chio_security_types::recovery::{AuthorityDomainId, RecoveryScopeV1, RecoveryTenantId};
 use chio_store_sqlite::SqliteAuthorityStore;
 
 fn kernel() -> ChioKernel {
@@ -89,14 +88,17 @@ fn public_original_scope_uses_the_installed_sqlite_authority_without_admission(
         .durable_admission_store_uuid()
         .ok_or("installed authority is absent")?;
     scope.authority_domain = AuthorityDomainId::new(installed)?;
-    let expected_namespace = AuthenticatedRequestNamespace::for_local_system(
-        AdmissionIdentifier::try_new("coordinator_authority_id", installed)?,
-    )?;
     let original = kernel.recovery_process_original_request_scope(&scope, &seed)?;
-    assert_eq!(original.namespace(), expected_namespace.digest());
     assert_eq!(original.request_id().as_str(), seed.request_id);
     assert!(original.matches(&scope, &seed));
     assert!(original.clone().matches(&scope, &seed));
+
+    let mut tenant_scope = scope.clone();
+    tenant_scope.tenant_id = RecoveryTenantId::new("tenant:other")?;
+    let tenant_original = kernel.recovery_process_original_request_scope(&tenant_scope, &seed)?;
+    assert_eq!(original.namespace(), tenant_original.namespace());
+    assert!(tenant_original.matches(&tenant_scope, &seed));
+    assert!(!original.matches(&tenant_scope, &seed));
 
     let mut changed_seed = seed.clone();
     changed_seed.arguments = serde_json::json!({"changed": true});

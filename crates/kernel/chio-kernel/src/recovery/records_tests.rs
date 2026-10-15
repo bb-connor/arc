@@ -122,7 +122,6 @@ fn approval_submission_and_storage_use_the_same_attestation_bound() -> TestResul
             MAX_RECOVERY_APPROVAL_ATTESTATIONS + 1,
             ContractError::Malformed,
         ),
-        (MAX_RECOVERY_OBLIGATIONS, ContractError::LimitExceeded),
     ] {
         let approval = json!({
             "intent": fixture["approval_intent"],
@@ -139,6 +138,30 @@ fn approval_submission_and_storage_use_the_same_attestation_bound() -> TestResul
             Err(error) if error == expected
         ));
     }
+    Ok(())
+}
+
+#[test]
+fn oversized_approval_refuses_at_the_contract_wire_preflight() -> TestResult {
+    let fixture = authority_fixture()?;
+    let approval = json!({
+        "intent": fixture["approval_intent"],
+        "coverage": vec![fixture["coverage"][0].clone(); 64]
+    });
+    let approval_bytes = canonical_json_bytes(&approval)?;
+    assert!(approval_bytes.len() > MAX_RECOVERY_WIRE_BYTES);
+    assert!(matches!(
+        decode_contract::<RecoveryApprovalSubmissionV1>(&approval_bytes),
+        Err(ContractError::LimitExceeded)
+    ));
+    let mut workflow = workflow_wire()?;
+    workflow["approval"] = approval;
+    let workflow_bytes = canonical_json_bytes(&workflow)?;
+    assert!(workflow_bytes.len() > MAX_RECOVERY_WIRE_BYTES);
+    assert!(matches!(
+        decode_contract::<RecoveryWorkflowRecordV1>(&workflow_bytes),
+        Err(ContractError::LimitExceeded)
+    ));
     Ok(())
 }
 
