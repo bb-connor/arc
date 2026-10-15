@@ -24,6 +24,16 @@ if ! grep -Fq "verifier_refuses_unsupported_envelope_schema" "$gate"; then
   exit 1
 fi
 
+if ! grep -Fq "verifier_refuses_unsupported_envelope_payload_schema" "$gate"; then
+  echo "agent-web.proof-envelope-schema.payload-refusal-missing: unsupported envelope payload schema refusal test" >&2
+  exit 1
+fi
+
+if ! grep -Fq "verifier_refuses_envelope_without_passport_scope" "$gate"; then
+  echo "agent-web.proof-envelope-schema.scope-refusal-missing: required passport scope refusal test" >&2
+  exit 1
+fi
+
 "$gate"
 
 echo "check-agent-web-proof-envelope-schema.test.sh: Agent Web proof-envelope schema gate passed"
