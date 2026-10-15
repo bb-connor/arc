@@ -259,3 +259,63 @@ fn authority_clock_regression_denies_before_source_access() -> AnchoredTestResul
         .imported_inactive());
     Ok(())
 }
+
+#[test]
+fn nul_source_identities_refuse_before_pinning_or_sealing() -> AnchoredTestResult {
+    for (nonce, capability) in [("n\0x", "capability"), ("nonce", "cap\0ability")] {
+        let fixture = fixture_real_time();
+        let source = Source::new(&fixture, true)?;
+        assert!(source
+            .raw
+            .check_and_insert_through("ordinary", "capability", u64::MAX)?);
+        assert!(source
+            .raw
+            .check_and_insert_through(nonce, capability, u64::MAX)?);
+        let binding = DpopReplaySourceBinding {
+            dpop_authority_id: identifier("authority", AUTHORITY_ID),
+            destination_authority_id: identifier("destination", &fixture.fence.store_uuid),
+        };
+        let before = source.raw.preview_unsealed(&binding)?;
+        let markers = before
+            .markers()
+            .iter()
+            .map(chio_core::canonical::canonical_json_bytes)
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(markers.len(), 2);
+        let global_before = global_count(&fixture);
+        for _ in 0..2 {
+            match pin(&fixture, &source).expect_err("refuse unrepresentable source identity") {
+                AdmissionOperationStoreError::Invariant(message) => {
+                    assert_eq!(message, "DPoP replay source marker identity contains NUL");
+                }
+                other => panic!("expected source identity refusal, got {other:?}"),
+            }
+            assert_eq!(counts(&fixture), [0, 0, 0]);
+            assert_eq!(global_count(&fixture), global_before);
+            assert_eq!(load(&fixture)?, None);
+            assert_eq!(
+                source
+                    .raw
+                    .preview_unsealed(&binding)?
+                    .markers()
+                    .iter()
+                    .map(chio_core::canonical::canonical_json_bytes)
+                    .collect::<Result<Vec<_>, _>>()?,
+                markers
+            );
+        }
+        assert_eq!(source.calls(), ["preview", "preview"]);
+        assert!(!source
+            .raw
+            .check_and_insert_through(nonce, capability, u64::MAX)?);
+        assert!(!source
+            .raw
+            .check_and_insert_through("ordinary", "capability", u64::MAX)?);
+        assert!(source
+            .raw
+            .check_and_insert_through("still-unsealed", "capability", u64::MAX)?);
+        assert_eq!(counts(&fixture), [0, 0, 0]);
+        assert_eq!(global_count(&fixture), global_before);
+    }
+    Ok(())
+}

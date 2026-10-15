@@ -32,6 +32,13 @@ fn hash(domain: &[u8], value: &impl Serialize) -> IntegrityResult<String> {
 pub(super) fn new_expectation(
     snapshot: DpopReplaySourceSnapshot,
 ) -> Result<DpopReplayMigrationRecordV1, AdmissionOperationStoreError> {
+    if snapshot
+        .markers()
+        .iter()
+        .any(|marker| marker.nonce.contains('\0') || marker.capability_id.contains('\0'))
+    {
+        return Err(invariant("DPoP replay source marker identity contains NUL"));
+    }
     // The destination derives generation identity from the full pinned source,
     // not from a mutable owner lease or an identifier supplied by the source.
     let expectation_id = hash(
