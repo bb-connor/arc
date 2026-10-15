@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS finding_status_feeds (
     feed_id TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(feed_id) = 'text' AND length(feed_id) BETWEEN 1 AND 512 AND instr(feed_id, char(0)) = 0),
+        CHECK (typeof(feed_id) = 'text' AND length(feed_id) BETWEEN 1 AND 512 AND instr(feed_id, char(0)) = 0 AND octet_length(feed_id) <= 2048),
     operator_id TEXT NOT NULL
-        CHECK (typeof(operator_id) = 'text' AND length(operator_id) BETWEEN 1 AND 512 AND instr(operator_id, char(0)) = 0),
+        CHECK (typeof(operator_id) = 'text' AND length(operator_id) BETWEEN 1 AND 512 AND instr(operator_id, char(0)) = 0 AND octet_length(operator_id) <= 2048),
     key_domain_nonce INTEGER NOT NULL
         CHECK (key_domain_nonce = 3318287169837494),
     registered_at INTEGER NOT NULL CHECK (registered_at > 0),
@@ -28,13 +28,14 @@ CREATE TABLE IF NOT EXISTS finding_status_epochs (
         CHECK (key_domain_nonce = 3318287169837494),
     map_epoch INTEGER NOT NULL CHECK (map_epoch > 0),
     epoch_id TEXT NOT NULL
-        CHECK (typeof(epoch_id) = 'text' AND length(epoch_id) = 64 AND instr(epoch_id, char(0)) = 0 AND epoch_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(epoch_id) = 'text' AND length(epoch_id) = 64 AND instr(epoch_id, char(0)) = 0 AND octet_length(epoch_id) <= 256 AND epoch_id NOT GLOB '*[^0-9a-f]*'),
     root_hash TEXT NOT NULL
-        CHECK (typeof(root_hash) = 'text' AND length(root_hash) = 64 AND instr(root_hash, char(0)) = 0 AND root_hash NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(root_hash) = 'text' AND length(root_hash) = 64 AND instr(root_hash, char(0)) = 0 AND octet_length(root_hash) <= 256 AND root_hash NOT GLOB '*[^0-9a-f]*'),
     signed_epoch_sha256 TEXT NOT NULL CHECK (
         typeof(signed_epoch_sha256) = 'text'
         AND length(signed_epoch_sha256) = 64
         AND instr(signed_epoch_sha256, char(0)) = 0
+        AND octet_length(signed_epoch_sha256) <= 256
         AND signed_epoch_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     signed_epoch_bytes BLOB NOT NULL CHECK (
@@ -42,12 +43,13 @@ CREATE TABLE IF NOT EXISTS finding_status_epochs (
         AND length(signed_epoch_bytes) BETWEEN 1 AND 262144
     ),
     operator_key TEXT NOT NULL
-        CHECK (typeof(operator_key) = 'text' AND length(operator_key) BETWEEN 1 AND 4096 AND instr(operator_key, char(0)) = 0),
+        CHECK (typeof(operator_key) = 'text' AND length(operator_key) BETWEEN 1 AND 4096 AND instr(operator_key, char(0)) = 0 AND octet_length(operator_key) <= 16384),
     operator_key_epoch INTEGER NOT NULL CHECK (operator_key_epoch >= 0),
     operator_authorization_sha256 TEXT NOT NULL CHECK (
         typeof(operator_authorization_sha256) = 'text'
         AND length(operator_authorization_sha256) = 64
         AND instr(operator_authorization_sha256, char(0)) = 0
+        AND octet_length(operator_authorization_sha256) <= 256
         AND operator_authorization_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     generated_at INTEGER NOT NULL CHECK (generated_at > 0),
@@ -81,22 +83,24 @@ CREATE TABLE IF NOT EXISTS finding_status_feed_floors (
         CHECK (key_domain_nonce = 3318287169837494),
     map_epoch INTEGER NOT NULL CHECK (map_epoch > 0),
     epoch_id TEXT NOT NULL
-        CHECK (typeof(epoch_id) = 'text' AND length(epoch_id) = 64 AND instr(epoch_id, char(0)) = 0 AND epoch_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(epoch_id) = 'text' AND length(epoch_id) = 64 AND instr(epoch_id, char(0)) = 0 AND octet_length(epoch_id) <= 256 AND epoch_id NOT GLOB '*[^0-9a-f]*'),
     root_hash TEXT NOT NULL
-        CHECK (typeof(root_hash) = 'text' AND length(root_hash) = 64 AND instr(root_hash, char(0)) = 0 AND root_hash NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(root_hash) = 'text' AND length(root_hash) = 64 AND instr(root_hash, char(0)) = 0 AND octet_length(root_hash) <= 256 AND root_hash NOT GLOB '*[^0-9a-f]*'),
     signed_epoch_sha256 TEXT NOT NULL CHECK (
         typeof(signed_epoch_sha256) = 'text'
         AND length(signed_epoch_sha256) = 64
         AND instr(signed_epoch_sha256, char(0)) = 0
+        AND octet_length(signed_epoch_sha256) <= 256
         AND signed_epoch_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     operator_key TEXT NOT NULL
-        CHECK (typeof(operator_key) = 'text' AND length(operator_key) BETWEEN 1 AND 4096 AND instr(operator_key, char(0)) = 0),
+        CHECK (typeof(operator_key) = 'text' AND length(operator_key) BETWEEN 1 AND 4096 AND instr(operator_key, char(0)) = 0 AND octet_length(operator_key) <= 16384),
     operator_key_epoch INTEGER NOT NULL CHECK (operator_key_epoch >= 0),
     operator_authorization_sha256 TEXT NOT NULL CHECK (
         typeof(operator_authorization_sha256) = 'text'
         AND length(operator_authorization_sha256) = 64
         AND instr(operator_authorization_sha256, char(0)) = 0
+        AND octet_length(operator_authorization_sha256) <= 256
         AND operator_authorization_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     advanced_at INTEGER NOT NULL CHECK (advanced_at > 0),
@@ -141,16 +145,17 @@ END;
 
 CREATE TABLE IF NOT EXISTS finding_retraction_intents (
     intent_id TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(intent_id) = 'text' AND length(intent_id) = 64 AND instr(intent_id, char(0)) = 0 AND intent_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(intent_id) = 'text' AND length(intent_id) = 64 AND instr(intent_id, char(0)) = 0 AND octet_length(intent_id) <= 256 AND intent_id NOT GLOB '*[^0-9a-f]*'),
     feed_id TEXT NOT NULL,
     operator_id TEXT NOT NULL,
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
     source TEXT NOT NULL CHECK (source IN ('voluntary', 'enforcement')),
     intent_sha256 TEXT NOT NULL CHECK (
         typeof(intent_sha256) = 'text'
         AND length(intent_sha256) = 64
         AND instr(intent_sha256, char(0)) = 0
+        AND octet_length(intent_sha256) <= 256
         AND intent_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     intent_bytes BLOB NOT NULL CHECK (
@@ -167,6 +172,7 @@ CREATE TABLE IF NOT EXISTS finding_retraction_intents (
         OR (
             length(finality_evidence_sha256) = 64
             AND instr(finality_evidence_sha256, char(0)) = 0
+            AND octet_length(finality_evidence_sha256) <= 256
             AND finality_evidence_sha256 NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -184,6 +190,7 @@ CREATE TABLE IF NOT EXISTS finding_retraction_intents (
         OR (
             length(published_epoch_id) = 64
             AND instr(published_epoch_id, char(0)) = 0
+            AND octet_length(published_epoch_id) <= 256
             AND published_epoch_id NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -255,12 +262,13 @@ CREATE TABLE IF NOT EXISTS finding_status_states (
     feed_id TEXT NOT NULL,
     operator_id TEXT NOT NULL,
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
     state TEXT NOT NULL CHECK (state IN ('pending', 'retracted')),
     retraction_intent_sha256 TEXT NOT NULL CHECK (
         typeof(retraction_intent_sha256) = 'text'
         AND length(retraction_intent_sha256) = 64
         AND instr(retraction_intent_sha256, char(0)) = 0
+        AND octet_length(retraction_intent_sha256) <= 256
         AND retraction_intent_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     first_observed_at INTEGER NOT NULL CHECK (first_observed_at > 0),
@@ -271,6 +279,7 @@ CREATE TABLE IF NOT EXISTS finding_status_states (
         OR (
             length(retracted_epoch_id) = 64
             AND instr(retracted_epoch_id, char(0)) = 0
+            AND octet_length(retracted_epoch_id) <= 256
             AND retracted_epoch_id NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -279,6 +288,7 @@ CREATE TABLE IF NOT EXISTS finding_status_states (
         OR (
             length(retracted_root_hash) = 64
             AND instr(retracted_root_hash, char(0)) = 0
+            AND octet_length(retracted_root_hash) <= 256
             AND retracted_root_hash NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -325,13 +335,14 @@ CREATE TABLE IF NOT EXISTS finding_status_leaves (
     feed_id TEXT NOT NULL,
     operator_id TEXT NOT NULL,
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
     key_domain_nonce INTEGER NOT NULL
         CHECK (key_domain_nonce = 3318287169837494),
     status_value_sha256 TEXT NOT NULL CHECK (
         typeof(status_value_sha256) = 'text'
         AND length(status_value_sha256) = 64
         AND instr(status_value_sha256, char(0)) = 0
+        AND octet_length(status_value_sha256) <= 256
         AND status_value_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     status_value_bytes BLOB NOT NULL CHECK (
@@ -342,12 +353,13 @@ CREATE TABLE IF NOT EXISTS finding_status_leaves (
         typeof(retraction_intent_sha256) = 'text'
         AND length(retraction_intent_sha256) = 64
         AND instr(retraction_intent_sha256, char(0)) = 0
+        AND octet_length(retraction_intent_sha256) <= 256
         AND retraction_intent_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     local_intent_id TEXT,
     first_map_epoch INTEGER NOT NULL CHECK (first_map_epoch > 0),
     first_epoch_id TEXT NOT NULL
-        CHECK (typeof(first_epoch_id) = 'text' AND length(first_epoch_id) = 64 AND instr(first_epoch_id, char(0)) = 0 AND first_epoch_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(first_epoch_id) = 'text' AND length(first_epoch_id) = 64 AND instr(first_epoch_id, char(0)) = 0 AND octet_length(first_epoch_id) <= 256 AND first_epoch_id NOT GLOB '*[^0-9a-f]*'),
     recorded_at INTEGER NOT NULL CHECK (recorded_at > 0),
     PRIMARY KEY (feed_id, finding_id),
     FOREIGN KEY (feed_id, operator_id)
@@ -377,18 +389,18 @@ CREATE TABLE IF NOT EXISTS finding_status_proofs (
     feed_id TEXT NOT NULL,
     operator_id TEXT NOT NULL,
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
     key_domain_nonce INTEGER NOT NULL
         CHECK (key_domain_nonce = 3318287169837494),
     map_epoch INTEGER NOT NULL CHECK (map_epoch > 0),
     epoch_id TEXT NOT NULL
-        CHECK (typeof(epoch_id) = 'text' AND length(epoch_id) = 64 AND instr(epoch_id, char(0)) = 0 AND epoch_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(epoch_id) = 'text' AND length(epoch_id) = 64 AND instr(epoch_id, char(0)) = 0 AND octet_length(epoch_id) <= 256 AND epoch_id NOT GLOB '*[^0-9a-f]*'),
     root_hash TEXT NOT NULL
-        CHECK (typeof(root_hash) = 'text' AND length(root_hash) = 64 AND instr(root_hash, char(0)) = 0 AND root_hash NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(root_hash) = 'text' AND length(root_hash) = 64 AND instr(root_hash, char(0)) = 0 AND octet_length(root_hash) <= 256 AND root_hash NOT GLOB '*[^0-9a-f]*'),
     proof_kind TEXT NOT NULL CHECK (proof_kind IN ('inclusion', 'non_inclusion')),
     proof_sha256 TEXT NOT NULL CHECK (
         typeof(proof_sha256) = 'text'
-        AND length(proof_sha256) = 64 AND instr(proof_sha256, char(0)) = 0 AND proof_sha256 NOT GLOB '*[^0-9a-f]*'
+        AND length(proof_sha256) = 64 AND instr(proof_sha256, char(0)) = 0 AND octet_length(proof_sha256) <= 256 AND proof_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     proof_bytes BLOB NOT NULL CHECK (
         typeof(proof_bytes) = 'blob'
@@ -399,6 +411,7 @@ CREATE TABLE IF NOT EXISTS finding_status_proofs (
         OR (
             length(status_value_sha256) = 64
             AND instr(status_value_sha256, char(0)) = 0
+            AND octet_length(status_value_sha256) <= 256
             AND status_value_sha256 NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -414,6 +427,7 @@ CREATE TABLE IF NOT EXISTS finding_status_proofs (
         OR (
             length(retraction_intent_sha256) = 64
             AND instr(retraction_intent_sha256, char(0)) = 0
+            AND octet_length(retraction_intent_sha256) <= 256
             AND retraction_intent_sha256 NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -470,18 +484,21 @@ CREATE TABLE IF NOT EXISTS finding_status_projection_commits (
         typeof(snapshot_digest) = 'text'
         AND length(snapshot_digest) = 64
         AND instr(snapshot_digest, char(0)) = 0
+        AND octet_length(snapshot_digest) <= 256
         AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_commit_digest TEXT NOT NULL CHECK (
         typeof(previous_commit_digest) = 'text'
         AND length(previous_commit_digest) = 64
         AND instr(previous_commit_digest, char(0)) = 0
+        AND octet_length(previous_commit_digest) <= 256
         AND previous_commit_digest NOT GLOB '*[^0-9a-f]*'
     ),
     commit_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(commit_digest) = 'text'
         AND length(commit_digest) = 64
         AND instr(commit_digest, char(0)) = 0
+        AND octet_length(commit_digest) <= 256
         AND commit_digest NOT GLOB '*[^0-9a-f]*'
     )
 );

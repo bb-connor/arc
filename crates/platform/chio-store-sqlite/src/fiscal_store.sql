@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS fiscal_authority_state (
         typeof(finalized_checkpoint_digest) = 'text'
         AND length(finalized_checkpoint_digest) = 64
         AND instr(finalized_checkpoint_digest, char(0)) = 0
+        AND octet_length(finalized_checkpoint_digest) <= 256
         AND finalized_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     state_version INTEGER NOT NULL CHECK (state_version > 0)
@@ -12,22 +13,22 @@ CREATE TABLE IF NOT EXISTS fiscal_authority_state (
 
 CREATE TABLE IF NOT EXISTS fiscal_genesis_policies (
     policy_id TEXT PRIMARY KEY CHECK (
-        length(policy_id) = 64 AND instr(policy_id, char(0)) = 0 AND policy_id NOT GLOB '*[^0-9a-f]*'
+        length(policy_id) = 64 AND instr(policy_id, char(0)) = 0 AND octet_length(policy_id) <= 256 AND policy_id NOT GLOB '*[^0-9a-f]*'
     ),
     policy_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(policy_digest) = 'text'
-        AND length(policy_digest) = 64 AND instr(policy_digest, char(0)) = 0 AND policy_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(policy_digest) = 64 AND instr(policy_digest, char(0)) = 0 AND octet_length(policy_digest) <= 256 AND policy_digest NOT GLOB '*[^0-9a-f]*'
     ),
     policy_json BLOB NOT NULL CHECK (typeof(policy_json) = 'blob' AND length(policy_json) BETWEEN 1 AND 4194304)
 );
 
 CREATE TABLE IF NOT EXISTS fiscal_charters (
     charter_id TEXT PRIMARY KEY CHECK (
-        length(charter_id) = 64 AND instr(charter_id, char(0)) = 0 AND charter_id NOT GLOB '*[^0-9a-f]*'
+        length(charter_id) = 64 AND instr(charter_id, char(0)) = 0 AND octet_length(charter_id) <= 256 AND charter_id NOT GLOB '*[^0-9a-f]*'
     ),
     charter_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(charter_digest) = 'text'
-        AND length(charter_digest) = 64 AND instr(charter_digest, char(0)) = 0 AND charter_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(charter_digest) = 64 AND instr(charter_digest, char(0)) = 0 AND octet_length(charter_digest) <= 256 AND charter_digest NOT GLOB '*[^0-9a-f]*'
     ),
     charter_sequence INTEGER NOT NULL CHECK (charter_sequence > 0),
     lifecycle_state TEXT NOT NULL CHECK (lifecycle_state IN ('proposed', 'pinned', 'active', 'superseded')),
@@ -36,11 +37,11 @@ CREATE TABLE IF NOT EXISTS fiscal_charters (
 
 CREATE TABLE IF NOT EXISTS fiscal_schedules (
     schedule_id TEXT PRIMARY KEY CHECK (
-        length(schedule_id) = 64 AND instr(schedule_id, char(0)) = 0 AND schedule_id NOT GLOB '*[^0-9a-f]*'
+        length(schedule_id) = 64 AND instr(schedule_id, char(0)) = 0 AND octet_length(schedule_id) <= 256 AND schedule_id NOT GLOB '*[^0-9a-f]*'
     ),
     schedule_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(schedule_digest) = 'text'
-        AND length(schedule_digest) = 64 AND instr(schedule_digest, char(0)) = 0 AND schedule_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(schedule_digest) = 64 AND instr(schedule_digest, char(0)) = 0 AND octet_length(schedule_digest) <= 256 AND schedule_digest NOT GLOB '*[^0-9a-f]*'
     ),
     domain_json TEXT NOT NULL CHECK (domain_json <> ''),
     schedule_sequence INTEGER NOT NULL CHECK (schedule_sequence > 0),
@@ -50,22 +51,22 @@ CREATE TABLE IF NOT EXISTS fiscal_schedules (
 
 CREATE TABLE IF NOT EXISTS fiscal_proposals (
     proposal_id TEXT PRIMARY KEY CHECK (
-        length(proposal_id) = 64 AND instr(proposal_id, char(0)) = 0 AND proposal_id NOT GLOB '*[^0-9a-f]*'
+        length(proposal_id) = 64 AND instr(proposal_id, char(0)) = 0 AND octet_length(proposal_id) <= 256 AND proposal_id NOT GLOB '*[^0-9a-f]*'
     ),
     proposal_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(proposal_digest) = 'text'
-        AND length(proposal_digest) = 64 AND instr(proposal_digest, char(0)) = 0 AND proposal_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(proposal_digest) = 64 AND instr(proposal_digest, char(0)) = 0 AND octet_length(proposal_digest) <= 256 AND proposal_digest NOT GLOB '*[^0-9a-f]*'
     ),
     signed_json BLOB NOT NULL CHECK (typeof(signed_json) = 'blob' AND length(signed_json) BETWEEN 1 AND 4194304)
 );
 
 CREATE TABLE IF NOT EXISTS fiscal_proposal_admissions (
     admission_id TEXT PRIMARY KEY CHECK (
-        length(admission_id) = 64 AND instr(admission_id, char(0)) = 0 AND admission_id NOT GLOB '*[^0-9a-f]*'
+        length(admission_id) = 64 AND instr(admission_id, char(0)) = 0 AND octet_length(admission_id) <= 256 AND admission_id NOT GLOB '*[^0-9a-f]*'
     ),
     admission_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(admission_digest) = 'text'
-        AND length(admission_digest) = 64 AND instr(admission_digest, char(0)) = 0 AND admission_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(admission_digest) = 64 AND instr(admission_digest, char(0)) = 0 AND octet_length(admission_digest) <= 256 AND admission_digest NOT GLOB '*[^0-9a-f]*'
     ),
     admitted_at INTEGER NOT NULL CHECK (admitted_at > 0),
     status TEXT NOT NULL CHECK (status IN ('admitted', 'activated')),
@@ -84,33 +85,33 @@ FROM fiscal_proposal_admissions;
 
 CREATE TABLE IF NOT EXISTS fiscal_approvals (
     approval_id TEXT PRIMARY KEY CHECK (
-        length(approval_id) = 64 AND instr(approval_id, char(0)) = 0 AND approval_id NOT GLOB '*[^0-9a-f]*'
+        length(approval_id) = 64 AND instr(approval_id, char(0)) = 0 AND octet_length(approval_id) <= 256 AND approval_id NOT GLOB '*[^0-9a-f]*'
     ),
     approval_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(approval_digest) = 'text'
-        AND length(approval_digest) = 64 AND instr(approval_digest, char(0)) = 0 AND approval_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(approval_digest) = 64 AND instr(approval_digest, char(0)) = 0 AND octet_length(approval_digest) <= 256 AND approval_digest NOT GLOB '*[^0-9a-f]*'
     ),
     signed_json BLOB NOT NULL CHECK (typeof(signed_json) = 'blob' AND length(signed_json) BETWEEN 1 AND 4194304)
 );
 
 CREATE TABLE IF NOT EXISTS fiscal_activations (
     activation_id TEXT PRIMARY KEY CHECK (
-        length(activation_id) = 64 AND instr(activation_id, char(0)) = 0 AND activation_id NOT GLOB '*[^0-9a-f]*'
+        length(activation_id) = 64 AND instr(activation_id, char(0)) = 0 AND octet_length(activation_id) <= 256 AND activation_id NOT GLOB '*[^0-9a-f]*'
     ),
     activation_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(activation_digest) = 'text'
-        AND length(activation_digest) = 64 AND instr(activation_digest, char(0)) = 0 AND activation_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(activation_digest) = 64 AND instr(activation_digest, char(0)) = 0 AND octet_length(activation_digest) <= 256 AND activation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     signed_json BLOB NOT NULL CHECK (typeof(signed_json) = 'blob' AND length(signed_json) BETWEEN 1 AND 4194304)
 );
 
 CREATE TABLE IF NOT EXISTS fiscal_runtime_readiness (
     readiness_id TEXT PRIMARY KEY CHECK (
-        length(readiness_id) = 64 AND instr(readiness_id, char(0)) = 0 AND readiness_id NOT GLOB '*[^0-9a-f]*'
+        length(readiness_id) = 64 AND instr(readiness_id, char(0)) = 0 AND octet_length(readiness_id) <= 256 AND readiness_id NOT GLOB '*[^0-9a-f]*'
     ),
     readiness_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(readiness_digest) = 'text'
-        AND length(readiness_digest) = 64 AND instr(readiness_digest, char(0)) = 0 AND readiness_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(readiness_digest) = 64 AND instr(readiness_digest, char(0)) = 0 AND octet_length(readiness_digest) <= 256 AND readiness_digest NOT GLOB '*[^0-9a-f]*'
     ),
     readiness_sequence INTEGER NOT NULL UNIQUE CHECK (readiness_sequence > 0),
     registry_json BLOB NOT NULL CHECK (typeof(registry_json) = 'blob' AND length(registry_json) BETWEEN 1 AND 4194304),
@@ -124,12 +125,14 @@ CREATE TABLE IF NOT EXISTS fiscal_fee_schedule_bindings (
         typeof(fiscal_schedule_digest) = 'text'
         AND length(fiscal_schedule_digest) = 64
         AND instr(fiscal_schedule_digest, char(0)) = 0
+        AND octet_length(fiscal_schedule_digest) <= 256
         AND fiscal_schedule_digest NOT GLOB '*[^0-9a-f]*'
     ),
     envelope_digest TEXT NOT NULL CHECK (
         typeof(envelope_digest) = 'text'
         AND length(envelope_digest) = 64
         AND instr(envelope_digest, char(0)) = 0
+        AND octet_length(envelope_digest) <= 256
         AND envelope_digest NOT GLOB '*[^0-9a-f]*'
     ),
     FOREIGN KEY (fiscal_schedule_id) REFERENCES fiscal_schedules(schedule_id)
@@ -137,7 +140,7 @@ CREATE TABLE IF NOT EXISTS fiscal_fee_schedule_bindings (
 
 CREATE TABLE IF NOT EXISTS fiscal_continuity_checkpoints (
     checkpoint_digest TEXT PRIMARY KEY CHECK (
-        length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
+        length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 AND octet_length(checkpoint_digest) <= 256 AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     continuity_sequence INTEGER NOT NULL UNIQUE CHECK (continuity_sequence >= 0),
     status TEXT NOT NULL CHECK (status IN ('finalized', 'staged')),
@@ -146,7 +149,7 @@ CREATE TABLE IF NOT EXISTS fiscal_continuity_checkpoints (
 
 CREATE TABLE IF NOT EXISTS fiscal_staged_transitions (
     transition_id TEXT PRIMARY KEY CHECK (
-        length(transition_id) = 64 AND instr(transition_id, char(0)) = 0 AND transition_id NOT GLOB '*[^0-9a-f]*'
+        length(transition_id) = 64 AND instr(transition_id, char(0)) = 0 AND octet_length(transition_id) <= 256 AND transition_id NOT GLOB '*[^0-9a-f]*'
     ),
     current_checkpoint_digest TEXT NOT NULL,
     next_checkpoint_digest TEXT NOT NULL UNIQUE,
@@ -166,12 +169,12 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_activation_mutations (
     activation_id TEXT NOT NULL UNIQUE,
     activation_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(activation_digest) = 'text'
-        AND length(activation_digest) = 64 AND instr(activation_digest, char(0)) = 0 AND activation_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(activation_digest) = 64 AND instr(activation_digest, char(0)) = 0 AND octet_length(activation_digest) <= 256 AND activation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     admission_id TEXT NOT NULL UNIQUE,
     admission_digest TEXT NOT NULL CHECK (
         typeof(admission_digest) = 'text'
-        AND length(admission_digest) = 64 AND instr(admission_digest, char(0)) = 0 AND admission_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(admission_digest) = 64 AND instr(admission_digest, char(0)) = 0 AND octet_length(admission_digest) <= 256 AND admission_digest NOT GLOB '*[^0-9a-f]*'
     ),
     expected_admission_version INTEGER NOT NULL CHECK (expected_admission_version > 0),
     activated_admission_version INTEGER NOT NULL CHECK (
@@ -186,6 +189,7 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_activation_mutations (
         typeof(candidate_schedule_digest) = 'text'
         AND length(candidate_schedule_digest) = 64
         AND instr(candidate_schedule_digest, char(0)) = 0
+        AND octet_length(candidate_schedule_digest) <= 256
         AND candidate_schedule_digest NOT GLOB '*[^0-9a-f]*'
     ),
     predecessor_schedule_id TEXT,
@@ -193,6 +197,7 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_activation_mutations (
         predecessor_schedule_digest IS NULL OR (
             length(predecessor_schedule_digest) = 64
             AND instr(predecessor_schedule_digest, char(0)) = 0
+            AND octet_length(predecessor_schedule_digest) <= 256
             AND predecessor_schedule_digest NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -209,12 +214,12 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_mutations (
     activation_id TEXT NOT NULL UNIQUE,
     activation_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(activation_digest) = 'text'
-        AND length(activation_digest) = 64 AND instr(activation_digest, char(0)) = 0 AND activation_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(activation_digest) = 64 AND instr(activation_digest, char(0)) = 0 AND octet_length(activation_digest) <= 256 AND activation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     admission_id TEXT NOT NULL UNIQUE,
     admission_digest TEXT NOT NULL CHECK (
         typeof(admission_digest) = 'text'
-        AND length(admission_digest) = 64 AND instr(admission_digest, char(0)) = 0 AND admission_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(admission_digest) = 64 AND instr(admission_digest, char(0)) = 0 AND octet_length(admission_digest) <= 256 AND admission_digest NOT GLOB '*[^0-9a-f]*'
     ),
     expected_admission_version INTEGER NOT NULL CHECK (expected_admission_version > 0),
     activated_admission_version INTEGER NOT NULL CHECK (
@@ -229,6 +234,7 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_mutations (
         typeof(successor_charter_digest) = 'text'
         AND length(successor_charter_digest) = 64
         AND instr(successor_charter_digest, char(0)) = 0
+        AND octet_length(successor_charter_digest) <= 256
         AND successor_charter_digest NOT GLOB '*[^0-9a-f]*'
     ),
     predecessor_charter_id TEXT NOT NULL UNIQUE,
@@ -236,6 +242,7 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_mutations (
         typeof(predecessor_charter_digest) = 'text'
         AND length(predecessor_charter_digest) = 64
         AND instr(predecessor_charter_digest, char(0)) = 0
+        AND octet_length(predecessor_charter_digest) <= 256
         AND predecessor_charter_digest NOT GLOB '*[^0-9a-f]*'
     ),
     FOREIGN KEY (transition_id) REFERENCES fiscal_staged_transitions(transition_id),
@@ -253,6 +260,7 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_schedules (
         typeof(candidate_schedule_digest) = 'text'
         AND length(candidate_schedule_digest) = 64
         AND instr(candidate_schedule_digest, char(0)) = 0
+        AND octet_length(candidate_schedule_digest) <= 256
         AND candidate_schedule_digest NOT GLOB '*[^0-9a-f]*'
     ),
     predecessor_schedule_id TEXT NOT NULL UNIQUE,
@@ -260,6 +268,7 @@ CREATE TABLE IF NOT EXISTS fiscal_staged_rotation_schedules (
         typeof(predecessor_schedule_digest) = 'text'
         AND length(predecessor_schedule_digest) = 64
         AND instr(predecessor_schedule_digest, char(0)) = 0
+        AND octet_length(predecessor_schedule_digest) <= 256
         AND predecessor_schedule_digest NOT GLOB '*[^0-9a-f]*'
     ),
     PRIMARY KEY (transition_id, domain_json),
@@ -278,17 +287,18 @@ CREATE TABLE IF NOT EXISTS fiscal_projection_commits (
     mutation_kind TEXT NOT NULL CHECK (mutation_kind <> ''),
     snapshot_digest TEXT NOT NULL CHECK (
         typeof(snapshot_digest) = 'text'
-        AND length(snapshot_digest) = 64 AND instr(snapshot_digest, char(0)) = 0 AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(snapshot_digest) = 64 AND instr(snapshot_digest, char(0)) = 0 AND octet_length(snapshot_digest) <= 256 AND snapshot_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_commit_digest TEXT NOT NULL CHECK (
         typeof(previous_commit_digest) = 'text'
         AND length(previous_commit_digest) = 64
         AND instr(previous_commit_digest, char(0)) = 0
+        AND octet_length(previous_commit_digest) <= 256
         AND previous_commit_digest NOT GLOB '*[^0-9a-f]*'
     ),
     commit_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(commit_digest) = 'text'
-        AND length(commit_digest) = 64 AND instr(commit_digest, char(0)) = 0 AND commit_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(commit_digest) = 64 AND instr(commit_digest, char(0)) = 0 AND octet_length(commit_digest) <= 256 AND commit_digest NOT GLOB '*[^0-9a-f]*'
     ),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
     store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),

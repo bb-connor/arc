@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS chio_finding_payloads (
     finding_id TEXT PRIMARY KEY,
     tenant_id TEXT NOT NULL,
     media_type TEXT NOT NULL,
-    payload_sha256 TEXT NOT NULL CHECK(typeof(payload_sha256) = 'text' AND length(payload_sha256) = 64 AND instr(payload_sha256, char(0)) = 0),
+    payload_sha256 TEXT NOT NULL CHECK(typeof(payload_sha256) = 'text' AND length(payload_sha256) = 64 AND instr(payload_sha256, char(0)) = 0 AND octet_length(payload_sha256) <= 256),
     nonce BLOB NOT NULL CHECK(typeof(nonce) = 'blob' AND length(nonce) = 12),
     ciphertext BLOB NOT NULL,
     created_at INTEGER NOT NULL

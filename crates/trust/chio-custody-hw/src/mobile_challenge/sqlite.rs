@@ -156,10 +156,11 @@ impl SqliteMobileChallengeStore {
                         CHECK (
                             length(challenge_id) = 64
                             AND instr(challenge_id, char(0)) = 0
+                            AND octet_length(challenge_id) <= 256
                             AND challenge_id NOT GLOB '*[^0-9a-f]*'
                         ),
                     challenge_json TEXT NOT NULL
-                        CHECK (length(challenge_json) BETWEEN 1 AND 4096 AND instr(challenge_json, char(0)) = 0),
+                        CHECK (length(challenge_json) BETWEEN 1 AND 4096 AND instr(challenge_json, char(0)) = 0 AND octet_length(challenge_json) <= 16384),
                     expires_at_unix_seconds INTEGER NOT NULL
                         CHECK (expires_at_unix_seconds > 0),
                     consumed_at_unix_seconds INTEGER
@@ -171,8 +172,8 @@ impl SqliteMobileChallengeStore {
                  CREATE INDEX IF NOT EXISTS idx_chio_mobile_challenge_expiry
                     ON chio_mobile_attestation_challenges (expires_at_unix_seconds);
                  CREATE TABLE IF NOT EXISTS chio_app_attest_counters (
-                    key_id TEXT NOT NULL CHECK (length(key_id) BETWEEN 1 AND 512 AND instr(key_id, char(0)) = 0),
-                    app_id TEXT NOT NULL CHECK (length(app_id) BETWEEN 1 AND 512 AND instr(app_id, char(0)) = 0),
+                    key_id TEXT NOT NULL CHECK (length(key_id) BETWEEN 1 AND 512 AND instr(key_id, char(0)) = 0 AND octet_length(key_id) <= 2048),
+                    app_id TEXT NOT NULL CHECK (length(app_id) BETWEEN 1 AND 512 AND instr(app_id, char(0)) = 0 AND octet_length(app_id) <= 2048),
                     counter INTEGER NOT NULL CHECK (counter BETWEEN 0 AND 4294967295),
                     PRIMARY KEY (key_id, app_id)
                  ) STRICT, WITHOUT ROWID;",

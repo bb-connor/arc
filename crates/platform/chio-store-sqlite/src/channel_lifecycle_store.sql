@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS channel_state_records (
         typeof(state_digest) = 'text'
         AND length(state_digest) = 64
         AND instr(state_digest, char(0)) = 0
+        AND octet_length(state_digest) <= 256
         AND state_digest NOT GLOB '*[^0-9a-f]*'
     ),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
@@ -13,6 +14,7 @@ CREATE TABLE IF NOT EXISTS channel_state_records (
         typeof(checkpoint_digest) = 'text'
         AND length(checkpoint_digest) = 64
         AND instr(checkpoint_digest, char(0)) = 0
+        AND octet_length(checkpoint_digest) <= 256
         AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     state_json BLOB NOT NULL CHECK (typeof(state_json) = 'blob' AND length(state_json) BETWEEN 1 AND 1048576),
@@ -33,9 +35,10 @@ CREATE TABLE IF NOT EXISTS channel_state_records (
     CHECK (
         length(channel_id) = 64
         AND instr(channel_id, char(0)) = 0
+        AND octet_length(channel_id) <= 256
         AND channel_id NOT GLOB '*[^0-9a-f]*'
         AND (operation_id IS NULL
-             OR (length(operation_id) = 64 AND instr(operation_id, char(0)) = 0
+             OR (length(operation_id) = 64 AND instr(operation_id, char(0)) = 0 AND octet_length(operation_id) <= 256
                  AND operation_id NOT GLOB '*[^0-9a-f]*'))
         AND ((sequence = 0 AND state_kind = 'initial' AND operation_id IS NULL)
              OR (sequence > 0 AND state_kind = 'signed'))
@@ -72,12 +75,14 @@ CREATE TABLE IF NOT EXISTS channel_lifecycle_records (
         typeof(channel_id) = 'text'
         AND length(channel_id) = 64
         AND instr(channel_id, char(0)) = 0
+        AND octet_length(channel_id) <= 256
         AND channel_id NOT GLOB '*[^0-9a-f]*'
     ),
     open_intent_digest TEXT NOT NULL CHECK (
         typeof(open_intent_digest) = 'text'
         AND length(open_intent_digest) = 64
         AND instr(open_intent_digest, char(0)) = 0
+        AND octet_length(open_intent_digest) <= 256
         AND open_intent_digest NOT GLOB '*[^0-9a-f]*'
     ),
     open_intent_json BLOB NOT NULL CHECK (typeof(open_intent_json) = 'blob' AND length(open_intent_json) BETWEEN 1 AND 1048576),
@@ -85,6 +90,7 @@ CREATE TABLE IF NOT EXISTS channel_lifecycle_records (
         typeof(open_digest) = 'text'
         AND length(open_digest) = 64
         AND instr(open_digest, char(0)) = 0
+        AND octet_length(open_digest) <= 256
         AND open_digest NOT GLOB '*[^0-9a-f]*'
     ),
     open_json BLOB NOT NULL CHECK (typeof(open_json) = 'blob' AND length(open_json) BETWEEN 1 AND 1048576),
@@ -97,6 +103,7 @@ CREATE TABLE IF NOT EXISTS channel_lifecycle_records (
         typeof(latest_state_digest) = 'text'
         AND length(latest_state_digest) = 64
         AND instr(latest_state_digest, char(0)) = 0
+        AND octet_length(latest_state_digest) <= 256
         AND latest_state_digest NOT GLOB '*[^0-9a-f]*'
     ),
     latest_sequence INTEGER NOT NULL CHECK (latest_sequence >= 0),
@@ -108,12 +115,14 @@ CREATE TABLE IF NOT EXISTS channel_lifecycle_records (
         typeof(channel_head_digest) = 'text'
         AND length(channel_head_digest) = 64
         AND instr(channel_head_digest, char(0)) = 0
+        AND octet_length(channel_head_digest) <= 256
         AND channel_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     escrow_head_digest TEXT NOT NULL CHECK (
         typeof(escrow_head_digest) = 'text'
         AND length(escrow_head_digest) = 64
         AND instr(escrow_head_digest, char(0)) = 0
+        AND octet_length(escrow_head_digest) <= 256
         AND escrow_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
@@ -121,6 +130,7 @@ CREATE TABLE IF NOT EXISTS channel_lifecycle_records (
         typeof(checkpoint_digest) = 'text'
         AND length(checkpoint_digest) = 64
         AND instr(checkpoint_digest, char(0)) = 0
+        AND octet_length(checkpoint_digest) <= 256
         AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     record_version INTEGER NOT NULL CHECK (record_version > 0),
@@ -140,10 +150,11 @@ CREATE TABLE IF NOT EXISTS channel_lifecycle_records (
     CHECK (
         (live_reservation_id IS NULL AND operation_id IS NULL)
         OR
-        (length(live_reservation_id) = 64 AND instr(live_reservation_id, char(0)) = 0
+        (length(live_reservation_id) = 64 AND instr(live_reservation_id, char(0)) = 0 AND octet_length(live_reservation_id) <= 256
          AND live_reservation_id NOT GLOB '*[^0-9a-f]*'
          AND length(operation_id) = 64
          AND instr(operation_id, char(0)) = 0
+         AND octet_length(operation_id) <= 256
          AND operation_id NOT GLOB '*[^0-9a-f]*')
     )
 );
@@ -218,31 +229,36 @@ CREATE TABLE IF NOT EXISTS channel_prepared_admission_plans (
         typeof(operation_id) = 'text'
         AND length(operation_id) = 64
         AND instr(operation_id, char(0)) = 0
+        AND octet_length(operation_id) <= 256
         AND operation_id NOT GLOB '*[^0-9a-f]*'
     ),
-    request_id TEXT NOT NULL CHECK (typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND instr(request_id, char(0)) = 0),
+    request_id TEXT NOT NULL CHECK (typeof(request_id) = 'text' AND length(request_id) BETWEEN 1 AND 512 AND instr(request_id, char(0)) = 0 AND octet_length(request_id) <= 2048),
     request_namespace_digest TEXT NOT NULL CHECK (
         typeof(request_namespace_digest) = 'text'
         AND length(request_namespace_digest) = 64
         AND instr(request_namespace_digest, char(0)) = 0
+        AND octet_length(request_namespace_digest) <= 256
         AND request_namespace_digest NOT GLOB '*[^0-9a-f]*'
     ),
     request_binding_digest TEXT NOT NULL CHECK (
         typeof(request_binding_digest) = 'text'
         AND length(request_binding_digest) = 64
         AND instr(request_binding_digest, char(0)) = 0
+        AND octet_length(request_binding_digest) <= 256
         AND request_binding_digest NOT GLOB '*[^0-9a-f]*'
     ),
     provider_binding_digest TEXT NOT NULL CHECK (
         typeof(provider_binding_digest) = 'text'
         AND length(provider_binding_digest) = 64
         AND instr(provider_binding_digest, char(0)) = 0
+        AND octet_length(provider_binding_digest) <= 256
         AND provider_binding_digest NOT GLOB '*[^0-9a-f]*'
     ),
     reservation_id TEXT NOT NULL UNIQUE CHECK (
         typeof(reservation_id) = 'text'
         AND length(reservation_id) = 64
         AND instr(reservation_id, char(0)) = 0
+        AND octet_length(reservation_id) <= 256
         AND reservation_id NOT GLOB '*[^0-9a-f]*'
     ),
     channel_id TEXT NOT NULL,
@@ -253,6 +269,7 @@ CREATE TABLE IF NOT EXISTS channel_prepared_admission_plans (
         typeof(reservation_proposal_digest) = 'text'
         AND length(reservation_proposal_digest) = 64
         AND instr(reservation_proposal_digest, char(0)) = 0
+        AND octet_length(reservation_proposal_digest) <= 256
         AND reservation_proposal_digest NOT GLOB '*[^0-9a-f]*'
     ),
     lifecycle_state TEXT NOT NULL CHECK (lifecycle_state = 'open'),
@@ -264,12 +281,14 @@ CREATE TABLE IF NOT EXISTS channel_prepared_admission_plans (
         typeof(channel_head_digest) = 'text'
         AND length(channel_head_digest) = 64
         AND instr(channel_head_digest, char(0)) = 0
+        AND octet_length(channel_head_digest) <= 256
         AND channel_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     escrow_head_digest TEXT NOT NULL CHECK (
         typeof(escrow_head_digest) = 'text'
         AND length(escrow_head_digest) = 64
         AND instr(escrow_head_digest, char(0)) = 0
+        AND octet_length(escrow_head_digest) <= 256
         AND escrow_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
@@ -277,12 +296,14 @@ CREATE TABLE IF NOT EXISTS channel_prepared_admission_plans (
         typeof(checkpoint_digest) = 'text'
         AND length(checkpoint_digest) = 64
         AND instr(checkpoint_digest, char(0)) = 0
+        AND octet_length(checkpoint_digest) <= 256
         AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     plan_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(plan_digest) = 'text'
         AND length(plan_digest) = 64
         AND instr(plan_digest, char(0)) = 0
+        AND octet_length(plan_digest) <= 256
         AND plan_digest NOT GLOB '*[^0-9a-f]*'
     ),
     plan_json BLOB NOT NULL CHECK (typeof(plan_json) = 'blob' AND length(plan_json) BETWEEN 1 AND 4194304),
@@ -341,6 +362,7 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(reservation_id) = 'text'
         AND length(reservation_id) = 64
         AND instr(reservation_id, char(0)) = 0
+        AND octet_length(reservation_id) <= 256
         AND reservation_id NOT GLOB '*[^0-9a-f]*'
     ),
     operation_id TEXT NOT NULL UNIQUE,
@@ -351,12 +373,14 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(prepared_plan_digest) = 'text'
         AND length(prepared_plan_digest) = 64
         AND instr(prepared_plan_digest, char(0)) = 0
+        AND octet_length(prepared_plan_digest) <= 256
         AND prepared_plan_digest NOT GLOB '*[^0-9a-f]*'
     ),
     reservation_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(reservation_digest) = 'text'
         AND length(reservation_digest) = 64
         AND instr(reservation_digest, char(0)) = 0
+        AND octet_length(reservation_digest) <= 256
         AND reservation_digest NOT GLOB '*[^0-9a-f]*'
     ),
     reservation_json BLOB NOT NULL CHECK (typeof(reservation_json) = 'blob' AND length(reservation_json) BETWEEN 1 AND 1048576),
@@ -364,6 +388,7 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(authority_pins_digest) = 'text'
         AND length(authority_pins_digest) = 64
         AND instr(authority_pins_digest, char(0)) = 0
+        AND octet_length(authority_pins_digest) <= 256
         AND authority_pins_digest NOT GLOB '*[^0-9a-f]*'
     ),
     authority_pins_json BLOB NOT NULL CHECK (
@@ -374,18 +399,21 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(request_binding_digest) = 'text'
         AND length(request_binding_digest) = 64
         AND instr(request_binding_digest, char(0)) = 0
+        AND octet_length(request_binding_digest) <= 256
         AND request_binding_digest NOT GLOB '*[^0-9a-f]*'
     ),
     provider_binding_digest TEXT NOT NULL CHECK (
         typeof(provider_binding_digest) = 'text'
         AND length(provider_binding_digest) = 64
         AND instr(provider_binding_digest, char(0)) = 0
+        AND octet_length(provider_binding_digest) <= 256
         AND provider_binding_digest NOT GLOB '*[^0-9a-f]*'
     ),
     stage_batch_id TEXT NOT NULL CHECK (
         typeof(stage_batch_id) = 'text'
         AND length(stage_batch_id) = 64
         AND instr(stage_batch_id, char(0)) = 0
+        AND octet_length(stage_batch_id) <= 256
         AND stage_batch_id NOT GLOB '*[^0-9a-f]*'
     ),
     stage_descriptor_kind TEXT NOT NULL CHECK (
@@ -398,6 +426,7 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(stage_descriptor_digest) = 'text'
         AND length(stage_descriptor_digest) = 64
         AND instr(stage_descriptor_digest, char(0)) = 0
+        AND octet_length(stage_descriptor_digest) <= 256
         AND stage_descriptor_digest NOT GLOB '*[^0-9a-f]*'
     ),
     base_checkpoint_sequence INTEGER NOT NULL CHECK (base_checkpoint_sequence > 0),
@@ -405,12 +434,14 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(base_checkpoint_digest) = 'text'
         AND length(base_checkpoint_digest) = 64
         AND instr(base_checkpoint_digest, char(0)) = 0
+        AND octet_length(base_checkpoint_digest) <= 256
         AND base_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     ready_checkpoint_digest TEXT NOT NULL CHECK (
         typeof(ready_checkpoint_digest) = 'text'
         AND length(ready_checkpoint_digest) = 64
         AND instr(ready_checkpoint_digest, char(0)) = 0
+        AND octet_length(ready_checkpoint_digest) <= 256
         AND ready_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     ready_checkpoint_sequence INTEGER NOT NULL CHECK (ready_checkpoint_sequence > 0),
@@ -418,18 +449,21 @@ CREATE TABLE IF NOT EXISTS channel_reservation_records (
         typeof(ready_effect_head_digest) = 'text'
         AND length(ready_effect_head_digest) = 64
         AND instr(ready_effect_head_digest, char(0)) = 0
+        AND octet_length(ready_effect_head_digest) <= 256
         AND ready_effect_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     replay_protocol_digest TEXT NOT NULL CHECK (
         typeof(replay_protocol_digest) = 'text'
         AND length(replay_protocol_digest) = 64
         AND instr(replay_protocol_digest, char(0)) = 0
+        AND octet_length(replay_protocol_digest) <= 256
         AND replay_protocol_digest NOT GLOB '*[^0-9a-f]*'
     ),
     replay_content_digest TEXT NOT NULL CHECK (
         typeof(replay_content_digest) = 'text'
         AND length(replay_content_digest) = 64
         AND instr(replay_content_digest, char(0)) = 0
+        AND octet_length(replay_content_digest) <= 256
         AND replay_content_digest NOT GLOB '*[^0-9a-f]*'
     ),
     replay_json BLOB NOT NULL CHECK (

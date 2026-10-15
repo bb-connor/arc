@@ -1,8 +1,8 @@
 CREATE TABLE caller_executor_configuration (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     identity BLOB NOT NULL CHECK (typeof(identity) = 'blob' AND length(identity) BETWEEN 1 AND 4096),
-    device TEXT NOT NULL CHECK (typeof(device) = 'text' AND length(device) BETWEEN 1 AND 20 AND instr(device, char(0)) = 0),
-    inode TEXT NOT NULL CHECK (typeof(inode) = 'text' AND length(inode) BETWEEN 1 AND 20 AND instr(inode, char(0)) = 0),
+    device TEXT NOT NULL CHECK (typeof(device) = 'text' AND length(device) BETWEEN 1 AND 20 AND instr(device, char(0)) = 0 AND octet_length(device) <= 80),
+    inode TEXT NOT NULL CHECK (typeof(inode) = 'text' AND length(inode) BETWEEN 1 AND 20 AND instr(inode, char(0)) = 0 AND octet_length(inode) <= 80),
     max_operations INTEGER NOT NULL CHECK (max_operations BETWEEN 1 AND 64)
 );
 CREATE TABLE caller_executor_clock (
@@ -10,11 +10,11 @@ CREATE TABLE caller_executor_clock (
     high_water_unix_ms INTEGER NOT NULL CHECK (high_water_unix_ms BETWEEN 1 AND 9007199254740991)
 );
 CREATE TABLE caller_executor_claims (
-    kernel_key TEXT NOT NULL CHECK (typeof(kernel_key) = 'text' AND length(kernel_key) = 64 AND instr(kernel_key, char(0)) = 0),
-    operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id) = 64 AND instr(operation_id, char(0)) = 0),
-    authorization_digest TEXT NOT NULL UNIQUE CHECK (typeof(authorization_digest) = 'text' AND length(authorization_digest) = 64 AND instr(authorization_digest, char(0)) = 0),
+    kernel_key TEXT NOT NULL CHECK (typeof(kernel_key) = 'text' AND length(kernel_key) = 64 AND instr(kernel_key, char(0)) = 0 AND octet_length(kernel_key) <= 256),
+    operation_id TEXT PRIMARY KEY NOT NULL CHECK (length(operation_id) = 64 AND instr(operation_id, char(0)) = 0 AND octet_length(operation_id) <= 256),
+    authorization_digest TEXT NOT NULL UNIQUE CHECK (typeof(authorization_digest) = 'text' AND length(authorization_digest) = 64 AND instr(authorization_digest, char(0)) = 0 AND octet_length(authorization_digest) <= 256),
     authorization BLOB NOT NULL CHECK (typeof(authorization) = 'blob' AND length(authorization) BETWEEN 1 AND 32768),
-    claim_id TEXT NOT NULL UNIQUE CHECK (typeof(claim_id) = 'text' AND length(claim_id) = 36 AND instr(claim_id, char(0)) = 0),
+    claim_id TEXT NOT NULL UNIQUE CHECK (typeof(claim_id) = 'text' AND length(claim_id) = 36 AND instr(claim_id, char(0)) = 0 AND octet_length(claim_id) <= 144),
     claimed_at_unix_ms INTEGER NOT NULL CHECK (claimed_at_unix_ms BETWEEN 1 AND 9007199254740991),
     UNIQUE (kernel_key, operation_id)
 );

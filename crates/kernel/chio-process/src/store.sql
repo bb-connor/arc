@@ -62,15 +62,15 @@ CREATE TABLE IF NOT EXISTS process_settled_waits (
 );
 CREATE TABLE IF NOT EXISTS process_state_blobs (
     process_id TEXT NOT NULL REFERENCES processes(id),
-    sha256 TEXT NOT NULL CHECK (typeof(sha256) = 'text' AND length(sha256) = 64 AND instr(sha256, char(0)) = 0),
+    sha256 TEXT NOT NULL CHECK (typeof(sha256) = 'text' AND length(sha256) = 64 AND instr(sha256, char(0)) = 0 AND octet_length(sha256) <= 256),
     data BLOB NOT NULL CHECK (typeof(data) = 'blob' AND length(data) <= 1048576),
     PRIMARY KEY (process_id, sha256)
 );
 CREATE TABLE IF NOT EXISTS process_prepared_invocations (
     process_id TEXT NOT NULL,
     operation_key TEXT NOT NULL,
-    binding TEXT NOT NULL CHECK (typeof(binding) = 'text' AND length(binding) = 64 AND instr(binding, char(0)) = 0),
-    sha256 TEXT NOT NULL CHECK (typeof(sha256) = 'text' AND length(sha256) = 64 AND instr(sha256, char(0)) = 0),
+    binding TEXT NOT NULL CHECK (typeof(binding) = 'text' AND length(binding) = 64 AND instr(binding, char(0)) = 0 AND octet_length(binding) <= 256),
+    sha256 TEXT NOT NULL CHECK (typeof(sha256) = 'text' AND length(sha256) = 64 AND instr(sha256, char(0)) = 0 AND octet_length(sha256) <= 256),
     PRIMARY KEY (process_id, operation_key),
     FOREIGN KEY (process_id, sha256) REFERENCES process_state_blobs(process_id, sha256)
 );

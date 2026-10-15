@@ -1,16 +1,17 @@
 CREATE TABLE IF NOT EXISTS findings (
     finding_id TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
     artifact_json TEXT NOT NULL CHECK (
         typeof(artifact_json) = 'text'
         AND length(artifact_json) BETWEEN 1 AND 262144
         AND instr(artifact_json, char(0)) = 0
+        AND octet_length(artifact_json) <= 1048576
     ),
     artifact_sha256 TEXT NOT NULL
-        CHECK (typeof(artifact_sha256) = 'text' AND length(artifact_sha256) = 64 AND instr(artifact_sha256, char(0)) = 0 AND artifact_sha256 NOT GLOB '*[^0-9a-f]*'),
-    topic TEXT NOT NULL CHECK (typeof(topic) = 'text' AND length(topic) BETWEEN 1 AND 120 AND instr(topic, char(0)) = 0),
+        CHECK (typeof(artifact_sha256) = 'text' AND length(artifact_sha256) = 64 AND instr(artifact_sha256, char(0)) = 0 AND octet_length(artifact_sha256) <= 256 AND artifact_sha256 NOT GLOB '*[^0-9a-f]*'),
+    topic TEXT NOT NULL CHECK (typeof(topic) = 'text' AND length(topic) BETWEEN 1 AND 120 AND instr(topic, char(0)) = 0 AND octet_length(topic) <= 480),
     context_sha256 TEXT NOT NULL
-        CHECK (typeof(context_sha256) = 'text' AND length(context_sha256) = 64 AND instr(context_sha256, char(0)) = 0 AND context_sha256 NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(context_sha256) = 'text' AND length(context_sha256) = 64 AND instr(context_sha256, char(0)) = 0 AND octet_length(context_sha256) <= 256 AND context_sha256 NOT GLOB '*[^0-9a-f]*'),
     issued_at INTEGER NOT NULL CHECK (issued_at >= 0),
     expires_at INTEGER NOT NULL CHECK (expires_at > issued_at),
     indexed_at INTEGER NOT NULL CHECK (indexed_at > 0)
@@ -36,7 +37,7 @@ END;
 
 CREATE TABLE IF NOT EXISTS recipe_blobs (
     canonical_sha256 TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(canonical_sha256) = 'text' AND length(canonical_sha256) = 64 AND instr(canonical_sha256, char(0)) = 0 AND canonical_sha256 NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(canonical_sha256) = 'text' AND length(canonical_sha256) = 64 AND instr(canonical_sha256, char(0)) = 0 AND octet_length(canonical_sha256) <= 256 AND canonical_sha256 NOT GLOB '*[^0-9a-f]*'),
     blob_bytes BLOB NOT NULL CHECK (
         typeof(blob_bytes) = 'blob'
         AND length(blob_bytes) BETWEEN 1 AND 1048576
@@ -58,24 +59,26 @@ END;
 
 CREATE TABLE IF NOT EXISTS collateral_allocations (
     allocation_id TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(allocation_id) = 'text' AND length(allocation_id) = 64 AND instr(allocation_id, char(0)) = 0 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(allocation_id) = 'text' AND length(allocation_id) = 64 AND instr(allocation_id, char(0)) = 0 AND octet_length(allocation_id) <= 256 AND allocation_id NOT GLOB '*[^0-9a-f]*'),
     seller_hex TEXT NOT NULL CHECK (seller_hex <> ''),
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0 AND octet_length(listing_id) <= 2048),
     backing_envelope_sha256 TEXT NOT NULL CHECK (
         typeof(backing_envelope_sha256) = 'text'
         AND length(backing_envelope_sha256) = 64
         AND instr(backing_envelope_sha256, char(0)) = 0
+        AND octet_length(backing_envelope_sha256) <= 256
         AND backing_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     backing_envelope_json TEXT NOT NULL CHECK (
         typeof(backing_envelope_json) = 'text'
         AND length(backing_envelope_json) BETWEEN 1 AND 262144
         AND instr(backing_envelope_json, char(0)) = 0
+        AND octet_length(backing_envelope_json) <= 1048576
     ),
     currency TEXT NOT NULL
-        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND octet_length(currency) <= 12 AND currency NOT GLOB '*[^A-Z]*'),
     locked_units INTEGER NOT NULL CHECK (locked_units > 0),
     maximum_sale_exposure_units INTEGER NOT NULL CHECK (
         maximum_sale_exposure_units > 0
@@ -131,34 +134,36 @@ END;
 
 CREATE TABLE IF NOT EXISTS fee_events (
     idempotency_key TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(idempotency_key) = 'text' AND length(idempotency_key) BETWEEN 1 AND 1024 AND instr(idempotency_key, char(0)) = 0),
+        CHECK (typeof(idempotency_key) = 'text' AND length(idempotency_key) BETWEEN 1 AND 1024 AND instr(idempotency_key, char(0)) = 0 AND octet_length(idempotency_key) <= 4096),
     fee_schedule_envelope_sha256 TEXT NOT NULL CHECK (
         typeof(fee_schedule_envelope_sha256) = 'text'
         AND length(fee_schedule_envelope_sha256) = 64
         AND instr(fee_schedule_envelope_sha256, char(0)) = 0
+        AND octet_length(fee_schedule_envelope_sha256) <= 256
         AND fee_schedule_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     event_kind TEXT NOT NULL
         CHECK (event_kind IN ('publication', 'participation_epoch')),
     epoch_index INTEGER NOT NULL CHECK (epoch_index >= 0),
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0 AND octet_length(listing_id) <= 2048),
     payer TEXT NOT NULL CHECK (payer <> ''),
     amount_units INTEGER NOT NULL CHECK (amount_units > 0),
     currency TEXT NOT NULL
-        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND currency NOT GLOB '*[^A-Z]*'),
+        CHECK (typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND octet_length(currency) <= 12 AND currency NOT GLOB '*[^A-Z]*'),
     pool_principal_id TEXT NOT NULL CHECK (pool_principal_id <> ''),
     rail_destination TEXT NOT NULL CHECK (rail_destination <> ''),
     instruction_sha256 TEXT NOT NULL CHECK (
         typeof(instruction_sha256) = 'text'
         AND length(instruction_sha256) = 64
         AND instr(instruction_sha256, char(0)) = 0
+        AND octet_length(instruction_sha256) <= 256
         AND instruction_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     observation_sha256 TEXT CHECK (
         observation_sha256 IS NULL
-        OR (length(observation_sha256) = 64 AND instr(observation_sha256, char(0)) = 0
+        OR (length(observation_sha256) = 64 AND instr(observation_sha256, char(0)) = 0 AND octet_length(observation_sha256) <= 256
             AND observation_sha256 NOT GLOB '*[^0-9a-f]*')
     ),
     state TEXT NOT NULL CHECK (state IN ('intent', 'reconciled', 'failed')),
@@ -205,26 +210,29 @@ END;
 
 CREATE TABLE IF NOT EXISTS finding_activation_attempts (
     admission_id TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(admission_id) = 'text' AND length(admission_id) = 64 AND instr(admission_id, char(0)) = 0 AND admission_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(admission_id) = 'text' AND length(admission_id) = 64 AND instr(admission_id, char(0)) = 0 AND octet_length(admission_id) <= 256 AND admission_id NOT GLOB '*[^0-9a-f]*'),
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0 AND octet_length(listing_id) <= 2048),
     backing_allocation_id TEXT NOT NULL CHECK (
         typeof(backing_allocation_id) = 'text'
         AND length(backing_allocation_id) = 64
         AND instr(backing_allocation_id, char(0)) = 0
+        AND octet_length(backing_allocation_id) <= 256
         AND backing_allocation_id NOT GLOB '*[^0-9a-f]*'
     ),
     admission_envelope_sha256 TEXT NOT NULL CHECK (
         typeof(admission_envelope_sha256) = 'text'
         AND length(admission_envelope_sha256) = 64
         AND instr(admission_envelope_sha256, char(0)) = 0
+        AND octet_length(admission_envelope_sha256) <= 256
         AND admission_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     admission_envelope_json TEXT NOT NULL CHECK (
         typeof(admission_envelope_json) = 'text'
         AND length(admission_envelope_json) BETWEEN 1 AND 262144
         AND instr(admission_envelope_json, char(0)) = 0
+        AND octet_length(admission_envelope_json) <= 1048576
     ),
     prepared_at INTEGER NOT NULL CHECK (prepared_at > 0),
     state TEXT NOT NULL CHECK (state IN ('prepared', 'activated')),
@@ -286,26 +294,29 @@ END;
 
 CREATE TABLE IF NOT EXISTS admissions (
     admission_id TEXT NOT NULL PRIMARY KEY
-        CHECK (typeof(admission_id) = 'text' AND length(admission_id) = 64 AND instr(admission_id, char(0)) = 0 AND admission_id NOT GLOB '*[^0-9a-f]*'),
+        CHECK (typeof(admission_id) = 'text' AND length(admission_id) = 64 AND instr(admission_id, char(0)) = 0 AND octet_length(admission_id) <= 256 AND admission_id NOT GLOB '*[^0-9a-f]*'),
     finding_id TEXT NOT NULL
-        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND finding_id NOT GLOB '*[^0-9a-f]*'),
-    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0),
+        CHECK (typeof(finding_id) = 'text' AND length(finding_id) = 64 AND instr(finding_id, char(0)) = 0 AND octet_length(finding_id) <= 256 AND finding_id NOT GLOB '*[^0-9a-f]*'),
+    listing_id TEXT NOT NULL CHECK (typeof(listing_id) = 'text' AND length(listing_id) BETWEEN 1 AND 512 AND instr(listing_id, char(0)) = 0 AND octet_length(listing_id) <= 2048),
     backing_allocation_id TEXT NOT NULL CHECK (
         typeof(backing_allocation_id) = 'text'
         AND length(backing_allocation_id) = 64
         AND instr(backing_allocation_id, char(0)) = 0
+        AND octet_length(backing_allocation_id) <= 256
         AND backing_allocation_id NOT GLOB '*[^0-9a-f]*'
     ),
     admission_envelope_sha256 TEXT NOT NULL CHECK (
         typeof(admission_envelope_sha256) = 'text'
         AND length(admission_envelope_sha256) = 64
         AND instr(admission_envelope_sha256, char(0)) = 0
+        AND octet_length(admission_envelope_sha256) <= 256
         AND admission_envelope_sha256 NOT GLOB '*[^0-9a-f]*'
     ),
     admission_envelope_json TEXT NOT NULL CHECK (
         typeof(admission_envelope_json) = 'text'
         AND length(admission_envelope_json) BETWEEN 1 AND 262144
         AND instr(admission_envelope_json, char(0)) = 0
+        AND octet_length(admission_envelope_json) <= 1048576
     ),
     expires_at INTEGER NOT NULL CHECK (expires_at > 0),
     activated_at INTEGER NOT NULL CHECK (activated_at > 0),

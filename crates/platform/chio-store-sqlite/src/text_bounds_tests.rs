@@ -1,11 +1,14 @@
 //! Bounded TEXT columns refuse embedded NULs and bounded BLOB columns refuse
 //! TEXT.
 //!
-//! SQLite's `length()` and `GLOB` stop at the first NUL in a TEXT value, so a
-//! valid prefix could otherwise carry an unbounded tail. Each probe copies one
-//! bounded column definition out of a live catalog into a UTF-8 and a UTF-16
-//! database, inserts a value whose prefix is valid and whose tail is a NUL plus
-//! a megabyte of padding, and requires the column CHECK to refuse it.
+//! SQLite's `length()` and `GLOB` stop at the first NUL in a TEXT value, and
+//! `length()` skips UTF-8 continuation bytes, so a value with a valid character
+//! count could otherwise carry an unbounded tail. Each probe copies one bounded
+//! column definition out of a live catalog into UTF-8, UTF-16le and UTF-16be
+//! databases. It requires the column CHECK to accept a valid value and to
+//! refuse a valid prefix followed by a NUL and a megabyte of padding, and, in
+//! UTF-8, a prefix followed by one lead byte and a megabyte of continuation
+//! bytes.
 
 use std::error::Error;
 
@@ -63,6 +66,20 @@ fn insert(probe: &Connection, value: Value) -> rusqlite::Result<usize> {
     probe.execute("INSERT INTO probe VALUES (?1)", [value])
 }
 
+fn insert_text_bytes(probe: &Connection, bytes: Vec<u8>) -> rusqlite::Result<usize> {
+    probe.execute(
+        "INSERT INTO probe VALUES (CAST(?1 AS TEXT))",
+        [Value::Blob(bytes)],
+    )
+}
+
+fn continuation_padded(valid: &str) -> Vec<u8> {
+    let mut bytes = valid.as_bytes()[..valid.len() - 1].to_vec();
+    bytes.push(0xc0);
+    bytes.resize(bytes.len() + PADDING, 0x80);
+    bytes
+}
+
 fn is_check_refusal(result: &rusqlite::Result<usize>) -> bool {
     matches!(
         result,
@@ -88,7 +105,7 @@ fn assert_column_refuses_nul_padding(
     )?;
     let definition =
         column_definition(&table_sql, column).ok_or(format!("{table}.{column} is not defined"))?;
-    for encoding in ["UTF-8", "UTF-16le"] {
+    for encoding in ["UTF-8", "UTF-16le", "UTF-16be"] {
         let probe = Connection::open_in_memory()?;
         probe.execute_batch(&format!(
             "PRAGMA encoding = '{encoding}'; CREATE TABLE probe ({definition});"
@@ -102,6 +119,13 @@ fn assert_column_refuses_nul_padding(
                 );
                 let padded = insert(&probe, Value::Text(nul_padded(valid)));
                 assert!(is_check_refusal(&padded), "{table}.{column}: {padded:?}");
+                if encoding == "UTF-8" {
+                    let stretched = insert_text_bytes(&probe, continuation_padded(valid));
+                    assert!(
+                        is_check_refusal(&stretched),
+                        "{table}.{column}: {stretched:?}"
+                    );
+                }
             }
             Bound::Blob(len) => {
                 assert_eq!(

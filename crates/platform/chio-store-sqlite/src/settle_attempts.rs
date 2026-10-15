@@ -33,11 +33,11 @@ CREATE TABLE IF NOT EXISTS settle_attempts (
     row_version          INTEGER NOT NULL CHECK (row_version >= 0),
     lease_owner          TEXT CHECK (
                             lease_owner IS NULL OR
-                            (length(lease_owner) BETWEEN 1 AND 128 AND instr(lease_owner, char(0)) = 0)
+                            (length(lease_owner) BETWEEN 1 AND 128 AND instr(lease_owner, char(0)) = 0 AND octet_length(lease_owner) <= 512)
                          ),
     lease_token          TEXT CHECK (
                             lease_token IS NULL OR
-                            (length(lease_token) BETWEEN 1 AND 128 AND instr(lease_token, char(0)) = 0)
+                            (length(lease_token) BETWEEN 1 AND 128 AND instr(lease_token, char(0)) = 0 AND octet_length(lease_token) <= 512)
                          ),
     lease_until_ms       INTEGER CHECK (lease_until_ms IS NULL OR lease_until_ms >= 0),
     reason_code          TEXT,

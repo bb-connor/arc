@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS chio_finding_operator_payments (
     payer TEXT NOT NULL,
     payee TEXT NOT NULL,
     amount_units INTEGER NOT NULL CHECK(amount_units > 0),
-    currency TEXT NOT NULL CHECK(typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0),
+    currency TEXT NOT NULL CHECK(typeof(currency) = 'text' AND length(currency) = 3 AND instr(currency, char(0)) = 0 AND octet_length(currency) <= 12),
     governed_intent_id TEXT,
     governed_intent_hash TEXT,
     state TEXT NOT NULL CHECK(state IN ('held', 'captured', 'released', 'refunded')),

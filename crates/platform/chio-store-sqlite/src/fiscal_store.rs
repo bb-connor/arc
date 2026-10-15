@@ -2376,6 +2376,7 @@ pub(crate) fn verify_fiscal_sql_invariants(
                     WHERE binding.envelope_digest IS NULL
                        OR length(binding.envelope_digest) <> 64
                        OR instr(binding.envelope_digest, char(0)) <> 0
+                       OR octet_length(binding.envelope_digest) > 256
                        OR binding.envelope_digest GLOB '*[^0-9a-f]*'
                        OR NOT EXISTS(
                            SELECT 1 FROM fiscal_schedules AS schedule

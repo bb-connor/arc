@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
     channel_id TEXT PRIMARY KEY CHECK (
         length(channel_id) = 64
         AND instr(channel_id, char(0)) = 0
+        AND octet_length(channel_id) <= 256
         AND channel_id NOT GLOB '*[^0-9a-f]*'
     ),
     chain_id TEXT NOT NULL CHECK (chain_id <> ''),
@@ -36,30 +37,35 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(open_digest) = 'text'
         AND length(open_digest) = 64
         AND instr(open_digest, char(0)) = 0
+        AND octet_length(open_digest) <= 256
         AND open_digest NOT GLOB '*[^0-9a-f]*'
     ),
     close_digest TEXT NOT NULL CHECK (
         typeof(close_digest) = 'text'
         AND length(close_digest) = 64
         AND instr(close_digest, char(0)) = 0
+        AND octet_length(close_digest) <= 256
         AND close_digest NOT GLOB '*[^0-9a-f]*'
     ),
     close_body_digest TEXT NOT NULL CHECK (
         typeof(close_body_digest) = 'text'
         AND length(close_body_digest) = 64
         AND instr(close_body_digest, char(0)) = 0
+        AND octet_length(close_body_digest) <= 256
         AND close_body_digest NOT GLOB '*[^0-9a-f]*'
     ),
     effective_close_digest TEXT NOT NULL CHECK (
         typeof(effective_close_digest) = 'text'
         AND length(effective_close_digest) = 64
         AND instr(effective_close_digest, char(0)) = 0
+        AND octet_length(effective_close_digest) <= 256
         AND effective_close_digest NOT GLOB '*[^0-9a-f]*'
     ),
     final_state_digest TEXT NOT NULL CHECK (
         typeof(final_state_digest) = 'text'
         AND length(final_state_digest) = 64
         AND instr(final_state_digest, char(0)) = 0
+        AND octet_length(final_state_digest) <= 256
         AND final_state_digest NOT GLOB '*[^0-9a-f]*'
     ),
     final_state_sequence INTEGER NOT NULL CHECK (final_state_sequence >= 0),
@@ -73,18 +79,21 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(source_checkpoint_digest) = 'text'
         AND length(source_checkpoint_digest) = 64
         AND instr(source_checkpoint_digest, char(0)) = 0
+        AND octet_length(source_checkpoint_digest) <= 256
         AND source_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     source_channel_head_digest TEXT NOT NULL CHECK (
         typeof(source_channel_head_digest) = 'text'
         AND length(source_channel_head_digest) = 64
         AND instr(source_channel_head_digest, char(0)) = 0
+        AND octet_length(source_channel_head_digest) <= 256
         AND source_channel_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     source_escrow_head_digest TEXT NOT NULL CHECK (
         typeof(source_escrow_head_digest) = 'text'
         AND length(source_escrow_head_digest) = 64
         AND instr(source_escrow_head_digest, char(0)) = 0
+        AND octet_length(source_escrow_head_digest) <= 256
         AND source_escrow_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     closing_checkpoint_sequence INTEGER NOT NULL CHECK (closing_checkpoint_sequence > 0),
@@ -92,18 +101,21 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(closing_checkpoint_digest) = 'text'
         AND length(closing_checkpoint_digest) = 64
         AND instr(closing_checkpoint_digest, char(0)) = 0
+        AND octet_length(closing_checkpoint_digest) <= 256
         AND closing_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     closing_channel_head_digest TEXT NOT NULL CHECK (
         typeof(closing_channel_head_digest) = 'text'
         AND length(closing_channel_head_digest) = 64
         AND instr(closing_channel_head_digest, char(0)) = 0
+        AND octet_length(closing_channel_head_digest) <= 256
         AND closing_channel_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     closing_escrow_head_digest TEXT NOT NULL CHECK (
         typeof(closing_escrow_head_digest) = 'text'
         AND length(closing_escrow_head_digest) = 64
         AND instr(closing_escrow_head_digest, char(0)) = 0
+        AND octet_length(closing_escrow_head_digest) <= 256
         AND closing_escrow_head_digest NOT GLOB '*[^0-9a-f]*'
     ),
     closing_lifecycle_json BLOB NOT NULL CHECK (
@@ -124,12 +136,14 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(asset_binding_digest) = 'text'
         AND length(asset_binding_digest) = 64
         AND instr(asset_binding_digest, char(0)) = 0
+        AND octet_length(asset_binding_digest) <= 256
         AND asset_binding_digest NOT GLOB '*[^0-9a-f]*'
     ),
     original_dispatch_digest TEXT NOT NULL CHECK (
         typeof(original_dispatch_digest) = 'text'
         AND length(original_dispatch_digest) = 64
         AND instr(original_dispatch_digest, char(0)) = 0
+        AND octet_length(original_dispatch_digest) <= 256
         AND original_dispatch_digest NOT GLOB '*[^0-9a-f]*'
     ),
     close_submission_cutoff_unix_ms INTEGER NOT NULL CHECK (
@@ -142,24 +156,28 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(frost_slot_id) = 'text'
         AND length(frost_slot_id) = 64
         AND instr(frost_slot_id, char(0)) = 0
+        AND octet_length(frost_slot_id) <= 256
         AND frost_slot_id NOT GLOB '*[^0-9a-f]*'
     ),
     frost_authorization_id TEXT NOT NULL CHECK (
         typeof(frost_authorization_id) = 'text'
         AND length(frost_authorization_id) = 64
         AND instr(frost_authorization_id, char(0)) = 0
+        AND octet_length(frost_authorization_id) <= 256
         AND frost_authorization_id NOT GLOB '*[^0-9a-f]*'
     ),
     frost_action_digest TEXT NOT NULL CHECK (
         typeof(frost_action_digest) = 'text'
         AND length(frost_action_digest) = 64
         AND instr(frost_action_digest, char(0)) = 0
+        AND octet_length(frost_action_digest) <= 256
         AND frost_action_digest NOT GLOB '*[^0-9a-f]*'
     ),
     frost_envelope_digest TEXT NOT NULL CHECK (
         typeof(frost_envelope_digest) = 'text'
         AND length(frost_envelope_digest) = 64
         AND instr(frost_envelope_digest, char(0)) = 0
+        AND octet_length(frost_envelope_digest) <= 256
         AND frost_envelope_digest NOT GLOB '*[^0-9a-f]*'
     ),
     frost_scope_id TEXT NOT NULL CHECK (frost_scope_id <> ''),
@@ -170,6 +188,7 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(frost_roster_digest) = 'text'
         AND length(frost_roster_digest) = 64
         AND instr(frost_roster_digest, char(0)) = 0
+        AND octet_length(frost_roster_digest) <= 256
         AND frost_roster_digest NOT GLOB '*[^0-9a-f]*'
     ),
     frost_key_epoch INTEGER NOT NULL CHECK (frost_key_epoch > 0),
@@ -178,6 +197,7 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(authorization_digest) = 'text'
         AND length(authorization_digest) = 64
         AND instr(authorization_digest, char(0)) = 0
+        AND octet_length(authorization_digest) <= 256
         AND authorization_digest NOT GLOB '*[^0-9a-f]*'
     ),
     authorization_json BLOB NOT NULL CHECK (
@@ -188,12 +208,14 @@ CREATE TABLE IF NOT EXISTS chio_channel_release_publications (
         typeof(publication_binding_digest) = 'text'
         AND length(publication_binding_digest) = 64
         AND instr(publication_binding_digest, char(0)) = 0
+        AND octet_length(publication_binding_digest) <= 256
         AND publication_binding_digest NOT GLOB '*[^0-9a-f]*'
     ),
     prepared_call_digest TEXT NOT NULL UNIQUE CHECK (
         typeof(prepared_call_digest) = 'text'
         AND length(prepared_call_digest) = 64
         AND instr(prepared_call_digest, char(0)) = 0
+        AND octet_length(prepared_call_digest) <= 256
         AND prepared_call_digest NOT GLOB '*[^0-9a-f]*'
     ),
     prepared_call_json BLOB NOT NULL CHECK (

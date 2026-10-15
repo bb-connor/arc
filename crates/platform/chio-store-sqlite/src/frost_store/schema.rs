@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
     ceremony_id TEXT PRIMARY KEY CHECK (
         length(ceremony_id) = 64
         AND instr(ceremony_id, char(0)) = 0
+        AND octet_length(ceremony_id) <= 256
         AND ceremony_id NOT GLOB '*[^0-9a-f]*'
     ),
     config_json BLOB NOT NULL CHECK (typeof(config_json) = 'blob' AND length(config_json) > 0),
@@ -10,12 +11,14 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
         typeof(config_digest) = 'text'
         AND length(config_digest) = 64
         AND instr(config_digest, char(0)) = 0
+        AND octet_length(config_digest) <= 256
         AND config_digest NOT GLOB '*[^0-9a-f]*'
     ),
     participant_set_digest TEXT NOT NULL CHECK (
         typeof(participant_set_digest) = 'text'
         AND length(participant_set_digest) = 64
         AND instr(participant_set_digest, char(0)) = 0
+        AND octet_length(participant_set_digest) <= 256
         AND participant_set_digest NOT GLOB '*[^0-9a-f]*'
     ),
     scope_id TEXT NOT NULL CHECK (scope_id <> ''),
@@ -38,6 +41,7 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
         OR (
             length(input_transcript_digest) = 64
             AND instr(input_transcript_digest, char(0)) = 0
+            AND octet_length(input_transcript_digest) <= 256
             AND input_transcript_digest NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -47,6 +51,7 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
         OR (
             length(group_public_key) = 64
             AND instr(group_public_key, char(0)) = 0
+            AND octet_length(group_public_key) <= 256
             AND group_public_key NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -60,6 +65,7 @@ CREATE TABLE IF NOT EXISTS frost_ceremonies (
         typeof(record_digest) = 'text'
         AND length(record_digest) = 64
         AND instr(record_digest, char(0)) = 0
+        AND octet_length(record_digest) <= 256
         AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     CHECK (
@@ -107,11 +113,11 @@ CREATE TABLE IF NOT EXISTS frost_round2_acceptances (
     sender_participant_id TEXT NOT NULL CHECK (sender_participant_id <> ''),
     recipient_participant_id TEXT NOT NULL CHECK (recipient_participant_id <> ''),
     envelope_json BLOB NOT NULL CHECK (typeof(envelope_json) = 'blob' AND length(envelope_json) BETWEEN 1 AND 32768),
-    envelope_digest TEXT NOT NULL CHECK (typeof(envelope_digest) = 'text' AND length(envelope_digest) = 64 AND instr(envelope_digest, char(0)) = 0 AND envelope_digest NOT GLOB '*[^0-9a-f]*'),
+    envelope_digest TEXT NOT NULL CHECK (typeof(envelope_digest) = 'text' AND length(envelope_digest) = 64 AND instr(envelope_digest, char(0)) = 0 AND octet_length(envelope_digest) <= 256 AND envelope_digest NOT GLOB '*[^0-9a-f]*'),
     share_nonce BLOB NOT NULL CHECK (typeof(share_nonce) = 'blob' AND length(share_nonce) = 12),
     share_ciphertext BLOB NOT NULL CHECK (typeof(share_ciphertext) = 'blob' AND length(share_ciphertext) > 16),
     accepted_at_unix_ms INTEGER NOT NULL CHECK (accepted_at_unix_ms > 0),
-    record_digest TEXT NOT NULL CHECK (typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND record_digest NOT GLOB '*[^0-9a-f]*'),
+    record_digest TEXT NOT NULL CHECK (typeof(record_digest) = 'text' AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND octet_length(record_digest) <= 256 AND record_digest NOT GLOB '*[^0-9a-f]*'),
     PRIMARY KEY (ceremony_id, key_epoch, round, sender_participant_id, recipient_participant_id),
     CHECK (sender_participant_id <> recipient_participant_id)
 );
@@ -121,17 +127,17 @@ CREATE TABLE IF NOT EXISTS frost_roster_history (
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     roster_id TEXT NOT NULL CHECK (
         typeof(roster_id) = 'text'
-        AND length(roster_id) = 64 AND instr(roster_id, char(0)) = 0 AND roster_id NOT GLOB '*[^0-9a-f]*'
+        AND length(roster_id) = 64 AND instr(roster_id, char(0)) = 0 AND octet_length(roster_id) <= 256 AND roster_id NOT GLOB '*[^0-9a-f]*'
     ),
     roster_digest TEXT NOT NULL CHECK (
         typeof(roster_digest) = 'text'
-        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND roster_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND octet_length(roster_digest) <= 256 AND roster_digest NOT GLOB '*[^0-9a-f]*'
     ),
     roster_json BLOB NOT NULL CHECK (typeof(roster_json) = 'blob' AND length(roster_json) > 0),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
     checkpoint_digest TEXT NOT NULL CHECK (
         typeof(checkpoint_digest) = 'text'
-        AND length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 AND octet_length(checkpoint_digest) <= 256 AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     checkpoint_json BLOB NOT NULL CHECK (typeof(checkpoint_json) = 'blob' AND length(checkpoint_json) > 0),
     activation_fence INTEGER NOT NULL CHECK (activation_fence > 0),
@@ -142,7 +148,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_history (
     source_owner_epoch INTEGER NOT NULL CHECK (source_owner_epoch > 0),
     record_digest TEXT NOT NULL CHECK (
         typeof(record_digest) = 'text'
-        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND record_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND octet_length(record_digest) <= 256 AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     PRIMARY KEY (scope_id, key_epoch),
     UNIQUE (roster_id),
@@ -155,12 +161,12 @@ CREATE TABLE IF NOT EXISTS frost_active_rosters (
     key_epoch INTEGER NOT NULL CHECK (key_epoch > 0),
     roster_digest TEXT NOT NULL CHECK (
         typeof(roster_digest) = 'text'
-        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND roster_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND octet_length(roster_digest) <= 256 AND roster_digest NOT GLOB '*[^0-9a-f]*'
     ),
     checkpoint_sequence INTEGER NOT NULL CHECK (checkpoint_sequence > 0),
     checkpoint_digest TEXT NOT NULL CHECK (
         typeof(checkpoint_digest) = 'text'
-        AND length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(checkpoint_digest) = 64 AND instr(checkpoint_digest, char(0)) = 0 AND octet_length(checkpoint_digest) <= 256 AND checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     activation_fence INTEGER NOT NULL CHECK (activation_fence > 0),
     clock_high_water INTEGER NOT NULL CHECK (clock_high_water > 0),
@@ -177,7 +183,7 @@ CREATE TABLE IF NOT EXISTS frost_active_rosters (
 
 CREATE TABLE IF NOT EXISTS frost_roster_rotations (
     rotation_id TEXT PRIMARY KEY CHECK (
-        length(rotation_id) = 64 AND instr(rotation_id, char(0)) = 0 AND rotation_id NOT GLOB '*[^0-9a-f]*'
+        length(rotation_id) = 64 AND instr(rotation_id, char(0)) = 0 AND octet_length(rotation_id) <= 256 AND rotation_id NOT GLOB '*[^0-9a-f]*'
     ),
     scope_id TEXT NOT NULL CHECK (scope_id <> ''),
     state TEXT NOT NULL CHECK (
@@ -188,6 +194,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_rotations (
         typeof(predecessor_checkpoint_digest) = 'text'
         AND length(predecessor_checkpoint_digest) = 64
         AND instr(predecessor_checkpoint_digest, char(0)) = 0
+        AND octet_length(predecessor_checkpoint_digest) <= 256
         AND predecessor_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     predecessor_checkpoint_json BLOB NOT NULL CHECK (
@@ -198,6 +205,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_rotations (
         typeof(target_roster_digest) = 'text'
         AND length(target_roster_digest) = 64
         AND instr(target_roster_digest, char(0)) = 0
+        AND octet_length(target_roster_digest) <= 256
         AND target_roster_digest NOT GLOB '*[^0-9a-f]*'
     ),
     target_roster_json BLOB NOT NULL CHECK (typeof(target_roster_json) = 'blob' AND length(target_roster_json) > 0),
@@ -206,6 +214,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_rotations (
         typeof(rotation_authorization_digest) = 'text'
         AND length(rotation_authorization_digest) = 64
         AND instr(rotation_authorization_digest, char(0)) = 0
+        AND octet_length(rotation_authorization_digest) <= 256
         AND rotation_authorization_digest NOT GLOB '*[^0-9a-f]*'
     ),
     burn_summary_json BLOB NOT NULL CHECK (typeof(burn_summary_json) = 'blob' AND length(burn_summary_json) > 0),
@@ -213,6 +222,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_rotations (
         typeof(old_session_burn_root) = 'text'
         AND length(old_session_burn_root) = 64
         AND instr(old_session_burn_root, char(0)) = 0
+        AND octet_length(old_session_burn_root) <= 256
         AND old_session_burn_root NOT GLOB '*[^0-9a-f]*'
     ),
     expected_checkpoint_sequence INTEGER NOT NULL CHECK (
@@ -225,6 +235,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_rotations (
         OR (
             length(anchored_checkpoint_digest) = 64
             AND instr(anchored_checkpoint_digest, char(0)) = 0
+            AND octet_length(anchored_checkpoint_digest) <= 256
             AND anchored_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
         )
     ),
@@ -238,7 +249,7 @@ CREATE TABLE IF NOT EXISTS frost_roster_rotations (
     ),
     record_digest TEXT NOT NULL CHECK (
         typeof(record_digest) = 'text'
-        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND record_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND octet_length(record_digest) <= 256 AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     CHECK (
         (state = 'staged' AND state_version = 1
@@ -269,13 +280,14 @@ WHERE state IN ('staged', 'anchor_advanced');
 CREATE TABLE IF NOT EXISTS frost_signer_sessions (
     session_id TEXT NOT NULL CHECK (
         typeof(session_id) = 'text'
-        AND length(session_id) = 64 AND instr(session_id, char(0)) = 0 AND session_id NOT GLOB '*[^0-9a-f]*'
+        AND length(session_id) = 64 AND instr(session_id, char(0)) = 0 AND octet_length(session_id) <= 256 AND session_id NOT GLOB '*[^0-9a-f]*'
     ),
     participant_id TEXT NOT NULL CHECK (participant_id <> ''),
     authorization_slot_id TEXT NOT NULL CHECK (
         typeof(authorization_slot_id) = 'text'
         AND length(authorization_slot_id) = 64
         AND instr(authorization_slot_id, char(0)) = 0
+        AND octet_length(authorization_slot_id) <= 256
         AND authorization_slot_id NOT GLOB '*[^0-9a-f]*'
     ),
     scope_id TEXT NOT NULL CHECK (scope_id <> ''),
@@ -284,29 +296,32 @@ CREATE TABLE IF NOT EXISTS frost_signer_sessions (
         typeof(authorization_id) = 'text'
         AND length(authorization_id) = 64
         AND instr(authorization_id, char(0)) = 0
+        AND octet_length(authorization_id) <= 256
         AND authorization_id NOT GLOB '*[^0-9a-f]*'
     ),
     signing_message_digest TEXT NOT NULL CHECK (
         typeof(signing_message_digest) = 'text'
         AND length(signing_message_digest) = 64
         AND instr(signing_message_digest, char(0)) = 0
+        AND octet_length(signing_message_digest) <= 256
         AND signing_message_digest NOT GLOB '*[^0-9a-f]*'
     ),
     roster_digest TEXT NOT NULL CHECK (
         typeof(roster_digest) = 'text'
-        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND roster_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND octet_length(roster_digest) <= 256 AND roster_digest NOT GLOB '*[^0-9a-f]*'
     ),
     coordinator_id TEXT NOT NULL CHECK (coordinator_id <> ''),
     resource_fence INTEGER NOT NULL CHECK (resource_fence > 0),
     ceremony_id TEXT NOT NULL CHECK (
         typeof(ceremony_id) = 'text'
-        AND length(ceremony_id) = 64 AND instr(ceremony_id, char(0)) = 0 AND ceremony_id NOT GLOB '*[^0-9a-f]*'
+        AND length(ceremony_id) = 64 AND instr(ceremony_id, char(0)) = 0 AND octet_length(ceremony_id) <= 256 AND ceremony_id NOT GLOB '*[^0-9a-f]*'
     ),
     authorization_body_json BLOB NOT NULL CHECK (typeof(authorization_body_json) = 'blob' AND length(authorization_body_json) > 0),
     bound_checkpoint_digest TEXT NOT NULL CHECK (
         typeof(bound_checkpoint_digest) = 'text'
         AND length(bound_checkpoint_digest) = 64
         AND instr(bound_checkpoint_digest, char(0)) = 0
+        AND octet_length(bound_checkpoint_digest) <= 256
         AND bound_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     bound_checkpoint_json BLOB NOT NULL CHECK (typeof(bound_checkpoint_json) = 'blob' AND length(bound_checkpoint_json) > 0),
@@ -315,6 +330,7 @@ CREATE TABLE IF NOT EXISTS frost_signer_sessions (
         typeof(verification_share) = 'text'
         AND length(verification_share) = 64
         AND instr(verification_share, char(0)) = 0
+        AND octet_length(verification_share) <= 256
         AND verification_share NOT GLOB '*[^0-9a-f]*'
     ),
     state TEXT NOT NULL CHECK (
@@ -330,11 +346,12 @@ CREATE TABLE IF NOT EXISTS frost_signer_sessions (
         typeof(commitment_digest) = 'text'
         AND length(commitment_digest) = 64
         AND instr(commitment_digest, char(0)) = 0
+        AND octet_length(commitment_digest) <= 256
         AND commitment_digest NOT GLOB '*[^0-9a-f]*'
     ),
     signing_package_digest TEXT CHECK (
         signing_package_digest IS NULL
-        OR (length(signing_package_digest) = 64 AND instr(signing_package_digest, char(0)) = 0
+        OR (length(signing_package_digest) = 64 AND instr(signing_package_digest, char(0)) = 0 AND octet_length(signing_package_digest) <= 256
             AND signing_package_digest NOT GLOB '*[^0-9a-f]*')
     ),
     signature_share BLOB,
@@ -346,7 +363,7 @@ CREATE TABLE IF NOT EXISTS frost_signer_sessions (
     updated_at_unix_ms INTEGER NOT NULL CHECK (updated_at_unix_ms >= created_at_unix_ms),
     record_digest TEXT NOT NULL CHECK (
         typeof(record_digest) = 'text'
-        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND record_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND octet_length(record_digest) <= 256 AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     PRIMARY KEY (session_id, participant_id),
     UNIQUE (authorization_slot_id, participant_id),
@@ -379,12 +396,13 @@ CREATE TABLE IF NOT EXISTS frost_signer_sessions (
 
 CREATE TABLE IF NOT EXISTS frost_coordinator_sessions (
     session_id TEXT PRIMARY KEY CHECK (
-        length(session_id) = 64 AND instr(session_id, char(0)) = 0 AND session_id NOT GLOB '*[^0-9a-f]*'
+        length(session_id) = 64 AND instr(session_id, char(0)) = 0 AND octet_length(session_id) <= 256 AND session_id NOT GLOB '*[^0-9a-f]*'
     ),
     authorization_slot_id TEXT NOT NULL UNIQUE CHECK (
         typeof(authorization_slot_id) = 'text'
         AND length(authorization_slot_id) = 64
         AND instr(authorization_slot_id, char(0)) = 0
+        AND octet_length(authorization_slot_id) <= 256
         AND authorization_slot_id NOT GLOB '*[^0-9a-f]*'
     ),
     scope_id TEXT NOT NULL CHECK (scope_id <> ''),
@@ -393,17 +411,19 @@ CREATE TABLE IF NOT EXISTS frost_coordinator_sessions (
         typeof(authorization_id) = 'text'
         AND length(authorization_id) = 64
         AND instr(authorization_id, char(0)) = 0
+        AND octet_length(authorization_id) <= 256
         AND authorization_id NOT GLOB '*[^0-9a-f]*'
     ),
     signing_message_digest TEXT NOT NULL CHECK (
         typeof(signing_message_digest) = 'text'
         AND length(signing_message_digest) = 64
         AND instr(signing_message_digest, char(0)) = 0
+        AND octet_length(signing_message_digest) <= 256
         AND signing_message_digest NOT GLOB '*[^0-9a-f]*'
     ),
     roster_digest TEXT NOT NULL CHECK (
         typeof(roster_digest) = 'text'
-        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND roster_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(roster_digest) = 64 AND instr(roster_digest, char(0)) = 0 AND octet_length(roster_digest) <= 256 AND roster_digest NOT GLOB '*[^0-9a-f]*'
     ),
     coordinator_id TEXT NOT NULL CHECK (coordinator_id <> ''),
     resource_fence INTEGER NOT NULL CHECK (resource_fence > 0),
@@ -413,6 +433,7 @@ CREATE TABLE IF NOT EXISTS frost_coordinator_sessions (
         typeof(bound_checkpoint_digest) = 'text'
         AND length(bound_checkpoint_digest) = 64
         AND instr(bound_checkpoint_digest, char(0)) = 0
+        AND octet_length(bound_checkpoint_digest) <= 256
         AND bound_checkpoint_digest NOT GLOB '*[^0-9a-f]*'
     ),
     bound_checkpoint_json BLOB NOT NULL CHECK (typeof(bound_checkpoint_json) = 'blob' AND length(bound_checkpoint_json) > 0),
@@ -428,14 +449,14 @@ CREATE TABLE IF NOT EXISTS frost_coordinator_sessions (
     signing_package BLOB,
     signing_package_digest TEXT CHECK (
         signing_package_digest IS NULL
-        OR (length(signing_package_digest) = 64 AND instr(signing_package_digest, char(0)) = 0
+        OR (length(signing_package_digest) = 64 AND instr(signing_package_digest, char(0)) = 0 AND octet_length(signing_package_digest) <= 256
             AND signing_package_digest NOT GLOB '*[^0-9a-f]*')
     ),
     shares_json BLOB NOT NULL CHECK (typeof(shares_json) = 'blob' AND length(shares_json) > 0),
     authorization_blob BLOB,
     authorization_blob_digest TEXT CHECK (
         authorization_blob_digest IS NULL
-        OR (length(authorization_blob_digest) = 64 AND instr(authorization_blob_digest, char(0)) = 0
+        OR (length(authorization_blob_digest) = 64 AND instr(authorization_blob_digest, char(0)) = 0 AND octet_length(authorization_blob_digest) <= 256
             AND authorization_blob_digest NOT GLOB '*[^0-9a-f]*')
     ),
     availability_receipt TEXT,
@@ -451,7 +472,7 @@ CREATE TABLE IF NOT EXISTS frost_coordinator_sessions (
     updated_at_unix_ms INTEGER NOT NULL CHECK (updated_at_unix_ms >= created_at_unix_ms),
     record_digest TEXT NOT NULL CHECK (
         typeof(record_digest) = 'text'
-        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND record_digest NOT GLOB '*[^0-9a-f]*'
+        AND length(record_digest) = 64 AND instr(record_digest, char(0)) = 0 AND octet_length(record_digest) <= 256 AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     CHECK (
         (state = 'collecting_commitments'
@@ -487,18 +508,21 @@ CREATE TABLE IF NOT EXISTS frost_projection_commits (
         typeof(record_digest) = 'text'
         AND length(record_digest) = 64
         AND instr(record_digest, char(0)) = 0
+        AND octet_length(record_digest) <= 256
         AND record_digest NOT GLOB '*[^0-9a-f]*'
     ),
     previous_chain_digest TEXT NOT NULL CHECK (
         typeof(previous_chain_digest) = 'text'
         AND length(previous_chain_digest) = 64
         AND instr(previous_chain_digest, char(0)) = 0
+        AND octet_length(previous_chain_digest) <= 256
         AND previous_chain_digest NOT GLOB '*[^0-9a-f]*'
     ),
     chain_digest TEXT NOT NULL CHECK (
         typeof(chain_digest) = 'text'
         AND length(chain_digest) = 64
         AND instr(chain_digest, char(0)) = 0
+        AND octet_length(chain_digest) <= 256
         AND chain_digest NOT GLOB '*[^0-9a-f]*'
     ),
     store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
