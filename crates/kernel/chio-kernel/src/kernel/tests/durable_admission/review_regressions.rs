@@ -141,6 +141,67 @@ fn durable_tool_error_after_dispatch_signs_a_kernel_reason() {
     );
 }
 
+struct DurableToolCancellationServer {
+    store: std::sync::Arc<TestAdmissionOperationStore>,
+    request_id: String,
+}
+
+#[async_trait::async_trait]
+impl ToolServerConnection for DurableToolCancellationServer {
+    fn server_id(&self) -> &str {
+        "durable-server"
+    }
+
+    fn tool_names(&self) -> Vec<String> {
+        vec!["mutate".to_owned()]
+    }
+
+    async fn invoke(
+        &self,
+        _tool_name: &str,
+        _arguments: serde_json::Value,
+        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
+    ) -> Result<serde_json::Value, KernelError> {
+        assert_eq!(
+            self.store.operation().state(),
+            AdmissionOperationState::DispatchCommitted
+        );
+        Err(KernelError::RequestCancelled {
+            request_id: self.request_id.clone().into(),
+            reason: TOOL_CONTROLLED_ERROR.to_owned(),
+        })
+    }
+}
+
+#[test]
+fn durable_tool_reported_cancellation_signs_a_kernel_reason() {
+    let (mut kernel, request, store, _invocations) =
+        durable_admission_fixture("durable-tool-cancellation");
+    kernel.register_tool_server(Box::new(DurableToolCancellationServer {
+        store: store.clone(),
+        request_id: request.request_id.clone(),
+    }));
+
+    let _ = kernel.evaluate_tool_call_blocking(&request);
+    assert_original_unknown_incident(
+        &store,
+        &request,
+        &chio_core::receipt::decision::Decision::Cancelled {
+            reason: "tool server reported cancellation after dispatch; outcome is unknown".into(),
+        },
+    );
+    let receipt = store
+        .state
+        .lock()
+        .expect("admission state")
+        .receipt
+        .clone()
+        .expect("signed terminal cancellation");
+    assert!(!serde_json::to_string(&receipt)
+        .expect("receipt json")
+        .contains(TOOL_CONTROLLED_ERROR));
+}
+
 #[test]
 fn durable_server_url_elicitation_terminalizes_as_outcome_unknown() {
     let (mut kernel, request, store, _invocations) =

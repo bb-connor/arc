@@ -53,6 +53,51 @@ struct ObligationParts<'a> {
 
 pub(in crate::kernel) const URL_ELICITATION_AFTER_DISPATCH: &str =
     "tool server returned URL elicitation after dispatch; outcome is unknown";
+pub(in crate::kernel) const TOOL_REPORTED_CANCELLATION_AFTER_DISPATCH: &str =
+    "tool server reported cancellation after dispatch; outcome is unknown";
+pub(in crate::kernel) const SESSION_CANCELLED_AFTER_DISPATCH: &str =
+    "session request cancelled after dispatch; outcome is unknown";
+
+impl ChioKernel {
+    /// The cancellation reason for a dispatched session request. It comes from
+    /// the cancellation the kernel holds for that request or for one of its
+    /// nested children, never from the error a tool connection returned.
+    pub(in crate::kernel) fn cancellation_reason_after_dispatch(
+        &self,
+        context: Option<&OperationContext>,
+        request_id: &RequestId,
+    ) -> String {
+        context
+            .and_then(|context| {
+                self.with_session(&context.session_id, |session| {
+                    Ok(if request_id == &context.request_id {
+                        session
+                            .inflight()
+                            .get(request_id)
+                            .filter(|request| request.cancellation_requested)
+                            .map(|request| {
+                                request
+                                    .cancellation_reason
+                                    .unwrap_or_else(|| SESSION_CANCELLED_AFTER_DISPATCH.to_owned())
+                            })
+                    } else {
+                        session
+                            .request_lineage(request_id)
+                            .filter(|child| {
+                                child.parent_request_id.as_ref() == Some(&context.request_id)
+                            })
+                            .and_then(|child| match child.terminal_state {
+                                Some(OperationTerminalState::Cancelled { reason }) => Some(reason),
+                                _ => None,
+                            })
+                    })
+                })
+                .ok()
+                .flatten()
+            })
+            .unwrap_or_else(|| TOOL_REPORTED_CANCELLATION_AFTER_DISPATCH.to_owned())
+    }
+}
 
 /// The terminal refusal a dispatched call signs when its tool outcome is not
 /// known. The reason is kernel-authored; tool-supplied text never reaches it.
@@ -62,14 +107,19 @@ pub(in crate::kernel) struct PostDispatchRefusal {
 }
 
 impl PostDispatchRefusal {
-    pub(in crate::kernel) fn classify(step: &str, error: &KernelError) -> Self {
+    pub(in crate::kernel) fn classify(
+        kernel: &ChioKernel,
+        context: Option<&OperationContext>,
+        step: &str,
+        error: &KernelError,
+    ) -> Self {
         match error {
             KernelError::UrlElicitationsRequired { .. } => Self {
                 reason: URL_ELICITATION_AFTER_DISPATCH.to_owned(),
                 cancelled: true,
             },
-            KernelError::RequestCancelled { reason, .. } => Self {
-                reason: reason.clone(),
+            KernelError::RequestCancelled { request_id, .. } => Self {
+                reason: kernel.cancellation_reason_after_dispatch(context, request_id),
                 cancelled: true,
             },
             KernelError::HotPathDeadlineExceeded { stage, budget_ms } => Self {
@@ -352,7 +402,12 @@ impl<'a> PostEffectObligation<'a> {
             let mut delivery_error = None;
             if let Some(admission) = parts.inputs.admission.as_ref() {
                 // An existing tool outcome excludes a competing unknown terminal.
-                let refusal = PostDispatchRefusal::classify(step, &source);
+                let refusal = PostDispatchRefusal::classify(
+                    self.kernel,
+                    parts.inputs.parent_context,
+                    step,
+                    &source,
+                );
                 match self.kernel.terminalize_dispatch_committed_admission(
                     admission.operation(),
                     parts

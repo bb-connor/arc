@@ -168,6 +168,12 @@ fn chio_runtime_admission_retains_reservations_on_ambiguous_cancellation(
     let response = kernel.evaluate_tool_call_blocking(&request)?;
 
     assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.receipt.decision,
+        Some(chio_core::receipt::decision::Decision::Cancelled {
+            reason: "tool server reported cancellation after dispatch; outcome is unknown".into(),
+        })
+    );
     assert_eq!(admission_calls.load(Ordering::SeqCst), 1);
     assert_eq!(side_effects.load(Ordering::SeqCst), 1);
     assert_eq!(
