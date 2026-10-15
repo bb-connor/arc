@@ -206,7 +206,7 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
             Fault::WrongOwner,
             Fault::Reject,
         ] {
-            let (mut kernel, _, _, request, _) =
+            let (mut kernel, _, _, request, _, dpop_store) =
                 request_with_replayed_approval("security-all-credentials")?;
             let counts = Arc::new(std::array::from_fn(|_| AtomicU64::new(0)));
             kernel.set_governed_approval_replay_store(Box::new(ApprovalProbe {
@@ -220,9 +220,37 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
                 tool: request.tool_name.clone(),
                 invocations: invocations.clone(),
             }));
+            let session = kernel.open_session(request.agent_id.clone(), vec![])?;
+            kernel.activate_session(&session)?;
+            let context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
+                chio_security_types::ports::TenantId::new("security-credential-tenant")?,
+                chio_security_types::ports::SessionId::new(session.as_str())?,
+                chio_security_types::PrincipalId::new(request.agent_id.clone())?,
+                chio_security_types::ports::IsolationEpochId::new("security-credential-epoch")?,
+                chio_security_types::ports::LineageId::new(request.capability.id.clone())?,
+                1,
+            ));
+            let parent = make_operation_context(&session, "credential-parent", &request.agent_id);
+            if nested {
+                kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            }
+            let evaluate_same_request = |kernel: &ChioKernel| {
+                if nested {
+                    kernel.evaluate_tool_call_with_nested_flow_client_and_security_context(
+                        &parent,
+                        &request,
+                        &mut NoopNestedFlowClient,
+                        None,
+                        Some(&context),
+                        None,
+                    )
+                } else {
+                    kernel.evaluate_tool_call_blocking_with_security_context(&request, &context)
+                }
+            };
             kernel.set_security_pre_dispatch_policy(SecurityPreDispatchPolicy::Enforce);
             kernel.set_security_pre_dispatch_hook(Arc::new(Hook(fault)));
-            let denied = evaluate(&kernel, &request, nested)?;
+            let denied = evaluate_same_request(&kernel)?;
             assert_eq!(denied.verdict, Verdict::Deny);
             assert!(
                 denied
@@ -232,15 +260,10 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
                 "{denied:?}"
             );
             assert_eq!(invocations.load(Ordering::SeqCst), 0);
-            assert_eq!(
-                kernel
-                    .dpop_nonce_store
-                    .as_ref()
-                    .ok_or("dpop store")?
-                    .utilization()?
-                    .0,
-                0
-            );
+            let history = dpop_store.dpop_history();
+            assert!(!history.is_empty());
+            assert!(history.iter().all(|claim| claim.disposition ==
+                crate::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReleasedBeforeDispatch));
             assert!(!kernel
                 .execution_nonce_store
                 .as_ref()
@@ -251,26 +274,19 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
                 [1, 0, 1]
             );
             kernel.set_security_pre_dispatch_hook(Arc::new(Hook(Fault::None)));
-            let accepted = evaluate(&kernel, &request, nested)?;
-            assert_eq!(accepted.verdict, Verdict::Allow, "{accepted:?}");
-            assert_eq!(invocations.load(Ordering::SeqCst), 1);
-            assert_eq!(
-                kernel
-                    .dpop_nonce_store
-                    .as_ref()
-                    .ok_or("dpop store")?
-                    .utilization()?
-                    .0,
-                1
-            );
-            assert!(kernel
+            let replay = evaluate_same_request(&kernel)?;
+            assert_eq!(replay.verdict, Verdict::Deny, "{replay:?}");
+            assert_eq!(replay.receipt, denied.receipt);
+            assert_eq!(invocations.load(Ordering::SeqCst), 0);
+            assert_eq!(dpop_store.dpop_history(), history);
+            assert!(!kernel
                 .execution_nonce_store
                 .as_ref()
                 .ok_or("nonce store")?
                 .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
             assert_eq!(
                 counts.each_ref().map(|count| count.load(Ordering::SeqCst)),
-                [2, 1, 1]
+                [1, 0, 1]
             );
         }
     }

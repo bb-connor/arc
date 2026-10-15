@@ -25,8 +25,6 @@ struct DpopSignParams {
   std::uint64_t issued_at = 0;
 };
 
-Result<DpopProof> sign_dpop_proof(const DpopSignParams& params);
-
 // Independently configured durable domain, not evidence of activation.
 struct DpopReplayAuthority {
   std::string destination_store_uuid;
@@ -36,9 +34,9 @@ struct DpopReplayAuthority {
   std::uint64_t max_clock_skew_secs = 30;
 };
 
-// V2 signatures bind the complete domain. Legacy nonce-store verifiers reject
-// this profile; signing itself neither reserves a nonce nor permits execution.
-Result<DpopProof> sign_authority_dpop_proof(const DpopSignParams& params,
-                                          const DpopReplayAuthority& authority);
+// Obtain the replay authority from authenticated configuration.
+// Signing neither reserves a nonce nor permits execution.
+Result<DpopProof> sign_dpop_proof(const DpopSignParams& params,
+                                const DpopReplayAuthority& authority);
 
 }  // namespace chio

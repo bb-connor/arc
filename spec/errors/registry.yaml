@@ -3009,6 +3009,17 @@ codes:
     consumed_by:
       - chio-kernel
 
+  - urn: "urn:chio:error:kernel:dpop-authority-mismatch"
+    domain: kernel
+    severity: error
+    summary: "The DPoP proof names a different replay authority."
+    help: "Sign a fresh proof for the independently configured active replay authority."
+    string_code: "CHIO-KERNEL-DPOP-AUTHORITY-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
   - urn: "urn:chio:error:kernel:dpop-capability"
     domain: kernel
     severity: error
@@ -3251,16 +3262,6 @@ codes:
     consumed_by:
       - chio-kernel
 
-  - urn: "urn:chio:error:kernel:dpop-reservation-ownership"
-    domain: kernel
-    severity: error
-    summary: "DPoP reservation ownership was not confirmed at commit."
-    help: "Retain the marker and reconcile the original operation before retrying."
-    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP"
-    since: "0.1.0"
-    stability: stable
-    consumed_by:
-      - chio-kernel
   - urn: "urn:chio:error:transport:task-capacity-exceeded"
     domain: transport
     severity: error

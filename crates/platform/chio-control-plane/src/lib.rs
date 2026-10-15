@@ -30,7 +30,9 @@ mod anchor_egress;
 pub mod attestation;
 mod bounded_worker_pool;
 pub mod certify;
+mod dpop_runtime;
 mod durable_admission;
+pub use dpop_runtime::{initialize_local_dpop_authority, load_local_dpop_authority};
 mod error;
 mod integer;
 mod json_input;
@@ -177,7 +179,6 @@ fn build_kernel_components(
     };
 
     let mut kernel = ChioKernel::new_with_clock(config, clock);
-    kernel.install_default_dpop_store();
     if kernel_policy.require_swarm_admission {
         kernel.require_swarm_admission();
     }
@@ -763,10 +764,10 @@ mod tests {
         let mut first = make_kernel_with_key(false, runtime.kernel_keypair());
         let mut second = make_kernel_with_key(false, runtime.kernel_keypair());
         runtime
-            .attach(&mut first)
+            .attach(&mut first, None)
             .expect("attach first durable kernel");
         runtime
-            .attach(&mut second)
+            .attach(&mut second, None)
             .expect("attach second durable kernel");
 
         assert!(DurableAdmissionRuntime::open(&admission_database).is_err());
@@ -915,7 +916,7 @@ mod tests {
         assert!(kernel.post_invocation_hook_count() >= 1);
     }
     #[test]
-    fn inbound_authority_production_kernel_accepts_subject_proof_preview() {
+    fn inbound_authority_production_kernel_refuses_unconfigured_dpop_preview() {
         let keypair = Keypair::generate();
         let loaded_policy = policy::LoadedPolicy {
             format: policy::PolicyFormat::ChioYaml,
@@ -945,7 +946,12 @@ mod tests {
         let proof = chio_kernel::DpopProof::sign(
             chio_kernel::DpopProofBody {
                 schema: chio_kernel::DPOP_SCHEMA.into(),
-                replay_authority: None,
+                replay_authority: serde_json::from_str::<serde_json::Value>(include_str!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../../tests/bindings/fixtures/dpop-authority-v1.json"
+                )))
+                .and_then(|vector| serde_json::from_value(vector["authority"].clone()))
+                .unwrap(),
                 capability_id: capability.id.clone(),
                 tool_server: "proof-srv".into(),
                 tool_name: "read".into(),
@@ -961,14 +967,17 @@ mod tests {
             &agent,
         )
         .unwrap();
-        kernel
-            .verify_dpop_for_permission_preview(
+        assert!(matches!(
+            kernel.verify_dpop_for_permission_preview(
                 &proof,
                 &capability,
                 "proof-srv",
                 "read",
                 &serde_json::json!({}),
-            )
-            .unwrap();
+            ),
+            Err(chio_kernel::KernelError::Dpop(
+                chio_kernel::dpop::DpopError::MissingAuthority
+            ))
+        ));
     }
 }

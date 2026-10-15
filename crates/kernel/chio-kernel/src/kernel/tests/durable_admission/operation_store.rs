@@ -464,10 +464,10 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
 
     fn load_dpop_replay_activation(
         &self,
-        binding: &crate::dpop::authority::DpopReplayAuthorityV1,
+        binding: &crate::dpop::authority::DpopReplayAuthority,
         fence: &StoreMutationFence,
         _: u64,
-    ) -> Result<crate::dpop::authority::DpopReplayAuthorityV1, AdmissionOperationStoreError> {
+    ) -> Result<crate::dpop::authority::DpopReplayAuthority, AdmissionOperationStoreError> {
         self.require_fence(fence)?;
         self.dpop_recovery.activation(binding)
     }

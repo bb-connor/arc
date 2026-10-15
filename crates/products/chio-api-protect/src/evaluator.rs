@@ -185,6 +185,7 @@ impl RequestEvaluator {
             receipt_store,
             revocation_store,
             None,
+            None,
             allow_ephemeral,
             Arc::new(chio_security_types::clock::SystemClock),
         )
@@ -200,6 +201,7 @@ impl RequestEvaluator {
         receipt_store: Option<Arc<dyn ReceiptStore>>,
         revocation_store: Option<Arc<dyn RevocationStore>>,
         durable_admission: Option<DurableAdmissionStores>,
+        dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
         allow_ephemeral: bool,
         clock: Arc<dyn chio_security_types::clock::Clock>,
     ) -> Result<Self, HttpAuthorityError> {
@@ -244,6 +246,9 @@ impl RequestEvaluator {
             builder = builder
                 .durable_admission_stores(durable.store, durable.outcome_store, durable.fence)
                 .stop_control(durable.stop);
+        }
+        if let Some(authority) = dpop_replay_authority {
+            builder = builder.dpop_replay_authority(authority);
         }
         let authority = builder.build(keypair, policy_hash)?;
 
@@ -626,6 +631,7 @@ mod tests {
             Some(receipt_store),
             Some(revocation_store),
             Some(DurableAdmissionStores::serving(&authority)),
+            None,
             false,
             Arc::new(chio_security_types::clock::SystemClock),
         )?
@@ -704,6 +710,7 @@ mod tests {
             Some(receipt_store),
             Some(revocation_store),
             Some(durable),
+            None,
             false,
             Arc::new(clock),
         )?

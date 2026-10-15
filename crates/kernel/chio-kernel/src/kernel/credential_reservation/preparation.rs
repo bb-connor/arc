@@ -19,7 +19,6 @@ pub(super) struct CredentialPreparationInput<'request> {
 pub(crate) struct PreparedDispatchCredentials<'kernel, 'request> {
     pub(super) kernel: &'kernel ChioKernel,
     pub(super) input: CredentialPreparationInput<'request>,
-    pub(super) dpop_proof: Option<&'request crate::dpop::DpopProof>,
     pub(super) dpop_credential: Option<DpopReplayCredentialV1>,
     pub(super) execution_nonce: Option<crate::execution_nonce::ValidatedExecutionNonce<'request>>,
     pub(super) durable_nonce_presented: bool,
@@ -192,33 +191,22 @@ impl ChioKernel {
             execution_nonce_credential,
             require_governed_approval,
         } = input;
-        let mut dpop_credential = None;
-        let dpop_proof = if dpop_required {
+        let dpop_credential = if dpop_required {
+            self.operation_owned_dpop_authority()
+                .ok_or(crate::dpop::DpopError::MissingAuthority)?;
             let proof = request
                 .dpop_proof
                 .as_ref()
-                .ok_or(KernelError::Dpop(crate::dpop::DpopError::MissingProof))?;
-            if self.dpop_authority.is_some() {
-                dpop_credential = Some(DpopReplayCredentialV1::from_verified(
-                    self.verify_operation_owned_dpop(
-                        proof,
-                        cap,
-                        &request.server_id,
-                        &request.tool_name,
-                        &request.arguments,
-                    )?,
-                ));
-                None
-            } else {
-                self.verify_dpop_for_permission_preview(
+                .ok_or(crate::dpop::DpopError::MissingProof)?;
+            Some(DpopReplayCredentialV1::from_verified(
+                self.verify_operation_owned_dpop(
                     proof,
                     cap,
                     &request.server_id,
                     &request.tool_name,
                     &request.arguments,
-                )?;
-                Some(proof)
-            }
+                )?,
+            ))
         } else {
             None
         };
@@ -252,7 +240,6 @@ impl ChioKernel {
         Ok(PreparedDispatchCredentials {
             kernel: self,
             input,
-            dpop_proof,
             dpop_credential,
             execution_nonce,
             durable_nonce_presented,

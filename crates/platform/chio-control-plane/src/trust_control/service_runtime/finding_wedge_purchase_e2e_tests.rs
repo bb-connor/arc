@@ -78,12 +78,11 @@ use chio_kernel::finding_purchase::{
 };
 use chio_kernel::finding_recovery::FINDING_RECOVERY_CONTEXT_ARGUMENT;
 use chio_kernel::{
-    ChioKernel, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, KernelConfig, KernelError,
-    NestedFlowBridge, PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState,
-    PaymentAuthorizeRequest, PaymentError, PaymentRailMode, PaymentResult, RailSettlementStatus,
-    ToolCallOutput, ToolCallRequest, ToolCallResponse, ToolServerConnection, Verdict,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES, DPOP_SCHEMA,
+    ChioKernel, KernelConfig, KernelError, NestedFlowBridge, PaymentAdapter, PaymentAuthorization,
+    PaymentAuthorizationState, PaymentAuthorizeRequest, PaymentError, PaymentRailMode,
+    PaymentResult, RailSettlementStatus, ToolCallOutput, ToolCallRequest, ToolCallResponse,
+    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, ReservationReceipt, SignedAcceptedBid,
@@ -127,6 +126,10 @@ use chio_store_sqlite::{
     FindingPurchaseReservationState, FindingPurchaseSlotState, SqliteFindingStatusStore,
 };
 use futures_util::stream;
+
+#[path = "finding_wedge_purchase_e2e_tests/dpop_fixture.rs"]
+mod dpop_fixture;
+use dpop_fixture::{dpop_proof, dpop_proof_at, fixture_dpop_authority};
 
 #[path = "finding_wedge_purchase_e2e_tests/admission_evidence.rs"]
 mod admission_evidence;
@@ -2032,16 +2035,8 @@ fn build_reveal_kernel(inputs: &RevealKernelInputs<'_>) -> Result<ChioKernel, An
         inner: FindingRevealServer::new(SERVER_ID.to_string(), inputs.web.sealed_payloads()),
         invocations: inputs.invocations.clone(),
     }));
-    let dpop_config = DpopConfig::default();
-    kernel
-        .set_dpop_store(
-            DpopNonceStore::new(
-                dpop_config.nonce_store_capacity,
-                std::time::Duration::from_secs(dpop_config.proof_ttl_secs),
-            )?,
-            dpop_config,
-        )
-        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
+    let dpop_authority = fixture_dpop_authority(inputs.authority)?;
+    kernel.set_operation_owned_dpop_authority(dpop_authority)?;
     if inputs.install_verifier {
         kernel.set_finding_purchase_verifier(Arc::new(MarketFindingPurchaseVerifier::new(
             purchase_authorities(inputs.web),
@@ -2292,47 +2287,6 @@ fn purchase_context_b64(inputs: &CarrierInputs<'_>) -> Result<String, AnyError> 
     Ok(STANDARD.encode(canonical_json_bytes(&context)?))
 }
 
-fn dpop_proof(
-    capability: &CapabilityToken,
-    buyer: &Keypair,
-    tool_name: &str,
-    arguments: &serde_json::Value,
-    nonce: &str,
-) -> Result<DpopProof, AnyError> {
-    dpop_proof_at(
-        capability,
-        buyer,
-        tool_name,
-        arguments,
-        nonce,
-        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
-    )
-}
-
-fn dpop_proof_at(
-    capability: &CapabilityToken,
-    buyer: &Keypair,
-    tool_name: &str,
-    arguments: &serde_json::Value,
-    nonce: &str,
-    issued_at: u64,
-) -> Result<DpopProof, AnyError> {
-    Ok(DpopProof::sign(
-        DpopProofBody {
-            replay_authority: None,
-            schema: DPOP_SCHEMA.to_string(),
-            capability_id: capability.id.clone(),
-            tool_server: SERVER_ID.to_string(),
-            tool_name: tool_name.to_string(),
-            action_hash: sha256_hex(&canonical_json_bytes(arguments)?),
-            nonce: nonce.to_string(),
-            issued_at,
-            agent_key: buyer.public_key(),
-        },
-        buyer,
-    )?)
-}
-
 fn governed_reveal_intent(
     request_id: &str,
     context_b64: &str,
@@ -2361,6 +2315,7 @@ fn governed_reveal_intent(
 }
 
 struct RevealRequestInputs<'a> {
+    authority: &'a SqliteAuthorityStore,
     request_id: &'a str,
     capability: &'a CapabilityToken,
     buyer: &'a Keypair,
@@ -2383,6 +2338,7 @@ fn reveal_request_at(
 ) -> Result<ToolCallRequest, AnyError> {
     let arguments = serde_json::json!({ "finding_id": inputs.finding_id });
     let proof = dpop_proof_at(
+        inputs.authority,
         inputs.capability,
         inputs.buyer,
         READ_FINDING_TOOL,
@@ -2634,6 +2590,7 @@ impl Lane {
             unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?;
         let request = reveal_request(&RevealRequestInputs {
+            authority: &self.authority,
             request_id,
             capability: &self.purchase.capability,
             buyer: &self.buyer,
@@ -2651,6 +2608,7 @@ impl Lane {
         nonce: &str,
     ) -> Result<ToolCallResponse, AnyError> {
         let request = reveal_request(&RevealRequestInputs {
+            authority: &self.authority,
             request_id,
             capability: &self.purchase.capability,
             buyer: &self.buyer,
@@ -2670,6 +2628,7 @@ impl Lane {
         nonce: &str,
     ) -> Result<ToolCallResponse, AnyError> {
         let request = reveal_request(&RevealRequestInputs {
+            authority: &self.authority,
             request_id,
             capability: &purchase.capability,
             buyer: &self.buyer,
@@ -3098,6 +3057,7 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
             unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
         )?;
         let request = reveal_request(&RevealRequestInputs {
+            authority: &authority,
             request_id: "wedge-reveal-1",
             capability: &purchase.capability,
             buyer: &buyer,
@@ -3191,6 +3151,7 @@ pub(super) async fn run_cognition_market_wedge_purchase_e2e() -> TestResult {
         install_status_verifier: true,
     })?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &authority,
         request_id: "wedge-reveal-1",
         capability: &purchase.capability,
         buyer: &buyer,
@@ -3573,6 +3534,7 @@ async fn wedge_purchase_digest_mismatch_denies_and_releases() -> TestResult {
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &authority,
         request_id: "wedge-digest-mismatch-1",
         capability: &purchase.capability,
         buyer: &buyer,
@@ -3752,6 +3714,7 @@ async fn wedge_purchase_media_type_mismatch_denies() -> TestResult {
 async fn wedge_purchase_without_governed_context_denies_before_dispatch() -> TestResult {
     let lane = open_lane(LaneOptions::standard()).await?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "wedge-no-context-1",
         capability: &lane.purchase.capability,
         buyer: &lane.buyer,
@@ -3772,6 +3735,7 @@ async fn wedge_purchase_without_governed_context_denies_before_dispatch() -> Tes
 async fn wedge_purchase_wrong_finding_argument_is_out_of_scope() -> TestResult {
     let lane = open_lane(LaneOptions::standard()).await?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "wedge-wrong-argument-1",
         capability: &lane.purchase.capability,
         buyer: &lane.buyer,
@@ -3817,6 +3781,7 @@ async fn wedge_purchase_without_a_verifier_denies() -> TestResult {
 }
 
 fn finding_recovery_request(
+    authority: &SqliteAuthorityStore,
     request_id: &str,
     capability: &CapabilityToken,
     buyer: &Keypair,
@@ -3829,7 +3794,14 @@ fn finding_recovery_request(
         "finding_id": finding_id,
         FINDING_RECOVERY_CONTEXT_ARGUMENT: context_b64,
     });
-    let proof = dpop_proof(capability, buyer, READ_FINDING_TOOL, &arguments, nonce)?;
+    let proof = dpop_proof(
+        authority,
+        capability,
+        buyer,
+        READ_FINDING_TOOL,
+        &arguments,
+        nonce,
+    )?;
     Ok(ToolCallRequest {
         request_id: request_id.to_owned(),
         capability: capability.clone(),
@@ -3896,6 +3868,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     let denied =
         lane.kernel
             .evaluate_tool_call_blocking(&reveal_request(&RevealRequestInputs {
+                authority: &lane.authority,
                 request_id: "wedge-recovery-denied-1",
                 capability: &lane.purchase.capability,
                 buyer: &lane.buyer,
@@ -4028,6 +4001,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
         "recovery_of_capability_id": lane.purchase.capability.id,
     });
     let mut legacy_request = finding_recovery_request(
+        &lane.authority,
         "wedge-legacy-recovery-1",
         &legacy,
         &lane.buyer,
@@ -4037,6 +4011,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
         "nonce-unused-legacy",
     )?;
     legacy_request.dpop_proof = Some(dpop_proof(
+        &lane.authority,
         &legacy,
         &lane.buyer,
         READ_FINDING_TOOL,
@@ -4062,6 +4037,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     assert_eq!(
         lane.kernel
             .evaluate_tool_call_blocking(&finding_recovery_request(
+                &lane.authority,
                 "wedge-self-minted-recovery-1",
                 &self_minted,
                 &lane.buyer,
@@ -4075,6 +4051,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     );
 
     let missing_status = finding_recovery_request(
+        &lane.authority,
         "wedge-recovery-missing-status-1",
         &recovery,
         &lane.buyer,
@@ -4087,6 +4064,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     assert_denied_with(&denied, "portable status proof");
 
     let request = finding_recovery_request(
+        &lane.authority,
         "wedge-recovery-1",
         &recovery,
         &lane.buyer,
@@ -4150,6 +4128,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
         "recovery_of_capability_id": lane.purchase.capability.id,
     });
     let mut legacy_remint_request = finding_recovery_request(
+        &lane.authority,
         "wedge-legacy-recovery-2",
         &legacy_remint,
         &lane.buyer,
@@ -4159,6 +4138,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
         "nonce-unused-legacy-remint",
     )?;
     legacy_remint_request.dpop_proof = Some(dpop_proof(
+        &lane.authority,
         &legacy_remint,
         &lane.buyer,
         READ_FINDING_TOOL,
@@ -4203,6 +4183,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     ));
     let late_status_denial =
         late_status_kernel.evaluate_tool_call_blocking(&finding_recovery_request(
+            &lane.authority,
             "wedge-recovery-late-status-denial",
             &remint,
             &lane.buyer,
@@ -4220,6 +4201,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     assert!(late_status_denial.output.is_none());
 
     let second = restarted.evaluate_tool_call_blocking(&finding_recovery_request(
+        &lane.authority,
         "wedge-recovery-2",
         &remint,
         &lane.buyer,
@@ -4256,6 +4238,7 @@ async fn wedge_purchase_recovery_grant_redelivers_without_charging() -> TestResu
     let retracted = publisher.publish_retraction(&intent_id, &[], retraction_now)?;
     let retracted_status_proof_b64 = STANDARD.encode(&retracted.proof_bytes);
     let retracted_recovery = restarted.evaluate_tool_call_blocking(&finding_recovery_request(
+        &lane.authority,
         "wedge-recovery-3",
         &remint,
         &lane.buyer,
@@ -5355,6 +5338,7 @@ async fn wedge_purchase_rejects_a_resigned_bid_envelope() -> TestResult {
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "wedge-resigned-bid-1",
         capability: &lane.purchase.capability,
         buyer: &lane.buyer,
@@ -5566,6 +5550,7 @@ async fn wedge_purchase_superseded_admission_stops_transacting() -> TestResult {
     })?;
     let status_proof_b64 = live_status_proof_b64_at(&lane.authority, &web.finding_id, now)?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "wedge-superseded-substitution-1",
         capability: &exchange.ask.body.token_offer,
         buyer: &second_buyer,

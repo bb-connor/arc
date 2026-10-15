@@ -31,6 +31,10 @@ pub use payload_maintenance::{
 #[path = "durable_admission/payload_maintenance_tests.rs"]
 pub(crate) mod payload_maintenance_tests;
 
+#[cfg(test)]
+#[path = "durable_admission/dpop_authority_tests.rs"]
+mod dpop_authority_tests;
+
 #[derive(Clone)]
 pub struct DurableAdmissionRuntime {
     // Drop this shared owner before releasing any authority ports. Its worker
@@ -283,7 +287,11 @@ impl DurableAdmissionRuntime {
             .map(|store| (store, self.fence.clone()))
     }
 
-    pub fn attach(&self, kernel: &mut ChioKernel) -> Result<(), CliError> {
+    pub fn attach(
+        &self,
+        kernel: &mut ChioKernel,
+        dpop_authority: Option<&chio_kernel::dpop::authority::DpopReplayAuthority>,
+    ) -> Result<(), CliError> {
         if kernel.public_key() != self.kernel_keypair.public_key() {
             return Err(CliError::cli_other_error(
                 "kernel signing key does not match the durable admission authority".to_string(),
@@ -297,6 +305,9 @@ impl DurableAdmissionRuntime {
         )?;
         kernel.set_budget_store_handle(self.budget.clone());
         kernel.set_revocation_store_handle(self.revocations.clone());
+        if let Some(authority) = dpop_authority {
+            kernel.set_operation_owned_dpop_authority(authority.clone())?;
+        }
         kernel.reconcile_durable_admission_startup()?;
         Ok(())
     }

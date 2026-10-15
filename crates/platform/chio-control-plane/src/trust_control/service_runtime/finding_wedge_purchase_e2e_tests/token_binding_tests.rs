@@ -19,6 +19,7 @@ async fn wedge_purchase_alternate_token_denies() -> TestResult {
         lane.purchase.capability.id
     );
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "wedge-alternate-token-1",
         capability: &alternate.ask.body.token_offer,
         buyer: &lane.buyer,

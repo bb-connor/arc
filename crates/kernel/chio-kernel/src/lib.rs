@@ -481,7 +481,7 @@ pub use cost_attribution::{
 pub use custody::PasskeyCapabilityVerifier;
 #[cfg(not(loom))]
 pub use dpop::{
-    is_supported_dpop_schema, verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof,
+    is_supported_dpop_schema, verify_dpop_proof_stateless, DpopConfig, DpopNonceStore, DpopProof,
     DpopProofBody, DPOP_SCHEMA,
 };
 #[cfg(not(loom))]

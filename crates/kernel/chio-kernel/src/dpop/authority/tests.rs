@@ -6,8 +6,8 @@ use std::time::Duration;
 
 const NOW: u64 = 1_800_000_000;
 
-fn authority() -> DpopReplayAuthorityV1 {
-    DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+fn authority() -> DpopReplayAuthority {
+    DpopReplayAuthority::new(DpopReplayAuthorityInput {
         destination_store_uuid: AdmissionIdentifier::try_new(
             "destination",
             "018f9878-7047-7abc-8c98-120dc65700ea",
@@ -40,8 +40,8 @@ fn fixture() -> (Keypair, CapabilityToken, DpopProof) {
     .unwrap();
     let proof = DpopProof::sign(
         DpopProofBody {
-            schema: DPOP_AUTHORITY_SCHEMA.into(),
-            replay_authority: Some(authority()),
+            schema: DPOP_SCHEMA.into(),
+            replay_authority: authority(),
             capability_id: cap.id.clone(),
             tool_server: "server".into(),
             tool_name: "tool".into(),
@@ -59,10 +59,10 @@ fn fixture() -> (Keypair, CapabilityToken, DpopProof) {
 fn verify(
     proof: &DpopProof,
     cap: &CapabilityToken,
-    expected: &DpopReplayAuthorityV1,
+    expected: &DpopReplayAuthority,
     now: u64,
 ) -> Result<VerifiedDpopReplayProof, KernelError> {
-    verify_authority_dpop_proof_stateless(
+    verify_dpop_proof_stateless(
         proof,
         cap,
         "server",
@@ -71,6 +71,40 @@ fn verify(
         expected,
         now,
     )
+}
+
+#[test]
+fn single_profile_accepts_authority_bound_v1() {
+    let (key, cap, proof) = fixture();
+    let mut body = proof.body;
+    body.schema = "chio.dpop_proof.v1".to_owned();
+    let proof = DpopProof::sign(body, &key).unwrap();
+    assert!(verify(&proof, &cap, &authority(), NOW).is_ok());
+}
+
+#[test]
+fn single_profile_refuses_retired_v2_id() {
+    let (key, cap, proof) = fixture();
+    let mut body = proof.body;
+    body.schema = "chio.dpop_proof.v2".to_owned();
+    let proof = DpopProof::sign(body, &key).unwrap();
+    assert!(matches!(
+        verify(&proof, &cap, &authority(), NOW),
+        Err(KernelError::Dpop(crate::dpop::DpopError::Schema))
+    ));
+}
+
+#[test]
+fn single_profile_refuses_authority_free_shape() {
+    let (_, _, proof) = fixture();
+    let mut value = serde_json::to_value(proof).unwrap();
+    value["body"]["schema"] = serde_json::json!("chio.dpop_proof.v1");
+    value["body"]
+        .as_object_mut()
+        .unwrap()
+        .remove("replay_authority");
+    let error = serde_json::from_value::<DpopProof>(value).unwrap_err();
+    assert_eq!(error.to_string(), "missing field `replay_authority`");
 }
 
 fn weak_key_forgery() -> (CapabilityToken, DpopProof) {
@@ -105,29 +139,6 @@ fn durable_dpop_rejects_weak_key_forgery() {
 }
 
 #[test]
-fn legacy_dpop_rejects_weak_key_forgery_without_consuming_nonce() {
-    let (cap, mut proof) = weak_key_forgery();
-    proof.body.schema = DPOP_SCHEMA.into();
-    proof.body.replay_authority = None;
-    let clock = std::sync::Arc::new(crate::replay_retention::tests::TestClock::new(NOW));
-    let store = crate::dpop::clock_tests::store(clock, 8);
-    assert!(matches!(
-        crate::dpop::verify_dpop_proof(
-            &proof,
-            &cap,
-            "server",
-            "tool",
-            &sha256_hex(b"{}"),
-            &store,
-            &DpopConfig::default()
-        ),
-        Err(KernelError::Dpop(crate::dpop::DpopError::Signature))
-    ));
-    assert_eq!(store.utilization().unwrap().0, 0);
-    assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
-}
-
-#[test]
 fn exact_authority_signature_yields_only_non_consuming_bounded_evidence() {
     let (_, cap, proof) = fixture();
     let verified = verify(&proof, &cap, &authority(), NOW).unwrap();
@@ -145,72 +156,6 @@ fn exact_authority_signature_yields_only_non_consuming_bounded_evidence() {
     assert!(!debug.contains("private-capability"));
     // Stateless verification can repeat. Neither result is replay custody.
     assert!(verify(&proof, &cap, &authority(), NOW).is_ok());
-}
-
-#[test]
-fn legacy_consuming_and_preview_ports_refuse_v2_without_burning_a_nonce() {
-    let (_, cap, proof) = fixture();
-    let store = DpopNonceStore::new(8, Duration::from_secs(300))
-        .expect("positive replay store test capacities");
-    assert!(matches!(
-        crate::dpop::verify_dpop_proof_stateless(
-            &proof,
-            &cap,
-            "server",
-            "tool",
-            &sha256_hex(b"{}"),
-            &DpopConfig::default(),
-            chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
-                .unwrap_or_else(|error| panic!("fixture clock: {error}"))
-        ),
-        Err(KernelError::Dpop(crate::dpop::DpopError::Schema))
-    ));
-    assert!(crate::dpop::verify_dpop_proof(
-        &proof,
-        &cap,
-        "server",
-        "tool",
-        &sha256_hex(b"{}"),
-        &store,
-        &DpopConfig::default()
-    )
-    .is_err());
-    assert_eq!(store.utilization().unwrap().0, 0);
-    assert_eq!(store.identity_byte_utilization().unwrap().0, 0);
-}
-
-#[test]
-fn old_proofs_and_schema_downgrades_never_enter_the_durable_domain() {
-    let (key, cap, proof) = fixture();
-    for retain_authority in [false, true] {
-        let mut body = proof.body.clone();
-        body.schema = DPOP_SCHEMA.into();
-        if !retain_authority {
-            body.replay_authority = None;
-        }
-        let legacy = DpopProof::sign(body, &key).unwrap();
-        assert!(verify(&legacy, &cap, &authority(), NOW).is_err());
-        if retain_authority {
-            assert!(matches!(
-                crate::dpop::verify_dpop_proof_stateless(
-                    &legacy,
-                    &cap,
-                    "server",
-                    "tool",
-                    &sha256_hex(b"{}"),
-                    &DpopConfig::default(),
-                    chio_security_types::clock::Clock::read(
-                        &chio_security_types::clock::SystemClock
-                    )
-                    .unwrap_or_else(|error| panic!("fixture clock: {error}"))
-                ),
-                Err(KernelError::Dpop(crate::dpop::DpopError::Schema))
-            ));
-        }
-    }
-    let mut downgraded = proof.clone();
-    downgraded.body.replay_authority = None;
-    assert!(verify(&downgraded, &cap, &authority(), NOW).is_err());
 }
 
 #[test]
@@ -238,9 +183,12 @@ fn every_destination_generation_and_policy_field_is_pinned_and_signed() {
             4 => changed.max_clock_skew_secs += 1,
             _ => unreachable!(),
         }
-        assert!(verify(&proof, &cap, &changed, NOW).is_err());
+        assert!(matches!(
+            verify(&proof, &cap, &changed, NOW),
+            Err(KernelError::Dpop(crate::dpop::DpopError::AuthorityMismatch))
+        ));
         let mut tampered = proof.clone();
-        tampered.body.replay_authority = Some(changed.clone());
+        tampered.body.replay_authority = changed.clone();
         assert!(
             verify(&tampered, &cap, &changed, NOW).is_err(),
             "unsigned change {field}"
@@ -272,10 +220,10 @@ fn durable_freshness_preserves_inclusive_horizon_and_future_skew() {
     }
     for issued in [u64::MAX, MAX_UNIX_SECS - 299] {
         proof.body.issued_at = issued;
-        let error = verify(&proof, &cap, &authority(), MAX_UNIX_SECS)
-            .unwrap_err()
-            .to_string();
-        assert!(error.contains("validity exceeds"), "{error}");
+        assert!(matches!(
+            verify(&proof, &cap, &authority(), MAX_UNIX_SECS),
+            Err(KernelError::Dpop(crate::dpop::DpopError::WindowOverflow))
+        ));
     }
     proof.body.issued_at = NOW;
     let error = verify(&proof, &cap, &authority(), MAX_UNIX_SECS + 1)
@@ -308,56 +256,101 @@ fn common_sender_and_invocation_checks_remain_mandatory() {
 }
 
 #[test]
-fn legacy_canonical_preimage_is_unchanged_when_authority_is_absent() {
-    let (key, _, proof) = fixture();
-    let mut body = proof.body;
-    body.schema = DPOP_SCHEMA.into();
-    body.replay_authority = None;
-    let signed = DpopProof::sign(body, &key).unwrap();
-    let value = serde_json::to_value(&signed.body).unwrap();
-    assert_eq!(value.as_object().unwrap().len(), 8);
-    assert!(value.get("replay_authority").is_none());
-    let bytes = canonical_json_bytes(&signed.body).unwrap();
-    assert!(key.public_key().verify(&bytes, &signed.signature));
-    let decoded: DpopProofBody = serde_json::from_value(value).unwrap();
-    assert!(decoded.replay_authority.is_none());
-    assert_eq!(canonical_json_bytes(&decoded).unwrap(), bytes);
+fn signed_preimage_requires_the_exact_authority_object() {
+    let (_, _, proof) = fixture();
+    let value = serde_json::to_value(&proof.body).unwrap();
+    assert_eq!(value.as_object().unwrap().len(), 9);
+    assert_eq!(
+        value["replay_authority"],
+        serde_json::to_value(authority()).unwrap()
+    );
+    let decoded: DpopProofBody = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(
+        canonical_json_bytes(&decoded).unwrap(),
+        canonical_json_bytes(&proof.body).unwrap()
+    );
+    for (invalid, expected) in [
+        (
+            serde_json::Value::Null,
+            "invalid type: null, expected struct DpopReplayAuthorityInput",
+        ),
+        (
+            serde_json::json!({}),
+            "missing field `destination_store_uuid`",
+        ),
+        (
+            serde_json::json!(false),
+            "invalid type: boolean `false`, expected struct DpopReplayAuthorityInput",
+        ),
+    ] {
+        let mut changed = value.clone();
+        changed["replay_authority"] = invalid;
+        assert_eq!(
+            serde_json::from_value::<DpopProofBody>(changed)
+                .unwrap_err()
+                .to_string(),
+            expected
+        );
+    }
 }
 
 #[test]
 fn authority_decode_rejects_noncanonical_identity_unknown_fields_and_unbounded_policy() {
     let original = serde_json::to_value(authority()).unwrap();
-    for (field, value) in [
+    for (field, value, expected) in [
         (
             "destination_store_uuid",
             serde_json::json!("018F9878-7047-7ABC-8C98-120DC65700EA"),
+            "DPoP proof verification failed: durable DPoP profile: destination store UUID is not canonical",
         ),
         (
             "destination_store_uuid",
             serde_json::json!(uuid::Uuid::nil().to_string()),
+            "DPoP proof verification failed: durable DPoP profile: destination store UUID is not canonical",
         ),
-        ("expectation_id", serde_json::json!("not-a-digest")),
-        ("dpop_authority_id", serde_json::json!(" padded")),
-        ("proof_ttl_secs", serde_json::json!(0)),
+        (
+            "expectation_id",
+            serde_json::json!("not-a-digest"),
+            "persisted_admission_digest must be lowercase SHA-256 hex",
+        ),
+        (
+            "dpop_authority_id",
+            serde_json::json!(" padded"),
+            "persisted_admission_text must not have leading or trailing whitespace",
+        ),
+        (
+            "proof_ttl_secs",
+            serde_json::json!(0),
+            "DPoP proof verification failed: durable DPoP profile: durable freshness policy exceeds its bounds",
+        ),
         (
             "proof_ttl_secs",
             serde_json::json!(MAX_DURABLE_DPOP_TTL_SECS + 1),
+            "DPoP proof verification failed: durable DPoP profile: durable freshness policy exceeds its bounds",
         ),
         (
             "max_clock_skew_secs",
             serde_json::json!(MAX_DURABLE_DPOP_CLOCK_SKEW_SECS + 1),
+            "DPoP proof verification failed: durable DPoP profile: durable freshness policy exceeds its bounds",
         ),
-        ("active", serde_json::json!(true)),
+        (
+            "active",
+            serde_json::json!(true),
+            "unknown field `active`, expected one of `destination_store_uuid`, `dpop_authority_id`, `expectation_id`, `proof_ttl_secs`, `max_clock_skew_secs`",
+        ),
     ] {
         let mut changed = original.clone();
         changed[field] = value;
-        assert!(
-            serde_json::from_value::<DpopReplayAuthorityV1>(changed).is_err(),
+        assert_eq!(
+            serde_json::from_value::<DpopReplayAuthority>(changed)
+                .unwrap_err()
+                .to_string(),
+            expected,
             "{field}"
         );
     }
     assert_eq!(
-        serde_json::from_value::<DpopReplayAuthorityV1>(original).unwrap(),
+        serde_json::from_value::<DpopReplayAuthority>(original).unwrap(),
         authority()
     );
 }
@@ -400,7 +393,7 @@ fn invalid_system_clock_is_not_reinterpreted_as_epoch_zero() {
 fn typescript_wire_vector_matches_rust_canonical_bytes_and_signature_verification() {
     let vector: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../../tests/bindings/fixtures/dpop-authority-v2.json"
+        "/../../../tests/bindings/fixtures/dpop-authority-v1.json"
     )))
     .unwrap();
     let proof: DpopProof = serde_json::from_value(vector["proof"].clone()).unwrap();

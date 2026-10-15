@@ -18,12 +18,7 @@ fn prune_checks_the_entire_release_before_deleting_any_marker() -> TestResult {
     let clock = Arc::new(TestClock::new(100));
     let store = clock_tests::store(clock.clone(), 8);
     for nonce in ["a", "b"] {
-        assert!(store.check_and_insert_entry(
-            nonce,
-            "cap",
-            ReplayHorizon::Local(Duration::from_secs(10)),
-            None,
-        )?);
+        assert!(store.check_and_insert_until(nonce, "cap", 110)?);
     }
     let charged = store.identity_byte_utilization()?.0;
     // Corrupt the second release's accounting to prove the first stays intact.
@@ -34,12 +29,7 @@ fn prune_checks_the_entire_release_before_deleting_any_marker() -> TestResult {
         .capability_counts
         .insert("cap".into(), 1);
     clock.set(111, 11);
-    assert_accounting_error(store.check_and_insert_entry(
-        "new",
-        "cap",
-        ReplayHorizon::Local(Duration::from_secs(10)),
-        None,
-    ));
+    assert_accounting_error(store.check_and_insert_until("new", "cap", 120));
     assert_eq!(store.utilization()?.0, 2);
     assert_eq!(store.identity_byte_utilization()?.0, charged);
     {
@@ -58,60 +48,49 @@ fn prune_checks_the_entire_release_before_deleting_any_marker() -> TestResult {
 }
 
 #[test]
-fn owned_rollback_preserves_marker_on_byte_underflow_and_latches_refusal() -> TestResult {
-    let store = DpopNonceStore::new(8, Duration::from_secs(60))
-        .expect("positive replay store test capacities");
-    assert!(store.reserve_for_dispatch_until("nonce", "cap", u64::MAX, "owner")?);
+fn prune_preserves_marker_on_byte_underflow_and_latches_refusal() -> TestResult {
+    let clock = Arc::new(TestClock::new(100));
+    let store = clock_tests::store(clock.clone(), 8);
+    assert!(store.check_and_insert_until("nonce", "cap", 110)?);
     store
         .inner
         .lock()
         .map_err(|_| "lock poisoned")?
         .identity_bytes = 0;
-    assert!(!store.rollback_dispatch_reservation("nonce", "cap", "other")?);
-    assert_accounting_error(store.rollback_dispatch_reservation("nonce", "cap", "owner"));
+    clock.set(110, 10);
+    assert_accounting_error(store.check_and_insert_until("new", "cap", 120));
     {
         let state = store.inner.lock().map_err(|_| "lock poisoned")?;
         assert_eq!(state.cache.len(), 1);
+        assert!(state.cache.peek(&("nonce".into(), "cap".into())).is_some());
         assert_eq!(state.capability_counts.get("cap"), Some(&1));
         assert_eq!(state.identity_bytes, 0);
     }
-    assert_accounting_error(store.rollback_dispatch_reservation("nonce", "cap", "owner"));
+    assert_accounting_error(store.check_and_insert_until("later", "cap", 120));
+    assert_accounting_error(store.preview_unsealed(&DpopReplaySourceBinding {
+        dpop_authority_id: AdmissionIdentifier::try_new("authority", "dpop")?,
+        destination_authority_id: AdmissionIdentifier::try_new("destination", "admission")?,
+    }));
     Ok(())
 }
 
 #[test]
-fn successful_prune_and_cancel_leave_exact_capacity_for_live_replay_markers() -> TestResult {
+fn successful_pruning_leaves_exact_capacity_for_live_replay_markers() -> TestResult {
     let clock = Arc::new(TestClock::new(100));
     let store = clock_tests::store(clock.clone(), 3);
     for nonce in ["a", "b"] {
-        assert!(store.check_and_insert_entry(
-            nonce,
-            "expired",
-            ReplayHorizon::Local(Duration::from_secs(10)),
-            None,
-        )?);
+        assert!(store.check_and_insert_until(nonce, "expired", 110)?);
     }
-    assert!(store.check_and_insert_entry(
-        "live",
-        "live-cap",
-        ReplayHorizon::Local(Duration::from_secs(100)),
-        Some("owner"),
-    )?);
+    assert!(store.check_and_insert_until("live", "live-cap", 200)?);
     clock.set(111, 11);
-    assert!(store.check_and_insert_entry(
-        "fresh",
-        "fresh-cap",
-        ReplayHorizon::Local(Duration::from_secs(100)),
-        None,
-    )?);
-    assert!(!store.check_and_insert_entry(
-        "live",
-        "live-cap",
-        ReplayHorizon::Local(Duration::from_secs(100)),
-        None,
-    )?);
-    assert!(!store.rollback_dispatch_reservation("live", "live-cap", "wrong-owner")?);
-    assert!(store.rollback_dispatch_reservation("live", "live-cap", "owner")?);
+    assert!(store.check_and_insert_until("fresh", "fresh-cap", 300)?);
+    assert!(!store.check_and_insert_until("live", "live-cap", 300)?);
+    assert_eq!(store.utilization()?.0, 2);
+    clock.set(200, 100);
+    assert!(matches!(
+        store.check_and_insert_until("elapsed", "trigger", 200),
+        Err(KernelError::Dpop(DpopError::Expired))
+    ));
     let state = store.inner.lock().map_err(|_| "lock poisoned")?;
     assert_eq!(state.cache.len(), 1);
     assert_eq!(
@@ -120,7 +99,7 @@ fn successful_prune_and_cancel_leave_exact_capacity_for_live_replay_markers() ->
     );
     assert_eq!(
         state.identity_bytes,
-        identity::retained_bytes("fresh", "fresh-cap", None)?
+        identity::retained_bytes("fresh", "fresh-cap")?
     );
     Ok(())
 }
@@ -141,10 +120,10 @@ fn proof_deadline_overflow_is_rejected_before_nonce_reservation() -> TestResult 
         },
         &key,
     )?;
-    let proof = DpopProof::sign(
+    let mut proof = DpopProof::sign(
         DpopProofBody {
             schema: DPOP_SCHEMA.into(),
-            replay_authority: None,
+            replay_authority: test_authority(),
             capability_id: cap.id.clone(),
             tool_server: "server".into(),
             tool_name: "tool".into(),
@@ -155,29 +134,19 @@ fn proof_deadline_overflow_is_rejected_before_nonce_reservation() -> TestResult 
         },
         &key,
     )?;
+    proof.body.issued_at = u64::MAX;
     let config = DpopConfig {
         proof_ttl_secs: u64::MAX,
         ..Default::default()
     };
     let store = DpopNonceStore::new(8, Duration::from_secs(60))
         .expect("positive replay store test capacities");
-    for result in [
-        verify_dpop_proof_stateless(
-            &proof,
-            &cap,
-            "server",
-            "tool",
-            "hash",
-            &config,
-            store.trusted_now()?,
-        ),
-        verify_dpop_proof(&proof, &cap, "server", "tool", "hash", &store, &config),
-    ] {
-        assert!(
-            matches!(result, Err(KernelError::Dpop(DpopError::WindowOverflow))),
-            "{result:?}"
-        );
-    }
+    let result =
+        verify_dpop_proof_stateless(&proof, &cap, "server", "tool", "hash", &test_authority(), 1);
+    assert!(matches!(
+        result,
+        Err(KernelError::Dpop(DpopError::WindowOverflow))
+    ));
     assert_eq!(store.utilization()?.0, 0);
     assert_eq!(store.identity_byte_utilization()?.0, 0);
     assert!(store.check_and_insert("nonce", "cap")?);

@@ -113,8 +113,20 @@ fn production_purchase_executor(
         BUYER_PAYOUT.to_owned(),
     )
     .map_err(std::io::Error::other)?;
+    let dpop_authority = {
+        crate::initialize_local_dpop_authority(
+            &authority,
+            &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "dpop_authority",
+                "operator-recovery-dpop",
+            )?,
+            &chio_kernel::DpopConfig::default(),
+            chio_test_support::clock::clock(),
+        )?
+    };
     FindingOperatorPurchaseExecutor::new(
         FindingOperatorPurchaseStorage {
+            dpop_authority,
             authority,
             operator_db_path,
             receipt_db_path: deployment.receipt_db.clone(),

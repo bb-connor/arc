@@ -5,6 +5,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -14,6 +15,15 @@
 #include "../src/transport_util.hpp"
 
 namespace {
+
+static_assert(!std::is_invocable_v<decltype(&chio::sign_dpop_proof),
+                                   const chio::DpopSignParams&>,
+              "DPoP signing requires an independently supplied replay authority");
+static_assert(!std::is_invocable_v<decltype(&chio::sign_dpop_proof),
+                                   const chio::DpopSignParams&, std::nullptr_t>,
+              "DPoP signing rejects null replay authority");
+static_assert(!std::is_default_constructible_v<chio::DpopProofBuilder>,
+              "DPoP builders require an independently supplied replay authority");
 
 class FakeTransport final : public chio::HttpTransport {
  public:
@@ -443,14 +453,16 @@ void test_dpop_proof() {
   params.nonce = "test-nonce";
   params.issued_at = 1700000000;
 
-  const auto proof = chio::sign_dpop_proof(params);
+  const chio::DpopReplayAuthority authority{
+      "018f9878-7047-7abc-8c98-120dc65700ea", "configured-dpop", std::string(64, 'a'), 300, 30};
+  const auto proof = chio::sign_dpop_proof(params, authority);
   require(proof.ok(), proof.error().message);
   require_contains(proof.value().body_json, "\"schema\":\"chio.dpop_proof.v1\"", "dpop body");
   require_contains(proof.value().body_json, "\"nonce\":\"test-nonce\"", "dpop body");
   require(!proof.value().signature_hex.empty(), "expected DPoP signature");
   require_contains(proof.value().to_json(), "\"signature\":", "dpop json");
 
-  const auto built = chio::DpopProofBuilder()
+  const auto built = chio::DpopProofBuilder(authority)
                          .capability_id("cap-123")
                          .tool_server("hosted-mcp")
                          .tool_name("read_file")
@@ -462,10 +474,20 @@ void test_dpop_proof() {
                          .build();
   require(built.ok(), built.error().message);
   require_contains(built.value().body_json, "\"nonce\":\"fixed-nonce\"", "dpop builder");
+  require_contains(built.value().body_json, "\"replay_authority\":{", "dpop builder authority");
+  require_contains(built.value().body_json, "\"dpop_authority_id\":\"configured-dpop\"", "dpop builder authority");
+  const auto invalid = chio::DpopProofBuilder(chio::DpopReplayAuthority{})
+                           .capability_id("cap-123")
+                           .tool_server("hosted-mcp")
+                           .tool_name("read_file")
+                           .action_args_json("{}")
+                           .key_provider(std::make_shared<chio::StaticSeedKeyProvider>(params.agent_seed_hex))
+                           .build();
+  require(!invalid.ok(), "DPoP builder rejects an empty replay authority");
 }
 
 void test_authority_dpop_proof() {
-  const auto vector = chio::detail::parse_json(read_file("tests/bindings/fixtures/dpop-authority-v2.json"));
+  const auto vector = chio::detail::parse_json(read_file("tests/bindings/fixtures/dpop-authority-v1.json"));
   require(vector && vector->is_object(), "expected durable DPoP vector");
   chio::DpopSignParams params;
   params.capability_id = "capability";
@@ -479,7 +501,7 @@ void test_authority_dpop_proof() {
   authority.destination_store_uuid = "018f9878-7047-7abc-8c98-120dc65700ea";
   authority.dpop_authority_id = "configured-dpop";
   authority.expectation_id = std::string(64, 'a');
-  const auto proof = chio::sign_authority_dpop_proof(params, authority);
+  const auto proof = chio::sign_dpop_proof(params, authority);
   require(proof.ok(), proof.error().message);
   require_eq(proof.value().body_json, vector->string_field("canonical_body"), "durable DPoP canonical body");
   const auto* expected = vector->get("proof");
@@ -490,24 +512,44 @@ void test_authority_dpop_proof() {
   const auto proof_digest = chio::invariants::sha256_hex_utf8(canonical_proof.value());
   require(proof_digest.ok(), proof_digest.error().message);
   require_eq(proof_digest.value(), vector->string_field("proof_sha256"), "cross-language durable DPoP digest");
-  const auto legacy = chio::sign_dpop_proof(params);
-  require(legacy.ok(), legacy.error().message);
-  require(legacy.value().body_json.find("replay_authority") == std::string::npos, "legacy preimage has no durable domain");
+  require(!chio::sign_dpop_proof(params, chio::DpopReplayAuthority{}).ok(), "empty replay authority must fail");
   for (const auto* name : {u8"\ufeffauthority", u8"authority\ufeff", u8"authority\u2000name"}) {
     auto exact = authority;
     exact.dpop_authority_id = name;
-    require(chio::sign_authority_dpop_proof(params, exact).ok(), "non-padding names must remain valid");
+    require(chio::sign_dpop_proof(params, exact).ok(), "non-padding names must remain valid");
   }
   for (const auto& name : {std::string(" padded"), std::string(u8"\u3000padded"), std::string("bad\x01name"), std::string(513, 'x')}) {
     auto invalid = authority;
     invalid.dpop_authority_id = name;
-    require(!chio::sign_authority_dpop_proof(params, invalid).ok(), "invalid authority name must fail");
+    require(!chio::sign_dpop_proof(params, invalid).ok(), "invalid authority name must fail");
+  }
+  for (const auto* uuid : {"00000000-0000-0000-0000-000000000000",
+                           "018F9878-7047-7ABC-8C98-120DC65700EA", "invalid"}) {
+    auto invalid = authority;
+    invalid.destination_store_uuid = uuid;
+    require(!chio::sign_dpop_proof(params, invalid).ok(), "invalid destination UUID must fail");
+  }
+  for (const auto& expectation : {std::string(), std::string(64, 'A'), std::string(63, 'a')}) {
+    auto invalid = authority;
+    invalid.expectation_id = expectation;
+    require(!chio::sign_dpop_proof(params, invalid).ok(), "invalid expectation digest must fail");
+  }
+  for (const auto ttl : {0ULL, 3601ULL}) {
+    auto invalid = authority;
+    invalid.proof_ttl_secs = ttl;
+    require(!chio::sign_dpop_proof(params, invalid).ok(), "invalid durable TTL must fail");
   }
   auto invalid = authority;
-  invalid.proof_ttl_secs = 3601;
-  require(!chio::sign_authority_dpop_proof(params, invalid).ok(), "unbounded durable TTL must fail");
+  invalid.max_clock_skew_secs = 301;
+  require(!chio::sign_dpop_proof(params, invalid).ok(), "unbounded clock skew must fail");
+  auto oversized = params;
+  oversized.nonce = std::string(4097, 'x');
+  require(!chio::sign_dpop_proof(oversized, authority).ok(), "oversized nonce must fail");
+  oversized = params;
+  oversized.capability_id = std::string(4097, 'x');
+  require(!chio::sign_dpop_proof(oversized, authority).ok(), "oversized capability ID must fail");
   params.issued_at = 9007199254740ULL;
-  require(!chio::sign_authority_dpop_proof(params, authority).ok(), "unbounded durable horizon must fail");
+  require(!chio::sign_dpop_proof(params, authority).ok(), "unbounded durable horizon must fail");
 }
 
 void test_client_session_with_fake_transport() {

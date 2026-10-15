@@ -295,6 +295,7 @@ pub struct HttpAuthorityBuilder {
     receipt_store: Option<Arc<dyn ReceiptStore>>,
     revocation_store: Option<Arc<dyn RevocationStore>>,
     durable_admission: Option<DurableAdmissionStores>,
+    dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
     stop_control: Option<chio_kernel::stop::StopControl>,
     trusted_capability_issuers: Vec<PublicKey>,
     allow_ephemeral_receipt_log: bool,
@@ -333,6 +334,16 @@ impl HttpAuthorityBuilder {
             outcome_store,
             fence,
         });
+        self
+    }
+
+    /// Select an authority already activated by the attached durable store.
+    #[must_use]
+    pub fn dpop_replay_authority(
+        mut self,
+        authority: chio_kernel::dpop::authority::DpopReplayAuthority,
+    ) -> Self {
+        self.dpop_replay_authority = Some(authority);
         self
     }
 
@@ -395,7 +406,6 @@ impl HttpAuthorityBuilder {
             self.clock
                 .unwrap_or_else(|| Arc::new(chio_security_types::clock::SystemClock)),
         );
-        kernel.install_default_dpop_store();
         if let Some(control) = self.stop_control {
             kernel.set_stop_control(control);
         }
@@ -410,6 +420,11 @@ impl HttpAuthorityBuilder {
         if let Some(durable) = self.durable_admission {
             kernel
                 .set_durable_admission_store(durable.store, durable.outcome_store, durable.fence)
+                .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
+        }
+        if let Some(authority) = self.dpop_replay_authority {
+            kernel
+                .set_operation_owned_dpop_authority(authority)
                 .map_err(|error| HttpAuthorityError::Kernel(error.to_string()))?;
         }
         kernel.register_tool_server(Box::new(HttpAuthorizationServer));
@@ -437,11 +452,9 @@ impl HttpAuthority {
     }
 
     /// Fail-closed constructor: no receipt or revocation store is attached and
-    /// both ephemeral opt-ins are off. Existing callers compile unchanged, but
-    /// the first mediated call now denies with a durable-persistence error
-    /// until a durable store is wired through [`HttpAuthority::builder`]. This
-    /// matches the kernel-backed lanes, which already deny when durable
-    /// persistence is missing.
+    /// both ephemeral opt-ins are off. Mediated calls deny with a
+    /// durable-persistence error until durable receipt and revocation stores
+    /// are wired through [`HttpAuthority::builder`].
     #[must_use]
     pub fn new(keypair: Keypair, policy_hash: String) -> Self {
         Self::assemble(
@@ -561,7 +574,6 @@ impl HttpAuthority {
             allow_ephemeral_receipt_log,
             allow_ephemeral_revocation_store,
         ));
-        kernel.install_default_dpop_store();
         kernel.register_tool_server(Box::new(HttpAuthorizationServer));
         kernel.add_guard(Box::new(HttpProjectionGuard));
 

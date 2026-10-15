@@ -3,7 +3,7 @@
 
 use super::AdmissionOperationStoreError as Error;
 use super::{AdmissionDigest, AdmissionIdentifier, AdmissionOperationId};
-use crate::dpop::authority::{DpopReplayAuthorityV1, VerifiedDpopReplayProof};
+use crate::dpop::authority::{DpopReplayAuthority, VerifiedDpopReplayProof};
 use serde::{Deserialize, Serialize};
 
 pub const MAX_DPOP_CLAIM_EPISODES: usize = 128;
@@ -18,7 +18,7 @@ const MAX_UNIX_SECS: u64 = 9_007_199_254_740;
     deny_unknown_fields
 )]
 pub struct DpopReplayCredentialV1 {
-    authority: DpopReplayAuthorityV1,
+    authority: DpopReplayAuthority,
     capability_id: String,
     nonce: String,
     invocation_digest: AdmissionDigest,
@@ -29,7 +29,7 @@ pub struct DpopReplayCredentialV1 {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct CredentialInput {
-    authority: DpopReplayAuthorityV1,
+    authority: DpopReplayAuthority,
     capability_id: String,
     nonce: String,
     invocation_digest: AdmissionDigest,
@@ -92,7 +92,7 @@ impl DpopReplayCredentialV1 {
         }
         Ok(())
     }
-    pub fn authority(&self) -> &DpopReplayAuthorityV1 {
+    pub fn authority(&self) -> &DpopReplayAuthority {
         &self.authority
     }
     pub fn capability_id(&self) -> &str {

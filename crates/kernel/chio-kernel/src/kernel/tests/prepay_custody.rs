@@ -60,6 +60,14 @@ struct PrepaymentAdapter {
 }
 
 impl PaymentAdapter for PrepaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "test-prepayment-custody"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::ReversibleHold)
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
@@ -162,13 +170,14 @@ impl Fixture {
     }
 
     fn with_dpop(mode: Mode, dpop_required: bool) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut kernel = make_kernel(make_monetary_config());
+        let mut config = make_monetary_config();
+        if dpop_required {
+            config.policy_hash = chio_core::crypto::sha256_hex(b"prepayment-custody-policy");
+        }
+        let mut kernel = make_kernel(config);
         install_strict_nonce_store(&mut kernel);
         if dpop_required {
-            kernel.set_dpop_store(
-                dpop::DpopNonceStore::new(1024, Duration::from_secs(300))?,
-                dpop::DpopConfig::default(),
-            )?;
+            super::durable_admission::dpop_acquisition::install_fixture_authority(&mut kernel);
         }
         let counters = Counters::default();
         kernel.set_payment_adapter(Box::new(PrepaymentAdapter {

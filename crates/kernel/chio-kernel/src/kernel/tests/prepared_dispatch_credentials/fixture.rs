@@ -6,22 +6,85 @@ pub(super) struct Fixture {
     pub(super) nonce: Arc<NonceState>,
     pub(super) clock: Arc<FixtureClock>,
     approval: Arc<ApprovalState>,
+    dpop: Option<Arc<TestAdmissionOperationStore>>,
 }
 
 impl Fixture {
     pub(super) fn new() -> TestResult<Self> {
-        let (mut kernel, _, _, request, _) =
-            request_with_replayed_approval("prepared-credentials")?;
+        Self::create(false)
+    }
+
+    pub(super) fn new_with_dpop() -> TestResult<Self> {
+        Self::create(true)
+    }
+
+    fn create(dpop_required: bool) -> TestResult<Self> {
         let clock = Arc::new(FixtureClock(AtomicU64::new(current_unix_timestamp())));
-        // This fixture switches clock domains after creating its signed inputs.
-        // No durable runtime owns the prior clock or fence.
-        assert!(kernel.durable_admission_runtime.is_none());
-        kernel.clock = clock.clone();
-        kernel.clock_fence = Arc::new(std::sync::Mutex::new(
-            chio_security_types::clock::ClockFence::default(),
+        let mut config = make_config();
+        config.policy_hash = sha256_hex(b"prepared-credential-test-policy");
+        let mut kernel = ChioKernel::new_with_clock(config, clock.clone());
+        let dpop = dpop_required.then(|| {
+            super::super::durable_admission::dpop_acquisition::install_fixture_authority(
+                &mut kernel,
+            )
+        });
+        let agent = make_keypair();
+        let mut grant = make_grant("prepared-server", "execute");
+        grant.dpop_required = dpop_required.then_some(true);
+        let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 3600);
+        let mut request = make_request(
+            "prepared-credentials",
+            &capability,
+            "execute",
+            "prepared-server",
+        );
+        let mut intent = make_governed_intent(
+            "prepared-intent",
+            "prepared-server",
+            "execute",
+            "approved operation",
+            1,
+            "USD",
+        );
+        bind_test_tool_approval(
+            &mut kernel,
+            &capability,
+            &request.arguments,
+            &request.request_id,
+            &mut intent,
+        );
+        request.approval_token = Some(make_governed_approval_token(
+            &kernel.config.keypair,
+            &capability.subject,
+            &intent,
+            &request.request_id,
         ));
-        // Reuse the complete signed fixture, replacing its deliberately spent
-        // approval backend and nonce backend with fresh, observable stores.
+        request.governed_intent = Some(intent);
+        if dpop_required {
+            request.dpop_proof = Some(make_dpop_proof(
+                &agent,
+                &capability,
+                &request.server_id,
+                &request.tool_name,
+                &request.arguments,
+                "prepared-proof",
+            ));
+        }
+        let nonce_config = ExecutionNonceConfig {
+            nonce_ttl_secs: 300,
+            nonce_store_capacity: 1024,
+            require_nonce: false,
+        };
+        request.execution_nonce = Some(mint_execution_nonce(
+            &kernel.config.keypair,
+            binding_for_request(&capability, &request),
+            &nonce_config,
+            i64::try_from(current_unix_timestamp())?,
+        )?);
+        kernel.set_execution_nonce_store(
+            nonce_config.clone(),
+            Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
+        );
         let nonce = Arc::new(NonceState {
             store: InMemoryExecutionNonceStore::from_config(
                 kernel
@@ -53,6 +116,7 @@ impl Fixture {
             request,
             nonce,
             approval,
+            dpop,
         })
     }
 
@@ -60,7 +124,7 @@ impl Fixture {
         self.kernel.prepare_dispatch_credentials(
             &self.request,
             &self.request.capability,
-            true,
+            self.dpop.is_some(),
             current_unix_timestamp(),
             false,
         )
@@ -78,12 +142,9 @@ impl Fixture {
 
     pub(super) fn dpop_occupancy(&self) -> TestResult<usize> {
         Ok(self
-            .kernel
-            .dpop_nonce_store
+            .dpop
             .as_ref()
-            .ok_or("dpop store")?
-            .utilization()?
-            .0)
+            .map_or(0, |store| store.dpop_history().len()))
     }
 
     pub(super) fn nonce_consumed(&self) -> TestResult<bool> {

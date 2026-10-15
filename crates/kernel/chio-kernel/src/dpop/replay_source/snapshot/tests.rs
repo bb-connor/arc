@@ -86,6 +86,45 @@ fn decoder_revalidates_digest_and_inventory_even_with_a_recomputed_digest() {
 }
 
 #[test]
+fn decoder_refuses_reservation_owner_fields_even_with_a_recomputed_digest() {
+    let original = snapshot();
+    let original_bytes = original.canonical_bytes().unwrap();
+    for owner in [serde_json::Value::Null, serde_json::json!("private-owner")] {
+        let mut envelope = serde_json::to_value(&original.0).unwrap();
+        let inventory = &mut envelope["body"]["inventory"];
+        let charged = inventory["charged_identity_bytes"]
+            .as_str()
+            .unwrap()
+            .parse::<usize>()
+            .unwrap();
+        inventory["charged_identity_bytes"] = (charged + owner.as_str().map_or(0, str::len))
+            .to_string()
+            .into();
+        inventory["markers"][0]["dispatch_reservation_id"] = owner;
+        let mut digest_input = DOMAIN.to_vec();
+        digest_input.extend(canonical_json_bytes(&envelope["body"]).unwrap());
+        envelope["inventory_sha256"] = sha256_hex(&digest_input).into();
+        let bytes = canonical_json_bytes(&envelope).unwrap();
+        let error = DpopReplaySourceSnapshot::from_canonical_bytes(&bytes).unwrap_err();
+        match error {
+            KernelError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(
+                error,
+            )) => {
+                assert_eq!(
+                    error.to_string(),
+                    "unknown field `dispatch_reservation_id`, expected one of `nonce`, `capability_id`, `retention`"
+                );
+            }
+            other => panic!("expected removed reservation field refusal, got {other:?}"),
+        }
+    }
+    assert_eq!(
+        DpopReplaySourceSnapshot::from_canonical_bytes(&original_bytes).unwrap(),
+        original
+    );
+}
+
+#[test]
 fn retention_clock_data_is_exact_and_never_collapses_local_into_signed() {
     let snapshot = snapshot();
     let mut body = snapshot.0.body;

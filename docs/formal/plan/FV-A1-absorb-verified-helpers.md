@@ -32,12 +32,11 @@ runtime decision shapes.
   `chio-kernel-core`.
 - The portable sibling-budget split is a distinct allocation law and is not a
   twin of the scalar admission predicate.
-- The DPoP verifier is atomic at the requirement-fold boundary, so successful
-  verification projects to both proof validity and nonce freshness there.
-  Replay admission is independently delegated inside `DpopNonceStore`. Direct
-  verification uses `check_and_insert_through`; kernel dispatch uses the
-  owner-qualified `reserve_for_dispatch_through` path so a proven
-  pre-dispatch failure can roll the reservation back.
+- The DPoP requirement fold projects proof validity against the configured,
+  activated authority. Durable admission separately acquires the exact
+  operation-owned replay claim. `DpopNonceStore` delegates source-marker
+  freshness to `nonce_admits`; its insertion and pruning APIs maintain the
+  bounded inventory that explicit source sealing retires.
 - Both guard loops use the type-owned `GuardStep::from` conversion, project
   every result through `guard_step_admits`, require that approval for
   continuation, and independently compare the observed step before allowing.
@@ -91,12 +90,11 @@ At proposal time, `formal_core` was a `pub(crate)` typed facade (`crates/kernel/
 
 **`dpop_freshness_valid` (formal_core.rs:154)**
 
-- Twin: `crates/kernel/chio-kernel/src/dpop.rs::verify_dpop_proof_stateless`,
-  in its freshness block.
-- Semantic delta: the runtime performs three checks where the model has two.
-  The third (`issued_at` not older than `now - (ttl + skew)`) is mathematically
-  implied by the second and remains defense in depth. The combined TTL and
-  skew arithmetic is saturating.
+- Twin: `crates/kernel/chio-kernel/src/dpop.rs::dpop_freshness_admits`,
+  reached through `verify_dpop_bindings_at` by the authority-bound verifier.
+- Semantic delta: the runtime rejects an unrepresentable signed deadline
+  before applying the shared freshness predicate. The future-skew comparison
+  saturates its upper bound; the authority also bounds its clock range.
 
 **`dpop_admits` (formal_core.rs:160)**
 
@@ -104,24 +102,23 @@ At proposal time, `formal_core` was a `pub(crate)` typed facade (`crates/kernel/
   `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs`
   and `nested_flow_evaluation.rs`. Each calls
   `verify_dpop_for_permission_preview`, projects the result through
-  `dpop_verification_admits`, and leaves single-use mutation to
-  `ChioKernel::reserve_dispatch_credentials` at the dispatch boundary.
+  `dpop_verification_admits`, and leaves replay custody to the durable
+  admission operation and its dispatch credential reservation.
 - Semantic delta: the runtime projects required, present, and statelessly valid
   into `dpop_verification_admits`. Nonce freshness is enforced separately by
-  the owner-qualified dispatch reservation so earlier budget or guard failures
-  do not consume the proof permanently.
+  the operation-owned claim. A released claim retains its spent-proof history
+  and cannot authorize a different operation.
 
 **`nonce_admits` (formal_core.rs:171)**
 
-- Twin: `crates/kernel/chio-kernel/src/dpop.rs::DpopNonceStore::check_and_insert_entry_at`,
-  reached by `check_and_insert_through` for direct verification and by
-  `reserve_for_dispatch_through` from
-  `ChioKernel::reserve_dispatch_credentials` for kernel dispatch.
+- Twin: `crates/kernel/chio-kernel/src/dpop.rs::DpopNonceStore::check_and_insert_entry`,
+  reached by `check_and_insert`, `check_and_insert_until` and
+  `check_and_insert_through` for source inventory insertion.
 - Semantic delta: the runtime couples `nonce_admits(already_live)` to atomic
-  marker insertion. Signed markers remain live through the inclusive
-  `issued_at + proof_ttl_secs` horizon, expired markers are reclaimed, and
-  full live capacity denies fail-closed. Dispatch reservations additionally
-  carry an owner so only a proven pre-dispatch unwind can remove them.
+  marker insertion. Signed markers retain their supplied inclusive or exclusive
+  horizon, expired markers are reclaimed, and full live
+  capacity denies fail-closed. Source sealing prevents further insertion and
+  pruning. This helper does not authorize durable DPoP dispatch.
 
 **`guard_pipeline_allows` (formal_core.rs:186)**
 
@@ -208,14 +205,14 @@ Each phase is one PR, independently landable, in this order (cheapest coupling f
    - Add `crates/kernel/chio-kernel/tests/budget_decision_equivalence.rs` (pre-refactor equivalence proptest, kept as regression) and projection unit tests beside the impls.
    - Add a Kani binding harness in `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs` if the projection can be expressed core-side; otherwise document why not (see Open questions).
 2. Phase 2: `dpop_admits`/`dpop_freshness_valid`/`nonce_admits` into the DPoP admission path.
-   - Modify `crates/kernel/chio-kernel/src/dpop.rs` (`verify_dpop_proof_stateless`
-     freshness block; `DpopNonceStore::check_and_insert_entry_at` returns
-     `nonce_admits(already_live)`; signed callers use
-     `check_and_insert_through` or `reserve_for_dispatch_through`).
+   - Modify `crates/kernel/chio-kernel/src/dpop.rs` (`dpop_freshness_admits`
+     freshness projection; `DpopNonceStore::check_and_insert_entry` returns
+     `nonce_admits(already_live)`; signed source markers use
+     `check_and_insert_through` or `check_and_insert_until`).
    - Modify `crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_core.rs`,
      `nested_flow_evaluation.rs`, and `credential_reservation.rs` (the
      requirement fold routes through `dpop_verification_admits`, then the
-     dispatch boundary reserves the signed nonce horizon).
+     dispatch boundary requires an exact operation-owned durable replay claim).
    - Add equivalence proptests in `crates/kernel/chio-kernel/tests/dpop_admission_equivalence.rs`, including the ttl/skew saturation edge cases.
 3. Phase 3: `guard_pipeline_allows` into the guard verdict fold.
    - Modify `crates/kernel/chio-kernel-core/src/evaluate.rs` (guard loop, lines 387-407 region) and `crates/kernel/chio-kernel/src/kernel/dispatch.rs::run_guards`.

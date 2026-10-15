@@ -2,7 +2,7 @@
 
 use super::KernelError;
 
-/// Maximum UTF-8 byte length of one nonce, capability or reservation identity.
+/// Maximum UTF-8 byte length of one nonce or capability identity.
 pub const MAX_DPOP_REPLAY_IDENTITY_PART_BYTES: usize = 4096;
 /// Default aggregate retained identity budget, separate from marker capacity.
 pub const DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY: usize = 16 * 1024 * 1024;
@@ -22,18 +22,13 @@ pub(super) fn validate_part(value: &str) -> Result<(), KernelError> {
     Ok(())
 }
 
-pub(super) fn retained_bytes(
-    nonce: &str,
-    capability_id: &str,
-    owner: Option<&str>,
-) -> Result<usize, KernelError> {
+pub(super) fn retained_bytes(nonce: &str, capability_id: &str) -> Result<usize, KernelError> {
     // Charge two capability copies per marker to cover the key and the
     // per-capability count map. Shared count keys only reduce actual usage.
     nonce
         .len()
         .checked_add(capability_id.len())
         .and_then(|bytes| bytes.checked_add(capability_id.len()))
-        .and_then(|bytes| bytes.checked_add(owner.map_or(0, str::len)))
         .ok_or_else(|| KernelError::Dpop(super::DpopError::IdentityOverflow))
 }
 

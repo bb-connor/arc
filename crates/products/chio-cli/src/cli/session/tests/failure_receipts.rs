@@ -33,7 +33,7 @@ impl Fixture {
         let mut kernel = build_kernel(loaded, &admission.kernel_keypair());
         let receipt_db_path = unique_db_path("chio-cli-failure-receipts");
         configure_receipt_store(&mut kernel, Some(&receipt_db_path), None, None)?;
-        admission.attach(&mut kernel)?;
+        admission.attach(&mut kernel, None)?;
         kernel.register_tool_server(Box::new(StubToolServer {
             id: "failure-server".into(),
         }));
