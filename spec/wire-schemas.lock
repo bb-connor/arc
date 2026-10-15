@@ -225,9 +225,9 @@ files = ["crates/trust/chio-credentials/src/lib.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.agent-web-proof-envelope.v2"
+value = "chio.agent-web-proof-envelope.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
-first_seen = "e0e0b791fe"
+first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.agent-web.external-projection-manifest.v1"
