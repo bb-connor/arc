@@ -939,4 +939,8 @@ impl AdmissionOperationStore for TestAdmissionOperationStore {
     }
 }
 
-impl QualifiedAdmissionOperationStore for TestAdmissionOperationStore {}
+impl QualifiedAdmissionOperationStore for TestAdmissionOperationStore {
+    fn recovery_deployment_port(&self) -> Option<&dyn crate::recovery::RecoveryDeploymentPort> {
+        None
+    }
+}

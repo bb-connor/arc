@@ -46,7 +46,9 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-pub(in crate::admission_operation_store) fn verify_recovery_initialization(
+/// Bounded check that `binding` is the retained native initialization of
+/// its security authority. Startup has verified the full histories.
+pub(in crate::admission_operation_store) fn verify_recovery_binding(
     connection: &Connection,
     binding: &NativeSecurityAuthorityBindingV1,
 ) -> Result<(), AdmissionOperationStoreError> {
@@ -55,5 +57,13 @@ pub(in crate::admission_operation_store) fn verify_recovery_initialization(
     if initialized.admission_binding()? != *binding {
         return Err(invalid("recovery native initialization differs"));
     }
+    Ok(())
+}
+
+pub(in crate::admission_operation_store) fn verify_recovery_initialization(
+    connection: &Connection,
+    binding: &NativeSecurityAuthorityBindingV1,
+) -> Result<(), AdmissionOperationStoreError> {
+    verify_recovery_binding(connection, binding)?;
     records::verify_all(connection).map(|_| ())
 }

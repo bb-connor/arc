@@ -58,6 +58,8 @@ mod operation_store;
 mod payment_recovery;
 #[path = "durable_admission/receipt_projection.rs"]
 mod receipt_projection;
+#[path = "durable_admission/recovery_actor.rs"]
+mod recovery_actor;
 #[path = "durable_admission/recovery_lease.rs"]
 mod recovery_lease;
 #[path = "durable_admission/return_context.rs"]

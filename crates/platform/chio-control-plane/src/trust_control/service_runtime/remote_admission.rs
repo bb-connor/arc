@@ -423,7 +423,13 @@ impl AdmissionOperationStore for RemoteAdmissionAuthority {
     }
 }
 
-impl QualifiedAdmissionOperationStore for RemoteAdmissionAuthority {}
+impl QualifiedAdmissionOperationStore for RemoteAdmissionAuthority {
+    fn recovery_deployment_port(
+        &self,
+    ) -> Option<&dyn chio_kernel::recovery::RecoveryDeploymentPort> {
+        None
+    }
+}
 
 impl ReceiptStore for RemoteAdmissionAuthority {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {

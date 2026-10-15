@@ -92,6 +92,7 @@ mod obligation;
 mod participant;
 mod projection;
 mod recovery;
+mod recovery_authority;
 mod recovery_deployment;
 mod recovery_resources;
 pub(crate) use recovery::verify_outcome_recovery_status;

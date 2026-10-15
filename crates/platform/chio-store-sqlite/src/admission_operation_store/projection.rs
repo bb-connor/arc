@@ -1509,7 +1509,13 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-impl QualifiedAdmissionOperationStore for SqliteAdmissionOperationStore {}
+impl QualifiedAdmissionOperationStore for SqliteAdmissionOperationStore {
+    fn recovery_deployment_port(
+        &self,
+    ) -> Option<&dyn chio_kernel::recovery::RecoveryDeploymentPort> {
+        Some(self)
+    }
+}
 
 impl ReceiptStore for SqliteAdmissionOperationStore {
     fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
