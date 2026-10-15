@@ -550,3 +550,21 @@ fn v1_continuation_rejects_expired_tasks() {
     assert_eq!(edge.task_counter, 1);
     assert!(edge.tasks.is_empty());
 }
+
+#[test]
+fn v1_origin_request_id_is_stable_across_edge_instances() {
+    let config = test_kernel_config();
+    let owner = v1_execution(&config.keypair);
+    let kernel = ChioKernel::new(config);
+    let start = || ChioA2aEdge::new(A2aEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
+    let mut first = start();
+    let mut restarted = start();
+    let before = retained_task(&mut first, &kernel, &owner, "review-1");
+    let after = retained_task(&mut restarted, &kernel, &owner, "review-1");
+    assert_ne!(before.id, after.id);
+    for (edge, task) in [(&first, &before), (&restarted, &after)] {
+        let request = &edge.tasks.get(&task.id).test_unwrap().request;
+        assert_eq!(request.origin_request_id, "a2a-request-review-1");
+        assert_eq!(request.kernel_request_id, "review-1");
+    }
+}
