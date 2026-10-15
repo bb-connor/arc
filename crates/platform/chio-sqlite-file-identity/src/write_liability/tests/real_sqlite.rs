@@ -686,9 +686,14 @@ fn auto_vacuum_pointer_maps_exceed_the_non_vacuum_growth_bound() -> TestResult {
              PRAGMA cache_spill = OFF; PRAGMA wal_autocheckpoint = 0;
              PRAGMA wal_checkpoint(TRUNCATE);"
         ))?;
-        let observed_mode: u64 =
-            connection.query_row("PRAGMA auto_vacuum", [], |row| row.get(0))?;
-        let observed_page: u64 = connection.query_row("PRAGMA page_size", [], |row| row.get(0))?;
+        let observed_mode =
+            u64::try_from(
+                connection.query_row("PRAGMA auto_vacuum", [], |row| row.get::<_, i64>(0))?,
+            )?;
+        let observed_page =
+            u64::try_from(
+                connection.query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))?,
+            )?;
         assert_eq!(observed_mode, mode);
         assert_eq!(observed_page, PAGE);
         let profile = SqliteFramePriceProfileData::checked(observed_page, 0, observed_mode);
@@ -704,13 +709,16 @@ fn auto_vacuum_pointer_maps_exceed_the_non_vacuum_growth_bound() -> TestResult {
             non_vacuum_growth.ok_or("the NONE growth control is absent")?
         };
         let before = page_count(&connection)?;
-        connection.execute("INSERT INTO items VALUES (1, zeroblob(?1))", [BODY])?;
+        connection.execute(
+            "INSERT INTO items VALUES (1, zeroblob(?1))",
+            [i64::try_from(BODY)?],
+        )?;
         let after = page_count(&connection)?;
-        let record_payload: u64 = connection.query_row(
+        let record_payload = u64::try_from(connection.query_row(
             "SELECT sum(payload) FROM dbstat WHERE name = 'items'",
             [],
-            |row| row.get(0),
-        )?;
+            |row| row.get::<_, i64>(0),
+        )?)?;
         assert_eq!(record_payload, BODY + 6);
         let growth = after
             .checked_sub(before)
