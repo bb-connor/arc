@@ -129,6 +129,8 @@ pub mod receipt_store;
 #[cfg(not(loom))]
 mod receipt_support;
 #[cfg(not(loom))]
+pub mod recovery;
+#[cfg(not(loom))]
 mod replay_retention;
 #[cfg(not(loom))]
 mod request_matching;
