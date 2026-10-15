@@ -1,6 +1,6 @@
 # Signed stop-operator deployment configuration (KSPEC-08 S28)
 
-Status: draft for owner review. No code has landed.
+Status: reviewed by the owner (2026-10-15). The open decisions are settled below. No code has landed.
 
 KSPEC-08 is `docs/superpowers/specs/2026-10-04-durable-stop-epoch-design.md` (cited below as `SPEC`). This note designs the S28 prerequisite. S28 is a signed deployment configuration carrying an operator roster, a quorum threshold `k` and a pinned time-attestation key. Boot verifies it, and stop and resume consume it. The two-person resume, quorum and break-glass rules (S19, S29) and the control-profile issuance carve-out (S13) all depend on it.
 
@@ -25,7 +25,7 @@ pub struct StopOperatorConfigV1 {
     pub authority_id: DurableAuthorityId,    // the admission store it governs (store uuid)
     pub deployment_generation: u64,          // strictly increasing per authority
     pub predecessor_digest: Option<Sha256Digest>,
-    pub rosters: Vec<StopRosterV1>,          // one per scope, kernel scope required
+    pub rosters: Vec<StopRosterV1>,          // the kernel scope only until tenant scopes exist
     pub stop_quorum_max: u16,                // default 8, hard maximum 64 (SPEC:681)
     pub resume_policy: ResumePolicyV1,       // OperatorPair default (SPEC:602-614, :1103)
     pub same_principal_cooldown_ms: Option<u64>, // >= 300_000 when set (SPEC:616-621)
@@ -63,9 +63,9 @@ pub struct RosterPrincipalV1 {
 
 ## Trust root and loading
 
-- The trust root is `config_authority_key`, pinned outside the document. It is a deployment input next to the kernel signing backend (a path, or a key in the existing boot configuration of each host), never read from the admission store. Rotating the root needs a document signed by the old root that names the new key, using the FROST roster's predecessor model.
+- The trust root is `config_authority_key`, pinned outside the document as a field in each host's existing boot configuration, next to the kernel signing backend. It is never read from the admission store. Rotating the root needs a document signed by the old root that names the new key, using the FROST roster's predecessor model.
 - Each host loads the document at boot, before `StopControl::durable` binds and before startup reconciliation (S9). The hosts are the hosted MCP edge, the process host, api-protect, trust control and the offline CLI. It is read with `O_NOFOLLOW` and a size bound, like `ActiveDefenseDeploymentConfig`, and verified offline (signature only, no store reads, no live clock).
-- The admission store records the installed document. A new table `admission_operation_stop_configs` (append-only, one row per generation, payload plus digest) is covered by the global commit chain like the stop chain. Boot refuses a file older than the installed generation. A newer file is installed in a writer transaction, and only while the kernel scope is running, because SPEC `:501` denies a new deployment generation while stopped. This needs one admission schema version. Under ST8 it lands in the single v1 schema rather than as a v39 migration.
+- The admission store records the installed document. A new table `admission_operation_stop_configs` (append-only, one row per generation, payload plus digest) is covered by the global commit chain like the stop chain. Boot refuses a file older than the installed generation. A newer file is installed in a writer transaction, and only while the kernel scope is running, because SPEC `:501` denies a new deployment generation while stopped. Installing a newer document needs both the config-root signature and a quorum of the currently installed roster: `quorum_k` distinct principals of the installed kernel roster sign the new document's digest. The first document has no installed roster, so it needs the root signature alone. This needs one admission schema version. Under ST8 it lands in the single v1 schema rather than as a v39 migration.
 - No document present means the shared-credential behavior of today. A document that is present but fails verification leaves every scope `not_ready` with reason `stop_config_unverified`. Stop still answers and resume refuses (S10).
 
 ## How stop and resume consume it
@@ -81,8 +81,8 @@ The tool-call `ThresholdApprovalCollector`, tenant onboarding UX, key ceremonies
 
 ## PR breakdown
 
-1. `PrincipalId`, `StopOperatorConfigV1`, `StopRosterV1` and the canonical encoding with offline verification and every load-time rejection, in `chio-kernel::stop` or a small `chio-stop-config` module. Unit tests and signed fixtures from a generator. No host wiring.
-2. The store: `admission_operation_stop_configs`, install and readback in a writer transaction, global commit coverage, the generation and predecessor rules, and refusal while stopped. Folded into the ST8 v1 schema if ST8 has landed, otherwise one schema version.
+1. `PrincipalId`, `StopOperatorConfigV1`, `StopRosterV1` and the canonical encoding with offline verification and every load-time rejection, in `chio-kernel::stop` or a small `chio-stop-config` module. Kernel-scope roster only; a tenant scope is refused at load. Unit tests and signed fixtures from a generator. No host wiring.
+2. The store: `admission_operation_stop_configs`, install and readback in a writer transaction, global commit coverage, the generation and predecessor rules, the installed-roster quorum over a newer document, and refusal while stopped. Folded into the ST8 v1 schema if ST8 has landed, otherwise one schema version.
 3. Boot wiring in each host: a pinned trust root input, load before `StopControl::durable`, `not_ready` on a bad document, and status reporting the installed generation and roster digests.
 4. Operator stop tokens on every route, the `StopAuthorizer::Operator` record, and offline CLI support.
 5. Quorum resume (`StopControlQuorumV1`), `OperatorPair` exclusion from chain stoppers, and the removal of shared-credential resume once a document is installed. `StopAuthorizer::Quorum` carries `roster_digest` and generation.
@@ -91,8 +91,8 @@ The tool-call `ThresholdApprovalCollector`, tenant onboarding UX, key ceremonies
 
 PRs 1 to 3 are infrastructure with no behavior change when no document is installed. PR 5 is where the "no two-person resume" claim limit can be lifted.
 
-## Open decisions
+## Decisions
 
-- Where the trust root key lives on each host: a dedicated file, or a field in the host's existing boot configuration.
-- Whether tenant rosters ship in PR 1 or wait for tenant scopes, which are themselves still unbuilt.
-- Whether installing a newer document requires a quorum of the current roster in addition to the root signature.
+- The trust root is a pinned field in each host's existing boot configuration, next to the kernel signing backend.
+- Tenant rosters wait for tenant scopes. PR 1 ships the kernel-scope roster only.
+- Installing a newer document requires both the config-root signature and a quorum of the currently installed roster.
