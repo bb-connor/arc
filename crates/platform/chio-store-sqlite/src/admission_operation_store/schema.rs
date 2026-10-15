@@ -5,10 +5,10 @@ mod clock;
 pub(super) use clock::authority_validation_time;
 pub(crate) use clock::{observe_authority_time, verify_trusted_time};
 
-/// The single admission schema, as the ordered fragments every store is
-/// created from and every open is verified against.
+/// The admission v1 schema: every table family, in creation order. A store is
+/// created from exactly this list and every open is verified against it.
 fn admission_operation_schema_sql() -> Result<String, AdmissionOperationStoreError> {
-    let fragments = [
+    let schema_v1 = [
         ADMISSION_OPERATION_SCHEMA,
         super::recovery::SCHEMA,
         include_str!("../admission_operation_nonce.sql"),
@@ -30,7 +30,7 @@ fn admission_operation_schema_sql() -> Result<String, AdmissionOperationStoreErr
         super::caller_budget::SCHEMA,
         super::stop_epoch::SCHEMA,
     ];
-    Ok(fragments.join("\n"))
+    Ok(schema_v1.join("\n"))
 }
 
 pub(crate) fn initialize_admission_operation_schema(

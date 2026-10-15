@@ -37,7 +37,7 @@ kernel of that host. It does not reach another process or a remote kernel.
 
 With a local durable admission store, an operator stop is a
 `chio.stop-epoch.v1` record in `admission_operation_stop_epochs` (admission
-schema v38). Records are append-only, hash-chained per scope, covered by the
+schema v1). Records are append-only, hash-chained per scope, covered by the
 global authority commit chain and anchored before the call returns. Reason text
 is kept in a separate note table; the record holds only its salted commitment.
 

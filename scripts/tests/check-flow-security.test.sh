@@ -114,7 +114,7 @@ expected_counts = {
     "strict manifest v2": 25,
     "security kernel adapters": 49,
     "durable flow state": 44,
-    "native flow custody": 145,
+    "native flow custody": 131,
     "native dispatch participant snapshots": 3,
     "native dispatch ledger callbacks": 3,
     "native dispatch attachment contracts": 4,

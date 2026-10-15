@@ -1040,10 +1040,8 @@ fn append_revocation_delta(
     Ok(())
 }
 
-/// Seed the append-only delta log when opening a pre-v3 revocation database.
-/// Existing projection rows form the complete revocation state at the migration
-/// boundary. They receive a deterministic dense prefix; all later mutations are
-/// appended transactionally by `append_revocation_delta`.
+/// Create the delta-log metadata row and keep `next_seq` at or above the
+/// highest logged sequence.
 fn initialize_revocation_delta_log(
     transaction: &Transaction<'_>,
 ) -> Result<(), RevocationStoreError> {

@@ -187,7 +187,7 @@ impl SqliteAdmissionOperationStore {
         let mut connection = self.connection()?;
         let tx = self.begin_write(&mut connection, Some(fence))?;
         if !schema::present(&tx)? {
-            return Err(invalid("native checkpoint requires admission schema v36"));
+            return Err(invalid("native checkpoint catalog is absent"));
         }
         let observed_at = observed_time(&tx, trusted_now_unix_ms, &self.serving_owner)?;
         let actual = super::records::load(&tx, selected.authority())?
