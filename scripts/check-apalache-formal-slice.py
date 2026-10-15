@@ -357,17 +357,11 @@ def check_post_admission_drop_guard() -> None:
         "every URL and non-URL server error must use the same unknown resolver",
     )
     require(
-        "A returned output reaches finalization after" in text
-        and "budget reconciliation, so its hold is committed." in text
-        and "Every Err returned after polling any invoke path is outcome-unknown."
+        "A known returned output reaches reconciliation and commits its hold." in text
+        and "Post-dispatch errors, including URL elicitation, are outcome-unknown."
         in text
-        and "URL elicitation follows this rule regardless of nested bridge activity."
-        in text
-        and "Only an error before mark_dispatch_started is pre-dispatch and reversible."
-        in text
-        and "After that mark, an expired deadline or failed/regressed clock read is"
-        in text
-        and "outcome-unknown even when invoke has not yet been polled. Holds remain."
+        and "Cleanup before the effect boundary is reversible." in text
+        and "These separate events represent a failed trusted clock read before the"
         in text,
         "the model must classify all server-returned errors as outcome-unknown",
     )
@@ -399,24 +393,15 @@ def check_post_admission_drop_guard() -> None:
         "positive drop-guard config must keep the documented bounds and disable mutations",
     )
     for anchor in (
-        "evaluate_tool_call_async_with_session_context",
-        "evaluate_tool_call_with_nested_flow_client_async",
-        "PostAdmissionDropGuard::new",
-        "PostAdmissionDropGuard::child_receipts_mut",
-        "record_buffered_child_receipts",
-        "PostAdmissionDropGuard::mark_dispatch_started",
-        "PostAdmissionDropGuard::disarm",
-        "record_chio_receipt_with_mode",
-        "finalize_tool_output_with_metadata_and_payee_binding",
-        "retained_admission_receipt_metadata",
-        "ambiguous_dispatch_receipt_metadata",
         "PostAdmissionDropGuard::handle_pre_dispatch_drop",
-        "record_pre_dispatch_cleanup_fault_receipt",
-        "PostAdmissionDropGuard::drop",
-        "flush_buffered_child_receipts_from_drop",
-        "evaluate_runtime_admission_tracked",
-        "ChioRuntimeAdmissionHook::release_reservations",
-        "ChioRuntimeAdmissionHook::release_reserved",
+        "PostEffectObligation::enter",
+        "DischargeBinding::validate_receipt",
+        "effect_obligation/post_effect.rs::flush_children",
+        "prepare_ordinary and record_durable_return",
+        "commit_terminal_receipt",
+        "Discharged::deliver and PreparedResponse::finish_delivery",
+        "PostEffectObligation::fail",
+        "EvidenceRecoveryResources and EvidenceRecovery::ensure_clear",
     ):
         require(anchor in text, f"drop-guard ground-truth header is missing {anchor}")
 
