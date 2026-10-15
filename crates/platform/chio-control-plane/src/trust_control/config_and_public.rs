@@ -703,10 +703,25 @@ pub(crate) fn resolve_passport_lifecycle_for_service(
     let Some(_) = config.passport_statuses_file.as_deref() else {
         return Ok(None);
     };
-    let (_, registry) = load_passport_status_registry_for_admin(config)?;
+    let (path, registry) = load_passport_status_registry_for_admin(config)?;
     let mut lifecycle = registry.resolve_for_passport(passport, at)?;
     lifecycle.source = Some("registry:trust-control".to_string());
+    crate::passport_revocation::check_passport_revocation(&path, &lifecycle)?;
     Ok(Some(lifecycle))
+}
+
+/// Resolves `passport_id` against the configured lifecycle registry and its
+/// durable revocation oracle.
+pub(crate) fn resolve_passport_status_for_service(
+    config: &TrustServiceConfig,
+    passport_id: &str,
+    at: u64,
+) -> Result<PassportLifecycleResolution, CliError> {
+    let (path, registry) = load_passport_status_registry_for_admin(config)?;
+    let mut resolution = registry.resolve_at(passport_id, at);
+    resolution.source = Some("registry:trust-control".to_string());
+    crate::passport_revocation::check_passport_revocation(&path, &resolution)?;
+    Ok(resolution)
 }
 
 pub(crate) fn portable_passport_status_reference_for_service(
@@ -717,10 +732,11 @@ pub(crate) fn portable_passport_status_reference_for_service(
     let Some(_) = config.passport_statuses_file.as_deref() else {
         return Ok(None);
     };
-    let (_, registry) = load_passport_status_registry_for_admin(config)?;
-    registry
-        .portable_status_reference_for_passport(passport, at)
-        .map(Some)
+    let (path, registry) = load_passport_status_registry_for_admin(config)?;
+    let reference = registry.portable_status_reference_for_passport(passport, at)?;
+    let resolution = registry.resolve_for_passport(passport, at)?;
+    crate::passport_revocation::check_passport_revocation(&path, &resolution)?;
+    Ok(Some(reference))
 }
 
 pub(crate) fn passport_presentation_transport_for_service(

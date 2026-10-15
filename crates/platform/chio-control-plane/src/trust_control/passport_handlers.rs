@@ -418,12 +418,11 @@ pub(crate) async fn handle_resolve_passport_status(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let registry = match load_passport_status_registry_for_admin(&state.config) {
-        Ok((_, registry)) => registry,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    let mut resolution = registry.resolve_at(&passport_id, clock_now);
-    resolution.source = Some("registry:trust-control".to_string());
+    let resolution =
+        match resolve_passport_status_for_service(&state.config, &passport_id, clock_now) {
+            Ok(resolution) => resolution,
+            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        };
     match resolution.validate() {
         Ok(()) => Json(resolution).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -438,12 +437,11 @@ pub(crate) async fn handle_public_resolve_passport_status(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    let registry = match load_passport_status_registry_for_admin(&state.config) {
-        Ok((_, registry)) => registry,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
-    };
-    let mut resolution = registry.resolve_at(&passport_id, clock_now);
-    resolution.source = Some("registry:trust-control".to_string());
+    let resolution =
+        match resolve_passport_status_for_service(&state.config, &passport_id, clock_now) {
+            Ok(resolution) => resolution,
+            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+        };
     match resolution.validate() {
         Ok(()) => Json(resolution).into_response(),
         Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
@@ -470,9 +468,12 @@ pub(crate) async fn handle_revoke_passport_status(
     };
     let lane = state.operator_registry_write_lane.clone();
     run_registry_update(&lane, move || {
-        PassportStatusRegistry::update(&path, |registry| {
-            registry.revoke(&passport_id, request.reason.as_deref(), request.revoked_at)
-        })
+        crate::passport_revocation::revoke_passport_status(
+            &path,
+            &passport_id,
+            request.reason.as_deref(),
+            request.revoked_at,
+        )
     })
     .await
 }

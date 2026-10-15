@@ -314,9 +314,9 @@ pub(crate) fn plan_oid4vp_passport_lifecycle(
 ) -> Result<PassportLifecyclePlan, CliError> {
     if let Some(path) = config.passport_statuses_file.as_deref() {
         let registry = PassportStatusRegistry::load(path)?;
-        return Ok(PassportLifecyclePlan::Resolved(Some(
-            registry.resolve_at(passport_id, clock_now),
-        )));
+        let resolution = registry.resolve_at(passport_id, clock_now);
+        crate::passport_revocation::check_passport_revocation(path, &resolution)?;
+        return Ok(PassportLifecyclePlan::Resolved(Some(resolution)));
     }
     let Some(status_ref) = status_ref else {
         return Ok(PassportLifecyclePlan::Resolved(None));
