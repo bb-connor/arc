@@ -823,6 +823,9 @@ fn validate_reason(reason: &str) -> Result<(), StopControlError> {
     Ok(())
 }
 
+#[path = "stop/config.rs"]
+pub mod config;
+
 #[cfg(test)]
 #[path = "stop/tests.rs"]
 mod tests;

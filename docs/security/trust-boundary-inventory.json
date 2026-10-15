@@ -1234,6 +1234,7 @@
     "crates/kernel/chio-kernel/src/kernel/mod.rs::scope_from_capability_snapshot::from_wire",
     "crates/kernel/chio-kernel/src/payment.rs::read_payment_json::from_wire",
     "crates/kernel/chio-kernel/src/provider_verdict.rs::build_tool_call_request::from_wire",
+    "crates/kernel/chio-kernel/src/stop/config.rs::decode::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::from_canonical_bytes::from_wire",
@@ -17196,6 +17197,7 @@
     "crates/kernel/chio-kernel/src/kernel/mod.rs::scope_from_capability_snapshot::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/payment.rs::read_payment_json::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/provider_verdict.rs::build_tool_call_request::from_wire#1::decode_canonical",
+    "crates/kernel/chio-kernel/src/stop/config.rs::decode::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire#2::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::from_canonical_bytes::from_wire#1::decode_signed",
@@ -18203,6 +18205,9 @@
     ],
     "crates/kernel/chio-kernel/src/response_simulation_report.rs": [
       "validate::shared-reader::crates/core/chio-response-model/src/simulation.rs::evaluate_response_simulation"
+    ],
+    "crates/kernel/chio-kernel/src/stop/config.rs": [
+      "decode::original-json-reader::UntrustedJsonText"
     ],
     "crates/kernel/chio-kernel/src/tool_outcome.rs": [
       "canonical_blob_bounded::original-json-reader::UntrustedJsonText",
