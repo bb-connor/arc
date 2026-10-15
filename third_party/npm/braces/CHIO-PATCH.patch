@@ -1,0 +1,63 @@
+--- a/lib/constants.js
++++ b/lib/constants.js
+@@ -1,6 +1,7 @@
+ 'use strict';
+
+ module.exports = {
++  MAX_DEPTH: 100,
+   MAX_LENGTH: 10000,
+
+   // Digits
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -7,6 +7,7 @@
+  */
+
+ const {
++  MAX_DEPTH,
+   MAX_LENGTH,
+   CHAR_BACKSLASH, /* \ */
+   CHAR_BACKTICK, /* ` */
+@@ -54,6 +55,13 @@
+    */
+
+   const advance = () => input[index++];
++  const open = node => {
++    if (stack.length > MAX_DEPTH) {
++      throw new SyntaxError(`Pattern nesting exceeds max depth (${MAX_DEPTH})`);
++    }
++    stack.push(node);
++  };
++
+   const push = node => {
+     if (node.type === 'text' && prev.type === 'dot') {
+       prev.type = 'text';
+@@ -144,7 +152,7 @@
+
+     if (value === CHAR_LEFT_PARENTHESES) {
+       block = push({ type: 'paren', nodes: [] });
+-      stack.push(block);
++      open(block);
+       push({ type: 'text', value });
+       continue;
+     }
+@@ -210,7 +218,7 @@
+       };
+
+       block = push(brace);
+-      stack.push(block);
++      open(block);
+       push({ type: 'open', value });
+       continue;
+     }
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "braces",
+   "description": "Bash-like brace expansion, implemented in JavaScript. Safer than other brace expansion libs, with complete support for the Bash 4.3 braces specification, without sacrificing speed.",
+-  "version": "3.0.3",
++  "version": "3.0.4-chio.1",
+   "homepage": "https://github.com/micromatch/braces",
+   "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
+   "contributors": [

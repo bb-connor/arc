@@ -105,10 +105,9 @@ included in both Alpine Rust builders. Their failed campaigns remain evidence;
 builder commands require a separate terminal rerun before qualification.
 
 The October 4 JavaScript scan initially reported 25 advisory IDs. Patched
-versions remove 23. Two unpatched Expo/React Native peer-tooling dependencies
-have a separate, scoped and expiring disposition; they remain release debt,
-not repaired upstream vulnerabilities. See
-[the tooling advisory record](npm-peer-tooling-advisories-2026-10-04.md).
+versions remove 23. The remaining two, in the Expo/React Native peer tooling
+(node-forge and braces), have no upstream release and are repaired by the
+[npm path forks](../../third_party/npm/README.md).
 
 Review the vendor provenance, dependency/audit closure, container inputs, SDK
 compatibility and qualification documentation as separate slices. Require terminal
