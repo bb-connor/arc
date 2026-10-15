@@ -104,7 +104,7 @@ fn verify_signature_ref(
 
 fn derive_replay_scope(endpoint_url_digest: &str) -> AgentWebReplayScope {
     let mut hasher = Sha256::new();
-    hasher.update(b"chio.agent-web.replay-scope.v2\0");
+    hasher.update(b"chio.agent-web.replay-scope.v1\0");
     hasher.update(endpoint_url_digest.as_bytes());
     let digest: [u8; 32] = hasher.finalize().into();
     AgentWebReplayScope::from_digest(digest)

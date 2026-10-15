@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use chio_core_types::{
     canonical_json_bytes, sha256_hex, PublicKey, Signature,
-    CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA,
+    CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA,
 };
 use chio_transaction_passport::{TransactionPassport, TransactionPassportError};
 
@@ -39,8 +39,7 @@ pub(super) struct AgentWebProofEnvelope {
     schema: String,
     pub(super) envelope_id: String,
     transaction_passport_ref: String,
-    #[serde(default)]
-    agent_web_passport_scope_sha256: Option<String>,
+    agent_web_passport_scope_sha256: String,
     pub(super) source_protocol: String,
     pub(super) source_protocol_version: String,
     external_subject: String,
@@ -113,16 +112,13 @@ pub(super) fn validate_envelope(
     if envelope.transaction_passport_ref != passport.id {
         return Err(claim_failed("Agent Web envelope passport mismatch"));
     }
-    if envelope.schema != CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA {
+    if envelope.schema != CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA {
         return Err(claim_failed(format!(
             "unsupported Agent Web proof envelope schema: {}",
             envelope.schema
         )));
     }
-    let scope_sha256 = envelope
-        .agent_web_passport_scope_sha256
-        .as_deref()
-        .ok_or_else(|| claim_failed("Agent Web envelope missing passport scope digest"))?;
+    let scope_sha256 = &envelope.agent_web_passport_scope_sha256;
     validate_sha256_hex(scope_sha256)
         .map_err(|_| claim_failed("invalid Agent Web passport scope digest"))?;
     if scope_sha256 != passport_scope_sha256 {
@@ -209,12 +205,8 @@ struct AgentWebProofEnvelopeSignaturePayload<'a> {
 
 fn envelope_id_input(
     envelope: &AgentWebProofEnvelope,
-) -> Result<AgentWebProofEnvelopeIdInput<'_>, TransactionPassportError> {
-    let agent_web_passport_scope_sha256 = envelope
-        .agent_web_passport_scope_sha256
-        .as_deref()
-        .ok_or_else(|| claim_failed("Agent Web envelope missing passport scope digest"))?;
-    Ok(AgentWebProofEnvelopeIdInput {
+) -> AgentWebProofEnvelopeIdInput<'_> {
+    AgentWebProofEnvelopeIdInput {
         schema: &envelope.schema,
         transaction_passport_ref: &envelope.transaction_passport_ref,
         source_protocol: &envelope.source_protocol,
@@ -231,17 +223,17 @@ fn envelope_id_input(
         settlement_refs: &envelope.settlement_refs,
         risk_refs: &envelope.risk_refs,
         limitations: &envelope.limitations,
-        agent_web_passport_scope_sha256,
-    })
+        agent_web_passport_scope_sha256: &envelope.agent_web_passport_scope_sha256,
+    }
 }
 
 fn envelope_signature_payload(
     envelope: &AgentWebProofEnvelope,
-) -> Result<AgentWebProofEnvelopeSignaturePayload<'_>, TransactionPassportError> {
-    Ok(AgentWebProofEnvelopeSignaturePayload {
+) -> AgentWebProofEnvelopeSignaturePayload<'_> {
+    AgentWebProofEnvelopeSignaturePayload {
         envelope_id: &envelope.envelope_id,
-        id_input: envelope_id_input(envelope)?,
-    })
+        id_input: envelope_id_input(envelope),
+    }
 }
 
 fn validate_content_addressed_envelope_id(
@@ -259,7 +251,7 @@ fn validate_content_addressed_envelope_id(
 fn content_addressed_envelope_id(
     envelope: &AgentWebProofEnvelope,
 ) -> Result<String, TransactionPassportError> {
-    let payload = envelope_id_input(envelope)?;
+    let payload = envelope_id_input(envelope);
     let canonical = canonical_json_bytes(&payload)
         .map_err(|_| claim_failed("Agent Web envelope id is not content-addressed"))?;
     Ok(sha256_hex(&canonical))
@@ -290,7 +282,7 @@ fn verify_envelope_signature(
     }
     let signature = Signature::from_hex(signature_ref)
         .map_err(|_| claim_failed("Agent Web envelope signature invalid"))?;
-    let payload = envelope_signature_payload(envelope)?;
+    let payload = envelope_signature_payload(envelope);
     let canonical = chio_core_types::canonical_json_bytes(&payload)
         .map_err(|_| claim_failed("Agent Web envelope signature invalid"))?;
     if !public_key.verify(&canonical, &signature) {

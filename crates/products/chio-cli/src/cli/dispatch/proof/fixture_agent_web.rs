@@ -198,7 +198,7 @@ fn agent_web_receipt_intents(
         }
         let envelope: serde_json::Value = crate::input::json(&budget.read(&envelope_path)?)?;
         if envelope.get("schema").and_then(serde_json::Value::as_str)
-            != Some("chio.agent-web-proof-envelope.v2")
+            != Some("chio.agent-web-proof-envelope.v1")
         {
             continue;
         }
@@ -296,7 +296,7 @@ pub(super) fn refresh_agent_web_envelopes_for_subjects(
     if openapi_subject_path.is_file() {
         let mut subject = read_json_value(&openapi_subject_path)?;
         subject["x_chio_proof_envelope_profile"] =
-            serde_json::Value::String("chio.agent-web-proof-envelope.v2".to_string());
+            serde_json::Value::String("chio.agent-web-proof-envelope.v1".to_string());
         write_json_line_file(&openapi_subject_path, &subject)?;
     }
     let mut envelope_ids = BTreeSet::new();
@@ -341,7 +341,7 @@ pub(super) fn refresh_agent_web_envelopes_for_subjects(
         envelope["projection_manifest_sha256"] =
             serde_json::Value::String(sha256_file(&bundle.join(manifest_path))?);
         envelope["schema"] =
-            serde_json::Value::String("chio.agent-web-proof-envelope.v2".to_string());
+            serde_json::Value::String("chio.agent-web-proof-envelope.v1".to_string());
         envelope["agent_web_passport_scope_sha256"] =
             serde_json::Value::String(passport_scope_sha256.clone());
         sign_agent_web_envelope_value(&mut envelope, &keypair, &public_key)?;
@@ -352,7 +352,7 @@ pub(super) fn refresh_agent_web_envelopes_for_subjects(
             )));
         }
         write_json_line_file(&envelope_path, &envelope)?;
-        node["schema"] = serde_json::Value::String("chio.agent-web-proof-envelope.v2".to_string());
+        node["schema"] = serde_json::Value::String("chio.agent-web-proof-envelope.v1".to_string());
         node["sha256"] = serde_json::Value::String(sha256_file(&envelope_path)?);
     }
     Ok(())
