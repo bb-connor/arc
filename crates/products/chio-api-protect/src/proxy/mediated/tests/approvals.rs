@@ -354,15 +354,21 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         .all(|row| row.receipt.verify_signature().unwrap_or(false)));
     drop(store);
     drop(state);
+    // A replay against an operation awaiting its caller report is refused
+    // without a new receipt; the retained operation keeps its owner.
     let reopened = harness.open(harness.config.clone()).await?;
     let (status, replay) = post_evaluate(reopened, &body).await;
-    assert_eq!(status, StatusCode::OK, "{replay}");
-    assert_eq!(replay["status"], "deny", "{replay}");
-    assert_eq!(replay["execution_authorized"], false, "{replay}");
-    assert_receipt_denial(
-        &replay,
-        "request replay is retained in state AwaitingCallerReport",
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR, "{replay}");
+    assert_eq!(replay["error"], "chio_mediation_failed", "{replay}");
+    assert!(
+        replay["message"]
+            .as_str()
+            .is_some_and(|message| message
+                .contains("request replay is retained in state AwaitingCallerReport")),
+        "{replay}"
     );
+    assert!(replay.get("receipt").is_none(), "{replay}");
+    assert!(replay.get("authorization").is_none(), "{replay}");
     assert_eq!(effects.load(Ordering::SeqCst), 1);
     Ok(())
 }
@@ -533,13 +539,11 @@ async fn ap23_fresh_start_rechecks_signer_retirement_and_capability_revocation()
             "protocol": "chio.caller-delivery.v1", "execution_nonce": reserved["execution_nonce"],
             "arguments": {"value": "A"}, "credentials": {"approval_token": token},
         }), Some(MEDIATED_CONTROL_TOKEN)).await;
-        if retire_signer {
-            assert_eq!(status, StatusCode::FORBIDDEN, "{denied}");
-            assert_receipt_denial(&denied, "approval signer is not in configured roster");
-        } else {
-            assert_eq!(status, StatusCode::CONFLICT, "{denied}");
-            assert_eq!(denied["error"], "chio_caller_delivery_rejected", "{denied}");
-        }
+        // The reserved operation is retained, so either refusal leaves it
+        // with its owner and signs no new receipt.
+        assert_eq!(status, StatusCode::CONFLICT, "{denied}");
+        assert_eq!(denied["error"], "chio_caller_delivery_rejected", "{denied}");
+        assert!(denied.get("receipt").is_none(), "{denied}");
         assert!(denied.get("authorization").is_none(), "{denied}");
     }
     Ok(())
