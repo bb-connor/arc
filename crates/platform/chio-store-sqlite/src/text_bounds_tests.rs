@@ -88,12 +88,11 @@ fn continuation_padded(valid: &str) -> Vec<u8> {
     bytes
 }
 
-fn is_check_refusal(result: &rusqlite::Result<usize>) -> bool {
+fn is_constraint_refusal(result: &rusqlite::Result<usize>, code: i32) -> bool {
     matches!(
         result,
         Err(rusqlite::Error::SqliteFailure(error, Some(_)))
-            if error.extended_code == ffi::SQLITE_CONSTRAINT_CHECK
-                || error.extended_code == ffi::SQLITE_CONSTRAINT_DATATYPE
+            if error.extended_code == code
     )
 }
 
@@ -129,10 +128,13 @@ fn assert_column_refuses_nul_padding(
                     "{table}.{column}"
                 );
                 let padded = insert(&probe, Value::Text(nul_padded(valid)));
-                assert!(is_check_refusal(&padded), "{table}.{column}: {padded:?}");
+                assert!(
+                    is_constraint_refusal(&padded, ffi::SQLITE_CONSTRAINT_CHECK),
+                    "{table}.{column}: {padded:?}"
+                );
                 let stretched = insert_text_bytes(&probe, continuation_padded(valid));
                 assert!(
-                    is_check_refusal(&stretched),
+                    is_constraint_refusal(&stretched, ffi::SQLITE_CONSTRAINT_CHECK),
                     "{table}.{column}: {stretched:?}"
                 );
             }
@@ -143,15 +145,28 @@ fn assert_column_refuses_nul_padding(
                     "{table}.{column}"
                 );
                 let text = insert(&probe, Value::Text(nul_padded(&"a".repeat(len))));
-                assert!(is_check_refusal(&text), "{table}.{column}: {text:?}");
+                let code = if is_strict(&table_sql) {
+                    ffi::SQLITE_CONSTRAINT_DATATYPE
+                } else {
+                    ffi::SQLITE_CONSTRAINT_CHECK
+                };
+                assert!(
+                    is_constraint_refusal(&text, code),
+                    "{table}.{column}: {text:?}"
+                );
             }
         }
         if let Bound::ExactText(valid) = bound {
             let mut in_width = valid[..valid.len() - 1].to_owned();
             in_width.push('\0');
             let refused = insert(&probe, Value::Text(in_width));
-            assert!(is_check_refusal(&refused), "{table}.{column}: {refused:?}");
+            assert!(
+                is_constraint_refusal(&refused, ffi::SQLITE_CONSTRAINT_CHECK),
+                "{table}.{column}: {refused:?}"
+            );
         }
+        let rows: i64 = probe.query_row("SELECT count(*) FROM probe", [], |row| row.get(0))?;
+        assert_eq!(rows, 1, "{table}.{column}: refusal changed the stored rows");
     }
     Ok(())
 }
