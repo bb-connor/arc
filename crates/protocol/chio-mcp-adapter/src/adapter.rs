@@ -237,28 +237,43 @@ impl McpAdapter {
         }
         let transport =
             StdioMcpTransport::spawn_with_timeouts(command, args, launch, request_timeouts)?;
-        let enforcement_evidence = {
-            match transport.enforcement_evidence().cloned() {
-                Some(evidence) => Some(evidence),
-                None => {
-                    let error = AdapterError::ConnectionFailed(
-                        "cage-required transport returned no fully enforced evidence".into(),
-                    );
-                    return Err(merge_shutdown_error(error, transport.shutdown()));
-                }
-            }
-        };
-        let enforcement_receipt = transport.enforcement_receipt().cloned();
-        if enforcement_receipt.is_none() {
-            let error = AdapterError::ConnectionFailed(
-                "cage-required transport returned no persisted enforcement receipt".into(),
-            );
-            return Err(merge_shutdown_error(error, transport.shutdown()));
-        }
-        let mut adapter = Self::new(config, Box::new(transport));
-        adapter.native_enforcement_evidence = enforcement_evidence;
-        adapter.native_enforcement_receipt = enforcement_receipt;
-        Ok(adapter)
+        let (evidence, receipt) = spawn_enforcement(&transport)?;
+        Ok(Self::with_native_enforcement(
+            config,
+            Box::new(transport),
+            evidence,
+            receipt,
+        ))
+    }
+
+    /// Adapt a spawned cage-required transport that another owner also reads.
+    /// The adapter serializes its requests over the shared transport and
+    /// carries the spawn-time enforcement evidence and persisted receipt.
+    pub fn from_shared_enforced_transport(
+        config: McpAdapterConfig,
+        transport: StdioMcpTransport,
+    ) -> Result<(Arc<dyn McpTransport>, Self), AdapterError> {
+        let (evidence, receipt) = spawn_enforcement(&transport)?;
+        let shared: Arc<dyn McpTransport> = Arc::new(transport);
+        let adapter = Self::with_native_enforcement(
+            config,
+            Box::new(SerializedMcpTransport::from_arc(Arc::clone(&shared))),
+            evidence,
+            receipt,
+        );
+        Ok((shared, adapter))
+    }
+
+    fn with_native_enforcement(
+        config: McpAdapterConfig,
+        transport: Box<dyn McpTransport>,
+        evidence: chio_cage::FullyEnforcedEvidence,
+        receipt: chio_core::receipt::body::ChioReceipt,
+    ) -> Self {
+        let mut adapter = Self::new(config, transport);
+        adapter.native_enforcement_evidence = Some(evidence);
+        adapter.native_enforcement_receipt = Some(receipt);
+        adapter
     }
 
     #[must_use]
@@ -373,4 +388,30 @@ impl McpAdapter {
         self.transport
             .complete_resource_argument(uri, argument_name, value, context)
     }
+}
+
+/// The fully enforced evidence and persisted receipt a cage-required spawn
+/// must have produced. A spawn without both is shut down and refused.
+fn spawn_enforcement(
+    transport: &StdioMcpTransport,
+) -> Result<
+    (
+        chio_cage::FullyEnforcedEvidence,
+        chio_core::receipt::body::ChioReceipt,
+    ),
+    AdapterError,
+> {
+    let Some(evidence) = transport.enforcement_evidence().cloned() else {
+        let error = AdapterError::ConnectionFailed(
+            "cage-required transport returned no fully enforced evidence".into(),
+        );
+        return Err(merge_shutdown_error(error, transport.shutdown()));
+    };
+    let Some(receipt) = transport.enforcement_receipt().cloned() else {
+        let error = AdapterError::ConnectionFailed(
+            "cage-required transport returned no persisted enforcement receipt".into(),
+        );
+        return Err(merge_shutdown_error(error, transport.shutdown()));
+    };
+    Ok((evidence, receipt))
 }

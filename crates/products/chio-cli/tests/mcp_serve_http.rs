@@ -6050,5 +6050,7 @@ fn mcp_serve_http_refuses_a_wrapped_command_the_launch_policy_does_not_bind() {
     );
 }
 
+#[path = "mcp_serve_http/confinement.rs"]
+mod confinement;
 #[path = "mcp_serve_http/durable_stop.rs"]
 mod durable_stop;

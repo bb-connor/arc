@@ -42,7 +42,7 @@ use chio_kernel::{
     CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
     CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
 };
-use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig, SerializedMcpTransport};
+use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig};
 use chio_mcp_adapter::edge::ingress::{
     mcp_inbox, AccountedMessage, McpInboxSender, McpRequestGeneration, McpResponseContext,
 };

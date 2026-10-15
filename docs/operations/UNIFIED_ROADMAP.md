@@ -378,7 +378,9 @@ This is #1174's bug-fix lane, promoted to a preview gate. It runs on post-#1160 
   - Open in Part A: the per-request response slots and session-side `finish_call` (A1-A4, section 4.2), the lag resync (A7-A11) and the retry rule (section 4.6).
   - **Exit:** Part A's acceptance cases pass on `chio mcp serve-http`: responses route without loss on live streams and eligible retries replay by request identity without redispatching the effect (with KSPEC-05 section 4.6's disconnect exceptions), a lagged consumer never hangs, a stale cursor after a restore is refused, and subscriptions survive restarts.
 - **KERN-5: isolation evidence.** KSPEC-07 steps 1 and 2, plus `AgentHostBwrap` and `Seatbelt` backend kinds, before any HOST-M2 isolation claim.
-  - First amend KSPEC-07 to add those kinds. Its closed `ConfinementBackendKind` (`LinuxCage`, `FirecrackerGuest`, `ProcessContainer`) exists only in the spec text, not in code, and #1177's PROGRAM-MAP already asks for this one amendment.
+  - KSPEC-07 revision 6 adds both kinds. The closed `ConfinementBackendKind` in `chio-cage-plan` carries all five, and `chio_cage::render_tool_confinement` renders a receipt confined only for a verified `FullyEnforced` Linux cage launch bound at dispatch (#1265).
+  - Step 1: an adapted server binds its spawn receipt while its child runs, and delivery preparation refuses after exit (#1265). Step 2: the process runner signs `chio.process.container-launch.v1` and binds `worker_profile` from the signed record (#1292).
+  - **Status:** the exit is met on main. The native `mcp_serve_http_adapted_server_call_binds_its_verified_cage_launch` case renders a real caged call confined against its persisted launch receipt, and unconfined without the launch or under an unpinned launch signer.
   - **Exit:** the amended backend kinds exist in code, and a receipt renders as confined only when a verified `FullyEnforced` launch record is bound at dispatch; every other native effect renders "unconfined".
 - **KERN-6: gates.**
   - KDEF-GT1: one whole hosted CI run passes.
