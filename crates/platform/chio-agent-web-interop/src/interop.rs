@@ -14,7 +14,7 @@ use chio_core_types::{
         decision::Decision,
         kinds::{ReceiptKind, TrustLevel},
     },
-    sha256_hex, PublicKey, CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA,
+    sha256_hex, PublicKey, CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA,
 };
 use chio_transaction_passport::{
     verify_minimal_passport_artifacts, verify_transaction_passport_signature_with_evidence_graph,
@@ -757,7 +757,7 @@ fn verify_agent_web_interop_with_trust_mode(
         .iter()
         .filter(|node| node.role == AgentWebEvidenceRole::AgentWebProofEnvelope)
     {
-        if envelope_node.schema != CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA {
+        if envelope_node.schema != CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA {
             return Err(claim_failed(format!(
                 "unsupported Agent Web proof envelope schema: {}",
                 envelope_node.schema
@@ -766,7 +766,7 @@ fn verify_agent_web_interop_with_trust_mode(
         let envelope: AgentWebProofEnvelope = parse_artifact(
             bundle,
             envelope_node,
-            CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA,
+            CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA,
         )?;
         validate_envelope(&bundle.passport, &passport_scope_sha256, &envelope, trust)?;
         if !envelope_ids.insert(envelope.envelope_id.clone()) {

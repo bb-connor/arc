@@ -107,8 +107,6 @@ while IFS= read -r line; do
   if [[ "$path" == "docs/security/committed-linux-evidence.md" ]]; then
     authority_text="${authority_text//\`chio.security-check-authority.v3\`/}"
   fi
-  # The legacy quoted v2 identifier is exempt only where the contract checker
-  # and the identity regressions hold it as the record they must refuse.
   if [[ "$path" == "scripts/check-security-ci-contract.py" ||
         "$path" == "scripts/tests/trusted-ci-identity-regressions.test.py" ]]; then
     authority_text="${authority_text//\"chio.security-check-authority.v2\"/}"
@@ -185,26 +183,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  # Agent Web proof envelopes intentionally ship a scope-bound v2 projection
-  # while retaining signed v1 envelope verification for compatibility. Limit
-  # this exemption to the exact schema, its exported constant, and the contract
-  # test diagnostic that names the v2 schema check.
-  if [[ "$text" =~ chio\.agent-web-proof-envelope\.v2|CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA|agent-web\.proof-envelope-schema\.contract-missing:\ scope-bound\ v2\ schema\ test ]]; then
-    continue
-  fi
-  if [[ "$path" == "crates/platform/chio-agent-web-interop/tests/agent_web_interop/core_tests.rs" ]] && \
-     [[ "$text" =~ v1\ proof\ envelope\ with\ a\ v2-only\ passport\ scope\ digest ]]; then
-    continue
-  fi
-
-  # The Agent Web replay-scope v2 string is a hash domain separator, not a
-  # Chio wire or SDK version. Keep the exemption limited to that exact domain.
-  if [[ "$text" =~ chio\.agent-web\.replay-scope\.v2 ]]; then
-    continue
-  fi
-
-  # Mercury proof packages intentionally publish v2 while retaining legacy v1
-  # verification. This subsystem format is outside the v1 wire-surface scan.
   if [[ "$text" =~ chio\.mercury\.proof_package\.v2 ]]; then
     continue
   fi
@@ -220,8 +198,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  # Public settlement intentionally publishes v2 dispatch and execution-receipt
-  # artifacts while preserving v1 bundle verification.
   if [[ "$text" =~ chio\.web3-settlement-(dispatch|execution-receipt)\.v2|CHIO_WEB3_SETTLEMENT_(DISPATCH|RECEIPT|EXECUTION_RECEIPT)_V2_SCHEMA|WEB3_SETTLEMENT_EXECUTION_RECEIPT_SCHEMA ]]; then
     continue
   fi

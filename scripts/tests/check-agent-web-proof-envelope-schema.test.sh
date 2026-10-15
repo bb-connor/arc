@@ -14,8 +14,8 @@ if ! grep -Fq "published_agent_web_schemas_accept_supported_projection_fixtures"
   exit 1
 fi
 
-if ! grep -Fq "published_v2_proof_envelope_schema_requires_scope_and_unique_receipts" "$gate"; then
-  echo "agent-web.proof-envelope-schema.contract-missing: scope-bound v2 schema test" >&2
+if ! grep -Fq "published_proof_envelope_schema_requires_scope_and_unique_receipts" "$gate"; then
+  echo "agent-web.proof-envelope-schema.contract-missing: scope-bound v1 schema test" >&2
   exit 1
 fi
 

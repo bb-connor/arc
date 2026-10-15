@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://chio.world/schemas/chio-agent-web/v2/proof-envelope.schema.json",
-  "title": "Chio Agent Web Proof Envelope v2",
+  "$id": "https://chio.world/schemas/chio-agent-web/v1/proof-envelope.schema.json",
+  "title": "Chio Agent Web Proof Envelope v1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -26,7 +26,7 @@
     "signature"
   ],
   "properties": {
-    "schema": { "const": "chio.agent-web-proof-envelope.v2" },
+    "schema": { "const": "chio.agent-web-proof-envelope.v1" },
     "envelope_id": { "type": "string", "minLength": 1 },
     "transaction_passport_ref": { "type": "string", "minLength": 1 },
     "agent_web_passport_scope_sha256": { "$ref": "#/$defs/sha256" },

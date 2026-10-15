@@ -1,4 +1,4 @@
-//! Signed-artifact schema registry and fail-closed compatibility gate.
+//! Signed-artifact schema registry and fail-closed validation.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -264,7 +264,7 @@ pub const CHIO_ENTERPRISE_TELEMETRY_PROJECTION_V1_SCHEMA: &str =
 pub const CHIO_ENTERPRISE_APPROVAL_CASE_V1_SCHEMA: &str = "chio.enterprise.approval-case.v1";
 pub const CHIO_ENTERPRISE_CONTROL_EVIDENCE_MAP_V1_SCHEMA: &str =
     "chio.enterprise.control-evidence-map.v1";
-pub const CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA: &str = "chio.agent-web-proof-envelope.v2";
+pub const CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA: &str = "chio.agent-web-proof-envelope.v1";
 pub const CHIO_AGENT_WEB_EXTERNAL_PROJECTION_MANIFEST_V1_SCHEMA: &str =
     "chio.agent-web.external-projection-manifest.v1";
 pub const CHIO_AGENT_WEB_INTEROP_VERIFIER_REPORT_V1_SCHEMA: &str =
@@ -1064,8 +1064,8 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         Some(("enterprise_control_evidence_map", "enterprise-export-v1")),
     ),
     (
-        CHIO_AGENT_WEB_PROOF_ENVELOPE_V2_SCHEMA,
-        Some(("agent_web_proof_envelope", "agent-web-interop-v2")),
+        CHIO_AGENT_WEB_PROOF_ENVELOPE_SCHEMA,
+        Some(("agent_web_proof_envelope", "agent-web-interop-v1")),
     ),
     (
         CHIO_AGENT_WEB_EXTERNAL_PROJECTION_MANIFEST_V1_SCHEMA,
@@ -1217,7 +1217,7 @@ const fn known_signed_artifact_schemas() -> [&'static str; SIGNED_ARTIFACT_SCHEM
 const KNOWN_SIGNED_ARTIFACT_SCHEMA_LIST: [&str; SIGNED_ARTIFACT_SCHEMA_SPECS.len()] =
     known_signed_artifact_schemas();
 
-/// Known signed artifacts accepted by the core compatibility gate.
+/// Known signed artifacts accepted by core validation.
 pub const KNOWN_SIGNED_ARTIFACT_SCHEMAS: &[&str] = &KNOWN_SIGNED_ARTIFACT_SCHEMA_LIST;
 
 /// Lightweight registry entry for schema-aware verifiers and reports.

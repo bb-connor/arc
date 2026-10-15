@@ -3957,7 +3957,7 @@ describe('App operator paths', () => {
     sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const agentWebEnvelopeJson = JSON.stringify({
-      schema: 'chio.agent-web-proof-envelope.v2',
+      schema: 'chio.agent-web-proof-envelope.v1',
       envelope_id: 'agent-web-envelope-standard-webhooks-valid',
       transaction_passport_ref: 'passport-agent-web-valid',
       source_protocol: 'standard-webhooks',
@@ -4006,7 +4006,7 @@ describe('App operator paths', () => {
           {
             path: 'standard-webhooks-envelope.json',
             sha256: agentWebEnvelopeDigest,
-            schema: 'chio.agent-web-proof-envelope.v2',
+            schema: 'chio.agent-web-proof-envelope.v1',
             renderer_hint: 'agent-web-proof-envelope',
             participates_in_primary_verdict: true,
           },
@@ -4102,7 +4102,7 @@ describe('App operator paths', () => {
     sessionStorage.clear()
     window.history.replaceState({}, '', '/?view=proof-room')
     const agentWebEnvelopeJson = JSON.stringify({
-      schema: 'chio.agent-web-proof-envelope.v2',
+      schema: 'chio.agent-web-proof-envelope.v1',
       envelope_id: 'agent-web-envelope-mcp-invalid-projection',
       transaction_passport_ref: 'passport-agent-web-valid',
       source_protocol: 'mcp',
@@ -4139,7 +4139,7 @@ describe('App operator paths', () => {
           {
             path: 'mcp-envelope.json',
             sha256: agentWebEnvelopeDigest,
-            schema: 'chio.agent-web-proof-envelope.v2',
+            schema: 'chio.agent-web-proof-envelope.v1',
             renderer_hint: 'agent-web-proof-envelope',
             participates_in_primary_verdict: true,
           },
@@ -5604,7 +5604,7 @@ describe('App operator paths', () => {
     }
 
     const agentWebEnvelopeJson = JSON.stringify({
-      schema: 'chio.agent-web-proof-envelope.v2',
+      schema: 'chio.agent-web-proof-envelope.v1',
       envelope_id: 'uploaded-agent-web-envelope',
       source_protocol: 'mcp',
       source_protocol_version: '2025-06-18',
@@ -5675,7 +5675,7 @@ describe('App operator paths', () => {
         {
           path: 'mcp-envelope.json',
           sha256: agentWebEnvelopeDigest,
-          schema: 'chio.agent-web-proof-envelope.v2',
+          schema: 'chio.agent-web-proof-envelope.v1',
           renderer_hint: 'agent-web-proof-envelope',
         },
         {
