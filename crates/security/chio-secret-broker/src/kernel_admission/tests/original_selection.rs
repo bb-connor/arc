@@ -150,15 +150,14 @@ fn broker_prepares_a_unique_original_and_refuses_unknown_or_reused_requests() ->
     // The tenant namespace and request ID form a unique replay key, so the
     // same tenant cannot retain a second operation under this request ID.
     let reused = broker.reissued(REQUEST_ID, "4".repeat(32))?;
-    let denied = broker.evaluate(&reused)?;
-    assert_eq!(denied.verdict, Verdict::Deny);
-    let reason = denied.reason.as_deref().unwrap_or_default();
+    let expected = format!(
+        "request id conflicts with retained operation {}",
+        dispatch.operation_id
+    );
+    let conflict = broker.admit(&reused)?;
     assert!(
-        reason.contains(&format!(
-            "request id conflicts with retained operation {}",
-            dispatch.operation_id
-        )),
-        "{reason}"
+        matches!(&conflict, Err(KernelError::DurableAdmission(reason)) if reason == &expected),
+        "{conflict:?}"
     );
     assert_eq!(
         request_operations(&store.database, REQUEST_ID)?.as_slice(),
@@ -519,6 +518,13 @@ struct NativeBroker {
 
 impl NativeBroker {
     fn evaluate(&self, execute: &BrokerExecuteRequest) -> TestResult<ToolCallResponse> {
+        Ok(self.admit(execute)??)
+    }
+
+    fn admit(
+        &self,
+        execute: &BrokerExecuteRequest,
+    ) -> TestResult<std::result::Result<ToolCallResponse, KernelError>> {
         let request: ToolCallRequest = serde_json::from_value(json!({
             "request_id": execute.invocation_id, "capability": self.parent,
             "tool_name": BROKER_TOOL, "server_id": BROKER_SERVER,
@@ -529,7 +535,7 @@ impl NativeBroker {
         }))?;
         Ok(self
             .kernel
-            .evaluate_tool_call_blocking_with_security_context(&request, &self.context)?)
+            .evaluate_tool_call_blocking_with_security_context(&request, &self.context))
     }
 
     fn reissued(&self, invocation_id: &str, nonce: String) -> TestResult<BrokerExecuteRequest> {
