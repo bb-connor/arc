@@ -20,6 +20,169 @@ fn strict_contract(authority: &str) -> HttpEgressContract {
 }
 
 #[test]
+fn bare_authority_refuses_every_nondefault_port() {
+    for (scheme, authority, target, denied) in [
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com:8443/report",
+            "api.example.com:8443",
+        ),
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com:80/report",
+            "api.example.com:80",
+        ),
+        (
+            "http",
+            "api.example.com",
+            "http://api.example.com:8080/report",
+            "api.example.com:8080",
+        ),
+        (
+            "http",
+            "api.example.com",
+            "http://api.example.com:443/report",
+            "api.example.com:443",
+        ),
+        (
+            "https",
+            "8.8.8.8",
+            "https://8.8.8.8:8443/report",
+            "8.8.8.8:8443",
+        ),
+        (
+            "https",
+            "[2001:4860:4860::8888]",
+            "https://[2001:4860:4860::8888]:8443/report",
+            "[2001:4860:4860::8888]:8443",
+        ),
+    ] {
+        let mut contract = strict_contract(authority);
+        contract.allowed_schemes = BTreeSet::from([scheme.to_owned()]);
+        assert_eq!(
+            contract.enforce_url(target, 0),
+            Err(HttpEgressError::AuthorityDenied {
+                authority: denied.to_owned()
+            }),
+            "{target}"
+        );
+    }
+}
+
+#[test]
+fn declared_authority_accepts_its_default_or_exact_explicit_port() {
+    for (scheme, authority, target, normalized) in [
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com/report",
+            "api.example.com",
+        ),
+        (
+            "https",
+            "api.example.com",
+            "https://api.example.com:443/report",
+            "api.example.com",
+        ),
+        (
+            "https",
+            "api.example.com:443",
+            "https://api.example.com/report",
+            "api.example.com",
+        ),
+        (
+            "https",
+            "api.example.com:443",
+            "https://api.example.com:443/report",
+            "api.example.com",
+        ),
+        (
+            "https",
+            "api.example.com:8443",
+            "https://api.example.com:8443/report",
+            "api.example.com:8443",
+        ),
+        (
+            "http",
+            "api.example.com",
+            "http://api.example.com/report",
+            "api.example.com",
+        ),
+        (
+            "http",
+            "api.example.com:80",
+            "http://api.example.com:80/report",
+            "api.example.com",
+        ),
+        (
+            "http",
+            "api.example.com:8080",
+            "http://api.example.com:8080/report",
+            "api.example.com:8080",
+        ),
+        (
+            "https",
+            "[2001:4860:4860::8888]",
+            "https://[2001:4860:4860::8888]:443/report",
+            "[2001:4860:4860::8888]",
+        ),
+        (
+            "https",
+            "[2001:4860:4860::8888]:8443",
+            "https://[2001:4860:4860::8888]:8443/report",
+            "[2001:4860:4860::8888]:8443",
+        ),
+        (
+            "https",
+            "api.example.com:8443",
+            "https://API.EXAMPLE.COM:8443/report",
+            "api.example.com:8443",
+        ),
+    ] {
+        let mut contract = strict_contract(authority);
+        contract.allowed_schemes = BTreeSet::from([scheme.to_owned()]);
+        let target = contract.enforce_url(target, 0).expect("declared authority");
+        assert_eq!(target.scheme, scheme);
+        assert_eq!(target.authority, normalized);
+    }
+}
+
+#[test]
+fn explicit_authority_refuses_other_ports_and_userinfo() {
+    for (authority, target, denied) in [
+        (
+            "api.example.com:8443",
+            "https://api.example.com:9443/report",
+            "api.example.com:9443",
+        ),
+        (
+            "api.example.com:8443",
+            "https://api.example.com/report",
+            "api.example.com",
+        ),
+        (
+            "[2001:4860:4860::8888]:8443",
+            "https://[2001:4860:4860::8888]:9443/report",
+            "[2001:4860:4860::8888]:9443",
+        ),
+    ] {
+        assert_eq!(
+            strict_contract(authority).enforce_url(target, 0),
+            Err(HttpEgressError::AuthorityDenied {
+                authority: denied.to_owned()
+            })
+        );
+    }
+    assert_eq!(
+        strict_contract("api.example.com:8443")
+            .enforce_url("https://credential@api.example.com:8443/report", 0),
+        Err(HttpEgressError::UserinfoDenied)
+    );
+}
+
+#[test]
 fn loopback_hostname_policy_respects_contract_flag() {
     let contract = HttpEgressContract::permissive_for_tests("localhost:80");
     contract
