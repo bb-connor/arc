@@ -282,7 +282,7 @@ impl RemoteSessionFactory {
                     server_version: self.config.server_version.clone(),
                     public_key: admitted_manifest.manifest.public_key.clone(),
                 },
-                Box::new(SerializedMcpTransport::from_arc(Arc::clone(transport))),
+                Box::new(chio_mcp_adapter::adapter::SerializedMcpTransport::from_arc(Arc::clone(transport))),
             );
             return Ok(Arc::new(AdaptedMcpServer::new_with_manifest_registry(
                 adapter,

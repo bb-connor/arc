@@ -44,6 +44,10 @@ impl ToolServerConnection for SharedUpstreamToolServer {
         ToolServerConnection::prepare_delivery(self.upstream.as_ref(), context).await
     }
 
+    fn prepared_native_launch_receipt(&self) -> Option<chio_core::receipt::body::ChioReceipt> {
+        self.upstream.prepared_native_launch_receipt()
+    }
+
     async fn invoke_in_context(
         &self,
         context: &chio_kernel::ToolDispatchContext,
@@ -77,37 +81,36 @@ impl SharedUpstreamOwner {
             .ok_or_else(|| {
                 CliError::cli_other_error("admitted remote MCP manifest is unavailable".to_string())
             })?;
-        let launch_transport = || -> Result<Arc<dyn McpTransport>, CliError> {
+        let adapter_config = || McpAdapterConfig {
+            server_id: config.server_id.clone(),
+            server_name: config.server_name.clone(),
+            server_version: config.server_version.clone(),
+            public_key: admitted_manifest.manifest.public_key.clone(),
+        };
+        let launch_transport = || -> Result<(Arc<dyn McpTransport>, McpAdapter), CliError> {
             let native_launch = config.native_launch_factory.prepare_launch(
                 &config.wrapped_command,
                 &wrapped_arg_refs,
                 &config.server_id,
                 Arc::clone(&manifest_registry),
             )?;
-            Ok(Arc::new(StdioMcpTransport::spawn(
-                &config.wrapped_command,
-                &wrapped_arg_refs,
-                native_launch,
-            )?) as Arc<dyn McpTransport>)
+            let transport =
+                StdioMcpTransport::spawn(&config.wrapped_command, &wrapped_arg_refs, native_launch)?;
+            Ok(McpAdapter::from_shared_enforced_transport(adapter_config(), transport)?)
         };
         #[cfg(test)]
-        let notification_source = match &config.test_transport {
-            Some(transport) => Arc::clone(transport),
+        let (notification_source, adapter) = match &config.test_transport {
+            Some(transport) => (
+                Arc::clone(transport),
+                McpAdapter::new(
+                    adapter_config(),
+                    Box::new(chio_mcp_adapter::adapter::SerializedMcpTransport::from_arc(Arc::clone(transport))),
+                ),
+            ),
             None => launch_transport()?,
         };
         #[cfg(not(test))]
-        let notification_source = launch_transport()?;
-        let adapter = McpAdapter::new(
-            McpAdapterConfig {
-                server_id: config.server_id.clone(),
-                server_name: config.server_name.clone(),
-                server_version: config.server_version.clone(),
-                public_key: admitted_manifest.manifest.public_key.clone(),
-            },
-            Box::new(SerializedMcpTransport::from_arc(
-                notification_source.clone(),
-            )),
-        );
+        let (notification_source, adapter) = launch_transport()?;
         let upstream_server = Arc::new(AdaptedMcpServer::new_with_manifest_registry(
             adapter,
             manifest_registry.as_ref(),
