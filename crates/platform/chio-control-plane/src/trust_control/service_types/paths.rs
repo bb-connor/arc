@@ -102,6 +102,10 @@ pub(crate) const PUBLIC_PASSPORT_VERIFIER_DISCOVERY_PATH: &str =
     "/v1/public/passport/discovery/verifier";
 pub(crate) const PUBLIC_PASSPORT_DISCOVERY_TRANSPARENCY_PATH: &str =
     "/v1/public/passport/discovery/transparency";
+pub(crate) const PUBLIC_PASSPORT_REVOCATION_ROOT_PATH: &str =
+    "/v1/public/passport/revocations/root";
+pub(crate) const PUBLIC_PASSPORT_REVOCATION_LEAVES_PATH: &str =
+    "/v1/public/passport/revocations/leaves";
 pub(crate) const PASSPORT_STATUS_REVOKE_PATH: &str = "/v1/passport/statuses/{passport_id}/revoke";
 pub(crate) const PASSPORT_VERIFIER_POLICIES_PATH: &str = "/v1/passport/verifier-policies";
 pub(crate) const PASSPORT_VERIFIER_POLICY_PATH: &str = "/v1/passport/verifier-policies/{policy_id}";

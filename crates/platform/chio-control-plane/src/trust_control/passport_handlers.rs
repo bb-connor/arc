@@ -12,7 +12,7 @@ use super::report_validation::{
 use super::*;
 
 #[path = "passport_handlers/public_authority_trust.rs"]
-mod public_authority_trust;
+pub(super) mod public_authority_trust;
 use public_authority_trust::{public_oid4vp_trusted_keys, run_public_authority_trust_read};
 
 pub(crate) async fn handle_passport_issuer_metadata(

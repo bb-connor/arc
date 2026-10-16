@@ -4690,6 +4690,27 @@ Portable lifecycle resolution itself remains Chio-native and operator-scoped:
   lifecycle distributions that omit TTL are not healthy states for portable
   consumers
 
+Trust-control also publishes its passport revocation set to federation
+partners:
+
+- `GET /v1/public/passport/revocations/root` returns the oracle's
+  `SignedEpochRoot`, signed with the trust-control authority key over the
+  `chio-revocation-oracle:v1:epoch-root` domain; its `issued_at_unix_ms` is
+  the signing time and its `signer_id` is the authority public key in hex
+- `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
+  `chio.passport-revocation-leaves.v1` page of the leaves with a sequence
+  number above `after`, in insertion order, at most 256 leaves and 512 KiB
+- a partner pins the authority key and a `revocationFreshnessTtlSeconds` of 1
+  to 300 seconds in its `chio.partner-card-registry.v1` card; a card without
+  the TTL, or with a TTL outside that range, is refused at load
+- the partner rebuilds the tree from the leaves and accepts the signed root
+  only when the rebuilt root, epoch and leaf count equal it; a root that does
+  not verify against the pinned key, rolls back the accepted epoch or signing
+  time, is dated more than 5 seconds ahead, or signs a second root for an
+  accepted epoch is refused, and a refused root leaves the mirror unchanged
+- a mirror whose accepted root is older than the TTL, or that holds no
+  verified root, is stale and denies fail closed
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 
