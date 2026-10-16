@@ -22,8 +22,6 @@ fn verifier(key: &Keypair) -> Result<JwtBearerVerifier, chio_kernel::dpop::DpopE
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store: Arc::new(DpopNonceStore::new(32, Duration::from_secs(300))?),
-        sender_dpop_config: DpopConfig::default(),
     })
 }
 
@@ -54,8 +52,6 @@ async fn inbound_authority_proxy_authentication_controls_jwt_identity() -> TestR
                         SenderRequest::from_request(&request),
                         None,
                         None,
-                        "POST",
-                        "chio-mcp",
                     ) {
                         Ok(_) => {
                             calls.fetch_add(1, Ordering::SeqCst);

@@ -94,7 +94,6 @@ fn test_introspection_verifier(
     audience: Option<&str>,
     required_scopes: &[&str],
 ) -> IntrospectionBearerVerifier {
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     IntrospectionBearerVerifier {
         clock: RemoteClock::default(),
         client: client_builder_with_contract(&HttpEgressContract::permissive_for_tests(
@@ -114,8 +113,6 @@ fn test_introspection_verifier(
             .collect(),
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
         egress_contract: None,
     }
 }
@@ -123,7 +120,6 @@ fn test_introspection_verifier(
 #[test]
 fn jwt_bearer_verifier_builds_oauth_session_auth_context() {
     let keypair = Keypair::generate();
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     let token = sign_jwt(
         &keypair,
         &json!({
@@ -147,8 +143,6 @@ fn jwt_bearer_verifier_builds_oauth_session_auth_context() {
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     };
 
     let auth_context = verifier
@@ -157,8 +151,6 @@ fn jwt_bearer_verifier_builds_oauth_session_auth_context() {
             &empty_header_map(),
             Some("http://localhost:3000".to_string()),
             None,
-            "POST",
-            "chio-mcp",
         )
         .unwrap();
     assert_eq!(auth_context.transport, SessionTransport::StreamableHttp);
@@ -251,7 +243,6 @@ fn jwt_bearer_verifier_builds_oauth_session_auth_context() {
 fn jwt_bearer_verifier_authenticates_rs256_jwks_token() {
     let private_key = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
     let public_key = private_key.to_public_key();
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     let token = sign_jwt_rs256(
         &private_key,
         &json!({
@@ -280,8 +271,6 @@ fn jwt_bearer_verifier_authenticates_rs256_jwks_token() {
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     };
 
     let auth_context = verifier
@@ -290,8 +279,6 @@ fn jwt_bearer_verifier_authenticates_rs256_jwks_token() {
             &empty_header_map(),
             Some("http://localhost:3000".to_string()),
             None,
-            "POST",
-            "chio-mcp",
         )
         .unwrap();
     match &auth_context.method {
@@ -311,7 +298,6 @@ fn jwt_bearer_verifier_authenticates_rs256_jwks_token() {
 #[test]
 fn jwt_bearer_verifier_authenticates_es256_jwks_token() {
     let signing_key = p256::ecdsa::SigningKey::random(&mut p256::elliptic_curve::rand_core::OsRng);
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     let token = sign_jwt_es256(
         &signing_key,
         &json!({
@@ -340,12 +326,10 @@ fn jwt_bearer_verifier_authenticates_es256_jwks_token() {
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     };
 
     let auth_context = verifier
-        .authenticate_token(&token, &empty_header_map(), None, None, "POST", "chio-mcp")
+        .authenticate_token(&token, &empty_header_map(), None, None)
         .unwrap();
     match &auth_context.method {
         SessionAuthMethod::OAuthBearer {
@@ -365,7 +349,6 @@ fn jwt_bearer_verifier_authenticates_es256_jwks_token() {
 fn jwt_bearer_verifier_authenticates_ps256_jwks_token() {
     let private_key = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
     let public_key = private_key.to_public_key();
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     let token = sign_jwt_ps256(
         &private_key,
         &json!({
@@ -394,12 +377,10 @@ fn jwt_bearer_verifier_authenticates_ps256_jwks_token() {
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     };
 
     let auth_context = verifier
-        .authenticate_token(&token, &empty_header_map(), None, None, "POST", "chio-mcp")
+        .authenticate_token(&token, &empty_header_map(), None, None)
         .unwrap();
     match &auth_context.method {
         SessionAuthMethod::OAuthBearer {
@@ -418,7 +399,6 @@ fn jwt_bearer_verifier_authenticates_ps256_jwks_token() {
 #[test]
 fn jwt_bearer_verifier_authenticates_es384_jwks_token() {
     let signing_key = p384::ecdsa::SigningKey::random(&mut p384::elliptic_curve::rand_core::OsRng);
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     let token = sign_jwt_es384(
         &signing_key,
         &json!({
@@ -447,12 +427,10 @@ fn jwt_bearer_verifier_authenticates_es384_jwks_token() {
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     };
 
     let auth_context = verifier
-        .authenticate_token(&token, &empty_header_map(), None, None, "POST", "chio-mcp")
+        .authenticate_token(&token, &empty_header_map(), None, None)
         .unwrap();
     match &auth_context.method {
         SessionAuthMethod::OAuthBearer {
@@ -489,7 +467,6 @@ fn introspection_bearer_verifier_accepts_active_token_with_resource_claim() {
                     scope: Some("mcp:invoke tools.read".to_string()),
                     scp: vec![],
                     client_id: Some("client-123".to_string()),
-                    jti: None,
                     oid: None,
                     azp: None,
                     appid: None,
@@ -509,8 +486,6 @@ fn introspection_bearer_verifier_accepts_active_token_with_resource_claim() {
             },
             origin: Some("http://localhost:3000".to_string()),
             protected_resource_metadata: None,
-            expected_method: "POST",
-            expected_target: "chio-mcp",
         })
         .unwrap();
     match &auth_context.method {
@@ -584,7 +559,6 @@ fn introspection_bearer_verifier_rejects_inactive_token() {
                     scope: None,
                     scp: vec![],
                     client_id: None,
-                    jti: None,
                     oid: None,
                     azp: None,
                     appid: None,
@@ -604,8 +578,6 @@ fn introspection_bearer_verifier_rejects_inactive_token() {
             },
             origin: None,
             protected_resource_metadata: None,
-            expected_method: "POST",
-            expected_target: "chio-mcp",
         })
         .unwrap_err();
     assert_eq!(error.status(), StatusCode::UNAUTHORIZED);
@@ -627,7 +599,6 @@ fn sign_jwt(keypair: &Keypair, claims: &serde_json::Value) -> String {
 }
 
 fn inbound_sender_verifier(key: &Keypair) -> JwtBearerVerifier {
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     JwtBearerVerifier {
         clock: RemoteClock::default(),
         key_source: JwtVerificationKeySource::Static(key.public_key()),
@@ -636,8 +607,6 @@ fn inbound_sender_verifier(key: &Keypair) -> JwtBearerVerifier {
         required_scopes: vec![],
         provider_profile: JwtProviderProfile::Generic,
         enterprise_provider_registry: None,
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     }
 }
 
@@ -669,7 +638,7 @@ fn inbound_authority_jwt_rejects_weak_key_forgery() {
         let mut verifier = inbound_sender_verifier(&Keypair::generate());
         verifier.key_source = key_source;
         assert!(verifier
-            .authenticate_token(&token, &empty_header_map(), None, None, "POST", "chio-mcp")
+            .authenticate_token(&token, &empty_header_map(), None, None)
             .is_err());
     }
 }
@@ -682,7 +651,7 @@ fn inbound_authority_jwt_unknown_empty_or_null_confirmation_never_becomes_bearer
         json!({}), Value::Null, json!({"chioSenderKey":null}), json!({"x5t#S256":""})]
         .into_iter().map(|cnf| {
             let token = sign_jwt(&key, &json!({"iss":"https://issuer.example", "aud":"chio-mcp", "sub":"sender", "exp":unix_now()+300, "cnf":cnf}));
-            match verifier.authenticate_token(&token, &HeaderMap::new(), None, None, "POST", "chio-mcp") {
+            match verifier.authenticate_token(&token, &HeaderMap::new(), None, None) {
                 Ok(_) => StatusCode::OK,
                 Err(response) => response.status(),
             }
@@ -709,7 +678,7 @@ fn inbound_authority_jwt_caller_headers_cannot_claim_transport_identity() {
             HeaderValue::from_static("127.0.0.1"),
         ),
     ]);
-    let result = verifier.authenticate_token(&token, &headers, None, None, "POST", "chio-mcp");
+    let result = verifier.authenticate_token(&token, &headers, None, None);
     let status = match result {
         Ok(_) => StatusCode::OK,
         Err(response) => response.status(),
@@ -718,7 +687,7 @@ fn inbound_authority_jwt_caller_headers_cannot_claim_transport_identity() {
 }
 
 #[test]
-fn inbound_authority_remote_subject_is_the_authenticated_sender_key() {
+fn inbound_authority_dpop_bound_jwt_is_refused_and_never_a_bearer() {
     let issuer = Keypair::generate();
     let sender = Keypair::generate();
     let verifier = inbound_sender_verifier(&issuer);
@@ -727,31 +696,54 @@ fn inbound_authority_remote_subject_is_the_authenticated_sender_key() {
         &issuer,
         &json!({"iss":"https://issuer.example","aud":"chio-mcp","sub":"sender","exp":now+300,"jti":"subject-bootstrap","cnf":{"chioSenderKey":sender.public_key().to_hex()}}),
     );
-    let proof = DpopProof::sign(
-        chio_kernel::dpop::DpopProofBody {
-            schema: chio_kernel::DPOP_SCHEMA.into(),
-            replay_authority: None,
-            capability_id: "subject-bootstrap".into(),
-            tool_server: "chio-mcp".into(),
-            tool_name: "POST".into(),
-            action_hash: sha256_hex(HTTP_DPOP_ACTION_HASH_EMPTY),
-            nonce: "subject-proof".into(),
-            issued_at: now,
-            agent_key: sender.public_key(),
-        },
-        &sender,
-    )
-    .unwrap();
+    let presented = HeaderMap::from_iter([(
+        HeaderName::from_static(DPOP_HEADER),
+        HeaderValue::from_static("presented-proof"),
+    )]);
+    for headers in [HeaderMap::new(), presented] {
+        let response = verifier
+            .authenticate_token(&token, &headers, None, None)
+            .expect_err("a DPoP-bound token has no usable proof path");
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let cause = response
+            .extensions()
+            .get::<Arc<SenderConstraintError>>()
+            .expect("typed sender refusal");
+        assert!(matches!(
+            cause.as_ref(),
+            SenderConstraintError::DpopUnavailable
+        ));
+        assert_eq!(
+            cause.to_string(),
+            "urn:chio:error:transport:dpop-sender-proof-unavailable"
+        );
+    }
+}
+
+#[test]
+fn inbound_authority_plain_bearer_presenting_dpop_is_refused() {
+    let issuer = Keypair::generate();
+    let verifier = inbound_sender_verifier(&issuer);
+    let now = verifier.clock.seconds().unwrap();
+    let token = sign_jwt(
+        &issuer,
+        &json!({"iss":"https://issuer.example","aud":"chio-mcp","sub":"sender","exp":now+300}),
+    );
     let headers = HeaderMap::from_iter([(
         HeaderName::from_static(DPOP_HEADER),
-        HeaderValue::from_str(&URL_SAFE_NO_PAD.encode(serde_json::to_vec(&proof).unwrap()))
-            .unwrap(),
+        HeaderValue::from_static("presented-proof"),
     )]);
-    let auth = verifier
-        .authenticate_token(&token, &headers, None, None, "POST", "chio-mcp")
-        .unwrap();
-    let subject = derive_session_agent_public_key(&test_remote_config(), &auth, true).unwrap();
-    assert_eq!(subject, sender.public_key());
+    let response = verifier
+        .authenticate_token(&token, &headers, None, None)
+        .expect_err("a presented Chio DPoP proof is refused");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    assert!(matches!(
+        response
+            .extensions()
+            .get::<Arc<SenderConstraintError>>()
+            .map(AsRef::as_ref),
+        Some(SenderConstraintError::DpopUnavailable)
+    ));
 }
 
 async fn refusal(result: Result<SessionAuthContext, Response>) -> (StatusCode, String) {
@@ -774,7 +766,6 @@ fn introspection_claims(iss: Option<&str>, exp: Option<u64>) -> JwtClaims {
         scope: None,
         scp: vec![],
         client_id: None,
-        jti: None,
         oid: None,
         azp: None,
         appid: None,
@@ -807,8 +798,6 @@ fn introspect(
         },
         origin: None,
         protected_resource_metadata: None,
-        expected_method: "POST",
-        expected_target: "chio-mcp",
     })
 }
 
@@ -822,15 +811,7 @@ async fn jwt_bearer_verifier_rejects_token_without_exp() {
         &json!({"iss": "https://issuer.example", "aud": "chio-mcp", "sub": "user", "iat": now}),
     );
     assert_eq!(
-        refusal(verifier.authenticate_token(
-            &token,
-            &empty_header_map(),
-            None,
-            None,
-            "POST",
-            "chio-mcp"
-        ))
-        .await,
+        refusal(verifier.authenticate_token(&token, &empty_header_map(), None, None)).await,
         (
             StatusCode::UNAUTHORIZED,
             "JWT bearer token has no exp".to_string()
@@ -873,15 +854,7 @@ async fn jwt_bearer_verifier_rejects_issuer_mismatch() {
     ] {
         let token = sign_jwt(&key, &claims);
         assert_eq!(
-            refusal(verifier.authenticate_token(
-                &token,
-                &empty_header_map(),
-                None,
-                None,
-                "POST",
-                "chio-mcp"
-            ))
-            .await,
+            refusal(verifier.authenticate_token(&token, &empty_header_map(), None, None)).await,
             (
                 StatusCode::UNAUTHORIZED,
                 "JWT bearer issuer mismatch".to_string()
@@ -977,10 +950,7 @@ async fn invalid_token_challenge_carries_error_invalid_token() {
             &token,
             &empty_header_map(),
             None,
-            Some(&metadata),
-            "POST",
-            "chio-mcp"
-        ))
+            Some(&metadata)))
         .await,
         (
             StatusCode::UNAUTHORIZED,
@@ -1021,15 +991,8 @@ async fn missing_required_scope_answers_403_insufficient_scope_challenge() {
         "Bearer error=\"insufficient_scope\", scope=\"mcp:invoke\", resource_metadata=\"{TEST_RESOURCE_METADATA_URL}\""
     );
     assert_eq!(
-        challenge(verifier.authenticate_token(
-            &token,
-            &empty_header_map(),
-            None,
-            Some(&metadata),
-            "POST",
-            "chio-mcp"
-        ))
-        .await,
+        challenge(verifier.authenticate_token(&token, &empty_header_map(), None, Some(&metadata)))
+            .await,
         (
             StatusCode::FORBIDDEN,
             expected_challenge.clone(),
@@ -1055,8 +1018,6 @@ async fn missing_required_scope_answers_403_insufficient_scope_challenge() {
             },
             origin: None,
             protected_resource_metadata: Some(&metadata),
-            expected_method: "POST",
-            expected_target: "chio-mcp",
         },
     );
     assert_eq!(
