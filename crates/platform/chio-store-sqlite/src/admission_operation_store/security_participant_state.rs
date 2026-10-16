@@ -31,6 +31,7 @@ pub(in crate::admission_operation_store) use storage::with_test_current_rows;
 mod integrity;
 mod mutations;
 mod observation;
+pub(in crate::admission_operation_store) use observation::verify_recovery_initialization;
 mod occupancy;
 pub(crate) use mutations::NativeFlowJoinAuthority;
 mod readback;

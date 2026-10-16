@@ -3310,10 +3310,10 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
 rust_symbols = ["initialize_admission_operation_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "c7ffd8c230789655f0fb52562a98ea301e6370150acd2ab0ba0fd8061d84d59f"
+normalized_sha256 = "faf99498350ea0805c29ad017b784980d70c6bb9836816b6ed525b25597db169"
 symbol_sha256 = [
   { symbol = "initialize_admission_operation_schema", sha256 = "be897df34155017039d2fada7d28460ce6066a45f80ae52ecf5e601b7dbf890c" },
-  { symbol = "verify_admission_operation_invariants", sha256 = "31bb6ab77b865c86c6cce12e66cdc988240473c24a65a4bb315c41c95edd21a8" },
+  { symbol = "verify_admission_operation_invariants", sha256 = "86c004ee3c7f6a900f895ab3573f31644434a1e3d34c9ed2d9adf321a2b381b1" },
   { symbol = "verify_admission_operation_schema", sha256 = "de79fa606f610563a0562aed2211835a119a6aa2884d339b24ab66b70cbeab86" },
   { symbol = "admission_operation_schema_catalog", sha256 = "4a8cba51f37d8fc12954a905486130a1e772b734099c64a6ee56cd23a8f239fb" },
 ]

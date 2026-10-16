@@ -23,6 +23,26 @@ pub(crate) fn verify_global_coverage(
     verify_no_orphan_commit(connection)
 }
 
+/// Seek retained ownership by projection kind and key.
+pub(super) fn retains_global_ownership(
+    connection: &Connection,
+    key: &str,
+) -> Result<bool, AdmissionOperationStoreError> {
+    if !table_exists(connection, GLOBAL_COMMITS_TABLE)? {
+        return Err(invariant("recovery global commit catalog is absent"));
+    }
+    connection
+        .query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM main.authority_global_commits
+                WHERE projection_kind = ?1 AND projection_key = ?2
+             )",
+            [RECOVERY_PROJECTION_KIND, key],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
+}
+
 fn verify_event_ownership(connection: &Connection) -> Result<(), AdmissionOperationStoreError> {
     let mut events = connection
         .prepare(&format!(

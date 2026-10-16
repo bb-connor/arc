@@ -15,7 +15,7 @@ use super::{
 
 /// One local event whose stored digest equals the v1 digest of its fields.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct RecordEvent {
+pub(in crate::admission_operation_store) struct RecordEvent {
     pub sequence: u64,
     pub record_key: String,
     pub record_version: u64,
@@ -115,6 +115,21 @@ fn authenticate(row: StoredEventRow) -> Result<RecordEvent, AdmissionOperationSt
         event_digest: stored_digest,
         observed_at,
     })
+}
+
+pub(super) fn has_events(
+    connection: &Connection,
+    key: &str,
+) -> Result<bool, AdmissionOperationStoreError> {
+    connection
+        .query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM main.admission_operation_recovery_events WHERE record_key = ?1
+             )",
+            [key],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)
 }
 
 /// The bounded stored event of `key` at `version`, unauthenticated.

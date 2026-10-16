@@ -3,9 +3,11 @@
 use chio_core::canonical::canonical_json_bytes;
 use chio_kernel::admission_operation::AdmissionOperationStoreError;
 use rusqlite::{Connection, OptionalExtension};
+use serde::{de::DeserializeOwned, Serialize};
 
 use super::digest::{is_digest_hex, record_digest, RecordDigestInput};
-use super::history::current_event;
+use super::global_coverage::retains_global_ownership;
+use super::history::{current_event, has_events, RecordEvent};
 use super::{
     bounded_text, invariant, require_key, safe_integer, sqlite_error, stored_digest, stored_text,
     MAX_NATIVE_REQUEST_BYTES, MAX_NATIVE_REQUEST_CHARS, MAX_RECORD_KIND_CHARS,
@@ -13,14 +15,14 @@ use super::{
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum RecordKind {
+pub(in crate::admission_operation_store) enum RecordKind {
     Deployment,
     Workflow,
     Command,
 }
 
 impl RecordKind {
-    pub(super) const fn as_str(self) -> &'static str {
+    pub(in crate::admission_operation_store) const fn as_str(self) -> &'static str {
         match self {
             Self::Deployment => "deployment",
             Self::Workflow => "workflow",
@@ -40,9 +42,61 @@ impl RecordKind {
 
 /// The native request a workflow record exclusively owns.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) struct NativeIdentity {
+pub(in crate::admission_operation_store) struct NativeIdentity {
     pub namespace: String,
     pub request: String,
+}
+
+/// A bounded current projection authenticated against its latest local event.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(in crate::admission_operation_store) struct ProtectedRecord {
+    pub key: String,
+    pub scope: String,
+    pub kind: RecordKind,
+    pub version: u64,
+    pub payload: Vec<u8>,
+    pub native: Option<NativeIdentity>,
+    pub event: RecordEvent,
+}
+
+impl ProtectedRecord {
+    /// Refuse payload bytes that the selected type cannot reproduce exactly.
+    pub(in crate::admission_operation_store) fn decode_payload<T>(
+        &self,
+    ) -> Result<T, AdmissionOperationStoreError>
+    where
+        T: DeserializeOwned + Serialize,
+    {
+        let value: T = serde_json::from_slice(&self.payload)
+            .map_err(|_| invariant("recovery record payload does not decode"))?;
+        let encoded = canonical_json_bytes(&value)
+            .map_err(|_| invariant("recovery record payload does not encode"))?;
+        if encoded != self.payload {
+            return Err(invariant(
+                "recovery record payload is not exact canonical data",
+            ));
+        }
+        Ok(value)
+    }
+}
+
+/// Read inside a fenced transaction after startup has authenticated the local
+/// and global histories. The current row and latest local event use indexed
+/// point lookups. Absence requires both journals to have no retained owner.
+pub(in crate::admission_operation_store) fn load_record(
+    connection: &Connection,
+    key: &str,
+) -> Result<Option<ProtectedRecord>, AdmissionOperationStoreError> {
+    require_key(key)?;
+    if let Some(row) = stored_row(connection, key)? {
+        return authenticate(connection, key, row).map(Some);
+    }
+    if retains_global_ownership(connection, key)? || has_events(connection, key)? {
+        return Err(invariant(
+            "recovery record disappeared with retained history",
+        ));
+    }
+    Ok(None)
 }
 
 /// Columns are selected only within their storage type, text character and
@@ -69,7 +123,7 @@ pub(super) fn verify_present_record(
     require_key(key)?;
     let row = stored_row(connection, key)?
         .ok_or_else(|| invariant("recovery record disappeared during verification"))?;
-    authenticate(connection, key, row)
+    authenticate(connection, key, row).map(|_| ())
 }
 
 fn stored_row(
@@ -129,7 +183,7 @@ fn authenticate(
     connection: &Connection,
     key: &str,
     row: StoredRecordRow,
-) -> Result<(), AdmissionOperationStoreError> {
+) -> Result<ProtectedRecord, AdmissionOperationStoreError> {
     let (true, Some(scope), Some(kind), Some(payload)) =
         (row.within, row.scope, row.kind, row.payload)
     else {
@@ -176,7 +230,15 @@ fn authenticate(
     if event.record_digest != digest {
         return Err(invariant("recovery record digest differs from its event"));
     }
-    Ok(())
+    Ok(ProtectedRecord {
+        key: key.to_owned(),
+        scope,
+        kind,
+        version,
+        payload,
+        native,
+        event,
+    })
 }
 
 /// Every persisted payload is the canonical JSON encoding of its value.
