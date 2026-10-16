@@ -3288,6 +3288,19 @@ pub const KERNEL_DPOP_ACTION: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel"],
 };
 
+pub const KERNEL_DPOP_AUTHORITY_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-authority-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The DPoP proof names a different replay authority.",
+    help: "Sign a fresh proof for the independently configured active replay authority.",
+    string_code: "CHIO-KERNEL-DPOP-AUTHORITY-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
 pub const KERNEL_DPOP_CAPABILITY: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:dpop-capability",
     domain: Domain::Kernel,
@@ -3568,19 +3581,6 @@ pub const KERNEL_FINANCIAL_BUDGET_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
     summary: "Security boundary refused: financial-budget-exceeded.",
     help: "Restore the named invariant and present fresh evidence for the exact request.",
     string_code: "CHIO-KERNEL-FINANCIAL-BUDGET-EXCEEDED",
-    jsonrpc_code: None,
-    since: "0.1.0",
-    stability: "stable",
-    consumed_by: &["chio-kernel"],
-};
-
-pub const KERNEL_DPOP_RESERVATION_OWNERSHIP: ErrorCodeSpec = ErrorCodeSpec {
-    urn: "urn:chio:error:kernel:dpop-reservation-ownership",
-    domain: Domain::Kernel,
-    severity: Severity::Error,
-    summary: "DPoP reservation ownership was not confirmed at commit.",
-    help: "Retain the marker and reconcile the original operation before retrying.",
-    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP",
     jsonrpc_code: None,
     since: "0.1.0",
     stability: "stable",
@@ -3936,6 +3936,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_APPROVAL_REPLAY_UNAVAILABLE,
     KERNEL_DPOP_ACCOUNTING,
     KERNEL_DPOP_ACTION,
+    KERNEL_DPOP_AUTHORITY_MISMATCH,
     KERNEL_DPOP_CAPABILITY,
     KERNEL_DPOP_CAPABILITY_CAPACITY,
     KERNEL_DPOP_CAPACITY,
@@ -3958,7 +3959,6 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_UNAVAILABLE,
     KERNEL_DPOP_WINDOW_OVERFLOW,
     KERNEL_FINANCIAL_BUDGET_EXCEEDED,
-    KERNEL_DPOP_RESERVATION_OWNERSHIP,
     TRANSPORT_TASK_CAPACITY_EXCEEDED,
     TRANSPORT_STREAM_CAPACITY_EXCEEDED,
     KERNEL_DPOP_INVALID_CAPACITY,

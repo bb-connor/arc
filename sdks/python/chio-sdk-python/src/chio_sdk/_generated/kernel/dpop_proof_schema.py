@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
+# Schema sha256: c785132ff35c3027a919bab8b2f95d9c699e261d1d605caa42de4f73aa106e19
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -11,17 +11,12 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, conint, constr
 
 from ..capability import governed_approval_token_schema
-
-
-class Schema(Enum):
-    chio_dpop_proof_v1 = "chio.dpop_proof.v1"
-    chio_dpop_proof_v2 = "chio.dpop_proof.v2"
 
 
 class ReplayAuthority(BaseModel):
@@ -39,8 +34,8 @@ class Body(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    schema_: Schema = Field(..., alias="schema")
-    replay_authority: ReplayAuthority | None = None
+    schema_: Literal["chio.dpop_proof.v1"] = Field(..., alias="schema")
+    replay_authority: ReplayAuthority
     capability_id: constr(min_length=1)
     tool_server: constr(min_length=1)
     tool_name: constr(min_length=1)
