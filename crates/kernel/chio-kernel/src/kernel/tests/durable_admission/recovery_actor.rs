@@ -343,7 +343,7 @@ fn unsupported_scope_constraints_are_policy_refusals() -> TestResult {
     assert_eq!(
         kernel.verify_capability_full_pre_admit(&token, None, current_unix_timestamp()),
         Err(
-            "invalid capability constraint: unsupported capability constraint: TableAllowlist"
+            "invalid capability constraint: unsupported capability constraint: TableAllowlist; grant-specific enforcement is unavailable"
                 .into()
         )
     );
