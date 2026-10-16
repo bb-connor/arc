@@ -67,17 +67,27 @@ impl ProtectedRecord {
     where
         T: DeserializeOwned + Serialize,
     {
-        let value: T = serde_json::from_slice(&self.payload)
-            .map_err(|_| invariant("recovery record payload does not decode"))?;
-        let encoded = canonical_json_bytes(&value)
-            .map_err(|_| invariant("recovery record payload does not encode"))?;
-        if encoded != self.payload {
-            return Err(invariant(
-                "recovery record payload is not exact canonical data",
-            ));
-        }
-        Ok(value)
+        decode_protected_payload(&self.payload)
     }
+}
+
+/// Refuse bytes that the selected payload type cannot reproduce exactly.
+pub(in crate::admission_operation_store) fn decode_protected_payload<T>(
+    payload: &[u8],
+) -> Result<T, AdmissionOperationStoreError>
+where
+    T: DeserializeOwned + Serialize,
+{
+    let value: T = serde_json::from_slice(payload)
+        .map_err(|_| invariant("recovery record payload does not decode"))?;
+    let encoded = canonical_json_bytes(&value)
+        .map_err(|_| invariant("recovery record payload does not encode"))?;
+    if encoded != payload {
+        return Err(invariant(
+            "recovery record payload is not exact canonical data",
+        ));
+    }
+    Ok(value)
 }
 
 /// Read inside a fenced transaction after startup has authenticated the local

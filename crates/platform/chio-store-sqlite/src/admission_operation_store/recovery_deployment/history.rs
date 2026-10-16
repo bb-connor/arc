@@ -48,7 +48,6 @@ fn retain(
     planning::save_planned(
         tx,
         owner,
-        profile,
         &ProtectedWrite {
             key: &key,
             scope: &scope,

@@ -35,6 +35,7 @@ use super::*;
 
 mod actor_authentication;
 mod authenticated_read;
+mod semantic_installation;
 
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 

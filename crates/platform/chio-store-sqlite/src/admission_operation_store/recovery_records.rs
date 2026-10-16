@@ -24,7 +24,9 @@ use record::NativeIdentity;
 pub(crate) use global_coverage::verify_global_coverage;
 pub(crate) use history::projection_reference;
 pub(in crate::admission_operation_store) use history::verify_local_history;
-pub(in crate::admission_operation_store) use record::{load_record, ProtectedRecord, RecordKind};
+pub(in crate::admission_operation_store) use record::{
+    decode_protected_payload, load_record, ProtectedRecord, RecordKind,
+};
 pub(in crate::admission_operation_store) use write::{
     encode_protected, first_version_retains, persist_protected_record, protected_scope_key,
     require_latest_projection_head, ProtectedRecordKind, ProtectedWrite,

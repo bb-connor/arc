@@ -17,8 +17,9 @@ use serde::{Deserialize, Serialize};
 use crate::serving_owner::SqliteServingOwner;
 
 use super::super::recovery_records::{
-    encode_protected, first_version_retains, load_record, persist_protected_record,
-    protected_scope_key, ProtectedRecord, ProtectedRecordKind, ProtectedWrite, RecordKind,
+    decode_protected_payload, encode_protected, first_version_retains, load_record,
+    persist_protected_record, protected_scope_key, ProtectedRecord, ProtectedRecordKind,
+    ProtectedWrite, RecordKind,
 };
 use super::super::recovery_resources::{require_recovery_floor, RecoveryPressureStage};
 use super::super::{invariant, sqlite_error, stored_u64};
@@ -157,15 +158,24 @@ fn any_planning_history(tx: &Connection) -> Result<bool, AdmissionOperationStore
     tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM main.admission_operation_recovery_records
                 WHERE record_key GLOB 'recovery-planning-quota:*'
-                   OR record_key GLOB 'deployment:*' OR record_key GLOB 'deployment-history:*')
+                   OR record_key GLOB 'deployment:*' OR record_key GLOB 'deployment-history:*'
+                   OR record_key GLOB 'semantic-deployment:*'
+                   OR record_key GLOB 'semantic-deployment-history:*'
+                   OR record_key GLOB 'semantic-route:*')
             OR EXISTS(SELECT 1 FROM main.admission_operation_recovery_events
                 WHERE record_key GLOB 'recovery-planning-quota:*'
-                   OR record_key GLOB 'deployment:*' OR record_key GLOB 'deployment-history:*')
+                   OR record_key GLOB 'deployment:*' OR record_key GLOB 'deployment-history:*'
+                   OR record_key GLOB 'semantic-deployment:*'
+                   OR record_key GLOB 'semantic-deployment-history:*'
+                   OR record_key GLOB 'semantic-route:*')
             OR EXISTS(SELECT 1 FROM main.authority_global_commits
                 WHERE projection_kind = 'recovery'
                   AND (projection_key GLOB 'recovery-planning-quota:*'
                        OR projection_key GLOB 'deployment:*'
-                       OR projection_key GLOB 'deployment-history:*'))",
+                       OR projection_key GLOB 'deployment-history:*'
+                       OR projection_key GLOB 'semantic-deployment:*'
+                       OR projection_key GLOB 'semantic-deployment-history:*'
+                       OR projection_key GLOB 'semantic-route:*'))",
         [],
         |row| row.get(0),
     )
@@ -215,6 +225,25 @@ fn data_tenant(
     Ok(profile.scope.tenant_id.clone())
 }
 
+fn record_tenant(
+    key: &str,
+    scope: &str,
+    kind: RecordKind,
+    payload: &[u8],
+    domain: &AuthorityDomainId,
+) -> Result<RecoveryTenantId, AdmissionOperationStoreError> {
+    if super::super::semantic_deployment::owns_planning_key(key) {
+        super::super::semantic_deployment::planning_tenant(key, scope, kind, payload, domain)
+    } else {
+        let profile: RecoveryDeploymentV1 = decode_protected_payload(payload)?;
+        data_tenant(key, scope, kind, &profile, domain)
+    }
+}
+
+fn mutable_planning_key(key: &str) -> bool {
+    key.starts_with(CURRENT_PREFIX) || super::super::semantic_deployment::mutable_planning_key(key)
+}
+
 fn inventory(
     tx: &Connection,
     domain: &AuthorityDomainId,
@@ -223,6 +252,9 @@ fn inventory(
         .prepare(
             "SELECT record_key FROM main.admission_operation_recovery_records
              WHERE record_key GLOB 'deployment:*' OR record_key GLOB 'deployment-history:*'
+                   OR record_key GLOB 'semantic-deployment:*'
+                   OR record_key GLOB 'semantic-deployment-history:*'
+                   OR record_key GLOB 'semantic-route:*'
              ORDER BY record_key",
         )
         .map_err(sqlite_error)?;
@@ -243,9 +275,8 @@ fn inventory(
         let key = key.map_err(sqlite_error)?;
         let record = load_record(tx, &key)?
             .ok_or_else(|| invariant("recovery planning projection disappeared"))?;
-        let profile: RecoveryDeploymentV1 = record.decode_payload()?;
-        let tenant = data_tenant(&key, &record.scope, record.kind, &profile, domain)?;
-        if key.starts_with(HISTORY_PREFIX) && record.version != 1 {
+        let tenant = record_tenant(&key, &record.scope, record.kind, &record.payload, domain)?;
+        if !mutable_planning_key(&key) && record.version != 1 {
             return Err(invariant("recovery immutable planning record changed"));
         }
         let events: i64 = tx
@@ -413,11 +444,10 @@ fn persist_budget(
 }
 
 /// Persist one deployment record and charge both allocations atomically.
-/// Only the current deployment key may be rewritten.
-pub(super) fn save_planned(
+/// Only current installation projections may be rewritten.
+pub(in crate::admission_operation_store) fn save_planned(
     tx: &Transaction<'_>,
     owner: &SqliteServingOwner,
-    profile: &RecoveryDeploymentV1,
     write: &ProtectedWrite<'_>,
 ) -> Result<(), AdmissionOperationStoreError> {
     let domain = physical_domain(tx)?;
@@ -427,14 +457,11 @@ pub(super) fn save_planned(
     if write.kind != ProtectedRecordKind::Deployment {
         return Err(invariant("recovery planning record kind changed"));
     }
-    if encode_protected(profile)? != write.payload {
-        return Err(invariant("recovery planning payload refused"));
-    }
-    let selected = data_tenant(
+    let selected = record_tenant(
         write.key,
         write.scope,
         RecordKind::Deployment,
-        profile,
+        write.payload,
         &domain,
     )?;
     require_recovery_floor(tx, RecoveryPressureStage::Intake)?;
@@ -442,12 +469,17 @@ pub(super) fn save_planned(
     if let Some(record) = &existing {
         if record.scope != write.scope
             || record.kind != RecordKind::Deployment
-            || !write.key.starts_with(CURRENT_PREFIX)
+            || !mutable_planning_key(write.key)
         {
             return Err(invariant("recovery planning immutable identity changed"));
         }
-        let retained: RecoveryDeploymentV1 = record.decode_payload()?;
-        data_tenant(write.key, &record.scope, record.kind, &retained, &domain)?;
+        record_tenant(
+            write.key,
+            &record.scope,
+            record.kind,
+            &record.payload,
+            &domain,
+        )?;
     }
     let retained_global = peek(tx, &domain, None)?;
     if retained_global.is_none() && any_planning_history(tx)? {
