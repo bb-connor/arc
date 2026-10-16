@@ -818,7 +818,11 @@ fn inbound_authority_invocation_proof_schema_preserves_signed_shape() {
     let body = json!({
         "schema":"chio.dpop_proof.v1", "capability_id":"cap", "tool_server":"srv",
         "tool_name":"read", "action_hash":"a".repeat(64), "nonce":"wire-proof",
-        "issued_at":1, "agent_key":key.public_key()
+        "issued_at":1, "agent_key":key.public_key(),
+        "replay_authority": {
+            "destination_store_uuid":"00000000-0000-4000-8000-000000000001", "dpop_authority_id":"authority",
+            "expectation_id":"b".repeat(64), "proof_ttl_secs":300, "max_clock_skew_secs":30,
+        }
     });
     let proof = json!({"signature":key.sign(&chio_core_types::canonical::canonical_json_bytes(&body).unwrap()),"body":body});
     assert_schema_accepts("kernel/dpop_proof.schema.json", &proof);
@@ -841,16 +845,18 @@ fn inbound_authority_invocation_proof_schema_preserves_signed_shape() {
         *dpop_proof = None;
     }
     assert_schema_accepts("agent/tool_call_request.schema.json", &to_json(&request));
-    let mut invalid = proof.clone();
-    invalid["body"]["schema"] = json!("chio.dpop_proof.v3");
-    assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
-    invalid["body"]["schema"] = json!("chio.dpop_proof.v2");
-    assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
-    invalid["body"]["replay_authority"] = json!({
-        "destination_store_uuid":"00000000-0000-4000-8000-000000000001", "dpop_authority_id":"authority",
-        "expectation_id":"b".repeat(64), "proof_ttl_secs":300, "max_clock_skew_secs":30,
-    });
-    assert_schema_accepts("kernel/dpop_proof.schema.json", &invalid);
-    invalid["body"]["schema"] = json!("chio.dpop_proof.v1");
-    assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
+    for schema in ["chio.dpop_proof.v2", "chio.dpop_proof.v3"] {
+        let mut invalid = proof.clone();
+        invalid["body"]["schema"] = json!(schema);
+        assert_schema_rejects("kernel/dpop_proof.schema.json", &invalid);
+    }
+    let mut missing = proof.clone();
+    missing["body"]
+        .as_object_mut()
+        .expect("proof body object")
+        .remove("replay_authority");
+    assert_schema_rejects("kernel/dpop_proof.schema.json", &missing);
+    let mut null = proof;
+    null["body"]["replay_authority"] = Value::Null;
+    assert_schema_rejects("kernel/dpop_proof.schema.json", &null);
 }
