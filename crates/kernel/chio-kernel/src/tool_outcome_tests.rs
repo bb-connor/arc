@@ -522,7 +522,7 @@ fn raw_outcome_omits_transient_credentials_without_changing_request_material() {
             DpopProof::sign(
                 DpopProofBody {
                     schema: DPOP_SCHEMA.into(),
-                    replay_authority: None,
+                    replay_authority: crate::dpop::test_authority(),
                     capability_id: "capability-1".into(),
                     tool_server: "server-1".into(),
                     tool_name: "tool-1".into(),
