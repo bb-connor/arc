@@ -7,7 +7,7 @@ use chio_core::recovery::{
 };
 use chio_security_types::recovery::{
     CanonicalPayloadDigest, ProviderAccountId, ProviderId, ProviderResourceId,
-    SemanticDestinationId, SemanticOperationId, SemanticPackageId, VersionV1,
+    SemanticDestinationId, SemanticFieldId, SemanticOperationId, SemanticPackageId, VersionV1,
 };
 use chio_security_types::semantic::{
     SemanticChannelRuleV1, SemanticChannelV1, SemanticDeploymentV1, SemanticDestinationV1,
@@ -61,7 +61,7 @@ fn installation(
         output_schema: CanonicalPayloadDigest::from_bytes([2; 32]),
         implementation: CanonicalPayloadDigest::from_bytes([3; 32]),
         channels: channels()?,
-        input_fields: BoundedList::new(vec![])?,
+        input_fields: BoundedList::new(vec![SemanticFieldId::new("query")?])?,
         selectors: BoundedList::new(vec![])?,
         required_assertions: BoundedList::new(vec![])?,
         prerequisites: BoundedList::new(vec![])?,
@@ -70,18 +70,24 @@ fn installation(
         external_influence: false,
         withheld_status: None,
     };
+    let mut operations = Vec::new();
+    for tool in tools {
+        let mut operation = contract.clone();
+        operation.operation = SemanticOperationId::new(*tool)?;
+        operations.push(operation);
+    }
     let package = SignedSemanticPackageV1::sign(
         SemanticPackageV1 {
             domain_version: VersionV1,
             package: SemanticPackageId::new("support")?,
             dependencies: BoundedList::new(vec![])?,
-            operations: NonEmptyBoundedList::new(vec![contract.clone()])?,
+            operations: NonEmptyBoundedList::new(operations.clone())?,
         },
         &publisher,
     )?;
     let mut routes = Vec::new();
     let mut exposed = Vec::new();
-    for tool in tools {
+    for (tool, contract) in tools.iter().zip(operations.iter()) {
         let route = SemanticRouteV1 {
             server: ProtectedText::new("support-server")?,
             tool: ProtectedText::new(*tool)?,
@@ -133,7 +139,7 @@ fn installation(
         packages: NonEmptyBoundedList::new(vec![semantic_package_digest(package.body())?])?,
         routes: NonEmptyBoundedList::new(routes)?,
     };
-    Ok(NativeSemanticInstallation {
+    let value = NativeSemanticInstallation {
         deployment: SignedSemanticDeploymentV1::sign(body, &operator())?,
         packages: NonEmptyBoundedList::new(vec![package])?,
         operator_root: operator().public_key(),
@@ -141,7 +147,17 @@ fn installation(
         exposed: NonEmptyBoundedList::new(exposed)?,
         native_authority: binding.clone(),
         security_context: profile.security_context,
-    })
+    };
+    chio_semantic_contracts::compile_semantic_registry(
+        &value.deployment,
+        &value.deployment.body().scope,
+        value.packages.as_slice(),
+        &value.operator_root,
+        value.publisher_roots.as_slice(),
+        value.exposed.as_slice(),
+        &mut chio_semantic_contracts::VerificationBudget::new(4096)?,
+    )?;
+    Ok(value)
 }
 
 fn install(
@@ -347,7 +363,8 @@ fn semantic_generation_and_operator_rotation_refuse_without_writes() -> TestResu
     let before = owner.counts()?;
     let mut lower = current.clone();
     rotate(&mut lower, 1)?;
-    let same_generation = installation(&owner, &binding, "semantic-process", &["lookup"])?;
+    let mut same_generation = installation(&owner, &binding, "semantic-process", &["lookup"])?;
+    rotate(&mut same_generation, 2)?;
     let mut replacement = current.clone();
     let other = Keypair::from_seed(&[80; 32]);
     let mut body = replacement.deployment.body().clone();
@@ -427,5 +444,70 @@ fn semantic_missing_projection_refuses_replay_and_readback() -> TestResult {
         );
         assert_eq!(owner.counts()?, before);
     }
+    Ok(())
+}
+
+#[test]
+fn semantic_modified_signed_bodies_refuse_without_writes() -> TestResult {
+    let owner = authority()?;
+    let binding = owner.initialized_binding("semantic-security")?;
+    let good = installation(&owner, &binding, "semantic-process", &["read"])?;
+    let before = owner.counts()?;
+    let mut deployment_json = serde_json::to_value(&good.deployment)?;
+    deployment_json["body"]["generation"] = serde_json::json!(2);
+    let mut altered_deployment = good.clone();
+    altered_deployment.deployment = serde_json::from_value(deployment_json)?;
+    assert!(!altered_deployment.deployment.verify_signature()?);
+    let mut package_json = serde_json::to_value(&good.packages.as_slice()[0])?;
+    package_json["body"]["operations"][0]["external_influence"] = serde_json::json!(true);
+    let altered_package: SignedSemanticPackageV1 = serde_json::from_value(package_json)?;
+    assert!(!altered_package.verify_signature()?);
+    let mut package = good.clone();
+    package.packages = NonEmptyBoundedList::new(vec![altered_package])?;
+    for value in [altered_deployment, package] {
+        assert_eq!(
+            install(&owner, &value),
+            Err(invariant("semantic deployment registry refused"))
+        );
+        assert_eq!(owner.counts()?, before);
+    }
+    install(&owner, &good)?;
+    Ok(())
+}
+
+#[test]
+fn semantic_history_and_route_records_refuse_a_second_planned_version() -> TestResult {
+    let owner = authority()?;
+    let binding = owner.initialized_binding("semantic-security")?;
+    let value = installation(&owner, &binding, "semantic-process", &["read"])?;
+    install(&owner, &value)?;
+    let before = owner.counts()?;
+    for prefix in ["semantic-deployment-history:", "semantic-route:"] {
+        let mut connection = owner.store.connection()?;
+        let tx = owner.store.begin_write(&mut connection, None)?;
+        let key: String = tx.query_row(
+            "SELECT record_key FROM admission_operation_recovery_records
+             WHERE record_key GLOB ?1 ORDER BY record_key LIMIT 1",
+            [format!("{prefix}*")],
+            |row| row.get(0),
+        )?;
+        let record = load_record(&tx, &key)?.ok_or("fixture record absent")?;
+        assert_eq!(
+            super::super::planning::save_planned(
+                &tx,
+                &owner.store.serving_owner,
+                &ProtectedWrite {
+                    key: &key,
+                    scope: &record.scope,
+                    kind: ProtectedRecordKind::Deployment,
+                    payload: &record.payload,
+                },
+            ),
+            Err(invariant("recovery planning immutable identity changed")),
+        );
+        drop(tx);
+        assert_eq!(owner.counts()?, before);
+    }
+    owner.reopened()?;
     Ok(())
 }
