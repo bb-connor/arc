@@ -73,7 +73,7 @@ fn installation(
     let mut operations = Vec::new();
     for tool in tools {
         let mut operation = contract.clone();
-        operation.operation = SemanticOperationId::new(*tool)?;
+        operation.operation = SemanticOperationId::new(tool)?;
         operations.push(operation);
     }
     let package = SignedSemanticPackageV1::sign(
@@ -90,7 +90,7 @@ fn installation(
     for (tool, contract) in tools.iter().zip(operations.iter()) {
         let route = SemanticRouteV1 {
             server: ProtectedText::new("support-server")?,
-            tool: ProtectedText::new(*tool)?,
+            tool: ProtectedText::new(tool)?,
             package: semantic_package_digest(package.body())?,
             operation: contract.operation.clone(),
             implementation: contract.implementation,
