@@ -92,9 +92,10 @@ async fn refused_attempts(
     )
     .await;
     server.abort();
-    let server_result = server.await;
-    if let Ok(result) = server_result {
-        result?;
+    match server.await {
+        Ok(result) => result?,
+        Err(error) if error.is_cancelled() => {}
+        Err(error) => return Err(error.into()),
     }
     let error = result?.err().ok_or("REFUSED_STREAM was accepted")?;
     assert!(matches!(&error, HttpEgressError::Transport(_)), "{error:?}");
