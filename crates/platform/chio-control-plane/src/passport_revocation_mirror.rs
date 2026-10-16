@@ -39,6 +39,9 @@ pub const MAX_PARTNER_SYNC_LEAVES: u64 = 65_536;
 /// clock.
 pub const MAX_PARTNER_ROOT_FUTURE_SKEW_MS: u64 = 5_000;
 
+/// Largest stored signed root, in bytes.
+const MAX_STORED_ROOT_BYTES: usize = 16 * 1024;
+
 const MIRROR_SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS chio_partner_revocation_mirror (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
@@ -208,7 +211,7 @@ impl PartnerRevocationMirror {
     /// The accepted root and the partner sequence number it covers.
     pub fn accepted(&self) -> Result<Option<AcceptedPartnerRoot>, PartnerRevocationError> {
         self.oracle
-            .read(|connection| read_accepted(connection))
+            .read(read_accepted)
             .map_err(mirror_unavailable(&self.partner_id))
     }
 
@@ -465,7 +468,8 @@ fn encode_root(root: &SignedEpochRoot) -> Result<String, SqliteRevocationOracleE
 }
 
 fn decode_root(json: &str) -> Result<SignedEpochRoot, SqliteRevocationOracleError> {
-    serde_json::from_str(json).map_err(|_| corrupt("partner signed root"))
+    crate::json_input::read(json.as_bytes(), MAX_STORED_ROOT_BYTES)
+        .map_err(|_| corrupt("partner signed root"))
 }
 
 fn read_accepted(

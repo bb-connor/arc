@@ -5,6 +5,7 @@ use chio_credentials::{
     PassportLifecycleRecord, PassportLifecycleState, PassportStatusDistribution,
 };
 use chio_revocation_oracle::SignedEpochRoot;
+use chio_security_types::clock::FixedClock;
 
 use super::*;
 use crate::partner_card::{PartnerCard, PartnerFederationPolicy};
@@ -22,6 +23,7 @@ use crate::trust_control::service_runtime::router::build_router;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const PASSPORT: &str = "sha256:federated-passport";
+const NOW_MS: u64 = 1_800_000_000_000;
 
 struct Partner {
     _dir: tempfile::TempDir,
@@ -73,6 +75,7 @@ fn partner() -> Result<Partner, Box<dyn std::error::Error>> {
         Ok(())
     })?;
     let mut state = metrics_state("service-secret");
+    state.finding_challenge_clock = Arc::new(FixedClock::from_millis(NOW_MS));
     state.config.passport_statuses_file = Some(registry.clone());
     state.config.authority_seed_path = Some(seed);
     Ok(Partner {
@@ -130,7 +133,7 @@ fn loopback_sync(
     let agent = build_portable_fetch_agent(vec![addr], false, &deadline)
         .map_err(|error| PartnerRevocationError::Fetch("acme".to_owned(), error.to_string()))?;
     let mut feed = PartnerRevocationFeed::new("acme", &format!("http://{addr}"), agent);
-    mirror.sync(card, &mut feed, &chio_security_types::clock::SystemClock)
+    mirror.sync(card, &mut feed, &FixedClock::from_millis(NOW_MS))
 }
 
 #[tokio::test]
@@ -222,16 +225,11 @@ async fn a_revocation_at_the_partner_reaches_the_mirror_over_http() -> TestResul
     let (first, second) = tokio::task::spawn_blocking(move || {
         let mirror = PartnerRevocationMirror::open(&mirror_path, "acme")?;
         loopback_sync(addr, &mirror, &card)?;
-        let now = chio_security_types::clock::Clock::unix_millis(
-            &chio_security_types::clock::SystemClock,
-        )
-        .map_err(|error| PartnerRevocationError::Clock(error.to_string()))?
-        .get();
-        let first = mirror.check_passport(&card, PASSPORT, now);
+        let first = mirror.check_passport(&card, PASSPORT, NOW_MS);
         revoke_passport_status(&registry, PASSPORT, Some("compromised"), Some(2_000))
             .map_err(|error| PartnerRevocationError::Fetch("acme".to_owned(), error.to_string()))?;
         loopback_sync(addr, &mirror, &card)?;
-        Ok::<_, PartnerRevocationError>((first, mirror.check_passport(&card, PASSPORT, now)))
+        Ok::<_, PartnerRevocationError>((first, mirror.check_passport(&card, PASSPORT, NOW_MS)))
     })
     .await??;
     assert_eq!(first, Ok(()));
@@ -255,7 +253,7 @@ async fn the_strict_transport_refuses_a_loopback_partner_before_any_fetch() -> T
     let mirror_path =
         partner_revocation_mirror_path(&dir.path().join("b-passport-statuses.json"), "acme")?;
     let clock: Arc<dyn chio_security_types::clock::Clock> =
-        Arc::new(chio_security_types::clock::SystemClock);
+        Arc::new(FixedClock::from_millis(NOW_MS));
     let synced = {
         let mirror_path = mirror_path.clone();
         tokio::task::spawn_blocking(move || {
