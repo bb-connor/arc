@@ -1,5 +1,6 @@
 use super::*;
 
+use chio_kernel::stop::{DurableStopStore, StopScope, StopState};
 use chio_store_sqlite::{
     SqliteFindingOperatorBundleStore, SqliteFindingOperatorPaymentAdapter,
     SqliteFindingPayloadStore, TenantId, TenantKey,
@@ -1041,5 +1042,97 @@ async fn cognition_market_rejects_expired_prepared_ask_before_reservation() -> T
             .map_err(std::io::Error::other)?,
         0
     );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_route_stop_reaches_a_purchase_kernel_built_before_it() -> TestResult {
+    let mut lane = open_lane(LaneOptions::standard()).await?;
+    let operator_db = lane.deployment.database.with_file_name("operator-stop.db");
+    let executor = Arc::new(production_purchase_executor(
+        &lane.deployment,
+        lane.authority.clone(),
+        operator_db.clone(),
+    )?);
+    lane.state.finding_purchase_executor = Some(executor.clone());
+    lane.state.stop = TrustStop::for_authority(Some(&lane.authority));
+    let bundle = production_operator_bundle(&lane.deployment.web);
+    let retained = executor
+        .build_kernel(&bundle)
+        .map_err(|error| std::io::Error::other(format!("{error:?}")))?;
+    assert!(!retained.is_emergency_stopped());
+
+    let (status, body) = send(
+        &lane.state,
+        authed_post(
+            EMERGENCY_STOP_PATH,
+            serde_json::to_vec(&serde_json::json!({"reason": "incident"}))?,
+        )?,
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    let stopped = json_body(&body)?;
+    assert_eq!(stopped["stopped"], serde_json::json!(true));
+    assert_eq!(stopped["durability"], serde_json::json!("durable"));
+    let head = lane
+        .authority
+        .admission_operation_store()
+        .load_stop_head(StopScope::Kernel)?
+        .ok_or_else(|| missing("durable stop head"))?;
+    assert_eq!(head.state, StopState::Stopped);
+    assert_eq!(stopped["head"]["epoch"], serde_json::json!(head.epoch));
+
+    assert!(retained.is_emergency_stopped());
+    let status_proof_b64 = live_status_proof_b64_at(
+        &lane.authority,
+        &lane.deployment.web.finding_id,
+        unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
+    )?;
+    let request = reveal_request(&RevealRequestInputs {
+        request_id: "req-stop-retained-kernel",
+        capability: &lane.purchase.capability,
+        buyer: &lane.buyer,
+        finding_id: &lane.deployment.web.finding_id,
+        context_b64: Some(&lane.purchase.context_b64),
+        status_proof_b64: Some(&status_proof_b64),
+        nonce: "nonce-stop-retained-kernel",
+    })?;
+    let denied = retained.evaluate_tool_call_blocking(&request)?;
+    assert_eq!(denied.verdict, Verdict::Deny, "{:?}", denied.reason);
+    assert_eq!(
+        denied.reason.as_deref(),
+        Some(chio_kernel::EMERGENCY_STOP_DENY_REASON)
+    );
+    assert!(denied.output.is_none());
+    assert_eq!(
+        SqliteFindingOperatorPaymentAdapter::open(&operator_db)
+            .map_err(std::io::Error::other)?
+            .capture_count()
+            .map_err(std::io::Error::other)?,
+        0
+    );
+
+    let after = executor
+        .build_kernel(&bundle)
+        .map_err(|error| std::io::Error::other(format!("{error:?}")))?;
+    assert!(after.is_emergency_stopped());
+
+    let (status, body) = send(
+        &lane.state,
+        authed_post(
+            EMERGENCY_RESUME_PATH,
+            serde_json::to_vec(&serde_json::json!({
+                "expected_epoch": {
+                    "chain_generation": head.chain_generation,
+                    "epoch": head.epoch,
+                },
+            }))?,
+        )?,
+    )
+    .await?;
+    assert_eq!(status, StatusCode::OK, "{}", String::from_utf8_lossy(&body));
+    assert_eq!(json_body(&body)?["stopped"], serde_json::json!(false));
+    assert!(!retained.is_emergency_stopped());
+    assert!(!after.is_emergency_stopped());
     Ok(())
 }

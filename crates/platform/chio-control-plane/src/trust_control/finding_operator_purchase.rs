@@ -463,7 +463,7 @@ impl FindingOperatorPurchaseExecutor {
         })
     }
 
-    fn build_kernel(
+    pub(crate) fn build_kernel(
         &self,
         bundle: &FindingOperatorBundle,
     ) -> Result<ChioKernel, FindingPurchaseExecutionError> {
