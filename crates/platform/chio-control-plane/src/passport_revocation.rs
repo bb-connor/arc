@@ -9,7 +9,8 @@
 use std::path::{Path, PathBuf};
 
 use chio_credentials::{
-    PassportLifecycleRecord, PassportLifecycleResolution, PassportLifecycleState,
+    AgentPassport, Oid4vciChioPassportStatusReference, PassportLifecycleRecord,
+    PassportLifecycleResolution, PassportLifecycleState,
 };
 use chio_revocation_oracle::{
     passport_revocation_key, RevocationOracleError, SqliteRevocationOracle,
@@ -86,6 +87,20 @@ pub fn check_passport_revocation(
         )));
     }
     Ok(())
+}
+
+/// Builds the portable lifecycle reference for `passport` from the registry
+/// loaded from `path`, refusing a passport the durable revocation oracle
+/// beside `path` holds as revoked.
+pub fn portable_passport_status_reference(
+    path: &Path,
+    registry: &PassportStatusRegistry,
+    passport: &AgentPassport,
+    at: u64,
+) -> Result<Oid4vciChioPassportStatusReference, CliError> {
+    let reference = registry.portable_status_reference_for_passport(passport, at)?;
+    check_passport_revocation(path, &registry.resolve_for_passport(passport, at)?)?;
+    Ok(reference)
 }
 
 #[cfg(test)]

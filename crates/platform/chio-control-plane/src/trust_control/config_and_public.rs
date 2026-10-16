@@ -736,10 +736,8 @@ pub(crate) fn portable_passport_status_reference_for_service(
         return Ok(None);
     };
     let (path, registry) = load_passport_status_registry_for_admin(config)?;
-    let reference = registry.portable_status_reference_for_passport(passport, at)?;
-    let resolution = registry.resolve_for_passport(passport, at)?;
-    crate::passport_revocation::check_passport_revocation(&path, &resolution)?;
-    Ok(Some(reference))
+    crate::passport_revocation::portable_passport_status_reference(&path, &registry, passport, at)
+        .map(Some)
 }
 
 pub(crate) fn passport_presentation_transport_for_service(

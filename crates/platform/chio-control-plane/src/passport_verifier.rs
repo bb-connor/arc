@@ -567,7 +567,7 @@ impl PassportStatusRegistry {
         Ok(entry.clone())
     }
 
-    pub fn portable_status_reference_for_passport(
+    pub(crate) fn portable_status_reference_for_passport(
         &self,
         passport: &AgentPassport,
         at: u64,
@@ -906,7 +906,7 @@ impl PassportIssuanceOfferRegistry {
         request: &Oid4vciCredentialRequest,
         now: u64,
         portable_signing_keypair: Option<&Keypair>,
-        portable_status_registry: Option<&PassportStatusRegistry>,
+        portable_status_registry: Option<(&Path, &PassportStatusRegistry)>,
     ) -> Result<Oid4vciCredentialResponse, CliError> {
         request.validate()?;
         metadata.validate()?;
@@ -959,7 +959,14 @@ impl PassportIssuanceOfferRegistry {
             )));
         }
         let portable_status_reference = portable_status_registry
-            .map(|registry| registry.portable_status_reference_for_passport(&record.passport, now))
+            .map(|(path, registry)| {
+                crate::passport_revocation::portable_passport_status_reference(
+                    path,
+                    registry,
+                    &record.passport,
+                    now,
+                )
+            })
             .transpose()?;
 
         let response = if format == CHIO_PASSPORT_SD_JWT_VC_FORMAT {
