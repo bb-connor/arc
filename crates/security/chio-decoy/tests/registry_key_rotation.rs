@@ -6,7 +6,7 @@ use chacha20poly1305::aead::{Aead, KeyInit, Payload};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use chio_core_types::{canonical_json_bytes, Ed25519Backend, Keypair, SigningBackend};
 use chio_decoy::registry::{
-    LegacyRegistryKey, RegistryKeyRing, RegistryKeyVersion, VersionedRegistryKey,
+    RegistryKeyRing, RegistryKeyVersion, RetiredRegistryKey, VersionedRegistryKey,
 };
 use chio_decoy::{
     DecoyCreateRequest, DecoyDetection, DecoyDetector, ObservationClass, PrivateDecoyRegistry,
@@ -32,7 +32,7 @@ const OLD: u8 = 0;
 const OVERLAP: u8 = 1;
 const EXPIRED: u8 = 2;
 const NEW_ONLY: u8 = 3;
-const MISLABELED_LEGACY: u8 = 4;
+const MISLABELED_RETIRED: u8 = 4;
 const ENCRYPTION_ONLY_OVERLAP: u8 = 5;
 const OVERLAP_START: u64 = 100;
 const OVERLAP_END: u64 = 200;
@@ -262,7 +262,7 @@ impl RegistryKeyProvider for RotatingKeys {
             OLD => RegistryKeyRing::new(Self::versioned(tenant_id, false, 1)?, Vec::new(), 50),
             OVERLAP => RegistryKeyRing::new(
                 Self::versioned(tenant_id, true, 2)?,
-                vec![LegacyRegistryKey::new(
+                vec![RetiredRegistryKey::new(
                     Self::versioned(tenant_id, false, 1)?,
                     OVERLAP_START,
                     OVERLAP_END,
@@ -271,7 +271,7 @@ impl RegistryKeyProvider for RotatingKeys {
             ),
             EXPIRED => RegistryKeyRing::new(
                 Self::versioned(tenant_id, true, 2)?,
-                vec![LegacyRegistryKey::new(
+                vec![RetiredRegistryKey::new(
                     Self::versioned(tenant_id, false, 1)?,
                     OVERLAP_START,
                     OVERLAP_END,
@@ -279,9 +279,9 @@ impl RegistryKeyProvider for RotatingKeys {
                 OVERLAP_END,
             ),
             NEW_ONLY => RegistryKeyRing::new(Self::versioned(tenant_id, true, 2)?, Vec::new(), 250),
-            MISLABELED_LEGACY => RegistryKeyRing::new(
+            MISLABELED_RETIRED => RegistryKeyRing::new(
                 Self::versioned(tenant_id, true, 2)?,
-                vec![LegacyRegistryKey::new(
+                vec![RetiredRegistryKey::new(
                     Self::versioned(tenant_id, false, 3)?,
                     OVERLAP_START,
                     OVERLAP_END,
@@ -290,7 +290,7 @@ impl RegistryKeyProvider for RotatingKeys {
             ),
             ENCRYPTION_ONLY_OVERLAP => RegistryKeyRing::new(
                 Self::encryption_only_active(tenant_id)?,
-                vec![LegacyRegistryKey::new(
+                vec![RetiredRegistryKey::new(
                     Self::versioned(tenant_id, false, 1)?,
                     OVERLAP_START,
                     OVERLAP_END,
@@ -467,11 +467,11 @@ fn issue_watermark(registry: PrivateDecoyRegistry, marker_ref: RecordId, tenant_
             sequence: 1,
             operation_id: RecordId::new("issue-a").test_expect("valid operation"),
         })
-        .test_expect("legacy public reference resolves during overlap");
+        .test_expect("retired public reference resolves during overlap");
 }
 
 #[test]
-fn overlap_opens_legacy_private_public_and_marker_lookups_and_writes_active() {
+fn overlap_opens_retired_private_public_and_marker_lookups_and_writes_active() {
     let store = Arc::new(MemoryStore::default());
     let keys = Arc::new(RotatingKeys::new());
     let registry = PrivateDecoyRegistry::new(
@@ -500,7 +500,7 @@ fn overlap_opens_legacy_private_public_and_marker_lookups_and_writes_active() {
 
     assert!(registry
         .load_private(&tenant_a, &artifact("old-private"))
-        .test_expect("load legacy private record")
+        .test_expect("load retired private record")
         .is_some());
     let detection = DecoyDetector::new(Arc::new(registry.clone()))
         .detect(&TripwireObservation {
@@ -510,7 +510,7 @@ fn overlap_opens_legacy_private_public_and_marker_lookups_and_writes_active() {
             class: ObservationClass::InventoryScanner,
             observed_at_unix_ms: 150,
         })
-        .test_expect("resolve legacy marker");
+        .test_expect("resolve retired marker");
     assert!(matches!(
         detection,
         DecoyDetection::InactiveObservation { .. }
@@ -629,7 +629,7 @@ fn unknown_version_overlap_expiry_and_tenant_boundaries_fail_closed() {
         DecoyDetection::Clear
     );
 
-    keys.set_phase(MISLABELED_LEGACY);
+    keys.set_phase(MISLABELED_RETIRED);
     assert_eq!(
         registry.load_private(&tenant_a, &artifact("shared-artifact")),
         Err(RegistryError::KeyUnavailable)
@@ -647,7 +647,7 @@ fn unknown_version_overlap_expiry_and_tenant_boundaries_fail_closed() {
     );
     let duplicate_version = RegistryKeyRing::new(
         RotatingKeys::versioned(&tenant_a, true, 2).test_expect("active key"),
-        vec![LegacyRegistryKey::new(
+        vec![RetiredRegistryKey::new(
             RotatingKeys::versioned(&tenant_a, false, 2).test_expect("duplicate version"),
             OVERLAP_START,
             OVERLAP_END,
@@ -662,7 +662,7 @@ fn unknown_version_overlap_expiry_and_tenant_boundaries_fail_closed() {
 }
 
 #[test]
-fn shared_index_key_continues_to_the_matching_legacy_encryption_version() {
+fn shared_index_key_continues_to_the_matching_retired_encryption_version() {
     let store = Arc::new(MemoryStore::default());
     let keys = Arc::new(RotatingKeys::new());
     let registry = PrivateDecoyRegistry::new(
@@ -682,6 +682,6 @@ fn shared_index_key_continues_to_the_matching_legacy_encryption_version() {
 
     assert!(registry
         .load_private(&tenant_a, &artifact("encryption-only-old"))
-        .test_expect("legacy encryption version resolves after active authentication failure")
+        .test_expect("retired encryption version resolves after active authentication failure")
         .is_some());
 }
