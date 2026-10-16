@@ -1055,7 +1055,10 @@ async fn a_route_stop_reaches_a_purchase_kernel_built_before_it() -> TestResult 
         operator_db.clone(),
     )?);
     lane.state.finding_purchase_executor = Some(executor.clone());
-    lane.state.stop = TrustStop::for_authority(Some(&lane.authority));
+    lane.state.stop = TrustStop::for_serving(
+        Some(&lane.authority),
+        lane.state.finding_purchase_executor.as_ref(),
+    )?;
     let bundle = production_operator_bundle(&lane.deployment.web);
     let retained = executor
         .build_kernel(&bundle)
@@ -1134,5 +1137,56 @@ async fn a_route_stop_reaches_a_purchase_kernel_built_before_it() -> TestResult 
     assert_eq!(json_body(&body)?["stopped"], serde_json::json!(false));
     assert!(!retained.is_emergency_stopped());
     assert!(!after.is_emergency_stopped());
+    Ok(())
+}
+
+struct ProcessLocalStopExecutor {
+    authority: Arc<SqliteAuthorityStore>,
+}
+
+#[async_trait::async_trait]
+impl FindingPurchaseExecutor for ProcessLocalStopExecutor {
+    fn mutation_fence(&self) -> chio_kernel::admission_operation::StoreMutationFence {
+        self.authority.mutation_fence()
+    }
+
+    fn stop_control(&self) -> chio_kernel::stop::StopControl {
+        chio_kernel::stop::StopControl::process_local()
+    }
+
+    fn authenticate_buyer(
+        &self,
+        _bearer_token: &str,
+    ) -> Result<AuthenticatedFindingBuyer, FindingBuyerAuthenticationError> {
+        Err(FindingBuyerAuthenticationError)
+    }
+
+    async fn execute(
+        &self,
+        _buyer: AuthenticatedFindingBuyer,
+        _request: FindingPurchaseRequest,
+    ) -> Result<FindingPurchaseResult, FindingPurchaseExecutionError> {
+        Err(FindingPurchaseExecutionError::Unavailable(
+            "purchase execution is unavailable".to_owned(),
+        ))
+    }
+}
+
+#[test]
+fn a_purchase_executor_without_a_durable_stop_is_refused_at_serving() -> TestResult {
+    let deployment = provision(RevealCase::honest())?;
+    let authority = deployment.open()?;
+    let executor: crate::trust_control::finding_purchase_routes::SharedFindingPurchaseExecutor =
+        Arc::new(ProcessLocalStopExecutor {
+            authority: authority.clone(),
+        });
+    let Err(error) = TrustStop::for_serving(Some(&authority), Some(&executor)) else {
+        return Err(missing("process-local purchase stop refusal"));
+    };
+    assert_eq!(
+        error.to_string(),
+        CliError::cli_other_error("finding purchase executor stop control is not durable")
+            .to_string()
+    );
     Ok(())
 }

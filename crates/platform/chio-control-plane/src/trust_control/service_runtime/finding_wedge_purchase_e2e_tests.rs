@@ -2688,6 +2688,10 @@ impl FindingPurchaseExecutor for RoutedPurchaseExecutor {
         self.authority.mutation_fence()
     }
 
+    fn stop_control(&self) -> chio_kernel::stop::StopControl {
+        chio_kernel::stop::StopControl::process_local()
+    }
+
     fn authenticate_buyer(
         &self,
         bearer_token: &str,

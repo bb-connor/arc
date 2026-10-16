@@ -561,6 +561,11 @@ pub trait FindingPurchaseExecutor: Send + Sync {
     /// from the challenge runtime before either route is installed.
     fn mutation_fence(&self) -> chio_kernel::admission_operation::StoreMutationFence;
 
+    /// Kernel-scope stop bound to every purchase kernel. The host's operator
+    /// stop routes drive this control, so a completed stop holds at the first
+    /// evaluation of a purchase kernel built before it.
+    fn stop_control(&self) -> chio_kernel::stop::StopControl;
+
     /// Resolve one bearer credential to a buyer principal. Production
     /// implementations must use a constant-time token comparison and must not
     /// accept the global control-plane service credential.

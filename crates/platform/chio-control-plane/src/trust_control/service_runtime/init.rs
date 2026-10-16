@@ -238,12 +238,16 @@ async fn serve_async_inner(
         FederationAdmissionRateLimiter::from_memory_budget(&config.memory_budget),
     ));
     let cluster_progress = cluster.as_ref().map(|_| Arc::new(ClusterProgress::new()));
+    let stop = TrustStop::for_serving(
+        joint_authority_store.as_ref(),
+        finding_purchase_executor.as_ref(),
+    )?;
     let state = TrustServiceState {
         finding_challenge_clock,
         config,
         authority_keyring,
         authority_keyring_seed_path,
-        stop: TrustStop::for_authority(joint_authority_store.as_ref()),
+        stop,
         joint_authority_store,
         fiscal_runtime,
         budget_store,
