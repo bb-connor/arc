@@ -79,7 +79,7 @@ fn replay_entry_in_scope(
 #[test]
 fn published_agent_web_schemas_accept_supported_projection_fixtures() {
     let envelope_schema =
-        read_workspace_json("spec/schemas/chio-agent-web/v2/proof-envelope.schema.json");
+        read_workspace_json("spec/schemas/chio-agent-web/v1/proof-envelope.schema.json");
     let manifest_schema = read_workspace_json(
         "spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json",
     );
@@ -96,9 +96,9 @@ fn published_agent_web_schemas_accept_supported_projection_fixtures() {
 }
 
 #[test]
-fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
+fn published_proof_envelope_schema_requires_scope_and_unique_receipts() {
     let envelope_schema =
-        read_workspace_json("spec/schemas/chio-agent-web/v2/proof-envelope.schema.json");
+        read_workspace_json("spec/schemas/chio-agent-web/v1/proof-envelope.schema.json");
     let envelope_path = agent_web_envelope_or_manifest_paths(
         "fixtures/proof-room/agent-web/valid-webhook-cloudevents",
     )
@@ -107,7 +107,7 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
     .test_expect("Agent Web fixture contains a proof envelope");
     let envelope = read_workspace_json(&envelope_path);
 
-    assert_schema_accepts_value(&envelope_schema, &envelope, "scope-bound v2 proof envelope");
+    assert_schema_accepts_value(&envelope_schema, &envelope, "scope-bound v1 proof envelope");
 
     let mut missing_scope = envelope.clone();
     missing_scope
@@ -117,7 +117,7 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
     assert_schema_rejects_value(
         &envelope_schema,
         &missing_scope,
-        "v2 proof envelope without a passport scope digest",
+        "v1 proof envelope without a passport scope digest",
     );
 
     for (label, invalid_ref) in [
@@ -137,7 +137,7 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
         assert_schema_rejects_value(
             &envelope_schema,
             &invalid_receipt_ref,
-            &format!("v2 proof envelope with {label}"),
+            &format!("v1 proof envelope with {label}"),
         );
     }
 
@@ -150,7 +150,7 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
     assert_schema_rejects_value(
         &envelope_schema,
         &duplicate_receipts,
-        "v2 proof envelope with duplicate receipt references",
+        "v1 proof envelope with duplicate receipt references",
     );
 
     for invalid_receipt_ref in [
@@ -163,7 +163,7 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
         assert_schema_rejects_value(
             &envelope_schema,
             &noncanonical_receipt,
-            "v2 proof envelope with a noncanonical receipt reference",
+            "v1 proof envelope with a noncanonical receipt reference",
         );
     }
 }
@@ -171,14 +171,66 @@ fn published_v2_proof_envelope_schema_requires_scope_and_unique_receipts() {
 #[test]
 fn verifier_refuses_unsupported_envelope_schema() {
     let mut bundle = agent_web_bundle(AgentWebCase::Valid);
-    relabel_agent_web_envelopes_as_v1(&mut bundle);
+    relabel_agent_web_envelopes(&mut bundle, "chio.agent-web-proof-envelope.v2");
 
     let error = verify_agent_web_interop(&bundle)
         .test_expect_err("an envelope outside the supported schema must be refused");
 
     assert_eq!(
         error.to_string(),
-        "invalid evidence graph artifact: unsupported evidence graph node schema: chio.agent-web-proof-envelope.v1"
+        "invalid evidence graph artifact: unsupported evidence graph node schema: chio.agent-web-proof-envelope.v2"
+    );
+}
+
+#[test]
+fn verifier_refuses_unsupported_envelope_payload_schema() {
+    let mut bundle = agent_web_bundle(AgentWebCase::Valid);
+    replace_agent_web_envelope_artifact(
+        &mut bundle,
+        "standard-webhooks-envelope.json",
+        |envelope| {
+            envelope["schema"] = json!("chio.agent-web-proof-envelope.v2");
+        },
+    );
+
+    let error = verify_agent_web_interop(&bundle)
+        .test_expect_err("the graph schema cannot authorize an unsupported envelope payload");
+
+    assert_eq!(
+        error.to_string(),
+        "invalid Agent Web artifact standard-webhooks-envelope.json: unsupported schema: chio.agent-web-proof-envelope.v2"
+    );
+}
+
+#[test]
+fn verifier_refuses_envelope_without_passport_scope() {
+    let mut bundle = agent_web_bundle(AgentWebCase::Valid);
+    replace_agent_web_envelope_artifact(
+        &mut bundle,
+        "standard-webhooks-envelope.json",
+        |envelope| {
+            envelope
+                .as_object_mut()
+                .test_expect("proof envelope is an object")
+                .remove("agent_web_passport_scope_sha256");
+        },
+    );
+
+    let error = verify_agent_web_interop(&bundle)
+        .test_expect_err("an unscoped envelope must fail structural validation");
+    let chio_transaction_passport::TransactionPassportError::Input(input) = error else {
+        panic!("expected a structural decoding error, got {error}");
+    };
+    assert_eq!(
+        input.code(),
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
+    let source = std::error::Error::source(&input)
+        .and_then(std::error::Error::source)
+        .test_expect("decoding error retains its source");
+    assert_eq!(
+        source.to_string(),
+        "missing field `agent_web_passport_scope_sha256`"
     );
 }
 
@@ -577,7 +629,7 @@ fn agent_web_interop_rejects_duplicate_envelope_id() {
         &mut bundle,
         "duplicate-standard-webhooks-envelope.json",
         "agent-web-proof-envelope",
-        "chio.agent-web-proof-envelope.v2",
+        "chio.agent-web-proof-envelope.v1",
         duplicate_envelope,
     );
     let (passport_key, kernel_key, sidecar_key) = default_role_keys();
@@ -1306,7 +1358,7 @@ fn consuming_verifier_deduplicates_one_webhook_subject_across_envelopes() {
         &mut bundle,
         "duplicate-standard-webhooks-envelope.json",
         "agent-web-proof-envelope",
-        "chio.agent-web-proof-envelope.v2",
+        "chio.agent-web-proof-envelope.v1",
         duplicate_envelope,
     );
 
@@ -1412,7 +1464,7 @@ fn consuming_verifier_derives_opaque_scope_only_for_authenticated_delivery() {
         .test_expect("capture store lock remains available");
     assert_eq!(captured.len(), 1);
     let mut scope_hasher = <Sha256 as sha2::Digest>::new();
-    sha2::Digest::update(&mut scope_hasher, b"chio.agent-web.replay-scope.v2\0");
+    sha2::Digest::update(&mut scope_hasher, b"chio.agent-web.replay-scope.v1\0");
     sha2::Digest::update(
         &mut scope_hasher,
         STANDARD_WEBHOOKS_ENDPOINT_URL_DIGEST.as_bytes(),

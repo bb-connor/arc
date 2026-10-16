@@ -527,7 +527,7 @@ async function readAgentWebProjections(
   readArtifact: ProofRoomArtifactReader,
 ): Promise<ProofRoomAgentWebProjection[]> {
   const artifacts = manifest.artifacts ?? []
-  const envelopeSchemas = ['chio.agent-web-proof-envelope.v2'] as const
+  const envelopeSchemas = ['chio.agent-web-proof-envelope.v1'] as const
   const envelopeArtifacts = artifacts.filter(
     (artifact) =>
       envelopeSchemas.some((schema) => schema === artifact.schema)

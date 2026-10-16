@@ -1891,7 +1891,7 @@ fields, silently repair an over-disclosure, or make absent signatures trusted.
 
 ### 6.4.6 Agent Web Envelope Family
 
-`chio.agent-web-proof-envelope.v2` is the current projection envelope for
+`chio.agent-web-proof-envelope.v1` is the current projection envelope for
 external protocol objects. It binds one source protocol and version, one
 external subject path and digest, unique Chio receipt references, a transaction
 passport reference and canonical passport-scope digest, a projection manifest

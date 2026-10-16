@@ -1009,10 +1009,7 @@ pub(crate) fn sign_agent_web_envelope_with_key(envelope: &mut Value, keypair: &K
     sign_agent_web_envelope_value(envelope, keypair, &public_key);
 }
 
-/// Re-sign every proof envelope in `bundle` under the unscoped
-/// `chio.agent-web-proof-envelope.v1` shape, keeping the graph and passport
-/// consistent so only the envelope schema decides the verdict.
-pub(crate) fn relabel_agent_web_envelopes_as_v1(bundle: &mut AgentWebInteropBundle) {
+pub(crate) fn relabel_agent_web_envelopes(bundle: &mut AgentWebInteropBundle, schema: &str) {
     let sidecar_keypair = agent_web_fixture_sidecar_keypair();
     let sidecar_public_key = sidecar_keypair.public_key().to_hex();
     let mut graph: Value = serde_json::from_slice(&bundle.evidence_graph_bytes)
@@ -1046,14 +1043,10 @@ pub(crate) fn relabel_agent_web_envelopes_as_v1(bundle: &mut AgentWebInteropBund
                     .test_expect("Agent Web envelope exists"),
             )
             .test_expect("Agent Web envelope parses");
-            envelope["schema"] = Value::String("chio.agent-web-proof-envelope.v1".to_string());
-            envelope
-                .as_object_mut()
-                .test_expect("Agent Web envelope is an object")
-                .remove("agent_web_passport_scope_sha256");
+            envelope["schema"] = Value::String(schema.to_string());
             sign_agent_web_envelope_value(&mut envelope, &sidecar_keypair, &sidecar_public_key);
             let bytes = json_bytes(envelope);
-            node["schema"] = Value::String("chio.agent-web-proof-envelope.v1".to_string());
+            node["schema"] = Value::String(schema.to_string());
             node["sha256"] = Value::String(chio_core_types::sha256_hex(&bytes));
             bundle.artifacts.insert(path, bytes);
         }
