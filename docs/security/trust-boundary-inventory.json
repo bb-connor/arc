@@ -15888,9 +15888,8 @@
       "retained_typed_conversions": []
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": {
-      "contract": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
+      "contract": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion.",
       "migrations": [
-        "decode_sender_dpop_proof::from_slice",
         "parse_request_time_authorization_details::from_str",
         "parse_request_time_transaction_context::from_str"
       ],
