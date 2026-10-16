@@ -4481,6 +4481,7 @@ dependencies = [
  "chio-manifest",
  "chio-security-types",
  "chio-store-sqlite",
+ "chio-test-support",
  "chrono",
  "serde",
  "serde_json",

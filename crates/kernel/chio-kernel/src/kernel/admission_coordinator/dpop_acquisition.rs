@@ -51,8 +51,6 @@ impl ChioKernel {
         {
             return Err(error("DPoP activation changed its configured domain"));
         }
-        // The retired volatile source is deliberately not consulted here.
-        // Its irreversible activation and history belong to the durable store.
         Ok(now)
     }
 
