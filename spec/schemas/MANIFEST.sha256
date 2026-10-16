@@ -1,4 +1,4 @@
-7e4537e370f4e1cc77a777e45a32367b68fab7e3ac944891b93ed2ab3804ce6d  spec/schemas/MANIFEST.sha256
+e2ab7e74e72f8f1a28babef2cc801bf6c12f61061f4fbd225a349151df6e255e  spec/schemas/MANIFEST.sha256
 59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03  spec/schemas/VERSION
 e90c7bc3c555c335559650c71f7fda1e3c13d134a5ff8ceaa0041000536c2ea9  spec/schemas/chio-agent-web/v1/external-projection-manifest.schema.json
 1cd24132ad8f98fad89bb62aa756304c2dee0b51aacd69c922e0f786dce2abec  spec/schemas/chio-agent-web/v1/interop-verifier-report.schema.json
@@ -618,6 +618,9 @@ a89cebb22ad42d0353c5c0a2b35af56a2198a003b172e864741c5b9a878eaccc  spec/schemas/c
 33a84d19445de5074f554f66ff838acb72bc002772b5dcf82ad53abccb4dc656  spec/schemas/chio-wire/v1/trust-control/heartbeat.schema.json
 47661110b2674673ca5f1401271af6a0de8a2f465440ac964553ce6be1f9e0ae  spec/schemas/chio-wire/v1/trust-control/lease.schema.json
 63540f55a91b96cf071cece6b3465e8c3bba82512a91a5f83b05affc757033f4  spec/schemas/chio-wire/v1/trust-control/terminate.schema.json
+d31778e9066c2360a04ed54e268b5c90a5a4b639f5a383c88b0721eaf8cb9ed2  spec/schemas/chio-wire/v1/work/join-inputs.schema.json
+48926aaa5375d15532499822bfecc2101f4ba14b5a63c38bb6337946e2dcf67d  spec/schemas/chio-wire/v1/work/request.schema.json
+e870e486f90b3a4a163f060b656538523bf731570dbb64eb0212d65486da8b2d  spec/schemas/chio-wire/v1/work/response.schema.json
 4646a51a6d23c27f0ba3951923e029ab9568bfa87f1b373ad2b1334be0ca7f62  spec/schemas/chio-workflow/v1/preflight-plan.schema.json
 3374b9d40520b66cae420da1f9c8bb07fed6bfbd62ae918615e2f88b6e1b7700  spec/schemas/chio-workflow/v1/preflight-report.schema.json
 f109672e496e5e3bb56c5a3d61ed882b922d8bbade45899975d1852921f7890e  spec/schemas/financial-credential-defs.v1.schema.json

@@ -47,6 +47,8 @@ mod store;
 pub(crate) mod treaty;
 mod types;
 mod validation;
+#[cfg(feature = "work")]
+pub mod work;
 
 pub(crate) use admission::{
     commit_prepared_runtime_admission, prepare_runtime_admission_from_bundle, trust_floor_identity,

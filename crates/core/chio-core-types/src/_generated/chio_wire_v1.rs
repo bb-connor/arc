@@ -192293,3 +192293,9245 @@ pub mod trust_control_terminate {
         }
     }
 }
+pub mod work_join_inputs {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`ArtifactVersionRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifact",
+    ///    "provenance",
+    ///    "scope",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "artifact": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "provenance": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/scope"
+    ///    },
+    ///    "version": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ArtifactVersionRef {
+        pub artifact: OpaqueId,
+        pub provenance: RecoveryDigest32,
+        pub scope: Scope,
+        pub version: OpaqueId,
+    }
+    impl ::std::convert::From<&ArtifactVersionRef> for ArtifactVersionRef {
+        fn from(value: &ArtifactVersionRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`OpaqueId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OpaqueId(::std::string::String);
+    impl ::std::ops::Deref for OpaqueId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OpaqueId> for ::std::string::String {
+        fn from(value: OpaqueId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OpaqueId> for OpaqueId {
+        fn from(value: &OpaqueId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OpaqueId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OpaqueId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`RecoveryDigest32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery digest32",
+    ///  "type": "array",
+    ///  "items": {
+    ///    "title": "Recovery digest octet",
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct RecoveryDigest32(pub [u8; 32usize]);
+    impl ::std::ops::Deref for RecoveryDigest32 {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDigest32> for [u8; 32usize] {
+        fn from(value: RecoveryDigest32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDigest32> for RecoveryDigest32 {
+        fn from(value: &RecoveryDigest32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`Scope`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authority_domain",
+    ///    "process_id",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "authority_domain": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "process_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Scope {
+        pub authority_domain: OpaqueId,
+        pub process_id: OpaqueId,
+        pub tenant_id: OpaqueId,
+    }
+    impl ::std::convert::From<&Scope> for Scope {
+        fn from(value: &Scope) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkDigest(::std::string::String);
+    impl ::std::ops::Deref for WorkDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkDigest> for ::std::string::String {
+        fn from(value: WorkDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkDigest> for WorkDigest {
+        fn from(value: &WorkDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`WorkId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkId(::std::string::String);
+    impl ::std::ops::Deref for WorkId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkId> for ::std::string::String {
+        fn from(value: WorkId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkId> for WorkId {
+        fn from(value: &WorkId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`WorkJoinInputsV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/work/join-inputs.schema.json",
+    ///  "title": "Work Join Inputs V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "graph_sha256",
+    ///    "join_id",
+    ///    "next_task_id",
+    ///    "parents",
+    ///    "schema",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "graph_sha256": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "join_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "next_task_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "parents": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "acceptance_evidence_digest",
+    ///          "artifact_digest",
+    ///          "artifact_ref",
+    ///          "receipt_id",
+    ///          "task_id"
+    ///        ],
+    ///        "properties": {
+    ///          "acceptance_evidence_digest": {
+    ///            "$ref": "#/$defs/workDigest"
+    ///          },
+    ///          "artifact_digest": {
+    ///            "$ref": "#/$defs/workDigest"
+    ///          },
+    ///          "artifact_ref": {
+    ///            "$ref": "#/$defs/artifactVersionRef"
+    ///          },
+    ///          "receipt_id": {
+    ///            "$ref": "#/$defs/workId"
+    ///          },
+    ///          "task_id": {
+    ///            "$ref": "#/$defs/workId"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 16,
+    ///      "minItems": 1
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.work.join-inputs.v1"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkJoinInputsV1 {
+        pub graph_sha256: WorkDigest,
+        pub join_id: WorkId,
+        pub next_task_id: WorkId,
+        pub parents: ::std::vec::Vec<WorkJoinInputsV1ParentsItem>,
+        pub schema: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&WorkJoinInputsV1> for WorkJoinInputsV1 {
+        fn from(value: &WorkJoinInputsV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkJoinInputsV1ParentsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "acceptance_evidence_digest",
+    ///    "artifact_digest",
+    ///    "artifact_ref",
+    ///    "receipt_id",
+    ///    "task_id"
+    ///  ],
+    ///  "properties": {
+    ///    "acceptance_evidence_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "artifact_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "artifact_ref": {
+    ///      "$ref": "#/$defs/artifactVersionRef"
+    ///    },
+    ///    "receipt_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "task_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkJoinInputsV1ParentsItem {
+        pub acceptance_evidence_digest: WorkDigest,
+        pub artifact_digest: WorkDigest,
+        pub artifact_ref: ArtifactVersionRef,
+        pub receipt_id: WorkId,
+        pub task_id: WorkId,
+    }
+    impl ::std::convert::From<&WorkJoinInputsV1ParentsItem> for WorkJoinInputsV1ParentsItem {
+        fn from(value: &WorkJoinInputsV1ParentsItem) -> Self {
+            value.clone()
+        }
+    }
+}
+pub mod work_request {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`CatalogCursor`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_generation",
+    ///    "position"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_generation": {
+    ///      "$ref": "#/$defs/policyGeneration"
+    ///    },
+    ///    "position": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CatalogCursor {
+        pub catalog_generation: PolicyGeneration,
+        pub position: WorkDigest,
+    }
+    impl ::std::convert::From<&CatalogCursor> for CatalogCursor {
+        fn from(value: &CatalogCursor) -> Self {
+            value.clone()
+        }
+    }
+    ///`CatalogRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_id",
+    ///    "owner"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "owner": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CatalogRef {
+        pub catalog_id: WorkId,
+        pub owner: WorkId,
+    }
+    impl ::std::convert::From<&CatalogRef> for CatalogRef {
+        fn from(value: &CatalogRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`CommandRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "command_digest",
+    ///    "command_id",
+    ///    "program_id"
+    ///  ],
+    ///  "properties": {
+    ///    "command_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "command_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CommandRef {
+        pub command_digest: WorkDigest,
+        pub command_id: WorkId,
+        pub program_id: WorkId,
+    }
+    impl ::std::convert::From<&CommandRef> for CommandRef {
+        fn from(value: &CommandRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`Commitment`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "graph_ref",
+    ///    "handle",
+    ///    "invocation_ref",
+    ///    "permit",
+    ///    "profile_ref"
+    ///  ],
+    ///  "properties": {
+    ///    "funding": {
+    ///      "$ref": "#/$defs/fundingRef"
+    ///    },
+    ///    "graph_ref": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "handle": {
+    ///      "$ref": "#/$defs/handle"
+    ///    },
+    ///    "invocation_ref": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "permit": {
+    ///      "$ref": "#/$defs/delegationRecord"
+    ///    },
+    ///    "profile_ref": {
+    ///      "$ref": "#/$defs/profileRef"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Commitment {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub funding: ::std::option::Option<FundingRef>,
+        pub graph_ref: WorkDigest,
+        pub handle: Handle,
+        pub invocation_ref: WorkDigest,
+        pub permit: DelegationRecord,
+        pub profile_ref: ProfileRef,
+    }
+    impl ::std::convert::From<&Commitment> for Commitment {
+        fn from(value: &Commitment) -> Self {
+            value.clone()
+        }
+    }
+    ///`DelegationRecord`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Work delegation record",
+    ///  "type": "object"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct DelegationRecord(pub ::serde_json::Map<::std::string::String, ::serde_json::Value>);
+    impl ::std::ops::Deref for DelegationRecord {
+        type Target = ::serde_json::Map<::std::string::String, ::serde_json::Value>;
+        fn deref(&self) -> &::serde_json::Map<::std::string::String, ::serde_json::Value> {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DelegationRecord>
+        for ::serde_json::Map<::std::string::String, ::serde_json::Value>
+    {
+        fn from(value: DelegationRecord) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DelegationRecord> for DelegationRecord {
+        fn from(value: &DelegationRecord) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::serde_json::Map<::std::string::String, ::serde_json::Value>>
+        for DelegationRecord
+    {
+        fn from(value: ::serde_json::Map<::std::string::String, ::serde_json::Value>) -> Self {
+            Self(value)
+        }
+    }
+    ///`DraftRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "draft_id",
+    ///    "graph_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "draft_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "graph_sha256": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DraftRef {
+        pub draft_id: WorkId,
+        pub graph_sha256: WorkDigest,
+    }
+    impl ::std::convert::From<&DraftRef> for DraftRef {
+        fn from(value: &DraftRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`FundingRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "agreement_digest",
+    ///    "rail",
+    ///    "reserve_ref"
+    ///  ],
+    ///  "properties": {
+    ///    "agreement_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "rail": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "reserve_ref": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct FundingRef {
+        pub agreement_digest: WorkDigest,
+        pub rail: WorkId,
+        pub reserve_ref: WorkId,
+    }
+    impl ::std::convert::From<&FundingRef> for FundingRef {
+        fn from(value: &FundingRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`GraphRecord`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Work graph record",
+    ///  "type": "object"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct GraphRecord(pub ::serde_json::Map<::std::string::String, ::serde_json::Value>);
+    impl ::std::ops::Deref for GraphRecord {
+        type Target = ::serde_json::Map<::std::string::String, ::serde_json::Value>;
+        fn deref(&self) -> &::serde_json::Map<::std::string::String, ::serde_json::Value> {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<GraphRecord>
+        for ::serde_json::Map<::std::string::String, ::serde_json::Value>
+    {
+        fn from(value: GraphRecord) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&GraphRecord> for GraphRecord {
+        fn from(value: &GraphRecord) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::serde_json::Map<::std::string::String, ::serde_json::Value>>
+        for GraphRecord
+    {
+        fn from(value: ::serde_json::Map<::std::string::String, ::serde_json::Value>) -> Self {
+            Self(value)
+        }
+    }
+    ///`Handle`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocation_hash",
+    ///    "program_id",
+    ///    "receiver_kernel_id",
+    ///    "request_id",
+    ///    "slot_id"
+    ///  ],
+    ///  "properties": {
+    ///    "allocation_hash": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "receiver_kernel_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "request_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "slot_id": {
+    ///      "$ref": "#/$defs/workSlotId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Handle {
+        pub allocation_hash: WorkDigest,
+        pub program_id: WorkId,
+        pub receiver_kernel_id: WorkId,
+        pub request_id: OpaqueId,
+        pub slot_id: WorkSlotId,
+    }
+    impl ::std::convert::From<&Handle> for Handle {
+        fn from(value: &Handle) -> Self {
+            value.clone()
+        }
+    }
+    ///`OpaqueId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OpaqueId(::std::string::String);
+    impl ::std::ops::Deref for OpaqueId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OpaqueId> for ::std::string::String {
+        fn from(value: OpaqueId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OpaqueId> for OpaqueId {
+        fn from(value: &OpaqueId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OpaqueId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OpaqueId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`PolicyGeneration`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PolicyGeneration(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PolicyGeneration {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PolicyGeneration> for ::std::num::NonZeroU64 {
+        fn from(value: PolicyGeneration) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PolicyGeneration> for PolicyGeneration {
+        fn from(value: &PolicyGeneration) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PolicyGeneration {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PolicyGeneration {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PolicyGeneration {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PolicyGeneration {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PolicyGeneration {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PolicyGeneration {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PreparationRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "command_digest",
+    ///    "preparation_id",
+    ///    "program_id"
+    ///  ],
+    ///  "properties": {
+    ///    "command_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "preparation_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PreparationRef {
+        pub command_digest: WorkDigest,
+        pub preparation_id: WorkId,
+        pub program_id: WorkId,
+    }
+    impl ::std::convert::From<&PreparationRef> for PreparationRef {
+        fn from(value: &PreparationRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`ProfileRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_entry",
+    ///    "deployment_digest",
+    ///    "owner",
+    ///    "policy_generation",
+    ///    "profile_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_entry": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "deployment_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "owner": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "policy_generation": {
+    ///      "$ref": "#/$defs/policyGeneration"
+    ///    },
+    ///    "profile_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ProfileRef {
+        pub catalog_entry: WorkId,
+        pub deployment_digest: RecoveryDigest32,
+        pub owner: WorkId,
+        pub policy_generation: PolicyGeneration,
+        pub profile_digest: RecoveryDigest32,
+    }
+    impl ::std::convert::From<&ProfileRef> for ProfileRef {
+        fn from(value: &ProfileRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryDigest32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery digest32",
+    ///  "type": "array",
+    ///  "items": {
+    ///    "title": "Recovery digest octet",
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct RecoveryDigest32(pub [u8; 32usize]);
+    impl ::std::ops::Deref for RecoveryDigest32 {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDigest32> for [u8; 32usize] {
+        fn from(value: RecoveryDigest32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDigest32> for RecoveryDigest32 {
+        fn from(value: &RecoveryDigest32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`WorkDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkDigest(::std::string::String);
+    impl ::std::ops::Deref for WorkDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkDigest> for ::std::string::String {
+        fn from(value: WorkDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkDigest> for WorkDigest {
+        fn from(value: &WorkDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`WorkId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkId(::std::string::String);
+    impl ::std::ops::Deref for WorkId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkId> for ::std::string::String {
+        fn from(value: WorkId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkId> for WorkId {
+        fn from(value: &WorkId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`WorkRequestV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/work/request.schema.json",
+    ///  "title": "Work Request V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "body",
+    ///    "schema",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "body": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "preparation"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "prepare"
+    ///            },
+    ///            "preparation": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "command_id",
+    ///                "program_id",
+    ///                "proposal",
+    ///                "schema",
+    ///                "version"
+    ///              ],
+    ///              "properties": {
+    ///                "command_id": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                },
+    ///                "program_id": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                },
+    ///                "proposal": {
+    ///                  "oneOf": [
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "child",
+    ///                        "kind",
+    ///                        "parent_allocation_hash",
+    ///                        "parent_id"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "child": {
+    ///                          "$ref": "#/$defs/delegationRecord"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "delegate"
+    ///                        },
+    ///                        "parent_allocation_hash": {
+    ///                          "$ref": "#/$defs/workDigest"
+    ///                        },
+    ///                        "parent_id": {
+    ///                          "$ref": "#/$defs/workSlotId"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "allocation_hash",
+    ///                        "arguments",
+    ///                        "kind",
+    ///                        "profile_ref",
+    ///                        "receiver_kernel_id",
+    ///                        "request_id",
+    ///                        "server_id",
+    ///                        "slot_id",
+    ///                        "tool_name"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "allocation_hash": {
+    ///                          "$ref": "#/$defs/workDigest"
+    ///                        },
+    ///                        "arguments": {},
+    ///                        "kind": {
+    ///                          "const": "offer"
+    ///                        },
+    ///                        "profile_ref": {
+    ///                          "$ref": "#/$defs/profileRef"
+    ///                        },
+    ///                        "receiver_kernel_id": {
+    ///                          "$ref": "#/$defs/workId"
+    ///                        },
+    ///                        "request_id": {
+    ///                          "$ref": "#/$defs/opaqueId"
+    ///                        },
+    ///                        "server_id": {
+    ///                          "$ref": "#/$defs/workId"
+    ///                        },
+    ///                        "slot_id": {
+    ///                          "$ref": "#/$defs/workSlotId"
+    ///                        },
+    ///                        "tool_name": {
+    ///                          "$ref": "#/$defs/workId"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "capability_hash",
+    ///                        "expected_revision",
+    ///                        "kind",
+    ///                        "offer",
+    ///                        "request_id"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "capability_hash": {
+    ///                          "$ref": "#/$defs/workDigest"
+    ///                        },
+    ///                        "expected_revision": {
+    ///                          "$ref": "#/$defs/safeInteger"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "select"
+    ///                        },
+    ///                        "offer": {
+    ///                          "$ref": "#/$defs/delegationRecord"
+    ///                        },
+    ///                        "request_id": {
+    ///                          "$ref": "#/$defs/opaqueId"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "dependencies",
+    ///                        "expected_bundle_sha256",
+    ///                        "join_draft_refs",
+    ///                        "kind",
+    ///                        "new_work"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "dependencies": {
+    ///                          "type": "array",
+    ///                          "items": {
+    ///                            "$ref": "#/$defs/graphRecord"
+    ///                          },
+    ///                          "maxItems": 64
+    ///                        },
+    ///                        "expected_bundle_sha256": {
+    ///                          "$ref": "#/$defs/workDigest"
+    ///                        },
+    ///                        "join_draft_refs": {
+    ///                          "type": "array",
+    ///                          "items": {
+    ///                            "$ref": "#/$defs/draftRef"
+    ///                          },
+    ///                          "maxItems": 16
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "extend"
+    ///                        },
+    ///                        "new_work": {
+    ///                          "type": "array",
+    ///                          "items": {
+    ///                            "type": "object",
+    ///                            "required": [
+    ///                              "handle",
+    ///                              "task_id"
+    ///                            ],
+    ///                            "properties": {
+    ///                              "handle": {
+    ///                                "$ref": "#/$defs/handle"
+    ///                              },
+    ///                              "task_id": {
+    ///                                "$ref": "#/$defs/workId"
+    ///                              }
+    ///                            },
+    ///                            "additionalProperties": false
+    ///                          },
+    ///                          "maxItems": 16
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "expected_bundle_sha256",
+    ///                        "join",
+    ///                        "kind",
+    ///                        "parents"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "expected_bundle_sha256": {
+    ///                          "$ref": "#/$defs/workDigest"
+    ///                        },
+    ///                        "join": {
+    ///                          "$ref": "#/$defs/graphRecord"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "join"
+    ///                        },
+    ///                        "parents": {
+    ///                          "type": "array",
+    ///                          "items": {
+    ///                            "$ref": "#/$defs/handle"
+    ///                          },
+    ///                          "maxItems": 16
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "commitment",
+    ///                        "kind",
+    ///                        "terms"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "commitment": {
+    ///                          "$ref": "#/$defs/commitment"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "agreement"
+    ///                        },
+    ///                        "terms": {
+    ///                          "oneOf": [
+    ///                            {
+    ///                              "type": "object",
+    ///                              "required": [
+    ///                                "kind",
+    ///                                "terms_reference"
+    ///                              ],
+    ///                              "properties": {
+    ///                                "kind": {
+    ///                                  "const": "unpaid"
+    ///                                },
+    ///                                "terms_reference": {
+    ///                                  "$ref": "#/$defs/workId"
+    ///                                }
+    ///                              },
+    ///                              "additionalProperties": false
+    ///                            },
+    ///                            {
+    ///                              "type": "object",
+    ///                              "required": [
+    ///                                "funding_profile_id",
+    ///                                "kind",
+    ///                                "terms_reference"
+    ///                              ],
+    ///                              "properties": {
+    ///                                "funding_profile_id": {
+    ///                                  "$ref": "#/$defs/workId"
+    ///                                },
+    ///                                "kind": {
+    ///                                  "const": "funded"
+    ///                                },
+    ///                                "terms_reference": {
+    ///                                  "$ref": "#/$defs/workId"
+    ///                                }
+    ///                              },
+    ///                              "additionalProperties": false
+    ///                            }
+    ///                          ]
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    }
+    ///                  ]
+    ///                },
+    ///                "schema": {
+    ///                  "const": "chio.work.preparation.v1"
+    ///                },
+    ///                "version": {
+    ///                  "const": 1
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "command",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "command": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "action",
+    ///                "command_id",
+    ///                "program_id",
+    ///                "schema",
+    ///                "version"
+    ///              ],
+    ///              "properties": {
+    ///                "action": {
+    ///                  "oneOf": [
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "kind",
+    ///                        "subdivision"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "kind": {
+    ///                          "const": "delegate"
+    ///                        },
+    ///                        "subdivision": {
+    ///                          "$ref": "#/$defs/delegationRecord"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "kind",
+    ///                        "selection"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "kind": {
+    ///                          "const": "select"
+    ///                        },
+    ///                        "selection": {
+    ///                          "$ref": "#/$defs/delegationRecord"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "binding",
+    ///                        "kind"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "binding": {
+    ///                          "$ref": "#/$defs/delegationRecord"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "seal"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "draft_ref",
+    ///                        "expected_bundle_sha256",
+    ///                        "kind"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "draft_ref": {
+    ///                          "$ref": "#/$defs/draftRef"
+    ///                        },
+    ///                        "expected_bundle_sha256": {
+    ///                          "$ref": "#/$defs/workDigest"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "extend"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "commitment",
+    ///                        "kind"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "commitment": {
+    ///                          "$ref": "#/$defs/commitment"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "submit"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "handle",
+    ///                        "kind"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "handle": {
+    ///                          "$ref": "#/$defs/handle"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "reconcile"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    },
+    ///                    {
+    ///                      "type": "object",
+    ///                      "required": [
+    ///                        "handle",
+    ///                        "kind"
+    ///                      ],
+    ///                      "properties": {
+    ///                        "handle": {
+    ///                          "$ref": "#/$defs/handle"
+    ///                        },
+    ///                        "kind": {
+    ///                          "const": "cancel"
+    ///                        }
+    ///                      },
+    ///                      "additionalProperties": false
+    ///                    }
+    ///                  ]
+    ///                },
+    ///                "command_id": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                },
+    ///                "program_id": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                },
+    ///                "schema": {
+    ///                  "const": "chio.work.command.v1"
+    ///                },
+    ///                "version": {
+    ///                  "const": 1
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            "kind": {
+    ///              "const": "submit"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "query"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "query"
+    ///            },
+    ///            "query": {
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "handle",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "handle": {
+    ///                      "$ref": "#/$defs/handle"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "work"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "command_ref",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "command_ref": {
+    ///                      "$ref": "#/$defs/commandRef"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "command"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "preparation_ref"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "preparation"
+    ///                    },
+    ///                    "preparation_ref": {
+    ///                      "$ref": "#/$defs/preparationRef"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "catalog_ref",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "catalog_ref": {
+    ///                      "$ref": "#/$defs/catalogRef"
+    ///                    },
+    ///                    "cursor": {
+    ///                      "$ref": "#/$defs/catalogCursor"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "catalog"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "profile_ref"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "profile"
+    ///                    },
+    ///                    "profile_ref": {
+    ///                      "$ref": "#/$defs/profileRef"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.work.request.v1"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkRequestV1 {
+        pub body: WorkRequestV1Body,
+        pub schema: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&WorkRequestV1> for WorkRequestV1 {
+        fn from(value: &WorkRequestV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1Body`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "preparation"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "prepare"
+    ///        },
+    ///        "preparation": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "command_id",
+    ///            "program_id",
+    ///            "proposal",
+    ///            "schema",
+    ///            "version"
+    ///          ],
+    ///          "properties": {
+    ///            "command_id": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "program_id": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "proposal": {
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "child",
+    ///                    "kind",
+    ///                    "parent_allocation_hash",
+    ///                    "parent_id"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "child": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "delegate"
+    ///                    },
+    ///                    "parent_allocation_hash": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "parent_id": {
+    ///                      "$ref": "#/$defs/workSlotId"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "allocation_hash",
+    ///                    "arguments",
+    ///                    "kind",
+    ///                    "profile_ref",
+    ///                    "receiver_kernel_id",
+    ///                    "request_id",
+    ///                    "server_id",
+    ///                    "slot_id",
+    ///                    "tool_name"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "allocation_hash": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "arguments": {},
+    ///                    "kind": {
+    ///                      "const": "offer"
+    ///                    },
+    ///                    "profile_ref": {
+    ///                      "$ref": "#/$defs/profileRef"
+    ///                    },
+    ///                    "receiver_kernel_id": {
+    ///                      "$ref": "#/$defs/workId"
+    ///                    },
+    ///                    "request_id": {
+    ///                      "$ref": "#/$defs/opaqueId"
+    ///                    },
+    ///                    "server_id": {
+    ///                      "$ref": "#/$defs/workId"
+    ///                    },
+    ///                    "slot_id": {
+    ///                      "$ref": "#/$defs/workSlotId"
+    ///                    },
+    ///                    "tool_name": {
+    ///                      "$ref": "#/$defs/workId"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "capability_hash",
+    ///                    "expected_revision",
+    ///                    "kind",
+    ///                    "offer",
+    ///                    "request_id"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "capability_hash": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "expected_revision": {
+    ///                      "$ref": "#/$defs/safeInteger"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "select"
+    ///                    },
+    ///                    "offer": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    },
+    ///                    "request_id": {
+    ///                      "$ref": "#/$defs/opaqueId"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "dependencies",
+    ///                    "expected_bundle_sha256",
+    ///                    "join_draft_refs",
+    ///                    "kind",
+    ///                    "new_work"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "dependencies": {
+    ///                      "type": "array",
+    ///                      "items": {
+    ///                        "$ref": "#/$defs/graphRecord"
+    ///                      },
+    ///                      "maxItems": 64
+    ///                    },
+    ///                    "expected_bundle_sha256": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "join_draft_refs": {
+    ///                      "type": "array",
+    ///                      "items": {
+    ///                        "$ref": "#/$defs/draftRef"
+    ///                      },
+    ///                      "maxItems": 16
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "extend"
+    ///                    },
+    ///                    "new_work": {
+    ///                      "type": "array",
+    ///                      "items": {
+    ///                        "type": "object",
+    ///                        "required": [
+    ///                          "handle",
+    ///                          "task_id"
+    ///                        ],
+    ///                        "properties": {
+    ///                          "handle": {
+    ///                            "$ref": "#/$defs/handle"
+    ///                          },
+    ///                          "task_id": {
+    ///                            "$ref": "#/$defs/workId"
+    ///                          }
+    ///                        },
+    ///                        "additionalProperties": false
+    ///                      },
+    ///                      "maxItems": 16
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "expected_bundle_sha256",
+    ///                    "join",
+    ///                    "kind",
+    ///                    "parents"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "expected_bundle_sha256": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "join": {
+    ///                      "$ref": "#/$defs/graphRecord"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "join"
+    ///                    },
+    ///                    "parents": {
+    ///                      "type": "array",
+    ///                      "items": {
+    ///                        "$ref": "#/$defs/handle"
+    ///                      },
+    ///                      "maxItems": 16
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "commitment",
+    ///                    "kind",
+    ///                    "terms"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "commitment": {
+    ///                      "$ref": "#/$defs/commitment"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "agreement"
+    ///                    },
+    ///                    "terms": {
+    ///                      "oneOf": [
+    ///                        {
+    ///                          "type": "object",
+    ///                          "required": [
+    ///                            "kind",
+    ///                            "terms_reference"
+    ///                          ],
+    ///                          "properties": {
+    ///                            "kind": {
+    ///                              "const": "unpaid"
+    ///                            },
+    ///                            "terms_reference": {
+    ///                              "$ref": "#/$defs/workId"
+    ///                            }
+    ///                          },
+    ///                          "additionalProperties": false
+    ///                        },
+    ///                        {
+    ///                          "type": "object",
+    ///                          "required": [
+    ///                            "funding_profile_id",
+    ///                            "kind",
+    ///                            "terms_reference"
+    ///                          ],
+    ///                          "properties": {
+    ///                            "funding_profile_id": {
+    ///                              "$ref": "#/$defs/workId"
+    ///                            },
+    ///                            "kind": {
+    ///                              "const": "funded"
+    ///                            },
+    ///                            "terms_reference": {
+    ///                              "$ref": "#/$defs/workId"
+    ///                            }
+    ///                          },
+    ///                          "additionalProperties": false
+    ///                        }
+    ///                      ]
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.work.preparation.v1"
+    ///            },
+    ///            "version": {
+    ///              "const": 1
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "command",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "command": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "action",
+    ///            "command_id",
+    ///            "program_id",
+    ///            "schema",
+    ///            "version"
+    ///          ],
+    ///          "properties": {
+    ///            "action": {
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "subdivision"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "delegate"
+    ///                    },
+    ///                    "subdivision": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "selection"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "select"
+    ///                    },
+    ///                    "selection": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "binding",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "binding": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "seal"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "draft_ref",
+    ///                    "expected_bundle_sha256",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "draft_ref": {
+    ///                      "$ref": "#/$defs/draftRef"
+    ///                    },
+    ///                    "expected_bundle_sha256": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "extend"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "commitment",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "commitment": {
+    ///                      "$ref": "#/$defs/commitment"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "submit"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "handle",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "handle": {
+    ///                      "$ref": "#/$defs/handle"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "reconcile"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "handle",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "handle": {
+    ///                      "$ref": "#/$defs/handle"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "cancel"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
+    ///            },
+    ///            "command_id": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "program_id": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "schema": {
+    ///              "const": "chio.work.command.v1"
+    ///            },
+    ///            "version": {
+    ///              "const": 1
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        "kind": {
+    ///          "const": "submit"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "query"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "query"
+    ///        },
+    ///        "query": {
+    ///          "oneOf": [
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "handle",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "handle": {
+    ///                  "$ref": "#/$defs/handle"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "work"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "command_ref",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "command_ref": {
+    ///                  "$ref": "#/$defs/commandRef"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "command"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "preparation_ref"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "preparation"
+    ///                },
+    ///                "preparation_ref": {
+    ///                  "$ref": "#/$defs/preparationRef"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "catalog_ref",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "catalog_ref": {
+    ///                  "$ref": "#/$defs/catalogRef"
+    ///                },
+    ///                "cursor": {
+    ///                  "$ref": "#/$defs/catalogCursor"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "catalog"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "profile_ref"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "profile"
+    ///                },
+    ///                "profile_ref": {
+    ///                  "$ref": "#/$defs/profileRef"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkRequestV1Body {
+        #[serde(rename = "prepare")]
+        Prepare {
+            preparation: WorkRequestV1BodyPreparation,
+        },
+        #[serde(rename = "submit")]
+        Submit { command: WorkRequestV1BodyCommand },
+        #[serde(rename = "query")]
+        Query { query: WorkRequestV1BodyQuery },
+    }
+    impl ::std::convert::From<&Self> for WorkRequestV1Body {
+        fn from(value: &WorkRequestV1Body) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyCommand`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "action",
+    ///    "command_id",
+    ///    "program_id",
+    ///    "schema",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "action": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "subdivision"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "delegate"
+    ///            },
+    ///            "subdivision": {
+    ///              "$ref": "#/$defs/delegationRecord"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "selection"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "select"
+    ///            },
+    ///            "selection": {
+    ///              "$ref": "#/$defs/delegationRecord"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "binding",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "binding": {
+    ///              "$ref": "#/$defs/delegationRecord"
+    ///            },
+    ///            "kind": {
+    ///              "const": "seal"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "draft_ref",
+    ///            "expected_bundle_sha256",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "draft_ref": {
+    ///              "$ref": "#/$defs/draftRef"
+    ///            },
+    ///            "expected_bundle_sha256": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "kind": {
+    ///              "const": "extend"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "commitment",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "commitment": {
+    ///              "$ref": "#/$defs/commitment"
+    ///            },
+    ///            "kind": {
+    ///              "const": "submit"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "handle",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "handle": {
+    ///              "$ref": "#/$defs/handle"
+    ///            },
+    ///            "kind": {
+    ///              "const": "reconcile"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "handle",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "handle": {
+    ///              "$ref": "#/$defs/handle"
+    ///            },
+    ///            "kind": {
+    ///              "const": "cancel"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "command_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.work.command.v1"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkRequestV1BodyCommand {
+        pub action: WorkRequestV1BodyCommandAction,
+        pub command_id: WorkId,
+        pub program_id: WorkId,
+        pub schema: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&WorkRequestV1BodyCommand> for WorkRequestV1BodyCommand {
+        fn from(value: &WorkRequestV1BodyCommand) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyCommandAction`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "subdivision"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "delegate"
+    ///        },
+    ///        "subdivision": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "selection"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "select"
+    ///        },
+    ///        "selection": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "binding",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "binding": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        },
+    ///        "kind": {
+    ///          "const": "seal"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "draft_ref",
+    ///        "expected_bundle_sha256",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "draft_ref": {
+    ///          "$ref": "#/$defs/draftRef"
+    ///        },
+    ///        "expected_bundle_sha256": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "kind": {
+    ///          "const": "extend"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "commitment",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "commitment": {
+    ///          "$ref": "#/$defs/commitment"
+    ///        },
+    ///        "kind": {
+    ///          "const": "submit"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "handle",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "handle": {
+    ///          "$ref": "#/$defs/handle"
+    ///        },
+    ///        "kind": {
+    ///          "const": "reconcile"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "handle",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "handle": {
+    ///          "$ref": "#/$defs/handle"
+    ///        },
+    ///        "kind": {
+    ///          "const": "cancel"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkRequestV1BodyCommandAction {
+        #[serde(rename = "delegate")]
+        Delegate { subdivision: DelegationRecord },
+        #[serde(rename = "select")]
+        Select { selection: DelegationRecord },
+        #[serde(rename = "seal")]
+        Seal { binding: DelegationRecord },
+        #[serde(rename = "extend")]
+        Extend {
+            draft_ref: DraftRef,
+            expected_bundle_sha256: WorkDigest,
+        },
+        #[serde(rename = "submit")]
+        Submit { commitment: Commitment },
+        #[serde(rename = "reconcile")]
+        Reconcile { handle: Handle },
+        #[serde(rename = "cancel")]
+        Cancel { handle: Handle },
+    }
+    impl ::std::convert::From<&Self> for WorkRequestV1BodyCommandAction {
+        fn from(value: &WorkRequestV1BodyCommandAction) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyPreparation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "command_id",
+    ///    "program_id",
+    ///    "proposal",
+    ///    "schema",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "command_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "proposal": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "child",
+    ///            "kind",
+    ///            "parent_allocation_hash",
+    ///            "parent_id"
+    ///          ],
+    ///          "properties": {
+    ///            "child": {
+    ///              "$ref": "#/$defs/delegationRecord"
+    ///            },
+    ///            "kind": {
+    ///              "const": "delegate"
+    ///            },
+    ///            "parent_allocation_hash": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "parent_id": {
+    ///              "$ref": "#/$defs/workSlotId"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "allocation_hash",
+    ///            "arguments",
+    ///            "kind",
+    ///            "profile_ref",
+    ///            "receiver_kernel_id",
+    ///            "request_id",
+    ///            "server_id",
+    ///            "slot_id",
+    ///            "tool_name"
+    ///          ],
+    ///          "properties": {
+    ///            "allocation_hash": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "arguments": {},
+    ///            "kind": {
+    ///              "const": "offer"
+    ///            },
+    ///            "profile_ref": {
+    ///              "$ref": "#/$defs/profileRef"
+    ///            },
+    ///            "receiver_kernel_id": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "request_id": {
+    ///              "$ref": "#/$defs/opaqueId"
+    ///            },
+    ///            "server_id": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "slot_id": {
+    ///              "$ref": "#/$defs/workSlotId"
+    ///            },
+    ///            "tool_name": {
+    ///              "$ref": "#/$defs/workId"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "capability_hash",
+    ///            "expected_revision",
+    ///            "kind",
+    ///            "offer",
+    ///            "request_id"
+    ///          ],
+    ///          "properties": {
+    ///            "capability_hash": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "expected_revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "kind": {
+    ///              "const": "select"
+    ///            },
+    ///            "offer": {
+    ///              "$ref": "#/$defs/delegationRecord"
+    ///            },
+    ///            "request_id": {
+    ///              "$ref": "#/$defs/opaqueId"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "dependencies",
+    ///            "expected_bundle_sha256",
+    ///            "join_draft_refs",
+    ///            "kind",
+    ///            "new_work"
+    ///          ],
+    ///          "properties": {
+    ///            "dependencies": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/graphRecord"
+    ///              },
+    ///              "maxItems": 64
+    ///            },
+    ///            "expected_bundle_sha256": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "join_draft_refs": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/draftRef"
+    ///              },
+    ///              "maxItems": 16
+    ///            },
+    ///            "kind": {
+    ///              "const": "extend"
+    ///            },
+    ///            "new_work": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "type": "object",
+    ///                "required": [
+    ///                  "handle",
+    ///                  "task_id"
+    ///                ],
+    ///                "properties": {
+    ///                  "handle": {
+    ///                    "$ref": "#/$defs/handle"
+    ///                  },
+    ///                  "task_id": {
+    ///                    "$ref": "#/$defs/workId"
+    ///                  }
+    ///                },
+    ///                "additionalProperties": false
+    ///              },
+    ///              "maxItems": 16
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "expected_bundle_sha256",
+    ///            "join",
+    ///            "kind",
+    ///            "parents"
+    ///          ],
+    ///          "properties": {
+    ///            "expected_bundle_sha256": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "join": {
+    ///              "$ref": "#/$defs/graphRecord"
+    ///            },
+    ///            "kind": {
+    ///              "const": "join"
+    ///            },
+    ///            "parents": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "$ref": "#/$defs/handle"
+    ///              },
+    ///              "maxItems": 16
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "commitment",
+    ///            "kind",
+    ///            "terms"
+    ///          ],
+    ///          "properties": {
+    ///            "commitment": {
+    ///              "$ref": "#/$defs/commitment"
+    ///            },
+    ///            "kind": {
+    ///              "const": "agreement"
+    ///            },
+    ///            "terms": {
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "terms_reference"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "unpaid"
+    ///                    },
+    ///                    "terms_reference": {
+    ///                      "$ref": "#/$defs/workId"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "funding_profile_id",
+    ///                    "kind",
+    ///                    "terms_reference"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "funding_profile_id": {
+    ///                      "$ref": "#/$defs/workId"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "funded"
+    ///                    },
+    ///                    "terms_reference": {
+    ///                      "$ref": "#/$defs/workId"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.work.preparation.v1"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkRequestV1BodyPreparation {
+        pub command_id: WorkId,
+        pub program_id: WorkId,
+        pub proposal: WorkRequestV1BodyPreparationProposal,
+        pub schema: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&WorkRequestV1BodyPreparation> for WorkRequestV1BodyPreparation {
+        fn from(value: &WorkRequestV1BodyPreparation) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyPreparationProposal`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "child",
+    ///        "kind",
+    ///        "parent_allocation_hash",
+    ///        "parent_id"
+    ///      ],
+    ///      "properties": {
+    ///        "child": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        },
+    ///        "kind": {
+    ///          "const": "delegate"
+    ///        },
+    ///        "parent_allocation_hash": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "parent_id": {
+    ///          "$ref": "#/$defs/workSlotId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "allocation_hash",
+    ///        "arguments",
+    ///        "kind",
+    ///        "profile_ref",
+    ///        "receiver_kernel_id",
+    ///        "request_id",
+    ///        "server_id",
+    ///        "slot_id",
+    ///        "tool_name"
+    ///      ],
+    ///      "properties": {
+    ///        "allocation_hash": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "arguments": {},
+    ///        "kind": {
+    ///          "const": "offer"
+    ///        },
+    ///        "profile_ref": {
+    ///          "$ref": "#/$defs/profileRef"
+    ///        },
+    ///        "receiver_kernel_id": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "request_id": {
+    ///          "$ref": "#/$defs/opaqueId"
+    ///        },
+    ///        "server_id": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "slot_id": {
+    ///          "$ref": "#/$defs/workSlotId"
+    ///        },
+    ///        "tool_name": {
+    ///          "$ref": "#/$defs/workId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "capability_hash",
+    ///        "expected_revision",
+    ///        "kind",
+    ///        "offer",
+    ///        "request_id"
+    ///      ],
+    ///      "properties": {
+    ///        "capability_hash": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "expected_revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "kind": {
+    ///          "const": "select"
+    ///        },
+    ///        "offer": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        },
+    ///        "request_id": {
+    ///          "$ref": "#/$defs/opaqueId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "dependencies",
+    ///        "expected_bundle_sha256",
+    ///        "join_draft_refs",
+    ///        "kind",
+    ///        "new_work"
+    ///      ],
+    ///      "properties": {
+    ///        "dependencies": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/graphRecord"
+    ///          },
+    ///          "maxItems": 64
+    ///        },
+    ///        "expected_bundle_sha256": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "join_draft_refs": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/draftRef"
+    ///          },
+    ///          "maxItems": 16
+    ///        },
+    ///        "kind": {
+    ///          "const": "extend"
+    ///        },
+    ///        "new_work": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "type": "object",
+    ///            "required": [
+    ///              "handle",
+    ///              "task_id"
+    ///            ],
+    ///            "properties": {
+    ///              "handle": {
+    ///                "$ref": "#/$defs/handle"
+    ///              },
+    ///              "task_id": {
+    ///                "$ref": "#/$defs/workId"
+    ///              }
+    ///            },
+    ///            "additionalProperties": false
+    ///          },
+    ///          "maxItems": 16
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "expected_bundle_sha256",
+    ///        "join",
+    ///        "kind",
+    ///        "parents"
+    ///      ],
+    ///      "properties": {
+    ///        "expected_bundle_sha256": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "join": {
+    ///          "$ref": "#/$defs/graphRecord"
+    ///        },
+    ///        "kind": {
+    ///          "const": "join"
+    ///        },
+    ///        "parents": {
+    ///          "type": "array",
+    ///          "items": {
+    ///            "$ref": "#/$defs/handle"
+    ///          },
+    ///          "maxItems": 16
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "commitment",
+    ///        "kind",
+    ///        "terms"
+    ///      ],
+    ///      "properties": {
+    ///        "commitment": {
+    ///          "$ref": "#/$defs/commitment"
+    ///        },
+    ///        "kind": {
+    ///          "const": "agreement"
+    ///        },
+    ///        "terms": {
+    ///          "oneOf": [
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "terms_reference"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "unpaid"
+    ///                },
+    ///                "terms_reference": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "funding_profile_id",
+    ///                "kind",
+    ///                "terms_reference"
+    ///              ],
+    ///              "properties": {
+    ///                "funding_profile_id": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "funded"
+    ///                },
+    ///                "terms_reference": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkRequestV1BodyPreparationProposal {
+        #[serde(rename = "delegate")]
+        Delegate {
+            child: DelegationRecord,
+            parent_allocation_hash: WorkDigest,
+            parent_id: WorkSlotId,
+        },
+        #[serde(rename = "offer")]
+        Offer {
+            allocation_hash: WorkDigest,
+            arguments: ::serde_json::Value,
+            profile_ref: ProfileRef,
+            receiver_kernel_id: WorkId,
+            request_id: OpaqueId,
+            server_id: WorkId,
+            slot_id: WorkSlotId,
+            tool_name: WorkId,
+        },
+        #[serde(rename = "select")]
+        Select {
+            capability_hash: WorkDigest,
+            expected_revision: SafeInteger,
+            offer: DelegationRecord,
+            request_id: OpaqueId,
+        },
+        #[serde(rename = "extend")]
+        Extend {
+            dependencies: ::std::vec::Vec<GraphRecord>,
+            expected_bundle_sha256: WorkDigest,
+            join_draft_refs: ::std::vec::Vec<DraftRef>,
+            new_work: ::std::vec::Vec<WorkRequestV1BodyPreparationProposalNewWorkItem>,
+        },
+        #[serde(rename = "join")]
+        Join {
+            expected_bundle_sha256: WorkDigest,
+            join: GraphRecord,
+            parents: ::std::vec::Vec<Handle>,
+        },
+        #[serde(rename = "agreement")]
+        Agreement {
+            commitment: Commitment,
+            terms: WorkRequestV1BodyPreparationProposalTerms,
+        },
+    }
+    impl ::std::convert::From<&Self> for WorkRequestV1BodyPreparationProposal {
+        fn from(value: &WorkRequestV1BodyPreparationProposal) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyPreparationProposalNewWorkItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "handle",
+    ///    "task_id"
+    ///  ],
+    ///  "properties": {
+    ///    "handle": {
+    ///      "$ref": "#/$defs/handle"
+    ///    },
+    ///    "task_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkRequestV1BodyPreparationProposalNewWorkItem {
+        pub handle: Handle,
+        pub task_id: WorkId,
+    }
+    impl ::std::convert::From<&WorkRequestV1BodyPreparationProposalNewWorkItem>
+        for WorkRequestV1BodyPreparationProposalNewWorkItem
+    {
+        fn from(value: &WorkRequestV1BodyPreparationProposalNewWorkItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyPreparationProposalTerms`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "terms_reference"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "unpaid"
+    ///        },
+    ///        "terms_reference": {
+    ///          "$ref": "#/$defs/workId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "funding_profile_id",
+    ///        "kind",
+    ///        "terms_reference"
+    ///      ],
+    ///      "properties": {
+    ///        "funding_profile_id": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "kind": {
+    ///          "const": "funded"
+    ///        },
+    ///        "terms_reference": {
+    ///          "$ref": "#/$defs/workId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkRequestV1BodyPreparationProposalTerms {
+        #[serde(rename = "unpaid")]
+        Unpaid { terms_reference: WorkId },
+        #[serde(rename = "funded")]
+        Funded {
+            funding_profile_id: WorkId,
+            terms_reference: WorkId,
+        },
+    }
+    impl ::std::convert::From<&Self> for WorkRequestV1BodyPreparationProposalTerms {
+        fn from(value: &WorkRequestV1BodyPreparationProposalTerms) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkRequestV1BodyQuery`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "handle",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "handle": {
+    ///          "$ref": "#/$defs/handle"
+    ///        },
+    ///        "kind": {
+    ///          "const": "work"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "command_ref",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "command_ref": {
+    ///          "$ref": "#/$defs/commandRef"
+    ///        },
+    ///        "kind": {
+    ///          "const": "command"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "preparation_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "preparation"
+    ///        },
+    ///        "preparation_ref": {
+    ///          "$ref": "#/$defs/preparationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "catalog_ref",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "catalog_ref": {
+    ///          "$ref": "#/$defs/catalogRef"
+    ///        },
+    ///        "cursor": {
+    ///          "$ref": "#/$defs/catalogCursor"
+    ///        },
+    ///        "kind": {
+    ///          "const": "catalog"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "profile_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "profile"
+    ///        },
+    ///        "profile_ref": {
+    ///          "$ref": "#/$defs/profileRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkRequestV1BodyQuery {
+        #[serde(rename = "work")]
+        Work { handle: Handle },
+        #[serde(rename = "command")]
+        Command { command_ref: CommandRef },
+        #[serde(rename = "preparation")]
+        Preparation { preparation_ref: PreparationRef },
+        #[serde(rename = "catalog")]
+        Catalog {
+            catalog_ref: CatalogRef,
+            #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+            cursor: ::std::option::Option<CatalogCursor>,
+        },
+        #[serde(rename = "profile")]
+        Profile { profile_ref: ProfileRef },
+    }
+    impl ::std::convert::From<&Self> for WorkRequestV1BodyQuery {
+        fn from(value: &WorkRequestV1BodyQuery) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkSlotId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9._:/-]{1,256}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkSlotId(::std::string::String);
+    impl ::std::ops::Deref for WorkSlotId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkSlotId> for ::std::string::String {
+        fn from(value: WorkSlotId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkSlotId> for WorkSlotId {
+        fn from(value: &WorkSlotId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkSlotId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9._:/-]{1,256}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9._:/-]{1,256}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkSlotId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkSlotId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkSlotId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkSlotId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
+pub mod work_response {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`Acceptance`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifact",
+    ///    "artifact_digest",
+    ///    "contract_digest",
+    ///    "decision",
+    ///    "evaluator",
+    ///    "evidence",
+    ///    "handle",
+    ///    "procedure_digest",
+    ///    "producer"
+    ///  ],
+    ///  "properties": {
+    ///    "artifact": {
+    ///      "$ref": "#/$defs/artifactVersionRef"
+    ///    },
+    ///    "artifact_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "contract_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "decision": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "accepted",
+    ///        "rejected"
+    ///      ]
+    ///    },
+    ///    "evaluator": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "evidence": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/opaqueId"
+    ///      },
+    ///      "maxItems": 16
+    ///    },
+    ///    "handle": {
+    ///      "$ref": "#/$defs/handle"
+    ///    },
+    ///    "procedure_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "producer": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Acceptance {
+        pub artifact: ArtifactVersionRef,
+        pub artifact_digest: WorkDigest,
+        pub contract_digest: RecoveryDigest32,
+        pub decision: AcceptanceDecision,
+        pub evaluator: OpaqueId,
+        pub evidence: ::std::vec::Vec<OpaqueId>,
+        pub handle: Handle,
+        pub procedure_digest: WorkDigest,
+        pub producer: Operation,
+    }
+    impl ::std::convert::From<&Acceptance> for Acceptance {
+        fn from(value: &Acceptance) -> Self {
+            value.clone()
+        }
+    }
+    ///`AcceptanceDecision`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "accepted",
+    ///    "rejected"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum AcceptanceDecision {
+        #[serde(rename = "accepted")]
+        Accepted,
+        #[serde(rename = "rejected")]
+        Rejected,
+    }
+    impl ::std::convert::From<&Self> for AcceptanceDecision {
+        fn from(value: &AcceptanceDecision) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for AcceptanceDecision {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Accepted => f.write_str("accepted"),
+                Self::Rejected => f.write_str("rejected"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for AcceptanceDecision {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "accepted" => Ok(Self::Accepted),
+                "rejected" => Ok(Self::Rejected),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AcceptanceDecision {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AcceptanceDecision {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AcceptanceDecision {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ArtifactVersionRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifact",
+    ///    "provenance",
+    ///    "scope",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "artifact": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "provenance": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/scope"
+    ///    },
+    ///    "version": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ArtifactVersionRef {
+        pub artifact: OpaqueId,
+        pub provenance: RecoveryDigest32,
+        pub scope: Scope,
+        pub version: OpaqueId,
+    }
+    impl ::std::convert::From<&ArtifactVersionRef> for ArtifactVersionRef {
+        fn from(value: &ArtifactVersionRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`BindingField`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "program_id",
+    ///    "command_id",
+    ///    "slot_id",
+    ///    "allocation_hash",
+    ///    "receiver_kernel_id",
+    ///    "request_id",
+    ///    "capability_hash",
+    ///    "profile_ref",
+    ///    "graph_sha256",
+    ///    "draft_ref",
+    ///    "permit",
+    ///    "invocation_ref"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum BindingField {
+        #[serde(rename = "program_id")]
+        ProgramId,
+        #[serde(rename = "command_id")]
+        CommandId,
+        #[serde(rename = "slot_id")]
+        SlotId,
+        #[serde(rename = "allocation_hash")]
+        AllocationHash,
+        #[serde(rename = "receiver_kernel_id")]
+        ReceiverKernelId,
+        #[serde(rename = "request_id")]
+        RequestId,
+        #[serde(rename = "capability_hash")]
+        CapabilityHash,
+        #[serde(rename = "profile_ref")]
+        ProfileRef,
+        #[serde(rename = "graph_sha256")]
+        GraphSha256,
+        #[serde(rename = "draft_ref")]
+        DraftRef,
+        #[serde(rename = "permit")]
+        Permit,
+        #[serde(rename = "invocation_ref")]
+        InvocationRef,
+    }
+    impl ::std::convert::From<&Self> for BindingField {
+        fn from(value: &BindingField) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for BindingField {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::ProgramId => f.write_str("program_id"),
+                Self::CommandId => f.write_str("command_id"),
+                Self::SlotId => f.write_str("slot_id"),
+                Self::AllocationHash => f.write_str("allocation_hash"),
+                Self::ReceiverKernelId => f.write_str("receiver_kernel_id"),
+                Self::RequestId => f.write_str("request_id"),
+                Self::CapabilityHash => f.write_str("capability_hash"),
+                Self::ProfileRef => f.write_str("profile_ref"),
+                Self::GraphSha256 => f.write_str("graph_sha256"),
+                Self::DraftRef => f.write_str("draft_ref"),
+                Self::Permit => f.write_str("permit"),
+                Self::InvocationRef => f.write_str("invocation_ref"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for BindingField {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "program_id" => Ok(Self::ProgramId),
+                "command_id" => Ok(Self::CommandId),
+                "slot_id" => Ok(Self::SlotId),
+                "allocation_hash" => Ok(Self::AllocationHash),
+                "receiver_kernel_id" => Ok(Self::ReceiverKernelId),
+                "request_id" => Ok(Self::RequestId),
+                "capability_hash" => Ok(Self::CapabilityHash),
+                "profile_ref" => Ok(Self::ProfileRef),
+                "graph_sha256" => Ok(Self::GraphSha256),
+                "draft_ref" => Ok(Self::DraftRef),
+                "permit" => Ok(Self::Permit),
+                "invocation_ref" => Ok(Self::InvocationRef),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for BindingField {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for BindingField {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for BindingField {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`CatalogCursor`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_generation",
+    ///    "position"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_generation": {
+    ///      "$ref": "#/$defs/policyGeneration"
+    ///    },
+    ///    "position": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CatalogCursor {
+        pub catalog_generation: PolicyGeneration,
+        pub position: WorkDigest,
+    }
+    impl ::std::convert::From<&CatalogCursor> for CatalogCursor {
+        fn from(value: &CatalogCursor) -> Self {
+            value.clone()
+        }
+    }
+    ///`CatalogPage`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_ref",
+    ///    "entries"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_ref": {
+    ///      "$ref": "#/$defs/catalogRef"
+    ///    },
+    ///    "entries": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/profileRef"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    "next": {
+    ///      "$ref": "#/$defs/catalogCursor"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CatalogPage {
+        pub catalog_ref: CatalogRef,
+        pub entries: ::std::vec::Vec<ProfileRef>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub next: ::std::option::Option<CatalogCursor>,
+    }
+    impl ::std::convert::From<&CatalogPage> for CatalogPage {
+        fn from(value: &CatalogPage) -> Self {
+            value.clone()
+        }
+    }
+    ///`CatalogRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_id",
+    ///    "owner"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "owner": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CatalogRef {
+        pub catalog_id: WorkId,
+        pub owner: WorkId,
+    }
+    impl ::std::convert::From<&CatalogRef> for CatalogRef {
+        fn from(value: &CatalogRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`CommandRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "command_digest",
+    ///    "command_id",
+    ///    "program_id"
+    ///  ],
+    ///  "properties": {
+    ///    "command_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "command_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CommandRef {
+        pub command_digest: WorkDigest,
+        pub command_id: WorkId,
+        pub program_id: WorkId,
+    }
+    impl ::std::convert::From<&CommandRef> for CommandRef {
+        fn from(value: &CommandRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`CommandResult`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "command_ref",
+    ///    "outcome"
+    ///  ],
+    ///  "properties": {
+    ///    "command_ref": {
+    ///      "$ref": "#/$defs/commandRef"
+    ///    },
+    ///    "outcome": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "result",
+    ///            "revision"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "applied"
+    ///            },
+    ///            "result": {
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "slot"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "delegated"
+    ///                    },
+    ///                    "slot": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "revision"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "selected"
+    ///                    },
+    ///                    "revision": {
+    ///                      "$ref": "#/$defs/safeInteger"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "permit"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "sealed"
+    ///                    },
+    ///                    "permit": {
+    ///                      "$ref": "#/$defs/delegationRecord"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "bundle_sha256",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "bundle_sha256": {
+    ///                      "$ref": "#/$defs/workDigest"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "extended"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "owner_operation_ref"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "submitted"
+    ///                    },
+    ///                    "owner_operation_ref": {
+    ///                      "$ref": "#/$defs/ownerOperationRef"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "view"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "reconciled"
+    ///                    },
+    ///                    "view": {
+    ///                      "$ref": "#/$defs/view"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "control",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "control": {
+    ///                      "$ref": "#/$defs/control"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "cancel_observed"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_operation_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_operation_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "rejection"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "refused"
+    ///            },
+    ///            "rejection": {
+    ///              "$ref": "#/$defs/rejection"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CommandResult {
+        pub command_ref: CommandRef,
+        pub outcome: CommandResultOutcome,
+    }
+    impl ::std::convert::From<&CommandResult> for CommandResult {
+        fn from(value: &CommandResult) -> Self {
+            value.clone()
+        }
+    }
+    ///`CommandResultOutcome`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "result",
+    ///        "revision"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "applied"
+    ///        },
+    ///        "result": {
+    ///          "oneOf": [
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "slot"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "delegated"
+    ///                },
+    ///                "slot": {
+    ///                  "$ref": "#/$defs/delegationRecord"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "revision"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "selected"
+    ///                },
+    ///                "revision": {
+    ///                  "$ref": "#/$defs/safeInteger"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "permit"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "sealed"
+    ///                },
+    ///                "permit": {
+    ///                  "$ref": "#/$defs/delegationRecord"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "bundle_sha256",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "bundle_sha256": {
+    ///                  "$ref": "#/$defs/workDigest"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "extended"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "owner_operation_ref"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "submitted"
+    ///                },
+    ///                "owner_operation_ref": {
+    ///                  "$ref": "#/$defs/ownerOperationRef"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "view"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "reconciled"
+    ///                },
+    ///                "view": {
+    ///                  "$ref": "#/$defs/view"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "control",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "control": {
+    ///                  "$ref": "#/$defs/control"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "cancel_observed"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_operation_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_operation_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "rejection"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "refused"
+    ///        },
+    ///        "rejection": {
+    ///          "$ref": "#/$defs/rejection"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum CommandResultOutcome {
+        #[serde(rename = "applied")]
+        Applied {
+            result: CommandResultOutcomeResult,
+            revision: SafeInteger,
+        },
+        #[serde(rename = "pending")]
+        Pending {
+            owner_operation_ref: OwnerOperationRef,
+        },
+        #[serde(rename = "refused")]
+        Refused { rejection: Rejection },
+    }
+    impl ::std::convert::From<&Self> for CommandResultOutcome {
+        fn from(value: &CommandResultOutcome) -> Self {
+            value.clone()
+        }
+    }
+    ///`CommandResultOutcomeResult`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "slot"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "delegated"
+    ///        },
+    ///        "slot": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "revision"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "selected"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "permit"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "sealed"
+    ///        },
+    ///        "permit": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "bundle_sha256",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "bundle_sha256": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "kind": {
+    ///          "const": "extended"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_operation_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "submitted"
+    ///        },
+    ///        "owner_operation_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "view"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "reconciled"
+    ///        },
+    ///        "view": {
+    ///          "$ref": "#/$defs/view"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "control",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "control": {
+    ///          "$ref": "#/$defs/control"
+    ///        },
+    ///        "kind": {
+    ///          "const": "cancel_observed"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum CommandResultOutcomeResult {
+        #[serde(rename = "delegated")]
+        Delegated { slot: DelegationRecord },
+        #[serde(rename = "selected")]
+        Selected { revision: SafeInteger },
+        #[serde(rename = "sealed")]
+        Sealed { permit: DelegationRecord },
+        #[serde(rename = "extended")]
+        Extended { bundle_sha256: WorkDigest },
+        #[serde(rename = "submitted")]
+        Submitted {
+            owner_operation_ref: OwnerOperationRef,
+        },
+        #[serde(rename = "reconciled")]
+        Reconciled { view: View },
+        #[serde(rename = "cancel_observed")]
+        CancelObserved { control: Control },
+    }
+    impl ::std::convert::From<&Self> for CommandResultOutcomeResult {
+        fn from(value: &CommandResultOutcomeResult) -> Self {
+            value.clone()
+        }
+    }
+    ///`Control`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "active",
+    ///    "cancel_requested",
+    ///    "cancelled",
+    ///    "quarantined"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Control {
+        #[serde(rename = "active")]
+        Active,
+        #[serde(rename = "cancel_requested")]
+        CancelRequested,
+        #[serde(rename = "cancelled")]
+        Cancelled,
+        #[serde(rename = "quarantined")]
+        Quarantined,
+    }
+    impl ::std::convert::From<&Self> for Control {
+        fn from(value: &Control) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Control {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Active => f.write_str("active"),
+                Self::CancelRequested => f.write_str("cancel_requested"),
+                Self::Cancelled => f.write_str("cancelled"),
+                Self::Quarantined => f.write_str("quarantined"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Control {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "active" => Ok(Self::Active),
+                "cancel_requested" => Ok(Self::CancelRequested),
+                "cancelled" => Ok(Self::Cancelled),
+                "quarantined" => Ok(Self::Quarantined),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Control {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Control {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Control {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`DelegationRecord`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Work delegation record",
+    ///  "type": "object"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct DelegationRecord(pub ::serde_json::Map<::std::string::String, ::serde_json::Value>);
+    impl ::std::ops::Deref for DelegationRecord {
+        type Target = ::serde_json::Map<::std::string::String, ::serde_json::Value>;
+        fn deref(&self) -> &::serde_json::Map<::std::string::String, ::serde_json::Value> {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DelegationRecord>
+        for ::serde_json::Map<::std::string::String, ::serde_json::Value>
+    {
+        fn from(value: DelegationRecord) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DelegationRecord> for DelegationRecord {
+        fn from(value: &DelegationRecord) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::serde_json::Map<::std::string::String, ::serde_json::Value>>
+        for DelegationRecord
+    {
+        fn from(value: ::serde_json::Map<::std::string::String, ::serde_json::Value>) -> Self {
+            Self(value)
+        }
+    }
+    ///`DraftRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "draft_id",
+    ///    "graph_sha256"
+    ///  ],
+    ///  "properties": {
+    ///    "draft_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "graph_sha256": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DraftRef {
+        pub draft_id: WorkId,
+        pub graph_sha256: WorkDigest,
+    }
+    impl ::std::convert::From<&DraftRef> for DraftRef {
+        fn from(value: &DraftRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`Effect`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectNeverAdmittedV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectAdmissionUnresolvedV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectClosedBeforeEffectV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectAwaitingApprovalV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectInFlightV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectAwaitingCallerReportV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectUnknownV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectCompleteV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectPartialV1"
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/recoveryEffectFailedAfterEffectV1"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum Effect {
+        NeverAdmittedV1(RecoveryEffectNeverAdmittedV1),
+        AdmissionUnresolvedV1(RecoveryEffectAdmissionUnresolvedV1),
+        ClosedBeforeEffectV1(RecoveryEffectClosedBeforeEffectV1),
+        AwaitingApprovalV1(RecoveryEffectAwaitingApprovalV1),
+        InFlightV1(RecoveryEffectInFlightV1),
+        AwaitingCallerReportV1(RecoveryEffectAwaitingCallerReportV1),
+        UnknownV1(RecoveryEffectUnknownV1),
+        CompleteV1(RecoveryEffectCompleteV1),
+        PartialV1(RecoveryEffectPartialV1),
+        FailedAfterEffectV1(RecoveryEffectFailedAfterEffectV1),
+    }
+    impl ::std::convert::From<&Self> for Effect {
+        fn from(value: &Effect) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectNeverAdmittedV1> for Effect {
+        fn from(value: RecoveryEffectNeverAdmittedV1) -> Self {
+            Self::NeverAdmittedV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectAdmissionUnresolvedV1> for Effect {
+        fn from(value: RecoveryEffectAdmissionUnresolvedV1) -> Self {
+            Self::AdmissionUnresolvedV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectClosedBeforeEffectV1> for Effect {
+        fn from(value: RecoveryEffectClosedBeforeEffectV1) -> Self {
+            Self::ClosedBeforeEffectV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectAwaitingApprovalV1> for Effect {
+        fn from(value: RecoveryEffectAwaitingApprovalV1) -> Self {
+            Self::AwaitingApprovalV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectInFlightV1> for Effect {
+        fn from(value: RecoveryEffectInFlightV1) -> Self {
+            Self::InFlightV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectAwaitingCallerReportV1> for Effect {
+        fn from(value: RecoveryEffectAwaitingCallerReportV1) -> Self {
+            Self::AwaitingCallerReportV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectUnknownV1> for Effect {
+        fn from(value: RecoveryEffectUnknownV1) -> Self {
+            Self::UnknownV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectCompleteV1> for Effect {
+        fn from(value: RecoveryEffectCompleteV1) -> Self {
+            Self::CompleteV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectPartialV1> for Effect {
+        fn from(value: RecoveryEffectPartialV1) -> Self {
+            Self::PartialV1(value)
+        }
+    }
+    impl ::std::convert::From<RecoveryEffectFailedAfterEffectV1> for Effect {
+        fn from(value: RecoveryEffectFailedAfterEffectV1) -> Self {
+            Self::FailedAfterEffectV1(value)
+        }
+    }
+    ///`Handle`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "allocation_hash",
+    ///    "program_id",
+    ///    "receiver_kernel_id",
+    ///    "request_id",
+    ///    "slot_id"
+    ///  ],
+    ///  "properties": {
+    ///    "allocation_hash": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "receiver_kernel_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "request_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "slot_id": {
+    ///      "$ref": "#/$defs/workSlotId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Handle {
+        pub allocation_hash: WorkDigest,
+        pub program_id: WorkId,
+        pub receiver_kernel_id: WorkId,
+        pub request_id: OpaqueId,
+        pub slot_id: WorkSlotId,
+    }
+    impl ::std::convert::From<&Handle> for Handle {
+        fn from(value: &Handle) -> Self {
+            value.clone()
+        }
+    }
+    ///`OpaqueId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct OpaqueId(::std::string::String);
+    impl ::std::ops::Deref for OpaqueId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<OpaqueId> for ::std::string::String {
+        fn from(value: OpaqueId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&OpaqueId> for OpaqueId {
+        fn from(value: &OpaqueId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for OpaqueId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for OpaqueId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for OpaqueId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Operation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "native_admission_digest",
+    ///    "operation_id",
+    ///    "operation_version"
+    ///  ],
+    ///  "properties": {
+    ///    "native_admission_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "operation_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "operation_version": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Operation {
+        pub native_admission_digest: RecoveryDigest32,
+        pub operation_id: OpaqueId,
+        pub operation_version: ::std::num::NonZeroU64,
+    }
+    impl ::std::convert::From<&Operation> for Operation {
+        fn from(value: &Operation) -> Self {
+            value.clone()
+        }
+    }
+    ///`OwnerOperationRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "operation",
+    ///    "scope"
+    ///  ],
+    ///  "properties": {
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/scope"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct OwnerOperationRef {
+        pub operation: Operation,
+        pub scope: Scope,
+    }
+    impl ::std::convert::From<&OwnerOperationRef> for OwnerOperationRef {
+        fn from(value: &OwnerOperationRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`PolicyGeneration`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 1.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct PolicyGeneration(pub ::std::num::NonZeroU64);
+    impl ::std::ops::Deref for PolicyGeneration {
+        type Target = ::std::num::NonZeroU64;
+        fn deref(&self) -> &::std::num::NonZeroU64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PolicyGeneration> for ::std::num::NonZeroU64 {
+        fn from(value: PolicyGeneration) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PolicyGeneration> for PolicyGeneration {
+        fn from(value: &PolicyGeneration) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<::std::num::NonZeroU64> for PolicyGeneration {
+        fn from(value: ::std::num::NonZeroU64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for PolicyGeneration {
+        type Err = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PolicyGeneration {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for PolicyGeneration {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for PolicyGeneration {
+        type Error = <::std::num::NonZeroU64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for PolicyGeneration {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`PreparationRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "command_digest",
+    ///    "preparation_id",
+    ///    "program_id"
+    ///  ],
+    ///  "properties": {
+    ///    "command_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "preparation_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "program_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct PreparationRef {
+        pub command_digest: WorkDigest,
+        pub preparation_id: WorkId,
+        pub program_id: WorkId,
+    }
+    impl ::std::convert::From<&PreparationRef> for PreparationRef {
+        fn from(value: &PreparationRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`Prepared`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "artifact",
+    ///        "kind",
+    ///        "preparation_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "artifact": {
+    ///          "oneOf": [
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "subdivision"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "subdivision"
+    ///                },
+    ///                "subdivision": {
+    ///                  "$ref": "#/$defs/delegationRecord"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "invocation_ref",
+    ///                "kind",
+    ///                "offer"
+    ///              ],
+    ///              "properties": {
+    ///                "invocation_ref": {
+    ///                  "$ref": "#/$defs/workDigest"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "offer"
+    ///                },
+    ///                "offer": {
+    ///                  "$ref": "#/$defs/delegationRecord"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "selection"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "selection"
+    ///                },
+    ///                "selection": {
+    ///                  "$ref": "#/$defs/delegationRecord"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "draft_ref",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "draft_ref": {
+    ///                  "$ref": "#/$defs/draftRef"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "graph_draft"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "draft_ref",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "draft_ref": {
+    ///                  "$ref": "#/$defs/draftRef"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "join_draft"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "agreement_digest",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "agreement_digest": {
+    ///                  "$ref": "#/$defs/workDigest"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "agreement"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        },
+    ///        "kind": {
+    ///          "const": "prepared"
+    ///        },
+    ///        "preparation_ref": {
+    ///          "$ref": "#/$defs/preparationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_operation_ref",
+    ///        "preparation_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_operation_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        },
+    ///        "preparation_ref": {
+    ///          "$ref": "#/$defs/preparationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "preparation_ref",
+    ///        "rejection"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "refused"
+    ///        },
+    ///        "preparation_ref": {
+    ///          "$ref": "#/$defs/preparationRef"
+    ///        },
+    ///        "rejection": {
+    ///          "$ref": "#/$defs/rejection"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum Prepared {
+        #[serde(rename = "prepared")]
+        Prepared {
+            artifact: PreparedArtifact,
+            preparation_ref: PreparationRef,
+        },
+        #[serde(rename = "pending")]
+        Pending {
+            owner_operation_ref: OwnerOperationRef,
+            preparation_ref: PreparationRef,
+        },
+        #[serde(rename = "refused")]
+        Refused {
+            preparation_ref: PreparationRef,
+            rejection: Rejection,
+        },
+    }
+    impl ::std::convert::From<&Self> for Prepared {
+        fn from(value: &Prepared) -> Self {
+            value.clone()
+        }
+    }
+    ///`PreparedArtifact`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "subdivision"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "subdivision"
+    ///        },
+    ///        "subdivision": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "invocation_ref",
+    ///        "kind",
+    ///        "offer"
+    ///      ],
+    ///      "properties": {
+    ///        "invocation_ref": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "kind": {
+    ///          "const": "offer"
+    ///        },
+    ///        "offer": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "selection"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "selection"
+    ///        },
+    ///        "selection": {
+    ///          "$ref": "#/$defs/delegationRecord"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "draft_ref",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "draft_ref": {
+    ///          "$ref": "#/$defs/draftRef"
+    ///        },
+    ///        "kind": {
+    ///          "const": "graph_draft"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "draft_ref",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "draft_ref": {
+    ///          "$ref": "#/$defs/draftRef"
+    ///        },
+    ///        "kind": {
+    ///          "const": "join_draft"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "agreement_digest",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "agreement_digest": {
+    ///          "$ref": "#/$defs/workDigest"
+    ///        },
+    ///        "kind": {
+    ///          "const": "agreement"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum PreparedArtifact {
+        #[serde(rename = "subdivision")]
+        Subdivision { subdivision: DelegationRecord },
+        #[serde(rename = "offer")]
+        Offer {
+            invocation_ref: WorkDigest,
+            offer: DelegationRecord,
+        },
+        #[serde(rename = "selection")]
+        Selection { selection: DelegationRecord },
+        #[serde(rename = "graph_draft")]
+        GraphDraft { draft_ref: DraftRef },
+        #[serde(rename = "join_draft")]
+        JoinDraft { draft_ref: DraftRef },
+        #[serde(rename = "agreement")]
+        Agreement { agreement_digest: WorkDigest },
+    }
+    impl ::std::convert::From<&Self> for PreparedArtifact {
+        fn from(value: &PreparedArtifact) -> Self {
+            value.clone()
+        }
+    }
+    ///`Profile`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "acceptance_procedure",
+    ///    "conditions",
+    ///    "currency",
+    ///    "implementation_digest",
+    ///    "max_units",
+    ///    "profile_ref",
+    ///    "recovery_operations",
+    ///    "server_id",
+    ///    "tool_name",
+    ///    "tool_schema_digest",
+    ///    "valid_until_unix_ms"
+    ///  ],
+    ///  "properties": {
+    ///    "acceptance_procedure": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "conditions": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "object",
+    ///        "required": [
+    ///          "enforcement",
+    ///          "source",
+    ///          "statement_digest"
+    ///        ],
+    ///        "properties": {
+    ///          "enforcement": {
+    ///            "type": "string",
+    ///            "enum": [
+    ///              "local",
+    ///              "remote"
+    ///            ]
+    ///          },
+    ///          "source": {
+    ///            "$ref": "#/$defs/workId"
+    ///          },
+    ///          "statement_digest": {
+    ///            "$ref": "#/$defs/workDigest"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    "currency": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "funding_profile_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "implementation_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "max_units": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "profile_ref": {
+    ///      "$ref": "#/$defs/profileRef"
+    ///    },
+    ///    "recovery_operations": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/recoveryOperation"
+    ///      },
+    ///      "maxItems": 8,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "server_id": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "tool_name": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "tool_schema_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "valid_until_unix_ms": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Profile {
+        pub acceptance_procedure: WorkDigest,
+        pub conditions: ::std::vec::Vec<ProfileConditionsItem>,
+        pub currency: WorkId,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub funding_profile_id: ::std::option::Option<WorkId>,
+        pub implementation_digest: WorkDigest,
+        pub max_units: SafeInteger,
+        pub profile_ref: ProfileRef,
+        pub recovery_operations: Vec<RecoveryOperation>,
+        pub server_id: WorkId,
+        pub tool_name: WorkId,
+        pub tool_schema_digest: WorkDigest,
+        pub valid_until_unix_ms: SafeInteger,
+    }
+    impl ::std::convert::From<&Profile> for Profile {
+        fn from(value: &Profile) -> Self {
+            value.clone()
+        }
+    }
+    ///`ProfileConditionsItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "enforcement",
+    ///    "source",
+    ///    "statement_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "enforcement": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "local",
+    ///        "remote"
+    ///      ]
+    ///    },
+    ///    "source": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "statement_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ProfileConditionsItem {
+        pub enforcement: ProfileConditionsItemEnforcement,
+        pub source: WorkId,
+        pub statement_digest: WorkDigest,
+    }
+    impl ::std::convert::From<&ProfileConditionsItem> for ProfileConditionsItem {
+        fn from(value: &ProfileConditionsItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`ProfileConditionsItemEnforcement`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "local",
+    ///    "remote"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ProfileConditionsItemEnforcement {
+        #[serde(rename = "local")]
+        Local,
+        #[serde(rename = "remote")]
+        Remote,
+    }
+    impl ::std::convert::From<&Self> for ProfileConditionsItemEnforcement {
+        fn from(value: &ProfileConditionsItemEnforcement) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ProfileConditionsItemEnforcement {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Local => f.write_str("local"),
+                Self::Remote => f.write_str("remote"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ProfileConditionsItemEnforcement {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "local" => Ok(Self::Local),
+                "remote" => Ok(Self::Remote),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ProfileConditionsItemEnforcement {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ProfileConditionsItemEnforcement {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ProfileConditionsItemEnforcement {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ProfileRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "catalog_entry",
+    ///    "deployment_digest",
+    ///    "owner",
+    ///    "policy_generation",
+    ///    "profile_digest"
+    ///  ],
+    ///  "properties": {
+    ///    "catalog_entry": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "deployment_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    },
+    ///    "owner": {
+    ///      "$ref": "#/$defs/workId"
+    ///    },
+    ///    "policy_generation": {
+    ///      "$ref": "#/$defs/policyGeneration"
+    ///    },
+    ///    "profile_digest": {
+    ///      "$ref": "#/$defs/recoveryDigest32"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ProfileRef {
+        pub catalog_entry: WorkId,
+        pub deployment_digest: RecoveryDigest32,
+        pub owner: WorkId,
+        pub policy_generation: PolicyGeneration,
+        pub profile_digest: RecoveryDigest32,
+    }
+    impl ::std::convert::From<&ProfileRef> for ProfileRef {
+        fn from(value: &ProfileRef) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryDigest32`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery digest32",
+    ///  "type": "array",
+    ///  "items": {
+    ///    "title": "Recovery digest octet",
+    ///    "type": "integer",
+    ///    "maximum": 255.0,
+    ///    "minimum": 0.0
+    ///  },
+    ///  "maxItems": 32,
+    ///  "minItems": 32
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct RecoveryDigest32(pub [u8; 32usize]);
+    impl ::std::ops::Deref for RecoveryDigest32 {
+        type Target = [u8; 32usize];
+        fn deref(&self) -> &[u8; 32usize] {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RecoveryDigest32> for [u8; 32usize] {
+        fn from(value: RecoveryDigest32) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RecoveryDigest32> for RecoveryDigest32 {
+        fn from(value: &RecoveryDigest32) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<[u8; 32usize]> for RecoveryDigest32 {
+        fn from(value: [u8; 32usize]) -> Self {
+            Self(value)
+        }
+    }
+    ///`RecoveryEffectAdmissionUnresolvedV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect admission unresolved V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "admission_intent",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "admission_intent": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "kind": {
+    ///      "const": "admission_unresolved"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAdmissionUnresolvedV1 {
+        pub admission_intent: OpaqueId,
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryEffectAdmissionUnresolvedV1>
+        for RecoveryEffectAdmissionUnresolvedV1
+    {
+        fn from(value: &RecoveryEffectAdmissionUnresolvedV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectAwaitingApprovalV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect awaiting approval V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "awaiting_approval"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAwaitingApprovalV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectAwaitingApprovalV1> for RecoveryEffectAwaitingApprovalV1 {
+        fn from(value: &RecoveryEffectAwaitingApprovalV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectAwaitingCallerReportV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect awaiting caller report V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "awaiting_caller_report"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectAwaitingCallerReportV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectAwaitingCallerReportV1>
+        for RecoveryEffectAwaitingCallerReportV1
+    {
+        fn from(value: &RecoveryEffectAwaitingCallerReportV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectClosedBeforeEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect closed before effect V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "closure",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "closure": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "kind": {
+    ///      "const": "closed_before_effect"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectClosedBeforeEffectV1 {
+        pub closure: OpaqueId,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectClosedBeforeEffectV1>
+        for RecoveryEffectClosedBeforeEffectV1
+    {
+        fn from(value: &RecoveryEffectClosedBeforeEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectCompleteV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect complete V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "effect_count",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "effect_count": {
+    ///      "$ref": "#/$defs/safeInteger"
+    ///    },
+    ///    "kind": {
+    ///      "const": "complete"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectCompleteV1 {
+        pub effect_count: SafeInteger,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectCompleteV1> for RecoveryEffectCompleteV1 {
+        fn from(value: &RecoveryEffectCompleteV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectFailedAfterEffectV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect failed after effect V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applied_effects",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "applied_effects": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "kind": {
+    ///      "const": "failed_after_effect"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectFailedAfterEffectV1 {
+        pub applied_effects: ::std::num::NonZeroU64,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectFailedAfterEffectV1>
+        for RecoveryEffectFailedAfterEffectV1
+    {
+        fn from(value: &RecoveryEffectFailedAfterEffectV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectInFlightV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect in flight V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "in_flight"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectInFlightV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectInFlightV1> for RecoveryEffectInFlightV1 {
+        fn from(value: &RecoveryEffectInFlightV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectNeverAdmittedV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect never admitted V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "never_admitted"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectNeverAdmittedV1 {
+        pub kind: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&RecoveryEffectNeverAdmittedV1> for RecoveryEffectNeverAdmittedV1 {
+        fn from(value: &RecoveryEffectNeverAdmittedV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectPartialV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect partial V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "applied_effects",
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "applied_effects": {
+    ///      "type": "integer",
+    ///      "maximum": 9007199254740991.0,
+    ///      "minimum": 1.0
+    ///    },
+    ///    "kind": {
+    ///      "const": "partial"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectPartialV1 {
+        pub applied_effects: ::std::num::NonZeroU64,
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectPartialV1> for RecoveryEffectPartialV1 {
+        fn from(value: &RecoveryEffectPartialV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryEffectUnknownV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "title": "Recovery effect unknown V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kind",
+    ///    "operation"
+    ///  ],
+    ///  "properties": {
+    ///    "kind": {
+    ///      "const": "unknown"
+    ///    },
+    ///    "operation": {
+    ///      "$ref": "#/$defs/operation"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryEffectUnknownV1 {
+        pub kind: ::serde_json::Value,
+        pub operation: Operation,
+    }
+    impl ::std::convert::From<&RecoveryEffectUnknownV1> for RecoveryEffectUnknownV1 {
+        fn from(value: &RecoveryEffectUnknownV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryLink`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "available",
+    ///    "continuation_id",
+    ///    "control",
+    ///    "schema",
+    ///    "scope",
+    ///    "step_id",
+    ///    "version",
+    ///    "workflow_id"
+    ///  ],
+    ///  "properties": {
+    ///    "available": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/recoveryOperation"
+    ///      },
+    ///      "maxItems": 8,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "continuation_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "control": {
+    ///      "$ref": "#/$defs/control"
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.recovery.observation.v1"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/scope"
+    ///    },
+    ///    "step_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    },
+    ///    "workflow_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecoveryLink {
+        pub available: Vec<RecoveryOperation>,
+        pub continuation_id: OpaqueId,
+        pub control: Control,
+        pub schema: ::serde_json::Value,
+        pub scope: Scope,
+        pub step_id: OpaqueId,
+        pub version: ::serde_json::Value,
+        pub workflow_id: OpaqueId,
+    }
+    impl ::std::convert::From<&RecoveryLink> for RecoveryLink {
+        fn from(value: &RecoveryLink) -> Self {
+            value.clone()
+        }
+    }
+    ///`RecoveryOperation`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "inspect_workflow",
+    ///    "select_offer",
+    ///    "submit_approval",
+    ///    "resume_workflow",
+    ///    "cancel_workflow"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RecoveryOperation {
+        #[serde(rename = "inspect_workflow")]
+        InspectWorkflow,
+        #[serde(rename = "select_offer")]
+        SelectOffer,
+        #[serde(rename = "submit_approval")]
+        SubmitApproval,
+        #[serde(rename = "resume_workflow")]
+        ResumeWorkflow,
+        #[serde(rename = "cancel_workflow")]
+        CancelWorkflow,
+    }
+    impl ::std::convert::From<&Self> for RecoveryOperation {
+        fn from(value: &RecoveryOperation) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RecoveryOperation {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::InspectWorkflow => f.write_str("inspect_workflow"),
+                Self::SelectOffer => f.write_str("select_offer"),
+                Self::SubmitApproval => f.write_str("submit_approval"),
+                Self::ResumeWorkflow => f.write_str("resume_workflow"),
+                Self::CancelWorkflow => f.write_str("cancel_workflow"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RecoveryOperation {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "inspect_workflow" => Ok(Self::InspectWorkflow),
+                "select_offer" => Ok(Self::SelectOffer),
+                "submit_approval" => Ok(Self::SubmitApproval),
+                "resume_workflow" => Ok(Self::ResumeWorkflow),
+                "cancel_workflow" => Ok(Self::CancelWorkflow),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RecoveryOperation {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RecoveryOperation {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RecoveryOperation {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`RefusalCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "invalid_evidence",
+    ///    "unsupported_profile",
+    ///    "stale_basis",
+    ///    "revoked",
+    ///    "expired",
+    ///    "budget_unavailable",
+    ///    "unknown_effect",
+    ///    "audience_denied",
+    ///    "resource_exhausted"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RefusalCode {
+        #[serde(rename = "invalid_evidence")]
+        InvalidEvidence,
+        #[serde(rename = "unsupported_profile")]
+        UnsupportedProfile,
+        #[serde(rename = "stale_basis")]
+        StaleBasis,
+        #[serde(rename = "revoked")]
+        Revoked,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "budget_unavailable")]
+        BudgetUnavailable,
+        #[serde(rename = "unknown_effect")]
+        UnknownEffect,
+        #[serde(rename = "audience_denied")]
+        AudienceDenied,
+        #[serde(rename = "resource_exhausted")]
+        ResourceExhausted,
+    }
+    impl ::std::convert::From<&Self> for RefusalCode {
+        fn from(value: &RefusalCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RefusalCode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::InvalidEvidence => f.write_str("invalid_evidence"),
+                Self::UnsupportedProfile => f.write_str("unsupported_profile"),
+                Self::StaleBasis => f.write_str("stale_basis"),
+                Self::Revoked => f.write_str("revoked"),
+                Self::Expired => f.write_str("expired"),
+                Self::BudgetUnavailable => f.write_str("budget_unavailable"),
+                Self::UnknownEffect => f.write_str("unknown_effect"),
+                Self::AudienceDenied => f.write_str("audience_denied"),
+                Self::ResourceExhausted => f.write_str("resource_exhausted"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RefusalCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "invalid_evidence" => Ok(Self::InvalidEvidence),
+                "unsupported_profile" => Ok(Self::UnsupportedProfile),
+                "stale_basis" => Ok(Self::StaleBasis),
+                "revoked" => Ok(Self::Revoked),
+                "expired" => Ok(Self::Expired),
+                "budget_unavailable" => Ok(Self::BudgetUnavailable),
+                "unknown_effect" => Ok(Self::UnknownEffect),
+                "audience_denied" => Ok(Self::AudienceDenied),
+                "resource_exhausted" => Ok(Self::ResourceExhausted),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RefusalCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Rejection`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "code"
+    ///  ],
+    ///  "properties": {
+    ///    "code": {
+    ///      "$ref": "#/$defs/rejectionCode"
+    ///    },
+    ///    "field": {
+    ///      "$ref": "#/$defs/bindingField"
+    ///    },
+    ///    "reference": {
+    ///      "$ref": "#/$defs/commandRef"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Rejection {
+        pub code: RejectionCode,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub field: ::std::option::Option<BindingField>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub reference: ::std::option::Option<CommandRef>,
+    }
+    impl ::std::convert::From<&Rejection> for Rejection {
+        fn from(value: &Rejection) -> Self {
+            value.clone()
+        }
+    }
+    ///`RejectionCode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "schema",
+    ///    "malformed",
+    ///    "duplicate_key",
+    ///    "unsafe_integer",
+    ///    "bounds",
+    ///    "identifier",
+    ///    "binding_mismatch",
+    ///    "conflict",
+    ///    "stale_version",
+    ///    "stale_catalog",
+    ///    "expired",
+    ///    "revoked",
+    ///    "audience",
+    ///    "role",
+    ///    "cross_tenant",
+    ///    "unsupported_profile",
+    ///    "busy"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum RejectionCode {
+        #[serde(rename = "schema")]
+        Schema,
+        #[serde(rename = "malformed")]
+        Malformed,
+        #[serde(rename = "duplicate_key")]
+        DuplicateKey,
+        #[serde(rename = "unsafe_integer")]
+        UnsafeInteger,
+        #[serde(rename = "bounds")]
+        Bounds,
+        #[serde(rename = "identifier")]
+        Identifier,
+        #[serde(rename = "binding_mismatch")]
+        BindingMismatch,
+        #[serde(rename = "conflict")]
+        Conflict,
+        #[serde(rename = "stale_version")]
+        StaleVersion,
+        #[serde(rename = "stale_catalog")]
+        StaleCatalog,
+        #[serde(rename = "expired")]
+        Expired,
+        #[serde(rename = "revoked")]
+        Revoked,
+        #[serde(rename = "audience")]
+        Audience,
+        #[serde(rename = "role")]
+        Role,
+        #[serde(rename = "cross_tenant")]
+        CrossTenant,
+        #[serde(rename = "unsupported_profile")]
+        UnsupportedProfile,
+        #[serde(rename = "busy")]
+        Busy,
+    }
+    impl ::std::convert::From<&Self> for RejectionCode {
+        fn from(value: &RejectionCode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for RejectionCode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Schema => f.write_str("schema"),
+                Self::Malformed => f.write_str("malformed"),
+                Self::DuplicateKey => f.write_str("duplicate_key"),
+                Self::UnsafeInteger => f.write_str("unsafe_integer"),
+                Self::Bounds => f.write_str("bounds"),
+                Self::Identifier => f.write_str("identifier"),
+                Self::BindingMismatch => f.write_str("binding_mismatch"),
+                Self::Conflict => f.write_str("conflict"),
+                Self::StaleVersion => f.write_str("stale_version"),
+                Self::StaleCatalog => f.write_str("stale_catalog"),
+                Self::Expired => f.write_str("expired"),
+                Self::Revoked => f.write_str("revoked"),
+                Self::Audience => f.write_str("audience"),
+                Self::Role => f.write_str("role"),
+                Self::CrossTenant => f.write_str("cross_tenant"),
+                Self::UnsupportedProfile => f.write_str("unsupported_profile"),
+                Self::Busy => f.write_str("busy"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for RejectionCode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "schema" => Ok(Self::Schema),
+                "malformed" => Ok(Self::Malformed),
+                "duplicate_key" => Ok(Self::DuplicateKey),
+                "unsafe_integer" => Ok(Self::UnsafeInteger),
+                "bounds" => Ok(Self::Bounds),
+                "identifier" => Ok(Self::Identifier),
+                "binding_mismatch" => Ok(Self::BindingMismatch),
+                "conflict" => Ok(Self::Conflict),
+                "stale_version" => Ok(Self::StaleVersion),
+                "stale_catalog" => Ok(Self::StaleCatalog),
+                "expired" => Ok(Self::Expired),
+                "revoked" => Ok(Self::Revoked),
+                "audience" => Ok(Self::Audience),
+                "role" => Ok(Self::Role),
+                "cross_tenant" => Ok(Self::CrossTenant),
+                "unsupported_profile" => Ok(Self::UnsupportedProfile),
+                "busy" => Ok(Self::Busy),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RejectionCode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RejectionCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RejectionCode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`Release`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_available"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "release_id"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "release_id": {
+    ///          "$ref": "#/$defs/opaqueId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "evidence",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "evidence": {
+    ///          "$ref": "#/$defs/opaqueId"
+    ///        },
+    ///        "kind": {
+    ///          "const": "withheld"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "release_id"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "released"
+    ///        },
+    ///        "release_id": {
+    ///          "$ref": "#/$defs/opaqueId"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "reason"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "denied"
+    ///        },
+    ///        "reason": {
+    ///          "$ref": "#/$defs/refusalCode"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum Release {
+        #[serde(rename = "not_available")]
+        NotAvailable,
+        #[serde(rename = "pending")]
+        Pending { release_id: OpaqueId },
+        #[serde(rename = "withheld")]
+        Withheld { evidence: OpaqueId },
+        #[serde(rename = "released")]
+        Released { release_id: OpaqueId },
+        #[serde(rename = "denied")]
+        Denied { reason: RefusalCode },
+    }
+    impl ::std::convert::From<&Self> for Release {
+        fn from(value: &Release) -> Self {
+            value.clone()
+        }
+    }
+    ///`SafeInteger`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "maximum": 9007199254740991.0,
+    ///  "minimum": 0.0
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct SafeInteger(pub i64);
+    impl ::std::ops::Deref for SafeInteger {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SafeInteger> for i64 {
+        fn from(value: SafeInteger) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SafeInteger> for SafeInteger {
+        fn from(value: &SafeInteger) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<i64> for SafeInteger {
+        fn from(value: i64) -> Self {
+            Self(value)
+        }
+    }
+    impl ::std::str::FromStr for SafeInteger {
+        type Err = <i64 as ::std::str::FromStr>::Err;
+        fn from_str(value: &str) -> ::std::result::Result<Self, Self::Err> {
+            Ok(Self(value.parse()?))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &str) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: &String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<String> for SafeInteger {
+        type Error = <i64 as ::std::str::FromStr>::Err;
+        fn try_from(value: String) -> ::std::result::Result<Self, Self::Error> {
+            value.parse()
+        }
+    }
+    impl ::std::fmt::Display for SafeInteger {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            self.0.fmt(f)
+        }
+    }
+    ///`Scope`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "authority_domain",
+    ///    "process_id",
+    ///    "tenant_id"
+    ///  ],
+    ///  "properties": {
+    ///    "authority_domain": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "process_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    },
+    ///    "tenant_id": {
+    ///      "$ref": "#/$defs/opaqueId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Scope {
+        pub authority_domain: OpaqueId,
+        pub process_id: OpaqueId,
+        pub tenant_id: OpaqueId,
+    }
+    impl ::std::convert::From<&Scope> for Scope {
+        fn from(value: &Scope) -> Self {
+            value.clone()
+        }
+    }
+    ///`View`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "acceptance",
+    ///    "bilateral_delivery",
+    ///    "execution",
+    ///    "handle",
+    ///    "recovery",
+    ///    "result_reference",
+    ///    "settlement"
+    ///  ],
+    ///  "properties": {
+    ///    "acceptance": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "not_applicable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "observed_at",
+    ///            "revision",
+    ///            "source",
+    ///            "value"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "available"
+    ///            },
+    ///            "observed_at": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "source": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "value": {
+    ///              "$ref": "#/$defs/acceptance"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "code",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "code": {
+    ///              "$ref": "#/$defs/rejectionCode"
+    ///            },
+    ///            "kind": {
+    ///              "const": "unavailable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "bilateral_delivery": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "not_applicable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "observed_at",
+    ///            "revision",
+    ///            "source",
+    ///            "value"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "available"
+    ///            },
+    ///            "observed_at": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "source": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "value": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "envelope_digest",
+    ///                "state"
+    ///              ],
+    ///              "properties": {
+    ///                "envelope_digest": {
+    ///                  "$ref": "#/$defs/workDigest"
+    ///                },
+    ///                "state": {
+    ///                  "type": "string",
+    ///                  "enum": [
+    ///                    "retained",
+    ///                    "delivered"
+    ///                  ]
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "code",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "code": {
+    ///              "$ref": "#/$defs/rejectionCode"
+    ///            },
+    ///            "kind": {
+    ///              "const": "unavailable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "execution": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "not_applicable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "observed_at",
+    ///            "revision",
+    ///            "source",
+    ///            "value"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "available"
+    ///            },
+    ///            "observed_at": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "source": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "value": {
+    ///              "$ref": "#/$defs/effect"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "code",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "code": {
+    ///              "$ref": "#/$defs/rejectionCode"
+    ///            },
+    ///            "kind": {
+    ///              "const": "unavailable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "handle": {
+    ///      "$ref": "#/$defs/handle"
+    ///    },
+    ///    "recovery": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "not_applicable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "observed_at",
+    ///            "revision",
+    ///            "source",
+    ///            "value"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "available"
+    ///            },
+    ///            "observed_at": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "source": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "value": {
+    ///              "$ref": "#/$defs/recoveryLink"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "code",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "code": {
+    ///              "$ref": "#/$defs/rejectionCode"
+    ///            },
+    ///            "kind": {
+    ///              "const": "unavailable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "result_reference": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "not_applicable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "observed_at",
+    ///            "revision",
+    ///            "source",
+    ///            "value"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "available"
+    ///            },
+    ///            "observed_at": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "source": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "value": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "artifact",
+    ///                "release"
+    ///              ],
+    ///              "properties": {
+    ///                "artifact": {
+    ///                  "$ref": "#/$defs/artifactVersionRef"
+    ///                },
+    ///                "release": {
+    ///                  "$ref": "#/$defs/release"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "code",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "code": {
+    ///              "$ref": "#/$defs/rejectionCode"
+    ///            },
+    ///            "kind": {
+    ///              "const": "unavailable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "settlement": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "not_applicable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "owner_ref"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "pending"
+    ///            },
+    ///            "owner_ref": {
+    ///              "$ref": "#/$defs/ownerOperationRef"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "observed_at",
+    ///            "revision",
+    ///            "source",
+    ///            "value"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "available"
+    ///            },
+    ///            "observed_at": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "revision": {
+    ///              "$ref": "#/$defs/safeInteger"
+    ///            },
+    ///            "source": {
+    ///              "$ref": "#/$defs/workId"
+    ///            },
+    ///            "value": {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "agreement_digest",
+    ///                "rail"
+    ///              ],
+    ///              "properties": {
+    ///                "agreement_digest": {
+    ///                  "$ref": "#/$defs/workDigest"
+    ///                },
+    ///                "rail": {
+    ///                  "$ref": "#/$defs/workId"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "code",
+    ///            "kind"
+    ///          ],
+    ///          "properties": {
+    ///            "code": {
+    ///              "$ref": "#/$defs/rejectionCode"
+    ///            },
+    ///            "kind": {
+    ///              "const": "unavailable"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct View {
+        pub acceptance: ViewAcceptance,
+        pub bilateral_delivery: ViewBilateralDelivery,
+        pub execution: ViewExecution,
+        pub handle: Handle,
+        pub recovery: ViewRecovery,
+        pub result_reference: ViewResultReference,
+        pub settlement: ViewSettlement,
+    }
+    impl ::std::convert::From<&View> for View {
+        fn from(value: &View) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewAcceptance`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_applicable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "observed_at",
+    ///        "revision",
+    ///        "source",
+    ///        "value"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "available"
+    ///        },
+    ///        "observed_at": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "source": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "value": {
+    ///          "$ref": "#/$defs/acceptance"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum ViewAcceptance {
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+        #[serde(rename = "pending")]
+        Pending { owner_ref: OwnerOperationRef },
+        #[serde(rename = "available")]
+        Available {
+            observed_at: SafeInteger,
+            revision: SafeInteger,
+            source: WorkId,
+            value: Acceptance,
+        },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for ViewAcceptance {
+        fn from(value: &ViewAcceptance) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewBilateralDelivery`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_applicable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "observed_at",
+    ///        "revision",
+    ///        "source",
+    ///        "value"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "available"
+    ///        },
+    ///        "observed_at": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "source": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "value": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "envelope_digest",
+    ///            "state"
+    ///          ],
+    ///          "properties": {
+    ///            "envelope_digest": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "state": {
+    ///              "type": "string",
+    ///              "enum": [
+    ///                "retained",
+    ///                "delivered"
+    ///              ]
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum ViewBilateralDelivery {
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+        #[serde(rename = "pending")]
+        Pending { owner_ref: OwnerOperationRef },
+        #[serde(rename = "available")]
+        Available {
+            observed_at: SafeInteger,
+            revision: SafeInteger,
+            source: WorkId,
+            value: ViewBilateralDeliveryValue,
+        },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for ViewBilateralDelivery {
+        fn from(value: &ViewBilateralDelivery) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewBilateralDeliveryValue`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "envelope_digest",
+    ///    "state"
+    ///  ],
+    ///  "properties": {
+    ///    "envelope_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "state": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "retained",
+    ///        "delivered"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ViewBilateralDeliveryValue {
+        pub envelope_digest: WorkDigest,
+        pub state: ViewBilateralDeliveryValueState,
+    }
+    impl ::std::convert::From<&ViewBilateralDeliveryValue> for ViewBilateralDeliveryValue {
+        fn from(value: &ViewBilateralDeliveryValue) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewBilateralDeliveryValueState`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "retained",
+    ///    "delivered"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ViewBilateralDeliveryValueState {
+        #[serde(rename = "retained")]
+        Retained,
+        #[serde(rename = "delivered")]
+        Delivered,
+    }
+    impl ::std::convert::From<&Self> for ViewBilateralDeliveryValueState {
+        fn from(value: &ViewBilateralDeliveryValueState) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ViewBilateralDeliveryValueState {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Retained => f.write_str("retained"),
+                Self::Delivered => f.write_str("delivered"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ViewBilateralDeliveryValueState {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "retained" => Ok(Self::Retained),
+                "delivered" => Ok(Self::Delivered),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ViewBilateralDeliveryValueState {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ViewBilateralDeliveryValueState {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ViewBilateralDeliveryValueState {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ViewExecution`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_applicable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "observed_at",
+    ///        "revision",
+    ///        "source",
+    ///        "value"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "available"
+    ///        },
+    ///        "observed_at": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "source": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "value": {
+    ///          "$ref": "#/$defs/effect"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum ViewExecution {
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+        #[serde(rename = "pending")]
+        Pending { owner_ref: OwnerOperationRef },
+        #[serde(rename = "available")]
+        Available {
+            observed_at: SafeInteger,
+            revision: SafeInteger,
+            source: WorkId,
+            value: Effect,
+        },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for ViewExecution {
+        fn from(value: &ViewExecution) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewRecovery`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_applicable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "observed_at",
+    ///        "revision",
+    ///        "source",
+    ///        "value"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "available"
+    ///        },
+    ///        "observed_at": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "source": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "value": {
+    ///          "$ref": "#/$defs/recoveryLink"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum ViewRecovery {
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+        #[serde(rename = "pending")]
+        Pending { owner_ref: OwnerOperationRef },
+        #[serde(rename = "available")]
+        Available {
+            observed_at: SafeInteger,
+            revision: SafeInteger,
+            source: WorkId,
+            value: RecoveryLink,
+        },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for ViewRecovery {
+        fn from(value: &ViewRecovery) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewResultReference`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_applicable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "observed_at",
+    ///        "revision",
+    ///        "source",
+    ///        "value"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "available"
+    ///        },
+    ///        "observed_at": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "source": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "value": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "artifact",
+    ///            "release"
+    ///          ],
+    ///          "properties": {
+    ///            "artifact": {
+    ///              "$ref": "#/$defs/artifactVersionRef"
+    ///            },
+    ///            "release": {
+    ///              "$ref": "#/$defs/release"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum ViewResultReference {
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+        #[serde(rename = "pending")]
+        Pending { owner_ref: OwnerOperationRef },
+        #[serde(rename = "available")]
+        Available {
+            observed_at: SafeInteger,
+            revision: SafeInteger,
+            source: WorkId,
+            value: ViewResultReferenceValue,
+        },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for ViewResultReference {
+        fn from(value: &ViewResultReference) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewResultReferenceValue`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "artifact",
+    ///    "release"
+    ///  ],
+    ///  "properties": {
+    ///    "artifact": {
+    ///      "$ref": "#/$defs/artifactVersionRef"
+    ///    },
+    ///    "release": {
+    ///      "$ref": "#/$defs/release"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ViewResultReferenceValue {
+        pub artifact: ArtifactVersionRef,
+        pub release: Release,
+    }
+    impl ::std::convert::From<&ViewResultReferenceValue> for ViewResultReferenceValue {
+        fn from(value: &ViewResultReferenceValue) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewSettlement`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "not_applicable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "owner_ref"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "pending"
+    ///        },
+    ///        "owner_ref": {
+    ///          "$ref": "#/$defs/ownerOperationRef"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "observed_at",
+    ///        "revision",
+    ///        "source",
+    ///        "value"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "available"
+    ///        },
+    ///        "observed_at": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "revision": {
+    ///          "$ref": "#/$defs/safeInteger"
+    ///        },
+    ///        "source": {
+    ///          "$ref": "#/$defs/workId"
+    ///        },
+    ///        "value": {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "agreement_digest",
+    ///            "rail"
+    ///          ],
+    ///          "properties": {
+    ///            "agreement_digest": {
+    ///              "$ref": "#/$defs/workDigest"
+    ///            },
+    ///            "rail": {
+    ///              "$ref": "#/$defs/workId"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum ViewSettlement {
+        #[serde(rename = "not_applicable")]
+        NotApplicable,
+        #[serde(rename = "pending")]
+        Pending { owner_ref: OwnerOperationRef },
+        #[serde(rename = "available")]
+        Available {
+            observed_at: SafeInteger,
+            revision: SafeInteger,
+            source: WorkId,
+            value: ViewSettlementValue,
+        },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for ViewSettlement {
+        fn from(value: &ViewSettlement) -> Self {
+            value.clone()
+        }
+    }
+    ///`ViewSettlementValue`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "agreement_digest",
+    ///    "rail"
+    ///  ],
+    ///  "properties": {
+    ///    "agreement_digest": {
+    ///      "$ref": "#/$defs/workDigest"
+    ///    },
+    ///    "rail": {
+    ///      "$ref": "#/$defs/workId"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ViewSettlementValue {
+        pub agreement_digest: WorkDigest,
+        pub rail: WorkId,
+    }
+    impl ::std::convert::From<&ViewSettlementValue> for ViewSettlementValue {
+        fn from(value: &ViewSettlementValue) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkDigest`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkDigest(::std::string::String);
+    impl ::std::ops::Deref for WorkDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkDigest> for ::std::string::String {
+        fn from(value: WorkDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkDigest> for WorkDigest {
+        fn from(value: &WorkDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`WorkId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "not": {
+    ///    "pattern": "[\\r\\n]"
+    ///  },
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkId(::std::string::String);
+    impl ::std::ops::Deref for WorkId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkId> for ::std::string::String {
+        fn from(value: WorkId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkId> for WorkId {
+        fn from(value: &WorkId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`WorkResponseV1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio.world/schemas/chio-wire/v1/work/response.schema.json",
+    ///  "title": "Work Response V1",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "body",
+    ///    "schema",
+    ///    "version"
+    ///  ],
+    ///  "properties": {
+    ///    "body": {
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "prepared"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "prepared"
+    ///            },
+    ///            "prepared": {
+    ///              "$ref": "#/$defs/prepared"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "result"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "command"
+    ///            },
+    ///            "result": {
+    ///              "$ref": "#/$defs/commandResult"
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        },
+    ///        {
+    ///          "type": "object",
+    ///          "required": [
+    ///            "kind",
+    ///            "result"
+    ///          ],
+    ///          "properties": {
+    ///            "kind": {
+    ///              "const": "query"
+    ///            },
+    ///            "result": {
+    ///              "oneOf": [
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "view"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "work"
+    ///                    },
+    ///                    "view": {
+    ///                      "$ref": "#/$defs/view"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "result"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "command"
+    ///                    },
+    ///                    "result": {
+    ///                      "$ref": "#/$defs/commandResult"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "prepared"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "preparation"
+    ///                    },
+    ///                    "prepared": {
+    ///                      "$ref": "#/$defs/prepared"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "page"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "catalog"
+    ///                    },
+    ///                    "page": {
+    ///                      "$ref": "#/$defs/catalogPage"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "kind",
+    ///                    "profile"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "kind": {
+    ///                      "const": "profile"
+    ///                    },
+    ///                    "profile": {
+    ///                      "$ref": "#/$defs/profile"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                },
+    ///                {
+    ///                  "type": "object",
+    ///                  "required": [
+    ///                    "code",
+    ///                    "kind"
+    ///                  ],
+    ///                  "properties": {
+    ///                    "code": {
+    ///                      "$ref": "#/$defs/rejectionCode"
+    ///                    },
+    ///                    "kind": {
+    ///                      "const": "unavailable"
+    ///                    }
+    ///                  },
+    ///                  "additionalProperties": false
+    ///                }
+    ///              ]
+    ///            }
+    ///          },
+    ///          "additionalProperties": false
+    ///        }
+    ///      ]
+    ///    },
+    ///    "schema": {
+    ///      "const": "chio.work.response.v1"
+    ///    },
+    ///    "version": {
+    ///      "const": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct WorkResponseV1 {
+        pub body: WorkResponseV1Body,
+        pub schema: ::serde_json::Value,
+        pub version: ::serde_json::Value,
+    }
+    impl ::std::convert::From<&WorkResponseV1> for WorkResponseV1 {
+        fn from(value: &WorkResponseV1) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkResponseV1Body`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "prepared"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "prepared"
+    ///        },
+    ///        "prepared": {
+    ///          "$ref": "#/$defs/prepared"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "result"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "command"
+    ///        },
+    ///        "result": {
+    ///          "$ref": "#/$defs/commandResult"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "result"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "query"
+    ///        },
+    ///        "result": {
+    ///          "oneOf": [
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "view"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "work"
+    ///                },
+    ///                "view": {
+    ///                  "$ref": "#/$defs/view"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "result"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "command"
+    ///                },
+    ///                "result": {
+    ///                  "$ref": "#/$defs/commandResult"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "prepared"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "preparation"
+    ///                },
+    ///                "prepared": {
+    ///                  "$ref": "#/$defs/prepared"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "page"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "catalog"
+    ///                },
+    ///                "page": {
+    ///                  "$ref": "#/$defs/catalogPage"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "kind",
+    ///                "profile"
+    ///              ],
+    ///              "properties": {
+    ///                "kind": {
+    ///                  "const": "profile"
+    ///                },
+    ///                "profile": {
+    ///                  "$ref": "#/$defs/profile"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            },
+    ///            {
+    ///              "type": "object",
+    ///              "required": [
+    ///                "code",
+    ///                "kind"
+    ///              ],
+    ///              "properties": {
+    ///                "code": {
+    ///                  "$ref": "#/$defs/rejectionCode"
+    ///                },
+    ///                "kind": {
+    ///                  "const": "unavailable"
+    ///                }
+    ///              },
+    ///              "additionalProperties": false
+    ///            }
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkResponseV1Body {
+        #[serde(rename = "prepared")]
+        Prepared { prepared: Prepared },
+        #[serde(rename = "command")]
+        Command { result: CommandResult },
+        #[serde(rename = "query")]
+        Query { result: WorkResponseV1BodyResult },
+    }
+    impl ::std::convert::From<&Self> for WorkResponseV1Body {
+        fn from(value: &WorkResponseV1Body) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkResponseV1BodyResult`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "view"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "work"
+    ///        },
+    ///        "view": {
+    ///          "$ref": "#/$defs/view"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "result"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "command"
+    ///        },
+    ///        "result": {
+    ///          "$ref": "#/$defs/commandResult"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "prepared"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "preparation"
+    ///        },
+    ///        "prepared": {
+    ///          "$ref": "#/$defs/prepared"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "page"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "catalog"
+    ///        },
+    ///        "page": {
+    ///          "$ref": "#/$defs/catalogPage"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "kind",
+    ///        "profile"
+    ///      ],
+    ///      "properties": {
+    ///        "kind": {
+    ///          "const": "profile"
+    ///        },
+    ///        "profile": {
+    ///          "$ref": "#/$defs/profile"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "code",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "code": {
+    ///          "$ref": "#/$defs/rejectionCode"
+    ///        },
+    ///        "kind": {
+    ///          "const": "unavailable"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(tag = "kind", deny_unknown_fields)]
+    pub enum WorkResponseV1BodyResult {
+        #[serde(rename = "work")]
+        Work { view: View },
+        #[serde(rename = "command")]
+        Command { result: CommandResult },
+        #[serde(rename = "preparation")]
+        Preparation { prepared: Prepared },
+        #[serde(rename = "catalog")]
+        Catalog { page: CatalogPage },
+        #[serde(rename = "profile")]
+        Profile { profile: Profile },
+        #[serde(rename = "unavailable")]
+        Unavailable { code: RejectionCode },
+    }
+    impl ::std::convert::From<&Self> for WorkResponseV1BodyResult {
+        fn from(value: &WorkResponseV1BodyResult) -> Self {
+            value.clone()
+        }
+    }
+    ///`WorkSlotId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[A-Za-z0-9._:/-]{1,256}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct WorkSlotId(::std::string::String);
+    impl ::std::ops::Deref for WorkSlotId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<WorkSlotId> for ::std::string::String {
+        fn from(value: WorkSlotId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&WorkSlotId> for WorkSlotId {
+        fn from(value: &WorkSlotId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for WorkSlotId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9._:/-]{1,256}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9._:/-]{1,256}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for WorkSlotId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for WorkSlotId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for WorkSlotId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for WorkSlotId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}

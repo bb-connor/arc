@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/work/join-inputs.schema.json",
+  "title": "Work Join Inputs V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "graph_sha256",
+    "join_id",
+    "next_task_id",
+    "parents"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.work.join-inputs.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "graph_sha256": {
+      "$ref": "#/$defs/workDigest"
+    },
+    "join_id": {
+      "$ref": "#/$defs/workId"
+    },
+    "next_task_id": {
+      "$ref": "#/$defs/workId"
+    },
+    "parents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "receipt_id",
+          "artifact_ref",
+          "artifact_digest",
+          "acceptance_evidence_digest"
+        ],
+        "properties": {
+          "task_id": {
+            "$ref": "#/$defs/workId"
+          },
+          "receipt_id": {
+            "$ref": "#/$defs/workId"
+          },
+          "artifact_ref": {
+            "$ref": "#/$defs/artifactVersionRef"
+          },
+          "artifact_digest": {
+            "$ref": "#/$defs/workDigest"
+          },
+          "acceptance_evidence_digest": {
+            "$ref": "#/$defs/workDigest"
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 16
+    }
+  },
+  "$defs": {
+    "artifactVersionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "artifact",
+        "version",
+        "provenance"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "artifact": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "version": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provenance": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "workDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "workId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    }
+  }
+}

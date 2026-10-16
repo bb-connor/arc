@@ -1,0 +1,811 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/work/request.schema.json",
+  "title": "Work Request V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.work.request.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "body": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "preparation"
+          ],
+          "properties": {
+            "kind": {
+              "const": "prepare"
+            },
+            "preparation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema",
+                "version",
+                "program_id",
+                "command_id",
+                "proposal"
+              ],
+              "properties": {
+                "schema": {
+                  "const": "chio.work.preparation.v1"
+                },
+                "version": {
+                  "const": 1
+                },
+                "program_id": {
+                  "$ref": "#/$defs/workId"
+                },
+                "command_id": {
+                  "$ref": "#/$defs/workId"
+                },
+                "proposal": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "parent_id",
+                        "parent_allocation_hash",
+                        "child"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "delegate"
+                        },
+                        "parent_id": {
+                          "$ref": "#/$defs/workSlotId"
+                        },
+                        "parent_allocation_hash": {
+                          "$ref": "#/$defs/workDigest"
+                        },
+                        "child": {
+                          "$ref": "#/$defs/delegationRecord"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "slot_id",
+                        "allocation_hash",
+                        "profile_ref",
+                        "receiver_kernel_id",
+                        "server_id",
+                        "tool_name",
+                        "arguments",
+                        "request_id"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "offer"
+                        },
+                        "slot_id": {
+                          "$ref": "#/$defs/workSlotId"
+                        },
+                        "allocation_hash": {
+                          "$ref": "#/$defs/workDigest"
+                        },
+                        "profile_ref": {
+                          "$ref": "#/$defs/profileRef"
+                        },
+                        "receiver_kernel_id": {
+                          "$ref": "#/$defs/workId"
+                        },
+                        "server_id": {
+                          "$ref": "#/$defs/workId"
+                        },
+                        "tool_name": {
+                          "$ref": "#/$defs/workId"
+                        },
+                        "arguments": {},
+                        "request_id": {
+                          "$ref": "#/$defs/opaqueId"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "offer",
+                        "request_id",
+                        "capability_hash",
+                        "expected_revision"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "select"
+                        },
+                        "offer": {
+                          "$ref": "#/$defs/delegationRecord"
+                        },
+                        "request_id": {
+                          "$ref": "#/$defs/opaqueId"
+                        },
+                        "capability_hash": {
+                          "$ref": "#/$defs/workDigest"
+                        },
+                        "expected_revision": {
+                          "$ref": "#/$defs/safeInteger"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "expected_bundle_sha256",
+                        "new_work",
+                        "dependencies",
+                        "join_draft_refs"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "extend"
+                        },
+                        "expected_bundle_sha256": {
+                          "$ref": "#/$defs/workDigest"
+                        },
+                        "new_work": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [
+                              "task_id",
+                              "handle"
+                            ],
+                            "properties": {
+                              "task_id": {
+                                "$ref": "#/$defs/workId"
+                              },
+                              "handle": {
+                                "$ref": "#/$defs/handle"
+                              }
+                            }
+                          },
+                          "maxItems": 16
+                        },
+                        "dependencies": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/graphRecord"
+                          },
+                          "maxItems": 64
+                        },
+                        "join_draft_refs": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/draftRef"
+                          },
+                          "maxItems": 16
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "expected_bundle_sha256",
+                        "join",
+                        "parents"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "join"
+                        },
+                        "expected_bundle_sha256": {
+                          "$ref": "#/$defs/workDigest"
+                        },
+                        "join": {
+                          "$ref": "#/$defs/graphRecord"
+                        },
+                        "parents": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/handle"
+                          },
+                          "maxItems": 16
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "commitment",
+                        "terms"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "agreement"
+                        },
+                        "commitment": {
+                          "$ref": "#/$defs/commitment"
+                        },
+                        "terms": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "kind",
+                                "terms_reference"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "unpaid"
+                                },
+                                "terms_reference": {
+                                  "$ref": "#/$defs/workId"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "kind",
+                                "funding_profile_id",
+                                "terms_reference"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "funded"
+                                },
+                                "funding_profile_id": {
+                                  "$ref": "#/$defs/workId"
+                                },
+                                "terms_reference": {
+                                  "$ref": "#/$defs/workId"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "command"
+          ],
+          "properties": {
+            "kind": {
+              "const": "submit"
+            },
+            "command": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "schema",
+                "version",
+                "program_id",
+                "command_id",
+                "action"
+              ],
+              "properties": {
+                "schema": {
+                  "const": "chio.work.command.v1"
+                },
+                "version": {
+                  "const": 1
+                },
+                "program_id": {
+                  "$ref": "#/$defs/workId"
+                },
+                "command_id": {
+                  "$ref": "#/$defs/workId"
+                },
+                "action": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "subdivision"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "delegate"
+                        },
+                        "subdivision": {
+                          "$ref": "#/$defs/delegationRecord"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "selection"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "select"
+                        },
+                        "selection": {
+                          "$ref": "#/$defs/delegationRecord"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "binding"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "seal"
+                        },
+                        "binding": {
+                          "$ref": "#/$defs/delegationRecord"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "expected_bundle_sha256",
+                        "draft_ref"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "extend"
+                        },
+                        "expected_bundle_sha256": {
+                          "$ref": "#/$defs/workDigest"
+                        },
+                        "draft_ref": {
+                          "$ref": "#/$defs/draftRef"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "commitment"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "submit"
+                        },
+                        "commitment": {
+                          "$ref": "#/$defs/commitment"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "handle"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "reconcile"
+                        },
+                        "handle": {
+                          "$ref": "#/$defs/handle"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "handle"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "cancel"
+                        },
+                        "handle": {
+                          "$ref": "#/$defs/handle"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "query"
+          ],
+          "properties": {
+            "kind": {
+              "const": "query"
+            },
+            "query": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "handle"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "work"
+                    },
+                    "handle": {
+                      "$ref": "#/$defs/handle"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "command_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "command"
+                    },
+                    "command_ref": {
+                      "$ref": "#/$defs/commandRef"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "preparation_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "preparation"
+                    },
+                    "preparation_ref": {
+                      "$ref": "#/$defs/preparationRef"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "catalog_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "catalog"
+                    },
+                    "catalog_ref": {
+                      "$ref": "#/$defs/catalogRef"
+                    },
+                    "cursor": {
+                      "$ref": "#/$defs/catalogCursor"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "profile_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "profile"
+                    },
+                    "profile_ref": {
+                      "$ref": "#/$defs/profileRef"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "catalogCursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_generation",
+        "position"
+      ],
+      "properties": {
+        "catalog_generation": {
+          "$ref": "#/$defs/policyGeneration"
+        },
+        "position": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "catalogRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "catalog_id"
+      ],
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/workId"
+        },
+        "catalog_id": {
+          "$ref": "#/$defs/workId"
+        }
+      }
+    },
+    "commandRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_id",
+        "command_id",
+        "command_digest"
+      ],
+      "properties": {
+        "program_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "command_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "command_digest": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "commitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "permit",
+        "profile_ref",
+        "invocation_ref",
+        "graph_ref"
+      ],
+      "properties": {
+        "handle": {
+          "$ref": "#/$defs/handle"
+        },
+        "permit": {
+          "$ref": "#/$defs/delegationRecord"
+        },
+        "profile_ref": {
+          "$ref": "#/$defs/profileRef"
+        },
+        "invocation_ref": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "graph_ref": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "funding": {
+          "$ref": "#/$defs/fundingRef"
+        }
+      }
+    },
+    "delegationRecord": {
+      "type": "object",
+      "title": "Work delegation record"
+    },
+    "draftRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "draft_id",
+        "graph_sha256"
+      ],
+      "properties": {
+        "draft_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "fundingRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rail",
+        "agreement_digest",
+        "reserve_ref"
+      ],
+      "properties": {
+        "rail": {
+          "$ref": "#/$defs/workId"
+        },
+        "agreement_digest": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "reserve_ref": {
+          "$ref": "#/$defs/workId"
+        }
+      }
+    },
+    "graphRecord": {
+      "type": "object",
+      "title": "Work graph record"
+    },
+    "handle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_id",
+        "slot_id",
+        "allocation_hash",
+        "receiver_kernel_id",
+        "request_id"
+      ],
+      "properties": {
+        "program_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "slot_id": {
+          "$ref": "#/$defs/workSlotId"
+        },
+        "allocation_hash": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "receiver_kernel_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "request_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "policyGeneration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "preparationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_id",
+        "preparation_id",
+        "command_digest"
+      ],
+      "properties": {
+        "program_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "preparation_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "command_digest": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "catalog_entry",
+        "deployment_digest",
+        "policy_generation",
+        "profile_digest"
+      ],
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/workId"
+        },
+        "catalog_entry": {
+          "$ref": "#/$defs/workId"
+        },
+        "deployment_digest": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "policy_generation": {
+          "$ref": "#/$defs/policyGeneration"
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "workDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "workId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "workSlotId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:/-]{1,256}$"
+    }
+  }
+}

@@ -20,13 +20,18 @@ chio-kernel = { workspace = true }
 chio-runtime-proof-parity = { workspace = true }
 chio-sqlite-file-identity = { workspace = true }
 chio-swarm-authority = { workspace = true }
+chio-workflow = { workspace = true, optional = true }
 chio-weights = { workspace = true }
 rusqlite = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 
+[features]
+work = ["dep:chio-workflow"]
+
 [dev-dependencies]
+jsonschema = { workspace = true }
 chio-test-support = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
@@ -43,3 +48,7 @@ harness = false
 
 [lints]
 workspace = true
+
+[[test]]
+name = "work_contracts"
+required-features = ["work"]
