@@ -421,7 +421,10 @@ fn semantic_missing_projection_refuses_replay_and_readback() -> TestResult {
         let value = installation(&owner, &binding, "semantic-process", &["read"])?;
         install(&owner, &value)?;
         let raw = Connection::open(&owner.database)?;
-        raw.execute_batch("DROP TRIGGER admission_operation_recovery_records_no_delete;")?;
+        raw.execute_batch(
+            "PRAGMA foreign_keys = OFF;
+             DROP TRIGGER admission_operation_recovery_records_no_delete;",
+        )?;
         raw.execute(
             "DELETE FROM admission_operation_recovery_records WHERE record_key = (
               SELECT record_key FROM admission_operation_recovery_records
