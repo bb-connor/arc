@@ -161,7 +161,7 @@ impl DpopReplaySourceSnapshot {
         &self.0.body.inventory.markers
     }
 
-    /// Check a trusted destination clock before retiring the legacy domain.
+    /// Check a trusted destination clock before retiring the source domain.
     /// This does not translate monotonic deadlines or expire any marker.
     pub fn validate_transition_time(&self, authority_now_unix_ms: u64) -> Result<(), KernelError> {
         let high = unsigned(&self.0.body.inventory.wall_clock_high_water_unix_ns)?;
