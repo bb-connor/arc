@@ -52,6 +52,8 @@ impl Probe {
                 .header("mcp-session-id", session)
                 .header("mcp-protocol-version", PROTOCOL_VERSION);
         }
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback restart probe,
+        // outside substrate tool egress.
         request.send().map_err(request_error)
     }
 
@@ -129,6 +131,8 @@ impl Probe {
             .header("mcp-session-id", session)
             .header("mcp-protocol-version", PROTOCOL_VERSION)
             .header("last-event-id", cursor)
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback restart probe,
+            // outside substrate tool egress.
             .send()
             .map(|response| response.status())
             .map_err(request_error)
@@ -313,6 +317,8 @@ pub(super) fn run(
 ) -> Result<Vec<ScenarioResult>, RunnerError> {
     let started = Instant::now();
     let probe = Probe {
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: the probe targets the loopback
+        // server the conformance runner launched, not substrate tool egress.
         client: Client::new(),
         endpoint: format!("http://{listen}/mcp"),
         token: options.auth_token.clone(),
