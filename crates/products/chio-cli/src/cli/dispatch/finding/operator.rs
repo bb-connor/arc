@@ -953,7 +953,7 @@ pub(super) fn cmd_finding_operator_init(
     SqliteAuthorityStore::provision(&paths.authority_database, &paths.authority_lock_root)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     {
-        let clock = crate::cli::input::time::clock();
+        let clock = crate::input::time::clock();
         let authority = SqliteAuthorityStore::open_serving_with_clock(
             &paths.authority_database,
             &paths.authority_lock_root,
@@ -1013,7 +1013,7 @@ pub(super) fn cmd_finding_operator_serve(profile_path: &Path) -> Result<(), CliE
     set_operator_umask();
     let (profile, root) = load_profile(profile_path)?;
     let paths = ResolvedOperatorPaths::new(&root, &profile.paths);
-    let clock = crate::cli::input::time::clock();
+    let clock = crate::input::time::clock();
     let authority = Arc::new(
         SqliteAuthorityStore::open_serving_with_clock(
             &paths.authority_database,
