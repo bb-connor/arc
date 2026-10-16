@@ -16,6 +16,10 @@ mod payload_maintenance;
 #[path = "init/authority_provision_tests.rs"]
 mod authority_provision_tests;
 
+#[cfg(test)]
+#[path = "init/verifier_policy_freshness_tests.rs"]
+mod verifier_policy_freshness_tests;
+
 pub(crate) async fn serve_async(
     config: TrustServiceConfig,
     injected_joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
