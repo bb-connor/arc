@@ -495,7 +495,7 @@ references = 2
 [[dispatch_sites]]
 id = "D038"
 path = "crates/kernel/chio-kernel/src/kernel/session_ops.rs"
-symbol = "ChioKernel::evaluate_session_operation"
+symbol = "ChioKernel::evaluate_session_operation_scoped"
 target = ".evaluate_tool_call_sync_with_session_guard_attempt"
 references = 1
 
