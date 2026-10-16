@@ -728,30 +728,33 @@ profile boundary.
 
 The Chio invocation proof object below is distinct from the hosted HTTP
 DPoP proof. The native `tool_call_request` has no field carrying it; the
-ordinary session bridge supplies no invocation proof. Hosted HTTP sender
-proof authenticates the edge session and is not forwarded as this kernel
-invocation proof. A grant requiring invocation-level DPoP therefore needs
+ordinary session bridge supplies no invocation proof. The hosted HTTP
+edge accepts no DPoP sender proof ({{hosted-admission}}). A grant requiring invocation-level DPoP therefore needs
 a surface that carries the object; neither transport silently supplies it.
 
 
 When any matching tool grant has `dpop_required: true`, the hosted
 kernel requires a valid proof before invocation. The native proof is
 `{body,signature}`. Its body has `schema` (`chio.dpop_proof.v1`),
-`capability_id`, `tool_server`, `tool_name`, `action_hash`, `nonce`,
-`issued_at` (Unix seconds), and `agent_key`. The subject signs canonical
+`replay_authority`, `capability_id`, `tool_server`, `tool_name`,
+`action_hash`, `nonce`, `issued_at` (Unix seconds), and `agent_key`.
+`replay_authority` names the durable replay domain the verifier selects
+independently of the proof: `destination_store_uuid`,
+`dpop_authority_id`, `expectation_id`, `proof_ttl_secs`, and
+`max_clock_skew_secs`. All members are required. The subject signs canonical
 JSON of that body, without a prefix. `action_hash` hashes canonical
 arguments only. This is capability/action proof of possession; it is
 distinct from the HTTP-method and URI JWT binding in {{RFC9449}}.
 
-The kernel checks schema, subject key, capability/server/tool/action
-bindings, freshness, signature, and nonce replay state. The default
-freshness window is 300 seconds with 30 seconds future-clock allowance;
-the expiration comparison is inclusive. The nonce's replay identity
-is `(nonce, capability_id)` and is retained through its signed expiry.
-Preview and dispatch revalidation can be stateless; dispatch credential
-reservation reserves the nonce. A required proof with unavailable replay
-state fails closed. Hosted HTTP sender constraint is a separate binding
-specified in {{hosted-admission}}.
+The kernel checks schema, that `replay_authority` equals its activated
+authority, subject key, capability/server/tool/action bindings,
+freshness, signature, and durable nonce replay state. Freshness uses the
+authority's `proof_ttl_secs` and `max_clock_skew_secs`; the expiration
+comparison is inclusive. The nonce's replay identity is
+`(nonce, capability_id)` within that authority and is retained through
+its signed expiry. Preview and dispatch revalidation can be stateless;
+dispatch credential acquisition claims the nonce in durable custody. A
+kernel with no activated replay authority refuses every required proof.
 
 ## Delegation {#delegation}
 
@@ -3222,20 +3225,13 @@ The edge accepts tokens in one configured mode:
 The edge has no unauthenticated mode.
 
 A JWT or introspected token can bind the request to a sender through
-members of its `cnf` claim. For `chioSenderKey`, the request MUST carry
-a `DPoP` header whose value is the base64url encoding without padding
-{{RFC4648}} of a Chio sender proof ({{sender-constraint}}) signed by
-that key. The proof binds `capability_id` to the token's `jti` claim,
-`tool_server` to the edge's resource identifier (its protected resource,
-or `/mcp`), `tool_name` to the HTTP method, and `action_hash` to the
-SHA-256 hash of the empty octet string. The edge rejects a stale proof,
-a proof issued too far in the future, and a proof whose nonce it has
-already seen for the same `jti`. For `x5t#S256` and
+members of its `cnf` claim. For `x5t#S256` and
 `chioAttestationSha256`, the request MUST carry the header
 `x-chio-mtls-thumbprint-sha256` or `x-chio-runtime-attestation-sha256`,
 respectively, with a value equal to the claim. A failed check is 401.
-These checks authenticate HTTP requests; the edge does not pass the
-proof to the kernel ({{hosted-tool-calls}}).
+Chio DPoP sender binding is unavailable on this edge: it MUST reject
+with 401 a token whose `cnf` carries `chioSenderKey` and any request
+that carries a `DPoP` header, and MUST NOT admit either as a bearer.
 
 The edge binds the authentication context of `initialize` to the
 session. Every later request of the session MUST present the same

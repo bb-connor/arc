@@ -208,7 +208,6 @@ impl Default for ChioOAuthSenderConstraintProfile {
             schema: CHIO_OAUTH_SENDER_CONSTRAINT_SCHEMA.to_string(),
             subject_binding: CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT.to_string(),
             proof_types_supported: vec![
-                CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP.to_string(),
                 CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS.to_string(),
                 CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION.to_string(),
             ],

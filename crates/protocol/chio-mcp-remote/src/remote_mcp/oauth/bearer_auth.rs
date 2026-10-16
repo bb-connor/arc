@@ -23,8 +23,6 @@ pub(super) async fn authenticate_session_request<'a>(
     headers: impl Into<SenderRequest<'a>>,
     auth_mode: &RemoteAuthMode,
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
-    expected_method: &str,
-    expected_target: &str,
 ) -> Result<SessionAuthContext, Response> {
     let headers = headers.into();
     let token = extract_bearer_token(&headers, protected_resource_metadata)?;
@@ -53,8 +51,6 @@ pub(super) async fn authenticate_session_request<'a>(
             headers,
             origin,
             protected_resource_metadata,
-            expected_method,
-            expected_target,
         ),
         RemoteAuthMode::IntrospectionBearer { verifier } => {
             verifier
@@ -63,8 +59,6 @@ pub(super) async fn authenticate_session_request<'a>(
                     headers,
                     origin,
                     protected_resource_metadata,
-                    expected_method,
-                    expected_target,
                 )
                 .await
         }
@@ -403,8 +397,6 @@ impl JwtBearerVerifier {
         headers: impl Into<SenderRequest<'a>>,
         origin: Option<String>,
         protected_resource_metadata: Option<&ProtectedResourceMetadata>,
-        expected_method: &str,
-        expected_target: &str,
     ) -> Result<SessionAuthContext, Response> {
         let headers = headers.into();
         let (header, claims, signed_input, signature) =
@@ -517,18 +509,7 @@ impl JwtBearerVerifier {
                 error,
             )
         })?;
-        SenderConstraintVerifier::new(
-            &self.clock,
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
-        )
-        .validate(
-            claims.cnf.as_ref(),
-            headers,
-            claims.jti.as_deref(),
-            expected_target,
-            expected_method,
-        )
+        sender_constraint::validate_sender_constraint(claims.cnf.as_ref(), headers)
         .map_err(|error| {
             let mut response =
                 unauthorized_bearer_response(&error.to_string(), protected_resource_metadata);
@@ -611,8 +592,6 @@ pub(super) struct IntrospectionSessionAuthInput<'a> {
     pub(super) introspection: OAuthIntrospectionResponse,
     pub(super) origin: Option<String>,
     pub(super) protected_resource_metadata: Option<&'a ProtectedResourceMetadata>,
-    pub(super) expected_method: &'a str,
-    pub(super) expected_target: &'a str,
 }
 
 impl IntrospectionBearerVerifier {
@@ -622,8 +601,6 @@ impl IntrospectionBearerVerifier {
         headers: impl Into<SenderRequest<'a>>,
         origin: Option<String>,
         protected_resource_metadata: Option<&ProtectedResourceMetadata>,
-        expected_method: &str,
-        expected_target: &str,
     ) -> Result<SessionAuthContext, Response> {
         let headers = headers.into();
         let mut request = self
@@ -676,8 +653,6 @@ impl IntrospectionBearerVerifier {
             introspection,
             origin,
             protected_resource_metadata,
-            expected_method,
-            expected_target,
         })
     }
 
@@ -801,18 +776,7 @@ impl IntrospectionBearerVerifier {
                 error,
             )
         })?;
-        SenderConstraintVerifier::new(
-            &self.clock,
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
-        )
-        .validate(
-            claims.cnf.as_ref(),
-            input.headers,
-            claims.jti.as_deref(),
-            input.expected_target,
-            input.expected_method,
-        )
+        sender_constraint::validate_sender_constraint(claims.cnf.as_ref(), input.headers)
         .map_err(|error| {
             let mut response =
                 unauthorized_bearer_response(&error.to_string(), input.protected_resource_metadata);

@@ -3494,7 +3494,6 @@ fragments fail closed before token issuance.
 The same gated path sketches one bounded sender-constrained continuation
 contract. The request may carry:
 
-- `chio_sender_dpop_public_key`
 - `chio_sender_mtls_thumbprint_sha256`
 - `chio_sender_attestation_sha256`
 
@@ -3502,16 +3501,19 @@ If that gated path approves the request, the resulting sender constraint is
 persisted on the authorization code and then projected into access tokens
 through `cnf`:
 
-- `cnf.chioSenderKey`
 - `cnf["x5t#S256"]`
 - `cnf.chioAttestationSha256`
+
+Chio DPoP sender binding is unavailable on this edge until it holds durable
+replay custody for authentication proofs. A request carrying
+`chio_sender_dpop_public_key` is refused as `invalid_request`. A token whose
+`cnf` carries `chioSenderKey`, and any request presenting a `DPoP` header, is
+refused with `urn:chio:error:transport:dpop-sender-proof-unavailable` and is
+never admitted as a bearer.
 
 Runtime admission for the gated path then enforces the same bound sender proof
 continuity:
 
-- DPoP-bound flows must present a valid proof during token exchange and again
-  on protected-resource admission, including nonce, `jti`, `htm`, and `htu`
-  checks over the actual runtime request
 - mTLS-bound flows must present a matching
   `x-chio-mtls-thumbprint-sha256` header
 - attestation-bound flows must present a matching
@@ -3519,8 +3521,8 @@ continuity:
   `chio_transaction_context.runtimeAssuranceEvidenceSha256`
 
 Attestation alone never authorizes a sender. Chio only accepts the
-attestation-bound profile when it is paired with DPoP or mTLS continuity over
-the same request. Missing, stale, replayed, or mismatched sender proof fails
+attestation-bound profile when it is paired with mTLS continuity over the same
+request. Missing, stale, replayed, or mismatched sender proof fails
 closed as `invalid_request`, `invalid_grant`, or bearer denial depending on
 where the mismatch occurs.
 
@@ -5218,13 +5220,14 @@ is supported at the root and inherited unless explicitly overridden. Origin-spec
 requirements are refused until an origin-aware compiled guard is installed.
 
 `chio run` and `chio mcp serve` accept `--agent-public-key`. A policy requiring
-proofs requires this operator binding; the caller retains the private key. Remote
-sessions use the verified `cnf.chioSenderKey` as their capability subject and retain
-it in authenticated resume state. Static bearer and TLS-only authentication cannot
-bootstrap an invocation-proof policy without a Chio sender key. `chio check` owns
+proofs requires this operator binding; the caller retains the private key. Remote HTTP
+sessions carry no Chio sender key while sender DPoP binding is unavailable, so static
+bearer, OAuth and TLS-only authentication cannot bootstrap an invocation-proof policy
+and such policies deny over MCP HTTP. `chio check` owns
 its ephemeral test key and signs its own request. Unbound grants retain bearer
-semantics. Unsupported required-proof HTTP projections deny. Default kernel replay
-custody is bounded and process-local; it does not activate durable replay authority.
+semantics. Unsupported required-proof HTTP projections deny. Invocation-proof
+acceptance requires an independently configured, activated durable replay authority;
+without one, proof-required grants deny.
 
 MCP confirmation profiles are closed: unknown members (including unsupported
 RFC 9449 `jkt`), empty or null profiles, and empty bindings reject authentication.

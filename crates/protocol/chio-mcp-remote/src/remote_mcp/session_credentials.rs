@@ -413,8 +413,6 @@ pub(super) async fn authenticate_request(
             headers,
             &state.auth_mode,
             state.protected_resource_metadata.as_deref(),
-            method,
-            target,
         )
         .await
         .map(|context| (context, None));

@@ -182,14 +182,9 @@ fn validate_chio_oauth_authorization_profile_metadata(
             "{source} must advertise subject binding `{CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT}`"
         )));
     }
-    if !profile
-        .sender_constraints
-        .proof_types_supported
-        .iter()
-        .any(|proof| proof == CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP)
-    {
+    if profile.sender_constraints != expected_profile.sender_constraints {
         return Err(CliError::cli_other_error(format!(
-            "{source} must advertise Chio sender proof type `{CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP}`"
+            "{source} must advertise Chio's sender constraint profile"
         )));
     }
     if profile.portable_claim_catalog != expected_profile.portable_claim_catalog {
@@ -458,7 +453,6 @@ fn build_remote_auth_mode(
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime(&config.clock)?;
 
     if config.auth_token.is_some()
         && (config.auth_jwt_public_key.is_some()
@@ -519,8 +513,6 @@ fn build_remote_auth_mode(
                 required_scopes: config.auth_scopes.clone(),
                 provider_profile,
                 enterprise_provider_registry: enterprise_provider_registry.clone(),
-                sender_dpop_nonce_store,
-                sender_dpop_config,
             }),
         });
     }
@@ -568,8 +560,6 @@ fn build_remote_auth_mode(
                 required_scopes: config.auth_scopes.clone(),
                 provider_profile,
                 enterprise_provider_registry: enterprise_provider_registry.clone(),
-                sender_dpop_nonce_store,
-                sender_dpop_config,
                 egress_contract: Some(egress_contract),
             }),
         });
@@ -604,8 +594,6 @@ fn build_remote_auth_mode(
             required_scopes: config.auth_scopes.clone(),
             provider_profile,
             enterprise_provider_registry,
-            sender_dpop_nonce_store,
-            sender_dpop_config,
         }),
     })
 }
@@ -626,23 +614,6 @@ fn expected_bearer_issuer(
     }
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
     Ok(format!("{base_url}/oauth"))
-}
-
-fn build_sender_dpop_runtime(
-    clock: &RemoteClock,
-) -> Result<(Arc<DpopNonceStore>, DpopConfig), CliError> {
-    let config = DpopConfig::default();
-    let store = Arc::new(
-        DpopNonceStore::with_clock(
-            config.nonce_store_capacity,
-            config.nonce_store_capacity,
-            chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
-            Duration::from_secs(config.proof_ttl_secs),
-            Arc::new(clock.clone()),
-        )
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?,
-    );
-    Ok((store, config))
 }
 
 fn resolve_local_auth_issuer(
@@ -740,7 +711,6 @@ fn build_local_auth_server(
     })?;
     let base_url = normalize_public_base_url(config.public_base_url.as_deref(), local_addr)?;
     let default_audience = effective_resource_indicator(config, &base_url);
-    let (sender_dpop_nonce_store, sender_dpop_config) = build_sender_dpop_runtime(&config.clock)?;
     Ok(Some(LocalAuthorizationServer {
         clock: config.clock.clone(),
         signing_key,
@@ -753,8 +723,6 @@ fn build_local_auth_server(
         codes: Arc::new(StdMutex::new(HashMap::new())),
         consents: Arc::new(StdMutex::new(HashMap::new())),
         clients: Arc::new(clients),
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     }))
 }
 
@@ -1174,19 +1142,17 @@ fn build_request_sender_constraint(
     attestation_sha256: Option<&str>,
     transaction_context: Option<&GovernedAuthorizationTransactionContext>,
 ) -> Result<Option<ChioSenderConstraintClaims>, Response> {
-    let chio_sender_key =
-        normalize_optional_sender_value(dpop_public_key, CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER)?;
-    if let Some(sender_key) = chio_sender_key.as_deref() {
-        sender_constraint::decode_sender_key(sender_key).map_err(|error| {
-            input::with_source(
-                oauth_token_error(
-                    StatusCode::BAD_REQUEST,
-                    OAuthError::InvalidRequest,
-                    "sender public key decoding failed",
-                ),
-                error,
-            )
-        })?;
+    if normalize_optional_sender_value(dpop_public_key, CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER)?
+        .is_some()
+    {
+        return Err(input::with_source(
+            oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidRequest,
+                "Chio DPoP sender binding is unavailable",
+            ),
+            SenderConstraintError::DpopUnavailable,
+        ));
     }
     let mtls_thumbprint_sha256 = normalize_optional_sender_value(
         mtls_thumbprint_sha256,
@@ -1209,16 +1175,16 @@ fn build_request_sender_constraint(
                 "chio_sender_attestation_sha256 must match chio_transaction_context.runtimeAssuranceEvidenceSha256",
             ));
         }
-        if chio_sender_key.is_none() && mtls_thumbprint_sha256.is_none() {
+        if mtls_thumbprint_sha256.is_none() {
             return Err(oauth_token_error(
                 StatusCode::BAD_REQUEST,
                 OAuthError::InvalidRequest,
-                "attestation-bound sender semantics require either chio_sender_dpop_public_key or chio_sender_mtls_thumbprint_sha256",
+                "attestation-bound sender semantics require chio_sender_mtls_thumbprint_sha256",
             ));
         }
     }
     let claims = ChioSenderConstraintClaims {
-        chio_sender_key,
+        chio_sender_key: None,
         mtls_thumbprint_sha256,
         chio_attestation_sha256,
     };

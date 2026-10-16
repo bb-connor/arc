@@ -125,16 +125,20 @@ identity assertions fail closed.
 
 The same request may also opt into one bounded sender-constrained contract:
 
-- `chio_sender_dpop_public_key`
 - `chio_sender_mtls_thumbprint_sha256`
 - `chio_sender_attestation_sha256`
 
 When Chio issues a token from that request, it carries the accepted sender
 binding forward through `cnf`:
 
-- `cnf.chioSenderKey`
 - `cnf["x5t#S256"]`
 - `cnf.chioAttestationSha256`
+
+Chio DPoP sender binding is unavailable until the edge holds durable
+authentication replay custody. `chio_sender_dpop_public_key` is refused as
+`invalid_request`; a token whose `cnf` carries `chioSenderKey`, and any
+request presenting a `DPoP` header, is refused with
+`urn:chio:error:transport:dpop-sender-proof-unavailable`.
 
 ## Resource Binding
 

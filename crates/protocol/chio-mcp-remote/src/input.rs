@@ -97,38 +97,14 @@ where
 
 #[derive(thiserror::Error)]
 pub(crate) enum SenderConstraintError {
-    #[error("{}", .0.code())]
-    Clock(#[from] chio_security_types::clock::ClockError),
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    Replay(#[from] chio_kernel::KernelError),
-    #[error("{0}")]
-    Json(#[from] UntrustedJsonError),
-    #[error("urn:chio:error:transport:invalid-request-shape")]
-    Encoding(#[from] base64::DecodeError),
-    #[error("urn:chio:error:transport:invalid-request-shape")]
-    Header(#[from] axum::http::header::ToStrError),
+    #[error("urn:chio:error:transport:dpop-sender-proof-unavailable")]
+    DpopUnavailable,
     #[error("urn:chio:error:transport:dpop-verification-failed")]
     UnsupportedSchema,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    MissingBinding,
     #[error("urn:chio:error:transport:dpop-verification-failed")]
     MtlsBinding,
     #[error("urn:chio:error:transport:dpop-verification-failed")]
     AttestationBinding,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    MissingProof,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    SenderKeyMismatch,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    TargetMismatch,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    EmptyNonce,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    InvalidSignature,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    NonceReused,
-    #[error("urn:chio:error:transport:dpop-verification-failed")]
-    Canonical(#[from] chio_core::error::Error),
 }
 impl std::fmt::Debug for SenderConstraintError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
