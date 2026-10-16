@@ -217,11 +217,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
             })
         };
 
-    let loaded_verifier_policy_summary = state
-        .verifier_policy_registry()
-        .map(|registry| verifier_policy_health_counts(registry, clock_now))
-        .unwrap_or_default();
-
     let verifier_policy_summary = if let Some(path) = state.config.verifier_policies_file.as_deref()
     {
         match VerifierPolicyRegistry::load(path) {
@@ -232,8 +227,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
                     "available": true,
                     "count": configured_counts.total,
                     "activeCount": configured_counts.active,
-                    "loadedCount": loaded_verifier_policy_summary.total,
-                    "loadedActiveCount": loaded_verifier_policy_summary.active,
                 })
             }
             Err(_) => json!({
@@ -241,8 +234,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
                 "available": false,
                 "count": 0,
                 "activeCount": 0,
-                "loadedCount": loaded_verifier_policy_summary.total,
-                "loadedActiveCount": loaded_verifier_policy_summary.active,
             }),
         }
     } else {
@@ -251,8 +242,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
             "available": false,
             "count": 0,
             "activeCount": 0,
-            "loadedCount": 0,
-            "loadedActiveCount": 0,
         })
     };
 

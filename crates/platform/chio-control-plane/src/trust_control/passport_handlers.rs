@@ -610,11 +610,15 @@ pub(crate) async fn handle_create_passport_challenge(
     }
     let now = clock_now;
     let (policy_ref, policy) = if let Some(policy_id) = payload.policy_id.as_deref() {
-        let Some(registry) = state.verifier_policy_registry() else {
+        let Some(registry_path) = state.config.verifier_policies_file.as_deref() else {
             return plain_http_error(
                 StatusCode::CONFLICT,
                 "trust service is missing --verifier-policies-file for policy references",
             );
+        };
+        let registry = match VerifierPolicyRegistry::load(registry_path) {
+            Ok(registry) => registry,
+            Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
         };
         let document = match registry.active_policy(policy_id, now) {
             Ok(document) => document,
@@ -685,7 +689,7 @@ fn verify_passport_challenge_payload(
     let now = clock_now;
     let challenge = expected_challenge.unwrap_or(&payload.presentation.challenge);
     let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
-        state.verifier_policy_registry(),
+        state.config.verifier_policies_file.as_deref(),
         challenge,
         now,
     ) {
@@ -1354,7 +1358,7 @@ pub(crate) async fn handle_federated_issue(
     }
 
     let (resolved_policy, policy_source) = match resolve_verifier_policy_for_challenge(
-        state.verifier_policy_registry(),
+        state.config.verifier_policies_file.as_deref(),
         &payload.expected_challenge,
         now,
     ) {

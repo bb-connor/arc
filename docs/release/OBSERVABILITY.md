@@ -37,7 +37,8 @@ replaying raw traffic by hand.
 - `federation.enterpriseProviders`: configured/available state plus counts for
   total, enabled, validated, invalid, and the currently loaded snapshot
 - `federation.verifierPolicies`: configured/available state plus total and
-  active policy counts, including the currently loaded runtime view
+  active policy counts read from the registry file that challenge creation and
+  verification read on each request
 - `runtimeAssurancePolicyConfigured`: whether trust-control is currently
   enforcing runtime-assurance issuance tiers from policy
 - `federation.certifications`: configured/available state plus active,

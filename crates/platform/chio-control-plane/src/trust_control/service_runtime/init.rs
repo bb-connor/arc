@@ -138,8 +138,7 @@ async fn serve_async_inner(
         config.enterprise_providers_file.as_deref(),
         "trust_control",
     )?;
-    let verifier_policy_registry =
-        load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
+    validate_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
     let joint_authority_store = match injected_joint_authority_store {
         Some(store) => {
             validate_injected_joint_authority_store(&config, &store)?;
@@ -254,7 +253,6 @@ async fn serve_async_inner(
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
         evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
         enterprise_provider_registry,
-        verifier_policy_registry,
         federation_admission_rate_limiter,
         cluster,
         cluster_progress,

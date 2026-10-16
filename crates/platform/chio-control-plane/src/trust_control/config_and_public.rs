@@ -352,13 +352,13 @@ pub(crate) fn load_enterprise_provider_registry(
     Ok(Some(Arc::new(registry)))
 }
 
-pub(crate) fn load_verifier_policy_registry(
+pub(crate) fn validate_verifier_policy_registry(
     path: Option<&std::path::Path>,
     surface: &str,
-) -> Result<Option<Arc<VerifierPolicyRegistry>>, CliError> {
+) -> Result<(), CliError> {
     let clock_now = unix_timestamp_now()?;
     let Some(path) = path else {
-        return Ok(None);
+        return Ok(());
     };
     let registry = VerifierPolicyRegistry::load(path)?;
     for document in registry.policies.values() {
@@ -371,7 +371,7 @@ pub(crate) fn load_verifier_policy_registry(
             );
         }
     }
-    Ok(Some(Arc::new(registry)))
+    Ok(())
 }
 
 fn configured_enterprise_provider_registry_path(
@@ -625,8 +625,10 @@ pub(crate) fn load_certification_discovery_network_for_admin(
     Ok((path, network))
 }
 
+/// Resolves the challenge policy, reading a referenced policy from the
+/// registry file as it is now. One call reads the file once.
 pub(crate) fn resolve_verifier_policy_for_challenge(
-    registry: Option<&VerifierPolicyRegistry>,
+    registry_path: Option<&Path>,
     challenge: &PassportPresentationChallenge,
     now: u64,
 ) -> Result<(Option<PassportVerifierPolicy>, Option<String>), CliError> {
@@ -636,11 +638,12 @@ pub(crate) fn resolve_verifier_policy_for_challenge(
     let Some(reference) = challenge.policy_ref.as_ref() else {
         return Ok((None, None));
     };
-    let Some(registry) = registry else {
+    let Some(registry_path) = registry_path else {
         return Err(CliError::cli_other_error(
             "verifier policy reference requires a configured verifier policy registry".to_string(),
         ));
     };
+    let registry = VerifierPolicyRegistry::load(registry_path)?;
     let document = registry.active_policy(&reference.policy_id, now)?;
     if document.body.verifier != challenge.verifier {
         return Err(CliError::cli_other_error(format!(
