@@ -409,7 +409,7 @@ fn semantic_readback_refuses_foreign_fence_and_stale_time() -> TestResult {
 }
 
 #[test]
-fn semantic_missing_projection_refuses_replay_and_readback() -> TestResult {
+fn semantic_missing_projections_refuse_planning_and_poison_live_owner() -> TestResult {
     for prefix in [
         "semantic-deployment:",
         "semantic-deployment-history:",
@@ -421,6 +421,12 @@ fn semantic_missing_projection_refuses_replay_and_readback() -> TestResult {
         let value = installation(&owner, &binding, "semantic-process", &["read"])?;
         install(&owner, &value)?;
         let raw = Connection::open(&owner.database)?;
+        let guard: String = raw.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger'
+             AND name = 'admission_operation_recovery_records_no_delete'",
+            [],
+            |row| row.get(0),
+        )?;
         raw.execute_batch(
             "PRAGMA foreign_keys = OFF;
              DROP TRIGGER admission_operation_recovery_records_no_delete;",
@@ -431,19 +437,30 @@ fn semantic_missing_projection_refuses_replay_and_readback() -> TestResult {
               WHERE record_key GLOB ?1 ORDER BY record_key LIMIT 1)",
             [format!("{prefix}*")],
         )?;
+        raw.execute_batch(&guard)?;
         let before = owner.counts()?;
         let message = if prefix == "recovery-planning-quota:" {
             "recovery record disappeared with retained history"
         } else {
             "recovery planning quota counters changed"
         };
-        assert_eq!(install(&owner, &value), Err(invariant(message)),);
         assert_eq!(
-            owner
-                .store
-                .read_semantic_installation(&value.deployment.body().scope, &owner.fence, now_ms()?)
-                .err(),
-            Some(invariant(message)),
+            super::super::planning::verify_planning_allocations(&raw),
+            Err(invariant(message)),
+        );
+        assert_eq!(
+            install(&owner, &value),
+            Err(AdmissionOperationStoreError::OutcomeUnknown(
+                "authority database changed outside its serving-owner connection".into(),
+            )),
+        );
+        assert_eq!(
+            owner.store.read_semantic_installation(
+                &value.deployment.body().scope, &owner.fence, now_ms()?,
+            ).err(),
+            Some(AdmissionOperationStoreError::OutcomeUnknown(
+                "sqlite authority owner is poisoned after an outcome-unknown anchor sync".into(),
+            )),
         );
         assert_eq!(owner.counts()?, before);
     }
