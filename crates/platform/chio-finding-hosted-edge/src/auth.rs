@@ -11,6 +11,7 @@ use chio_finding_market_port::{
     HostedCapabilityAdmission, HostedCapabilityAdmissionOutcome, HostedMarketPortError,
     HostedPrincipal, HostedPrincipalRole, HostedTenantId,
 };
+use chio_kernel::dpop::authority::DpopReplayAuthority;
 use chio_kernel::{DpopProof, DPOP_SCHEMA};
 use hmac::{Hmac, Mac as _};
 use serde::Serialize;
@@ -51,17 +52,18 @@ impl HostedTenantAuthPolicy {
     }
 }
 
-/// Authenticator configuration: pinned capability authorities, DPoP
-/// freshness bounds, per-tenant nonce capacity, and the per-tenant
-/// method policies. Validated in full at construction.
+/// Authenticator configuration: pinned capability authorities, the DPoP
+/// replay authority whose freshness bounds every proof must name, per-tenant
+/// nonce capacity, and the per-tenant method policies. A tenant allowing
+/// capability DPoP requires the replay authority. Validated in full at
+/// construction.
 #[derive(Clone, Debug)]
 pub struct HostedAuthenticatorConfig {
     pub deployment_id: String,
     pub public_endpoint: String,
     pub capability_authorities: Vec<PublicKey>,
     pub maximum_capability_ttl_secs: u64,
-    pub dpop_proof_ttl_secs: u64,
-    pub dpop_clock_skew_secs: u64,
+    pub dpop_replay_authority: Option<DpopReplayAuthority>,
     pub dpop_nonce_capacity_per_tenant: u64,
     pub tenant_policies: Vec<HostedTenantAuthPolicy>,
 }
@@ -72,8 +74,13 @@ impl HostedAuthenticatorConfig {
             || self.capability_authorities.is_empty()
             || self.capability_authorities.len() > 128
             || !(30..=3_600).contains(&self.maximum_capability_ttl_secs)
-            || !(5..=300).contains(&self.dpop_proof_ttl_secs)
-            || self.dpop_clock_skew_secs > 60
+            || self
+                .dpop_replay_authority
+                .as_ref()
+                .is_some_and(|authority| {
+                    !(5..=300).contains(&authority.proof_ttl_secs())
+                        || authority.max_clock_skew_secs() > 60
+                })
             || !(1_000..=10_000_000).contains(&self.dpop_nonce_capacity_per_tenant)
             || self.tenant_policies.is_empty()
             || self.tenant_policies.len() > 10_000
@@ -90,6 +97,13 @@ impl HostedAuthenticatorConfig {
         let mut tenants = BTreeSet::new();
         for policy in &self.tenant_policies {
             policy.validate()?;
+            if policy
+                .allowed_methods
+                .contains(&HostedAuthMethod::CapabilityDpop)
+                && self.dpop_replay_authority.is_none()
+            {
+                return Err(HostedEdgeError::Configuration);
+            }
             if !tenants.insert(policy.tenant_id.as_str()) {
                 return Err(HostedEdgeError::Configuration);
             }
@@ -429,6 +443,11 @@ impl HostedAuthenticator {
         require_role(&principal, request.required_role)?;
         let artifact_signer_key = principal_signer_key(&principal)?;
         let action_hash = request_action_hash(request)?;
+        let replay_authority = self
+            .config
+            .dpop_replay_authority
+            .as_ref()
+            .ok_or(HostedEdgeError::Configuration)?;
         verify_dpop_stateless(
             proof,
             capability,
@@ -436,13 +455,12 @@ impl HostedAuthenticator {
             &request.action,
             &action_hash,
             request.now_unix_secs,
-            self.config.dpop_proof_ttl_secs,
-            self.config.dpop_clock_skew_secs,
+            replay_authority,
         )?;
         let valid_through = proof
             .body
             .issued_at
-            .checked_add(self.config.dpop_proof_ttl_secs)
+            .checked_add(replay_authority.proof_ttl_secs())
             .ok_or(HostedEdgeError::AuthenticationFailed)?;
         let nonce_sha256 = sha256_hex(proof.body.nonce.as_bytes());
         let admission = self
@@ -563,7 +581,6 @@ fn request_action_hash(request: &HostedAuthRequest) -> Result<String, HostedEdge
     .map_err(|_| HostedEdgeError::InvalidRequest)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn verify_dpop_stateless(
     proof: &DpopProof,
     capability: &CapabilityToken,
@@ -571,11 +588,17 @@ fn verify_dpop_stateless(
     expected_action: &str,
     expected_action_hash: &str,
     now: u64,
-    ttl: u64,
-    skew: u64,
+    authority: &DpopReplayAuthority,
 ) -> Result<(), HostedEdgeError> {
-    if proof.body.schema != DPOP_SCHEMA
-        || proof.body.agent_key != capability.subject
+    if proof.body.schema != DPOP_SCHEMA {
+        return Err(HostedEdgeError::AuthenticationFailed);
+    }
+    if proof.body.replay_authority != *authority {
+        return Err(HostedEdgeError::DpopAuthorityMismatch);
+    }
+    let ttl = authority.proof_ttl_secs();
+    let skew = authority.max_clock_skew_secs();
+    if proof.body.agent_key != capability.subject
         || proof.body.capability_id != capability.id
         || proof.body.tool_server != expected_server
         || proof.body.tool_name != expected_action
@@ -768,14 +791,52 @@ mod tests {
         })
     }
 
+    fn replay_authority(id: &str, proof_ttl_secs: u64) -> DpopReplayAuthority {
+        serde_json::from_value(serde_json::json!({
+            "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+            "dpop_authority_id": id,
+            "expectation_id": "a".repeat(64),
+            "proof_ttl_secs": proof_ttl_secs,
+            "max_clock_skew_secs": 5
+        }))
+        .unwrap_or_else(|_| unreachable!())
+    }
+
+    #[test]
+    fn capability_dpop_tenant_requires_a_bounded_replay_authority() {
+        let authority = Keypair::generate();
+        let subject = Keypair::generate();
+        let pepper =
+            Arc::new(StaticApiKeyPepper::new(vec![7; 32]).unwrap_or_else(|_| unreachable!()));
+        for replay in [None, Some(replay_authority("hosted-dpop", 301))] {
+            let mut config = config(authority.public_key());
+            config.dpop_replay_authority = replay;
+            let built = HostedAuthenticator::new(
+                config,
+                repository(&pepper, &subject.public_key()),
+                pepper.clone(),
+            );
+            assert!(matches!(built, Err(HostedEdgeError::Configuration)));
+        }
+        let mut api_key_only = config(authority.public_key());
+        api_key_only.dpop_replay_authority = None;
+        api_key_only.tenant_policies[0].allowed_methods =
+            [HostedAuthMethod::ApiKey].into_iter().collect();
+        assert!(HostedAuthenticator::new(
+            api_key_only,
+            repository(&pepper, &subject.public_key()),
+            pepper,
+        )
+        .is_ok());
+    }
+
     fn config(authority: PublicKey) -> HostedAuthenticatorConfig {
         HostedAuthenticatorConfig {
             deployment_id: "deployment-a".to_owned(),
             public_endpoint: "https://market.example".to_owned(),
             capability_authorities: vec![authority],
             maximum_capability_ttl_secs: 300,
-            dpop_proof_ttl_secs: 60,
-            dpop_clock_skew_secs: 5,
+            dpop_replay_authority: Some(replay_authority("hosted-dpop", 60)),
             dpop_nonce_capacity_per_tenant: 1_000,
             tenant_policies: vec![HostedTenantAuthPolicy {
                 tenant_id: tenant(),
@@ -900,20 +961,39 @@ mod tests {
                     secret: "unused-unused-unused-unused-unused".to_owned(),
                 });
                 let action_hash = request_action_hash(&unsigned).unwrap_or_default();
-                let proof = DpopProof::sign(
+                let body = DpopProofBody {
+                    replay_authority: replay_authority("hosted-dpop", 60),
+                    schema: DPOP_SCHEMA.to_owned(),
+                    capability_id: capability.id.clone(),
+                    tool_server: audience,
+                    tool_name: "finding.purchase".to_owned(),
+                    action_hash,
+                    nonce: "nonce-0000000001".to_owned(),
+                    issued_at: 100,
+                    agent_key: subject.public_key(),
+                };
+                let foreign = DpopProof::sign(
                     DpopProofBody {
-                        replay_authority: None,
-                        schema: DPOP_SCHEMA.to_owned(),
-                        capability_id: capability.id.clone(),
-                        tool_server: audience,
-                        tool_name: "finding.purchase".to_owned(),
-                        action_hash,
-                        nonce: "nonce-0000000001".to_owned(),
-                        issued_at: 100,
-                        agent_key: subject.public_key(),
+                        replay_authority: replay_authority("foreign-dpop", 60),
+                        ..body.clone()
                     },
                     &subject,
                 );
+                assert!(foreign.is_ok());
+                if let Ok(foreign) = foreign {
+                    let rejected = authenticator
+                        .authenticate(base_request(HostedAuthCredential::CapabilityDpop {
+                            capability: Box::new(capability.clone()),
+                            proof: Box::new(foreign),
+                        }))
+                        .await;
+                    assert_eq!(rejected, Err(HostedEdgeError::DpopAuthorityMismatch));
+                    assert_eq!(
+                        HostedEdgeError::DpopAuthorityMismatch.code(),
+                        "dpop_authority_mismatch"
+                    );
+                }
+                let proof = DpopProof::sign(body, &subject);
                 assert!(proof.is_ok());
                 if let Ok(proof) = proof {
                     let mut wrong_binding = base_request(HostedAuthCredential::CapabilityDpop {
