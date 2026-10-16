@@ -50,7 +50,7 @@ where
     })?
 }
 
-pub(super) async fn run_public_authority_trust_read<F>(
+pub(in crate::trust_control) async fn run_public_authority_trust_read<F>(
     state: &TrustServiceState,
     read: F,
 ) -> Response
