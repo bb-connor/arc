@@ -130,7 +130,6 @@ fn state_with(config: TrustServiceConfig, clock: Arc<dyn Clock>) -> TrustService
         receipt_query_snapshots: None,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
         evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        enterprise_provider_registry: None,
         federation_admission_rate_limiter: Arc::new(Mutex::new(
             FederationAdmissionRateLimiter::default(),
         )),

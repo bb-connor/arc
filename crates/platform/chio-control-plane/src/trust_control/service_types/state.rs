@@ -30,7 +30,6 @@ pub(crate) struct TrustServiceState {
     pub(crate) receipt_query_lane: Arc<tokio::sync::Semaphore>,
     /// Full-history exports have an independent single-worker budget.
     pub(crate) evidence_export_lane: Arc<tokio::sync::Semaphore>,
-    pub(crate) enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
     pub(crate) federation_admission_rate_limiter: Arc<Mutex<FederationAdmissionRateLimiter>>,
     pub(crate) cluster: Option<Arc<Mutex<ClusterRuntimeState>>>,
     /// Progress signal for the single background cluster-sync loop. `Some`
@@ -289,18 +288,6 @@ impl TrustServiceState {
                     "trust control service requires --revocation-db",
                 )
             })
-    }
-
-    pub(crate) fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
-        self.enterprise_provider_registry.as_deref()
-    }
-
-    pub(crate) fn validated_enterprise_provider(
-        &self,
-        provider_id: &str,
-    ) -> Option<&EnterpriseProviderRecord> {
-        self.enterprise_provider_registry()
-            .and_then(|registry| registry.validated_provider(provider_id))
     }
 }
 

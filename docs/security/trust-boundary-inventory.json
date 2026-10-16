@@ -1285,7 +1285,6 @@
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire",
     "crates/platform/chio-control-plane/src/economic_state_anchor.rs::post::from_wire",
     "crates/platform/chio-control-plane/src/enterprise_federation.rs::load::from_wire",
-    "crates/platform/chio-control-plane/src/enterprise_federation.rs::load::from_wire",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_federation_policy::from_wire",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file::from_wire",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_ndjson_file::from_wire",
@@ -14957,11 +14956,6 @@
           "load",
           "decode_signed",
           "64 * 1024 * 1024"
-        ],
-        [
-          "load",
-          "decode_signed",
-          "64 * 1024 * 1024"
         ]
       ],
       "retained_typed_conversions": [
@@ -17409,7 +17403,6 @@
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire#2::decode_signed",
     "crates/platform/chio-control-plane/src/economic_state_anchor.rs::post#2::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/enterprise_federation.rs::load#1::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/enterprise_federation.rs::load#2::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_federation_policy::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/evidence_export.rs::read_json_file::from_wire#1::decode_signed",
@@ -18702,7 +18695,7 @@
       "post#2::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/enterprise_federation.rs": [
-      "load#1::original-json-reader::UntrustedJsonText",
+      "load#1::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode",
       "load#2::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/evidence_export.rs": [

@@ -1438,10 +1438,22 @@ pub(crate) async fn handle_federated_issue(
     let mut enterprise_audit = None;
     let mut scim_lifecycle_record = None;
     if let Some(identity) = payload.enterprise_identity.as_ref() {
+        let provider_registry = match state.config.enterprise_providers_file.as_deref() {
+            Some(path) if identity.provider_record_id.is_some() => {
+                match EnterpriseProviderRegistry::load(path) {
+                    Ok(registry) => Some(registry),
+                    Err(error) => {
+                        return plain_http_error(StatusCode::CONFLICT, &error.to_string())
+                    }
+                }
+            }
+            _ => None,
+        };
         let validated_provider = identity
             .provider_record_id
             .as_deref()
-            .and_then(|provider_id| state.validated_enterprise_provider(provider_id));
+            .zip(provider_registry.as_ref())
+            .and_then(|(provider_id, registry)| registry.validated_provider(provider_id));
         let lane_active = identity.provider_record_id.is_some();
         let mut audit =
             build_enterprise_admission_audit(identity, &subject_public_key_hex, validated_provider);

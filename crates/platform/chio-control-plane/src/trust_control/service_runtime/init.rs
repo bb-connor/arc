@@ -134,7 +134,7 @@ async fn serve_async_inner(
         finding_rail.is_some(),
         finding_authority_status_resolver.is_some(),
     )?;
-    let enterprise_provider_registry = load_enterprise_provider_registry(
+    validate_enterprise_provider_registry(
         config.enterprise_providers_file.as_deref(),
         "trust_control",
     )?;
@@ -252,7 +252,6 @@ async fn serve_async_inner(
         receipt_query_snapshots,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
         evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        enterprise_provider_registry,
         federation_admission_rate_limiter,
         cluster,
         cluster_progress,

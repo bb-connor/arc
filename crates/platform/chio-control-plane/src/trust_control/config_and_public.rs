@@ -331,12 +331,12 @@ mod finding_market_runtime_tests {
     }
 }
 
-pub(crate) fn load_enterprise_provider_registry(
+pub(crate) fn validate_enterprise_provider_registry(
     path: Option<&std::path::Path>,
     surface: &str,
-) -> Result<Option<Arc<EnterpriseProviderRegistry>>, CliError> {
+) -> Result<(), CliError> {
     let Some(path) = path else {
-        return Ok(None);
+        return Ok(());
     };
     let registry = EnterpriseProviderRegistry::load(path)?;
     for record in registry.providers.values() {
@@ -349,7 +349,7 @@ pub(crate) fn load_enterprise_provider_registry(
             );
         }
     }
-    Ok(Some(Arc::new(registry)))
+    Ok(())
 }
 
 pub(crate) fn validate_verifier_policy_registry(

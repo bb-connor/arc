@@ -172,11 +172,6 @@ fn verifier_policy_health_counts(
 
 fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, crate::CliError> {
     let clock_now = unix_timestamp_now()?;
-    let loaded_enterprise_provider_summary = state
-        .enterprise_provider_registry()
-        .map(enterprise_provider_health_counts)
-        .unwrap_or_default();
-
     let enterprise_provider_summary =
         if let Some(path) = state.config.enterprise_providers_file.as_deref() {
             match EnterpriseProviderRegistry::load(path) {
@@ -189,8 +184,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
                         "enabledCount": configured_counts.enabled,
                         "validatedCount": configured_counts.validated,
                         "invalidCount": configured_counts.invalid,
-                        "loadedCount": loaded_enterprise_provider_summary.total,
-                        "loadedValidatedCount": loaded_enterprise_provider_summary.validated,
                     })
                 }
                 Err(_) => json!({
@@ -200,8 +193,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
                     "enabledCount": 0,
                     "validatedCount": 0,
                     "invalidCount": 0,
-                    "loadedCount": loaded_enterprise_provider_summary.total,
-                    "loadedValidatedCount": loaded_enterprise_provider_summary.validated,
                 }),
             }
         } else {
@@ -212,8 +203,6 @@ fn trust_federation_health_snapshot(state: &TrustServiceState) -> Result<Value, 
                 "enabledCount": 0,
                 "validatedCount": 0,
                 "invalidCount": 0,
-                "loadedCount": 0,
-                "loadedValidatedCount": 0,
             })
         };
 
