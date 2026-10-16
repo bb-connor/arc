@@ -3,7 +3,7 @@ use std::path::Path;
 use chio_core::Keypair;
 use chio_revocation_oracle::{
     passport_revocation_key, EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle,
-    SqliteRevocationOracle, SubjectId, MAX_REVOCATION_SUBJECT_BYTES,
+    RevocationOracleError, SqliteRevocationOracle, SubjectId, MAX_REVOCATION_SUBJECT_BYTES,
 };
 
 use super::{
@@ -55,11 +55,12 @@ fn the_signed_root_covers_the_oracle_and_carries_the_signing_time() -> TestResul
     assert_eq!(signed.root.root_hash, committed.root_hash);
     assert_eq!(signed.root.leaf_count, 1);
     assert_eq!(signed.root.issued_at_unix_ms, 9_000);
-    assert!(signed
-        .verify(&passport_revocation_root_verifier(
+    assert_eq!(
+        signed.verify(&passport_revocation_root_verifier(
             &Keypair::from_seed(&[12; 32]).public_key()
-        ))
-        .is_err());
+        )),
+        Err(RevocationOracleError::SignatureVerificationFailed)
+    );
     Ok(())
 }
 

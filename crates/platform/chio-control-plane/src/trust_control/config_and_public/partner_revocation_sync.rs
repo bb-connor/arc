@@ -99,7 +99,7 @@ fn partner_feed_contract(card: &PartnerCard) -> Result<(Url, HttpEgressContract)
 
 /// Syncs the mirror at `mirror_path` from `card`'s partner over the bounded
 /// strict transport, sampling acceptance time from `clock` after the fetch.
-pub(crate) fn sync_partner_revocation_mirror(
+pub fn sync_partner_revocation_mirror(
     card: PartnerCard,
     mirror_path: PathBuf,
     clock: Arc<dyn chio_security_types::clock::Clock>,
