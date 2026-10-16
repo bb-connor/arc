@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9c3522ff79e430e736091f3e10d405a7c28615e03da0e81496a60cfec8262f3c
+# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -19,7 +19,7 @@ from .dpop_proof_schema import Body, ChioInvocationProofOfPossession, ReplayAuth
 from .execution_nonce_schema import BoundTo, ChioSignedExecutionNonce, Nonce, Schema
 from .heartbeat_schema import ChioKernelmessageHeartbeat
 from .tool_call_chunk_schema import ChioKernelmessageToolCallChunk
-from .tool_call_response_schema import ChioKernelmessageToolCallResponse, Detail, Error, Error10, Error11, Error12, Error13, Error9, Result, Result3, Result4, Result5, Result6
+from .tool_call_response_schema import ChioKernelmessageToolCallResponse, Detail, Error, Error10, Error11, Error12, Error13, Error9, Result, Result16, Result17, Result18, Result19
 
 __all__ = [
     "Authorization",
@@ -61,10 +61,10 @@ __all__ = [
     "ReplayAuthority",
     "Report",
     "Result",
-    "Result3",
-    "Result4",
-    "Result5",
-    "Result6",
+    "Result16",
+    "Result17",
+    "Result18",
+    "Result19",
     "Schema",
     "StoreFence",
     "WorkerProfile",

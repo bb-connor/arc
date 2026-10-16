@@ -1278,6 +1278,7 @@
     "crates/kernel/chio-runtime-core/src/treaty.rs::receipt_lineage_statement_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire",
+    "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire",
     "crates/platform/chio-commerce-order/src/input.rs::decode::from_wire",
     "crates/platform/chio-control-plane/src/attestation/model.rs::verify_and_appraise::from_wire",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire",
@@ -1656,6 +1657,17 @@
     "crates/trust/chio-weights/src/card.rs::from_canonical_json::from_wire"
   ],
   "raw_decoders": [
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
+    "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
     "crates/core/chio-core-types/src/_generated/chio_wire_v1.rs::try_from::custom_deserialize",
@@ -6037,6 +6049,17 @@
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
       "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
+      "try_from::custom_deserialize",
       "try_from::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/canonical/signed_json.rs": [
@@ -7132,6 +7155,12 @@
     ],
     "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/write.rs": [
       "require_canonical_payload::from_slice"
+    ],
+    "crates/kernel/chio-runtime-core/src/work/decode.rs": [
+      "decode::from_value"
+    ],
+    "crates/kernel/chio-runtime-core/src/work/ids.rs": [
+      "as_str::custom_deserialize"
     ]
   },
   "decoder_file_contracts": {
@@ -7152,7 +7181,7 @@
             "serde::Deserializer"
           ],
           "checked": true,
-          "instances": 786
+          "instances": 797
         }
       ]
     },
@@ -12318,6 +12347,38 @@
           "checked": true
         }
       ]
+    },
+    "crates/kernel/chio-runtime-core/src/work/decode.rs": {
+      "kind": "strict-preflight-reparse",
+      "contract": "Allocation-free preflight bounds bytes, depth, nodes, container entries and safe integers before the duplicate-aware original-JSON reader builds a Value; typed conversion then refuses unknown fields and variants, and validate() enforces work bounds and commitment bindings. Decoding proves no signature, authority or audience.",
+      "readers": [
+        {
+          "reader": "decode",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-runtime-core/src/work/ids.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Closed work identifier and digest deserializers validate through their constructors after an outer original-byte reader.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
     }
   },
   "tenant_runtime_families": {
@@ -17342,6 +17403,7 @@
     "crates/kernel/chio-runtime-core/src/treaty.rs::receipt_lineage_statement_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire#1::decode_signed",
+    "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire#1::decode_document",
     "crates/platform/chio-commerce-order/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/model.rs::verify_and_appraise#4::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire#1::decode_signed",
@@ -23100,6 +23162,12 @@
     ],
     "crates/tooling/chio-spec-codegen/src/schema_catalog.rs": [
       "load::shared-reader::crates/tooling/chio-spec-codegen/src/lib.rs::read_schema_file"
+    ],
+    "crates/kernel/chio-runtime-core/src/work/decode.rs": [
+      "decode::original-json-reader::UntrustedJsonText",
+      "decode_work_join_inputs::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
+      "decode_work_request::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
+      "decode_work_response::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode"
     ]
   },
   "retired_direct_readers": {

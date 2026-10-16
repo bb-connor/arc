@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: fe49be39159bcf9dc8399c2abfd143cb953b77513ffa367498a50f52a0e44afd
+// Schema SHA: 9dd07ed6b8a6798299f7f0bd6dc9f8a178dc0ab7cf90435ce8edab69fd9fe430
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -54763,5 +54763,2755 @@ export namespace TrustControl_Terminate {
      * Optional normalized URL of the successor leader, when termination is part of a planned handoff.
      */
     successorLeaderUrl?: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/join-inputs.schema.json
+export namespace Work_JoinInputs {
+  export type WorkDigest = string;
+  export type WorkId = string;
+  export type OpaqueId = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type RecoveryDigest32 = [
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet
+  ];
+  export type RecoveryDigestOctet = number;
+
+  export interface WorkJoinInputsV1 {
+    schema: "chio.work.join-inputs.v1";
+    version: 1;
+    graph_sha256: WorkDigest;
+    join_id: WorkId;
+    next_task_id: WorkId;
+    /**
+     * @minItems 1
+     * @maxItems 16
+     */
+    parents:
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ]
+      | [
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          },
+          {
+            task_id: WorkId;
+            receipt_id: WorkId;
+            artifact_ref: ArtifactVersionRef;
+            artifact_digest: WorkDigest;
+            acceptance_evidence_digest: WorkDigest;
+          }
+        ];
+  }
+  export interface ArtifactVersionRef {
+    scope: Scope;
+    artifact: OpaqueId;
+    version: OpaqueId;
+    provenance: RecoveryDigest32;
+  }
+  export interface Scope {
+    authority_domain: OpaqueId;
+    tenant_id: OpaqueId;
+    process_id: OpaqueId;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/request.schema.json
+export namespace Work_Request {
+  export type WorkId = string;
+  export type WorkSlotId = string;
+  export type WorkDigest = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type RecoveryDigest32 = [
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet
+  ];
+  export type RecoveryDigestOctet = number;
+  export type PolicyGeneration = number;
+  export type OpaqueId = string;
+  export type SafeInteger = number;
+
+  export interface WorkRequestV1 {
+    schema: "chio.work.request.v1";
+    version: 1;
+    body:
+      | {
+          kind: "prepare";
+          preparation: {
+            schema: "chio.work.preparation.v1";
+            version: 1;
+            program_id: WorkId;
+            command_id: WorkId;
+            proposal:
+              | {
+                  kind: "delegate";
+                  parent_id: WorkSlotId;
+                  parent_allocation_hash: WorkDigest;
+                  child: WorkDelegationRecord;
+                }
+              | {
+                  kind: "offer";
+                  slot_id: WorkSlotId;
+                  allocation_hash: WorkDigest;
+                  profile_ref: ProfileRef;
+                  receiver_kernel_id: WorkId;
+                  server_id: WorkId;
+                  tool_name: WorkId;
+                  arguments: unknown;
+                  request_id: OpaqueId;
+                }
+              | {
+                  kind: "select";
+                  offer: WorkDelegationRecord;
+                  request_id: OpaqueId;
+                  capability_hash: WorkDigest;
+                  expected_revision: SafeInteger;
+                }
+              | {
+                  kind: "extend";
+                  expected_bundle_sha256: WorkDigest;
+                  /**
+                   * @maxItems 16
+                   */
+                  new_work:
+                    | []
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ]
+                    | [
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        },
+                        {
+                          task_id: WorkId;
+                          handle: Handle;
+                        }
+                      ];
+                  /**
+                   * @maxItems 64
+                   */
+                  dependencies: WorkGraphRecord[];
+                  /**
+                   * @maxItems 16
+                   */
+                  join_draft_refs:
+                    | []
+                    | [DraftRef]
+                    | [DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef, DraftRef]
+                    | [
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef
+                      ]
+                    | [
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef
+                      ]
+                    | [
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef
+                      ]
+                    | [
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef
+                      ]
+                    | [
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef
+                      ]
+                    | [
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef,
+                        DraftRef
+                      ];
+                }
+              | {
+                  kind: "join";
+                  expected_bundle_sha256: WorkDigest;
+                  join: WorkGraphRecord;
+                  /**
+                   * @maxItems 16
+                   */
+                  parents:
+                    | []
+                    | [Handle]
+                    | [Handle, Handle]
+                    | [Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle, Handle]
+                    | [
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle
+                      ]
+                    | [
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle
+                      ]
+                    | [
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle
+                      ]
+                    | [
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle,
+                        Handle
+                      ];
+                }
+              | {
+                  kind: "agreement";
+                  commitment: Commitment;
+                  terms:
+                    | {
+                        kind: "unpaid";
+                        terms_reference: WorkId;
+                      }
+                    | {
+                        kind: "funded";
+                        funding_profile_id: WorkId;
+                        terms_reference: WorkId;
+                      };
+                };
+          };
+        }
+      | {
+          kind: "submit";
+          command: {
+            schema: "chio.work.command.v1";
+            version: 1;
+            program_id: WorkId;
+            command_id: WorkId;
+            action:
+              | {
+                  kind: "delegate";
+                  subdivision: WorkDelegationRecord;
+                }
+              | {
+                  kind: "select";
+                  selection: WorkDelegationRecord;
+                }
+              | {
+                  kind: "seal";
+                  binding: WorkDelegationRecord;
+                }
+              | {
+                  kind: "extend";
+                  expected_bundle_sha256: WorkDigest;
+                  draft_ref: DraftRef;
+                }
+              | {
+                  kind: "submit";
+                  commitment: Commitment;
+                }
+              | {
+                  kind: "reconcile";
+                  handle: Handle;
+                }
+              | {
+                  kind: "cancel";
+                  handle: Handle;
+                };
+          };
+        }
+      | {
+          kind: "query";
+          query:
+            | {
+                kind: "work";
+                handle: Handle;
+              }
+            | {
+                kind: "command";
+                command_ref: CommandRef;
+              }
+            | {
+                kind: "preparation";
+                preparation_ref: PreparationRef;
+              }
+            | {
+                kind: "catalog";
+                catalog_ref: CatalogRef;
+                cursor?: CatalogCursor;
+              }
+            | {
+                kind: "profile";
+                profile_ref: ProfileRef;
+              };
+        };
+  }
+  export interface WorkDelegationRecord {}
+  export interface ProfileRef {
+    owner: WorkId;
+    catalog_entry: WorkId;
+    deployment_digest: RecoveryDigest32;
+    policy_generation: PolicyGeneration;
+    profile_digest: RecoveryDigest32;
+  }
+  export interface Handle {
+    program_id: WorkId;
+    slot_id: WorkSlotId;
+    allocation_hash: WorkDigest;
+    receiver_kernel_id: WorkId;
+    request_id: OpaqueId;
+  }
+  export interface WorkGraphRecord {}
+  export interface DraftRef {
+    draft_id: WorkId;
+    graph_sha256: WorkDigest;
+  }
+  export interface Commitment {
+    handle: Handle;
+    permit: WorkDelegationRecord;
+    profile_ref: ProfileRef;
+    invocation_ref: WorkDigest;
+    graph_ref: WorkDigest;
+    funding?: FundingRef;
+  }
+  export interface FundingRef {
+    rail: WorkId;
+    agreement_digest: WorkDigest;
+    reserve_ref: WorkId;
+  }
+  export interface CommandRef {
+    program_id: WorkId;
+    command_id: WorkId;
+    command_digest: WorkDigest;
+  }
+  export interface PreparationRef {
+    program_id: WorkId;
+    preparation_id: WorkId;
+    command_digest: WorkDigest;
+  }
+  export interface CatalogRef {
+    owner: WorkId;
+    catalog_id: WorkId;
+  }
+  export interface CatalogCursor {
+    catalog_generation: PolicyGeneration;
+    position: WorkDigest;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/work/response.schema.json
+export namespace Work_Response {
+  export type Prepared =
+    | {
+        kind: "prepared";
+        preparation_ref: PreparationRef;
+        artifact:
+          | {
+              kind: "subdivision";
+              subdivision: WorkDelegationRecord;
+            }
+          | {
+              kind: "offer";
+              offer: WorkDelegationRecord;
+              invocation_ref: WorkDigest;
+            }
+          | {
+              kind: "selection";
+              selection: WorkDelegationRecord;
+            }
+          | {
+              kind: "graph_draft";
+              draft_ref: DraftRef;
+            }
+          | {
+              kind: "join_draft";
+              draft_ref: DraftRef;
+            }
+          | {
+              kind: "agreement";
+              agreement_digest: WorkDigest;
+            };
+      }
+    | {
+        kind: "pending";
+        preparation_ref: PreparationRef;
+        owner_operation_ref: OwnerOperationRef;
+      }
+    | {
+        kind: "refused";
+        preparation_ref: PreparationRef;
+        rejection: Rejection;
+      };
+  export type WorkId = string;
+  export type WorkDigest = string;
+  export type OpaqueId = string;
+  /**
+   * @minItems 32
+   * @maxItems 32
+   */
+  export type RecoveryDigest32 = [
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet,
+    RecoveryDigestOctet
+  ];
+  export type RecoveryDigestOctet = number;
+  export type RejectionCode =
+    | "schema"
+    | "malformed"
+    | "duplicate_key"
+    | "unsafe_integer"
+    | "bounds"
+    | "identifier"
+    | "binding_mismatch"
+    | "conflict"
+    | "stale_version"
+    | "stale_catalog"
+    | "expired"
+    | "revoked"
+    | "audience"
+    | "role"
+    | "cross_tenant"
+    | "unsupported_profile"
+    | "busy";
+  export type BindingField =
+    | "program_id"
+    | "command_id"
+    | "slot_id"
+    | "allocation_hash"
+    | "receiver_kernel_id"
+    | "request_id"
+    | "capability_hash"
+    | "profile_ref"
+    | "graph_sha256"
+    | "draft_ref"
+    | "permit"
+    | "invocation_ref";
+  export type SafeInteger = number;
+  export type WorkSlotId = string;
+  export type Effect =
+    | RecoveryEffectNeverAdmittedV1
+    | RecoveryEffectAdmissionUnresolvedV1
+    | RecoveryEffectClosedBeforeEffectV1
+    | RecoveryEffectAwaitingApprovalV1
+    | RecoveryEffectInFlightV1
+    | RecoveryEffectAwaitingCallerReportV1
+    | RecoveryEffectUnknownV1
+    | RecoveryEffectCompleteV1
+    | RecoveryEffectPartialV1
+    | RecoveryEffectFailedAfterEffectV1;
+  export type Release =
+    | {
+        kind: "not_available";
+      }
+    | {
+        kind: "pending";
+        release_id: OpaqueId;
+      }
+    | {
+        kind: "withheld";
+        evidence: OpaqueId;
+      }
+    | {
+        kind: "released";
+        release_id: OpaqueId;
+      }
+    | {
+        kind: "denied";
+        reason: RefusalCode;
+      };
+  export type RefusalCode =
+    | "invalid_evidence"
+    | "unsupported_profile"
+    | "stale_basis"
+    | "revoked"
+    | "expired"
+    | "budget_unavailable"
+    | "unknown_effect"
+    | "audience_denied"
+    | "resource_exhausted";
+  export type Control = "active" | "cancel_requested" | "cancelled" | "quarantined";
+  export type RecoveryOperation =
+    | "inspect_workflow"
+    | "select_offer"
+    | "submit_approval"
+    | "resume_workflow"
+    | "cancel_workflow";
+  export type PolicyGeneration = number;
+
+  export interface WorkResponseV1 {
+    schema: "chio.work.response.v1";
+    version: 1;
+    body:
+      | {
+          kind: "prepared";
+          prepared: Prepared;
+        }
+      | {
+          kind: "command";
+          result: CommandResult;
+        }
+      | {
+          kind: "query";
+          result:
+            | {
+                kind: "work";
+                view: View;
+              }
+            | {
+                kind: "command";
+                result: CommandResult;
+              }
+            | {
+                kind: "preparation";
+                prepared: Prepared;
+              }
+            | {
+                kind: "catalog";
+                page: CatalogPage;
+              }
+            | {
+                kind: "profile";
+                profile: Profile;
+              }
+            | {
+                kind: "unavailable";
+                code: RejectionCode;
+              };
+        };
+  }
+  export interface PreparationRef {
+    program_id: WorkId;
+    preparation_id: WorkId;
+    command_digest: WorkDigest;
+  }
+  export interface WorkDelegationRecord {}
+  export interface DraftRef {
+    draft_id: WorkId;
+    graph_sha256: WorkDigest;
+  }
+  export interface OwnerOperationRef {
+    operation: Operation;
+    scope: Scope;
+  }
+  export interface Operation {
+    operation_id: OpaqueId;
+    native_admission_digest: RecoveryDigest32;
+    operation_version: number;
+  }
+  export interface Scope {
+    authority_domain: OpaqueId;
+    tenant_id: OpaqueId;
+    process_id: OpaqueId;
+  }
+  export interface Rejection {
+    code: RejectionCode;
+    field?: BindingField;
+    reference?: CommandRef;
+  }
+  export interface CommandRef {
+    program_id: WorkId;
+    command_id: WorkId;
+    command_digest: WorkDigest;
+  }
+  export interface CommandResult {
+    command_ref: CommandRef;
+    outcome:
+      | {
+          kind: "applied";
+          revision: SafeInteger;
+          result:
+            | {
+                kind: "delegated";
+                slot: WorkDelegationRecord;
+              }
+            | {
+                kind: "selected";
+                revision: SafeInteger;
+              }
+            | {
+                kind: "sealed";
+                permit: WorkDelegationRecord;
+              }
+            | {
+                kind: "extended";
+                bundle_sha256: WorkDigest;
+              }
+            | {
+                kind: "submitted";
+                owner_operation_ref: OwnerOperationRef;
+              }
+            | {
+                kind: "reconciled";
+                view: View;
+              }
+            | {
+                kind: "cancel_observed";
+                control: Control;
+              };
+        }
+      | {
+          kind: "pending";
+          owner_operation_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "refused";
+          rejection: Rejection;
+        };
+  }
+  export interface View {
+    handle: Handle;
+    execution:
+      | {
+          kind: "not_applicable";
+        }
+      | {
+          kind: "pending";
+          owner_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "available";
+          source: WorkId;
+          revision: SafeInteger;
+          observed_at: SafeInteger;
+          value: Effect;
+        }
+      | {
+          kind: "unavailable";
+          code: RejectionCode;
+        };
+    acceptance:
+      | {
+          kind: "not_applicable";
+        }
+      | {
+          kind: "pending";
+          owner_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "available";
+          source: WorkId;
+          revision: SafeInteger;
+          observed_at: SafeInteger;
+          value: Acceptance;
+        }
+      | {
+          kind: "unavailable";
+          code: RejectionCode;
+        };
+    result_reference:
+      | {
+          kind: "not_applicable";
+        }
+      | {
+          kind: "pending";
+          owner_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "available";
+          source: WorkId;
+          revision: SafeInteger;
+          observed_at: SafeInteger;
+          value: {
+            artifact: ArtifactVersionRef;
+            release: Release;
+          };
+        }
+      | {
+          kind: "unavailable";
+          code: RejectionCode;
+        };
+    recovery:
+      | {
+          kind: "not_applicable";
+        }
+      | {
+          kind: "pending";
+          owner_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "available";
+          source: WorkId;
+          revision: SafeInteger;
+          observed_at: SafeInteger;
+          value: RecoveryLink;
+        }
+      | {
+          kind: "unavailable";
+          code: RejectionCode;
+        };
+    settlement:
+      | {
+          kind: "not_applicable";
+        }
+      | {
+          kind: "pending";
+          owner_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "available";
+          source: WorkId;
+          revision: SafeInteger;
+          observed_at: SafeInteger;
+          value: {
+            rail: WorkId;
+            agreement_digest: WorkDigest;
+          };
+        }
+      | {
+          kind: "unavailable";
+          code: RejectionCode;
+        };
+    bilateral_delivery:
+      | {
+          kind: "not_applicable";
+        }
+      | {
+          kind: "pending";
+          owner_ref: OwnerOperationRef;
+        }
+      | {
+          kind: "available";
+          source: WorkId;
+          revision: SafeInteger;
+          observed_at: SafeInteger;
+          value: {
+            envelope_digest: WorkDigest;
+            state: "retained" | "delivered";
+          };
+        }
+      | {
+          kind: "unavailable";
+          code: RejectionCode;
+        };
+  }
+  export interface Handle {
+    program_id: WorkId;
+    slot_id: WorkSlotId;
+    allocation_hash: WorkDigest;
+    receiver_kernel_id: WorkId;
+    request_id: OpaqueId;
+  }
+  export interface RecoveryEffectNeverAdmittedV1 {
+    kind: "never_admitted";
+  }
+  export interface RecoveryEffectAdmissionUnresolvedV1 {
+    kind: "admission_unresolved";
+    admission_intent: OpaqueId;
+  }
+  export interface RecoveryEffectClosedBeforeEffectV1 {
+    kind: "closed_before_effect";
+    operation: Operation;
+    closure: OpaqueId;
+  }
+  export interface RecoveryEffectAwaitingApprovalV1 {
+    kind: "awaiting_approval";
+    operation: Operation;
+  }
+  export interface RecoveryEffectInFlightV1 {
+    kind: "in_flight";
+    operation: Operation;
+  }
+  export interface RecoveryEffectAwaitingCallerReportV1 {
+    kind: "awaiting_caller_report";
+    operation: Operation;
+  }
+  export interface RecoveryEffectUnknownV1 {
+    kind: "unknown";
+    operation: Operation;
+  }
+  export interface RecoveryEffectCompleteV1 {
+    kind: "complete";
+    operation: Operation;
+    effect_count: SafeInteger;
+  }
+  export interface RecoveryEffectPartialV1 {
+    kind: "partial";
+    operation: Operation;
+    applied_effects: number;
+  }
+  export interface RecoveryEffectFailedAfterEffectV1 {
+    kind: "failed_after_effect";
+    operation: Operation;
+    applied_effects: number;
+  }
+  export interface Acceptance {
+    handle: Handle;
+    producer: Operation;
+    artifact: ArtifactVersionRef;
+    artifact_digest: WorkDigest;
+    contract_digest: RecoveryDigest32;
+    procedure_digest: WorkDigest;
+    evaluator: OpaqueId;
+    decision: "accepted" | "rejected";
+    /**
+     * @maxItems 16
+     */
+    evidence:
+      | []
+      | [OpaqueId]
+      | [OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId, OpaqueId]
+      | [
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId
+        ]
+      | [
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId
+        ]
+      | [
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId
+        ]
+      | [
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId
+        ]
+      | [
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId,
+          OpaqueId
+        ];
+  }
+  export interface ArtifactVersionRef {
+    scope: Scope;
+    artifact: OpaqueId;
+    version: OpaqueId;
+    provenance: RecoveryDigest32;
+  }
+  export interface RecoveryLink {
+    schema: "chio.recovery.observation.v1";
+    version: 1;
+    scope: Scope;
+    workflow_id: OpaqueId;
+    step_id: OpaqueId;
+    continuation_id: OpaqueId;
+    control: Control;
+    /**
+     * @maxItems 8
+     */
+    available:
+      | []
+      | [RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation
+        ]
+      | [
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation
+        ];
+  }
+  export interface CatalogPage {
+    catalog_ref: CatalogRef;
+    /**
+     * @maxItems 64
+     */
+    entries: ProfileRef[];
+    next?: CatalogCursor;
+  }
+  export interface CatalogRef {
+    owner: WorkId;
+    catalog_id: WorkId;
+  }
+  export interface ProfileRef {
+    owner: WorkId;
+    catalog_entry: WorkId;
+    deployment_digest: RecoveryDigest32;
+    policy_generation: PolicyGeneration;
+    profile_digest: RecoveryDigest32;
+  }
+  export interface CatalogCursor {
+    catalog_generation: PolicyGeneration;
+    position: WorkDigest;
+  }
+  export interface Profile {
+    profile_ref: ProfileRef;
+    server_id: WorkId;
+    tool_name: WorkId;
+    tool_schema_digest: WorkDigest;
+    implementation_digest: WorkDigest;
+    max_units: SafeInteger;
+    currency: WorkId;
+    acceptance_procedure: WorkDigest;
+    /**
+     * @maxItems 8
+     */
+    recovery_operations:
+      | []
+      | [RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation, RecoveryOperation]
+      | [
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation
+        ]
+      | [
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation,
+          RecoveryOperation
+        ];
+    valid_until_unix_ms: SafeInteger;
+    /**
+     * @maxItems 64
+     */
+    conditions: {
+      source: WorkId;
+      enforcement: "local" | "remote";
+      statement_digest: WorkDigest;
+    }[];
+    funding_profile_id?: WorkId;
   }
 }

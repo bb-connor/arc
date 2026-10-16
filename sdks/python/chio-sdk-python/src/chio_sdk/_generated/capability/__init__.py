@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9c3522ff79e430e736091f3e10d405a7c28615e03da0e81496a60cfec8262f3c
+# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -20,7 +20,7 @@ from .revocation_schema import ChioCapabilityRevocationEntry
 from .security_binding_schema import ChioCapabilitySecurityBinding, SecurityBindingText
 from .supplemental_authorization_schema import ChioOpaqueSupplementalAuthorization
 from .threshold_approval_proposal_schema import Algorithm, ChioThresholdApprovalProposal, ThresholdProposalPublicKey, ThresholdProposalSignature
-from .token_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytoken, ChioScope, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, DelegationLink, GenericConstraint, GrantKind, GrantSubsetRelation, Kind, MonetaryAmount, Operation, PromptGrant, RequireApprovalAboveConstraint, ResourceGrant, ScopeAttenuation, Subset, ToolGrant, Value, Value1, Value2
+from .token_schema import Algorithm, Attenuation, AttenuationProof, AttenuationWitness, Caveat, ChioCapabilitytoken, ChioScope, Constraint, CumulativeApprovalDelegableConstraint, CumulativeApprovalDirectConstraint, DelegationLink, GenericConstraint, GrantKind, GrantSubsetRelation, Kind, MonetaryAmount, Operation, PromptGrant, RequireApprovalAboveConstraint, ResourceGrant, ScopeAttenuation, Subset, ToolGrant, Value, Value4, Value5
 from .verified_approval_set_schema import ChioVerifiedApprovalSetBody, TokenDigest
 
 __all__ = [
@@ -76,6 +76,6 @@ __all__ = [
     "TokenDigest",
     "ToolGrant",
     "Value",
-    "Value1",
-    "Value2",
+    "Value4",
+    "Value5",
 ]

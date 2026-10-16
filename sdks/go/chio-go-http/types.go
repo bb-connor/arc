@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: 283967ccea526d87b72ace99db802f4faee2a903b9d941479bcb57e763cc16e7
+// Schema content SHA-256: edd4db223f71003535d91fc1664ea95781f5b12ebc6119553c9dccf3029db407
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -4609,6 +4609,601 @@ const (
 	TrustControlTerminateReasonOperatorStepdown TrustControlTerminateReason = "operator_stepdown"
 	TrustControlTerminateReasonQuorumLost       TrustControlTerminateReason = "quorum_lost"
 	TrustControlTerminateReasonTermAdvanced     TrustControlTerminateReason = "term_advanced"
+)
+
+// Defines values for WorkJoinInputsSchema.
+const (
+	WorkJoinInputsSchemaChioWorkJoinInputsV1 WorkJoinInputsSchema = "chio.work.join-inputs.v1"
+)
+
+// Defines values for WorkJoinInputsVersion.
+const (
+	WorkJoinInputsVersionN1 WorkJoinInputsVersion = 1
+)
+
+// Defines values for WorkRequestBody0Kind.
+const (
+	WorkRequestBody0KindPrepare WorkRequestBody0Kind = "prepare"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal0Kind.
+const (
+	WorkRequestBody0PreparationProposal0KindDelegate WorkRequestBody0PreparationProposal0Kind = "delegate"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal1Kind.
+const (
+	WorkRequestBody0PreparationProposal1KindOffer WorkRequestBody0PreparationProposal1Kind = "offer"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal2Kind.
+const (
+	WorkRequestBody0PreparationProposal2KindSelect WorkRequestBody0PreparationProposal2Kind = "select"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal3Kind.
+const (
+	WorkRequestBody0PreparationProposal3KindExtend WorkRequestBody0PreparationProposal3Kind = "extend"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal4Kind.
+const (
+	WorkRequestBody0PreparationProposal4KindJoin WorkRequestBody0PreparationProposal4Kind = "join"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal5Kind.
+const (
+	WorkRequestBody0PreparationProposal5KindAgreement WorkRequestBody0PreparationProposal5Kind = "agreement"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal5Terms0Kind.
+const (
+	WorkRequestBody0PreparationProposal5Terms0KindUnpaid WorkRequestBody0PreparationProposal5Terms0Kind = "unpaid"
+)
+
+// Defines values for WorkRequestBody0PreparationProposal5Terms1Kind.
+const (
+	WorkRequestBody0PreparationProposal5Terms1KindFunded WorkRequestBody0PreparationProposal5Terms1Kind = "funded"
+)
+
+// Defines values for WorkRequestBody0PreparationSchema.
+const (
+	WorkRequestBody0PreparationSchemaChioWorkPreparationV1 WorkRequestBody0PreparationSchema = "chio.work.preparation.v1"
+)
+
+// Defines values for WorkRequestBody0PreparationVersion.
+const (
+	WorkRequestBody0PreparationVersionN1 WorkRequestBody0PreparationVersion = 1
+)
+
+// Defines values for WorkRequestBody1CommandAction0Kind.
+const (
+	WorkRequestBody1CommandAction0KindDelegate WorkRequestBody1CommandAction0Kind = "delegate"
+)
+
+// Defines values for WorkRequestBody1CommandAction1Kind.
+const (
+	WorkRequestBody1CommandAction1KindSelect WorkRequestBody1CommandAction1Kind = "select"
+)
+
+// Defines values for WorkRequestBody1CommandAction2Kind.
+const (
+	WorkRequestBody1CommandAction2KindSeal WorkRequestBody1CommandAction2Kind = "seal"
+)
+
+// Defines values for WorkRequestBody1CommandAction3Kind.
+const (
+	WorkRequestBody1CommandAction3KindExtend WorkRequestBody1CommandAction3Kind = "extend"
+)
+
+// Defines values for WorkRequestBody1CommandAction4Kind.
+const (
+	WorkRequestBody1CommandAction4KindSubmit WorkRequestBody1CommandAction4Kind = "submit"
+)
+
+// Defines values for WorkRequestBody1CommandAction5Kind.
+const (
+	WorkRequestBody1CommandAction5KindReconcile WorkRequestBody1CommandAction5Kind = "reconcile"
+)
+
+// Defines values for WorkRequestBody1CommandAction6Kind.
+const (
+	WorkRequestBody1CommandAction6KindCancel WorkRequestBody1CommandAction6Kind = "cancel"
+)
+
+// Defines values for WorkRequestBody1CommandSchema.
+const (
+	WorkRequestBody1CommandSchemaChioWorkCommandV1 WorkRequestBody1CommandSchema = "chio.work.command.v1"
+)
+
+// Defines values for WorkRequestBody1CommandVersion.
+const (
+	WorkRequestBody1CommandVersionN1 WorkRequestBody1CommandVersion = 1
+)
+
+// Defines values for WorkRequestBody1Kind.
+const (
+	WorkRequestBody1KindSubmit WorkRequestBody1Kind = "submit"
+)
+
+// Defines values for WorkRequestBody2Kind.
+const (
+	WorkRequestBody2KindQuery WorkRequestBody2Kind = "query"
+)
+
+// Defines values for WorkRequestBody2Query0Kind.
+const (
+	WorkRequestBody2Query0KindWork WorkRequestBody2Query0Kind = "work"
+)
+
+// Defines values for WorkRequestBody2Query1Kind.
+const (
+	WorkRequestBody2Query1KindCommand WorkRequestBody2Query1Kind = "command"
+)
+
+// Defines values for WorkRequestBody2Query2Kind.
+const (
+	WorkRequestBody2Query2KindPreparation WorkRequestBody2Query2Kind = "preparation"
+)
+
+// Defines values for WorkRequestBody2Query3Kind.
+const (
+	WorkRequestBody2Query3KindCatalog WorkRequestBody2Query3Kind = "catalog"
+)
+
+// Defines values for WorkRequestBody2Query4Kind.
+const (
+	WorkRequestBody2Query4KindProfile WorkRequestBody2Query4Kind = "profile"
+)
+
+// Defines values for WorkRequestSchema.
+const (
+	WorkRequestSchemaChioWorkRequestV1 WorkRequestSchema = "chio.work.request.v1"
+)
+
+// Defines values for WorkRequestVersion.
+const (
+	WorkRequestVersionN1 WorkRequestVersion = 1
+)
+
+// Defines values for WorkResponseBody0Kind.
+const (
+	WorkResponseBody0KindPrepared WorkResponseBody0Kind = "prepared"
+)
+
+// Defines values for WorkResponseBody1Kind.
+const (
+	WorkResponseBody1KindCommand WorkResponseBody1Kind = "command"
+)
+
+// Defines values for WorkResponseBody2Kind.
+const (
+	WorkResponseBody2KindQuery WorkResponseBody2Kind = "query"
+)
+
+// Defines values for WorkResponseBody2Result0Kind.
+const (
+	WorkResponseBody2Result0KindWork WorkResponseBody2Result0Kind = "work"
+)
+
+// Defines values for WorkResponseBody2Result1Kind.
+const (
+	WorkResponseBody2Result1KindCommand WorkResponseBody2Result1Kind = "command"
+)
+
+// Defines values for WorkResponseBody2Result2Kind.
+const (
+	WorkResponseBody2Result2KindPreparation WorkResponseBody2Result2Kind = "preparation"
+)
+
+// Defines values for WorkResponseBody2Result3Kind.
+const (
+	WorkResponseBody2Result3KindCatalog WorkResponseBody2Result3Kind = "catalog"
+)
+
+// Defines values for WorkResponseBody2Result4Kind.
+const (
+	WorkResponseBody2Result4KindProfile WorkResponseBody2Result4Kind = "profile"
+)
+
+// Defines values for WorkResponseBody2Result5Kind.
+const (
+	WorkResponseBody2Result5KindUnavailable WorkResponseBody2Result5Kind = "unavailable"
+)
+
+// Defines values for WorkResponseSchema.
+const (
+	WorkResponseSchemaChioWorkResponseV1 WorkResponseSchema = "chio.work.response.v1"
+)
+
+// Defines values for WorkResponseVersion.
+const (
+	WorkResponseVersionN1 WorkResponseVersion = 1
+)
+
+// Defines values for WorkResponseAcceptanceDecision.
+const (
+	WorkResponseAcceptanceDecisionAccepted WorkResponseAcceptanceDecision = "accepted"
+	WorkResponseAcceptanceDecisionRejected WorkResponseAcceptanceDecision = "rejected"
+)
+
+// Defines values for WorkResponseBindingField.
+const (
+	WorkResponseBindingFieldAllocationHash   WorkResponseBindingField = "allocation_hash"
+	WorkResponseBindingFieldCapabilityHash   WorkResponseBindingField = "capability_hash"
+	WorkResponseBindingFieldCommandId        WorkResponseBindingField = "command_id"
+	WorkResponseBindingFieldDraftRef         WorkResponseBindingField = "draft_ref"
+	WorkResponseBindingFieldGraphSha256      WorkResponseBindingField = "graph_sha256"
+	WorkResponseBindingFieldInvocationRef    WorkResponseBindingField = "invocation_ref"
+	WorkResponseBindingFieldPermit           WorkResponseBindingField = "permit"
+	WorkResponseBindingFieldProfileRef       WorkResponseBindingField = "profile_ref"
+	WorkResponseBindingFieldProgramId        WorkResponseBindingField = "program_id"
+	WorkResponseBindingFieldReceiverKernelId WorkResponseBindingField = "receiver_kernel_id"
+	WorkResponseBindingFieldRequestId        WorkResponseBindingField = "request_id"
+	WorkResponseBindingFieldSlotId           WorkResponseBindingField = "slot_id"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Kind.
+const (
+	WorkResponseCommandResultOutcome0KindApplied WorkResponseCommandResultOutcome0Kind = "applied"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result0Kind.
+const (
+	WorkResponseCommandResultOutcome0Result0KindDelegated WorkResponseCommandResultOutcome0Result0Kind = "delegated"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result1Kind.
+const (
+	WorkResponseCommandResultOutcome0Result1KindSelected WorkResponseCommandResultOutcome0Result1Kind = "selected"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result2Kind.
+const (
+	WorkResponseCommandResultOutcome0Result2KindSealed WorkResponseCommandResultOutcome0Result2Kind = "sealed"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result3Kind.
+const (
+	WorkResponseCommandResultOutcome0Result3KindExtended WorkResponseCommandResultOutcome0Result3Kind = "extended"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result4Kind.
+const (
+	WorkResponseCommandResultOutcome0Result4KindSubmitted WorkResponseCommandResultOutcome0Result4Kind = "submitted"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result5Kind.
+const (
+	WorkResponseCommandResultOutcome0Result5KindReconciled WorkResponseCommandResultOutcome0Result5Kind = "reconciled"
+)
+
+// Defines values for WorkResponseCommandResultOutcome0Result6Kind.
+const (
+	WorkResponseCommandResultOutcome0Result6KindCancelObserved WorkResponseCommandResultOutcome0Result6Kind = "cancel_observed"
+)
+
+// Defines values for WorkResponseCommandResultOutcome1Kind.
+const (
+	WorkResponseCommandResultOutcome1KindPending WorkResponseCommandResultOutcome1Kind = "pending"
+)
+
+// Defines values for WorkResponseCommandResultOutcome2Kind.
+const (
+	WorkResponseCommandResultOutcome2KindRefused WorkResponseCommandResultOutcome2Kind = "refused"
+)
+
+// Defines values for WorkResponseControl.
+const (
+	WorkResponseControlActive          WorkResponseControl = "active"
+	WorkResponseControlCancelRequested WorkResponseControl = "cancel_requested"
+	WorkResponseControlCancelled       WorkResponseControl = "cancelled"
+	WorkResponseControlQuarantined     WorkResponseControl = "quarantined"
+)
+
+// Defines values for WorkResponsePrepared0Artifact0Kind.
+const (
+	WorkResponsePrepared0Artifact0KindSubdivision WorkResponsePrepared0Artifact0Kind = "subdivision"
+)
+
+// Defines values for WorkResponsePrepared0Artifact1Kind.
+const (
+	WorkResponsePrepared0Artifact1KindOffer WorkResponsePrepared0Artifact1Kind = "offer"
+)
+
+// Defines values for WorkResponsePrepared0Artifact2Kind.
+const (
+	WorkResponsePrepared0Artifact2KindSelection WorkResponsePrepared0Artifact2Kind = "selection"
+)
+
+// Defines values for WorkResponsePrepared0Artifact3Kind.
+const (
+	WorkResponsePrepared0Artifact3KindGraphDraft WorkResponsePrepared0Artifact3Kind = "graph_draft"
+)
+
+// Defines values for WorkResponsePrepared0Artifact4Kind.
+const (
+	WorkResponsePrepared0Artifact4KindJoinDraft WorkResponsePrepared0Artifact4Kind = "join_draft"
+)
+
+// Defines values for WorkResponsePrepared0Artifact5Kind.
+const (
+	WorkResponsePrepared0Artifact5KindAgreement WorkResponsePrepared0Artifact5Kind = "agreement"
+)
+
+// Defines values for WorkResponsePrepared0Kind.
+const (
+	WorkResponsePrepared0KindPrepared WorkResponsePrepared0Kind = "prepared"
+)
+
+// Defines values for WorkResponsePrepared1Kind.
+const (
+	WorkResponsePrepared1KindPending WorkResponsePrepared1Kind = "pending"
+)
+
+// Defines values for WorkResponsePrepared2Kind.
+const (
+	WorkResponsePrepared2KindRefused WorkResponsePrepared2Kind = "refused"
+)
+
+// Defines values for WorkResponseProfileConditionsEnforcement.
+const (
+	WorkResponseProfileConditionsEnforcementLocal  WorkResponseProfileConditionsEnforcement = "local"
+	WorkResponseProfileConditionsEnforcementRemote WorkResponseProfileConditionsEnforcement = "remote"
+)
+
+// Defines values for WorkResponseRecoveryEffectAdmissionUnresolvedV1Kind.
+const (
+	WorkResponseRecoveryEffectAdmissionUnresolvedV1KindAdmissionUnresolved WorkResponseRecoveryEffectAdmissionUnresolvedV1Kind = "admission_unresolved"
+)
+
+// Defines values for WorkResponseRecoveryEffectAwaitingApprovalV1Kind.
+const (
+	WorkResponseRecoveryEffectAwaitingApprovalV1KindAwaitingApproval WorkResponseRecoveryEffectAwaitingApprovalV1Kind = "awaiting_approval"
+)
+
+// Defines values for WorkResponseRecoveryEffectAwaitingCallerReportV1Kind.
+const (
+	WorkResponseRecoveryEffectAwaitingCallerReportV1KindAwaitingCallerReport WorkResponseRecoveryEffectAwaitingCallerReportV1Kind = "awaiting_caller_report"
+)
+
+// Defines values for WorkResponseRecoveryEffectClosedBeforeEffectV1Kind.
+const (
+	WorkResponseRecoveryEffectClosedBeforeEffectV1KindClosedBeforeEffect WorkResponseRecoveryEffectClosedBeforeEffectV1Kind = "closed_before_effect"
+)
+
+// Defines values for WorkResponseRecoveryEffectCompleteV1Kind.
+const (
+	WorkResponseRecoveryEffectCompleteV1KindComplete WorkResponseRecoveryEffectCompleteV1Kind = "complete"
+)
+
+// Defines values for WorkResponseRecoveryEffectFailedAfterEffectV1Kind.
+const (
+	WorkResponseRecoveryEffectFailedAfterEffectV1KindFailedAfterEffect WorkResponseRecoveryEffectFailedAfterEffectV1Kind = "failed_after_effect"
+)
+
+// Defines values for WorkResponseRecoveryEffectInFlightV1Kind.
+const (
+	WorkResponseRecoveryEffectInFlightV1KindInFlight WorkResponseRecoveryEffectInFlightV1Kind = "in_flight"
+)
+
+// Defines values for WorkResponseRecoveryEffectNeverAdmittedV1Kind.
+const (
+	WorkResponseRecoveryEffectNeverAdmittedV1KindNeverAdmitted WorkResponseRecoveryEffectNeverAdmittedV1Kind = "never_admitted"
+)
+
+// Defines values for WorkResponseRecoveryEffectPartialV1Kind.
+const (
+	WorkResponseRecoveryEffectPartialV1KindPartial WorkResponseRecoveryEffectPartialV1Kind = "partial"
+)
+
+// Defines values for WorkResponseRecoveryEffectUnknownV1Kind.
+const (
+	WorkResponseRecoveryEffectUnknownV1KindUnknown WorkResponseRecoveryEffectUnknownV1Kind = "unknown"
+)
+
+// Defines values for WorkResponseRecoveryLinkSchema.
+const (
+	WorkResponseRecoveryLinkSchemaChioRecoveryObservationV1 WorkResponseRecoveryLinkSchema = "chio.recovery.observation.v1"
+)
+
+// Defines values for WorkResponseRecoveryLinkVersion.
+const (
+	WorkResponseRecoveryLinkVersionN1 WorkResponseRecoveryLinkVersion = 1
+)
+
+// Defines values for WorkResponseRecoveryOperation.
+const (
+	WorkResponseRecoveryOperationCancelWorkflow  WorkResponseRecoveryOperation = "cancel_workflow"
+	WorkResponseRecoveryOperationInspectWorkflow WorkResponseRecoveryOperation = "inspect_workflow"
+	WorkResponseRecoveryOperationResumeWorkflow  WorkResponseRecoveryOperation = "resume_workflow"
+	WorkResponseRecoveryOperationSelectOffer     WorkResponseRecoveryOperation = "select_offer"
+	WorkResponseRecoveryOperationSubmitApproval  WorkResponseRecoveryOperation = "submit_approval"
+)
+
+// Defines values for WorkResponseRefusalCode.
+const (
+	WorkResponseRefusalCodeAudienceDenied     WorkResponseRefusalCode = "audience_denied"
+	WorkResponseRefusalCodeBudgetUnavailable  WorkResponseRefusalCode = "budget_unavailable"
+	WorkResponseRefusalCodeExpired            WorkResponseRefusalCode = "expired"
+	WorkResponseRefusalCodeInvalidEvidence    WorkResponseRefusalCode = "invalid_evidence"
+	WorkResponseRefusalCodeResourceExhausted  WorkResponseRefusalCode = "resource_exhausted"
+	WorkResponseRefusalCodeRevoked            WorkResponseRefusalCode = "revoked"
+	WorkResponseRefusalCodeStaleBasis         WorkResponseRefusalCode = "stale_basis"
+	WorkResponseRefusalCodeUnknownEffect      WorkResponseRefusalCode = "unknown_effect"
+	WorkResponseRefusalCodeUnsupportedProfile WorkResponseRefusalCode = "unsupported_profile"
+)
+
+// Defines values for WorkResponseRejectionCode.
+const (
+	WorkResponseRejectionCodeAudience           WorkResponseRejectionCode = "audience"
+	WorkResponseRejectionCodeBindingMismatch    WorkResponseRejectionCode = "binding_mismatch"
+	WorkResponseRejectionCodeBounds             WorkResponseRejectionCode = "bounds"
+	WorkResponseRejectionCodeBusy               WorkResponseRejectionCode = "busy"
+	WorkResponseRejectionCodeConflict           WorkResponseRejectionCode = "conflict"
+	WorkResponseRejectionCodeCrossTenant        WorkResponseRejectionCode = "cross_tenant"
+	WorkResponseRejectionCodeDuplicateKey       WorkResponseRejectionCode = "duplicate_key"
+	WorkResponseRejectionCodeExpired            WorkResponseRejectionCode = "expired"
+	WorkResponseRejectionCodeIdentifier         WorkResponseRejectionCode = "identifier"
+	WorkResponseRejectionCodeMalformed          WorkResponseRejectionCode = "malformed"
+	WorkResponseRejectionCodeRevoked            WorkResponseRejectionCode = "revoked"
+	WorkResponseRejectionCodeRole               WorkResponseRejectionCode = "role"
+	WorkResponseRejectionCodeSchema             WorkResponseRejectionCode = "schema"
+	WorkResponseRejectionCodeStaleCatalog       WorkResponseRejectionCode = "stale_catalog"
+	WorkResponseRejectionCodeStaleVersion       WorkResponseRejectionCode = "stale_version"
+	WorkResponseRejectionCodeUnsafeInteger      WorkResponseRejectionCode = "unsafe_integer"
+	WorkResponseRejectionCodeUnsupportedProfile WorkResponseRejectionCode = "unsupported_profile"
+)
+
+// Defines values for WorkResponseRelease0Kind.
+const (
+	WorkResponseRelease0KindNotAvailable WorkResponseRelease0Kind = "not_available"
+)
+
+// Defines values for WorkResponseRelease1Kind.
+const (
+	WorkResponseRelease1KindPending WorkResponseRelease1Kind = "pending"
+)
+
+// Defines values for WorkResponseRelease2Kind.
+const (
+	WorkResponseRelease2KindWithheld WorkResponseRelease2Kind = "withheld"
+)
+
+// Defines values for WorkResponseRelease3Kind.
+const (
+	WorkResponseRelease3KindReleased WorkResponseRelease3Kind = "released"
+)
+
+// Defines values for WorkResponseRelease4Kind.
+const (
+	WorkResponseRelease4KindDenied WorkResponseRelease4Kind = "denied"
+)
+
+// Defines values for WorkResponseViewAcceptance0Kind.
+const (
+	WorkResponseViewAcceptance0KindNotApplicable WorkResponseViewAcceptance0Kind = "not_applicable"
+)
+
+// Defines values for WorkResponseViewAcceptance1Kind.
+const (
+	WorkResponseViewAcceptance1KindPending WorkResponseViewAcceptance1Kind = "pending"
+)
+
+// Defines values for WorkResponseViewAcceptance2Kind.
+const (
+	WorkResponseViewAcceptance2KindAvailable WorkResponseViewAcceptance2Kind = "available"
+)
+
+// Defines values for WorkResponseViewAcceptance3Kind.
+const (
+	WorkResponseViewAcceptance3KindUnavailable WorkResponseViewAcceptance3Kind = "unavailable"
+)
+
+// Defines values for WorkResponseViewBilateralDelivery0Kind.
+const (
+	WorkResponseViewBilateralDelivery0KindNotApplicable WorkResponseViewBilateralDelivery0Kind = "not_applicable"
+)
+
+// Defines values for WorkResponseViewBilateralDelivery1Kind.
+const (
+	WorkResponseViewBilateralDelivery1KindPending WorkResponseViewBilateralDelivery1Kind = "pending"
+)
+
+// Defines values for WorkResponseViewBilateralDelivery2Kind.
+const (
+	WorkResponseViewBilateralDelivery2KindAvailable WorkResponseViewBilateralDelivery2Kind = "available"
+)
+
+// Defines values for WorkResponseViewBilateralDelivery2ValueState.
+const (
+	WorkResponseViewBilateralDelivery2ValueStateDelivered WorkResponseViewBilateralDelivery2ValueState = "delivered"
+	WorkResponseViewBilateralDelivery2ValueStateRetained  WorkResponseViewBilateralDelivery2ValueState = "retained"
+)
+
+// Defines values for WorkResponseViewBilateralDelivery3Kind.
+const (
+	WorkResponseViewBilateralDelivery3KindUnavailable WorkResponseViewBilateralDelivery3Kind = "unavailable"
+)
+
+// Defines values for WorkResponseViewExecution0Kind.
+const (
+	WorkResponseViewExecution0KindNotApplicable WorkResponseViewExecution0Kind = "not_applicable"
+)
+
+// Defines values for WorkResponseViewExecution1Kind.
+const (
+	WorkResponseViewExecution1KindPending WorkResponseViewExecution1Kind = "pending"
+)
+
+// Defines values for WorkResponseViewExecution2Kind.
+const (
+	WorkResponseViewExecution2KindAvailable WorkResponseViewExecution2Kind = "available"
+)
+
+// Defines values for WorkResponseViewExecution3Kind.
+const (
+	WorkResponseViewExecution3KindUnavailable WorkResponseViewExecution3Kind = "unavailable"
+)
+
+// Defines values for WorkResponseViewRecovery0Kind.
+const (
+	WorkResponseViewRecovery0KindNotApplicable WorkResponseViewRecovery0Kind = "not_applicable"
+)
+
+// Defines values for WorkResponseViewRecovery1Kind.
+const (
+	WorkResponseViewRecovery1KindPending WorkResponseViewRecovery1Kind = "pending"
+)
+
+// Defines values for WorkResponseViewRecovery2Kind.
+const (
+	WorkResponseViewRecovery2KindAvailable WorkResponseViewRecovery2Kind = "available"
+)
+
+// Defines values for WorkResponseViewRecovery3Kind.
+const (
+	WorkResponseViewRecovery3KindUnavailable WorkResponseViewRecovery3Kind = "unavailable"
+)
+
+// Defines values for WorkResponseViewResultReference0Kind.
+const (
+	WorkResponseViewResultReference0KindNotApplicable WorkResponseViewResultReference0Kind = "not_applicable"
+)
+
+// Defines values for WorkResponseViewResultReference1Kind.
+const (
+	WorkResponseViewResultReference1KindPending WorkResponseViewResultReference1Kind = "pending"
+)
+
+// Defines values for WorkResponseViewResultReference2Kind.
+const (
+	WorkResponseViewResultReference2KindAvailable WorkResponseViewResultReference2Kind = "available"
+)
+
+// Defines values for WorkResponseViewResultReference3Kind.
+const (
+	WorkResponseViewResultReference3KindUnavailable WorkResponseViewResultReference3Kind = "unavailable"
+)
+
+// Defines values for WorkResponseViewSettlement0Kind.
+const (
+	WorkResponseViewSettlement0KindNotApplicable WorkResponseViewSettlement0Kind = "not_applicable"
+)
+
+// Defines values for WorkResponseViewSettlement1Kind.
+const (
+	WorkResponseViewSettlement1KindPending WorkResponseViewSettlement1Kind = "pending"
+)
+
+// Defines values for WorkResponseViewSettlement2Kind.
+const (
+	WorkResponseViewSettlement2KindAvailable WorkResponseViewSettlement2Kind = "available"
+)
+
+// Defines values for WorkResponseViewSettlement3Kind.
+const (
+	WorkResponseViewSettlement3KindUnavailable WorkResponseViewSettlement3Kind = "unavailable"
 )
 
 // AgentActiveResponseGovernedIntent defines model for AgentActiveResponseGovernedIntent.
@@ -16387,6 +16982,1364 @@ type TrustControlTerminate struct {
 // TrustControlTerminateReason Typed reason for releasing the lease. `leader_handoff` covers planned reassignment, `quorum_lost` covers detected loss of cluster quorum, `operator_stepdown` covers explicit operator action, and `term_advanced` covers a higher election term superseding the lease.
 type TrustControlTerminateReason string
 
+// WorkJoinInputs defines model for WorkJoinInputs.
+type WorkJoinInputs struct {
+	GraphSha256 WorkJoinInputsWorkDigest `json:"graph_sha256"`
+	JoinId      WorkJoinInputsWorkId     `json:"join_id"`
+	NextTaskId  WorkJoinInputsWorkId     `json:"next_task_id"`
+	Parents     []struct {
+		AcceptanceEvidenceDigest WorkJoinInputsWorkDigest         `json:"acceptance_evidence_digest"`
+		ArtifactDigest           WorkJoinInputsWorkDigest         `json:"artifact_digest"`
+		ArtifactRef              WorkJoinInputsArtifactVersionRef `json:"artifact_ref"`
+		ReceiptId                WorkJoinInputsWorkId             `json:"receipt_id"`
+		TaskId                   WorkJoinInputsWorkId             `json:"task_id"`
+	} `json:"parents"`
+	Schema  WorkJoinInputsSchema  `json:"schema"`
+	Version WorkJoinInputsVersion `json:"version"`
+}
+
+// WorkJoinInputsSchema defines model for WorkJoinInputs.Schema.
+type WorkJoinInputsSchema string
+
+// WorkJoinInputsVersion defines model for WorkJoinInputs.Version.
+type WorkJoinInputsVersion int64
+
+// WorkJoinInputsArtifactVersionRef defines model for WorkJoinInputsArtifactVersionRef.
+type WorkJoinInputsArtifactVersionRef struct {
+	Artifact   WorkJoinInputsOpaqueId         `json:"artifact"`
+	Provenance WorkJoinInputsRecoveryDigest32 `json:"provenance"`
+	Scope      WorkJoinInputsScope            `json:"scope"`
+	Version    WorkJoinInputsOpaqueId         `json:"version"`
+}
+
+// WorkJoinInputsOpaqueId defines model for WorkJoinInputsOpaqueId.
+type WorkJoinInputsOpaqueId = string
+
+// WorkJoinInputsRecoveryDigest32 defines model for WorkJoinInputsRecoveryDigest32.
+type WorkJoinInputsRecoveryDigest32 = []int64
+
+// WorkJoinInputsScope defines model for WorkJoinInputsScope.
+type WorkJoinInputsScope struct {
+	AuthorityDomain WorkJoinInputsOpaqueId `json:"authority_domain"`
+	ProcessId       WorkJoinInputsOpaqueId `json:"process_id"`
+	TenantId        WorkJoinInputsOpaqueId `json:"tenant_id"`
+}
+
+// WorkJoinInputsWorkDigest defines model for WorkJoinInputsWorkDigest.
+type WorkJoinInputsWorkDigest = string
+
+// WorkJoinInputsWorkId defines model for WorkJoinInputsWorkId.
+type WorkJoinInputsWorkId = string
+
+// WorkRequest defines model for WorkRequest.
+type WorkRequest struct {
+	Body    WorkRequest_Body   `json:"body"`
+	Schema  WorkRequestSchema  `json:"schema"`
+	Version WorkRequestVersion `json:"version"`
+}
+
+// WorkRequestBody0 defines model for .
+type WorkRequestBody0 struct {
+	Kind        WorkRequestBody0Kind `json:"kind"`
+	Preparation struct {
+		CommandId WorkRequestWorkId                       `json:"command_id"`
+		ProgramId WorkRequestWorkId                       `json:"program_id"`
+		Proposal  WorkRequest_Body_0_Preparation_Proposal `json:"proposal"`
+		Schema    WorkRequestBody0PreparationSchema       `json:"schema"`
+		Version   WorkRequestBody0PreparationVersion      `json:"version"`
+	} `json:"preparation"`
+}
+
+// WorkRequestBody0Kind defines model for WorkRequest.Body.0.Kind.
+type WorkRequestBody0Kind string
+
+// WorkRequestBody0PreparationProposal0 defines model for .
+type WorkRequestBody0PreparationProposal0 struct {
+	Child                WorkRequestDelegationRecord              `json:"child"`
+	Kind                 WorkRequestBody0PreparationProposal0Kind `json:"kind"`
+	ParentAllocationHash WorkRequestWorkDigest                    `json:"parent_allocation_hash"`
+	ParentId             WorkRequestWorkSlotId                    `json:"parent_id"`
+}
+
+// WorkRequestBody0PreparationProposal0Kind defines model for WorkRequest.Body.0.Preparation.Proposal.0.Kind.
+type WorkRequestBody0PreparationProposal0Kind string
+
+// WorkRequestBody0PreparationProposal1 defines model for .
+type WorkRequestBody0PreparationProposal1 struct {
+	AllocationHash   WorkRequestWorkDigest                    `json:"allocation_hash"`
+	Arguments        interface{}                              `json:"arguments"`
+	Kind             WorkRequestBody0PreparationProposal1Kind `json:"kind"`
+	ProfileRef       WorkRequestProfileRef                    `json:"profile_ref"`
+	ReceiverKernelId WorkRequestWorkId                        `json:"receiver_kernel_id"`
+	RequestId        WorkRequestOpaqueId                      `json:"request_id"`
+	ServerId         WorkRequestWorkId                        `json:"server_id"`
+	SlotId           WorkRequestWorkSlotId                    `json:"slot_id"`
+	ToolName         WorkRequestWorkId                        `json:"tool_name"`
+}
+
+// WorkRequestBody0PreparationProposal1Kind defines model for WorkRequest.Body.0.Preparation.Proposal.1.Kind.
+type WorkRequestBody0PreparationProposal1Kind string
+
+// WorkRequestBody0PreparationProposal2 defines model for .
+type WorkRequestBody0PreparationProposal2 struct {
+	CapabilityHash   WorkRequestWorkDigest                    `json:"capability_hash"`
+	ExpectedRevision WorkRequestSafeInteger                   `json:"expected_revision"`
+	Kind             WorkRequestBody0PreparationProposal2Kind `json:"kind"`
+	Offer            WorkRequestDelegationRecord              `json:"offer"`
+	RequestId        WorkRequestOpaqueId                      `json:"request_id"`
+}
+
+// WorkRequestBody0PreparationProposal2Kind defines model for WorkRequest.Body.0.Preparation.Proposal.2.Kind.
+type WorkRequestBody0PreparationProposal2Kind string
+
+// WorkRequestBody0PreparationProposal3 defines model for .
+type WorkRequestBody0PreparationProposal3 struct {
+	Dependencies         []WorkRequestGraphRecord                 `json:"dependencies"`
+	ExpectedBundleSha256 WorkRequestWorkDigest                    `json:"expected_bundle_sha256"`
+	JoinDraftRefs        []WorkRequestDraftRef                    `json:"join_draft_refs"`
+	Kind                 WorkRequestBody0PreparationProposal3Kind `json:"kind"`
+	NewWork              []struct {
+		Handle WorkRequestHandle `json:"handle"`
+		TaskId WorkRequestWorkId `json:"task_id"`
+	} `json:"new_work"`
+}
+
+// WorkRequestBody0PreparationProposal3Kind defines model for WorkRequest.Body.0.Preparation.Proposal.3.Kind.
+type WorkRequestBody0PreparationProposal3Kind string
+
+// WorkRequestBody0PreparationProposal4 defines model for .
+type WorkRequestBody0PreparationProposal4 struct {
+	ExpectedBundleSha256 WorkRequestWorkDigest                    `json:"expected_bundle_sha256"`
+	Join                 WorkRequestGraphRecord                   `json:"join"`
+	Kind                 WorkRequestBody0PreparationProposal4Kind `json:"kind"`
+	Parents              []WorkRequestHandle                      `json:"parents"`
+}
+
+// WorkRequestBody0PreparationProposal4Kind defines model for WorkRequest.Body.0.Preparation.Proposal.4.Kind.
+type WorkRequestBody0PreparationProposal4Kind string
+
+// WorkRequestBody0PreparationProposal5 defines model for .
+type WorkRequestBody0PreparationProposal5 struct {
+	Commitment WorkRequestCommitment                           `json:"commitment"`
+	Kind       WorkRequestBody0PreparationProposal5Kind        `json:"kind"`
+	Terms      WorkRequest_Body_0_Preparation_Proposal_5_Terms `json:"terms"`
+}
+
+// WorkRequestBody0PreparationProposal5Kind defines model for WorkRequest.Body.0.Preparation.Proposal.5.Kind.
+type WorkRequestBody0PreparationProposal5Kind string
+
+// WorkRequestBody0PreparationProposal5Terms0 defines model for .
+type WorkRequestBody0PreparationProposal5Terms0 struct {
+	Kind           WorkRequestBody0PreparationProposal5Terms0Kind `json:"kind"`
+	TermsReference WorkRequestWorkId                              `json:"terms_reference"`
+}
+
+// WorkRequestBody0PreparationProposal5Terms0Kind defines model for WorkRequest.Body.0.Preparation.Proposal.5.Terms.0.Kind.
+type WorkRequestBody0PreparationProposal5Terms0Kind string
+
+// WorkRequestBody0PreparationProposal5Terms1 defines model for .
+type WorkRequestBody0PreparationProposal5Terms1 struct {
+	FundingProfileId WorkRequestWorkId                              `json:"funding_profile_id"`
+	Kind             WorkRequestBody0PreparationProposal5Terms1Kind `json:"kind"`
+	TermsReference   WorkRequestWorkId                              `json:"terms_reference"`
+}
+
+// WorkRequestBody0PreparationProposal5Terms1Kind defines model for WorkRequest.Body.0.Preparation.Proposal.5.Terms.1.Kind.
+type WorkRequestBody0PreparationProposal5Terms1Kind string
+
+// WorkRequest_Body_0_Preparation_Proposal_5_Terms defines model for WorkRequest.Body.0.Preparation.Proposal.5.Terms.
+type WorkRequest_Body_0_Preparation_Proposal_5_Terms struct {
+	union json.RawMessage
+}
+
+// WorkRequest_Body_0_Preparation_Proposal defines model for WorkRequest.Body.0.Preparation.Proposal.
+type WorkRequest_Body_0_Preparation_Proposal struct {
+	union json.RawMessage
+}
+
+// WorkRequestBody0PreparationSchema defines model for WorkRequest.Body.0.Preparation.Schema.
+type WorkRequestBody0PreparationSchema string
+
+// WorkRequestBody0PreparationVersion defines model for WorkRequest.Body.0.Preparation.Version.
+type WorkRequestBody0PreparationVersion int64
+
+// WorkRequestBody1 defines model for .
+type WorkRequestBody1 struct {
+	Command struct {
+		Action    WorkRequest_Body_1_Command_Action `json:"action"`
+		CommandId WorkRequestWorkId                 `json:"command_id"`
+		ProgramId WorkRequestWorkId                 `json:"program_id"`
+		Schema    WorkRequestBody1CommandSchema     `json:"schema"`
+		Version   WorkRequestBody1CommandVersion    `json:"version"`
+	} `json:"command"`
+	Kind WorkRequestBody1Kind `json:"kind"`
+}
+
+// WorkRequestBody1CommandAction0 defines model for .
+type WorkRequestBody1CommandAction0 struct {
+	Kind        WorkRequestBody1CommandAction0Kind `json:"kind"`
+	Subdivision WorkRequestDelegationRecord        `json:"subdivision"`
+}
+
+// WorkRequestBody1CommandAction0Kind defines model for WorkRequest.Body.1.Command.Action.0.Kind.
+type WorkRequestBody1CommandAction0Kind string
+
+// WorkRequestBody1CommandAction1 defines model for .
+type WorkRequestBody1CommandAction1 struct {
+	Kind      WorkRequestBody1CommandAction1Kind `json:"kind"`
+	Selection WorkRequestDelegationRecord        `json:"selection"`
+}
+
+// WorkRequestBody1CommandAction1Kind defines model for WorkRequest.Body.1.Command.Action.1.Kind.
+type WorkRequestBody1CommandAction1Kind string
+
+// WorkRequestBody1CommandAction2 defines model for .
+type WorkRequestBody1CommandAction2 struct {
+	Binding WorkRequestDelegationRecord        `json:"binding"`
+	Kind    WorkRequestBody1CommandAction2Kind `json:"kind"`
+}
+
+// WorkRequestBody1CommandAction2Kind defines model for WorkRequest.Body.1.Command.Action.2.Kind.
+type WorkRequestBody1CommandAction2Kind string
+
+// WorkRequestBody1CommandAction3 defines model for .
+type WorkRequestBody1CommandAction3 struct {
+	DraftRef             WorkRequestDraftRef                `json:"draft_ref"`
+	ExpectedBundleSha256 WorkRequestWorkDigest              `json:"expected_bundle_sha256"`
+	Kind                 WorkRequestBody1CommandAction3Kind `json:"kind"`
+}
+
+// WorkRequestBody1CommandAction3Kind defines model for WorkRequest.Body.1.Command.Action.3.Kind.
+type WorkRequestBody1CommandAction3Kind string
+
+// WorkRequestBody1CommandAction4 defines model for .
+type WorkRequestBody1CommandAction4 struct {
+	Commitment WorkRequestCommitment              `json:"commitment"`
+	Kind       WorkRequestBody1CommandAction4Kind `json:"kind"`
+}
+
+// WorkRequestBody1CommandAction4Kind defines model for WorkRequest.Body.1.Command.Action.4.Kind.
+type WorkRequestBody1CommandAction4Kind string
+
+// WorkRequestBody1CommandAction5 defines model for .
+type WorkRequestBody1CommandAction5 struct {
+	Handle WorkRequestHandle                  `json:"handle"`
+	Kind   WorkRequestBody1CommandAction5Kind `json:"kind"`
+}
+
+// WorkRequestBody1CommandAction5Kind defines model for WorkRequest.Body.1.Command.Action.5.Kind.
+type WorkRequestBody1CommandAction5Kind string
+
+// WorkRequestBody1CommandAction6 defines model for .
+type WorkRequestBody1CommandAction6 struct {
+	Handle WorkRequestHandle                  `json:"handle"`
+	Kind   WorkRequestBody1CommandAction6Kind `json:"kind"`
+}
+
+// WorkRequestBody1CommandAction6Kind defines model for WorkRequest.Body.1.Command.Action.6.Kind.
+type WorkRequestBody1CommandAction6Kind string
+
+// WorkRequest_Body_1_Command_Action defines model for WorkRequest.Body.1.Command.Action.
+type WorkRequest_Body_1_Command_Action struct {
+	union json.RawMessage
+}
+
+// WorkRequestBody1CommandSchema defines model for WorkRequest.Body.1.Command.Schema.
+type WorkRequestBody1CommandSchema string
+
+// WorkRequestBody1CommandVersion defines model for WorkRequest.Body.1.Command.Version.
+type WorkRequestBody1CommandVersion int64
+
+// WorkRequestBody1Kind defines model for WorkRequest.Body.1.Kind.
+type WorkRequestBody1Kind string
+
+// WorkRequestBody2 defines model for .
+type WorkRequestBody2 struct {
+	Kind  WorkRequestBody2Kind     `json:"kind"`
+	Query WorkRequest_Body_2_Query `json:"query"`
+}
+
+// WorkRequestBody2Kind defines model for WorkRequest.Body.2.Kind.
+type WorkRequestBody2Kind string
+
+// WorkRequestBody2Query0 defines model for .
+type WorkRequestBody2Query0 struct {
+	Handle WorkRequestHandle          `json:"handle"`
+	Kind   WorkRequestBody2Query0Kind `json:"kind"`
+}
+
+// WorkRequestBody2Query0Kind defines model for WorkRequest.Body.2.Query.0.Kind.
+type WorkRequestBody2Query0Kind string
+
+// WorkRequestBody2Query1 defines model for .
+type WorkRequestBody2Query1 struct {
+	CommandRef WorkRequestCommandRef      `json:"command_ref"`
+	Kind       WorkRequestBody2Query1Kind `json:"kind"`
+}
+
+// WorkRequestBody2Query1Kind defines model for WorkRequest.Body.2.Query.1.Kind.
+type WorkRequestBody2Query1Kind string
+
+// WorkRequestBody2Query2 defines model for .
+type WorkRequestBody2Query2 struct {
+	Kind           WorkRequestBody2Query2Kind `json:"kind"`
+	PreparationRef WorkRequestPreparationRef  `json:"preparation_ref"`
+}
+
+// WorkRequestBody2Query2Kind defines model for WorkRequest.Body.2.Query.2.Kind.
+type WorkRequestBody2Query2Kind string
+
+// WorkRequestBody2Query3 defines model for .
+type WorkRequestBody2Query3 struct {
+	CatalogRef WorkRequestCatalogRef      `json:"catalog_ref"`
+	Cursor     *WorkRequestCatalogCursor  `json:"cursor,omitempty"`
+	Kind       WorkRequestBody2Query3Kind `json:"kind"`
+}
+
+// WorkRequestBody2Query3Kind defines model for WorkRequest.Body.2.Query.3.Kind.
+type WorkRequestBody2Query3Kind string
+
+// WorkRequestBody2Query4 defines model for .
+type WorkRequestBody2Query4 struct {
+	Kind       WorkRequestBody2Query4Kind `json:"kind"`
+	ProfileRef WorkRequestProfileRef      `json:"profile_ref"`
+}
+
+// WorkRequestBody2Query4Kind defines model for WorkRequest.Body.2.Query.4.Kind.
+type WorkRequestBody2Query4Kind string
+
+// WorkRequest_Body_2_Query defines model for WorkRequest.Body.2.Query.
+type WorkRequest_Body_2_Query struct {
+	union json.RawMessage
+}
+
+// WorkRequest_Body defines model for WorkRequest.Body.
+type WorkRequest_Body struct {
+	union json.RawMessage
+}
+
+// WorkRequestSchema defines model for WorkRequest.Schema.
+type WorkRequestSchema string
+
+// WorkRequestVersion defines model for WorkRequest.Version.
+type WorkRequestVersion int64
+
+// WorkRequestCatalogCursor defines model for WorkRequestCatalogCursor.
+type WorkRequestCatalogCursor struct {
+	CatalogGeneration WorkRequestPolicyGeneration `json:"catalog_generation"`
+	Position          WorkRequestWorkDigest       `json:"position"`
+}
+
+// WorkRequestCatalogRef defines model for WorkRequestCatalogRef.
+type WorkRequestCatalogRef struct {
+	CatalogId WorkRequestWorkId `json:"catalog_id"`
+	Owner     WorkRequestWorkId `json:"owner"`
+}
+
+// WorkRequestCommandRef defines model for WorkRequestCommandRef.
+type WorkRequestCommandRef struct {
+	CommandDigest WorkRequestWorkDigest `json:"command_digest"`
+	CommandId     WorkRequestWorkId     `json:"command_id"`
+	ProgramId     WorkRequestWorkId     `json:"program_id"`
+}
+
+// WorkRequestCommitment defines model for WorkRequestCommitment.
+type WorkRequestCommitment struct {
+	Funding       *WorkRequestFundingRef      `json:"funding,omitempty"`
+	GraphRef      WorkRequestWorkDigest       `json:"graph_ref"`
+	Handle        WorkRequestHandle           `json:"handle"`
+	InvocationRef WorkRequestWorkDigest       `json:"invocation_ref"`
+	Permit        WorkRequestDelegationRecord `json:"permit"`
+	ProfileRef    WorkRequestProfileRef       `json:"profile_ref"`
+}
+
+// WorkRequestDelegationRecord defines model for WorkRequestDelegationRecord.
+type WorkRequestDelegationRecord = map[string]interface{}
+
+// WorkRequestDraftRef defines model for WorkRequestDraftRef.
+type WorkRequestDraftRef struct {
+	DraftId     WorkRequestWorkId     `json:"draft_id"`
+	GraphSha256 WorkRequestWorkDigest `json:"graph_sha256"`
+}
+
+// WorkRequestFundingRef defines model for WorkRequestFundingRef.
+type WorkRequestFundingRef struct {
+	AgreementDigest WorkRequestWorkDigest `json:"agreement_digest"`
+	Rail            WorkRequestWorkId     `json:"rail"`
+	ReserveRef      WorkRequestWorkId     `json:"reserve_ref"`
+}
+
+// WorkRequestGraphRecord defines model for WorkRequestGraphRecord.
+type WorkRequestGraphRecord = map[string]interface{}
+
+// WorkRequestHandle defines model for WorkRequestHandle.
+type WorkRequestHandle struct {
+	AllocationHash   WorkRequestWorkDigest `json:"allocation_hash"`
+	ProgramId        WorkRequestWorkId     `json:"program_id"`
+	ReceiverKernelId WorkRequestWorkId     `json:"receiver_kernel_id"`
+	RequestId        WorkRequestOpaqueId   `json:"request_id"`
+	SlotId           WorkRequestWorkSlotId `json:"slot_id"`
+}
+
+// WorkRequestOpaqueId defines model for WorkRequestOpaqueId.
+type WorkRequestOpaqueId = string
+
+// WorkRequestPolicyGeneration defines model for WorkRequestPolicyGeneration.
+type WorkRequestPolicyGeneration = int64
+
+// WorkRequestPreparationRef defines model for WorkRequestPreparationRef.
+type WorkRequestPreparationRef struct {
+	CommandDigest WorkRequestWorkDigest `json:"command_digest"`
+	PreparationId WorkRequestWorkId     `json:"preparation_id"`
+	ProgramId     WorkRequestWorkId     `json:"program_id"`
+}
+
+// WorkRequestProfileRef defines model for WorkRequestProfileRef.
+type WorkRequestProfileRef struct {
+	CatalogEntry     WorkRequestWorkId           `json:"catalog_entry"`
+	DeploymentDigest WorkRequestRecoveryDigest32 `json:"deployment_digest"`
+	Owner            WorkRequestWorkId           `json:"owner"`
+	PolicyGeneration WorkRequestPolicyGeneration `json:"policy_generation"`
+	ProfileDigest    WorkRequestRecoveryDigest32 `json:"profile_digest"`
+}
+
+// WorkRequestRecoveryDigest32 defines model for WorkRequestRecoveryDigest32.
+type WorkRequestRecoveryDigest32 = []int64
+
+// WorkRequestSafeInteger defines model for WorkRequestSafeInteger.
+type WorkRequestSafeInteger = int64
+
+// WorkRequestWorkDigest defines model for WorkRequestWorkDigest.
+type WorkRequestWorkDigest = string
+
+// WorkRequestWorkId defines model for WorkRequestWorkId.
+type WorkRequestWorkId = string
+
+// WorkRequestWorkSlotId defines model for WorkRequestWorkSlotId.
+type WorkRequestWorkSlotId = string
+
+// WorkResponse defines model for WorkResponse.
+type WorkResponse struct {
+	Body    WorkResponse_Body   `json:"body"`
+	Schema  WorkResponseSchema  `json:"schema"`
+	Version WorkResponseVersion `json:"version"`
+}
+
+// WorkResponseBody0 defines model for .
+type WorkResponseBody0 struct {
+	Kind     WorkResponseBody0Kind `json:"kind"`
+	Prepared WorkResponsePrepared  `json:"prepared"`
+}
+
+// WorkResponseBody0Kind defines model for WorkResponse.Body.0.Kind.
+type WorkResponseBody0Kind string
+
+// WorkResponseBody1 defines model for .
+type WorkResponseBody1 struct {
+	Kind   WorkResponseBody1Kind     `json:"kind"`
+	Result WorkResponseCommandResult `json:"result"`
+}
+
+// WorkResponseBody1Kind defines model for WorkResponse.Body.1.Kind.
+type WorkResponseBody1Kind string
+
+// WorkResponseBody2 defines model for .
+type WorkResponseBody2 struct {
+	Kind   WorkResponseBody2Kind      `json:"kind"`
+	Result WorkResponse_Body_2_Result `json:"result"`
+}
+
+// WorkResponseBody2Kind defines model for WorkResponse.Body.2.Kind.
+type WorkResponseBody2Kind string
+
+// WorkResponseBody2Result0 defines model for .
+type WorkResponseBody2Result0 struct {
+	Kind WorkResponseBody2Result0Kind `json:"kind"`
+	View WorkResponseView             `json:"view"`
+}
+
+// WorkResponseBody2Result0Kind defines model for WorkResponse.Body.2.Result.0.Kind.
+type WorkResponseBody2Result0Kind string
+
+// WorkResponseBody2Result1 defines model for .
+type WorkResponseBody2Result1 struct {
+	Kind   WorkResponseBody2Result1Kind `json:"kind"`
+	Result WorkResponseCommandResult    `json:"result"`
+}
+
+// WorkResponseBody2Result1Kind defines model for WorkResponse.Body.2.Result.1.Kind.
+type WorkResponseBody2Result1Kind string
+
+// WorkResponseBody2Result2 defines model for .
+type WorkResponseBody2Result2 struct {
+	Kind     WorkResponseBody2Result2Kind `json:"kind"`
+	Prepared WorkResponsePrepared         `json:"prepared"`
+}
+
+// WorkResponseBody2Result2Kind defines model for WorkResponse.Body.2.Result.2.Kind.
+type WorkResponseBody2Result2Kind string
+
+// WorkResponseBody2Result3 defines model for .
+type WorkResponseBody2Result3 struct {
+	Kind WorkResponseBody2Result3Kind `json:"kind"`
+	Page WorkResponseCatalogPage      `json:"page"`
+}
+
+// WorkResponseBody2Result3Kind defines model for WorkResponse.Body.2.Result.3.Kind.
+type WorkResponseBody2Result3Kind string
+
+// WorkResponseBody2Result4 defines model for .
+type WorkResponseBody2Result4 struct {
+	Kind    WorkResponseBody2Result4Kind `json:"kind"`
+	Profile WorkResponseProfile          `json:"profile"`
+}
+
+// WorkResponseBody2Result4Kind defines model for WorkResponse.Body.2.Result.4.Kind.
+type WorkResponseBody2Result4Kind string
+
+// WorkResponseBody2Result5 defines model for .
+type WorkResponseBody2Result5 struct {
+	Code WorkResponseRejectionCode    `json:"code"`
+	Kind WorkResponseBody2Result5Kind `json:"kind"`
+}
+
+// WorkResponseBody2Result5Kind defines model for WorkResponse.Body.2.Result.5.Kind.
+type WorkResponseBody2Result5Kind string
+
+// WorkResponse_Body_2_Result defines model for WorkResponse.Body.2.Result.
+type WorkResponse_Body_2_Result struct {
+	union json.RawMessage
+}
+
+// WorkResponse_Body defines model for WorkResponse.Body.
+type WorkResponse_Body struct {
+	union json.RawMessage
+}
+
+// WorkResponseSchema defines model for WorkResponse.Schema.
+type WorkResponseSchema string
+
+// WorkResponseVersion defines model for WorkResponse.Version.
+type WorkResponseVersion int64
+
+// WorkResponseAcceptance defines model for WorkResponseAcceptance.
+type WorkResponseAcceptance struct {
+	Artifact        WorkResponseArtifactVersionRef `json:"artifact"`
+	ArtifactDigest  WorkResponseWorkDigest         `json:"artifact_digest"`
+	ContractDigest  WorkResponseRecoveryDigest32   `json:"contract_digest"`
+	Decision        WorkResponseAcceptanceDecision `json:"decision"`
+	Evaluator       WorkResponseOpaqueId           `json:"evaluator"`
+	Evidence        []WorkResponseOpaqueId         `json:"evidence"`
+	Handle          WorkResponseHandle             `json:"handle"`
+	ProcedureDigest WorkResponseWorkDigest         `json:"procedure_digest"`
+	Producer        WorkResponseOperation          `json:"producer"`
+}
+
+// WorkResponseAcceptanceDecision defines model for WorkResponseAcceptance.Decision.
+type WorkResponseAcceptanceDecision string
+
+// WorkResponseArtifactVersionRef defines model for WorkResponseArtifactVersionRef.
+type WorkResponseArtifactVersionRef struct {
+	Artifact   WorkResponseOpaqueId         `json:"artifact"`
+	Provenance WorkResponseRecoveryDigest32 `json:"provenance"`
+	Scope      WorkResponseScope            `json:"scope"`
+	Version    WorkResponseOpaqueId         `json:"version"`
+}
+
+// WorkResponseBindingField defines model for WorkResponseBindingField.
+type WorkResponseBindingField string
+
+// WorkResponseCatalogCursor defines model for WorkResponseCatalogCursor.
+type WorkResponseCatalogCursor struct {
+	CatalogGeneration WorkResponsePolicyGeneration `json:"catalog_generation"`
+	Position          WorkResponseWorkDigest       `json:"position"`
+}
+
+// WorkResponseCatalogPage defines model for WorkResponseCatalogPage.
+type WorkResponseCatalogPage struct {
+	CatalogRef WorkResponseCatalogRef     `json:"catalog_ref"`
+	Entries    []WorkResponseProfileRef   `json:"entries"`
+	Next       *WorkResponseCatalogCursor `json:"next,omitempty"`
+}
+
+// WorkResponseCatalogRef defines model for WorkResponseCatalogRef.
+type WorkResponseCatalogRef struct {
+	CatalogId WorkResponseWorkId `json:"catalog_id"`
+	Owner     WorkResponseWorkId `json:"owner"`
+}
+
+// WorkResponseCommandRef defines model for WorkResponseCommandRef.
+type WorkResponseCommandRef struct {
+	CommandDigest WorkResponseWorkDigest `json:"command_digest"`
+	CommandId     WorkResponseWorkId     `json:"command_id"`
+	ProgramId     WorkResponseWorkId     `json:"program_id"`
+}
+
+// WorkResponseCommandResult defines model for WorkResponseCommandResult.
+type WorkResponseCommandResult struct {
+	CommandRef WorkResponseCommandRef            `json:"command_ref"`
+	Outcome    WorkResponseCommandResult_Outcome `json:"outcome"`
+}
+
+// WorkResponseCommandResultOutcome0 defines model for .
+type WorkResponseCommandResultOutcome0 struct {
+	Kind     WorkResponseCommandResultOutcome0Kind      `json:"kind"`
+	Result   WorkResponseCommandResult_Outcome_0_Result `json:"result"`
+	Revision WorkResponseSafeInteger                    `json:"revision"`
+}
+
+// WorkResponseCommandResultOutcome0Kind defines model for WorkResponseCommandResult.Outcome.0.Kind.
+type WorkResponseCommandResultOutcome0Kind string
+
+// WorkResponseCommandResultOutcome0Result0 defines model for .
+type WorkResponseCommandResultOutcome0Result0 struct {
+	Kind WorkResponseCommandResultOutcome0Result0Kind `json:"kind"`
+	Slot WorkResponseDelegationRecord                 `json:"slot"`
+}
+
+// WorkResponseCommandResultOutcome0Result0Kind defines model for WorkResponseCommandResult.Outcome.0.Result.0.Kind.
+type WorkResponseCommandResultOutcome0Result0Kind string
+
+// WorkResponseCommandResultOutcome0Result1 defines model for .
+type WorkResponseCommandResultOutcome0Result1 struct {
+	Kind     WorkResponseCommandResultOutcome0Result1Kind `json:"kind"`
+	Revision WorkResponseSafeInteger                      `json:"revision"`
+}
+
+// WorkResponseCommandResultOutcome0Result1Kind defines model for WorkResponseCommandResult.Outcome.0.Result.1.Kind.
+type WorkResponseCommandResultOutcome0Result1Kind string
+
+// WorkResponseCommandResultOutcome0Result2 defines model for .
+type WorkResponseCommandResultOutcome0Result2 struct {
+	Kind   WorkResponseCommandResultOutcome0Result2Kind `json:"kind"`
+	Permit WorkResponseDelegationRecord                 `json:"permit"`
+}
+
+// WorkResponseCommandResultOutcome0Result2Kind defines model for WorkResponseCommandResult.Outcome.0.Result.2.Kind.
+type WorkResponseCommandResultOutcome0Result2Kind string
+
+// WorkResponseCommandResultOutcome0Result3 defines model for .
+type WorkResponseCommandResultOutcome0Result3 struct {
+	BundleSha256 WorkResponseWorkDigest                       `json:"bundle_sha256"`
+	Kind         WorkResponseCommandResultOutcome0Result3Kind `json:"kind"`
+}
+
+// WorkResponseCommandResultOutcome0Result3Kind defines model for WorkResponseCommandResult.Outcome.0.Result.3.Kind.
+type WorkResponseCommandResultOutcome0Result3Kind string
+
+// WorkResponseCommandResultOutcome0Result4 defines model for .
+type WorkResponseCommandResultOutcome0Result4 struct {
+	Kind              WorkResponseCommandResultOutcome0Result4Kind `json:"kind"`
+	OwnerOperationRef WorkResponseOwnerOperationRef                `json:"owner_operation_ref"`
+}
+
+// WorkResponseCommandResultOutcome0Result4Kind defines model for WorkResponseCommandResult.Outcome.0.Result.4.Kind.
+type WorkResponseCommandResultOutcome0Result4Kind string
+
+// WorkResponseCommandResultOutcome0Result5 defines model for .
+type WorkResponseCommandResultOutcome0Result5 struct {
+	Kind WorkResponseCommandResultOutcome0Result5Kind `json:"kind"`
+	View WorkResponseView                             `json:"view"`
+}
+
+// WorkResponseCommandResultOutcome0Result5Kind defines model for WorkResponseCommandResult.Outcome.0.Result.5.Kind.
+type WorkResponseCommandResultOutcome0Result5Kind string
+
+// WorkResponseCommandResultOutcome0Result6 defines model for .
+type WorkResponseCommandResultOutcome0Result6 struct {
+	Control WorkResponseControl                          `json:"control"`
+	Kind    WorkResponseCommandResultOutcome0Result6Kind `json:"kind"`
+}
+
+// WorkResponseCommandResultOutcome0Result6Kind defines model for WorkResponseCommandResult.Outcome.0.Result.6.Kind.
+type WorkResponseCommandResultOutcome0Result6Kind string
+
+// WorkResponseCommandResult_Outcome_0_Result defines model for WorkResponseCommandResult.Outcome.0.Result.
+type WorkResponseCommandResult_Outcome_0_Result struct {
+	union json.RawMessage
+}
+
+// WorkResponseCommandResultOutcome1 defines model for .
+type WorkResponseCommandResultOutcome1 struct {
+	Kind              WorkResponseCommandResultOutcome1Kind `json:"kind"`
+	OwnerOperationRef WorkResponseOwnerOperationRef         `json:"owner_operation_ref"`
+}
+
+// WorkResponseCommandResultOutcome1Kind defines model for WorkResponseCommandResult.Outcome.1.Kind.
+type WorkResponseCommandResultOutcome1Kind string
+
+// WorkResponseCommandResultOutcome2 defines model for .
+type WorkResponseCommandResultOutcome2 struct {
+	Kind      WorkResponseCommandResultOutcome2Kind `json:"kind"`
+	Rejection WorkResponseRejection                 `json:"rejection"`
+}
+
+// WorkResponseCommandResultOutcome2Kind defines model for WorkResponseCommandResult.Outcome.2.Kind.
+type WorkResponseCommandResultOutcome2Kind string
+
+// WorkResponseCommandResult_Outcome defines model for WorkResponseCommandResult.Outcome.
+type WorkResponseCommandResult_Outcome struct {
+	union json.RawMessage
+}
+
+// WorkResponseControl defines model for WorkResponseControl.
+type WorkResponseControl string
+
+// WorkResponseDelegationRecord defines model for WorkResponseDelegationRecord.
+type WorkResponseDelegationRecord = map[string]interface{}
+
+// WorkResponseDraftRef defines model for WorkResponseDraftRef.
+type WorkResponseDraftRef struct {
+	DraftId     WorkResponseWorkId     `json:"draft_id"`
+	GraphSha256 WorkResponseWorkDigest `json:"graph_sha256"`
+}
+
+// WorkResponseEffect defines model for WorkResponseEffect.
+type WorkResponseEffect struct {
+	union json.RawMessage
+}
+
+// WorkResponseHandle defines model for WorkResponseHandle.
+type WorkResponseHandle struct {
+	AllocationHash   WorkResponseWorkDigest `json:"allocation_hash"`
+	ProgramId        WorkResponseWorkId     `json:"program_id"`
+	ReceiverKernelId WorkResponseWorkId     `json:"receiver_kernel_id"`
+	RequestId        WorkResponseOpaqueId   `json:"request_id"`
+	SlotId           WorkResponseWorkSlotId `json:"slot_id"`
+}
+
+// WorkResponseOpaqueId defines model for WorkResponseOpaqueId.
+type WorkResponseOpaqueId = string
+
+// WorkResponseOperation defines model for WorkResponseOperation.
+type WorkResponseOperation struct {
+	NativeAdmissionDigest WorkResponseRecoveryDigest32 `json:"native_admission_digest"`
+	OperationId           WorkResponseOpaqueId         `json:"operation_id"`
+	OperationVersion      int64                        `json:"operation_version"`
+}
+
+// WorkResponseOwnerOperationRef defines model for WorkResponseOwnerOperationRef.
+type WorkResponseOwnerOperationRef struct {
+	Operation WorkResponseOperation `json:"operation"`
+	Scope     WorkResponseScope     `json:"scope"`
+}
+
+// WorkResponsePolicyGeneration defines model for WorkResponsePolicyGeneration.
+type WorkResponsePolicyGeneration = int64
+
+// WorkResponsePreparationRef defines model for WorkResponsePreparationRef.
+type WorkResponsePreparationRef struct {
+	CommandDigest WorkResponseWorkDigest `json:"command_digest"`
+	PreparationId WorkResponseWorkId     `json:"preparation_id"`
+	ProgramId     WorkResponseWorkId     `json:"program_id"`
+}
+
+// WorkResponsePrepared defines model for WorkResponsePrepared.
+type WorkResponsePrepared struct {
+	union json.RawMessage
+}
+
+// WorkResponsePrepared0 defines model for .
+type WorkResponsePrepared0 struct {
+	Artifact       WorkResponsePrepared_0_Artifact `json:"artifact"`
+	Kind           WorkResponsePrepared0Kind       `json:"kind"`
+	PreparationRef WorkResponsePreparationRef      `json:"preparation_ref"`
+}
+
+// WorkResponsePrepared0Artifact0 defines model for .
+type WorkResponsePrepared0Artifact0 struct {
+	Kind        WorkResponsePrepared0Artifact0Kind `json:"kind"`
+	Subdivision WorkResponseDelegationRecord       `json:"subdivision"`
+}
+
+// WorkResponsePrepared0Artifact0Kind defines model for WorkResponsePrepared.0.Artifact.0.Kind.
+type WorkResponsePrepared0Artifact0Kind string
+
+// WorkResponsePrepared0Artifact1 defines model for .
+type WorkResponsePrepared0Artifact1 struct {
+	InvocationRef WorkResponseWorkDigest             `json:"invocation_ref"`
+	Kind          WorkResponsePrepared0Artifact1Kind `json:"kind"`
+	Offer         WorkResponseDelegationRecord       `json:"offer"`
+}
+
+// WorkResponsePrepared0Artifact1Kind defines model for WorkResponsePrepared.0.Artifact.1.Kind.
+type WorkResponsePrepared0Artifact1Kind string
+
+// WorkResponsePrepared0Artifact2 defines model for .
+type WorkResponsePrepared0Artifact2 struct {
+	Kind      WorkResponsePrepared0Artifact2Kind `json:"kind"`
+	Selection WorkResponseDelegationRecord       `json:"selection"`
+}
+
+// WorkResponsePrepared0Artifact2Kind defines model for WorkResponsePrepared.0.Artifact.2.Kind.
+type WorkResponsePrepared0Artifact2Kind string
+
+// WorkResponsePrepared0Artifact3 defines model for .
+type WorkResponsePrepared0Artifact3 struct {
+	DraftRef WorkResponseDraftRef               `json:"draft_ref"`
+	Kind     WorkResponsePrepared0Artifact3Kind `json:"kind"`
+}
+
+// WorkResponsePrepared0Artifact3Kind defines model for WorkResponsePrepared.0.Artifact.3.Kind.
+type WorkResponsePrepared0Artifact3Kind string
+
+// WorkResponsePrepared0Artifact4 defines model for .
+type WorkResponsePrepared0Artifact4 struct {
+	DraftRef WorkResponseDraftRef               `json:"draft_ref"`
+	Kind     WorkResponsePrepared0Artifact4Kind `json:"kind"`
+}
+
+// WorkResponsePrepared0Artifact4Kind defines model for WorkResponsePrepared.0.Artifact.4.Kind.
+type WorkResponsePrepared0Artifact4Kind string
+
+// WorkResponsePrepared0Artifact5 defines model for .
+type WorkResponsePrepared0Artifact5 struct {
+	AgreementDigest WorkResponseWorkDigest             `json:"agreement_digest"`
+	Kind            WorkResponsePrepared0Artifact5Kind `json:"kind"`
+}
+
+// WorkResponsePrepared0Artifact5Kind defines model for WorkResponsePrepared.0.Artifact.5.Kind.
+type WorkResponsePrepared0Artifact5Kind string
+
+// WorkResponsePrepared_0_Artifact defines model for WorkResponsePrepared.0.Artifact.
+type WorkResponsePrepared_0_Artifact struct {
+	union json.RawMessage
+}
+
+// WorkResponsePrepared0Kind defines model for WorkResponsePrepared.0.Kind.
+type WorkResponsePrepared0Kind string
+
+// WorkResponsePrepared1 defines model for .
+type WorkResponsePrepared1 struct {
+	Kind              WorkResponsePrepared1Kind     `json:"kind"`
+	OwnerOperationRef WorkResponseOwnerOperationRef `json:"owner_operation_ref"`
+	PreparationRef    WorkResponsePreparationRef    `json:"preparation_ref"`
+}
+
+// WorkResponsePrepared1Kind defines model for WorkResponsePrepared.1.Kind.
+type WorkResponsePrepared1Kind string
+
+// WorkResponsePrepared2 defines model for .
+type WorkResponsePrepared2 struct {
+	Kind           WorkResponsePrepared2Kind  `json:"kind"`
+	PreparationRef WorkResponsePreparationRef `json:"preparation_ref"`
+	Rejection      WorkResponseRejection      `json:"rejection"`
+}
+
+// WorkResponsePrepared2Kind defines model for WorkResponsePrepared.2.Kind.
+type WorkResponsePrepared2Kind string
+
+// WorkResponseProfile defines model for WorkResponseProfile.
+type WorkResponseProfile struct {
+	AcceptanceProcedure WorkResponseWorkDigest `json:"acceptance_procedure"`
+	Conditions          []struct {
+		Enforcement     WorkResponseProfileConditionsEnforcement `json:"enforcement"`
+		Source          WorkResponseWorkId                       `json:"source"`
+		StatementDigest WorkResponseWorkDigest                   `json:"statement_digest"`
+	} `json:"conditions"`
+	Currency             WorkResponseWorkId              `json:"currency"`
+	FundingProfileId     *WorkResponseWorkId             `json:"funding_profile_id,omitempty"`
+	ImplementationDigest WorkResponseWorkDigest          `json:"implementation_digest"`
+	MaxUnits             WorkResponseSafeInteger         `json:"max_units"`
+	ProfileRef           WorkResponseProfileRef          `json:"profile_ref"`
+	RecoveryOperations   []WorkResponseRecoveryOperation `json:"recovery_operations"`
+	ServerId             WorkResponseWorkId              `json:"server_id"`
+	ToolName             WorkResponseWorkId              `json:"tool_name"`
+	ToolSchemaDigest     WorkResponseWorkDigest          `json:"tool_schema_digest"`
+	ValidUntilUnixMs     WorkResponseSafeInteger         `json:"valid_until_unix_ms"`
+}
+
+// WorkResponseProfileConditionsEnforcement defines model for WorkResponseProfile.Conditions.Enforcement.
+type WorkResponseProfileConditionsEnforcement string
+
+// WorkResponseProfileRef defines model for WorkResponseProfileRef.
+type WorkResponseProfileRef struct {
+	CatalogEntry     WorkResponseWorkId           `json:"catalog_entry"`
+	DeploymentDigest WorkResponseRecoveryDigest32 `json:"deployment_digest"`
+	Owner            WorkResponseWorkId           `json:"owner"`
+	PolicyGeneration WorkResponsePolicyGeneration `json:"policy_generation"`
+	ProfileDigest    WorkResponseRecoveryDigest32 `json:"profile_digest"`
+}
+
+// WorkResponseRecoveryDigest32 defines model for WorkResponseRecoveryDigest32.
+type WorkResponseRecoveryDigest32 = []int64
+
+// WorkResponseRecoveryEffectAdmissionUnresolvedV1 defines model for WorkResponseRecoveryEffectAdmissionUnresolvedV1.
+type WorkResponseRecoveryEffectAdmissionUnresolvedV1 struct {
+	AdmissionIntent WorkResponseOpaqueId                                `json:"admission_intent"`
+	Kind            WorkResponseRecoveryEffectAdmissionUnresolvedV1Kind `json:"kind"`
+}
+
+// WorkResponseRecoveryEffectAdmissionUnresolvedV1Kind defines model for WorkResponseRecoveryEffectAdmissionUnresolvedV1.Kind.
+type WorkResponseRecoveryEffectAdmissionUnresolvedV1Kind string
+
+// WorkResponseRecoveryEffectAwaitingApprovalV1 defines model for WorkResponseRecoveryEffectAwaitingApprovalV1.
+type WorkResponseRecoveryEffectAwaitingApprovalV1 struct {
+	Kind      WorkResponseRecoveryEffectAwaitingApprovalV1Kind `json:"kind"`
+	Operation WorkResponseOperation                            `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectAwaitingApprovalV1Kind defines model for WorkResponseRecoveryEffectAwaitingApprovalV1.Kind.
+type WorkResponseRecoveryEffectAwaitingApprovalV1Kind string
+
+// WorkResponseRecoveryEffectAwaitingCallerReportV1 defines model for WorkResponseRecoveryEffectAwaitingCallerReportV1.
+type WorkResponseRecoveryEffectAwaitingCallerReportV1 struct {
+	Kind      WorkResponseRecoveryEffectAwaitingCallerReportV1Kind `json:"kind"`
+	Operation WorkResponseOperation                                `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectAwaitingCallerReportV1Kind defines model for WorkResponseRecoveryEffectAwaitingCallerReportV1.Kind.
+type WorkResponseRecoveryEffectAwaitingCallerReportV1Kind string
+
+// WorkResponseRecoveryEffectClosedBeforeEffectV1 defines model for WorkResponseRecoveryEffectClosedBeforeEffectV1.
+type WorkResponseRecoveryEffectClosedBeforeEffectV1 struct {
+	Closure   WorkResponseOpaqueId                               `json:"closure"`
+	Kind      WorkResponseRecoveryEffectClosedBeforeEffectV1Kind `json:"kind"`
+	Operation WorkResponseOperation                              `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectClosedBeforeEffectV1Kind defines model for WorkResponseRecoveryEffectClosedBeforeEffectV1.Kind.
+type WorkResponseRecoveryEffectClosedBeforeEffectV1Kind string
+
+// WorkResponseRecoveryEffectCompleteV1 defines model for WorkResponseRecoveryEffectCompleteV1.
+type WorkResponseRecoveryEffectCompleteV1 struct {
+	EffectCount WorkResponseSafeInteger                  `json:"effect_count"`
+	Kind        WorkResponseRecoveryEffectCompleteV1Kind `json:"kind"`
+	Operation   WorkResponseOperation                    `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectCompleteV1Kind defines model for WorkResponseRecoveryEffectCompleteV1.Kind.
+type WorkResponseRecoveryEffectCompleteV1Kind string
+
+// WorkResponseRecoveryEffectFailedAfterEffectV1 defines model for WorkResponseRecoveryEffectFailedAfterEffectV1.
+type WorkResponseRecoveryEffectFailedAfterEffectV1 struct {
+	AppliedEffects int64                                             `json:"applied_effects"`
+	Kind           WorkResponseRecoveryEffectFailedAfterEffectV1Kind `json:"kind"`
+	Operation      WorkResponseOperation                             `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectFailedAfterEffectV1Kind defines model for WorkResponseRecoveryEffectFailedAfterEffectV1.Kind.
+type WorkResponseRecoveryEffectFailedAfterEffectV1Kind string
+
+// WorkResponseRecoveryEffectInFlightV1 defines model for WorkResponseRecoveryEffectInFlightV1.
+type WorkResponseRecoveryEffectInFlightV1 struct {
+	Kind      WorkResponseRecoveryEffectInFlightV1Kind `json:"kind"`
+	Operation WorkResponseOperation                    `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectInFlightV1Kind defines model for WorkResponseRecoveryEffectInFlightV1.Kind.
+type WorkResponseRecoveryEffectInFlightV1Kind string
+
+// WorkResponseRecoveryEffectNeverAdmittedV1 defines model for WorkResponseRecoveryEffectNeverAdmittedV1.
+type WorkResponseRecoveryEffectNeverAdmittedV1 struct {
+	Kind WorkResponseRecoveryEffectNeverAdmittedV1Kind `json:"kind"`
+}
+
+// WorkResponseRecoveryEffectNeverAdmittedV1Kind defines model for WorkResponseRecoveryEffectNeverAdmittedV1.Kind.
+type WorkResponseRecoveryEffectNeverAdmittedV1Kind string
+
+// WorkResponseRecoveryEffectPartialV1 defines model for WorkResponseRecoveryEffectPartialV1.
+type WorkResponseRecoveryEffectPartialV1 struct {
+	AppliedEffects int64                                   `json:"applied_effects"`
+	Kind           WorkResponseRecoveryEffectPartialV1Kind `json:"kind"`
+	Operation      WorkResponseOperation                   `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectPartialV1Kind defines model for WorkResponseRecoveryEffectPartialV1.Kind.
+type WorkResponseRecoveryEffectPartialV1Kind string
+
+// WorkResponseRecoveryEffectUnknownV1 defines model for WorkResponseRecoveryEffectUnknownV1.
+type WorkResponseRecoveryEffectUnknownV1 struct {
+	Kind      WorkResponseRecoveryEffectUnknownV1Kind `json:"kind"`
+	Operation WorkResponseOperation                   `json:"operation"`
+}
+
+// WorkResponseRecoveryEffectUnknownV1Kind defines model for WorkResponseRecoveryEffectUnknownV1.Kind.
+type WorkResponseRecoveryEffectUnknownV1Kind string
+
+// WorkResponseRecoveryLink defines model for WorkResponseRecoveryLink.
+type WorkResponseRecoveryLink struct {
+	Available      []WorkResponseRecoveryOperation `json:"available"`
+	ContinuationId WorkResponseOpaqueId            `json:"continuation_id"`
+	Control        WorkResponseControl             `json:"control"`
+	Schema         WorkResponseRecoveryLinkSchema  `json:"schema"`
+	Scope          WorkResponseScope               `json:"scope"`
+	StepId         WorkResponseOpaqueId            `json:"step_id"`
+	Version        WorkResponseRecoveryLinkVersion `json:"version"`
+	WorkflowId     WorkResponseOpaqueId            `json:"workflow_id"`
+}
+
+// WorkResponseRecoveryLinkSchema defines model for WorkResponseRecoveryLink.Schema.
+type WorkResponseRecoveryLinkSchema string
+
+// WorkResponseRecoveryLinkVersion defines model for WorkResponseRecoveryLink.Version.
+type WorkResponseRecoveryLinkVersion int64
+
+// WorkResponseRecoveryOperation defines model for WorkResponseRecoveryOperation.
+type WorkResponseRecoveryOperation string
+
+// WorkResponseRefusalCode defines model for WorkResponseRefusalCode.
+type WorkResponseRefusalCode string
+
+// WorkResponseRejection defines model for WorkResponseRejection.
+type WorkResponseRejection struct {
+	Code      WorkResponseRejectionCode `json:"code"`
+	Field     *WorkResponseBindingField `json:"field,omitempty"`
+	Reference *WorkResponseCommandRef   `json:"reference,omitempty"`
+}
+
+// WorkResponseRejectionCode defines model for WorkResponseRejectionCode.
+type WorkResponseRejectionCode string
+
+// WorkResponseRelease defines model for WorkResponseRelease.
+type WorkResponseRelease struct {
+	union json.RawMessage
+}
+
+// WorkResponseRelease0 defines model for .
+type WorkResponseRelease0 struct {
+	Kind WorkResponseRelease0Kind `json:"kind"`
+}
+
+// WorkResponseRelease0Kind defines model for WorkResponseRelease.0.Kind.
+type WorkResponseRelease0Kind string
+
+// WorkResponseRelease1 defines model for .
+type WorkResponseRelease1 struct {
+	Kind      WorkResponseRelease1Kind `json:"kind"`
+	ReleaseId WorkResponseOpaqueId     `json:"release_id"`
+}
+
+// WorkResponseRelease1Kind defines model for WorkResponseRelease.1.Kind.
+type WorkResponseRelease1Kind string
+
+// WorkResponseRelease2 defines model for .
+type WorkResponseRelease2 struct {
+	Evidence WorkResponseOpaqueId     `json:"evidence"`
+	Kind     WorkResponseRelease2Kind `json:"kind"`
+}
+
+// WorkResponseRelease2Kind defines model for WorkResponseRelease.2.Kind.
+type WorkResponseRelease2Kind string
+
+// WorkResponseRelease3 defines model for .
+type WorkResponseRelease3 struct {
+	Kind      WorkResponseRelease3Kind `json:"kind"`
+	ReleaseId WorkResponseOpaqueId     `json:"release_id"`
+}
+
+// WorkResponseRelease3Kind defines model for WorkResponseRelease.3.Kind.
+type WorkResponseRelease3Kind string
+
+// WorkResponseRelease4 defines model for .
+type WorkResponseRelease4 struct {
+	Kind   WorkResponseRelease4Kind `json:"kind"`
+	Reason WorkResponseRefusalCode  `json:"reason"`
+}
+
+// WorkResponseRelease4Kind defines model for WorkResponseRelease.4.Kind.
+type WorkResponseRelease4Kind string
+
+// WorkResponseSafeInteger defines model for WorkResponseSafeInteger.
+type WorkResponseSafeInteger = int64
+
+// WorkResponseScope defines model for WorkResponseScope.
+type WorkResponseScope struct {
+	AuthorityDomain WorkResponseOpaqueId `json:"authority_domain"`
+	ProcessId       WorkResponseOpaqueId `json:"process_id"`
+	TenantId        WorkResponseOpaqueId `json:"tenant_id"`
+}
+
+// WorkResponseView defines model for WorkResponseView.
+type WorkResponseView struct {
+	Acceptance        WorkResponseView_Acceptance        `json:"acceptance"`
+	BilateralDelivery WorkResponseView_BilateralDelivery `json:"bilateral_delivery"`
+	Execution         WorkResponseView_Execution         `json:"execution"`
+	Handle            WorkResponseHandle                 `json:"handle"`
+	Recovery          WorkResponseView_Recovery          `json:"recovery"`
+	ResultReference   WorkResponseView_ResultReference   `json:"result_reference"`
+	Settlement        WorkResponseView_Settlement        `json:"settlement"`
+}
+
+// WorkResponseViewAcceptance0 defines model for .
+type WorkResponseViewAcceptance0 struct {
+	Kind WorkResponseViewAcceptance0Kind `json:"kind"`
+}
+
+// WorkResponseViewAcceptance0Kind defines model for WorkResponseView.Acceptance.0.Kind.
+type WorkResponseViewAcceptance0Kind string
+
+// WorkResponseViewAcceptance1 defines model for .
+type WorkResponseViewAcceptance1 struct {
+	Kind     WorkResponseViewAcceptance1Kind `json:"kind"`
+	OwnerRef WorkResponseOwnerOperationRef   `json:"owner_ref"`
+}
+
+// WorkResponseViewAcceptance1Kind defines model for WorkResponseView.Acceptance.1.Kind.
+type WorkResponseViewAcceptance1Kind string
+
+// WorkResponseViewAcceptance2 defines model for .
+type WorkResponseViewAcceptance2 struct {
+	Kind       WorkResponseViewAcceptance2Kind `json:"kind"`
+	ObservedAt WorkResponseSafeInteger         `json:"observed_at"`
+	Revision   WorkResponseSafeInteger         `json:"revision"`
+	Source     WorkResponseWorkId              `json:"source"`
+	Value      WorkResponseAcceptance          `json:"value"`
+}
+
+// WorkResponseViewAcceptance2Kind defines model for WorkResponseView.Acceptance.2.Kind.
+type WorkResponseViewAcceptance2Kind string
+
+// WorkResponseViewAcceptance3 defines model for .
+type WorkResponseViewAcceptance3 struct {
+	Code WorkResponseRejectionCode       `json:"code"`
+	Kind WorkResponseViewAcceptance3Kind `json:"kind"`
+}
+
+// WorkResponseViewAcceptance3Kind defines model for WorkResponseView.Acceptance.3.Kind.
+type WorkResponseViewAcceptance3Kind string
+
+// WorkResponseView_Acceptance defines model for WorkResponseView.Acceptance.
+type WorkResponseView_Acceptance struct {
+	union json.RawMessage
+}
+
+// WorkResponseViewBilateralDelivery0 defines model for .
+type WorkResponseViewBilateralDelivery0 struct {
+	Kind WorkResponseViewBilateralDelivery0Kind `json:"kind"`
+}
+
+// WorkResponseViewBilateralDelivery0Kind defines model for WorkResponseView.BilateralDelivery.0.Kind.
+type WorkResponseViewBilateralDelivery0Kind string
+
+// WorkResponseViewBilateralDelivery1 defines model for .
+type WorkResponseViewBilateralDelivery1 struct {
+	Kind     WorkResponseViewBilateralDelivery1Kind `json:"kind"`
+	OwnerRef WorkResponseOwnerOperationRef          `json:"owner_ref"`
+}
+
+// WorkResponseViewBilateralDelivery1Kind defines model for WorkResponseView.BilateralDelivery.1.Kind.
+type WorkResponseViewBilateralDelivery1Kind string
+
+// WorkResponseViewBilateralDelivery2 defines model for .
+type WorkResponseViewBilateralDelivery2 struct {
+	Kind       WorkResponseViewBilateralDelivery2Kind `json:"kind"`
+	ObservedAt WorkResponseSafeInteger                `json:"observed_at"`
+	Revision   WorkResponseSafeInteger                `json:"revision"`
+	Source     WorkResponseWorkId                     `json:"source"`
+	Value      struct {
+		EnvelopeDigest WorkResponseWorkDigest                       `json:"envelope_digest"`
+		State          WorkResponseViewBilateralDelivery2ValueState `json:"state"`
+	} `json:"value"`
+}
+
+// WorkResponseViewBilateralDelivery2Kind defines model for WorkResponseView.BilateralDelivery.2.Kind.
+type WorkResponseViewBilateralDelivery2Kind string
+
+// WorkResponseViewBilateralDelivery2ValueState defines model for WorkResponseView.BilateralDelivery.2.Value.State.
+type WorkResponseViewBilateralDelivery2ValueState string
+
+// WorkResponseViewBilateralDelivery3 defines model for .
+type WorkResponseViewBilateralDelivery3 struct {
+	Code WorkResponseRejectionCode              `json:"code"`
+	Kind WorkResponseViewBilateralDelivery3Kind `json:"kind"`
+}
+
+// WorkResponseViewBilateralDelivery3Kind defines model for WorkResponseView.BilateralDelivery.3.Kind.
+type WorkResponseViewBilateralDelivery3Kind string
+
+// WorkResponseView_BilateralDelivery defines model for WorkResponseView.BilateralDelivery.
+type WorkResponseView_BilateralDelivery struct {
+	union json.RawMessage
+}
+
+// WorkResponseViewExecution0 defines model for .
+type WorkResponseViewExecution0 struct {
+	Kind WorkResponseViewExecution0Kind `json:"kind"`
+}
+
+// WorkResponseViewExecution0Kind defines model for WorkResponseView.Execution.0.Kind.
+type WorkResponseViewExecution0Kind string
+
+// WorkResponseViewExecution1 defines model for .
+type WorkResponseViewExecution1 struct {
+	Kind     WorkResponseViewExecution1Kind `json:"kind"`
+	OwnerRef WorkResponseOwnerOperationRef  `json:"owner_ref"`
+}
+
+// WorkResponseViewExecution1Kind defines model for WorkResponseView.Execution.1.Kind.
+type WorkResponseViewExecution1Kind string
+
+// WorkResponseViewExecution2 defines model for .
+type WorkResponseViewExecution2 struct {
+	Kind       WorkResponseViewExecution2Kind `json:"kind"`
+	ObservedAt WorkResponseSafeInteger        `json:"observed_at"`
+	Revision   WorkResponseSafeInteger        `json:"revision"`
+	Source     WorkResponseWorkId             `json:"source"`
+	Value      WorkResponseEffect             `json:"value"`
+}
+
+// WorkResponseViewExecution2Kind defines model for WorkResponseView.Execution.2.Kind.
+type WorkResponseViewExecution2Kind string
+
+// WorkResponseViewExecution3 defines model for .
+type WorkResponseViewExecution3 struct {
+	Code WorkResponseRejectionCode      `json:"code"`
+	Kind WorkResponseViewExecution3Kind `json:"kind"`
+}
+
+// WorkResponseViewExecution3Kind defines model for WorkResponseView.Execution.3.Kind.
+type WorkResponseViewExecution3Kind string
+
+// WorkResponseView_Execution defines model for WorkResponseView.Execution.
+type WorkResponseView_Execution struct {
+	union json.RawMessage
+}
+
+// WorkResponseViewRecovery0 defines model for .
+type WorkResponseViewRecovery0 struct {
+	Kind WorkResponseViewRecovery0Kind `json:"kind"`
+}
+
+// WorkResponseViewRecovery0Kind defines model for WorkResponseView.Recovery.0.Kind.
+type WorkResponseViewRecovery0Kind string
+
+// WorkResponseViewRecovery1 defines model for .
+type WorkResponseViewRecovery1 struct {
+	Kind     WorkResponseViewRecovery1Kind `json:"kind"`
+	OwnerRef WorkResponseOwnerOperationRef `json:"owner_ref"`
+}
+
+// WorkResponseViewRecovery1Kind defines model for WorkResponseView.Recovery.1.Kind.
+type WorkResponseViewRecovery1Kind string
+
+// WorkResponseViewRecovery2 defines model for .
+type WorkResponseViewRecovery2 struct {
+	Kind       WorkResponseViewRecovery2Kind `json:"kind"`
+	ObservedAt WorkResponseSafeInteger       `json:"observed_at"`
+	Revision   WorkResponseSafeInteger       `json:"revision"`
+	Source     WorkResponseWorkId            `json:"source"`
+	Value      WorkResponseRecoveryLink      `json:"value"`
+}
+
+// WorkResponseViewRecovery2Kind defines model for WorkResponseView.Recovery.2.Kind.
+type WorkResponseViewRecovery2Kind string
+
+// WorkResponseViewRecovery3 defines model for .
+type WorkResponseViewRecovery3 struct {
+	Code WorkResponseRejectionCode     `json:"code"`
+	Kind WorkResponseViewRecovery3Kind `json:"kind"`
+}
+
+// WorkResponseViewRecovery3Kind defines model for WorkResponseView.Recovery.3.Kind.
+type WorkResponseViewRecovery3Kind string
+
+// WorkResponseView_Recovery defines model for WorkResponseView.Recovery.
+type WorkResponseView_Recovery struct {
+	union json.RawMessage
+}
+
+// WorkResponseViewResultReference0 defines model for .
+type WorkResponseViewResultReference0 struct {
+	Kind WorkResponseViewResultReference0Kind `json:"kind"`
+}
+
+// WorkResponseViewResultReference0Kind defines model for WorkResponseView.ResultReference.0.Kind.
+type WorkResponseViewResultReference0Kind string
+
+// WorkResponseViewResultReference1 defines model for .
+type WorkResponseViewResultReference1 struct {
+	Kind     WorkResponseViewResultReference1Kind `json:"kind"`
+	OwnerRef WorkResponseOwnerOperationRef        `json:"owner_ref"`
+}
+
+// WorkResponseViewResultReference1Kind defines model for WorkResponseView.ResultReference.1.Kind.
+type WorkResponseViewResultReference1Kind string
+
+// WorkResponseViewResultReference2 defines model for .
+type WorkResponseViewResultReference2 struct {
+	Kind       WorkResponseViewResultReference2Kind `json:"kind"`
+	ObservedAt WorkResponseSafeInteger              `json:"observed_at"`
+	Revision   WorkResponseSafeInteger              `json:"revision"`
+	Source     WorkResponseWorkId                   `json:"source"`
+	Value      struct {
+		Artifact WorkResponseArtifactVersionRef `json:"artifact"`
+		Release  WorkResponseRelease            `json:"release"`
+	} `json:"value"`
+}
+
+// WorkResponseViewResultReference2Kind defines model for WorkResponseView.ResultReference.2.Kind.
+type WorkResponseViewResultReference2Kind string
+
+// WorkResponseViewResultReference3 defines model for .
+type WorkResponseViewResultReference3 struct {
+	Code WorkResponseRejectionCode            `json:"code"`
+	Kind WorkResponseViewResultReference3Kind `json:"kind"`
+}
+
+// WorkResponseViewResultReference3Kind defines model for WorkResponseView.ResultReference.3.Kind.
+type WorkResponseViewResultReference3Kind string
+
+// WorkResponseView_ResultReference defines model for WorkResponseView.ResultReference.
+type WorkResponseView_ResultReference struct {
+	union json.RawMessage
+}
+
+// WorkResponseViewSettlement0 defines model for .
+type WorkResponseViewSettlement0 struct {
+	Kind WorkResponseViewSettlement0Kind `json:"kind"`
+}
+
+// WorkResponseViewSettlement0Kind defines model for WorkResponseView.Settlement.0.Kind.
+type WorkResponseViewSettlement0Kind string
+
+// WorkResponseViewSettlement1 defines model for .
+type WorkResponseViewSettlement1 struct {
+	Kind     WorkResponseViewSettlement1Kind `json:"kind"`
+	OwnerRef WorkResponseOwnerOperationRef   `json:"owner_ref"`
+}
+
+// WorkResponseViewSettlement1Kind defines model for WorkResponseView.Settlement.1.Kind.
+type WorkResponseViewSettlement1Kind string
+
+// WorkResponseViewSettlement2 defines model for .
+type WorkResponseViewSettlement2 struct {
+	Kind       WorkResponseViewSettlement2Kind `json:"kind"`
+	ObservedAt WorkResponseSafeInteger         `json:"observed_at"`
+	Revision   WorkResponseSafeInteger         `json:"revision"`
+	Source     WorkResponseWorkId              `json:"source"`
+	Value      struct {
+		AgreementDigest WorkResponseWorkDigest `json:"agreement_digest"`
+		Rail            WorkResponseWorkId     `json:"rail"`
+	} `json:"value"`
+}
+
+// WorkResponseViewSettlement2Kind defines model for WorkResponseView.Settlement.2.Kind.
+type WorkResponseViewSettlement2Kind string
+
+// WorkResponseViewSettlement3 defines model for .
+type WorkResponseViewSettlement3 struct {
+	Code WorkResponseRejectionCode       `json:"code"`
+	Kind WorkResponseViewSettlement3Kind `json:"kind"`
+}
+
+// WorkResponseViewSettlement3Kind defines model for WorkResponseView.Settlement.3.Kind.
+type WorkResponseViewSettlement3Kind string
+
+// WorkResponseView_Settlement defines model for WorkResponseView.Settlement.
+type WorkResponseView_Settlement struct {
+	union json.RawMessage
+}
+
+// WorkResponseWorkDigest defines model for WorkResponseWorkDigest.
+type WorkResponseWorkDigest = string
+
+// WorkResponseWorkId defines model for WorkResponseWorkId.
+type WorkResponseWorkId = string
+
+// WorkResponseWorkSlotId defines model for WorkResponseWorkSlotId.
+type WorkResponseWorkSlotId = string
+
 // Getter for additional properties for CapabilityToken_ScopeAttenuations_Item. Returns the specified
 // element and whether it was found
 func (a CapabilityToken_ScopeAttenuations_Item) Get(fieldName string) (value interface{}, found bool) {
@@ -25724,6 +27677,2536 @@ func (t SecurityResponsePlanV1ApprovalRequirement) MarshalJSON() ([]byte, error)
 }
 
 func (t *SecurityResponsePlanV1ApprovalRequirement) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal5Terms0 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal_5_Terms as a WorkRequestBody0PreparationProposal5Terms0
+func (t WorkRequest_Body_0_Preparation_Proposal_5_Terms) AsWorkRequestBody0PreparationProposal5Terms0() (WorkRequestBody0PreparationProposal5Terms0, error) {
+	var body WorkRequestBody0PreparationProposal5Terms0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal5Terms0 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal_5_Terms as the provided WorkRequestBody0PreparationProposal5Terms0
+func (t *WorkRequest_Body_0_Preparation_Proposal_5_Terms) FromWorkRequestBody0PreparationProposal5Terms0(v WorkRequestBody0PreparationProposal5Terms0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal5Terms0 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal_5_Terms, using the provided WorkRequestBody0PreparationProposal5Terms0
+func (t *WorkRequest_Body_0_Preparation_Proposal_5_Terms) MergeWorkRequestBody0PreparationProposal5Terms0(v WorkRequestBody0PreparationProposal5Terms0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal5Terms1 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal_5_Terms as a WorkRequestBody0PreparationProposal5Terms1
+func (t WorkRequest_Body_0_Preparation_Proposal_5_Terms) AsWorkRequestBody0PreparationProposal5Terms1() (WorkRequestBody0PreparationProposal5Terms1, error) {
+	var body WorkRequestBody0PreparationProposal5Terms1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal5Terms1 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal_5_Terms as the provided WorkRequestBody0PreparationProposal5Terms1
+func (t *WorkRequest_Body_0_Preparation_Proposal_5_Terms) FromWorkRequestBody0PreparationProposal5Terms1(v WorkRequestBody0PreparationProposal5Terms1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal5Terms1 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal_5_Terms, using the provided WorkRequestBody0PreparationProposal5Terms1
+func (t *WorkRequest_Body_0_Preparation_Proposal_5_Terms) MergeWorkRequestBody0PreparationProposal5Terms1(v WorkRequestBody0PreparationProposal5Terms1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkRequest_Body_0_Preparation_Proposal_5_Terms) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkRequest_Body_0_Preparation_Proposal_5_Terms) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal0 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal as a WorkRequestBody0PreparationProposal0
+func (t WorkRequest_Body_0_Preparation_Proposal) AsWorkRequestBody0PreparationProposal0() (WorkRequestBody0PreparationProposal0, error) {
+	var body WorkRequestBody0PreparationProposal0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal0 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal as the provided WorkRequestBody0PreparationProposal0
+func (t *WorkRequest_Body_0_Preparation_Proposal) FromWorkRequestBody0PreparationProposal0(v WorkRequestBody0PreparationProposal0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal0 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal, using the provided WorkRequestBody0PreparationProposal0
+func (t *WorkRequest_Body_0_Preparation_Proposal) MergeWorkRequestBody0PreparationProposal0(v WorkRequestBody0PreparationProposal0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal1 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal as a WorkRequestBody0PreparationProposal1
+func (t WorkRequest_Body_0_Preparation_Proposal) AsWorkRequestBody0PreparationProposal1() (WorkRequestBody0PreparationProposal1, error) {
+	var body WorkRequestBody0PreparationProposal1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal1 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal as the provided WorkRequestBody0PreparationProposal1
+func (t *WorkRequest_Body_0_Preparation_Proposal) FromWorkRequestBody0PreparationProposal1(v WorkRequestBody0PreparationProposal1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal1 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal, using the provided WorkRequestBody0PreparationProposal1
+func (t *WorkRequest_Body_0_Preparation_Proposal) MergeWorkRequestBody0PreparationProposal1(v WorkRequestBody0PreparationProposal1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal2 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal as a WorkRequestBody0PreparationProposal2
+func (t WorkRequest_Body_0_Preparation_Proposal) AsWorkRequestBody0PreparationProposal2() (WorkRequestBody0PreparationProposal2, error) {
+	var body WorkRequestBody0PreparationProposal2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal2 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal as the provided WorkRequestBody0PreparationProposal2
+func (t *WorkRequest_Body_0_Preparation_Proposal) FromWorkRequestBody0PreparationProposal2(v WorkRequestBody0PreparationProposal2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal2 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal, using the provided WorkRequestBody0PreparationProposal2
+func (t *WorkRequest_Body_0_Preparation_Proposal) MergeWorkRequestBody0PreparationProposal2(v WorkRequestBody0PreparationProposal2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal3 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal as a WorkRequestBody0PreparationProposal3
+func (t WorkRequest_Body_0_Preparation_Proposal) AsWorkRequestBody0PreparationProposal3() (WorkRequestBody0PreparationProposal3, error) {
+	var body WorkRequestBody0PreparationProposal3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal3 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal as the provided WorkRequestBody0PreparationProposal3
+func (t *WorkRequest_Body_0_Preparation_Proposal) FromWorkRequestBody0PreparationProposal3(v WorkRequestBody0PreparationProposal3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal3 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal, using the provided WorkRequestBody0PreparationProposal3
+func (t *WorkRequest_Body_0_Preparation_Proposal) MergeWorkRequestBody0PreparationProposal3(v WorkRequestBody0PreparationProposal3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal4 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal as a WorkRequestBody0PreparationProposal4
+func (t WorkRequest_Body_0_Preparation_Proposal) AsWorkRequestBody0PreparationProposal4() (WorkRequestBody0PreparationProposal4, error) {
+	var body WorkRequestBody0PreparationProposal4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal4 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal as the provided WorkRequestBody0PreparationProposal4
+func (t *WorkRequest_Body_0_Preparation_Proposal) FromWorkRequestBody0PreparationProposal4(v WorkRequestBody0PreparationProposal4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal4 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal, using the provided WorkRequestBody0PreparationProposal4
+func (t *WorkRequest_Body_0_Preparation_Proposal) MergeWorkRequestBody0PreparationProposal4(v WorkRequestBody0PreparationProposal4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody0PreparationProposal5 returns the union data inside the WorkRequest_Body_0_Preparation_Proposal as a WorkRequestBody0PreparationProposal5
+func (t WorkRequest_Body_0_Preparation_Proposal) AsWorkRequestBody0PreparationProposal5() (WorkRequestBody0PreparationProposal5, error) {
+	var body WorkRequestBody0PreparationProposal5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0PreparationProposal5 overwrites any union data inside the WorkRequest_Body_0_Preparation_Proposal as the provided WorkRequestBody0PreparationProposal5
+func (t *WorkRequest_Body_0_Preparation_Proposal) FromWorkRequestBody0PreparationProposal5(v WorkRequestBody0PreparationProposal5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0PreparationProposal5 performs a merge with any union data inside the WorkRequest_Body_0_Preparation_Proposal, using the provided WorkRequestBody0PreparationProposal5
+func (t *WorkRequest_Body_0_Preparation_Proposal) MergeWorkRequestBody0PreparationProposal5(v WorkRequestBody0PreparationProposal5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkRequest_Body_0_Preparation_Proposal) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkRequest_Body_0_Preparation_Proposal) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkRequestBody1CommandAction0 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction0
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction0() (WorkRequestBody1CommandAction0, error) {
+	var body WorkRequestBody1CommandAction0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction0 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction0
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction0(v WorkRequestBody1CommandAction0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction0 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction0
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction0(v WorkRequestBody1CommandAction0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1CommandAction1 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction1
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction1() (WorkRequestBody1CommandAction1, error) {
+	var body WorkRequestBody1CommandAction1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction1 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction1
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction1(v WorkRequestBody1CommandAction1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction1 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction1
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction1(v WorkRequestBody1CommandAction1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1CommandAction2 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction2
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction2() (WorkRequestBody1CommandAction2, error) {
+	var body WorkRequestBody1CommandAction2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction2 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction2
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction2(v WorkRequestBody1CommandAction2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction2 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction2
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction2(v WorkRequestBody1CommandAction2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1CommandAction3 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction3
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction3() (WorkRequestBody1CommandAction3, error) {
+	var body WorkRequestBody1CommandAction3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction3 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction3
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction3(v WorkRequestBody1CommandAction3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction3 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction3
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction3(v WorkRequestBody1CommandAction3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1CommandAction4 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction4
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction4() (WorkRequestBody1CommandAction4, error) {
+	var body WorkRequestBody1CommandAction4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction4 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction4
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction4(v WorkRequestBody1CommandAction4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction4 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction4
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction4(v WorkRequestBody1CommandAction4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1CommandAction5 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction5
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction5() (WorkRequestBody1CommandAction5, error) {
+	var body WorkRequestBody1CommandAction5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction5 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction5
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction5(v WorkRequestBody1CommandAction5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction5 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction5
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction5(v WorkRequestBody1CommandAction5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1CommandAction6 returns the union data inside the WorkRequest_Body_1_Command_Action as a WorkRequestBody1CommandAction6
+func (t WorkRequest_Body_1_Command_Action) AsWorkRequestBody1CommandAction6() (WorkRequestBody1CommandAction6, error) {
+	var body WorkRequestBody1CommandAction6
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1CommandAction6 overwrites any union data inside the WorkRequest_Body_1_Command_Action as the provided WorkRequestBody1CommandAction6
+func (t *WorkRequest_Body_1_Command_Action) FromWorkRequestBody1CommandAction6(v WorkRequestBody1CommandAction6) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1CommandAction6 performs a merge with any union data inside the WorkRequest_Body_1_Command_Action, using the provided WorkRequestBody1CommandAction6
+func (t *WorkRequest_Body_1_Command_Action) MergeWorkRequestBody1CommandAction6(v WorkRequestBody1CommandAction6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkRequest_Body_1_Command_Action) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkRequest_Body_1_Command_Action) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkRequestBody2Query0 returns the union data inside the WorkRequest_Body_2_Query as a WorkRequestBody2Query0
+func (t WorkRequest_Body_2_Query) AsWorkRequestBody2Query0() (WorkRequestBody2Query0, error) {
+	var body WorkRequestBody2Query0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody2Query0 overwrites any union data inside the WorkRequest_Body_2_Query as the provided WorkRequestBody2Query0
+func (t *WorkRequest_Body_2_Query) FromWorkRequestBody2Query0(v WorkRequestBody2Query0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody2Query0 performs a merge with any union data inside the WorkRequest_Body_2_Query, using the provided WorkRequestBody2Query0
+func (t *WorkRequest_Body_2_Query) MergeWorkRequestBody2Query0(v WorkRequestBody2Query0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody2Query1 returns the union data inside the WorkRequest_Body_2_Query as a WorkRequestBody2Query1
+func (t WorkRequest_Body_2_Query) AsWorkRequestBody2Query1() (WorkRequestBody2Query1, error) {
+	var body WorkRequestBody2Query1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody2Query1 overwrites any union data inside the WorkRequest_Body_2_Query as the provided WorkRequestBody2Query1
+func (t *WorkRequest_Body_2_Query) FromWorkRequestBody2Query1(v WorkRequestBody2Query1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody2Query1 performs a merge with any union data inside the WorkRequest_Body_2_Query, using the provided WorkRequestBody2Query1
+func (t *WorkRequest_Body_2_Query) MergeWorkRequestBody2Query1(v WorkRequestBody2Query1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody2Query2 returns the union data inside the WorkRequest_Body_2_Query as a WorkRequestBody2Query2
+func (t WorkRequest_Body_2_Query) AsWorkRequestBody2Query2() (WorkRequestBody2Query2, error) {
+	var body WorkRequestBody2Query2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody2Query2 overwrites any union data inside the WorkRequest_Body_2_Query as the provided WorkRequestBody2Query2
+func (t *WorkRequest_Body_2_Query) FromWorkRequestBody2Query2(v WorkRequestBody2Query2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody2Query2 performs a merge with any union data inside the WorkRequest_Body_2_Query, using the provided WorkRequestBody2Query2
+func (t *WorkRequest_Body_2_Query) MergeWorkRequestBody2Query2(v WorkRequestBody2Query2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody2Query3 returns the union data inside the WorkRequest_Body_2_Query as a WorkRequestBody2Query3
+func (t WorkRequest_Body_2_Query) AsWorkRequestBody2Query3() (WorkRequestBody2Query3, error) {
+	var body WorkRequestBody2Query3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody2Query3 overwrites any union data inside the WorkRequest_Body_2_Query as the provided WorkRequestBody2Query3
+func (t *WorkRequest_Body_2_Query) FromWorkRequestBody2Query3(v WorkRequestBody2Query3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody2Query3 performs a merge with any union data inside the WorkRequest_Body_2_Query, using the provided WorkRequestBody2Query3
+func (t *WorkRequest_Body_2_Query) MergeWorkRequestBody2Query3(v WorkRequestBody2Query3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody2Query4 returns the union data inside the WorkRequest_Body_2_Query as a WorkRequestBody2Query4
+func (t WorkRequest_Body_2_Query) AsWorkRequestBody2Query4() (WorkRequestBody2Query4, error) {
+	var body WorkRequestBody2Query4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody2Query4 overwrites any union data inside the WorkRequest_Body_2_Query as the provided WorkRequestBody2Query4
+func (t *WorkRequest_Body_2_Query) FromWorkRequestBody2Query4(v WorkRequestBody2Query4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody2Query4 performs a merge with any union data inside the WorkRequest_Body_2_Query, using the provided WorkRequestBody2Query4
+func (t *WorkRequest_Body_2_Query) MergeWorkRequestBody2Query4(v WorkRequestBody2Query4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkRequest_Body_2_Query) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkRequest_Body_2_Query) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkRequestBody0 returns the union data inside the WorkRequest_Body as a WorkRequestBody0
+func (t WorkRequest_Body) AsWorkRequestBody0() (WorkRequestBody0, error) {
+	var body WorkRequestBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody0 overwrites any union data inside the WorkRequest_Body as the provided WorkRequestBody0
+func (t *WorkRequest_Body) FromWorkRequestBody0(v WorkRequestBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody0 performs a merge with any union data inside the WorkRequest_Body, using the provided WorkRequestBody0
+func (t *WorkRequest_Body) MergeWorkRequestBody0(v WorkRequestBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody1 returns the union data inside the WorkRequest_Body as a WorkRequestBody1
+func (t WorkRequest_Body) AsWorkRequestBody1() (WorkRequestBody1, error) {
+	var body WorkRequestBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody1 overwrites any union data inside the WorkRequest_Body as the provided WorkRequestBody1
+func (t *WorkRequest_Body) FromWorkRequestBody1(v WorkRequestBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody1 performs a merge with any union data inside the WorkRequest_Body, using the provided WorkRequestBody1
+func (t *WorkRequest_Body) MergeWorkRequestBody1(v WorkRequestBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkRequestBody2 returns the union data inside the WorkRequest_Body as a WorkRequestBody2
+func (t WorkRequest_Body) AsWorkRequestBody2() (WorkRequestBody2, error) {
+	var body WorkRequestBody2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkRequestBody2 overwrites any union data inside the WorkRequest_Body as the provided WorkRequestBody2
+func (t *WorkRequest_Body) FromWorkRequestBody2(v WorkRequestBody2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkRequestBody2 performs a merge with any union data inside the WorkRequest_Body, using the provided WorkRequestBody2
+func (t *WorkRequest_Body) MergeWorkRequestBody2(v WorkRequestBody2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkRequest_Body) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkRequest_Body) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseBody2Result0 returns the union data inside the WorkResponse_Body_2_Result as a WorkResponseBody2Result0
+func (t WorkResponse_Body_2_Result) AsWorkResponseBody2Result0() (WorkResponseBody2Result0, error) {
+	var body WorkResponseBody2Result0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2Result0 overwrites any union data inside the WorkResponse_Body_2_Result as the provided WorkResponseBody2Result0
+func (t *WorkResponse_Body_2_Result) FromWorkResponseBody2Result0(v WorkResponseBody2Result0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2Result0 performs a merge with any union data inside the WorkResponse_Body_2_Result, using the provided WorkResponseBody2Result0
+func (t *WorkResponse_Body_2_Result) MergeWorkResponseBody2Result0(v WorkResponseBody2Result0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody2Result1 returns the union data inside the WorkResponse_Body_2_Result as a WorkResponseBody2Result1
+func (t WorkResponse_Body_2_Result) AsWorkResponseBody2Result1() (WorkResponseBody2Result1, error) {
+	var body WorkResponseBody2Result1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2Result1 overwrites any union data inside the WorkResponse_Body_2_Result as the provided WorkResponseBody2Result1
+func (t *WorkResponse_Body_2_Result) FromWorkResponseBody2Result1(v WorkResponseBody2Result1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2Result1 performs a merge with any union data inside the WorkResponse_Body_2_Result, using the provided WorkResponseBody2Result1
+func (t *WorkResponse_Body_2_Result) MergeWorkResponseBody2Result1(v WorkResponseBody2Result1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody2Result2 returns the union data inside the WorkResponse_Body_2_Result as a WorkResponseBody2Result2
+func (t WorkResponse_Body_2_Result) AsWorkResponseBody2Result2() (WorkResponseBody2Result2, error) {
+	var body WorkResponseBody2Result2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2Result2 overwrites any union data inside the WorkResponse_Body_2_Result as the provided WorkResponseBody2Result2
+func (t *WorkResponse_Body_2_Result) FromWorkResponseBody2Result2(v WorkResponseBody2Result2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2Result2 performs a merge with any union data inside the WorkResponse_Body_2_Result, using the provided WorkResponseBody2Result2
+func (t *WorkResponse_Body_2_Result) MergeWorkResponseBody2Result2(v WorkResponseBody2Result2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody2Result3 returns the union data inside the WorkResponse_Body_2_Result as a WorkResponseBody2Result3
+func (t WorkResponse_Body_2_Result) AsWorkResponseBody2Result3() (WorkResponseBody2Result3, error) {
+	var body WorkResponseBody2Result3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2Result3 overwrites any union data inside the WorkResponse_Body_2_Result as the provided WorkResponseBody2Result3
+func (t *WorkResponse_Body_2_Result) FromWorkResponseBody2Result3(v WorkResponseBody2Result3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2Result3 performs a merge with any union data inside the WorkResponse_Body_2_Result, using the provided WorkResponseBody2Result3
+func (t *WorkResponse_Body_2_Result) MergeWorkResponseBody2Result3(v WorkResponseBody2Result3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody2Result4 returns the union data inside the WorkResponse_Body_2_Result as a WorkResponseBody2Result4
+func (t WorkResponse_Body_2_Result) AsWorkResponseBody2Result4() (WorkResponseBody2Result4, error) {
+	var body WorkResponseBody2Result4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2Result4 overwrites any union data inside the WorkResponse_Body_2_Result as the provided WorkResponseBody2Result4
+func (t *WorkResponse_Body_2_Result) FromWorkResponseBody2Result4(v WorkResponseBody2Result4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2Result4 performs a merge with any union data inside the WorkResponse_Body_2_Result, using the provided WorkResponseBody2Result4
+func (t *WorkResponse_Body_2_Result) MergeWorkResponseBody2Result4(v WorkResponseBody2Result4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody2Result5 returns the union data inside the WorkResponse_Body_2_Result as a WorkResponseBody2Result5
+func (t WorkResponse_Body_2_Result) AsWorkResponseBody2Result5() (WorkResponseBody2Result5, error) {
+	var body WorkResponseBody2Result5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2Result5 overwrites any union data inside the WorkResponse_Body_2_Result as the provided WorkResponseBody2Result5
+func (t *WorkResponse_Body_2_Result) FromWorkResponseBody2Result5(v WorkResponseBody2Result5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2Result5 performs a merge with any union data inside the WorkResponse_Body_2_Result, using the provided WorkResponseBody2Result5
+func (t *WorkResponse_Body_2_Result) MergeWorkResponseBody2Result5(v WorkResponseBody2Result5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponse_Body_2_Result) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponse_Body_2_Result) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseBody0 returns the union data inside the WorkResponse_Body as a WorkResponseBody0
+func (t WorkResponse_Body) AsWorkResponseBody0() (WorkResponseBody0, error) {
+	var body WorkResponseBody0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody0 overwrites any union data inside the WorkResponse_Body as the provided WorkResponseBody0
+func (t *WorkResponse_Body) FromWorkResponseBody0(v WorkResponseBody0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody0 performs a merge with any union data inside the WorkResponse_Body, using the provided WorkResponseBody0
+func (t *WorkResponse_Body) MergeWorkResponseBody0(v WorkResponseBody0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody1 returns the union data inside the WorkResponse_Body as a WorkResponseBody1
+func (t WorkResponse_Body) AsWorkResponseBody1() (WorkResponseBody1, error) {
+	var body WorkResponseBody1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody1 overwrites any union data inside the WorkResponse_Body as the provided WorkResponseBody1
+func (t *WorkResponse_Body) FromWorkResponseBody1(v WorkResponseBody1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody1 performs a merge with any union data inside the WorkResponse_Body, using the provided WorkResponseBody1
+func (t *WorkResponse_Body) MergeWorkResponseBody1(v WorkResponseBody1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseBody2 returns the union data inside the WorkResponse_Body as a WorkResponseBody2
+func (t WorkResponse_Body) AsWorkResponseBody2() (WorkResponseBody2, error) {
+	var body WorkResponseBody2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseBody2 overwrites any union data inside the WorkResponse_Body as the provided WorkResponseBody2
+func (t *WorkResponse_Body) FromWorkResponseBody2(v WorkResponseBody2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseBody2 performs a merge with any union data inside the WorkResponse_Body, using the provided WorkResponseBody2
+func (t *WorkResponse_Body) MergeWorkResponseBody2(v WorkResponseBody2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponse_Body) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponse_Body) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result0 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result0
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result0() (WorkResponseCommandResultOutcome0Result0, error) {
+	var body WorkResponseCommandResultOutcome0Result0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result0 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result0
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result0(v WorkResponseCommandResultOutcome0Result0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result0 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result0
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result0(v WorkResponseCommandResultOutcome0Result0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result1 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result1
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result1() (WorkResponseCommandResultOutcome0Result1, error) {
+	var body WorkResponseCommandResultOutcome0Result1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result1 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result1
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result1(v WorkResponseCommandResultOutcome0Result1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result1 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result1
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result1(v WorkResponseCommandResultOutcome0Result1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result2 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result2
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result2() (WorkResponseCommandResultOutcome0Result2, error) {
+	var body WorkResponseCommandResultOutcome0Result2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result2 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result2
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result2(v WorkResponseCommandResultOutcome0Result2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result2 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result2
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result2(v WorkResponseCommandResultOutcome0Result2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result3 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result3
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result3() (WorkResponseCommandResultOutcome0Result3, error) {
+	var body WorkResponseCommandResultOutcome0Result3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result3 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result3
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result3(v WorkResponseCommandResultOutcome0Result3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result3 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result3
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result3(v WorkResponseCommandResultOutcome0Result3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result4 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result4
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result4() (WorkResponseCommandResultOutcome0Result4, error) {
+	var body WorkResponseCommandResultOutcome0Result4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result4 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result4
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result4(v WorkResponseCommandResultOutcome0Result4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result4 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result4
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result4(v WorkResponseCommandResultOutcome0Result4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result5 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result5
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result5() (WorkResponseCommandResultOutcome0Result5, error) {
+	var body WorkResponseCommandResultOutcome0Result5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result5 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result5
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result5(v WorkResponseCommandResultOutcome0Result5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result5 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result5
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result5(v WorkResponseCommandResultOutcome0Result5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0Result6 returns the union data inside the WorkResponseCommandResult_Outcome_0_Result as a WorkResponseCommandResultOutcome0Result6
+func (t WorkResponseCommandResult_Outcome_0_Result) AsWorkResponseCommandResultOutcome0Result6() (WorkResponseCommandResultOutcome0Result6, error) {
+	var body WorkResponseCommandResultOutcome0Result6
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0Result6 overwrites any union data inside the WorkResponseCommandResult_Outcome_0_Result as the provided WorkResponseCommandResultOutcome0Result6
+func (t *WorkResponseCommandResult_Outcome_0_Result) FromWorkResponseCommandResultOutcome0Result6(v WorkResponseCommandResultOutcome0Result6) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0Result6 performs a merge with any union data inside the WorkResponseCommandResult_Outcome_0_Result, using the provided WorkResponseCommandResultOutcome0Result6
+func (t *WorkResponseCommandResult_Outcome_0_Result) MergeWorkResponseCommandResultOutcome0Result6(v WorkResponseCommandResultOutcome0Result6) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseCommandResult_Outcome_0_Result) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseCommandResult_Outcome_0_Result) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome0 returns the union data inside the WorkResponseCommandResult_Outcome as a WorkResponseCommandResultOutcome0
+func (t WorkResponseCommandResult_Outcome) AsWorkResponseCommandResultOutcome0() (WorkResponseCommandResultOutcome0, error) {
+	var body WorkResponseCommandResultOutcome0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome0 overwrites any union data inside the WorkResponseCommandResult_Outcome as the provided WorkResponseCommandResultOutcome0
+func (t *WorkResponseCommandResult_Outcome) FromWorkResponseCommandResultOutcome0(v WorkResponseCommandResultOutcome0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome0 performs a merge with any union data inside the WorkResponseCommandResult_Outcome, using the provided WorkResponseCommandResultOutcome0
+func (t *WorkResponseCommandResult_Outcome) MergeWorkResponseCommandResultOutcome0(v WorkResponseCommandResultOutcome0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome1 returns the union data inside the WorkResponseCommandResult_Outcome as a WorkResponseCommandResultOutcome1
+func (t WorkResponseCommandResult_Outcome) AsWorkResponseCommandResultOutcome1() (WorkResponseCommandResultOutcome1, error) {
+	var body WorkResponseCommandResultOutcome1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome1 overwrites any union data inside the WorkResponseCommandResult_Outcome as the provided WorkResponseCommandResultOutcome1
+func (t *WorkResponseCommandResult_Outcome) FromWorkResponseCommandResultOutcome1(v WorkResponseCommandResultOutcome1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome1 performs a merge with any union data inside the WorkResponseCommandResult_Outcome, using the provided WorkResponseCommandResultOutcome1
+func (t *WorkResponseCommandResult_Outcome) MergeWorkResponseCommandResultOutcome1(v WorkResponseCommandResultOutcome1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseCommandResultOutcome2 returns the union data inside the WorkResponseCommandResult_Outcome as a WorkResponseCommandResultOutcome2
+func (t WorkResponseCommandResult_Outcome) AsWorkResponseCommandResultOutcome2() (WorkResponseCommandResultOutcome2, error) {
+	var body WorkResponseCommandResultOutcome2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseCommandResultOutcome2 overwrites any union data inside the WorkResponseCommandResult_Outcome as the provided WorkResponseCommandResultOutcome2
+func (t *WorkResponseCommandResult_Outcome) FromWorkResponseCommandResultOutcome2(v WorkResponseCommandResultOutcome2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseCommandResultOutcome2 performs a merge with any union data inside the WorkResponseCommandResult_Outcome, using the provided WorkResponseCommandResultOutcome2
+func (t *WorkResponseCommandResult_Outcome) MergeWorkResponseCommandResultOutcome2(v WorkResponseCommandResultOutcome2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseCommandResult_Outcome) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseCommandResult_Outcome) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseRecoveryEffectNeverAdmittedV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectNeverAdmittedV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectNeverAdmittedV1() (WorkResponseRecoveryEffectNeverAdmittedV1, error) {
+	var body WorkResponseRecoveryEffectNeverAdmittedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectNeverAdmittedV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectNeverAdmittedV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectNeverAdmittedV1(v WorkResponseRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectNeverAdmittedV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectNeverAdmittedV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectNeverAdmittedV1(v WorkResponseRecoveryEffectNeverAdmittedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectAdmissionUnresolvedV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectAdmissionUnresolvedV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectAdmissionUnresolvedV1() (WorkResponseRecoveryEffectAdmissionUnresolvedV1, error) {
+	var body WorkResponseRecoveryEffectAdmissionUnresolvedV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectAdmissionUnresolvedV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectAdmissionUnresolvedV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectAdmissionUnresolvedV1(v WorkResponseRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectAdmissionUnresolvedV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectAdmissionUnresolvedV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectAdmissionUnresolvedV1(v WorkResponseRecoveryEffectAdmissionUnresolvedV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectClosedBeforeEffectV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectClosedBeforeEffectV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectClosedBeforeEffectV1() (WorkResponseRecoveryEffectClosedBeforeEffectV1, error) {
+	var body WorkResponseRecoveryEffectClosedBeforeEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectClosedBeforeEffectV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectClosedBeforeEffectV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectClosedBeforeEffectV1(v WorkResponseRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectClosedBeforeEffectV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectClosedBeforeEffectV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectClosedBeforeEffectV1(v WorkResponseRecoveryEffectClosedBeforeEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectAwaitingApprovalV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectAwaitingApprovalV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectAwaitingApprovalV1() (WorkResponseRecoveryEffectAwaitingApprovalV1, error) {
+	var body WorkResponseRecoveryEffectAwaitingApprovalV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectAwaitingApprovalV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectAwaitingApprovalV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectAwaitingApprovalV1(v WorkResponseRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectAwaitingApprovalV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectAwaitingApprovalV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectAwaitingApprovalV1(v WorkResponseRecoveryEffectAwaitingApprovalV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectInFlightV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectInFlightV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectInFlightV1() (WorkResponseRecoveryEffectInFlightV1, error) {
+	var body WorkResponseRecoveryEffectInFlightV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectInFlightV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectInFlightV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectInFlightV1(v WorkResponseRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectInFlightV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectInFlightV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectInFlightV1(v WorkResponseRecoveryEffectInFlightV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectAwaitingCallerReportV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectAwaitingCallerReportV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectAwaitingCallerReportV1() (WorkResponseRecoveryEffectAwaitingCallerReportV1, error) {
+	var body WorkResponseRecoveryEffectAwaitingCallerReportV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectAwaitingCallerReportV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectAwaitingCallerReportV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectAwaitingCallerReportV1(v WorkResponseRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectAwaitingCallerReportV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectAwaitingCallerReportV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectAwaitingCallerReportV1(v WorkResponseRecoveryEffectAwaitingCallerReportV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectUnknownV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectUnknownV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectUnknownV1() (WorkResponseRecoveryEffectUnknownV1, error) {
+	var body WorkResponseRecoveryEffectUnknownV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectUnknownV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectUnknownV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectUnknownV1(v WorkResponseRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectUnknownV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectUnknownV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectUnknownV1(v WorkResponseRecoveryEffectUnknownV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectCompleteV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectCompleteV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectCompleteV1() (WorkResponseRecoveryEffectCompleteV1, error) {
+	var body WorkResponseRecoveryEffectCompleteV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectCompleteV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectCompleteV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectCompleteV1(v WorkResponseRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectCompleteV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectCompleteV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectCompleteV1(v WorkResponseRecoveryEffectCompleteV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectPartialV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectPartialV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectPartialV1() (WorkResponseRecoveryEffectPartialV1, error) {
+	var body WorkResponseRecoveryEffectPartialV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectPartialV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectPartialV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectPartialV1(v WorkResponseRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectPartialV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectPartialV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectPartialV1(v WorkResponseRecoveryEffectPartialV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRecoveryEffectFailedAfterEffectV1 returns the union data inside the WorkResponseEffect as a WorkResponseRecoveryEffectFailedAfterEffectV1
+func (t WorkResponseEffect) AsWorkResponseRecoveryEffectFailedAfterEffectV1() (WorkResponseRecoveryEffectFailedAfterEffectV1, error) {
+	var body WorkResponseRecoveryEffectFailedAfterEffectV1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRecoveryEffectFailedAfterEffectV1 overwrites any union data inside the WorkResponseEffect as the provided WorkResponseRecoveryEffectFailedAfterEffectV1
+func (t *WorkResponseEffect) FromWorkResponseRecoveryEffectFailedAfterEffectV1(v WorkResponseRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRecoveryEffectFailedAfterEffectV1 performs a merge with any union data inside the WorkResponseEffect, using the provided WorkResponseRecoveryEffectFailedAfterEffectV1
+func (t *WorkResponseEffect) MergeWorkResponseRecoveryEffectFailedAfterEffectV1(v WorkResponseRecoveryEffectFailedAfterEffectV1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseEffect) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseEffect) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponsePrepared0 returns the union data inside the WorkResponsePrepared as a WorkResponsePrepared0
+func (t WorkResponsePrepared) AsWorkResponsePrepared0() (WorkResponsePrepared0, error) {
+	var body WorkResponsePrepared0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0 overwrites any union data inside the WorkResponsePrepared as the provided WorkResponsePrepared0
+func (t *WorkResponsePrepared) FromWorkResponsePrepared0(v WorkResponsePrepared0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0 performs a merge with any union data inside the WorkResponsePrepared, using the provided WorkResponsePrepared0
+func (t *WorkResponsePrepared) MergeWorkResponsePrepared0(v WorkResponsePrepared0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared1 returns the union data inside the WorkResponsePrepared as a WorkResponsePrepared1
+func (t WorkResponsePrepared) AsWorkResponsePrepared1() (WorkResponsePrepared1, error) {
+	var body WorkResponsePrepared1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared1 overwrites any union data inside the WorkResponsePrepared as the provided WorkResponsePrepared1
+func (t *WorkResponsePrepared) FromWorkResponsePrepared1(v WorkResponsePrepared1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared1 performs a merge with any union data inside the WorkResponsePrepared, using the provided WorkResponsePrepared1
+func (t *WorkResponsePrepared) MergeWorkResponsePrepared1(v WorkResponsePrepared1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared2 returns the union data inside the WorkResponsePrepared as a WorkResponsePrepared2
+func (t WorkResponsePrepared) AsWorkResponsePrepared2() (WorkResponsePrepared2, error) {
+	var body WorkResponsePrepared2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared2 overwrites any union data inside the WorkResponsePrepared as the provided WorkResponsePrepared2
+func (t *WorkResponsePrepared) FromWorkResponsePrepared2(v WorkResponsePrepared2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared2 performs a merge with any union data inside the WorkResponsePrepared, using the provided WorkResponsePrepared2
+func (t *WorkResponsePrepared) MergeWorkResponsePrepared2(v WorkResponsePrepared2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponsePrepared) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponsePrepared) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponsePrepared0Artifact0 returns the union data inside the WorkResponsePrepared_0_Artifact as a WorkResponsePrepared0Artifact0
+func (t WorkResponsePrepared_0_Artifact) AsWorkResponsePrepared0Artifact0() (WorkResponsePrepared0Artifact0, error) {
+	var body WorkResponsePrepared0Artifact0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0Artifact0 overwrites any union data inside the WorkResponsePrepared_0_Artifact as the provided WorkResponsePrepared0Artifact0
+func (t *WorkResponsePrepared_0_Artifact) FromWorkResponsePrepared0Artifact0(v WorkResponsePrepared0Artifact0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0Artifact0 performs a merge with any union data inside the WorkResponsePrepared_0_Artifact, using the provided WorkResponsePrepared0Artifact0
+func (t *WorkResponsePrepared_0_Artifact) MergeWorkResponsePrepared0Artifact0(v WorkResponsePrepared0Artifact0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared0Artifact1 returns the union data inside the WorkResponsePrepared_0_Artifact as a WorkResponsePrepared0Artifact1
+func (t WorkResponsePrepared_0_Artifact) AsWorkResponsePrepared0Artifact1() (WorkResponsePrepared0Artifact1, error) {
+	var body WorkResponsePrepared0Artifact1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0Artifact1 overwrites any union data inside the WorkResponsePrepared_0_Artifact as the provided WorkResponsePrepared0Artifact1
+func (t *WorkResponsePrepared_0_Artifact) FromWorkResponsePrepared0Artifact1(v WorkResponsePrepared0Artifact1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0Artifact1 performs a merge with any union data inside the WorkResponsePrepared_0_Artifact, using the provided WorkResponsePrepared0Artifact1
+func (t *WorkResponsePrepared_0_Artifact) MergeWorkResponsePrepared0Artifact1(v WorkResponsePrepared0Artifact1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared0Artifact2 returns the union data inside the WorkResponsePrepared_0_Artifact as a WorkResponsePrepared0Artifact2
+func (t WorkResponsePrepared_0_Artifact) AsWorkResponsePrepared0Artifact2() (WorkResponsePrepared0Artifact2, error) {
+	var body WorkResponsePrepared0Artifact2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0Artifact2 overwrites any union data inside the WorkResponsePrepared_0_Artifact as the provided WorkResponsePrepared0Artifact2
+func (t *WorkResponsePrepared_0_Artifact) FromWorkResponsePrepared0Artifact2(v WorkResponsePrepared0Artifact2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0Artifact2 performs a merge with any union data inside the WorkResponsePrepared_0_Artifact, using the provided WorkResponsePrepared0Artifact2
+func (t *WorkResponsePrepared_0_Artifact) MergeWorkResponsePrepared0Artifact2(v WorkResponsePrepared0Artifact2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared0Artifact3 returns the union data inside the WorkResponsePrepared_0_Artifact as a WorkResponsePrepared0Artifact3
+func (t WorkResponsePrepared_0_Artifact) AsWorkResponsePrepared0Artifact3() (WorkResponsePrepared0Artifact3, error) {
+	var body WorkResponsePrepared0Artifact3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0Artifact3 overwrites any union data inside the WorkResponsePrepared_0_Artifact as the provided WorkResponsePrepared0Artifact3
+func (t *WorkResponsePrepared_0_Artifact) FromWorkResponsePrepared0Artifact3(v WorkResponsePrepared0Artifact3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0Artifact3 performs a merge with any union data inside the WorkResponsePrepared_0_Artifact, using the provided WorkResponsePrepared0Artifact3
+func (t *WorkResponsePrepared_0_Artifact) MergeWorkResponsePrepared0Artifact3(v WorkResponsePrepared0Artifact3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared0Artifact4 returns the union data inside the WorkResponsePrepared_0_Artifact as a WorkResponsePrepared0Artifact4
+func (t WorkResponsePrepared_0_Artifact) AsWorkResponsePrepared0Artifact4() (WorkResponsePrepared0Artifact4, error) {
+	var body WorkResponsePrepared0Artifact4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0Artifact4 overwrites any union data inside the WorkResponsePrepared_0_Artifact as the provided WorkResponsePrepared0Artifact4
+func (t *WorkResponsePrepared_0_Artifact) FromWorkResponsePrepared0Artifact4(v WorkResponsePrepared0Artifact4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0Artifact4 performs a merge with any union data inside the WorkResponsePrepared_0_Artifact, using the provided WorkResponsePrepared0Artifact4
+func (t *WorkResponsePrepared_0_Artifact) MergeWorkResponsePrepared0Artifact4(v WorkResponsePrepared0Artifact4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponsePrepared0Artifact5 returns the union data inside the WorkResponsePrepared_0_Artifact as a WorkResponsePrepared0Artifact5
+func (t WorkResponsePrepared_0_Artifact) AsWorkResponsePrepared0Artifact5() (WorkResponsePrepared0Artifact5, error) {
+	var body WorkResponsePrepared0Artifact5
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponsePrepared0Artifact5 overwrites any union data inside the WorkResponsePrepared_0_Artifact as the provided WorkResponsePrepared0Artifact5
+func (t *WorkResponsePrepared_0_Artifact) FromWorkResponsePrepared0Artifact5(v WorkResponsePrepared0Artifact5) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponsePrepared0Artifact5 performs a merge with any union data inside the WorkResponsePrepared_0_Artifact, using the provided WorkResponsePrepared0Artifact5
+func (t *WorkResponsePrepared_0_Artifact) MergeWorkResponsePrepared0Artifact5(v WorkResponsePrepared0Artifact5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponsePrepared_0_Artifact) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponsePrepared_0_Artifact) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseRelease0 returns the union data inside the WorkResponseRelease as a WorkResponseRelease0
+func (t WorkResponseRelease) AsWorkResponseRelease0() (WorkResponseRelease0, error) {
+	var body WorkResponseRelease0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRelease0 overwrites any union data inside the WorkResponseRelease as the provided WorkResponseRelease0
+func (t *WorkResponseRelease) FromWorkResponseRelease0(v WorkResponseRelease0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRelease0 performs a merge with any union data inside the WorkResponseRelease, using the provided WorkResponseRelease0
+func (t *WorkResponseRelease) MergeWorkResponseRelease0(v WorkResponseRelease0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRelease1 returns the union data inside the WorkResponseRelease as a WorkResponseRelease1
+func (t WorkResponseRelease) AsWorkResponseRelease1() (WorkResponseRelease1, error) {
+	var body WorkResponseRelease1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRelease1 overwrites any union data inside the WorkResponseRelease as the provided WorkResponseRelease1
+func (t *WorkResponseRelease) FromWorkResponseRelease1(v WorkResponseRelease1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRelease1 performs a merge with any union data inside the WorkResponseRelease, using the provided WorkResponseRelease1
+func (t *WorkResponseRelease) MergeWorkResponseRelease1(v WorkResponseRelease1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRelease2 returns the union data inside the WorkResponseRelease as a WorkResponseRelease2
+func (t WorkResponseRelease) AsWorkResponseRelease2() (WorkResponseRelease2, error) {
+	var body WorkResponseRelease2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRelease2 overwrites any union data inside the WorkResponseRelease as the provided WorkResponseRelease2
+func (t *WorkResponseRelease) FromWorkResponseRelease2(v WorkResponseRelease2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRelease2 performs a merge with any union data inside the WorkResponseRelease, using the provided WorkResponseRelease2
+func (t *WorkResponseRelease) MergeWorkResponseRelease2(v WorkResponseRelease2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRelease3 returns the union data inside the WorkResponseRelease as a WorkResponseRelease3
+func (t WorkResponseRelease) AsWorkResponseRelease3() (WorkResponseRelease3, error) {
+	var body WorkResponseRelease3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRelease3 overwrites any union data inside the WorkResponseRelease as the provided WorkResponseRelease3
+func (t *WorkResponseRelease) FromWorkResponseRelease3(v WorkResponseRelease3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRelease3 performs a merge with any union data inside the WorkResponseRelease, using the provided WorkResponseRelease3
+func (t *WorkResponseRelease) MergeWorkResponseRelease3(v WorkResponseRelease3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseRelease4 returns the union data inside the WorkResponseRelease as a WorkResponseRelease4
+func (t WorkResponseRelease) AsWorkResponseRelease4() (WorkResponseRelease4, error) {
+	var body WorkResponseRelease4
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseRelease4 overwrites any union data inside the WorkResponseRelease as the provided WorkResponseRelease4
+func (t *WorkResponseRelease) FromWorkResponseRelease4(v WorkResponseRelease4) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseRelease4 performs a merge with any union data inside the WorkResponseRelease, using the provided WorkResponseRelease4
+func (t *WorkResponseRelease) MergeWorkResponseRelease4(v WorkResponseRelease4) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseRelease) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseRelease) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseViewAcceptance0 returns the union data inside the WorkResponseView_Acceptance as a WorkResponseViewAcceptance0
+func (t WorkResponseView_Acceptance) AsWorkResponseViewAcceptance0() (WorkResponseViewAcceptance0, error) {
+	var body WorkResponseViewAcceptance0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewAcceptance0 overwrites any union data inside the WorkResponseView_Acceptance as the provided WorkResponseViewAcceptance0
+func (t *WorkResponseView_Acceptance) FromWorkResponseViewAcceptance0(v WorkResponseViewAcceptance0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewAcceptance0 performs a merge with any union data inside the WorkResponseView_Acceptance, using the provided WorkResponseViewAcceptance0
+func (t *WorkResponseView_Acceptance) MergeWorkResponseViewAcceptance0(v WorkResponseViewAcceptance0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewAcceptance1 returns the union data inside the WorkResponseView_Acceptance as a WorkResponseViewAcceptance1
+func (t WorkResponseView_Acceptance) AsWorkResponseViewAcceptance1() (WorkResponseViewAcceptance1, error) {
+	var body WorkResponseViewAcceptance1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewAcceptance1 overwrites any union data inside the WorkResponseView_Acceptance as the provided WorkResponseViewAcceptance1
+func (t *WorkResponseView_Acceptance) FromWorkResponseViewAcceptance1(v WorkResponseViewAcceptance1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewAcceptance1 performs a merge with any union data inside the WorkResponseView_Acceptance, using the provided WorkResponseViewAcceptance1
+func (t *WorkResponseView_Acceptance) MergeWorkResponseViewAcceptance1(v WorkResponseViewAcceptance1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewAcceptance2 returns the union data inside the WorkResponseView_Acceptance as a WorkResponseViewAcceptance2
+func (t WorkResponseView_Acceptance) AsWorkResponseViewAcceptance2() (WorkResponseViewAcceptance2, error) {
+	var body WorkResponseViewAcceptance2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewAcceptance2 overwrites any union data inside the WorkResponseView_Acceptance as the provided WorkResponseViewAcceptance2
+func (t *WorkResponseView_Acceptance) FromWorkResponseViewAcceptance2(v WorkResponseViewAcceptance2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewAcceptance2 performs a merge with any union data inside the WorkResponseView_Acceptance, using the provided WorkResponseViewAcceptance2
+func (t *WorkResponseView_Acceptance) MergeWorkResponseViewAcceptance2(v WorkResponseViewAcceptance2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewAcceptance3 returns the union data inside the WorkResponseView_Acceptance as a WorkResponseViewAcceptance3
+func (t WorkResponseView_Acceptance) AsWorkResponseViewAcceptance3() (WorkResponseViewAcceptance3, error) {
+	var body WorkResponseViewAcceptance3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewAcceptance3 overwrites any union data inside the WorkResponseView_Acceptance as the provided WorkResponseViewAcceptance3
+func (t *WorkResponseView_Acceptance) FromWorkResponseViewAcceptance3(v WorkResponseViewAcceptance3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewAcceptance3 performs a merge with any union data inside the WorkResponseView_Acceptance, using the provided WorkResponseViewAcceptance3
+func (t *WorkResponseView_Acceptance) MergeWorkResponseViewAcceptance3(v WorkResponseViewAcceptance3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseView_Acceptance) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseView_Acceptance) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseViewBilateralDelivery0 returns the union data inside the WorkResponseView_BilateralDelivery as a WorkResponseViewBilateralDelivery0
+func (t WorkResponseView_BilateralDelivery) AsWorkResponseViewBilateralDelivery0() (WorkResponseViewBilateralDelivery0, error) {
+	var body WorkResponseViewBilateralDelivery0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewBilateralDelivery0 overwrites any union data inside the WorkResponseView_BilateralDelivery as the provided WorkResponseViewBilateralDelivery0
+func (t *WorkResponseView_BilateralDelivery) FromWorkResponseViewBilateralDelivery0(v WorkResponseViewBilateralDelivery0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewBilateralDelivery0 performs a merge with any union data inside the WorkResponseView_BilateralDelivery, using the provided WorkResponseViewBilateralDelivery0
+func (t *WorkResponseView_BilateralDelivery) MergeWorkResponseViewBilateralDelivery0(v WorkResponseViewBilateralDelivery0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewBilateralDelivery1 returns the union data inside the WorkResponseView_BilateralDelivery as a WorkResponseViewBilateralDelivery1
+func (t WorkResponseView_BilateralDelivery) AsWorkResponseViewBilateralDelivery1() (WorkResponseViewBilateralDelivery1, error) {
+	var body WorkResponseViewBilateralDelivery1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewBilateralDelivery1 overwrites any union data inside the WorkResponseView_BilateralDelivery as the provided WorkResponseViewBilateralDelivery1
+func (t *WorkResponseView_BilateralDelivery) FromWorkResponseViewBilateralDelivery1(v WorkResponseViewBilateralDelivery1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewBilateralDelivery1 performs a merge with any union data inside the WorkResponseView_BilateralDelivery, using the provided WorkResponseViewBilateralDelivery1
+func (t *WorkResponseView_BilateralDelivery) MergeWorkResponseViewBilateralDelivery1(v WorkResponseViewBilateralDelivery1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewBilateralDelivery2 returns the union data inside the WorkResponseView_BilateralDelivery as a WorkResponseViewBilateralDelivery2
+func (t WorkResponseView_BilateralDelivery) AsWorkResponseViewBilateralDelivery2() (WorkResponseViewBilateralDelivery2, error) {
+	var body WorkResponseViewBilateralDelivery2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewBilateralDelivery2 overwrites any union data inside the WorkResponseView_BilateralDelivery as the provided WorkResponseViewBilateralDelivery2
+func (t *WorkResponseView_BilateralDelivery) FromWorkResponseViewBilateralDelivery2(v WorkResponseViewBilateralDelivery2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewBilateralDelivery2 performs a merge with any union data inside the WorkResponseView_BilateralDelivery, using the provided WorkResponseViewBilateralDelivery2
+func (t *WorkResponseView_BilateralDelivery) MergeWorkResponseViewBilateralDelivery2(v WorkResponseViewBilateralDelivery2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewBilateralDelivery3 returns the union data inside the WorkResponseView_BilateralDelivery as a WorkResponseViewBilateralDelivery3
+func (t WorkResponseView_BilateralDelivery) AsWorkResponseViewBilateralDelivery3() (WorkResponseViewBilateralDelivery3, error) {
+	var body WorkResponseViewBilateralDelivery3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewBilateralDelivery3 overwrites any union data inside the WorkResponseView_BilateralDelivery as the provided WorkResponseViewBilateralDelivery3
+func (t *WorkResponseView_BilateralDelivery) FromWorkResponseViewBilateralDelivery3(v WorkResponseViewBilateralDelivery3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewBilateralDelivery3 performs a merge with any union data inside the WorkResponseView_BilateralDelivery, using the provided WorkResponseViewBilateralDelivery3
+func (t *WorkResponseView_BilateralDelivery) MergeWorkResponseViewBilateralDelivery3(v WorkResponseViewBilateralDelivery3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseView_BilateralDelivery) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseView_BilateralDelivery) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseViewExecution0 returns the union data inside the WorkResponseView_Execution as a WorkResponseViewExecution0
+func (t WorkResponseView_Execution) AsWorkResponseViewExecution0() (WorkResponseViewExecution0, error) {
+	var body WorkResponseViewExecution0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewExecution0 overwrites any union data inside the WorkResponseView_Execution as the provided WorkResponseViewExecution0
+func (t *WorkResponseView_Execution) FromWorkResponseViewExecution0(v WorkResponseViewExecution0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewExecution0 performs a merge with any union data inside the WorkResponseView_Execution, using the provided WorkResponseViewExecution0
+func (t *WorkResponseView_Execution) MergeWorkResponseViewExecution0(v WorkResponseViewExecution0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewExecution1 returns the union data inside the WorkResponseView_Execution as a WorkResponseViewExecution1
+func (t WorkResponseView_Execution) AsWorkResponseViewExecution1() (WorkResponseViewExecution1, error) {
+	var body WorkResponseViewExecution1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewExecution1 overwrites any union data inside the WorkResponseView_Execution as the provided WorkResponseViewExecution1
+func (t *WorkResponseView_Execution) FromWorkResponseViewExecution1(v WorkResponseViewExecution1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewExecution1 performs a merge with any union data inside the WorkResponseView_Execution, using the provided WorkResponseViewExecution1
+func (t *WorkResponseView_Execution) MergeWorkResponseViewExecution1(v WorkResponseViewExecution1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewExecution2 returns the union data inside the WorkResponseView_Execution as a WorkResponseViewExecution2
+func (t WorkResponseView_Execution) AsWorkResponseViewExecution2() (WorkResponseViewExecution2, error) {
+	var body WorkResponseViewExecution2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewExecution2 overwrites any union data inside the WorkResponseView_Execution as the provided WorkResponseViewExecution2
+func (t *WorkResponseView_Execution) FromWorkResponseViewExecution2(v WorkResponseViewExecution2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewExecution2 performs a merge with any union data inside the WorkResponseView_Execution, using the provided WorkResponseViewExecution2
+func (t *WorkResponseView_Execution) MergeWorkResponseViewExecution2(v WorkResponseViewExecution2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewExecution3 returns the union data inside the WorkResponseView_Execution as a WorkResponseViewExecution3
+func (t WorkResponseView_Execution) AsWorkResponseViewExecution3() (WorkResponseViewExecution3, error) {
+	var body WorkResponseViewExecution3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewExecution3 overwrites any union data inside the WorkResponseView_Execution as the provided WorkResponseViewExecution3
+func (t *WorkResponseView_Execution) FromWorkResponseViewExecution3(v WorkResponseViewExecution3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewExecution3 performs a merge with any union data inside the WorkResponseView_Execution, using the provided WorkResponseViewExecution3
+func (t *WorkResponseView_Execution) MergeWorkResponseViewExecution3(v WorkResponseViewExecution3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseView_Execution) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseView_Execution) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseViewRecovery0 returns the union data inside the WorkResponseView_Recovery as a WorkResponseViewRecovery0
+func (t WorkResponseView_Recovery) AsWorkResponseViewRecovery0() (WorkResponseViewRecovery0, error) {
+	var body WorkResponseViewRecovery0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewRecovery0 overwrites any union data inside the WorkResponseView_Recovery as the provided WorkResponseViewRecovery0
+func (t *WorkResponseView_Recovery) FromWorkResponseViewRecovery0(v WorkResponseViewRecovery0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewRecovery0 performs a merge with any union data inside the WorkResponseView_Recovery, using the provided WorkResponseViewRecovery0
+func (t *WorkResponseView_Recovery) MergeWorkResponseViewRecovery0(v WorkResponseViewRecovery0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewRecovery1 returns the union data inside the WorkResponseView_Recovery as a WorkResponseViewRecovery1
+func (t WorkResponseView_Recovery) AsWorkResponseViewRecovery1() (WorkResponseViewRecovery1, error) {
+	var body WorkResponseViewRecovery1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewRecovery1 overwrites any union data inside the WorkResponseView_Recovery as the provided WorkResponseViewRecovery1
+func (t *WorkResponseView_Recovery) FromWorkResponseViewRecovery1(v WorkResponseViewRecovery1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewRecovery1 performs a merge with any union data inside the WorkResponseView_Recovery, using the provided WorkResponseViewRecovery1
+func (t *WorkResponseView_Recovery) MergeWorkResponseViewRecovery1(v WorkResponseViewRecovery1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewRecovery2 returns the union data inside the WorkResponseView_Recovery as a WorkResponseViewRecovery2
+func (t WorkResponseView_Recovery) AsWorkResponseViewRecovery2() (WorkResponseViewRecovery2, error) {
+	var body WorkResponseViewRecovery2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewRecovery2 overwrites any union data inside the WorkResponseView_Recovery as the provided WorkResponseViewRecovery2
+func (t *WorkResponseView_Recovery) FromWorkResponseViewRecovery2(v WorkResponseViewRecovery2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewRecovery2 performs a merge with any union data inside the WorkResponseView_Recovery, using the provided WorkResponseViewRecovery2
+func (t *WorkResponseView_Recovery) MergeWorkResponseViewRecovery2(v WorkResponseViewRecovery2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewRecovery3 returns the union data inside the WorkResponseView_Recovery as a WorkResponseViewRecovery3
+func (t WorkResponseView_Recovery) AsWorkResponseViewRecovery3() (WorkResponseViewRecovery3, error) {
+	var body WorkResponseViewRecovery3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewRecovery3 overwrites any union data inside the WorkResponseView_Recovery as the provided WorkResponseViewRecovery3
+func (t *WorkResponseView_Recovery) FromWorkResponseViewRecovery3(v WorkResponseViewRecovery3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewRecovery3 performs a merge with any union data inside the WorkResponseView_Recovery, using the provided WorkResponseViewRecovery3
+func (t *WorkResponseView_Recovery) MergeWorkResponseViewRecovery3(v WorkResponseViewRecovery3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseView_Recovery) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseView_Recovery) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseViewResultReference0 returns the union data inside the WorkResponseView_ResultReference as a WorkResponseViewResultReference0
+func (t WorkResponseView_ResultReference) AsWorkResponseViewResultReference0() (WorkResponseViewResultReference0, error) {
+	var body WorkResponseViewResultReference0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewResultReference0 overwrites any union data inside the WorkResponseView_ResultReference as the provided WorkResponseViewResultReference0
+func (t *WorkResponseView_ResultReference) FromWorkResponseViewResultReference0(v WorkResponseViewResultReference0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewResultReference0 performs a merge with any union data inside the WorkResponseView_ResultReference, using the provided WorkResponseViewResultReference0
+func (t *WorkResponseView_ResultReference) MergeWorkResponseViewResultReference0(v WorkResponseViewResultReference0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewResultReference1 returns the union data inside the WorkResponseView_ResultReference as a WorkResponseViewResultReference1
+func (t WorkResponseView_ResultReference) AsWorkResponseViewResultReference1() (WorkResponseViewResultReference1, error) {
+	var body WorkResponseViewResultReference1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewResultReference1 overwrites any union data inside the WorkResponseView_ResultReference as the provided WorkResponseViewResultReference1
+func (t *WorkResponseView_ResultReference) FromWorkResponseViewResultReference1(v WorkResponseViewResultReference1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewResultReference1 performs a merge with any union data inside the WorkResponseView_ResultReference, using the provided WorkResponseViewResultReference1
+func (t *WorkResponseView_ResultReference) MergeWorkResponseViewResultReference1(v WorkResponseViewResultReference1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewResultReference2 returns the union data inside the WorkResponseView_ResultReference as a WorkResponseViewResultReference2
+func (t WorkResponseView_ResultReference) AsWorkResponseViewResultReference2() (WorkResponseViewResultReference2, error) {
+	var body WorkResponseViewResultReference2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewResultReference2 overwrites any union data inside the WorkResponseView_ResultReference as the provided WorkResponseViewResultReference2
+func (t *WorkResponseView_ResultReference) FromWorkResponseViewResultReference2(v WorkResponseViewResultReference2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewResultReference2 performs a merge with any union data inside the WorkResponseView_ResultReference, using the provided WorkResponseViewResultReference2
+func (t *WorkResponseView_ResultReference) MergeWorkResponseViewResultReference2(v WorkResponseViewResultReference2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewResultReference3 returns the union data inside the WorkResponseView_ResultReference as a WorkResponseViewResultReference3
+func (t WorkResponseView_ResultReference) AsWorkResponseViewResultReference3() (WorkResponseViewResultReference3, error) {
+	var body WorkResponseViewResultReference3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewResultReference3 overwrites any union data inside the WorkResponseView_ResultReference as the provided WorkResponseViewResultReference3
+func (t *WorkResponseView_ResultReference) FromWorkResponseViewResultReference3(v WorkResponseViewResultReference3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewResultReference3 performs a merge with any union data inside the WorkResponseView_ResultReference, using the provided WorkResponseViewResultReference3
+func (t *WorkResponseView_ResultReference) MergeWorkResponseViewResultReference3(v WorkResponseViewResultReference3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseView_ResultReference) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseView_ResultReference) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsWorkResponseViewSettlement0 returns the union data inside the WorkResponseView_Settlement as a WorkResponseViewSettlement0
+func (t WorkResponseView_Settlement) AsWorkResponseViewSettlement0() (WorkResponseViewSettlement0, error) {
+	var body WorkResponseViewSettlement0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewSettlement0 overwrites any union data inside the WorkResponseView_Settlement as the provided WorkResponseViewSettlement0
+func (t *WorkResponseView_Settlement) FromWorkResponseViewSettlement0(v WorkResponseViewSettlement0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewSettlement0 performs a merge with any union data inside the WorkResponseView_Settlement, using the provided WorkResponseViewSettlement0
+func (t *WorkResponseView_Settlement) MergeWorkResponseViewSettlement0(v WorkResponseViewSettlement0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewSettlement1 returns the union data inside the WorkResponseView_Settlement as a WorkResponseViewSettlement1
+func (t WorkResponseView_Settlement) AsWorkResponseViewSettlement1() (WorkResponseViewSettlement1, error) {
+	var body WorkResponseViewSettlement1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewSettlement1 overwrites any union data inside the WorkResponseView_Settlement as the provided WorkResponseViewSettlement1
+func (t *WorkResponseView_Settlement) FromWorkResponseViewSettlement1(v WorkResponseViewSettlement1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewSettlement1 performs a merge with any union data inside the WorkResponseView_Settlement, using the provided WorkResponseViewSettlement1
+func (t *WorkResponseView_Settlement) MergeWorkResponseViewSettlement1(v WorkResponseViewSettlement1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewSettlement2 returns the union data inside the WorkResponseView_Settlement as a WorkResponseViewSettlement2
+func (t WorkResponseView_Settlement) AsWorkResponseViewSettlement2() (WorkResponseViewSettlement2, error) {
+	var body WorkResponseViewSettlement2
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewSettlement2 overwrites any union data inside the WorkResponseView_Settlement as the provided WorkResponseViewSettlement2
+func (t *WorkResponseView_Settlement) FromWorkResponseViewSettlement2(v WorkResponseViewSettlement2) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewSettlement2 performs a merge with any union data inside the WorkResponseView_Settlement, using the provided WorkResponseViewSettlement2
+func (t *WorkResponseView_Settlement) MergeWorkResponseViewSettlement2(v WorkResponseViewSettlement2) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsWorkResponseViewSettlement3 returns the union data inside the WorkResponseView_Settlement as a WorkResponseViewSettlement3
+func (t WorkResponseView_Settlement) AsWorkResponseViewSettlement3() (WorkResponseViewSettlement3, error) {
+	var body WorkResponseViewSettlement3
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromWorkResponseViewSettlement3 overwrites any union data inside the WorkResponseView_Settlement as the provided WorkResponseViewSettlement3
+func (t *WorkResponseView_Settlement) FromWorkResponseViewSettlement3(v WorkResponseViewSettlement3) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeWorkResponseViewSettlement3 performs a merge with any union data inside the WorkResponseView_Settlement, using the provided WorkResponseViewSettlement3
+func (t *WorkResponseView_Settlement) MergeWorkResponseViewSettlement3(v WorkResponseViewSettlement3) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t WorkResponseView_Settlement) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *WorkResponseView_Settlement) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

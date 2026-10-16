@@ -1,0 +1,1910 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-wire/v1/work/response.schema.json",
+  "title": "Work Response V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "version",
+    "body"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.work.response.v1"
+    },
+    "version": {
+      "const": 1
+    },
+    "body": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "prepared"
+          ],
+          "properties": {
+            "kind": {
+              "const": "prepared"
+            },
+            "prepared": {
+              "$ref": "#/$defs/prepared"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "result"
+          ],
+          "properties": {
+            "kind": {
+              "const": "command"
+            },
+            "result": {
+              "$ref": "#/$defs/commandResult"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "result"
+          ],
+          "properties": {
+            "kind": {
+              "const": "query"
+            },
+            "result": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "view"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "work"
+                    },
+                    "view": {
+                      "$ref": "#/$defs/view"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "result"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "command"
+                    },
+                    "result": {
+                      "$ref": "#/$defs/commandResult"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "prepared"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "preparation"
+                    },
+                    "prepared": {
+                      "$ref": "#/$defs/prepared"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "page"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "catalog"
+                    },
+                    "page": {
+                      "$ref": "#/$defs/catalogPage"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "profile"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "profile"
+                    },
+                    "profile": {
+                      "$ref": "#/$defs/profile"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "code"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "unavailable"
+                    },
+                    "code": {
+                      "$ref": "#/$defs/rejectionCode"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "producer",
+        "artifact",
+        "artifact_digest",
+        "contract_digest",
+        "procedure_digest",
+        "evaluator",
+        "decision",
+        "evidence"
+      ],
+      "properties": {
+        "handle": {
+          "$ref": "#/$defs/handle"
+        },
+        "producer": {
+          "$ref": "#/$defs/operation"
+        },
+        "artifact": {
+          "$ref": "#/$defs/artifactVersionRef"
+        },
+        "artifact_digest": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "contract_digest": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "procedure_digest": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "evaluator": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "accepted",
+            "rejected"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/opaqueId"
+          },
+          "maxItems": 16
+        }
+      }
+    },
+    "artifactVersionRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "artifact",
+        "version",
+        "provenance"
+      ],
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "artifact": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "version": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "provenance": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "bindingField": {
+      "type": "string",
+      "enum": [
+        "program_id",
+        "command_id",
+        "slot_id",
+        "allocation_hash",
+        "receiver_kernel_id",
+        "request_id",
+        "capability_hash",
+        "profile_ref",
+        "graph_sha256",
+        "draft_ref",
+        "permit",
+        "invocation_ref"
+      ]
+    },
+    "catalogCursor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_generation",
+        "position"
+      ],
+      "properties": {
+        "catalog_generation": {
+          "$ref": "#/$defs/policyGeneration"
+        },
+        "position": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "catalogPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "catalog_ref",
+        "entries"
+      ],
+      "properties": {
+        "catalog_ref": {
+          "$ref": "#/$defs/catalogRef"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/profileRef"
+          },
+          "maxItems": 64
+        },
+        "next": {
+          "$ref": "#/$defs/catalogCursor"
+        }
+      }
+    },
+    "catalogRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "catalog_id"
+      ],
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/workId"
+        },
+        "catalog_id": {
+          "$ref": "#/$defs/workId"
+        }
+      }
+    },
+    "commandRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_id",
+        "command_id",
+        "command_digest"
+      ],
+      "properties": {
+        "program_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "command_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "command_digest": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "commandResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command_ref",
+        "outcome"
+      ],
+      "properties": {
+        "command_ref": {
+          "$ref": "#/$defs/commandRef"
+        },
+        "outcome": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "revision",
+                "result"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "applied"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "result": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "slot"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "delegated"
+                        },
+                        "slot": {
+                          "$ref": "#/$defs/delegationRecord"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "revision"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "selected"
+                        },
+                        "revision": {
+                          "$ref": "#/$defs/safeInteger"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "permit"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "sealed"
+                        },
+                        "permit": {
+                          "$ref": "#/$defs/delegationRecord"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "bundle_sha256"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "extended"
+                        },
+                        "bundle_sha256": {
+                          "$ref": "#/$defs/workDigest"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "owner_operation_ref"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "submitted"
+                        },
+                        "owner_operation_ref": {
+                          "$ref": "#/$defs/ownerOperationRef"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "view"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "reconciled"
+                        },
+                        "view": {
+                          "$ref": "#/$defs/view"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "kind",
+                        "control"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "cancel_observed"
+                        },
+                        "control": {
+                          "$ref": "#/$defs/control"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_operation_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_operation_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "rejection"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "refused"
+                },
+                "rejection": {
+                  "$ref": "#/$defs/rejection"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "control": {
+      "type": "string",
+      "enum": [
+        "active",
+        "cancel_requested",
+        "cancelled",
+        "quarantined"
+      ]
+    },
+    "delegationRecord": {
+      "type": "object",
+      "title": "Work delegation record"
+    },
+    "draftRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "draft_id",
+        "graph_sha256"
+      ],
+      "properties": {
+        "draft_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "graph_sha256": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "effect": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/recoveryEffectNeverAdmittedV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectAdmissionUnresolvedV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectClosedBeforeEffectV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectAwaitingApprovalV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectInFlightV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectAwaitingCallerReportV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectUnknownV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectCompleteV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectPartialV1"
+        },
+        {
+          "$ref": "#/$defs/recoveryEffectFailedAfterEffectV1"
+        }
+      ]
+    },
+    "handle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_id",
+        "slot_id",
+        "allocation_hash",
+        "receiver_kernel_id",
+        "request_id"
+      ],
+      "properties": {
+        "program_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "slot_id": {
+          "$ref": "#/$defs/workSlotId"
+        },
+        "allocation_hash": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "receiver_kernel_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "request_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "opaqueId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "operation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation_id",
+        "native_admission_digest",
+        "operation_version"
+      ],
+      "properties": {
+        "operation_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "native_admission_digest": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "operation_version": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      }
+    },
+    "ownerOperationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "scope"
+      ],
+      "properties": {
+        "operation": {
+          "$ref": "#/$defs/operation"
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        }
+      }
+    },
+    "policyGeneration": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "preparationRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_id",
+        "preparation_id",
+        "command_digest"
+      ],
+      "properties": {
+        "program_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "preparation_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "command_digest": {
+          "$ref": "#/$defs/workDigest"
+        }
+      }
+    },
+    "prepared": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "preparation_ref",
+            "artifact"
+          ],
+          "properties": {
+            "kind": {
+              "const": "prepared"
+            },
+            "preparation_ref": {
+              "$ref": "#/$defs/preparationRef"
+            },
+            "artifact": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "subdivision"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "subdivision"
+                    },
+                    "subdivision": {
+                      "$ref": "#/$defs/delegationRecord"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "offer",
+                    "invocation_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "offer"
+                    },
+                    "offer": {
+                      "$ref": "#/$defs/delegationRecord"
+                    },
+                    "invocation_ref": {
+                      "$ref": "#/$defs/workDigest"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "selection"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "selection"
+                    },
+                    "selection": {
+                      "$ref": "#/$defs/delegationRecord"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "draft_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "graph_draft"
+                    },
+                    "draft_ref": {
+                      "$ref": "#/$defs/draftRef"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "draft_ref"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "join_draft"
+                    },
+                    "draft_ref": {
+                      "$ref": "#/$defs/draftRef"
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "kind",
+                    "agreement_digest"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "agreement"
+                    },
+                    "agreement_digest": {
+                      "$ref": "#/$defs/workDigest"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "preparation_ref",
+            "owner_operation_ref"
+          ],
+          "properties": {
+            "kind": {
+              "const": "pending"
+            },
+            "preparation_ref": {
+              "$ref": "#/$defs/preparationRef"
+            },
+            "owner_operation_ref": {
+              "$ref": "#/$defs/ownerOperationRef"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "preparation_ref",
+            "rejection"
+          ],
+          "properties": {
+            "kind": {
+              "const": "refused"
+            },
+            "preparation_ref": {
+              "$ref": "#/$defs/preparationRef"
+            },
+            "rejection": {
+              "$ref": "#/$defs/rejection"
+            }
+          }
+        }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_ref",
+        "server_id",
+        "tool_name",
+        "tool_schema_digest",
+        "implementation_digest",
+        "max_units",
+        "currency",
+        "acceptance_procedure",
+        "recovery_operations",
+        "valid_until_unix_ms",
+        "conditions"
+      ],
+      "properties": {
+        "profile_ref": {
+          "$ref": "#/$defs/profileRef"
+        },
+        "server_id": {
+          "$ref": "#/$defs/workId"
+        },
+        "tool_name": {
+          "$ref": "#/$defs/workId"
+        },
+        "tool_schema_digest": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "implementation_digest": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "max_units": {
+          "$ref": "#/$defs/safeInteger"
+        },
+        "currency": {
+          "$ref": "#/$defs/workId"
+        },
+        "acceptance_procedure": {
+          "$ref": "#/$defs/workDigest"
+        },
+        "recovery_operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recoveryOperation"
+          },
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "valid_until_unix_ms": {
+          "$ref": "#/$defs/safeInteger"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "enforcement",
+              "statement_digest"
+            ],
+            "properties": {
+              "source": {
+                "$ref": "#/$defs/workId"
+              },
+              "enforcement": {
+                "type": "string",
+                "enum": [
+                  "local",
+                  "remote"
+                ]
+              },
+              "statement_digest": {
+                "$ref": "#/$defs/workDigest"
+              }
+            }
+          },
+          "maxItems": 64
+        },
+        "funding_profile_id": {
+          "$ref": "#/$defs/workId"
+        }
+      }
+    },
+    "profileRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "catalog_entry",
+        "deployment_digest",
+        "policy_generation",
+        "profile_digest"
+      ],
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/workId"
+        },
+        "catalog_entry": {
+          "$ref": "#/$defs/workId"
+        },
+        "deployment_digest": {
+          "$ref": "#/$defs/recoveryDigest32"
+        },
+        "policy_generation": {
+          "$ref": "#/$defs/policyGeneration"
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/recoveryDigest32"
+        }
+      }
+    },
+    "recoveryDigest32": {
+      "type": "array",
+      "minItems": 32,
+      "maxItems": 32,
+      "items": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 255,
+        "title": "Recovery digest octet"
+      },
+      "title": "Recovery digest32"
+    },
+    "recoveryEffectAdmissionUnresolvedV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "admission_intent"
+      ],
+      "properties": {
+        "kind": {
+          "const": "admission_unresolved"
+        },
+        "admission_intent": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      },
+      "title": "Recovery effect admission unresolved V1"
+    },
+    "recoveryEffectAwaitingApprovalV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation"
+      ],
+      "properties": {
+        "kind": {
+          "const": "awaiting_approval"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        }
+      },
+      "title": "Recovery effect awaiting approval V1"
+    },
+    "recoveryEffectAwaitingCallerReportV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation"
+      ],
+      "properties": {
+        "kind": {
+          "const": "awaiting_caller_report"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        }
+      },
+      "title": "Recovery effect awaiting caller report V1"
+    },
+    "recoveryEffectClosedBeforeEffectV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation",
+        "closure"
+      ],
+      "properties": {
+        "kind": {
+          "const": "closed_before_effect"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        },
+        "closure": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      },
+      "title": "Recovery effect closed before effect V1"
+    },
+    "recoveryEffectCompleteV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation",
+        "effect_count"
+      ],
+      "properties": {
+        "kind": {
+          "const": "complete"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        },
+        "effect_count": {
+          "$ref": "#/$defs/safeInteger"
+        }
+      },
+      "title": "Recovery effect complete V1"
+    },
+    "recoveryEffectFailedAfterEffectV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation",
+        "applied_effects"
+      ],
+      "properties": {
+        "kind": {
+          "const": "failed_after_effect"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        },
+        "applied_effects": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "title": "Recovery effect failed after effect V1"
+    },
+    "recoveryEffectInFlightV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation"
+      ],
+      "properties": {
+        "kind": {
+          "const": "in_flight"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        }
+      },
+      "title": "Recovery effect in flight V1"
+    },
+    "recoveryEffectNeverAdmittedV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "const": "never_admitted"
+        }
+      },
+      "title": "Recovery effect never admitted V1"
+    },
+    "recoveryEffectPartialV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation",
+        "applied_effects"
+      ],
+      "properties": {
+        "kind": {
+          "const": "partial"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        },
+        "applied_effects": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "title": "Recovery effect partial V1"
+    },
+    "recoveryEffectUnknownV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "operation"
+      ],
+      "properties": {
+        "kind": {
+          "const": "unknown"
+        },
+        "operation": {
+          "$ref": "#/$defs/operation"
+        }
+      },
+      "title": "Recovery effect unknown V1"
+    },
+    "recoveryLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "version",
+        "scope",
+        "workflow_id",
+        "step_id",
+        "continuation_id",
+        "control",
+        "available"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.recovery.observation.v1"
+        },
+        "version": {
+          "const": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "workflow_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "step_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "continuation_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "control": {
+          "$ref": "#/$defs/control"
+        },
+        "available": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recoveryOperation"
+          },
+          "maxItems": 8,
+          "uniqueItems": true
+        }
+      }
+    },
+    "recoveryOperation": {
+      "type": "string",
+      "enum": [
+        "inspect_workflow",
+        "select_offer",
+        "submit_approval",
+        "resume_workflow",
+        "cancel_workflow"
+      ]
+    },
+    "refusalCode": {
+      "type": "string",
+      "enum": [
+        "invalid_evidence",
+        "unsupported_profile",
+        "stale_basis",
+        "revoked",
+        "expired",
+        "budget_unavailable",
+        "unknown_effect",
+        "audience_denied",
+        "resource_exhausted"
+      ]
+    },
+    "rejection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/rejectionCode"
+        },
+        "field": {
+          "$ref": "#/$defs/bindingField"
+        },
+        "reference": {
+          "$ref": "#/$defs/commandRef"
+        }
+      }
+    },
+    "rejectionCode": {
+      "type": "string",
+      "enum": [
+        "schema",
+        "malformed",
+        "duplicate_key",
+        "unsafe_integer",
+        "bounds",
+        "identifier",
+        "binding_mismatch",
+        "conflict",
+        "stale_version",
+        "stale_catalog",
+        "expired",
+        "revoked",
+        "audience",
+        "role",
+        "cross_tenant",
+        "unsupported_profile",
+        "busy"
+      ]
+    },
+    "release": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "not_available"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "release_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "pending"
+            },
+            "release_id": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "evidence"
+          ],
+          "properties": {
+            "kind": {
+              "const": "withheld"
+            },
+            "evidence": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "release_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "released"
+            },
+            "release_id": {
+              "$ref": "#/$defs/opaqueId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "const": "denied"
+            },
+            "reason": {
+              "$ref": "#/$defs/refusalCode"
+            }
+          }
+        }
+      ]
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_domain",
+        "tenant_id",
+        "process_id"
+      ],
+      "properties": {
+        "authority_domain": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "tenant_id": {
+          "$ref": "#/$defs/opaqueId"
+        },
+        "process_id": {
+          "$ref": "#/$defs/opaqueId"
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "execution",
+        "acceptance",
+        "result_reference",
+        "recovery",
+        "settlement",
+        "bilateral_delivery"
+      ],
+      "properties": {
+        "handle": {
+          "$ref": "#/$defs/handle"
+        },
+        "execution": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "revision",
+                "observed_at",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "available"
+                },
+                "source": {
+                  "$ref": "#/$defs/workId"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "observed_at": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "value": {
+                  "$ref": "#/$defs/effect"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unavailable"
+                },
+                "code": {
+                  "$ref": "#/$defs/rejectionCode"
+                }
+              }
+            }
+          ]
+        },
+        "acceptance": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "revision",
+                "observed_at",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "available"
+                },
+                "source": {
+                  "$ref": "#/$defs/workId"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "observed_at": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "value": {
+                  "$ref": "#/$defs/acceptance"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unavailable"
+                },
+                "code": {
+                  "$ref": "#/$defs/rejectionCode"
+                }
+              }
+            }
+          ]
+        },
+        "result_reference": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "revision",
+                "observed_at",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "available"
+                },
+                "source": {
+                  "$ref": "#/$defs/workId"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "observed_at": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "artifact",
+                    "release"
+                  ],
+                  "properties": {
+                    "artifact": {
+                      "$ref": "#/$defs/artifactVersionRef"
+                    },
+                    "release": {
+                      "$ref": "#/$defs/release"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unavailable"
+                },
+                "code": {
+                  "$ref": "#/$defs/rejectionCode"
+                }
+              }
+            }
+          ]
+        },
+        "recovery": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "revision",
+                "observed_at",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "available"
+                },
+                "source": {
+                  "$ref": "#/$defs/workId"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "observed_at": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "value": {
+                  "$ref": "#/$defs/recoveryLink"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unavailable"
+                },
+                "code": {
+                  "$ref": "#/$defs/rejectionCode"
+                }
+              }
+            }
+          ]
+        },
+        "settlement": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "revision",
+                "observed_at",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "available"
+                },
+                "source": {
+                  "$ref": "#/$defs/workId"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "observed_at": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "rail",
+                    "agreement_digest"
+                  ],
+                  "properties": {
+                    "rail": {
+                      "$ref": "#/$defs/workId"
+                    },
+                    "agreement_digest": {
+                      "$ref": "#/$defs/workDigest"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unavailable"
+                },
+                "code": {
+                  "$ref": "#/$defs/rejectionCode"
+                }
+              }
+            }
+          ]
+        },
+        "bilateral_delivery": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "not_applicable"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "owner_ref"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pending"
+                },
+                "owner_ref": {
+                  "$ref": "#/$defs/ownerOperationRef"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "source",
+                "revision",
+                "observed_at",
+                "value"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "available"
+                },
+                "source": {
+                  "$ref": "#/$defs/workId"
+                },
+                "revision": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "observed_at": {
+                  "$ref": "#/$defs/safeInteger"
+                },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "envelope_digest",
+                    "state"
+                  ],
+                  "properties": {
+                    "envelope_digest": {
+                      "$ref": "#/$defs/workDigest"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "retained",
+                        "delivered"
+                      ]
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "code"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "unavailable"
+                },
+                "code": {
+                  "$ref": "#/$defs/rejectionCode"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "workDigest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "workId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+      "not": {
+        "pattern": "[\\r\\n]"
+      }
+    },
+    "workSlotId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^[A-Za-z0-9._:/-]{1,256}$"
+    }
+  }
+}

@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 9c3522ff79e430e736091f3e10d405a7c28615e03da0e81496a60cfec8262f3c
+# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -28,7 +28,7 @@ class Result(BaseModel):
     value: Any
 
 
-class Result3(BaseModel):
+class Result16(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -36,7 +36,7 @@ class Result3(BaseModel):
     total_chunks: conint(ge=0)
 
 
-class Result4(BaseModel):
+class Result17(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -45,7 +45,7 @@ class Result4(BaseModel):
     chunks_received: conint(ge=0)
 
 
-class Result5(BaseModel):
+class Result18(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -108,7 +108,7 @@ class Error13(BaseModel):
     detail: constr(min_length=1)
 
 
-class Result6(BaseModel):
+class Result19(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
@@ -124,10 +124,10 @@ class ChioKernelmessageToolCallResponse(BaseModel):
     id: constr(min_length=1)
     result: (
         Result
-        | Result3
-        | Result4
-        | Result5
-        | Result6
+        | Result16
+        | Result17
+        | Result18
+        | Result19
         | pending_approval_schema.ChioToolcallresultPendingApproval
     )
     receipt: record_schema.ChioReceiptRecord
