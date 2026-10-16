@@ -825,6 +825,19 @@ pub const TRANSPORT_HTTP_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-http-core", "chio-cli"],
 };
 
+pub const TRANSPORT_DPOP_SENDER_PROOF_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:dpop-sender-proof-unavailable",
+    domain: Domain::Transport,
+    severity: Severity::Fatal,
+    summary: "Chio DPoP sender binding is unavailable on this transport.",
+    help: "Use a TLS-bound sender constraint or present the DPoP proof inside the tool call to an activated replay authority.",
+    string_code: "CHIO-TRANSPORT-DPOP-SENDER-PROOF-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub const TRANSPORT_DPOP_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:transport:dpop-verification-failed",
     domain: Domain::Transport,
@@ -3753,6 +3766,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSPORT_INVALID_REQUEST_SHAPE,
     TRANSPORT_AUTH_MISSING_OR_INVALID,
     TRANSPORT_HTTP_FAILED,
+    TRANSPORT_DPOP_SENDER_PROOF_UNAVAILABLE,
     TRANSPORT_DPOP_VERIFICATION_FAILED,
     TRANSPORT_UPSTREAM_FAILURE,
     TRANSPORT_METHOD_NOT_FOUND,

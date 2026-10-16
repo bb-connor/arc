@@ -8,10 +8,9 @@ use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, UnixMilli
 pub use clock::RemoteClock;
 mod oauth_error;
 pub use oauth_error::{OAuthError, OAuthRejection};
+mod input;
 #[path = "remote_mcp/sender_constraint.rs"]
 mod sender_constraint;
-use sender_constraint::SenderConstraintVerifier;
-mod input;
 mod transport_identity;
 use input::{
     decode as decode_json, BoundedJson, SenderConstraintError, MAX_AUTH_JSON_BYTES,

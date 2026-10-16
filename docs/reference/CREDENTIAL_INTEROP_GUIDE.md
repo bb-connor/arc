@@ -169,8 +169,8 @@ Shipped:
   state,
   one optional verifier-scoped identity assertion envelope for subject and
   continuity context,
-  one bounded hosted sender-constrained continuation contract over DPoP,
-  mTLS thumbprint binding, and one attestation-confirmation profile,
+  one bounded hosted sender-constrained continuation contract over mTLS
+  thumbprint binding and one attestation-confirmation profile,
   `client_id_scheme=redirect_uri`, `response_type=vp_token`,
   `response_mode=direct_post.jwt`, one signed request-object `request_uri`,
   one HTTPS cross-device launch URL, one Chio verifier metadata document, and
@@ -216,15 +216,16 @@ When the verifier continues from the wallet exchange into Chio's hosted
 authorization edge, it may also opt into one bounded sender-constrained
 contract:
 
-- `chio_sender_dpop_public_key`
 - `chio_sender_mtls_thumbprint_sha256`
 - `chio_sender_attestation_sha256`
 
 Chio treats these as continuity constraints, not as independent authority
-artifacts. DPoP and mTLS bind the runtime sender to the issued token, while
-the attestation digest is only accepted when it matches the carried
-`runtimeAssuranceEvidenceSha256` and is paired with DPoP or mTLS. Missing,
-replayed, or contradictory sender proof fails closed.
+artifacts. mTLS binds the runtime sender to the issued token, while the
+attestation digest is only accepted when it matches the carried
+`runtimeAssuranceEvidenceSha256` and is paired with mTLS. Missing or
+contradictory sender proof fails closed. Chio DPoP sender binding is
+unavailable until the edge holds durable authentication replay custody:
+`chio_sender_dpop_public_key` is refused as `invalid_request`.
 
 ## Cross-Issuer Portfolios
 

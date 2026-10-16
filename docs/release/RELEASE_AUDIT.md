@@ -224,9 +224,9 @@ Primary local qualification commands:
 - `for f in docs/standards/CHIO_PUBLIC_IDENTITY_PROFILE.json docs/standards/CHIO_PUBLIC_WALLET_DIRECTORY_ENTRY_EXAMPLE.json docs/standards/CHIO_PUBLIC_WALLET_ROUTING_EXAMPLE.json docs/standards/CHIO_PUBLIC_IDENTITY_QUALIFICATION_MATRIX.json; do jq empty "$f"; done`
 - `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange -- --exact --nocapture`
 - `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_assertion -- --exact --nocapture`
-- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime -- --exact --nocapture --test-threads=1`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_refuses_dpop_sender_constraint -- --exact --nocapture --test-threads=1`
 - `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_constraint -- --exact --nocapture --test-threads=1`
-- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpop_or_mtls -- --exact --nocapture --test-threads=1`
+- `cargo test -p chio-cli --test mcp_auth_server mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_mtls -- --exact --nocapture --test-threads=1`
 - `cargo test -p chio-core appraisal -- --nocapture`
 - `cargo test -p chio-core runtime_attestation_trust_policy -- --nocapture`
 - `cargo test -p chio-policy runtime_assurance_validation -- --nocapture`

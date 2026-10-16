@@ -85,6 +85,25 @@ baseline and its frozen line references remain historical evidence.
   both nonce families; historical registry counts and version names
   below do not describe this amended draft.
 
+### 2026-10-16: DPoP replay-authority alignment
+
+This targeted source review covers the invocation proof and hosted
+sender-constraint statements below. It does not requalify other rows.
+
+- **Invocation proof.** The `chio.dpop_proof.v1` body requires
+  `replay_authority`, and the kernel accepts a proof only when that
+  member equals its independently activated durable authority. Freshness
+  comes from that authority. Evidence:
+  `crates/kernel/chio-kernel/src/dpop/authority.rs` (`verify_dpop_proof_stateless`)
+  and `crates/kernel/chio-kernel/src/kernel/admission_coordinator/dpop_acquisition.rs`.
+  This supersedes the default-window and process-local replay wording in
+  the Sender Constraint rows.
+- **Hosted sender constraint.** The hosted edge accepts no DPoP sender
+  proof. A token whose `cnf` carries `chioSenderKey` and a request with a
+  `DPoP` header are rejected with 401 and never admitted as a bearer.
+  Evidence: `crates/protocol/chio-mcp-remote/src/remote_mcp/sender_constraint.rs`
+  (`validate_sender_constraint`). This supersedes row H13.
+
 ## Abstract and Sections 1-3
 
 # Final opening-section claim review

@@ -11,8 +11,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use chio_core::crypto::{sha256_hex, Keypair};
-use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
+use chio_core::crypto::Keypair;
 use chio_test_support::ctx::TestUnwrap;
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};
 use reqwest::blocking::{Client, Response};
@@ -310,38 +309,6 @@ fn post_mcp_json_with_headers(
         .body(serde_json::to_vec(body).expect("serialize request body"))
         .send()
         .expect("send HTTP MCP request")
-}
-
-fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("system time before unix epoch")
-        .as_secs()
-}
-
-fn encode_sender_dpop_header(
-    keypair: &Keypair,
-    binding_id: &str,
-    target: &str,
-    method: &str,
-    nonce: &str,
-) -> String {
-    let proof = DpopProof::sign(
-        DpopProofBody {
-            replay_authority: None,
-            schema: DPOP_SCHEMA.to_string(),
-            capability_id: binding_id.to_string(),
-            tool_server: target.to_string(),
-            tool_name: method.to_string(),
-            action_hash: sha256_hex(b""),
-            nonce: nonce.to_string(),
-            issued_at: unix_now(),
-            agent_key: keypair.public_key(),
-        },
-        keypair,
-    )
-    .expect("sign sender DPoP proof");
-    URL_SAFE_NO_PAD.encode(serde_json::to_vec(&proof).expect("serialize DPoP proof"))
 }
 
 fn consent_nonce(page: &str) -> String {
@@ -926,9 +893,9 @@ fn mcp_serve_http_local_auth_server_rejects_stale_or_mismatched_identity_asserti
 }
 
 #[test]
-fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime() {
+fn mcp_serve_http_local_auth_server_refuses_dpop_sender_constraint() {
     if skip_when_loopback_bind_denied(
-        "mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token_and_mcp_runtime",
+        "mcp_serve_http_local_auth_server_refuses_dpop_sender_constraint",
     ) {
         return;
     }
@@ -950,23 +917,41 @@ fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token
 
     let redirect_uri = "http://localhost:7777/callback";
     let resource = format!("{base_url}/mcp");
-    let sender_keypair = Keypair::generate();
-    let sender_key_hex = sender_keypair.public_key().to_hex();
+    let challenge = pkce_challenge("chio-auth-verifier");
+    let sender_key_hex = Keypair::generate().public_key().to_hex();
+    let refused = client
+        .get(format!("{base_url}/oauth/authorize"))
+        .query(&[
+            ("response_type", "code"),
+            ("client_id", "https://client.example/app"),
+            ("redirect_uri", redirect_uri),
+            ("state", "state-123"),
+            ("resource", resource.as_str()),
+            ("scope", "mcp:invoke"),
+            ("chio_sender_dpop_public_key", sender_key_hex.as_str()),
+            ("code_challenge", challenge.as_str()),
+            ("code_challenge_method", "S256"),
+        ])
+        .send()
+        .expect("send DPoP-bound authorize request");
+    assert_eq!(refused.status(), reqwest::StatusCode::BAD_REQUEST);
+    assert_eq!(
+        refused
+            .json::<Value>()
+            .test_unwrap("DPoP-bound authorize body"),
+        json!({
+            "error": "invalid_request",
+            "error_description": "urn:chio:error:transport:invalid-request-shape"
+        })
+    );
+
     let code = authorize_sender_bound_code(
         &client,
         &base_url,
         redirect_uri,
         resource.as_str(),
-        &[("chio_sender_dpop_public_key", sender_key_hex.as_str())],
         &[],
-    );
-
-    let code_dpop_header = encode_sender_dpop_header(
-        &sender_keypair,
-        code.as_str(),
-        &format!("{base_url}/oauth/token"),
-        "POST",
-        "token-dpop-nonce-1",
+        &[],
     );
     let token_response: Value = token_exchange_with_headers(
         &client,
@@ -979,35 +964,23 @@ fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token
             ("code_verifier", "chio-auth-verifier"),
             ("resource", resource.as_str()),
         ],
-        &[("dpop", code_dpop_header)],
+        &[],
     )
     .error_for_status()
-    .expect("sender-constrained token exchange ok")
+    .expect("bearer token exchange ok")
     .json()
-    .expect("decode sender-constrained token response");
+    .expect("decode bearer token response");
     let access_token = token_response["access_token"]
         .as_str()
         .expect("access token")
         .to_string();
-    let access_payload = decode_jwt_payload(&access_token);
-    assert_eq!(
-        access_payload["cnf"]["chioSenderKey"].as_str(),
-        Some(sender_key_hex.as_str())
-    );
-    let access_token_jti = access_payload["jti"].as_str().expect("access token jti");
+    assert!(decode_jwt_payload(&access_token).get("cnf").is_none());
 
-    let runtime_dpop_header = encode_sender_dpop_header(
-        &sender_keypair,
-        access_token_jti,
-        resource.as_str(),
-        "POST",
-        "runtime-dpop-nonce-1",
-    );
-    let initialize_response = post_mcp_json_with_headers(
+    let presented = post_mcp_json_with_headers(
         &client,
         &base_url,
         &access_token,
-        &[("dpop", runtime_dpop_header.clone())],
+        &[("dpop", "presented-proof".to_string())],
         &json!({
             "jsonrpc": "2.0",
             "id": 1,
@@ -1015,37 +988,14 @@ fn mcp_serve_http_local_auth_server_enforces_dpop_sender_constraint_across_token
             "params": {
                 "protocolVersion": "2025-11-25",
                 "capabilities": {},
-                "clientInfo": {"name": "sender-dpop-test", "version": "0.1.0"}
+                "clientInfo": {"name": "sender-dpop-refusal", "version": "0.1.0"}
             }
         }),
     );
-    let initialize_status = initialize_response.status();
-    let initialize_body = initialize_response.text().expect("initialize body");
-    assert!(
-        initialize_status.is_success(),
-        "sender-constrained initialize failed: status={initialize_status} body={initialize_body}"
-    );
-
-    let replay_response = post_mcp_json_with_headers(
-        &client,
-        &base_url,
-        &access_token,
-        &[("dpop", runtime_dpop_header)],
-        &json!({
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2025-11-25",
-                "capabilities": {},
-                "clientInfo": {"name": "sender-dpop-replay", "version": "0.1.0"}
-            }
-        }),
-    );
-    assert_eq!(replay_response.status(), reqwest::StatusCode::UNAUTHORIZED);
+    assert_eq!(presented.status(), reqwest::StatusCode::UNAUTHORIZED);
     assert_eq!(
-        replay_response.text().test_unwrap("replay body"),
-        "urn:chio:error:transport:dpop-verification-failed"
+        presented.text().test_unwrap("presented DPoP body"),
+        "urn:chio:error:transport:dpop-sender-proof-unavailable"
     );
 }
 
@@ -1244,9 +1194,9 @@ fn mcp_serve_http_local_auth_server_enforces_mtls_and_attestation_bound_sender_c
 }
 
 #[test]
-fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpop_or_mtls() {
+fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_mtls() {
     if skip_when_loopback_bind_denied(
-        "mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpop_or_mtls",
+        "mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_mtls",
     ) {
         return;
     }
@@ -1310,8 +1260,7 @@ fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpo
         })
     );
 
-    let sender_keypair = Keypair::generate();
-    let sender_key_hex = sender_keypair.public_key().to_hex();
+    let mtls_thumbprint = "a".repeat(64);
     let mismatch_context = json!({
         "intentId": "intent-attestation-mismatch-1",
         "intentHash": "intent-hash-attestation-mismatch-1",
@@ -1330,7 +1279,10 @@ fn mcp_serve_http_local_auth_server_rejects_attestation_bound_sender_without_dpo
             ("resource", resource.as_str()),
             ("scope", "mcp:invoke"),
             ("chio_transaction_context", mismatch_context.as_str()),
-            ("chio_sender_dpop_public_key", sender_key_hex.as_str()),
+            (
+                "chio_sender_mtls_thumbprint_sha256",
+                mtls_thumbprint.as_str(),
+            ),
             (
                 "chio_sender_attestation_sha256",
                 "sha256-attestation-auth-actual",
