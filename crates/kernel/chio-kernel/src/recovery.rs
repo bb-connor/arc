@@ -8,11 +8,13 @@ mod original_scope;
 mod ports;
 mod provider_budget;
 mod records;
+mod request_review;
 mod server;
 pub use original_scope::{RecoveryOriginalRequestError, RecoveryOriginalRequestScope};
 pub use ports::*;
 pub use provider_budget::*;
 pub use records::*;
+pub use request_review::{recovery_review_digest, RecoveryRequestProjection};
 pub use server::RecoveryToolServerConnection;
 #[cfg(test)]
 mod vector_test_fixture;
