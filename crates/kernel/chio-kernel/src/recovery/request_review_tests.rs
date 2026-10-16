@@ -259,22 +259,38 @@ fn action_preview_binds_the_complete_action_and_semantic_projection() -> TestRes
 }
 
 #[test]
-fn noncanonical_request_refuses_with_exact_errors() -> TestResult {
+fn typed_integer_semantics_remain_exact() -> TestResult {
     let mut request = seed_request()?;
     request.arguments = json!({"integer": u64::MAX});
     let projection = request.recovery_review_projection();
+    let semantics = projection.canonical_semantics()?;
+    let decoded: Value = serde_json::from_slice(semantics.as_bytes())?;
+    assert_eq!(decoded["arguments"]["integer"].as_u64(), Some(u64::MAX));
     assert_eq!(
-        projection.canonical_semantics(),
-        Err(ContractError::Malformed)
+        semantics.as_bytes(),
+        canonical_json_bytes(&serde_json::to_value(&projection)?["semantics"])?
     );
     let action = action()?;
+    let preview = projection.canonical_action_preview(&action)?;
     assert_eq!(
-        projection.canonical_action_preview(&action),
-        Err(ContractError::Malformed)
+        preview.as_bytes(),
+        canonical_json_bytes(&(action.clone(), decoded))?
     );
-    assert!(matches!(
-        recovery_review_digest(&action, &request),
-        Err(crate::KernelError::DurableAdmission(message)) if message == "recovery preview refused"
-    ));
+    assert_eq!(
+        recovery_review_digest(&action, &request)?.as_bytes(),
+        RecoveryDigestDomain::Preview.digest(&preview).as_bytes()
+    );
+    let mut adjacent = request.clone();
+    adjacent.arguments = json!({"integer": u64::MAX - 1});
+    assert_ne!(
+        semantics,
+        adjacent
+            .recovery_review_projection()
+            .canonical_semantics()?
+    );
+    assert_ne!(
+        recovery_review_digest(&action, &request)?,
+        recovery_review_digest(&action, &adjacent)?
+    );
     Ok(())
 }
