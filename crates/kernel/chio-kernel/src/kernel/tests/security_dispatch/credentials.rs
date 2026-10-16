@@ -276,7 +276,10 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
             kernel.set_security_pre_dispatch_hook(Arc::new(Hook(Fault::None)));
             let replay = evaluate_same_request(&kernel)?;
             assert_eq!(replay.verdict, Verdict::Deny, "{replay:?}");
-            assert_eq!(replay.receipt, denied.receipt);
+            assert_eq!(
+                serde_json::to_value(&replay.receipt)?,
+                serde_json::to_value(&denied.receipt)?
+            );
             assert_eq!(invocations.load(Ordering::SeqCst), 0);
             assert_eq!(dpop_store.dpop_history(), history);
             assert!(!kernel
