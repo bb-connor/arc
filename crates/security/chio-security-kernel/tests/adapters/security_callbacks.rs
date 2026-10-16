@@ -186,7 +186,7 @@ fn pre_dispatch_outcome_requires_exact_request_and_commitment() {
 #[test]
 fn outcome_record_panic_requires_recovery_without_releasing_output() {
     let (response, invocations, outcomes) = run(Fault::RecordPanic);
-    assert_recovery_required(response.test_unwrap_err());
+    assert_delivery_recovery_required(response.test_unwrap_err());
     assert_eq!(invocations, 1);
     assert_eq!(outcomes, vec![SecurityDispatchOutcome::Released]);
 }
@@ -194,7 +194,7 @@ fn outcome_record_panic_requires_recovery_without_releasing_output() {
 #[test]
 fn final_release_panic_requires_recovery_without_releasing_output() {
     let (response, invocations, _) = run(Fault::FinalReleasePanic);
-    assert_recovery_required(response.test_unwrap_err());
+    assert_delivery_recovery_required(response.test_unwrap_err());
     assert_eq!(invocations, 1);
 }
 
@@ -202,7 +202,7 @@ fn final_release_panic_requires_recovery_without_releasing_output() {
 fn post_effect_callback_errors_cannot_advertise_retryable_guard_denial() {
     for fault in [Fault::RecordError, Fault::FinalReleaseError] {
         let (response, invocations, _) = run(fault);
-        assert_recovery_required(response.test_unwrap_err());
+        assert_delivery_recovery_required(response.test_unwrap_err());
         assert_eq!(invocations, 1);
     }
 }
@@ -305,6 +305,13 @@ fn outcome_cleanup_during_unwind_does_not_double_panic() {
     assert!(unwound.is_err());
     assert_eq!(records.load(Ordering::SeqCst), 1);
     assert_eq!(drops.load(Ordering::SeqCst), 1);
+}
+
+fn assert_delivery_recovery_required(error: KernelError) {
+    let KernelError::DeliveryFailedAfterReceipt { source, .. } = error else {
+        panic!("{error}");
+    };
+    assert_recovery_required(*source);
 }
 
 fn assert_recovery_required(error: KernelError) {
