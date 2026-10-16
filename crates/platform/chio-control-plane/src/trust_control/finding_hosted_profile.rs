@@ -130,8 +130,8 @@ impl FindingHostedDatabaseProfile {
 pub struct FindingHostedIdentityProfile {
     pub capability_authorities: Vec<String>,
     pub maximum_capability_ttl_secs: u64,
-    pub dpop_proof_ttl_secs: u64,
-    pub dpop_clock_skew_secs: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
     pub nonce_capacity: u64,
     pub api_key_pepper_env: String,
 }
@@ -447,8 +447,7 @@ impl FindingHostedProfile {
             public_endpoint: self.public_endpoint.clone(),
             capability_authorities,
             maximum_capability_ttl_secs: self.identity.maximum_capability_ttl_secs,
-            dpop_proof_ttl_secs: self.identity.dpop_proof_ttl_secs,
-            dpop_clock_skew_secs: self.identity.dpop_clock_skew_secs,
+            dpop_replay_authority: self.identity.dpop_replay_authority.clone(),
             dpop_nonce_capacity_per_tenant: self.identity.nonce_capacity,
             tenant_policies,
         })
@@ -742,8 +741,14 @@ impl FindingHostedProfile {
         if self.identity.capability_authorities.is_empty()
             || self.identity.capability_authorities.len() > 128
             || !(30..=3_600).contains(&self.identity.maximum_capability_ttl_secs)
-            || !(5..=300).contains(&self.identity.dpop_proof_ttl_secs)
-            || self.identity.dpop_clock_skew_secs > 60
+            || self
+                .identity
+                .dpop_replay_authority
+                .as_ref()
+                .is_some_and(|authority| {
+                    !(5..=300).contains(&authority.proof_ttl_secs())
+                        || authority.max_clock_skew_secs() > 60
+                })
             || !(1_000..=10_000_000).contains(&self.identity.nonce_capacity)
         {
             return Err("hosted identity bounds are invalid".to_owned());
@@ -1076,6 +1081,15 @@ impl FindingHostedProfile {
                         .any(|principal| principal.capability_public_key_hex.is_some())
             {
                 return Err("hosted tenant has no usable principal".to_owned());
+            }
+            if tenant
+                .auth_methods
+                .contains(&FindingHostedAuthMethod::CapabilityDpop)
+                && self.identity.dpop_replay_authority.is_none()
+            {
+                return Err(
+                    "hosted DPoP authentication requires a configured replay authority".to_owned(),
+                );
             }
         }
         if !any_enabled_tenant {
@@ -1490,8 +1504,7 @@ mod tests {
         let identity = FindingHostedIdentityProfile {
             capability_authorities: vec!["a".repeat(64)],
             maximum_capability_ttl_secs: 300,
-            dpop_proof_ttl_secs: 60,
-            dpop_clock_skew_secs: 5,
+            dpop_replay_authority: None,
             nonce_capacity: 10_000,
             api_key_pepper_env: "CHIO_API_KEY_PEPPER".to_owned(),
         };
