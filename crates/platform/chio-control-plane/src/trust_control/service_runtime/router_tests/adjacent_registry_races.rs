@@ -777,3 +777,107 @@ async fn cancelled_credential_redemption_keeps_its_permit_and_still_consumes_the
     );
     Ok(())
 }
+
+/// Publishes the offered passport as active and points the service at that
+/// lifecycle registry, returning the registry path and the passport id.
+fn publish_offered_passport(
+    fixture: &mut PublicAuthorityFixture,
+    offers: &OffersFile,
+) -> Result<(PathBuf, String), Box<dyn std::error::Error>> {
+    let statuses = fixture.directory.path().join("passport-statuses.json");
+    let passport = issuable_passport(offers.issued_at)?;
+    let record = PassportStatusRegistry::update(&statuses, |registry| {
+        registry.publish(
+            &passport,
+            offers.issued_at,
+            chio_credentials::PassportStatusDistribution {
+                resolve_urls: vec![format!("{ADVERTISE_URL}/v1/passport/statuses/resolve")],
+                cache_ttl_secs: Some(300),
+            },
+        )
+    })?;
+    fixture.state.config.passport_statuses_file = Some(statuses.clone());
+    Ok((statuses, record.passport_id))
+}
+
+fn assert_registry_active(statuses: &Path, passport_id: &str, at: u64) -> TestResult {
+    assert_eq!(
+        PassportStatusRegistry::load(statuses)?
+            .resolve_at(passport_id, at)
+            .state,
+        chio_credentials::PassportLifecycleState::Active
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn a_passport_revoked_only_in_the_oracle_is_refused_a_credential() -> TestResult {
+    let (mut fixture, _authority_db) = PublicAuthorityFixture::provisioned()?;
+    let mut offers = OffersFile::new(&fixture)?;
+    let (statuses, passport_id) = publish_offered_passport(&mut fixture, &offers)?;
+    let (issued, issued_code) = offers.offer()?;
+    let issued_token = offers.redeem(&issued_code)?;
+    let (refused, refused_code) = offers.offer()?;
+    let refused_token = offers.redeem(&refused_code)?;
+    offers.write()?;
+    let (status, body) =
+        status_and_text(redeem_credential(&fixture.state, &issued_token, &issued)?.await).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    chio_revocation_oracle::SqliteRevocationOracle::open(
+        &crate::passport_revocation::passport_revocation_oracle_path(&statuses)?,
+    )?
+    .revoke(
+        chio_revocation_oracle::passport_revocation_key(&passport_id),
+        offers.issued_at * 1_000,
+    )?;
+    assert_registry_active(&statuses, &passport_id, offers.issued_at)?;
+    let before = std::fs::read(&offers.path)?;
+    assert_error(
+        redeem_credential(&fixture.state, &refused_token, &refused)?.await,
+        StatusCode::BAD_REQUEST,
+        &CliError::policy_error(format!(
+            "passport `{passport_id}` is revoked in the passport revocation oracle"
+        ))
+        .to_string(),
+    )
+    .await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    assert_eq!(
+        persisted_offers(&offers.path)?
+            .offers
+            .get(&refused.offer_id)
+            .map(|record| record.state),
+        Some(PassportIssuanceOfferState::TokenIssued)
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn an_unreadable_passport_revocation_oracle_refuses_a_credential() -> TestResult {
+    let (mut fixture, _authority_db) = PublicAuthorityFixture::provisioned()?;
+    let mut offers = OffersFile::new(&fixture)?;
+    let (statuses, passport_id) = publish_offered_passport(&mut fixture, &offers)?;
+    let (record, code) = offers.offer()?;
+    let token = offers.redeem(&code)?;
+    offers.write()?;
+    let oracle = crate::passport_revocation::passport_revocation_oracle_path(&statuses)?;
+    std::fs::create_dir(&oracle)?;
+    let unavailable = chio_revocation_oracle::SqliteRevocationOracle::open(&oracle)
+        .err()
+        .ok_or("a directory opened as the passport revocation oracle")?;
+
+    let before = std::fs::read(&offers.path)?;
+    assert_error(
+        redeem_credential(&fixture.state, &token, &record)?.await,
+        StatusCode::BAD_REQUEST,
+        &CliError::policy_error(format!(
+            "passport revocation oracle unavailable: {unavailable}"
+        ))
+        .to_string(),
+    )
+    .await?;
+    assert_eq!(std::fs::read(&offers.path)?, before);
+    assert_registry_active(&statuses, &passport_id, offers.issued_at)?;
+    Ok(())
+}
