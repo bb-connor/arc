@@ -41,6 +41,6 @@ pub use signer::{
 pub use sparse_merkle::InMemoryRevocationOracle;
 #[cfg(feature = "sqlite")]
 pub use sqlite::{
-    RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
+    RevocationLeaf, RevocationTransaction, SqliteRevocationOracle, SqliteRevocationOracleError,
     MAX_REVOCATION_SUBJECT_BYTES, SQLITE_REVOCATION_ORACLE_SCHEMA_VERSION,
 };

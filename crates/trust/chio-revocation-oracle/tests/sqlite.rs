@@ -1,8 +1,9 @@
 #![cfg(feature = "sqlite")]
 
 use chio_revocation_oracle::{
-    EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationOracle, RevocationOracleError,
-    SqliteRevocationOracle, SqliteRevocationOracleError, SubjectId, MAX_REVOCATION_SUBJECT_BYTES,
+    EpochNonce, InMemoryRevocationOracle, RevocationKey, RevocationLeaf, RevocationOracle,
+    RevocationOracleError, SqliteRevocationOracle, SqliteRevocationOracleError, SubjectId,
+    MAX_REVOCATION_SUBJECT_BYTES,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -218,5 +219,54 @@ fn malformed_utf8_subjects_are_refused_at_the_storage_layer() -> TestResult {
         SqliteRevocationOracle::open(&path).err(),
         Some(SqliteRevocationOracleError::Storage(_))
     ));
+    Ok(())
+}
+
+#[test]
+fn leaves_page_in_sequence_order_from_a_cursor() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.revoke(key("passport-a", 1), 10)?;
+    oracle.revoke(key("passport-b", 2), 20)?;
+    oracle.revoke(key("passport-c", 3), 30)?;
+
+    let first = oracle.leaves_after(0, 2)?;
+    assert_eq!(
+        first,
+        vec![
+            RevocationLeaf {
+                seq: 1,
+                key: key("passport-a", 1),
+                inserted_at_unix_ms: 10,
+            },
+            RevocationLeaf {
+                seq: 2,
+                key: key("passport-b", 2),
+                inserted_at_unix_ms: 20,
+            },
+        ]
+    );
+    let rest = oracle.leaves_after(2, 2)?;
+    assert_eq!(
+        rest,
+        vec![RevocationLeaf {
+            seq: 3,
+            key: key("passport-c", 3),
+            inserted_at_unix_ms: 30,
+        }]
+    );
+    assert!(oracle.leaves_after(3, 2)?.is_empty());
+    Ok(())
+}
+
+#[test]
+fn the_staged_root_is_the_root_the_transaction_commits() -> TestResult {
+    let oracle = SqliteRevocationOracle::open_in_memory()?;
+    oracle.revoke(key("passport-a", 1), 10)?;
+    let (staged, committed) = oracle.transact(20, |txn| {
+        txn.revoke(&key("passport-b", 1))?;
+        Ok(txn.epoch_root())
+    })?;
+    assert_eq!(staged, committed);
+    assert_eq!(committed.leaf_count, 2);
     Ok(())
 }
