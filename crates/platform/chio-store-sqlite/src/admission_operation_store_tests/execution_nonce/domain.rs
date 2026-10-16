@@ -164,6 +164,58 @@ fn durable_nonce_domain_requires_exact_operation_signature_context() -> TestResu
 #[test]
 fn durable_nonce_domain_rejects_schema_relabeling() -> TestResult {
     let fixture = nonce_fixture()?;
+    let decoded = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
+        fixture.reservation.canonical_bytes(),
+        &fixture.operation,
+        &fixture.original,
+        &fixture.key.public_key(),
+        now_ms(),
+    )?;
+    decoded.require_operation_bound_profile()?;
+    assert_eq!(decoded.signed_nonce(), fixture.reservation.signed_nonce());
+
+    for schema in [
+        "chio.execution_nonce.v2",
+        "chio.execution_nonce.v3",
+        "chio.operation_execution_nonce.v2",
+        "chio.operation_execution_nonce.v3",
+    ] {
+        let mut nonce = signed(&fixture)?;
+        nonce.nonce.schema = schema.into();
+        sign_for(&fixture.operation, &mut nonce, &fixture.key)?;
+        let context = canonical_json_bytes(&serde_json::json!({
+            "schema": "chio.admission-execution-nonce-signature.v1",
+            "operation_id": fixture.operation.binding().operation_id(),
+            "nonce": nonce.nonce,
+        }))?;
+        assert!(fixture.key.public_key().verify(&context, &nonce.signature));
+        let mut wire: serde_json::Value =
+            serde_json::from_slice(fixture.reservation.canonical_bytes())?;
+        wire["signed_nonce"] = serde_json::to_value(nonce)?;
+        let error = AdmissionExecutionNonceReservationV1::from_canonical_bytes(
+            &canonical_json_bytes(&wire)?,
+            &fixture.operation,
+            &fixture.original,
+            &fixture.key.public_key(),
+            now_ms(),
+        )
+        .expect_err("retired nonce schema entered the public reservation decoder");
+        assert_eq!(
+            error,
+            AdmissionOperationStoreError::Invariant(format!(
+                "execution nonce has unsupported schema: expected chio.execution_nonce.v1, got {schema}"
+            )),
+            "{schema}"
+        );
+    }
+    assert_eq!(
+        fixture
+            .fixture
+            .store
+            .load_by_operation_id(fixture.operation.binding().operation_id())?,
+        Some(fixture.operation.clone())
+    );
+
     let legacy = SqliteExecutionNonceStore::open_in_memory()?;
     let mut downgraded = signed(&fixture)?;
     downgraded.nonce.schema = "chio.execution_nonce.v1".into();
@@ -177,7 +229,7 @@ fn durable_nonce_domain_rejects_schema_relabeling() -> TestResult {
     .is_err());
     assert!(!legacy.is_consumed(downgraded.nonce_id())?);
     let mut upgraded = legacy_packet(&fixture)?;
-    upgraded.nonce.schema = "chio.execution_nonce.v2".into();
+    upgraded.nonce.schema = "chio.operation_execution_nonce.v1".into();
     assert!(AdmissionExecutionNonceReservationV1::verify(
         &fixture.operation,
         &fixture.original,

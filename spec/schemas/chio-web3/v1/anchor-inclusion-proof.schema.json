@@ -88,7 +88,7 @@
         "signature"
       ],
       "properties": {
-        "schema": { "const": "chio.checkpoint_statement.v2" },
+        "schema": { "const": "chio.checkpoint_statement.v1" },
         "checkpoint_seq": { "type": "integer", "minimum": 1 },
         "batch_start_seq": { "type": "integer", "minimum": 1 },
         "batch_end_seq": { "type": "integer", "minimum": 1 },

@@ -2432,7 +2432,7 @@ fn transparency_anchored_fixture(
             .test_expect("canonical checkpoint chain leaf"),
     );
     let statement_body = json!({
-        "schema": "chio.checkpoint_statement.v2",
+        "schema": "chio.checkpoint_statement.v1",
         "checkpoint_seq": 1,
         "batch_start_seq": 1,
         "batch_end_seq": 1,

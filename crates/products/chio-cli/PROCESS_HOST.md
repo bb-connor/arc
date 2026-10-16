@@ -200,7 +200,7 @@ version checks still apply at the new location.
 ## Process ABI
 
 Every surface an application or operator depends on is covered by one
-declared compatibility contract, `chio.process.abi.v3`, exported by the
+declared compatibility contract, `chio.process.abi.v1`, exported by the
 `chio-process` crate as `PROCESS_ABI`: the process journal schema with its
 checkpoint and blob bounds, the worker protocol `chio.process.v1` with its
 bootstrap and connection descriptors, the host configuration, the run plan,
@@ -210,14 +210,9 @@ records the ABI and the build that wrote the state in `host.json`; `serve`,
 recorded under another ABI, `status` reports the recorded and the serving
 ABI, and every connection descriptor names the ABI its worker is speaking.
 An incompatible change to any covered surface is a new ABI; state never
-migrates across ABIs implicitly, and hosts initialized before the field was
-recorded were written under the first ABI.
+migrates across ABIs, and state without a recorded ABI is refused.
 
-ABI v2 adds signed native MCP launch policies and `chio.manifest.v1` tool
-manifest metadata.
-ABI v1 state must be finished with its original compatible binary; it cannot
-be served, exported or imported by an ABI v2 host. The worker wire protocol
-remains `chio.process.v1`.
+The worker wire protocol is `chio.process.v1`.
 
 ## Configure worker mailboxes
 

@@ -253,7 +253,6 @@ fn process_host(governed: bool) -> TestResult {
             "servers": [{"id":host::SERVER, "command": target_argv, "request_timeout_seconds":30,
                 "launch_policy":security.join("cage-launch-policy.json"), "launch_policy_signer":provisioned["cagePolicyPublicKey"]}],
             "limits":{"max_calls":2,"max_processes":1,"max_depth":0},
-            "execution_nonces":true,
             "native_broker": {
                 "keyring":keyring.as_ref().map(|keyring| keyring.process_host_config()),
                 "security":{"tenant_id":TENANT_SCOPE,"isolation_epoch_id":"host-epoch-1","generation":1},
@@ -619,7 +618,7 @@ fn process_host(governed: bool) -> TestResult {
     );
     assert_eq!(
         verified["artifact_schema"],
-        "chio.process.call-observation.v3"
+        "chio.process.broker-call-observation.v1"
     );
     let mut wrong = record["config"].clone();
     wrong["native_broker"]["routes"][0]["broker_identity"] = json!(authority_key.public_key());

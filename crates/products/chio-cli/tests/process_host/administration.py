@@ -63,7 +63,7 @@ def relocation_files(binary, directory):
         else:
             host = moved / "host.json"
             record = json.loads(host.read_text())
-            record["abi"] = "chio.process.abi.v1"
+            record["abi"] = "chio.process.abi.v3"
             record["written_by"] = None
             write(host, record)
             manifest["files"]["host.json"] = hashlib.sha256(
@@ -75,7 +75,7 @@ def relocation_files(binary, directory):
         assert (moved / "authority.db").read_bytes() == before
         status = json.loads(command(binary, "status", "--state", moved).stdout)
         if variant == "incompatible-host":
-            assert status["abi"]["host"] == "chio.process.abi.v1"
+            assert status["abi"]["host"] == "chio.process.abi.v3"
             assert status["abi"]["written_by"] is None
 
 

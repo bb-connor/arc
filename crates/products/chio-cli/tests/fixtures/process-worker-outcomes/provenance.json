@@ -1,58 +1,166 @@
 {
-  "v1-network": {
-    "runtime_source": "cb5a34e722b52c794f2aaf84fbcb02a40bac3f03",
-    "observer_source": "48c7b83148262ed83a415fc54dbed01ac21da54d",
-    "runtime_id": "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8",
-    "source_directory": "outcomes-network-cb5a34e72-48c7b8314",
-    "sha256": "8fd7a5c8df02a55b209411b5f64c34ba0bda447f77a07aa447555c10c205f8d0",
-    "private_keys_exported": false,
-    "retrospective_observation": true,
-    "m5_acceptance_complete": false
-  },
-  "v2-budget": {
-    "runtime_source": "cb5a34e722b52c794f2aaf84fbcb02a40bac3f03",
-    "observer_source": "1ae9f9ddac749d71f27c9c7f62c49c519a53c7b3",
-    "runtime_id": "714d3643-e7f7-42f9-95b5-6a3a0d734ce8",
-    "source_directory": "outcomes-budget-cb5a34e72-1ae9f9dda",
-    "sha256": "40efb11f66702165309c2e5c7eb08b79f405fa66b77c88b2d0c848e44c10def4",
-    "private_keys_exported": false,
-    "retrospective_observation": true,
-    "m5_acceptance_complete": false
-  },
-  "v2-policy-bound-budget": {
-    "runtime_source": "f3a9a558eab15751c092f73c17e90a3ce93eb179",
-    "observer_source": "f3a9a558eab15751c092f73c17e90a3ce93eb179",
-    "runtime_id": "2aeedf94-f478-4c92-99fa-8a202c878aac",
-    "source_directory": "linux-x86-policy-binding-matrix-f3a9a558e",
-    "sha256": "8e3f2679fe1b6206ef553dea654df2e668af2dd5670b12f891f6c78abf81927a",
-    "private_keys_exported": false,
-    "retrospective_observation": false,
-    "m5_acceptance_complete": false
-  },
   "current-native-budget": {
-    "runtime_source": "a86d5f781691a472674fe3fafa1fb4d8dffed529",
-    "runtime_binary_sha256": "1d82c6dfc79dd83edcb60f828d9eb9051ab036909006977b6c83d3642ab4337b",
-    "cage_init_sha256": "4ad2e6b42eba27873a79cec87de95b0808ccad535c768d3a0f274cece5a13943",
-    "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
-    "runtime_id": "de64a4dd-6070-4699-a45a-3e7b6bb19bf0",
+    "runtime_source": "66138deb2192e910329c22b409dc20b19ca507d6",
+    "runtime_binary_sha256": "6d04bae6fab4a3a8cf3fb8a250e1e6be61aeaab9ea14cc4109eb550dff540405",
+    "cage_init_sha256": "c08e404e9bfc427883c8f55ac42b8d0d8f53a03791af3fd9c1003caa72dda999",
+    "probe_sha256": "e8567700fcefbb15506192acfec9a74cb24c3b307eb577eb3b9827f2e5691845",
+    "discovery_binary_sha256": "ae0c179e46005f4a6601066a754d560ec4627805d71ec0d1134147ca256dfcdd",
+    "runtime_id": "f2b73bf3-bb85-4768-b0b8-d3d0fee5aec8",
     "campaign": "examples/reference-swarm/qualify-process-budget.py",
-    "sha256": "871a89e06a80c7f60ed95903944d7753884b3ef4bb186db69717b78e4f904dc9",
+    "campaign_sha256": "ceec0310538496c79e06d3f7d8b858dfd1052be14ee4d317f438e7bf060ac089",
+    "worker_image_id": "sha256:0350b87a53ae9bfa026f1a35b815ce7d1771419f2aaa706d1672d4faec13a850",
+    "worker_base": "python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72",
+    "worker_dockerfile_sha256": "f627a633fcc0c1d0d7b8706de143b4b4bf2653161cbc2570f9305b97eb48f10b",
+    "sha256": "9948b4c8bfae235e37e2f55d1c67c9695fdfe7fe25866c9eb190222e87dfc9f1",
+    "kernel_pub_sha256": "423112badca271cea5dda07578f52d44c2ee86bbb62e81cdf676ef0c84caf51a",
+    "pins_sha256": "2535cd546e7527e29f270fa3a103a24dfb4bbd58c2f0bab539be645a0e22bcdf",
     "private_keys_exported": false,
     "retrospective_observation": true,
+    "retrospective_observation_basis": "Post-run or recovery readback/export of original signed retained evidence.",
+    "runtime_qualification": false,
+    "repository_installation": false,
     "m5_acceptance_complete": false,
-    "capture": "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement; CARGO_TARGET_DIR=<target>/static-pie cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement; docker build --platform linux/amd64 --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 -f examples/reference-swarm/QualificationWorker.Dockerfile -t chio-process-qualification .; python3 examples/reference-swarm/qualify-process-budget.py --chio <chio> --cage-init <chio-cage-init> --probe <enforcement-probe> --worker-image <image id> --output <dir>/campaign --receipt-rollback-anchor-root <private directory under /dev/shm, held by an open session>; chio process attest-outcomes --state <dir>/campaign/state --plan <dir>/campaign/run-plan.json --out outcomes.json; fixture = outcomes.json; kernel.pub = <dir>/campaign/state/authority.db.kernel.pub; pins = runtime_id plus each server's launch_policy_signer"
+    "capture_commands": [
+      {
+        "name": "budget-campaign",
+        "argv": [
+          "/usr/bin/python3",
+          "/home/ubuntu/v1pr-pv1/arc/examples/reference-swarm/qualify-process-budget.py",
+          "--chio",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio",
+          "--cage-init",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio-cage-init",
+          "--probe",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/enforcement-probe",
+          "--worker-image",
+          "sha256:0350b87a53ae9bfa026f1a35b815ce7d1771419f2aaa706d1672d4faec13a850",
+          "--output",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/budget/campaign",
+          "--receipt-rollback-anchor-root",
+          "/dev/shm/codex2-pv1-66138deb21/budget"
+        ]
+      },
+      {
+        "name": "budget-attest-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio",
+          "process",
+          "attest-outcomes",
+          "--state",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/budget/campaign/state",
+          "--plan",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/budget/campaign/run-plan.json",
+          "--out",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/budget/outcomes.json"
+        ]
+      },
+      {
+        "name": "budget-verify-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio",
+          "process",
+          "verify-outcomes",
+          "--artifact",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/budget/outcomes.json",
+          "--trusted-kernel-pubkey",
+          "/home/ubuntu/v1pr-pv1-pins/capture-66138deb21/budget/kernel.pub",
+          "--runtime-id",
+          "f2b73bf3-bb85-4768-b0b8-d3d0fee5aec8",
+          "--trusted-launch-policy-signer",
+          "alice-probe=903be9627381bf0ddd5905cb5ec59995b69273b8cb0be56f4dc0bc87369e8103",
+          "--trusted-launch-policy-signer",
+          "bob-probe=3f2fba44aea90fc36151bb7049e5755e793a9becd0ec208edde3218b88f83531",
+          "--trusted-launch-policy-signer",
+          "carol-probe=40cc67c9d0b3760eb1c08157e8760b8a6325f5a62cf20b7020b87c7e8e1c30bb",
+          "--trusted-launch-policy-signer",
+          "dave-probe=bc1969703e3742177f534d33c48f467104ddcae03aa948602f79525d44965731"
+        ]
+      }
+    ],
+    "capture_public_manifest_sha256": "a1ca8c31f8d17d760cf620e3c82ad794f40eb50776c1301ad7a5ea0e3b346794",
+    "capture_public_audit_sha256": "2a9f79a60c257611c355f460effa0e5b5bc32fe86d4481ff828ad774915d1368",
+    "capture_private_manifest_sha256": "e183b7da5f273b16294ce60c8229fd889d3583b6d58280f6a77031550958fbc7",
+    "capture_config_sha256": "97277fa22c19766a436446b98dc1a5169efb1be5cb858b089c104e2b1242562c",
+    "capture_terminal_sha256": "5ee0dd41506c4b0a462c296f7f30f37041844356e65beed3f6e0ed889dbf8a6e"
   },
   "current-native-clean": {
-    "runtime_source": "a86d5f781691a472674fe3fafa1fb4d8dffed529",
-    "runtime_binary_sha256": "1d82c6dfc79dd83edcb60f828d9eb9051ab036909006977b6c83d3642ab4337b",
-    "cage_init_sha256": "4ad2e6b42eba27873a79cec87de95b0808ccad535c768d3a0f274cece5a13943",
-    "probe_sha256": "8bdba2c6456b4c44cc2f8a214973444a8f8f63d1473c3b263571b95e76476e2b",
-    "runtime_id": "7a47fca7-a730-49bf-bc75-a4756bc13182",
+    "runtime_source": "66138deb2192e910329c22b409dc20b19ca507d6",
+    "runtime_binary_sha256": "6d04bae6fab4a3a8cf3fb8a250e1e6be61aeaab9ea14cc4109eb550dff540405",
+    "cage_init_sha256": "c08e404e9bfc427883c8f55ac42b8d0d8f53a03791af3fd9c1003caa72dda999",
+    "probe_sha256": "e8567700fcefbb15506192acfec9a74cb24c3b307eb577eb3b9827f2e5691845",
+    "discovery_binary_sha256": "ae0c179e46005f4a6601066a754d560ec4627805d71ec0d1134147ca256dfcdd",
+    "runtime_id": "0e012e00-be6e-4013-8207-5a2cc5bb629c",
     "campaign": "examples/reference-swarm/qualify-process-clean-exit.py",
-    "sha256": "eebde56740c38a776ffdd7cb895d93c2f33b53f2923a5d7259ba874d6fb959a8",
+    "campaign_sha256": "922c1c3c381e8a1247ca73b21ebf63eca7b7178f7a3be1e3adb0bf96ba482053",
+    "worker_image_id": "sha256:0350b87a53ae9bfa026f1a35b815ce7d1771419f2aaa706d1672d4faec13a850",
+    "worker_base": "python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72",
+    "worker_dockerfile_sha256": "f627a633fcc0c1d0d7b8706de143b4b4bf2653161cbc2570f9305b97eb48f10b",
+    "sha256": "eb0fc0b86809d4dbf08d5096cc6be9ebb6f3c9eb80dbc4063a3263a23ce73fc6",
+    "kernel_pub_sha256": "ae214c702e6a1a9d2404dfe1792c5563ebd2809890745d1130829377311c27dc",
+    "pins_sha256": "9a0c58e3314e8b26a34d1f884fc0e058837fb7e11d0ce6fdd1ad463b8fe85055",
     "private_keys_exported": false,
     "retrospective_observation": true,
+    "retrospective_observation_basis": "Post-run or recovery readback/export of original signed retained evidence.",
+    "runtime_qualification": false,
+    "repository_installation": false,
     "m5_acceptance_complete": false,
-    "capture": "cargo build --locked -p chio-cli --bin chio --features real-linux-enforcement; CARGO_TARGET_DIR=<target>/static-pie cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement; docker build --platform linux/amd64 --build-arg BASE=python:3.11-slim@sha256:d1053354624536b044162aaab1e418bd000ea35184fb1ae098ab3166b1072e72 -f examples/reference-swarm/QualificationWorker.Dockerfile -t chio-process-qualification .; python3 examples/reference-swarm/qualify-process-clean-exit.py --chio <chio> --cage-init <chio-cage-init> --probe <enforcement-probe> --worker-image <image id> --output <dir>/campaign --receipt-rollback-anchor-root <private directory under /dev/shm, held by an open session>; chio process attest-outcomes --state <dir>/campaign/state --plan <dir>/campaign/run-plan.json --out outcomes.json; fixture = outcomes.json; kernel.pub = <dir>/campaign/state/authority.db.kernel.pub; pins = runtime_id plus each server's launch_policy_signer"
+    "capture_commands": [
+      {
+        "name": "clean-campaign",
+        "argv": [
+          "/usr/bin/python3",
+          "/home/ubuntu/v1pr-pv1/arc/examples/reference-swarm/qualify-process-clean-exit.py",
+          "--chio",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio",
+          "--cage-init",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio-cage-init",
+          "--probe",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/enforcement-probe",
+          "--worker-image",
+          "sha256:0350b87a53ae9bfa026f1a35b815ce7d1771419f2aaa706d1672d4faec13a850",
+          "--output",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/clean/campaign",
+          "--receipt-rollback-anchor-root",
+          "/dev/shm/codex2-pv1-66138deb21/clean"
+        ]
+      },
+      {
+        "name": "clean-attest-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio",
+          "process",
+          "attest-outcomes",
+          "--state",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/clean/campaign/state",
+          "--plan",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/clean/campaign/run-plan.json",
+          "--out",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/clean/outcomes.json"
+        ]
+      },
+      {
+        "name": "clean-verify-outcomes",
+        "argv": [
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/bin/chio",
+          "process",
+          "verify-outcomes",
+          "--artifact",
+          "/home/ubuntu/v1pr-pv1-out/capture-66138deb21/clean/outcomes.json",
+          "--trusted-kernel-pubkey",
+          "/home/ubuntu/v1pr-pv1-pins/capture-66138deb21/clean/kernel.pub",
+          "--runtime-id",
+          "0e012e00-be6e-4013-8207-5a2cc5bb629c",
+          "--trusted-launch-policy-signer",
+          "erin-probe=743075cb108d7670bb329fb3fd8923845cb0cb8cf25da4c3c8effff2eadae6aa",
+          "--trusted-launch-policy-signer",
+          "frank-probe=36df2b5bda98784d2abb0068199e32da3019a2796c48d33d0e469c3c10bf036f"
+        ]
+      }
+    ],
+    "capture_public_manifest_sha256": "a1ca8c31f8d17d760cf620e3c82ad794f40eb50776c1301ad7a5ea0e3b346794",
+    "capture_public_audit_sha256": "2a9f79a60c257611c355f460effa0e5b5bc32fe86d4481ff828ad774915d1368",
+    "capture_private_manifest_sha256": "e183b7da5f273b16294ce60c8229fd889d3583b6d58280f6a77031550958fbc7",
+    "capture_config_sha256": "97277fa22c19766a436446b98dc1a5169efb1be5cb858b089c104e2b1242562c",
+    "capture_terminal_sha256": "5ee0dd41506c4b0a462c296f7f30f37041844356e65beed3f6e0ed889dbf8a6e"
   }
 }

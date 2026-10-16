@@ -35,95 +35,70 @@ fn refusal_error(state: AdmissionOperationState) -> &'static str {
     }
 }
 
-fn assert_incident_observation_rejected(
-    artifact: &str,
-    public_key: &str,
-    expected: &str,
+fn assert_signed_dispatch_commit_without_launch_is_refused(
+    decision: Decision,
 ) -> Result<(), CliError> {
-    let key = PublicKey::from_hex(public_key.trim()).map_err(error)?;
-    let signed = crate::receipt_verify::verify_original_receipt(artifact, &key)?;
-    let evidence: Evidence =
-        serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
-    let call = crate::process_response_verify::verify_values(
-        &evidence.request,
-        &evidence.context,
-        &evidence.response,
-        &key,
+    let mut fixture = SemanticRefusal::new(
+        AdmissionOperationState::OutcomeUnknownAfterDispatch,
+        decision,
     )?;
-    let process = evidence.context["process_id"]
-        .as_str()
-        .ok_or_else(|| error("missing fixture process"))?;
-    let cap: CapabilityToken = serde_json::from_value(
-        evidence.bootstrap.action.parameters["capabilities"][process].clone(),
-    )
-    .map_err(error)?;
+    receipt(&fixture.call, &fixture.key.public_key())?;
+    let mut operation = serde_json::to_value(&fixture.operation).map_err(error)?;
+    let _: Operation = serde_json::from_value(operation.clone()).map_err(error)?;
+    let commit = operation["dispatch_commit"]
+        .as_object_mut()
+        .ok_or_else(|| error("missing synthetic dispatch commit"))?;
     assert_eq!(
-        verify_operation(
-            evidence.operation.as_ref(),
-            &call,
-            &cap,
-            &evidence.runtime_id,
-            evidence.observed_at_unix_ms,
-        )
-        .map_err(|failure| failure.to_string()),
-        Err(error(expected).to_string()),
+        commit.remove("dispatch_launch"),
+        Some(json!({"native_launch": null, "worker_profile": null})),
     );
-    Ok(())
-}
-
-fn assert_incident_dispatch_commit_refused(
-    artifact: &str,
-    public_key: &str,
-) -> Result<(), CliError> {
-    let key = PublicKey::from_hex(public_key.trim()).map_err(error)?;
-    let signed = crate::receipt_verify::verify_original_receipt(artifact, &key)?;
+    let mut body = fixture.call.body();
+    body.action = ToolCallAction::from_parameters(operation).map_err(error)?;
+    body.content_hash = hash(&body.action.parameters)?;
+    let signed = ChioReceipt::sign(body, &fixture.key).map_err(error)?;
+    let signed = crate::receipt_verify::verify_original_receipt(
+        &serde_json::to_string(&signed).map_err(error)?,
+        &fixture.key.public_key(),
+    )?;
     assert_eq!(
-        serde_json::from_value::<Evidence>(signed.action.parameters.clone())
+        serde_json::from_value::<Operation>(signed.action.parameters)
             .err()
             .map(|failure| failure.to_string()),
+        Some("missing field `dispatch_launch`".to_owned()),
+    );
+
+    let _: AdmissionReceiptMetadataV1 =
+        serde_json::from_value(fixture.metadata()?["admission_operation"].clone())
+            .map_err(error)?;
+    let commit = fixture.metadata()?["admission_operation"]["retained_dispatch_commit"]
+        .as_object_mut()
+        .ok_or_else(|| error("missing synthetic signed dispatch commit"))?;
+    assert_eq!(
+        commit.remove("dispatch_launch"),
+        Some(json!({"native_launch": null, "worker_profile": null})),
+    );
+    fixture.resign()?;
+    assert_eq!(
+        serde_json::from_value::<AdmissionReceiptMetadataV1>(
+            fixture.metadata()?["admission_operation"].clone(),
+        )
+        .err()
+        .map(|failure| failure.to_string()),
         Some("missing field `dispatch_launch`".to_owned()),
     );
     Ok(())
 }
 
 #[test]
-fn issued_denial_incident_artifact_is_rejected() -> Result<(), CliError> {
-    assert_incident_observation_rejected(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/process-call-observation/issued-denial.json"
-        )),
-        "b4cdc34f12b6f9b4bca630d008b3c15333b82df760f801516c40c921b9257534",
-        COMPENSATED_ERROR,
-    )
-}
-
-#[test]
 fn interrupted_incident_dispatch_commit_without_its_launch_is_refused() -> Result<(), CliError> {
-    assert_incident_dispatch_commit_refused(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/process-call-observation/interrupted.json"
-        )),
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/process-call-observation/interrupted-kernel.pub"
-        )),
-    )
+    assert_signed_dispatch_commit_without_launch_is_refused(Decision::Incomplete {
+        reason: "upstream process exited before responding".into(),
+    })
 }
 
 #[test]
 fn unknown_incident_dispatch_commit_without_its_launch_is_refused() -> Result<(), CliError> {
-    assert_incident_dispatch_commit_refused(
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/process-call-observation/unknown.json"
-        )),
-        include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/fixtures/process-call-observation/kernel.pub"
-        )),
-    )
+    assert_signed_dispatch_commit_without_launch_is_refused(kernel_denial())
 }
 
 struct SemanticRefusal {

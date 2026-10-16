@@ -6,9 +6,7 @@ use super::*;
 
 pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), CliError> {
     let host = Host::open(state, false)?;
-    if host.record.config.execution_nonces {
-        host.checkpoint_receipts()?;
-    }
+    host.checkpoint_receipts()?;
     let directory = host.lease.directory.path();
     let runner = super::super::super::runner::completed_snapshot(&host, plan)?;
     let bootstrap: ChioReceipt = read_json(&directory.join("swarm-bootstrap.json"))?;
@@ -82,12 +80,7 @@ pub(crate) fn export(state: &Path, plan: &Path, output: &Path) -> Result<(), Cli
         .ok_or_else(|| error("missing retained family usage"))?;
     let native = native::export(&host.record.config, &calls)?;
     let run = Outcomes {
-        schema: if host.record.config.execution_nonces {
-            OUTCOMES_SCHEMA
-        } else {
-            PREVIOUS_OUTCOMES_SCHEMA
-        }
-        .into(),
+        schema: OUTCOMES_SCHEMA.into(),
         runtime_id: host.runtime.runtime_id().into(),
         observed_at_unix_ms: now,
         bootstrap,

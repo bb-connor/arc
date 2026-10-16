@@ -32,7 +32,7 @@ fn assert_preflight(response: &ToolCallResponse) -> TestResult {
         .execution_nonce
         .as_deref()
         .ok_or("preflight nonce")?;
-    assert_eq!(nonce.nonce.schema, "chio.execution_nonce.v2");
+    assert_eq!(nonce.nonce.schema, "chio.operation_execution_nonce.v1");
     assert!(nonce.reserved_hold_id().is_none());
     Ok(())
 }

@@ -5,7 +5,7 @@ fn operation_nonce_schema_preserves_both_profiles_and_rejects_unknown_versions()
     let key = Keypair::generate();
     let mut nonce = make_execution_nonce(&key);
     assert_schema_accepts("kernel/execution_nonce.schema.json", &to_json(&nonce));
-    nonce.nonce.schema = "chio.execution_nonce.v2".into();
+    nonce.nonce.schema = "chio.operation_execution_nonce.v1".into();
     nonce.signature = key.sign(
         &chio_core_types::canonical::canonical_json_bytes(&json!({
             "schema": "chio.admission-execution-nonce-signature.v1",
@@ -19,9 +19,16 @@ fn operation_nonce_schema_preserves_both_profiles_and_rejects_unknown_versions()
     let decoded: SignedExecutionNonce =
         serde_json::from_value(encoded.clone()).expect("decode nonce");
     assert_eq!(decoded, nonce);
-    let mut unknown = encoded.clone();
-    unknown["nonce"]["schema"] = json!("chio.execution_nonce.v3");
-    assert_schema_rejects("kernel/execution_nonce.schema.json", &unknown);
+    for schema in [
+        "chio.execution_nonce.v2",
+        "chio.execution_nonce.v3",
+        "chio.operation_execution_nonce.v2",
+        "chio.operation_execution_nonce.v3",
+    ] {
+        let mut unknown = encoded.clone();
+        unknown["nonce"]["schema"] = json!(schema);
+        assert_schema_rejects("kernel/execution_nonce.schema.json", &unknown);
+    }
     let mut unbound = encoded;
     unbound["nonce"]["bound_to"]
         .as_object_mut()

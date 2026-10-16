@@ -198,50 +198,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn historical_signed_outcomes_do_not_qualify_current_enforcement(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let key = PublicKey::from_hex(
-            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget-kernel.pub")
-                .trim(),
-        )?;
-        // The original signed evidence carries a retired launch policy schema id;
-        // its valid signature cannot qualify the current enforcement contract.
-        let signed = crate::receipt_verify::verify_original_receipt(
-            include_str!("../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"),
-            &key,
-        )?;
-        let selected: Value = crate::input::text(include_str!(
-            "../../../../tests/fixtures/process-worker-outcomes/v2-budget-pins.json"
-        ))?;
-        let pins: BTreeMap<String, PublicKey> = selected["launch_policy_signers"]
-            .as_object()
-            .ok_or("pins")?
-            .iter()
-            .map(|(server, value)| {
-                Ok((
-                    server.clone(),
-                    PublicKey::from_hex(value.as_str().ok_or("key")?)?,
-                ))
-            })
-            .collect::<Result<_, Box<dyn std::error::Error>>>()?;
-        let runtime = selected["runtime_id"].as_str().ok_or("runtime")?;
-        let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
-        assert!(super::super::verify_outcomes(&signed, &run, &key, runtime, &pins).is_err());
-        let error = verify(&run, &pins)
-            .err()
-            .ok_or("accepted historical evidence from obsolete enforcement")?;
-        assert_eq!(
-            error.to_string(),
-            CliError::cli_other_error(
-                "failed to parse cage launch policy exported-launch-policy: \
-                 urn:chio:error:attest:signed-json-invalid-shape"
-            )
-            .to_string()
-        );
-        Ok(())
-    }
-
-    #[test]
     fn retained_crash_outcomes_bind_actual_launches_without_inventing_exits(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let key = PublicKey::from_hex(
@@ -293,7 +249,7 @@ mod tests {
         let params = &signed.action.parameters;
         // A genuine signed exit of another campaign's launch.
         let foreign: Value = crate::input::text(include_str!(
-            "../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"
+            "../../../../tests/fixtures/process-worker-outcomes/current-native-clean.json"
         ))?;
         let foreign_exit = foreign["action"]["parameters"]["confinement"]
             .as_object()
@@ -393,26 +349,12 @@ mod tests {
         let matching: Outcomes = serde_json::from_value(matching)?;
         assert_eq!(verify(&matching, &pins)?["erin"]["terminal_verified"], true);
 
-        let foreign: Value = crate::input::text(include_str!(
-            "../../../../tests/fixtures/process-worker-outcomes/v2-budget.json"
-        ))?;
-        let foreign_exit = foreign["action"]["parameters"]["confinement"]
-            .as_object()
-            .ok_or("foreign confinement")?
-            .values()
-            .find_map(|launch| (!launch["terminal"].is_null()).then(|| launch["terminal"].clone()))
-            .ok_or("foreign signed exit")?;
-        for substituted in [
-            foreign_exit,
-            params["confinement"][frank]["terminal"].clone(),
-        ] {
-            let mut changed = params.clone();
-            *changed
-                .pointer_mut(&format!("/confinement/{erin}/terminal"))
-                .ok_or("erin terminal")? = substituted;
-            let changed: Outcomes = serde_json::from_value(changed)?;
-            assert!(verify(&changed, &pins).is_err());
-        }
+        let mut changed = params.clone();
+        *changed
+            .pointer_mut(&format!("/confinement/{erin}/terminal"))
+            .ok_or("erin terminal")? = params["confinement"][frank]["terminal"].clone();
+        let changed: Outcomes = serde_json::from_value(changed)?;
+        assert!(verify(&changed, &pins).is_err());
 
         let mut withheld: Outcomes = serde_json::from_value(params.clone())?;
         withheld

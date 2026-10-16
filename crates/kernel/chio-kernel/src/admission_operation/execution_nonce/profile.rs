@@ -8,7 +8,7 @@ use crate::execution_nonce::{
 use chio_core::crypto::Keypair;
 
 /// Nonce profile reserved for the operation-owned admission authority.
-pub const OPERATION_EXECUTION_NONCE_SCHEMA: &str = "chio.execution_nonce.v2";
+pub const OPERATION_EXECUTION_NONCE_SCHEMA: &str = "chio.operation_execution_nonce.v1";
 
 #[derive(Serialize)]
 struct SigningContext<'a> {
@@ -169,6 +169,31 @@ mod tests {
         let signed = SignedExecutionNonce { nonce, signature };
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 100)?;
         verify_operation_execution_nonce_at(&signed, &operation, &key.public_key(), &binding, 129)?;
+        for schema in [
+            "chio.execution_nonce.v2",
+            "chio.execution_nonce.v3",
+            "chio.operation_execution_nonce.v2",
+            "chio.operation_execution_nonce.v3",
+        ] {
+            let mut retired = signed.clone();
+            retired.nonce.schema = schema.into();
+            let bytes = signing_bytes(&operation, &retired.nonce)?;
+            retired.signature = key.sign(&bytes);
+            assert!(key.public_key().verify(&bytes, &retired.signature));
+            assert_eq!(
+                verify_operation_execution_nonce_at(
+                    &retired,
+                    &operation,
+                    &key.public_key(),
+                    &binding,
+                    100
+                ),
+                Err(AdmissionOperationStoreError::Invariant(
+                    "operation nonce issuance interval is invalid".into()
+                )),
+                "{schema}"
+            );
+        }
         for now in [99, 130, 131] {
             assert!(verify_operation_execution_nonce_at(
                 &signed,

@@ -124,7 +124,7 @@ different names for the same bytes.
 - `crates/economy/chio-anchor/src/bundle.rs:12` `CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA`
 - `crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs:58` `CHIO_ANCHOR_PROOF_BUNDLE_SCHEMA`
 
-## `chio.checkpoint_statement.v2` (3 declarations, 3 crates)
+## `chio.checkpoint_statement.v1` (3 declarations, 3 crates)
 
 - `crates/economy/chio-web3/src/anchors.rs:18` `CHIO_CHECKPOINT_STATEMENT_SCHEMA`
 - `crates/kernel/chio-kernel/src/checkpoint.rs:38` `CHECKPOINT_SCHEMA`

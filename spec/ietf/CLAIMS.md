@@ -26,6 +26,65 @@ Lifting the limit needs per-hop child-scope witnesses, a partner-key set separat
 - Added 2026-10-09 (cross-vendor review). Section Signature Suites and receipt verification step 3 now require every verifier to reject a present `algorithm` hint that disagrees with the signature encoding, with or without a floor, as `spec/PROTOCOL.md` requires for capabilities and receipts. This replaces the floor-aware-only qualification in ledger row 5 and receipt row R41. `ChioReceipt::verify_signature` (`crates/core/chio-core-types/src/receipt/body.rs:479-494`) does not check the hint; `verify_signature_with_floor` (lines 521-528) does. Section Implementation Status records that gap (work item RCPT-ALG-HINT).
 - Added 2026-10-09 (cross-vendor review). Section Privacy Considerations gains two paragraphs on unsalted output digests: `content_hash`, stream chunk digests, and a child `outcome_hash` let a receipt reader confirm an enumerable output (`crates/kernel/chio-kernel/src/receipt_support/receipt_content.rs:3-60`), and the signing nonce does not enter them. Mitigations are stated as considerations; no implementation change is claimed.
 
+### 2026-10-15: process-family source alignment
+
+This targeted source review uses implementation candidate
+`f4407d940902455bcac885e54421928c5e0c82ba` and its merge base
+`a6660313842da9b46eabeadc57d755a73330eeb3`. It covers the changed
+checkpoint and execution-nonce claims below and their signed-artifact
+registrations. It does not requalify the other historical rows, runtime
+behavior, rendering, interoperability, or publication. The September 30
+baseline and its frozen line references remain historical evidence.
+
+- **Checkpoint statements.** Issuance and verification accept only
+  `chio.checkpoint_statement.v1`. Checkpoint 1 requires its exact own
+  chain-leaf root; a detached later statement may omit `chain_root`
+  during standalone validation. Both endpoints require roots when
+  validating a predecessor pair. Evidence: `crates/kernel/chio-kernel/src/checkpoint.rs:38-47,118-129,1537-1601,1687-1692`.
+  This supersedes checkpoint-review rows F14-F16, F21, R01, O02, and
+  L06-L07. The merge base already enforced these commitment rules under
+  the sole statement label `chio.checkpoint_statement.v2`; the adoption
+  changes the label, not the cryptographic commitment rules.
+- **Consistency proofs, an older omission corrected in this scope.**
+  The merge base already accepts only
+  `chio.checkpoint_consistency_proof.v1` with cryptographic prefix
+  verification. All fifteen record fields are required and non-null,
+  including both roots, both endpoint inclusions, and the path array;
+  none has an omission default. Missing roots in a detached statement
+  remain a separate statement-validation rule. The proof still needs
+  authenticated prefix anchoring and endpoint/path verification.
+  Evidence: `crates/kernel/chio-kernel/src/checkpoint.rs:42,226-263,776-851`.
+  This supersedes the checkpoint-review consistency qualifications in
+  F03, F22, F25-F26, F30, R09, O04-O08, L08, and C08. The draft's old
+  metadata-only v1 and optional proof-field language was stale before
+  this adoption. No consistency-proof semantics change is claimed.
+- **Distinct nonce families.** The shared transport envelope still has
+  only `nonce` and `signature`. `chio.execution_nonce.v1` signs the
+  canonical nonce body. `chio.operation_execution_nonce.v1` signs the
+  canonical object containing the context schema
+  `chio.admission-execution-nonce-signature.v1`, an independently
+  authenticated `operation_id`, and the complete nonce body. The
+  operation verifier checks the independent issuer and six-field
+  binding, issuance and expiry, the safe-millisecond expiry bound, and
+  the signing-size bound. Fresh operation custody requires this profile;
+  historical signature verification does not authorize dispatch.
+  Evidence: `crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs:11-29,36-86,106-142`;
+  `crates/kernel/chio-kernel/src/admission_operation/execution_nonce.rs:16,172-180`;
+  `crates/kernel/chio-kernel/src/execution_nonce.rs:49-50,340-364`.
+  The merge base already used this signing context under
+  `chio.execution_nonce.v2`; the adoption supplies the distinct family
+  name. Body-only signing, replay-store verification, and reconciliation
+  in monetary-review rows C34-C38 and R32-R35 remain scoped to
+  `chio.execution_nonce.v1`. The schema-profile envelope is shared;
+  these rows do not qualify operation-owned signatures or custody.
+- **Authoritative-spend predicate and registry.** The predicate still
+  verifies the nonce body alone and does not verify an operation-bound
+  signing context (`crates/core/chio-core-types/src/message.rs:102-104`).
+  Its existing exclusions remain. The signed-artifact registrations now
+  name the sole checkpoint statement profile and separately register
+  both nonce families; historical registry counts and version names
+  below do not describe this amended draft.
+
 ## Abstract and Sections 1-3
 
 # Final opening-section claim review

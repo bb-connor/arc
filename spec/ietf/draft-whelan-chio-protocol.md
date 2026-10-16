@@ -1465,11 +1465,14 @@ hold authority is distinct from an aggregate invocation budget.
 ## Authoritative Spend {#authoritative-spend}
 
 An execution nonce has exactly the JSON-schema profile envelope
-members nonce and signature. The nonce body and its binding are:
+members nonce and signature. The body-only profile is
+`chio.execution_nonce.v1`; the operation-owned profile is
+`chio.operation_execution_nonce.v1` ({{operation-execution-nonces}}).
+They share this nonce body and binding:
 
 | Member | Type | Presence |
 | --- | --- | --- |
-| schema | string equal to chio.execution_nonce.v1 | required |
+| schema | chio.execution_nonce.v1 or chio.operation_execution_nonce.v1 | required |
 | nonce_id | nonempty string | required |
 | issued_at | integer from 0 through 9223372036854775807, Unix seconds | required |
 | expires_at | integer in the same range, Unix seconds | required |
@@ -1495,28 +1498,28 @@ defaults an omitted request_id to an empty string. Such decoding does
 not establish schema-profile acceptance; normal execution verification
 rejects an empty request_id.
 
-A nonce signer MUST sign the typed canonical JSON of the complete
-nonce body, including each optional body member that is present,
-without a domain prefix. The signature is beside nonce, not inside
-it. Reference kernel issuance uses its Ed25519 key; the schema's
-additional signature spellings do not establish an additional nonce
-issuance backend. Reference nonce identifiers are UUIDv7 strings and
-the default lifetime is 30 seconds. Nonce enforcement is an explicit
-runtime choice and is off by default.
+A `chio.execution_nonce.v1` signer MUST sign the typed canonical JSON
+of the complete nonce body, including each optional body member that
+is present, without a domain prefix. The signature is beside nonce,
+not inside it. Reference kernel issuance uses its Ed25519 key; the
+schema's additional signature spellings do not establish an additional
+nonce issuance backend. Reference nonce identifiers are UUIDv7 strings and
+the default lifetime is 30 seconds. Enforcement of this body-only
+profile is an explicit runtime choice and is off by default.
 
-A nonce verifier for a presented tool-call request MUST reject an
-unsupported schema, now greater than or equal to expires_at, an empty
-request_id, a mismatch in any of the six binding fields against the
-independently derived expected request, or an invalid signature under
-the kernel key. Before accepting that execution, it MUST reserve the
-nonce identifier exactly once in its replay store and reject a replay
-or replay-store failure. The consumed marker remains needed through
-the signed expiry.
+A `chio.execution_nonce.v1` verifier for a presented tool-call request
+MUST reject an unsupported schema, now greater than or equal to
+expires_at, an empty request_id, a mismatch in any of the six binding
+fields against the independently derived expected request, or an invalid
+signature under the kernel key. Before accepting that execution, it
+MUST reserve the nonce identifier exactly once in its replay store and
+reject a replay or replay-store failure. The consumed marker remains
+needed through the signed expiry.
 
-Reconciliation by a caller-reserved nonce is a distinct path. The
-reference implementation validates the nonce using its own signed
-binding, then separately checks the presented arguments hash, the
-named open hold, the hold's capability, and the reserved monetary
+Reconciliation by a caller-reserved `chio.execution_nonce.v1` nonce is
+a distinct path. The reference implementation validates the nonce using
+its own signed binding, then separately checks the presented arguments
+hash, the named open hold, the hold's capability, and the reserved monetary
 currency. It clamps realized units to remaining exposure and closes
 the hold atomically. Consumption is attempted only after settlement;
 a failure to write the consumed marker is nonfatal because the closed
@@ -1540,7 +1543,8 @@ every following condition holds:
    If that nonce has reserved_hold_id, it equals hold_id.
 6. The nonce's capability_id, tool_server, tool_name, and
    parameter_hash equal the receipt's corresponding call fields.
-7. The nonce signature verifies under the same admitted kernel_key.
+7. The nonce signature over the complete nonce body verifies under the
+   same admitted kernel_key.
 
 This predicate does not independently check nonce subject_id,
 request_id, schema, expiry, replay state, or the guarantee floor.
@@ -1550,6 +1554,49 @@ terminal.realized_spend_units, which can differ from the reported
 financial.cost_charged. Execution-time nonce verification and
 guarantee-floor checking are separate checks; successful evaluation
 of this predicate alone does not establish them.
+This body-only signature predicate does not verify an operation-owned
+nonce's signing context.
+
+### Operation-Owned Execution Nonces {#operation-execution-nonces}
+
+The `chio.operation_execution_nonce.v1` profile uses the same signed
+nonce envelope. Its signer MUST sign the canonical JSON of an object
+with exactly these members, without an additional domain prefix:
+
+| Member | Signed value |
+| --- | --- |
+| schema | chio.admission-execution-nonce-signature.v1 |
+| operation_id | Independently authenticated admission operation ID string. |
+| nonce | Complete nonce body, including its chio.operation_execution_nonce.v1 schema and all present optional members. |
+
+The operation ID is signing context; it is not an additional member of
+the signed-nonce transport envelope. A verifier MUST reconstruct it from
+the trusted admission binding, including the authenticated namespace,
+capability artifact, request, policy, and effect class. The presented
+nonce MUST NOT select or change that context. Changing the schema label
+does not translate a signature between the two nonce profiles.
+
+A verifier MUST require the operation profile's schema, a valid signature
+under the independently trusted issuer, and all six request-binding
+fields to match the independently derived expected request. It MUST
+reject a negative issued_at, issuance after the trusted verification
+time, expires_at less than or equal to issued_at, and a verification
+time greater than or equal to expires_at. It MUST reject expires_at
+above `floor(9007199254740991 / 1000)` Unix seconds. The reference
+implementation bounds both the canonical signing context and serialized
+reservation material to 16 KiB.
+
+Fresh operation-owned issuance and capture MUST require this profile
+and operation-owned durable nonce custody. Signature verification alone
+does not reserve a nonce or authorize a dispatch. Historical verification
+uses independently authenticated operation, request, issuer, and original
+verification-time evidence; success does not renew execution authority.
+
+The `chio.execution_nonce.v1` replay-store verifier MUST reject
+`chio.operation_execution_nonce.v1` before consuming a replay marker.
+Fresh operation-owned reservations and capture MUST reject
+`chio.execution_nonce.v1`, even if its signature is valid and a separate
+replay cache reports it unused.
 
 ## Metering Metadata {#metering}
 
@@ -2433,8 +2480,8 @@ and the approval's digest together in `economic_authorization`.
 
 # Receipt Checkpoints {#checkpoints}
 
-A checkpoint signs a commitment to a local receipt batch and, for v2,
-can commit the sequence of checkpoint batch roots. It supports audit
+A checkpoint signs a commitment to a local receipt batch and can commit
+the sequence of checkpoint batch roots. It supports audit
 evidence and checked continuity over supplied statements. It does not
 prove that a publisher disclosed every view it signed.
 
@@ -2442,8 +2489,7 @@ prove that a publisher disclosed every view it signed.
 
 The signed object has two required members, `body` and `signature`.
 A verifier MUST reject any unknown member in either the envelope or the
-body. New issuance uses `chio.checkpoint_statement.v2`. Legacy
-`chio.checkpoint_statement.v1` remains accepted for verification.
+body. Issuance and verification use only `chio.checkpoint_statement.v1`.
 
 | Body field | Type | Presence |
 |---|---|---|
@@ -2461,7 +2507,7 @@ body. New issuance uses `chio.checkpoint_statement.v2`. Legacy
 
 | Body field | Meaning |
 |---|---|
-| `schema` | Exactly `chio.checkpoint_statement.v1` or `chio.checkpoint_statement.v2`. |
+| `schema` | Exactly `chio.checkpoint_statement.v1`. |
 | `checkpoint_seq` | Positive checkpoint number. |
 | `batch_start_seq` | Positive first claim-log entry in the batch. |
 | `batch_end_seq` | Last claim-log entry in the batch, not less than its first. |
@@ -2531,10 +2577,10 @@ hashed chain leaves for checkpoint 1 through `checkpoint_seq`, in
 sequence order, with the parent hash above, without hashing them as
 leaves again. The chain tree's size is the checkpoint count.
 
-A v1 checkpoint producer MUST omit `chain_root`. A v2 checkpoint 1 producer MUST carry a
-`chain_root` equal to its own chain-leaf hash. A detached later v2
-statement can pass standalone validation without a chain root; a
-verifier MUST reject its use as a successor in a predecessor pair.
+A checkpoint 1 producer MUST carry a `chain_root` equal to its own
+chain-leaf hash. A detached later statement can pass standalone
+validation without a chain root; a verifier MUST reject its use as
+either endpoint in a predecessor pair.
 For the local store profile, the first persisted checkpoint MUST have
 checkpoint number 1, batch start 1, and no predecessor digest. Those
 store-genesis rules are separate from standalone statement validation.
@@ -2552,8 +2598,7 @@ signatures. It MUST require the successor's checkpoint number to equal
 the predecessor's plus 1, its batch start to equal the predecessor's
 batch end plus 1, and its `previous_checkpoint_sha256` to equal the
 SHA-256 digest of the predecessor's canonical typed body, excluding
-signature. Overflow is invalid. It MUST reject a successor that drops
-an existing chain commitment, and a v2 successor without a chain root.
+signature. Overflow is invalid. Both statements MUST carry chain roots.
 Predecessor linkage alone does not prove Merkle prefix extension or
 require increasing timestamps.
 
@@ -2571,16 +2616,16 @@ The consistency record is unsigned. Its fields are:
 | `to_log_tree_size` | Unsigned 64-bit integer | REQUIRED |
 | `appended_entry_start_seq` | Unsigned 64-bit integer | REQUIRED |
 | `appended_entry_end_seq` | Unsigned 64-bit integer | REQUIRED |
-| `from_chain_root` | Hash or null | OPTIONAL; absent by default |
-| `to_chain_root` | Hash or null | OPTIONAL; absent by default |
-| `chain_proof_hashes` | Array of hashes | OPTIONAL; defaults to `[]` |
-| `from_leaf_inclusion` | Merkle inclusion object or null | OPTIONAL; absent by default |
-| `to_leaf_inclusion` | Merkle inclusion object or null | OPTIONAL; absent by default |
+| `from_chain_root` | Hash | REQUIRED |
+| `to_chain_root` | Hash | REQUIRED |
+| `chain_proof_hashes` | Array of hashes | REQUIRED |
+| `from_leaf_inclusion` | Merkle inclusion object | REQUIRED |
+| `to_leaf_inclusion` | Merkle inclusion object | REQUIRED |
 
 
-| Field | Valid v2 meaning |
+| Field | Meaning |
 |---|---|
-| `schema` | `chio.checkpoint_consistency_proof.v2`. |
+| `schema` | Exactly `chio.checkpoint_consistency_proof.v1`. |
 | `log_id` | Derived log identifier of both endpoints. |
 | `from_checkpoint_seq` | Earlier checkpoint number. |
 | `to_checkpoint_seq` | Immediately following checkpoint number. |
@@ -2590,20 +2635,19 @@ The consistency record is unsigned. Its fields are:
 | `to_log_tree_size` | Later endpoint's `batch_end_seq`. |
 | `appended_entry_start_seq` | Later endpoint's `batch_start_seq`. |
 | `appended_entry_end_seq` | Later endpoint's `batch_end_seq`. |
-| `from_chain_root` | Earlier signed chain root, required for successful v2 verification. |
-| `to_chain_root` | Later signed chain root, required for successful v2 verification. |
+| `from_chain_root` | Earlier signed chain root. |
+| `to_chain_root` | Later signed chain root. |
 | `chain_proof_hashes` | RFC 9162 consistency path. |
 | `from_leaf_inclusion` | Earlier endpoint's own chain leaf at its final position. |
 | `to_leaf_inclusion` | Later endpoint's own chain leaf at its final position. |
 
 
-The first ten fields have no parsing defaults. A verifier MUST reject
-unknown members of the outer record. Producers omit absent roots and
-inclusions and an empty `chain_proof_hashes`. The compatibility parser
-accepts explicit null for the four optional roots/inclusions, but not
-for the array. Its nested inclusion objects have the format in
-{{inclusion-proofs}} and accept unknown members. Parsing acceptance
-does not establish a valid v2 proof.
+All fifteen fields are required, non-null, and have no parsing defaults.
+A verifier MUST reject missing or unknown members of the outer record.
+Producers MUST include `chain_proof_hashes`, including an empty array
+when the path is empty. The nested inclusion objects have the format in
+{{inclusion-proofs}} and accept unknown members in the reference typed
+parser. Parsing acceptance does not establish a valid proof.
 
 The log identifier is `local-log-` followed by 64 lowercase hexadecimal
 characters: SHA-256 of the raw Ed25519 key bytes, or of the UTF-8 bytes
@@ -2613,7 +2657,7 @@ identifier. A consistency verifier MUST reject a pair with different
 derived identifiers, and MUST compare every metadata field against the
 values recomputed from the signed bodies.
 
-For v2 verification, both signed statements MUST carry chain roots.
+For verification, both signed statements MUST carry chain roots.
 The verifier MUST require the record's roots to equal them and both
 endpoint inclusion objects to be present. For each endpoint, it MUST
 require an inclusion tree size equal to that endpoint's checkpoint
@@ -2638,13 +2682,8 @@ numbers as tree sizes and the two signed chain roots, following
 unsuccessful metadata, root, inclusion, anchor, or path comparisons
 are failed proofs.
 
-Legacy `chio.checkpoint_consistency_proof.v1` carries metadata continuity
-only. A verifier MUST NOT treat it as a cryptographic prefix proof.
-Successful legacy verification requires two v1 statements, decoded
-absence of both chain roots and endpoint inclusions, and an empty
-decoded `chain_proof_hashes`. Omission and explicit null both represent
-absence for its four optional fields; omission and `[]` both represent
-an empty path. Prefix anchors are not evaluated for legacy records.
+A verifier MUST reject any consistency-proof schema other than
+`chio.checkpoint_consistency_proof.v1`.
 
 ## Inclusion Proofs {#inclusion-proofs}
 
@@ -4345,9 +4384,11 @@ Initial values in the scope of this document are:
   ({{aggregate-budgets}}).
 * `chio.execution_nonce.v1`: authoritative execution nonce
   ({{authoritative-spend}}).
+* `chio.operation_execution_nonce.v1`: operation-owned execution nonce
+  with an operation-bound signing context ({{operation-execution-nonces}}).
 * `chio.threshold-approval-proposal.v1`: threshold proposal
   ({{threshold-approval}}).
-* `chio.checkpoint_statement.v2`: signed receipt checkpoint
+* `chio.checkpoint_statement.v1`: signed receipt checkpoint
   ({{checkpoint-statement}}).
 
 Approval tokens, delegation links, and child receipts do not gain a

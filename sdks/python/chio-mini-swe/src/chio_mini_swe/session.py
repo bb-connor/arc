@@ -432,7 +432,6 @@ def prepare(state, authorization_path):
             "schema": "chio.process.host.v1",
             "policy": str(state / "policy.yaml"),
             "native_broker": broker,
-            "execution_nonces": True,
             "servers": servers,
             "limits": {"max_processes": 2, "max_depth": 1, "max_calls": config["max_calls"]},
             "children": [

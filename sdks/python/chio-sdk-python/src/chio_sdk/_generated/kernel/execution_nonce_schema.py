@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 76d7fa85798af8c0fa0bf76f068a5e8c2e5d4c46d4b3bd275c8adb3e4185cecf
+# Schema sha256: 9c3522ff79e430e736091f3e10d405a7c28615e03da0e81496a60cfec8262f3c
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -20,11 +20,11 @@ from pydantic import ConfigDict, Field, conint, constr
 
 class Schema(Enum):
     """
-    v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+    chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
     """
 
     chio_execution_nonce_v1 = "chio.execution_nonce.v1"
-    chio_execution_nonce_v2 = "chio.execution_nonce.v2"
+    chio_operation_execution_nonce_v1 = "chio.operation_execution_nonce.v1"
 
 
 class BoundTo(BaseModel):
@@ -46,7 +46,7 @@ class Nonce(BaseModel):
     schema_: Schema = Field(
         ...,
         alias="schema",
-        description="v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.",
+        description="chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.",
     )
     nonce_id: constr(min_length=1)
     issued_at: conint(strict=True, ge=0)

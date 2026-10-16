@@ -51,7 +51,7 @@ capabilities:
             fixed: FixedClock::from_millis(epoch),
             unavailable: AtomicBool::new(false),
         });
-        let host = kernel_with_clock(directory.path(), loaded, true, false, None, clock.clone())?;
+        let host = kernel_with_clock(directory.path(), loaded, true, None, clock.clone())?;
         let subject = Keypair::generate().public_key();
         let token = host.kernel.issue_capability(&subject, scope.clone(), 60)?;
         assert_eq!(token.issued_at, epoch / 1000);

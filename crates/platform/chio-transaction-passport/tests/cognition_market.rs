@@ -869,7 +869,7 @@ fn add_transparency_anchor(bundle: &mut QualifiedBundle) -> TestResult {
     let chain_root =
         chio_core_types::merkle::leaf_hash(&canonical_json_bytes(&checkpoint_chain_leaf)?);
     let statement_body = json!({
-        "schema": "chio.checkpoint_statement.v2",
+        "schema": "chio.checkpoint_statement.v1",
         "checkpoint_seq": 1,
         "batch_start_seq": 1,
         "batch_end_seq": 1,

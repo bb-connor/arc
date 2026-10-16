@@ -920,7 +920,7 @@ files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.checkpoint_statement.v2"
+value = "chio.checkpoint_statement.v1"
 files = ["crates/economy/chio-web3/src/anchors.rs", "crates/kernel/chio-kernel/src/checkpoint.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
 first_seen = "041db5c226"
 
@@ -1558,11 +1558,6 @@ first_seen = "11e573d2d7"
 value = "chio.execution_nonce.v1"
 files = ["crates/kernel/chio-kernel/src/execution_nonce.rs"]
 first_seen = "11e573d2d7"
-
-[[schema]]
-value = "chio.execution_nonce.v2"
-files = ["crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs"]
-first_seen = "2cb85b1cb9"
 
 [[schema]]
 value = "chio.extension-inventory.v1"
@@ -3625,6 +3620,11 @@ files = ["crates/core/chio-core/src/extension/mod.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
+value = "chio.operation_execution_nonce.v1"
+files = ["crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs"]
+first_seen = "68d72d43cd"
+
+[[schema]]
 value = "chio.oracle-conversion-evidence.v1"
 files = ["crates/core/chio-core-types/src/oracle.rs", "crates/economy/chio-web3/src/anchors.rs"]
 first_seen = "11e573d2d7"
@@ -4350,9 +4350,9 @@ files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.process.abi.v3"
+value = "chio.process.abi.v1"
 files = ["crates/kernel/chio-process/src/lib.rs"]
-first_seen = "95f04d5d74"
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio.process.blobs.v1"
@@ -4360,29 +4360,19 @@ files = ["crates/kernel/chio-process/src/types.rs"]
 first_seen = "bd1ccfca6a"
 
 [[schema]]
+value = "chio.process.broker-call-observation.v1"
+files = ["crates/products/chio-cli/src/cli/process_host/call_evidence.rs"]
+first_seen = "62e9264884"
+
+[[schema]]
 value = "chio.process.call-observation.v1"
 files = ["crates/products/chio-cli/src/cli/process_host/call_evidence.rs"]
 first_seen = "f2e72bc05b"
 
 [[schema]]
-value = "chio.process.call-observation.v2"
-files = ["crates/products/chio-cli/src/cli/process_host/call_evidence.rs"]
-first_seen = "0b8a7273ac"
-
-[[schema]]
-value = "chio.process.call-observation.v3"
-files = ["crates/products/chio-cli/src/cli/process_host/call_evidence.rs"]
-first_seen = "ce36ef0b29"
-
-[[schema]]
-value = "chio.process.completed-fanout.v2"
+value = "chio.process.completed-fanout.v1"
 files = ["crates/products/chio-cli/src/cli/process_host/run_evidence.rs"]
-first_seen = "9dd317b6f3"
-
-[[schema]]
-value = "chio.process.completed-fanout.v3"
-files = ["crates/products/chio-cli/src/cli/process_host/run_evidence.rs"]
-first_seen = "0b8a7273ac"
+first_seen = "340165f9bd"
 
 [[schema]]
 value = "chio.process.container-launch.v1"
@@ -4415,14 +4405,9 @@ files = ["crates/kernel/chio-process/src/worker.rs"]
 first_seen = "6e5e44836d"
 
 [[schema]]
-value = "chio.process.worker-outcomes.v2"
+value = "chio.process.worker-outcomes.v1"
 files = ["crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs"]
-first_seen = "1ae9f9ddac"
-
-[[schema]]
-value = "chio.process.worker-outcomes.v3"
-files = ["crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes.rs"]
-first_seen = "0b8a7273ac"
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio.proof-room.bundle.v1"

@@ -1454,13 +1454,13 @@ authorization. A guarantee level (`single_node_atomic`, `ha_linearizable`,
 
 #### Operation-owned execution nonce profile
 
-`chio.execution_nonce.v2` is a distinct operation-owned profile. It uses the
+`chio.operation_execution_nonce.v1` is a distinct operation-owned profile. It uses the
 existing signed-nonce transport shape, but signs the canonical JSON of an object
 with exactly these members:
 
 - `schema`: the literal `chio.admission-execution-nonce-signature.v1`.
 - `operation_id`: the authenticated admission operation ID string.
-- `nonce`: the complete nonce body, including its `chio.execution_nonce.v2`
+- `nonce`: the complete nonce body, including its `chio.operation_execution_nonce.v1`
   schema label and every optional member present in that body.
 
 The verifier MUST reconstruct `operation_id` from the trusted admission binding,
@@ -1469,12 +1469,14 @@ effect class. The nonce cannot select or change that context. All six request
 binding fields, issuer, issuance interval and current expiry MUST also verify.
 Changing the schema label does not translate a signature between profiles.
 
-Legacy replay-store verifiers MUST reject v2 before consuming a replay marker.
-Fresh operation-owned reservations and capture MUST reject v1, even when its
-signature is valid and a separate legacy cache reports it unused. Historical v1
-reservations and committed decisions remain evidence, not renewed authority;
-pre-dispatch cleanup retains their immutable tombstones. This profile does not
-extend the v1 authoritative-spend qualification above.
+The `chio.execution_nonce.v1` replay-store verifier MUST reject
+`chio.operation_execution_nonce.v1` before consuming a replay marker.
+Fresh operation-owned reservations and capture MUST reject
+`chio.execution_nonce.v1`, even when its signature is valid and a separate replay
+cache reports it unused. Historical `chio.execution_nonce.v1` reservations and
+committed decisions remain evidence, not renewed authority; pre-dispatch cleanup
+retains their immutable tombstones. This profile does not extend the
+`chio.execution_nonce.v1` authoritative-spend qualification above.
 
 #### Authenticated caller start and delivery
 
@@ -2621,7 +2623,7 @@ envelope at this stage.
 Receipt batches can be committed to a Merkle checkpoint. Issuers use:
 
 ```text
-chio.checkpoint_statement.v2
+chio.checkpoint_statement.v1
 ```
 
 The signed body carries `chain_root`, the RFC 6962 commitment over the

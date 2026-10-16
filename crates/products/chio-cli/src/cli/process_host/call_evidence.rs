@@ -12,10 +12,10 @@ use chio_kernel::admission_operation::{
         RuntimeParticipantClaimEvidenceV1, RuntimeParticipantClaimReferenceV1,
         RuntimeParticipantDisposition, RuntimeParticipantPhase, MAX_RUNTIME_PARTICIPANT_EPISODES,
     },
-    AdmissionCompensationStatus, AdmissionDigest, AdmissionDispatchCommitBindingV1, AdmissionDispatchState,
-    AdmissionOperationBindingV1, AdmissionOperationKind, AdmissionOperationState,
-    AdmissionReceiptMetadataV1, AdmissionTerminalReplay, PersistedAdmissionOperationBindingV1,
-    LOCAL_SYSTEM_TENANT_ID,
+    AdmissionCompensationStatus, AdmissionDigest, AdmissionDispatchCommitBindingV1,
+    AdmissionDispatchState, AdmissionOperationBindingV1, AdmissionOperationKind,
+    AdmissionOperationState, AdmissionReceiptMetadataV1, AdmissionTerminalReplay,
+    PersistedAdmissionOperationBindingV1, LOCAL_SYSTEM_TENANT_ID,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -29,9 +29,8 @@ mod exporting;
 #[cfg(target_os = "linux")]
 pub(super) use exporting::export;
 
-const SCHEMA: &str = "chio.process.call-observation.v2";
-const LEGACY_SCHEMA: &str = "chio.process.call-observation.v1";
-const BROKER_SCHEMA: &str = "chio.process.call-observation.v3";
+const SCHEMA: &str = "chio.process.call-observation.v1";
+const BROKER_SCHEMA: &str = "chio.process.broker-call-observation.v1";
 const LIMIT: u64 = 32 * 1024 * 1024;
 
 #[cfg(test)]
@@ -60,8 +59,7 @@ struct Evidence {
     operation: Option<Operation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     nonce: Option<super::nonce_evidence::Evidence>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    receipt_log: Option<super::receipt_evidence::Evidence>,
+    receipt_log: super::receipt_evidence::Evidence,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     broker: Option<broker::Evidence>,
 }
@@ -156,10 +154,7 @@ fn verify_with_broker_config(
     require(
         !runtime.is_empty()
             && evidence.runtime_id == runtime
-            && matches!(
-                evidence.schema.as_str(),
-                SCHEMA | LEGACY_SCHEMA | BROKER_SCHEMA
-            )
+            && matches!(evidence.schema.as_str(), SCHEMA | BROKER_SCHEMA)
             && signed.action.parameters == serde_json::to_value(evidence).map_err(error)?,
         "call schema, runtime pin or signed payload differs",
     )?;
@@ -209,52 +204,43 @@ fn verify_with_broker_config(
         call.timestamp >= evidence.bootstrap.timestamp && call.timestamp <= signed.timestamp,
         "call receipt is outside observation interval",
     )?;
-    if matches!(evidence.schema.as_str(), SCHEMA | BROKER_SCHEMA) {
-        require(
-            evidence.nonce.is_some()
-                == evidence
-                    .operation
-                    .as_ref()
-                    .is_some_and(|operation| operation.execution_nonce_issuance_digest.is_some()),
-            "nonce evidence differs from retained issuance commitment",
-        )?;
-        super::nonce_evidence::verify(
-            evidence.nonce.as_ref(),
-            &call,
-            &evidence.response,
-            &cap,
-            key,
-            evidence.observed_at_unix_ms,
-        )?;
-        evidence
-            .receipt_log
-            .as_ref()
-            .ok_or_else(|| error("missing receipt log inclusion"))?
-            .verify(&call, key, evidence.observed_at_unix_ms)?;
-        if let Some(nonce) = &evidence.nonce {
-            let nonce_operation =
-                chio_kernel::admission_operation::AdmissionOperationV1::from_persisted(
-                    nonce.operation.clone(),
-                )
-                .map_err(error)?;
-            let operation = evidence
+    require(
+        evidence.nonce.is_some()
+            == evidence
                 .operation
                 .as_ref()
-                .ok_or_else(|| error("nonce has no owning operation"))?;
-            require(
-                nonce.operation.binding == operation.binding
-                    && nonce.operation.state == operation.state
-                    && nonce.operation.version == operation.version
-                    && nonce.operation.dispatch_commit == operation.dispatch_commit
-                    && nonce_operation.execution_nonce_issuance_digest()
-                        == operation.execution_nonce_issuance_digest.as_ref(),
-                "execution nonce custody differs from observed operation",
-            )?;
-        }
-    } else {
+                .is_some_and(|operation| operation.execution_nonce_issuance_digest.is_some()),
+        "nonce evidence differs from retained issuance commitment",
+    )?;
+    super::nonce_evidence::verify(
+        evidence.nonce.as_ref(),
+        &call,
+        &evidence.response,
+        &cap,
+        key,
+        evidence.observed_at_unix_ms,
+    )?;
+    evidence
+        .receipt_log
+        .verify(&call, key, evidence.observed_at_unix_ms)?;
+    if let Some(nonce) = &evidence.nonce {
+        let nonce_operation =
+            chio_kernel::admission_operation::AdmissionOperationV1::from_persisted(
+                nonce.operation.clone(),
+            )
+            .map_err(error)?;
+        let operation = evidence
+            .operation
+            .as_ref()
+            .ok_or_else(|| error("nonce has no owning operation"))?;
         require(
-            evidence.nonce.is_none() && evidence.receipt_log.is_none(),
-            "legacy call carries unsupported nonce or log claims",
+            nonce.operation.binding == operation.binding
+                && nonce.operation.state == operation.state
+                && nonce.operation.version == operation.version
+                && nonce.operation.dispatch_commit == operation.dispatch_commit
+                && nonce_operation.execution_nonce_issuance_digest()
+                    == operation.execution_nonce_issuance_digest.as_ref(),
+            "execution nonce custody differs from observed operation",
         )?;
     }
     verify_operation_with_runtime(
@@ -374,10 +360,10 @@ fn verify_operation_with_runtime(
                 projection.as_ref().is_some_and(|value| {
                     value.tool_outcome_id.is_none()
                         && value.tool_outcome_version.is_none()
-                        && value.compensation_status == AdmissionCompensationStatus::CompensatedBeforeDispatch
+                        && value.compensation_status
+                            == AdmissionCompensationStatus::CompensatedBeforeDispatch
                         && value.trusted_time_unix_ms / 1_000 == call.timestamp
-                })
-                    && refusal
+                }) && refusal
                     && call.content_hash == hash(&Value::Null)?
                     && owned.is_null()
                     && matches!(&operation.terminal_replay,
@@ -392,10 +378,11 @@ fn verify_operation_with_runtime(
             ))
         }
     };
-    if matches!(operation.state,
+    if matches!(
+        operation.state,
         AdmissionOperationState::CompensatedBeforeDispatch
-            | AdmissionOperationState::OutcomeUnknownAfterDispatch)
-    {
+            | AdmissionOperationState::OutcomeUnknownAfterDispatch
+    ) {
         let tenant = operation.binding.authenticated_tenant_id.as_str();
         let expected_tenant = (tenant != LOCAL_SYSTEM_TENANT_ID).then_some(tenant);
         require(
@@ -546,11 +533,7 @@ pub(super) fn verify_file(
         "graph_completion",
         "scenario_matrix",
     ];
-    if matches!(evidence.schema.as_str(), SCHEMA | BROKER_SCHEMA) {
-        checks.extend(["execution_nonces", "receipt_log_inclusion"]);
-    } else {
-        unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
-    }
+    checks.extend(["execution_nonces", "receipt_log_inclusion"]);
     if evidence.broker.is_some() {
         checks.extend([
             "broker_signature",

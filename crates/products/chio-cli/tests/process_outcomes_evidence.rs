@@ -52,7 +52,7 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
     let key = state.join("authority.db.kernel.pub");
     let verify = |path: &Path, runtime: &str| -> Result<Output> {
         Ok(Command::new(env!("CARGO_BIN_EXE_chio"))
-            .args(["process", "verify-outcomes", "--artifact"])
+            .args(["--json", "process", "verify-outcomes", "--artifact"])
             .arg(path)
             .arg("--trusted-kernel-pubkey")
             .arg(&key)
@@ -65,7 +65,7 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
     assert_eq!(report["workers"], 4);
     assert_eq!(report["captured_invocations"], 2);
     assert_eq!(report["m5_acceptance_complete"], false);
-    assert_eq!(report["artifact_schema"], "chio.process.worker-outcomes.v3");
+    assert_eq!(report["artifact_schema"], "chio.process.worker-outcomes.v1");
     assert_eq!(report["native_launches"], json!({}));
     assert!(!verify(&artifact, "another-runtime")?.status.success());
     let original: ChioReceipt = serde_json::from_slice(&std::fs::read(&artifact)?)?;
@@ -113,7 +113,8 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
         ("/authorities/1", params["authorities"][0].clone()),
         ("/calls/alice", params["calls"]["bob"].clone()),
         ("/observed_at_unix_ms", json!(1)),
-        ("/schema", json!("chio.process.worker-outcomes.v9")),
+        ("/schema", json!("chio.process.worker-outcomes.v2")),
+        ("/schema", json!("chio.process.worker-outcomes.v3")),
     ];
     for (index, (pointer, replacement)) in cases.into_iter().enumerate() {
         let mut body = original.body();
@@ -130,10 +131,18 @@ fn supervised_outcomes_bind_multiple_graphs_and_authoritative_family_usage() -> 
         assert!(signed.verify_signature()?);
         let path = root.join(format!("substitution-{index}.json"));
         std::fs::write(&path, canonical_json_bytes(&signed)?)?;
-        assert!(
-            !verify(&path, runtime)?.status.success(),
-            "accepted {pointer}"
-        );
+        let rejected = verify(&path, runtime)?;
+        assert!(!rejected.status.success(), "accepted {pointer}");
+        if pointer == "/schema" {
+            assert_eq!(rejected.status.code(), Some(1));
+            assert!(rejected.stdout.is_empty());
+            let report: Value = serde_json::from_slice(&rejected.stderr)?;
+            assert_eq!(report["code"], "urn:chio:error:cli:other");
+            assert_eq!(
+                report["message"],
+                "process host: outcome observation differs from pinned provisioning"
+            );
+        }
     }
     Ok(())
 }

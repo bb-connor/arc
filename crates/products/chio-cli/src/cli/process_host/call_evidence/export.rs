@@ -16,9 +16,7 @@ pub(crate) fn export(
     let context: Value = crate::process_response_verify::read_document(context)?;
     let response: Value = crate::process_response_verify::read_document(response)?;
     let host = Host::open(state, false)?;
-    if host.record.config.execution_nonces || host.record.config.native_broker.is_some() {
-        host.checkpoint_receipts()?;
-    }
+    host.checkpoint_receipts()?;
     let now = host
         .kernel
         .authority_clock_reading()
@@ -129,14 +127,20 @@ pub(super) fn observe(
             current.to_persisted() == operation.to_persisted(),
             "operation changed during observation",
         )?;
-        if matches!(operation.state(),
+        if matches!(
+            operation.state(),
             AdmissionOperationState::CompensatedBeforeDispatch
-                | AdmissionOperationState::OutcomeUnknownAfterDispatch)
-        {
-            let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) = operation.terminal_replay() else {
-                return Err(error("retained operation lacks its actual terminal receipt"));
+                | AdmissionOperationState::OutcomeUnknownAfterDispatch
+        ) {
+            let Some(AdmissionTerminalReplay::Receipt { receipt_id, .. }) =
+                operation.terminal_replay()
+            else {
+                return Err(error(
+                    "retained operation lacks its actual terminal receipt",
+                ));
             };
-            let retained_receipt = store.load_chio_receipt(receipt_id.as_str())
+            let retained_receipt = store
+                .load_chio_receipt(receipt_id.as_str())
                 .map_err(error)?
                 .ok_or_else(|| error("retained operation lacks its actual terminal receipt"))?;
             require(
@@ -159,18 +163,14 @@ pub(super) fn observe(
     } else {
         None
     };
-    let nonce = if host.record.config.execution_nonces {
-        super::super::nonce_evidence::export(
-            host,
-            &call,
-            operation
-                .as_ref()
-                .map(|operation| &operation.binding.operation_id),
-            now,
-        )?
-    } else {
-        None
-    };
+    let nonce = super::super::nonce_evidence::export(
+        host,
+        &call,
+        operation
+            .as_ref()
+            .map(|operation| &operation.binding.operation_id),
+        now,
+    )?;
     let broker = if host.record.config.native_broker.is_some() {
         Some(super::broker::export(
             host,
@@ -187,10 +187,8 @@ pub(super) fn observe(
     let evidence = Evidence {
         schema: if broker.is_some() {
             BROKER_SCHEMA
-        } else if host.record.config.execution_nonces {
-            SCHEMA
         } else {
-            LEGACY_SCHEMA
+            SCHEMA
         }
         .into(),
         runtime_id: host.runtime.runtime_id().into(),
@@ -201,11 +199,7 @@ pub(super) fn observe(
         response,
         operation,
         nonce,
-        receipt_log: if host.record.config.execution_nonces || broker.is_some() {
-            Some(super::super::receipt_evidence::export(host, &call, now)?)
-        } else {
-            None
-        },
+        receipt_log: super::super::receipt_evidence::export(host, &call, now)?,
         broker,
     };
     let parameters = serde_json::to_value(&evidence).map_err(error)?;

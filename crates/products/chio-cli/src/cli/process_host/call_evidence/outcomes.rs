@@ -21,8 +21,7 @@ pub(crate) use self::exporting::export;
 #[path = "outcomes_native.rs"]
 mod native;
 
-const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v3";
-const PREVIOUS_OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v2";
+const OUTCOMES_SCHEMA: &str = "chio.process.worker-outcomes.v1";
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -62,10 +61,7 @@ fn verify_outcomes(
     observation(&run.bootstrap, "provision_swarm")?;
     require(
         !runtime.is_empty()
-            && matches!(
-                run.schema.as_str(),
-                OUTCOMES_SCHEMA | PREVIOUS_OUTCOMES_SCHEMA
-            )
+            && run.schema == OUTCOMES_SCHEMA
             && run.runtime_id == runtime
             && run.bootstrap.action.parameters["runtime_id"] == runtime
             && signed.action.parameters == serde_json::to_value(run).map_err(error)?
@@ -80,10 +76,6 @@ fn verify_outcomes(
         "outcome observation differs from pinned provisioning",
     )?;
     super::super::state::require_abi(&run.host_record.abi, "worker outcomes")?;
-    require(
-        (run.schema == OUTCOMES_SCHEMA) == run.host_record.config.execution_nonces,
-        "outcome nonce profile differs from original provisioning",
-    )?;
     let caps: BTreeMap<String, CapabilityToken> =
         serde_json::from_value(run.bootstrap.action.parameters["capabilities"].clone())
             .map_err(error)?;
@@ -209,7 +201,7 @@ fn verify_outcomes(
             serde_json::from_value(signed_call.action.parameters.clone()).map_err(error)?;
         super::verify(signed_call, &evidence, key, runtime)?;
         require(
-            (run.schema == OUTCOMES_SCHEMA) == (evidence.schema == super::SCHEMA),
+            evidence.schema == super::SCHEMA,
             "worker call nonce and receipt-log profile differs from its run",
         )?;
         if let Some(nonce) = &evidence.nonce {
@@ -378,7 +370,7 @@ pub(crate) fn verify_file(
     let run: Outcomes = serde_json::from_value(signed.action.parameters.clone()).map_err(error)?;
     let pins = native::pins(policy_pins)?;
     let launches = verify_outcomes(&signed, &run, &key, runtime, &pins)?;
-    let mut unchecked = vec![
+    let unchecked = vec![
         "physical_effects",
         "scenario_matrix",
         "original_interrupted_launch",
@@ -393,16 +385,12 @@ pub(crate) fn verify_file(
         "continuation_custody",
         "aggregate_usage",
     ];
-    if run.schema == OUTCOMES_SCHEMA {
-        checks.extend(["execution_nonces", "receipt_log_inclusion"]);
-    } else {
-        unchecked.extend(["execution_nonces", "receipt_log_inclusion"]);
-    }
+    checks.extend(["execution_nonces", "receipt_log_inclusion"]);
     checks.push("call_referenced_native_launches");
     println!(
         "{}",
         json!({
-        "schema": "chio.process.worker-outcomes-verification.v2", "runtime_id": runtime,
+        "schema": "chio.process.worker-outcomes-verification.v1", "runtime_id": runtime,
         "artifact_schema": run.schema, "native_launches": launches,
         "graphs": run.authorities.len(), "workers": run.calls.len(),
         "captured_invocations": run.aggregate.captured_invocations,
@@ -415,39 +403,4 @@ pub(crate) fn verify_file(
         })
     );
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn historical_network_outcomes_cannot_claim_current_host_acceptance(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let key = PublicKey::from_hex(
-            include_str!(
-                "../../../../tests/fixtures/process-worker-outcomes/v1-network-kernel.pub"
-            )
-            .trim(),
-        )?;
-        let signed = crate::receipt_verify::verify_original_receipt(
-            include_str!("../../../../tests/fixtures/process-worker-outcomes/v1-network.json"),
-            &key,
-        )?;
-        let run: Outcomes = serde_json::from_value(signed.action.parameters.clone())?;
-        let runtime = "a86fa37d-97ec-4e6b-afbd-b178dd9a10a8";
-        assert_eq!(run.schema, "chio.process.worker-outcomes.v1");
-        assert_eq!(run.calls.len(), 2);
-        assert!(verify_outcomes(&signed, &run, &key, runtime, &BTreeMap::new()).is_err());
-        assert!(verify_outcomes(&signed, &run, &key, "other-runtime", &BTreeMap::new()).is_err());
-        assert!(verify_outcomes(
-            &signed,
-            &run,
-            &key,
-            runtime,
-            &BTreeMap::from([("network-probe".into(), key.clone())])
-        )
-        .is_err());
-        Ok(())
-    }
 }

@@ -178,7 +178,7 @@ func (n *KernelExecutionNonce) UnmarshalJSON(data []byte) error {
 	if err := decodeProtocolObject(data, &decoded); err != nil {
 		return err
 	}
-	if (decoded.Nonce.Schema != "chio.execution_nonce.v1" && decoded.Nonce.Schema != "chio.execution_nonce.v2") || decoded.Nonce.IssuedAt < 0 || decoded.Nonce.ExpiresAt < 0 {
+	if (decoded.Nonce.Schema != "chio.execution_nonce.v1" && decoded.Nonce.Schema != "chio.operation_execution_nonce.v1") || decoded.Nonce.IssuedAt < 0 || decoded.Nonce.ExpiresAt < 0 {
 		return fmt.Errorf("invalid execution nonce domain")
 	}
 	*n = KernelExecutionNonce(decoded)

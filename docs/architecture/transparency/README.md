@@ -144,7 +144,7 @@ pair that starts after checkpoint 1 must also name what anchors that prefix
 (a previously verified chain root or the prefix leaves themselves) through
 `verify_checkpoint_consistency_proof_with_anchor`; the set-level derivation
 builds its chain from sequence 1 and is anchored by construction. Statements
-use `chio.checkpoint_statement.v2` and consistency proofs use
+use `chio.checkpoint_statement.v1` and consistency proofs use
 `chio.checkpoint_consistency_proof.v1`; every other statement or proof schema is
 refused, and a consistency proof missing either chain root or either endpoint
 leaf inclusion does not deserialize. The store cross-checks every commitment
@@ -212,7 +212,7 @@ Checkpoint-anchored receipt proofs use
 `chio.transparency.receipt-inclusion-proof.v1`, whose schema requires the signed
 checkpoint statement and whose leaf is the RFC 6962 hash of the receipt bytes.
 Web3 projections use `chio.anchor-inclusion-proof.v1`, which embeds a
-`chio.checkpoint_statement.v2` statement and preserves its optional chain
+`chio.checkpoint_statement.v1` statement and preserves its optional chain
 commitment. Sequence 1 statements must carry `chain_root`, and later
 statements carry a signature-bound chain commitment only when `chain_root` is
 present. Cross-checkpoint consistency requires the checkpoint

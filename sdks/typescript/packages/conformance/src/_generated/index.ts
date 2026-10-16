@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 85bac48aa7d92d2bd890ced3196f35f556b972ea9b407528e0092895d16c04d4
+// Schema SHA: fe49be39159bcf9dc8399c2abfd143cb953b77513ffa367498a50f52a0e44afd
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -582,9 +582,9 @@ export namespace Agent_ToolCallRequest {
   export interface ChioSignedExecutionNonce {
     nonce: {
       /**
-       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       * chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
        */
-      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
+      schema: "chio.execution_nonce.v1" | "chio.operation_execution_nonce.v1";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -2028,9 +2028,9 @@ export namespace Kernel_ExecutionNonce {
   export interface ChioSignedExecutionNonce {
     nonce: {
       /**
-       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       * chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
        */
-      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
+      schema: "chio.execution_nonce.v1" | "chio.operation_execution_nonce.v1";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
@@ -2329,9 +2329,9 @@ export namespace Kernel_ToolCallResponse {
   export interface ChioSignedExecutionNonce {
     nonce: {
       /**
-       * v1 signs the canonical nonce body. v2 signs the operation-bound context defined by PROTOCOL.md and is not accepted by legacy replay-store verifiers.
+       * chio.execution_nonce.v1 signs the canonical nonce body. chio.operation_execution_nonce.v1 signs the operation-bound context defined by PROTOCOL.md and is not accepted by the chio.execution_nonce.v1 replay-store verifier.
        */
-      schema: "chio.execution_nonce.v1" | "chio.execution_nonce.v2";
+      schema: "chio.execution_nonce.v1" | "chio.operation_execution_nonce.v1";
       nonce_id: string;
       issued_at: number;
       expires_at: number;
