@@ -52,7 +52,7 @@ impl ApprovalRedemption {
                     && !value.chars().any(char::is_control)
             })
             .ok_or_else(|| denied("ordinary approval requires a stable request identity"))?;
-        let intent_value = unique_alias(metadata, "governedIntent", "chioGovernedIntent")?
+        let intent_value = chio_meta_member(metadata, "governedIntent", "chioGovernedIntent")?
             .ok_or_else(|| denied("ordinary approval requires its retained intent"))?;
         let intent: GovernedTransactionIntent = signed_value(intent_value)?;
         let id = record_id(&session.session_id, request_id).map_err(denied)?;
@@ -128,7 +128,7 @@ pub(crate) fn validate_redemption(
     let metadata = metadata
         .as_object()
         .ok_or_else(|| denied("approval metadata must be an object"))?;
-    let Some(value) = unique_alias(metadata, "approvalToken", "chioApprovalToken")? else {
+    let Some(value) = chio_meta_member(metadata, "approvalToken", "chioApprovalToken")? else {
         return Ok(());
     };
     let token: GovernedApprovalToken = signed_value(value)?;
@@ -139,17 +139,17 @@ pub(crate) fn validate_redemption(
     authority.redeem(session, params, metadata, &token)
 }
 
-fn unique_alias<'a>(
+fn chio_meta_member<'a>(
     metadata: &'a serde_json::Map<String, Value>,
-    first: &str,
-    second: &str,
+    unprefixed: &str,
+    member: &str,
 ) -> Result<Option<&'a Value>, CliError> {
-    match (metadata.get(first), metadata.get(second)) {
-        (Some(_), Some(_)) => Err(denied(
-            "ordinary approval metadata contains conflicting aliases",
-        )),
-        (value, None) | (None, value) => Ok(value),
+    if metadata.contains_key(unprefixed) {
+        return Err(denied(format!(
+            "_meta.{unprefixed} is not accepted; send _meta.{member}"
+        )));
     }
+    Ok(metadata.get(member))
 }
 
 fn signed_value<T: serde::de::DeserializeOwned>(value: &Value) -> Result<T, CliError> {

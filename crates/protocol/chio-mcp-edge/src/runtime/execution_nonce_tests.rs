@@ -271,7 +271,7 @@ fn tools_call_round_trips_execution_nonce_through_meta() {
                 "name": "read_file",
                 "arguments": { "path": "/tmp/demo.txt" },
                 "_meta": {
-                    "executionNonce": nonce
+                    "chioExecutionNonce": nonce
                 }
             }
         }))

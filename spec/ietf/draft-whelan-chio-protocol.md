@@ -3390,45 +3390,33 @@ the kernel denies a call for which a matching grant requires one
 ({{sender-constraint}}).
 
 The members of `params._meta` in {{tab-hosted-meta}} carry the other
-inputs of a native request ({{tab-tool-call-request}}). When a member
-and its alias are both present, the edge uses the member. `_meta` has to
+inputs of a native request ({{tab-tool-call-request}}). `_meta` has to
 be an object, and each member has to have the structure of its native
-equivalent; the edge answers -32602 otherwise.
+equivalent; the edge answers -32602 otherwise. The edge also answers
+-32602 to a member name without its `chio` prefix (for example
+`approvalToken`) and to `route_selection`.
 
 | Member | Native equivalent |
 |---|---|
 | `chioRequestId` | `id` |
-| `modelMetadata` | none ({{model-metadata}}) |
-| `executionNonce` | `execution_nonce` |
-| `governedIntent` | `governed_intent` |
-| `approvalToken` | `approval_token` |
-| `approvalTokens` | `approval_tokens` |
-| `thresholdApprovalProposal` | `threshold_approval_proposal` |
-| `supplementalAuthorization` | `supplemental_authorization` |
-| `routeSelection` | none |
+| `chioModelMetadata` | none ({{model-metadata}}) |
+| `chioExecutionNonce` | `execution_nonce` |
+| `chioGovernedIntent` | `governed_intent` |
+| `chioApprovalToken` | `approval_token` |
+| `chioApprovalTokens` | `approval_tokens` |
+| `chioThresholdApprovalProposal` | `threshold_approval_proposal` |
+| `chioSupplementalAuthorization` | `supplemental_authorization` |
+| `chioRouteSelection` | none |
 {: #tab-hosted-meta title="Chio Members of _meta in tools/call"}
-
-| Member | Accepted alias |
-|---|---|
-| `chioRequestId` | none |
-| `modelMetadata` | `chioModelMetadata` |
-| `executionNonce` | `chioExecutionNonce` |
-| `governedIntent` | `chioGovernedIntent` |
-| `approvalToken` | `chioApprovalToken` |
-| `approvalTokens` | `chioApprovalTokens` |
-| `thresholdApprovalProposal` | `chioThresholdApprovalProposal` |
-| `supplementalAuthorization` | `chioSupplementalAuthorization` |
-| `routeSelection` | `route_selection`, `chioRouteSelection` |
-{: #tab-hosted-aliases title="Accepted Chio Metadata Aliases"}
 
 `chioRequestId` is a non-empty string of at most 2048 UTF-8 octets, with
 no leading or trailing whitespace and no control characters. The kernel
 uses it as the request identifier. Without it, the edge uses the request
 identifier bound in a presented execution nonce, or assigns a new
 identifier to each call. A request that carries approval members or
-`supplementalAuthorization` MUST carry `chioRequestId`, and the approval
+`chioSupplementalAuthorization` MUST carry `chioRequestId`, and the approval
 members have to follow the combination rules of {{native-messages}};
-the edge answers -32602 otherwise. The kernel records `routeSelection`,
+the edge answers -32602 otherwise. The kernel records `chioRouteSelection`,
 an object, in the receipt's metadata as `route_selection`.
 
 The following request is illustrative.
@@ -3443,7 +3431,7 @@ The following request is illustrative.
     "arguments": {"text": "hi"},
     "_meta": {
       "chioRequestId": "req-7",
-      "modelMetadata": {
+      "chioModelMetadata": {
         "model_id": "m-1",
         "safety_tier": "standard",
         "provider": "p"
@@ -3495,7 +3483,7 @@ have been queued before that cancellation result.
 ## Model Metadata {#model-metadata}
 
 A client can describe the model on whose behalf it calls a tool, in the
-`modelMetadata` member of `_meta` ({{tab-model-metadata}}).
+`chioModelMetadata` member of `_meta` ({{tab-model-metadata}}).
 
 | Field | Type | Presence | Meaning |
 |---|---|---|---|

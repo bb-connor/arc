@@ -77,18 +77,28 @@ async fn ap23_mcp_redemption_refuses_lifetime_beyond_expired_pending_record() ->
 }
 
 #[tokio::test]
-async fn ap23_mcp_redemption_refuses_ambiguous_ordinary_approval_aliases() -> TestResult {
+async fn ap23_mcp_redemption_refuses_unprefixed_approval_token() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
     let approver = Keypair::generate();
     let calls = Arc::new(AtomicUsize::new(0));
     let (state, session) = open(config(directory.path(), &approver, calls.clone())?, None).await?;
-    let pending = submit(&state, &session, "ap23-ambiguous-bypass").await?;
+    let pending = submit(&state, &session, "ap23-unprefixed-token").await?;
     let approved = token(&pending, &approver)?;
     body(decide(&state, &pending, &approved).await?, StatusCode::OK).await?;
     let mut params = parameters(&pending, &approved);
-    params["_meta"]["approvalToken"] = serde_json::to_value(&approved)?;
-    params["_meta"]["chioApprovalToken"] = Value::Null;
-    require_denial(call(&session, params, 33).await)?;
+    let approval = params["_meta"]
+        .as_object_mut()
+        .and_then(|meta| meta.remove("chioApprovalToken"))
+        .ok_or("approved parameters carry chioApprovalToken")?;
+    params["_meta"]["approvalToken"] = approval;
+    let outcome = match call(&session, params, 33).await {
+        Ok(response) => response.to_string(),
+        Err(error) => error.to_string(),
+    };
+    assert!(
+        outcome.contains("_meta.approvalToken is not accepted; send _meta.chioApprovalToken"),
+        "{outcome}"
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     stop(state, session).await
 }

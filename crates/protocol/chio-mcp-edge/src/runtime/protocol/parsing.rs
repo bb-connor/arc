@@ -1,5 +1,34 @@
 use super::*;
 
+const UNPREFIXED_CHIO_META_MEMBERS: [(&str, &str); 9] = [
+    ("modelMetadata", "chioModelMetadata"),
+    ("executionNonce", "chioExecutionNonce"),
+    ("governedIntent", "chioGovernedIntent"),
+    ("approvalToken", "chioApprovalToken"),
+    ("approvalTokens", "chioApprovalTokens"),
+    ("thresholdApprovalProposal", "chioThresholdApprovalProposal"),
+    ("supplementalAuthorization", "chioSupplementalAuthorization"),
+    ("routeSelection", "chioRouteSelection"),
+    ("route_selection", "chioRouteSelection"),
+];
+
+fn chio_meta_member<'a>(
+    id: &Value,
+    meta: &'a serde_json::Map<String, Value>,
+    member: &str,
+) -> Result<Option<&'a Value>, Value> {
+    for (unprefixed, prefixed) in UNPREFIXED_CHIO_META_MEMBERS {
+        if prefixed == member && meta.contains_key(unprefixed) {
+            return Err(jsonrpc_error(
+                id.clone(),
+                JSONRPC_INVALID_PARAMS,
+                &format!("_meta.{unprefixed} is not accepted; send _meta.{prefixed}"),
+            ));
+        }
+    }
+    Ok(meta.get(member))
+}
+
 pub(in crate::runtime) fn parse_task_id(id: &Value, params: &Value) -> Result<String, Value> {
     let task_id = params
         .get("taskId")
@@ -202,10 +231,7 @@ pub(in crate::runtime) fn parse_request_model_metadata(
             "_meta must be an object",
         ));
     };
-    let Some(model_metadata) = meta
-        .get("modelMetadata")
-        .or_else(|| meta.get("chioModelMetadata"))
-    else {
+    let Some(model_metadata) = chio_meta_member(id, meta, "chioModelMetadata")? else {
         return Ok(None);
     };
 
@@ -213,7 +239,7 @@ pub(in crate::runtime) fn parse_request_model_metadata(
         jsonrpc_error(
             id.clone(),
             JSONRPC_INVALID_PARAMS,
-            "modelMetadata must be an object with model_id and optional safety_tier/provider",
+            "_meta.chioModelMetadata must be an object with model_id and optional safety_tier/provider",
         )
     })?;
 
@@ -236,10 +262,7 @@ pub(in crate::runtime) fn parse_request_execution_nonce(
             "_meta must be an object",
         ));
     };
-    let Some(execution_nonce) = meta
-        .get("executionNonce")
-        .or_else(|| meta.get("chioExecutionNonce"))
-    else {
+    let Some(execution_nonce) = chio_meta_member(id, meta, "chioExecutionNonce")? else {
         return Ok(None);
     };
 
@@ -249,7 +272,7 @@ pub(in crate::runtime) fn parse_request_execution_nonce(
             jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
-                "executionNonce must be a signed Chio execution nonce object",
+                "_meta.chioExecutionNonce must be a signed Chio execution nonce object",
             )
         })
 }
@@ -268,10 +291,7 @@ pub(in crate::runtime) fn parse_request_governed_intent(
             "_meta must be an object",
         ));
     };
-    let Some(governed_intent) = meta
-        .get("governedIntent")
-        .or_else(|| meta.get("chioGovernedIntent"))
-    else {
+    let Some(governed_intent) = chio_meta_member(id, meta, "chioGovernedIntent")? else {
         return Ok(None);
     };
 
@@ -281,7 +301,7 @@ pub(in crate::runtime) fn parse_request_governed_intent(
             jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
-                "governedIntent must be a Chio governed transaction intent object",
+                "_meta.chioGovernedIntent must be a Chio governed transaction intent object",
             )
         })
 }
@@ -306,41 +326,36 @@ pub(in crate::runtime) fn parse_request_approval_artifacts(
             "_meta must be an object",
         ));
     };
-    let approval_token = meta
-        .get("approvalToken")
-        .or_else(|| meta.get("chioApprovalToken"))
+    let approval_token = chio_meta_member(id, meta, "chioApprovalToken")?
         .map(|value| serde_json::from_value(value.clone()))
         .transpose()
         .map_err(|_| {
             jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
-                "approvalToken must be a Chio governed approval token",
+                "_meta.chioApprovalToken must be a Chio governed approval token",
             )
         })?;
-    let approval_tokens: Vec<GovernedApprovalToken> = meta
-        .get("approvalTokens")
-        .or_else(|| meta.get("chioApprovalTokens"))
+    let approval_tokens: Vec<GovernedApprovalToken> =
+        chio_meta_member(id, meta, "chioApprovalTokens")?
+            .map(|value| serde_json::from_value(value.clone()))
+            .transpose()
+            .map_err(|_| {
+                jsonrpc_error(
+                    id.clone(),
+                    JSONRPC_INVALID_PARAMS,
+                    "_meta.chioApprovalTokens must be an array of Chio governed approval tokens",
+                )
+            })?
+            .unwrap_or_default();
+    let threshold_approval_proposal = chio_meta_member(id, meta, "chioThresholdApprovalProposal")?
         .map(|value| serde_json::from_value(value.clone()))
         .transpose()
         .map_err(|_| {
             jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
-                "approvalTokens must be an array of Chio governed approval tokens",
-            )
-        })?
-        .unwrap_or_default();
-    let threshold_approval_proposal = meta
-        .get("thresholdApprovalProposal")
-        .or_else(|| meta.get("chioThresholdApprovalProposal"))
-        .map(|value| serde_json::from_value(value.clone()))
-        .transpose()
-        .map_err(|_| {
-            jsonrpc_error(
-                id.clone(),
-                JSONRPC_INVALID_PARAMS,
-                "thresholdApprovalProposal must be a Chio threshold approval proposal",
+                "_meta.chioThresholdApprovalProposal must be a Chio threshold approval proposal",
             )
         })?;
     if approval_token.is_some() && !approval_tokens.is_empty() {
@@ -381,10 +396,7 @@ pub(in crate::runtime) fn parse_request_supplemental_authorization(
             "_meta must be an object",
         ));
     };
-    let Some(authorization) = meta
-        .get("supplementalAuthorization")
-        .or_else(|| meta.get("chioSupplementalAuthorization"))
-    else {
+    let Some(authorization) = chio_meta_member(id, meta, "chioSupplementalAuthorization")? else {
         return Ok(None);
     };
 
@@ -394,7 +406,7 @@ pub(in crate::runtime) fn parse_request_supplemental_authorization(
             jsonrpc_error(
                 id.clone(),
                 JSONRPC_INVALID_PARAMS,
-                "supplementalAuthorization must contain only opaque signed_extension text",
+                "_meta.chioSupplementalAuthorization must contain only opaque signed_extension text",
             )
         })
 }
@@ -413,11 +425,7 @@ pub(in crate::runtime) fn parse_request_extra_metadata(
             "_meta must be an object",
         ));
     };
-    let Some(route_selection) = meta
-        .get("routeSelection")
-        .or_else(|| meta.get("route_selection"))
-        .or_else(|| meta.get("chioRouteSelection"))
-    else {
+    let Some(route_selection) = chio_meta_member(id, meta, "chioRouteSelection")? else {
         return Ok(None);
     };
 
@@ -425,7 +433,7 @@ pub(in crate::runtime) fn parse_request_extra_metadata(
         return Err(jsonrpc_error(
             id.clone(),
             JSONRPC_INVALID_PARAMS,
-            "routeSelection must be an object",
+            "_meta.chioRouteSelection must be an object",
         ));
     }
     Ok(Some(json!({ "route_selection": route_selection.clone() })))

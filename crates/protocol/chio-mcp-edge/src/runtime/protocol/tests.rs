@@ -139,6 +139,60 @@ fn mcp_meta_rejects_caller_supplied_supplemental_claim_fields() {
 }
 
 #[test]
+fn mcp_meta_refuses_unprefixed_chio_members() {
+    for (unprefixed, prefixed) in [
+        ("modelMetadata", "chioModelMetadata"),
+        ("executionNonce", "chioExecutionNonce"),
+        ("governedIntent", "chioGovernedIntent"),
+        ("approvalToken", "chioApprovalToken"),
+        ("approvalTokens", "chioApprovalTokens"),
+        ("thresholdApprovalProposal", "chioThresholdApprovalProposal"),
+        ("supplementalAuthorization", "chioSupplementalAuthorization"),
+        ("routeSelection", "chioRouteSelection"),
+        ("route_selection", "chioRouteSelection"),
+    ] {
+        let id = json!(7);
+        let params = json!({"_meta": {unprefixed: {}}});
+        let errors: Vec<Value> = [
+            parse_request_model_metadata(&id, &params).err(),
+            parse_request_execution_nonce(&id, &params).err(),
+            parse_request_governed_intent(&id, &params).err(),
+            parse_request_approval_artifacts(&id, &params).err(),
+            parse_request_supplemental_authorization(&id, &params).err(),
+            parse_request_extra_metadata(&id, &params).err(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        assert_eq!(errors.len(), 1, "{unprefixed}: {errors:?}");
+        assert_eq!(errors[0]["error"]["code"], JSONRPC_INVALID_PARAMS);
+        assert_eq!(
+            errors[0]["error"]["message"],
+            format!("_meta.{unprefixed} is not accepted; send _meta.{prefixed}")
+        );
+    }
+}
+
+#[test]
+fn mcp_meta_admits_chio_model_metadata_as_asserted() {
+    let metadata = parse_request_model_metadata(
+        &json!(7),
+        &json!({"_meta": {"chioModelMetadata": {
+            "model_id": "gpt-5",
+            "provider": "openai",
+            "provenance_class": "verified"
+        }}}),
+    )
+    .unwrap_or_else(|error| panic!("model metadata must parse: {error}"))
+    .unwrap_or_else(|| panic!("model metadata must be present"));
+    assert_eq!(metadata.model_id, "gpt-5");
+    assert_eq!(
+        metadata.provenance_class,
+        chio_core::capability::governance::ProvenanceEvidenceClass::Asserted
+    );
+}
+
+#[test]
 fn parse_jsonrpc_envelope_preserves_id_method_and_default_params() {
     let envelope = match parse_jsonrpc_envelope(&json!({
         "jsonrpc": "2.0",
