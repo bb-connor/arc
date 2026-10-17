@@ -1,4 +1,4 @@
-//! Production [`AttestVerifier`] implementation backed by `sigstore-rs`.
+//! Production [`AttestVerifier`](crate::AttestVerifier) implementation backed by `sigstore-rs`.
 //!
 //! Three verification surfaces are exposed:
 //!
@@ -8,7 +8,7 @@
 //!   against the signing materials, but does not currently verify Rekor
 //!   Merkle inclusion or the Signed Entry Timestamp (SET). Until Chio
 //!   performs those checks itself, this path marks
-//!   [`VerifiedAttestation::rekor_inclusion_verified`] as `false`.
+//!   [`VerifiedAttestation::rekor_inclusion_verified`](crate::VerifiedAttestation::rekor_inclusion_verified) as `false`.
 //!
 //! - [`SigstoreVerifier::verify_blob`] and [`SigstoreVerifier::verify_bytes`]
 //!   verify a detached `(artifact, signature, leaf-cert)` triple against
@@ -16,9 +16,9 @@
 //!   validation, OIDC issuer match, identity SAN regex match, certificate
 //!   validity-window check, and signature verification, but DO NOT consume
 //!   a Rekor inclusion proof and therefore mark the resulting
-//!   [`VerifiedAttestation`] with `rekor_inclusion_verified = false`.
+//!   [`VerifiedAttestation`](crate::VerifiedAttestation) with `rekor_inclusion_verified = false`.
 //!
-//! All paths are fail-closed: any error returns one of the [`AttestError`]
+//! All paths are fail-closed: any error returns one of the [`AttestError`](crate::AttestError)
 //! variants. There is no path through this module that returns
 //! `Ok(VerifiedAttestation)` after a partial verification.
 
@@ -34,9 +34,6 @@ mod validators;
 mod tests;
 
 use const_oid::ObjectIdentifier;
-
-#[allow(unused_imports)]
-use crate::{AttestError, AttestVerifier, VerifiedAttestation};
 
 pub use core::SigstoreVerifier;
 

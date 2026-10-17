@@ -1,11 +1,10 @@
 //! Prometheus text exposition for guard metrics.
 
 use chio_metrics_spec::{
-    CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL, CHIO_GUARD_DENY_TOTAL,
-    CHIO_GUARD_EVAL_DURATION_SECONDS, CHIO_GUARD_FUEL_CONSUMED_TOTAL,
+    CHIO_GUARD_DENY_TOTAL, CHIO_GUARD_EVAL_DURATION_SECONDS, CHIO_GUARD_FUEL_CONSUMED_TOTAL,
     CHIO_GUARD_HOST_CALL_DURATION_SECONDS, CHIO_GUARD_MODULE_BYTES, CHIO_GUARD_RELOAD_TOTAL,
-    CHIO_GUARD_VERDICT_TOTAL, CHIO_SETTLEMENT_UNRESOLVED_TOTAL, CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
-    GUARD_EVAL_DURATION_BUCKETS_SECONDS, GUARD_HOST_CALL_DURATION_BUCKETS_SECONDS,
+    CHIO_GUARD_VERDICT_TOTAL, GUARD_EVAL_DURATION_BUCKETS_SECONDS,
+    GUARD_HOST_CALL_DURATION_BUCKETS_SECONDS,
 };
 
 pub use chio_metrics_spec::MetricKind as PrometheusMetricKind;
@@ -83,49 +82,6 @@ pub const GUARD_METRIC_FAMILIES: &[GuardMetricFamily] = &[
 
 pub use chio_metrics_spec::CHIO_OTEL_INGRESS_DROP_TOTAL as METRIC_CHIO_OTEL_INGRESS_DROP_TOTAL;
 pub use chio_metrics_spec::CHIO_OTEL_SINK_DROP_TOTAL as METRIC_CHIO_OTEL_SINK_DROP_TOTAL;
-
-// Advertised runtime (non-guard) families the /metrics endpoint renders via the
-// chio-metrics-spec runtime families. Retained as endpoint documentation; the
-// actual samples are produced by render_otel_drop_families and the signing
-// family render, so this table is not iterated by the renderer.
-#[allow(dead_code)]
-const RUNTIME_METRIC_FAMILIES: &[GuardMetricFamily] = &[
-    GuardMetricFamily {
-        name: CHIO_SIGNING_QUEUE_BLOCK_TOTAL,
-        help: "Total receipt signing requests blocked by bounded queue capacity or byte budget.",
-        kind: PrometheusMetricKind::Counter,
-        labels: &["reason"],
-        buckets: &[],
-    },
-    GuardMetricFamily {
-        name: METRIC_CHIO_OTEL_INGRESS_DROP_TOTAL,
-        help: "Total OTEL ingress batches dropped by bounded queue admission.",
-        kind: PrometheusMetricKind::Counter,
-        labels: &[],
-        buckets: &[],
-    },
-    GuardMetricFamily {
-        name: METRIC_CHIO_OTEL_SINK_DROP_TOTAL,
-        help: "Total OTEL receipt sink batches dropped before append.",
-        kind: PrometheusMetricKind::Counter,
-        labels: &[],
-        buckets: &[],
-    },
-    GuardMetricFamily {
-        name: CHIO_SETTLEMENT_UNRESOLVED_TOTAL,
-        help: "Total settlement observer routing invocations with an unresolved outcome.",
-        kind: PrometheusMetricKind::Counter,
-        labels: &[],
-        buckets: &[],
-    },
-    GuardMetricFamily {
-        name: CHIO_AMBIGUOUS_DISPATCH_RETAINED_HOLD_TOTAL,
-        help: "Total budget or payment holds retained after an ambiguous post-dispatch outcome, labeled by whether durable reconciliation is available.",
-        kind: PrometheusMetricKind::Counter,
-        labels: &["reconciliation"],
-        buckets: &[],
-    },
-];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MetricsEndpointResponse {

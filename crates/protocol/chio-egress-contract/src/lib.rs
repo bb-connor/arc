@@ -672,7 +672,6 @@ mod operator_readiness;
 pub use operator_readiness::{OperatorReadinessError, OperatorReadinessProbe};
 
 #[cfg(feature = "reqwest-egress")]
-#[allow(unused_imports)]
 pub use reqwest_helper::{
     client_builder_with_contract, send_with_contract, ContractClient, ContractClientBuilder,
     ContractRequestBuilder, ContractResponse,

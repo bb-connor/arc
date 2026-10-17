@@ -116,7 +116,6 @@ pub struct SupplementalQuotaVerificationRecord {
 /// Fields are private so request handling cannot substitute a caller-built
 /// quota key or maximum after verification.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(dead_code)]
 pub(crate) struct KernelVerifiedSupplementalQuotaClaim {
     profile: String,
     owner_id: String,
@@ -133,8 +132,8 @@ pub(crate) struct KernelVerifiedSupplementalQuotaClaim {
     verifier_binding: SupplementalQuotaVerifierBinding,
 }
 
-#[allow(dead_code)]
 impl KernelVerifiedSupplementalQuotaClaim {
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn profile(&self) -> &str {
         &self.profile
@@ -145,6 +144,7 @@ impl KernelVerifiedSupplementalQuotaClaim {
         &self.owner_id
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn broker_capability_id(&self) -> &str {
         &self.broker_capability_id
@@ -170,6 +170,7 @@ impl KernelVerifiedSupplementalQuotaClaim {
         self.expires_at
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn request_binding_hash(&self) -> &str {
         &self.request_binding_hash
@@ -180,11 +181,13 @@ impl KernelVerifiedSupplementalQuotaClaim {
         &self.capability_id
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn capability_digest(&self) -> &str {
         &self.capability_digest
     }
 
+    #[cfg(test)]
     #[must_use]
     pub(crate) fn request_namespace_digest(&self) -> &str {
         &self.request_namespace_digest
@@ -612,7 +615,6 @@ fn ensure_context_match(
 ///
 /// Missing verifier support and every mismatch deny before a quota claim can
 /// reach the budget authority.
-#[allow(dead_code)]
 pub(crate) fn verify_supplemental_quota(
     verifier: Option<&dyn SupplementalQuotaVerifier>,
     signed_extension: &[u8],
@@ -724,7 +726,6 @@ pub(crate) fn verify_supplemental_quota(
 
 /// Combine one rechecked supplemental claim with the capability lineage that
 /// the kernel validated for the same request.
-#[allow(dead_code)]
 pub(crate) fn canonical_revocation_set_for_verified_claim(
     leaf_capability_id: &str,
     ancestor_capability_ids: &[String],

@@ -89,17 +89,6 @@ pub struct ExtensionHandle {
     http: reqwest_like::Client,
 }
 
-impl ExtensionHandle {
-    /// The opaque identifier assigned to this extension instance by the
-    /// Runtime API. Surfaced for structured logging in callers that
-    /// register in one place and log context in another.
-    #[must_use]
-    #[allow(dead_code)]
-    pub fn id(&self) -> &str {
-        &self.extension_id
-    }
-}
-
 /// Register this process as a Lambda Extension and subscribe to INVOKE +
 /// SHUTDOWN events.
 pub async fn register(extension_name: &str) -> Result<ExtensionHandle, LifecycleError> {
