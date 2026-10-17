@@ -1418,11 +1418,6 @@ impl GovernedApprovalToken {
         Ok(sha256_hex(&preimage))
     }
 
-    /// Compatibility name for the canonical signed artifact digest.
-    pub fn token_digest(&self) -> Result<String> {
-        self.artifact_digest()
-    }
-
     /// Verify the signature AND enforce the approval-token validity window in
     /// one pass.
     ///

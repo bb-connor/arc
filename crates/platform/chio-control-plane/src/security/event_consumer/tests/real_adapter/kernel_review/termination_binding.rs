@@ -301,8 +301,8 @@ fn request_with_a_different_signed_approval_set(
     let different = GovernedApprovalToken::sign(body, &approver).test_unwrap();
     assert!(different.verify_signature().test_unwrap());
     assert_ne!(
-        different.token_digest().test_unwrap(),
-        original.token_digest().test_unwrap()
+        different.artifact_digest().test_unwrap(),
+        original.artifact_digest().test_unwrap()
     );
     let tokens = vec![different];
     let mut attestation_body = request.artifact_authority_attestation().body.clone();

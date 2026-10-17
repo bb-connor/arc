@@ -573,7 +573,7 @@ impl ThresholdApprovalVoteRecord {
             ));
         }
         let token_digest = token
-            .token_digest()
+            .artifact_digest()
             .map_err(|error| invalid(format!("approval token digest failed: {error}")))?;
         Ok(Self {
             token,
@@ -762,7 +762,7 @@ impl ThresholdApprovalProposalRecord {
         token: &GovernedApprovalToken,
     ) -> Result<Option<&ThresholdApprovalVoteRecord>, ApprovalStoreError> {
         let digest = token
-            .token_digest()
+            .artifact_digest()
             .map_err(|error| ApprovalStoreError::Invalid(error.to_string()))?;
         let fingerprint = token.approver.to_hex();
         for vote in &self.votes {
