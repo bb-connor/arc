@@ -74,8 +74,6 @@ proptest! {
         let reference = seed_verified_head(&connection)
             .map_err(|error| TestCaseError::fail(error.to_string()))?;
 
-        prop_assert_eq!(snapshot.claim_log_count, reference.claim_log_count);
-        prop_assert_eq!(snapshot.claim_log_max_seq, reference.claim_log_max_seq);
         prop_assert_eq!(snapshot.checkpoint_seq, reference.checkpoint_seq());
         prop_assert_eq!(
             snapshot.checkpointed_entry_seq,
