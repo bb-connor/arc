@@ -14,9 +14,9 @@ use crate::security_admission_operation::{
 
 const CLEANUP_CLAIM_LEASE_MS: u64 = 30_000;
 const MAX_ACTIVE_RESPONSE_RECOVERY_OPERATIONS_PER_ACTIVATION: usize = 4_096;
-const APPROVAL_CLEANUP_SCHEMA: &str = "chio.admission-cleanup.approval.v2";
+const APPROVAL_CLEANUP_SCHEMA: &str = "chio.admission-cleanup.approval.v1";
 const ACTIVE_RESPONSE_APPROVAL_CLEANUP_SCHEMA: &str =
-    "chio.admission-cleanup.active-response-approval.v2";
+    "chio.admission-cleanup.active-response-approval.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -927,5 +927,22 @@ fn validate_schema(actual: &str, expected: &str) -> Result<(), KernelError> {
         Err(KernelError::Internal(format!(
             "cleanup payload schema `{actual}` is not `{expected}`"
         )))
+    }
+}
+
+#[cfg(test)]
+mod schema_identifier_tests {
+    use super::{ACTIVE_RESPONSE_APPROVAL_CLEANUP_SCHEMA, APPROVAL_CLEANUP_SCHEMA};
+
+    #[test]
+    fn cleanup_schema_identifiers_are_pinned() {
+        assert_eq!(
+            APPROVAL_CLEANUP_SCHEMA,
+            "chio.admission-cleanup.approval.v1"
+        );
+        assert_eq!(
+            ACTIVE_RESPONSE_APPROVAL_CLEANUP_SCHEMA,
+            "chio.admission-cleanup.active-response-approval.v1"
+        );
     }
 }

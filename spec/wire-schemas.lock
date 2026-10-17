@@ -150,14 +150,14 @@ files = ["crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_cont
 first_seen = "7e54c14a60"
 
 [[schema]]
-value = "chio.admission-cleanup.active-response-approval.v2"
+value = "chio.admission-cleanup.active-response-approval.v1"
 files = ["crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs"]
-first_seen = "b39b131271"
+first_seen = "2a766aa51d"
 
 [[schema]]
-value = "chio.admission-cleanup.approval.v2"
+value = "chio.admission-cleanup.approval.v1"
 files = ["crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs"]
-first_seen = "b39b131271"
+first_seen = "2a766aa51d"
 
 [[schema]]
 value = "chio.admission-operation.v1"

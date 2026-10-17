@@ -100,7 +100,7 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs:18` `ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA` = `chio.attested-finding-admission-artifact-payload.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_executor.rs:23` `ACTIVE_RESPONSE_EXECUTOR_AUTHORITY_SCHEMA` = `chio.active-response-executor-authority.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_policy.rs:22` `ACTIVE_RESPONSE_POLICY_DECISION_SCHEMA` = `chio.active-response-policy-decision.v1`
-- `crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs:17` `APPROVAL_CLEANUP_SCHEMA` = `chio.admission-cleanup.approval.v2`
+- `crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs:17` `APPROVAL_CLEANUP_SCHEMA` = `chio.admission-cleanup.approval.v1`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:11` `LEGACY_SCHEMA` = `chio.kernel-caller-return-context.v1`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:12` `SIGNING_SCHEMA` = `chio.kernel-caller-return-context.v2`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:13` `PARTICIPANT_SCHEMA` = `chio.kernel-caller-return-context.v3`
