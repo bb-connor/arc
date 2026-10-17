@@ -422,7 +422,7 @@ fn check_full_mode_uses_output_fixture_for_output_sensitive_policy() {
 }
 
 #[test]
-fn inbound_authority_check_signs_with_its_owned_subject_key() {
+fn inbound_authority_check_refuses_a_proof_policy_without_a_policy_authority() {
     let directory = tempfile::tempdir().unwrap();
     let policy = directory.path().join("proof.yaml");
     std::fs::write(
@@ -431,34 +431,7 @@ fn inbound_authority_check_signs_with_its_owned_subject_key() {
     )
     .unwrap();
     let (_stores, receipt_db, session_db) = private_store_paths();
-    let authority_path = directory.path().join("dpop-authority.json");
-    {
-        let clock = chio_test_support::clock::clock();
-        let runtime = chio_control_plane::DurableAdmissionRuntime::open_with_clock(
-            &session_db,
-            clock.clone(),
-        )
-        .unwrap();
-        let store = runtime.local_authority_store().unwrap();
-        let authority = chio_control_plane::initialize_local_dpop_authority(
-            &store,
-            &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
-                "dpop_authority",
-                "check-dpop",
-            )
-            .unwrap(),
-            &chio_kernel::DpopConfig::default(),
-            clock,
-        )
-        .unwrap();
-        std::fs::write(
-            &authority_path,
-            chio_core::canonical::canonical_json_bytes(&authority).unwrap(),
-        )
-        .unwrap();
-    }
     let output = Command::new(chio_cli_binary())
-        .env("CHIO_DPOP_REPLAY_AUTHORITY_FILE", &authority_path)
         .args(["--format", "json", "check", "--policy"])
         .arg(&policy)
         .arg("--receipt-db")
@@ -475,12 +448,14 @@ fn inbound_authority_check_signs_with_its_owned_subject_key() {
         ])
         .output()
         .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success(),
-        "stdout={} stderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+        !output.status.success(),
+        "stdout={}",
+        String::from_utf8_lossy(&output.stdout)
     );
-    let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(body["verdict"], "ALLOW");
+    assert!(
+        stderr.contains("urn:chio:error:kernel:dpop-missing-configuration"),
+        "stderr={stderr}"
+    );
 }

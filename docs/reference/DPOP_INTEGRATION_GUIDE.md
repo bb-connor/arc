@@ -124,6 +124,6 @@ provides an authority-free signing path.
 
 A serving kernel accepts DPoP only with an independently configured authority that is already active in its durable store. Ordinary startup loads that activation; it does not create or replace one. `DurableAdmissionRuntime::attach` takes the optional configured descriptor and verifies it before startup reconciliation.
 
-Chio policy files select the descriptor with `kernel.dpop_replay_authority`. CLI deployments using HushSpec can instead set `CHIO_DPOP_REPLAY_AUTHORITY_FILE` to a regular JSON file containing the descriptor. Configuring both sources is refused. The same file configures the CLI API-protect runtime. The file is bounded to 4096 bytes and duplicate fields are rejected. The selected descriptor must match the attached store, source generation and freshness policy exactly.
+Chio policy files select the descriptor with `kernel.dpop_replay_authority`; it is the only configuration path. HushSpec policies and the CLI API-protect runtime carry no descriptor, so their proof-required grants are refused. The selected descriptor must match the attached store, source generation and freshness policy exactly.
 
 Explicit deployment initialization can call `initialize_local_dpop_authority` with its serving store, chosen authority ID, freshness policy and trusted clock. Reopening uses `load_local_dpop_authority`; an absent or inactive record is an error. `finding operator init` provisions its authority once, and `finding operator serve` only loads it.
