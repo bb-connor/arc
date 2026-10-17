@@ -439,7 +439,9 @@ fn issue_watermark(registry: PrivateDecoyRegistry, marker_ref: RecordId, tenant_
                 tenant_id: tenant_id.clone(),
                 key_id,
                 key: TrustedWatermarkKey {
-                    public_key: signer.public_key().unwrap(),
+                    public_key: signer
+                        .public_key()
+                        .unwrap_or_else(|error| panic!("signing identity: {error}")),
                     status: WatermarkKeyStatus::Active,
                     not_before_unix_ms: 1,
                     signing_cutoff_unix_ms: 1_000,

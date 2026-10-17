@@ -424,7 +424,10 @@ impl HostFixture {
         let session_id = SessionId::new("session-host-lifecycle")
             .unwrap_or_else(|error| panic!("session: {error}"));
         let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
-            self.config.signer.public_key().unwrap(),
+            self.config
+                .signer
+                .public_key()
+                .unwrap_or_else(|error| panic!("signing identity: {error}")),
             1,
         )
         .unwrap_or_else(|error| panic!("executor identity: {error}"));

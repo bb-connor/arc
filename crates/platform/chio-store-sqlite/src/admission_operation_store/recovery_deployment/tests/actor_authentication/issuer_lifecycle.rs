@@ -38,7 +38,7 @@ fn managed_issuer_lifecycle_denies_authentication_and_revalidation() -> TestResu
     for terminal in ["retired", "revoked", "verification-deadline"] {
         let mut harness = harness()?;
         let (authority, clock) = managed_authority(&mut harness)?;
-        let old = authority.authority_public_key().unwrap();
+        let old = authority.authority_public_key()?;
         let capability = issued(&harness, SUBJECT_SEED, vec![recovery_grant("inspect")])?;
         let actor = authenticate(&harness, &capability, RecoveryPermission::Inspect)?;
         let before = writes(&harness.fixture)?;

@@ -80,7 +80,7 @@ fn f048_legacy_pinned_builder_keeps_compatible_pin_validation() -> TestResult {
         current.clone(),
         vec![old.clone(), old, current.clone()],
     )?;
-    assert_eq!(authority.authority_public_key().unwrap(), current);
+    assert_eq!(authority.authority_public_key()?, current);
     assert!(server.finish()? >= 1);
     Ok(())
 }

@@ -589,7 +589,7 @@ mod tests {
         let trusted_authority = LocalCapabilityAuthority::new(Keypair::generate());
         let untrusted_authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&untrusted_authority)?;
-        let current = trusted_authority.authority_public_key().unwrap();
+        let current = trusted_authority.authority_public_key()?;
 
         let result = chio_kernel::validate_issued_capability_response(
             &issued.capability,
@@ -619,7 +619,7 @@ mod tests {
             &issued.subject,
             &issued.scope,
             issued.ttl_seconds,
-            &authority.authority_public_key().unwrap(),
+            &authority.authority_public_key()?,
             chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         );
 
@@ -635,8 +635,8 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let previous = LocalCapabilityAuthority::new(Keypair::generate());
         let rotated = LocalCapabilityAuthority::new(Keypair::generate());
-        let previous_key = previous.authority_public_key().unwrap();
-        let rotated_key = rotated.authority_public_key().unwrap();
+        let previous_key = previous.authority_public_key()?;
+        let rotated_key = rotated.authority_public_key()?;
         let remote = remote_with_trusted_key(previous_key.clone())?;
         let issued = issue_test_capability(&previous)?;
         let refreshed = AuthorityKeyCache {
@@ -669,8 +669,8 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let previous = LocalCapabilityAuthority::new(Keypair::generate());
         let rotated = LocalCapabilityAuthority::new(Keypair::generate());
-        let previous_key = previous.authority_public_key().unwrap();
-        let rotated_key = rotated.authority_public_key().unwrap();
+        let previous_key = previous.authority_public_key()?;
+        let rotated_key = rotated.authority_public_key()?;
         let remote = remote_with_trusted_key(previous_key.clone())?;
         let issued = issue_test_capability(&rotated)?;
         let refreshed = AuthorityKeyCache {
@@ -730,7 +730,7 @@ mod tests {
             Err(chio_kernel::KernelError::CapabilityIssuanceFailed(_))
         ));
 
-        let current_key = authority.authority_public_key().unwrap();
+        let current_key = authority.authority_public_key()?;
         let remote = remote_with_trusted_key(current_key.clone())?;
         let result = remote.install_verified_status_cache(
             &issued.capability,

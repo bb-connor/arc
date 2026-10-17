@@ -257,7 +257,9 @@ fn approval_signers_reject_embedded_approver_mismatches() {
     .is_err());
     assert_ne!(
         embedded_approver.public_key(),
-        backend.public_key().unwrap()
+        backend
+            .public_key()
+            .unwrap_or_else(|error| panic!("signing identity: {error}"))
     );
 }
 

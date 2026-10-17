@@ -100,7 +100,7 @@ mod tests {
             root.path().join("issuer.db"),
             Arc::new(FixedClock::new(100)),
         )?;
-        let old = source.authority_public_key().unwrap();
+        let old = source.authority_public_key()?;
         let new = source.rotate_with_verification_deadline(110)?.public_key;
         let status = crate::trust_control::report_validation::authority_status_response(
             "sqlite".into(),
@@ -133,7 +133,7 @@ mod tests {
             Arc::new(FixedClock::new(100)),
         )?;
         source.initialize_replication("remote-lifecycle")?;
-        let old = source.authority_public_key().unwrap();
+        let old = source.authority_public_key()?;
         source.rotate_with_verification_deadline(110)?;
         let before = crate::trust_control::report_validation::authority_status_response(
             "sqlite".into(),
