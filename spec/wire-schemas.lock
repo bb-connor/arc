@@ -5945,11 +5945,6 @@ files = ["crates/kernel/chio-kernel/src/operator_report/constants.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio_dpop_v1"
-files = ["crates/kernel/chio-kernel/src/operator_report/constants.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
 value = "chio_finding_market_jobs_gc_tombstone_v1"
 files = ["crates/platform/chio-finding-market-store-postgres/src/lib.rs"]
 first_seen = "e057afb02a"
