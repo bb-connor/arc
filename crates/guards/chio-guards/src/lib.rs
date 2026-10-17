@@ -19,7 +19,6 @@
 //! | [`AgentVelocityGuard`] | **Full** | Per-agent and per-session rate limiting |
 //! | [`DataFlowGuard`] | **Full** | Cumulative bytes-read/written limits via session journal |
 //! | [`BehavioralSequenceGuard`] | **Full** | Tool ordering policies via session journal |
-//! | [`ResponseSanitizationGuard`] | **Full** | PII/PHI pattern detection and redaction |
 //! | [`AdvisoryPipeline`] | **Full** | Non-blocking advisory signals with optional promotion |
 //! | [`AnomalyAdvisoryGuard`] | **Full** | Flags unusual invocation patterns and delegation depth |
 //! | [`DataTransferAdvisoryGuard`] | **Full** | Flags high data transfer volumes |
@@ -123,9 +122,8 @@ pub use prompt_injection::{
 pub use response_sanitization::{
     AllowlistConfig, CategoryConfig, DenylistConfig, EntropyConfig, OutputSanitizer,
     OutputSanitizerConfig, OutputSanitizerConfigError, ProcessingStats, Redaction,
-    RedactionStrategy, ResponseSanitizationGuard, SanitizationAction, SanitizationResult,
-    SanitizedValue, ScanResult, SensitiveCategory, SensitiveDataFinding, SensitivityLevel, Span,
-    TokenVault,
+    RedactionStrategy, SanitizationResult, SanitizedValue, SensitiveCategory, SensitiveDataFinding,
+    Span, TokenVault,
 };
 pub use secret_leak::SecretLeakGuard;
 pub use shell_command::{ShellCommandConfigError, ShellCommandGuard};

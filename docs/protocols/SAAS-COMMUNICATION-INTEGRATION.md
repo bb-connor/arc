@@ -174,7 +174,7 @@ a customer SSN (`123-45-6789`).
 ```
 1. Kernel validates ToolGrant       -> ALLOW (channel in allowlist)
 2. ContentReviewGuard scans body    -> DENY
-   reason: "High-sensitivity pattern 'SSN' detected in outbound content"
+   reason: "PII pattern 'ssn' detected in outbound content"
    receipt: signed denial with redacted excerpt
 ```
 
@@ -629,9 +629,8 @@ Agent requests: create_issue(project: "FINANCE", ...)
 
 The content-review guard is a new pre-invocation guard type. It inspects
 tool call arguments for outbound content and evaluates it against
-configurable policies. It reuses PII detection patterns from the existing
-`ResponseSanitizationGuard` in `chio-guards/src/response_sanitization.rs`
-but applies them to **inputs** (outbound content) rather than outputs
+configurable policies. It applies PII detection to **inputs** (outbound
+content), while the post-invocation `SanitizerHook` applies it to outputs
 (inbound responses).
 
 ### 7.1 Architecture
@@ -686,12 +685,10 @@ pub struct ContentReviewPolicy {
 /// PII detection configuration for content review.
 #[derive(Debug, Clone)]
 pub struct PiiReviewConfig {
-    /// Reuse patterns from ResponseSanitizationGuard.
-    pub patterns: Vec<SensitivePattern>,
-    /// Action on detection: block the entire request or redact and allow.
-    pub action: SanitizationAction,
-    /// Minimum sensitivity level to trigger (Low, Medium, High).
-    pub minimum_level: SensitivityLevel,
+    /// Built-in PII detectors to run (email, ssn, phone_us, credit_card, ipv4).
+    pub detectors: Vec<String>,
+    /// Additional operator regexes for deployment-specific identifiers.
+    pub custom_patterns: Vec<String>,
 }
 ```
 
@@ -721,35 +718,32 @@ impl ContentReviewGuard {
 }
 ```
 
-### 7.4 PII Detection (reuse from response_sanitization)
+### 7.4 PII Detection
 
-The content-review guard reuses the same `SensitivePattern` definitions
-from `chio-guards/src/response_sanitization.rs`: SSN, email, phone, credit
-card, and medical record patterns. The difference is directionality:
+The content-review guard carries its own built-in PII detectors (email,
+SSN, US phone, card number, IPv4) plus operator regexes. The difference
+from response sanitization is directionality:
 
-- `ResponseSanitizationGuard`: post-invocation, scans tool **output**
-  before delivery to the agent.
+- `SanitizerHook`: post-invocation, redacts tool **output** before
+  delivery to the agent.
 - `ContentReviewGuard`: pre-invocation, scans tool **input** before the
   agent's message reaches the external world.
 
 ```rust
 fn check_pii(
     content: &str,
-    config: &PiiReviewConfig,
+    detectors: &[(&'static str, Regex)],
 ) -> Vec<ContentViolation> {
     let mut violations = Vec::new();
-    for pattern in &config.patterns {
-        if pattern.level >= config.minimum_level {
-            if pattern.regex.is_match(content) {
-                violations.push(ContentViolation {
-                    check: "pii",
-                    pattern_name: pattern.name.clone(),
-                    level: pattern.level,
-                    // Never include the matched text in the violation --
-                    // that would leak the PII into the receipt log.
-                    excerpt: "[match redacted]".to_string(),
-                });
-            }
+    for (name, regex) in detectors {
+        if regex.is_match(content) {
+            violations.push(ContentViolation {
+                check: "pii",
+                pattern_name: name.to_string(),
+                // Never include the matched text in the violation --
+                // that would leak the PII into the receipt log.
+                excerpt: "[match redacted]".to_string(),
+            });
         }
     }
     violations
@@ -787,9 +781,9 @@ which review policies activate and at what strictness:
 
 | Visibility | PII Check | Tone Check | Approval |
 |------------|-----------|------------|----------|
-| Internal | Medium+ sensitivity | Advisory | No |
-| External | Low+ sensitivity | Block | Per policy |
-| Financial | Low+ sensitivity | Block | RequireApprovalAbove |
+| Internal | email, ssn, credit_card | Advisory | No |
+| External | all built-in detectors | Block | Per policy |
+| Financial | all built-in detectors | Block | RequireApprovalAbove |
 
 Guards that see `ActionVisibility::Financial` always escalate to the
 strictest review path. Guards that see `ActionVisibility::Internal` run

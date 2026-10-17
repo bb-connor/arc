@@ -272,67 +272,49 @@ returns one of four verdicts:
   alongside the final verdict.
 - If no hooks modify the response, the final verdict is `Allow`.
 
-### 4.2 ResponseSanitizationGuard
+### 4.2 SanitizerHook
 
-**Purpose:** Scans tool responses (and request arguments when used
-pre-invocation) for PII and PHI patterns, then blocks or redacts matches
-before the data reaches the agent.
+**Purpose:** Scans tool responses for secrets, PII and PHI, then redacts
+matches before the data reaches the agent.
 
-**Guard name:** `response-sanitization`
+**Hook name:** `output-sanitizer`
 
-**Built-in patterns:**
+**Built-in detectors:**
 
-| Pattern | Example | Sensitivity | Redaction |
-| --- | --- | --- | --- |
-| SSN | `123-45-6789` | High | `[SSN REDACTED]` |
-| Email | `user@example.com` | Medium | `[EMAIL REDACTED]` |
-| Phone | `(555) 123-4567` | Low | `[PHONE REDACTED]` |
-| Credit card | `4111-1111-1111-1111` | High | `[CARD REDACTED]` |
-| Date of birth | `1990-01-15` or `01/15/1990` | Low | `[DATE REDACTED]` |
-| MRN | `MRN: 123456789` | High | `[MRN REDACTED]` |
-| ICD-10 | `J18.9`, `E11` | Medium | `[ICD REDACTED]` |
-
-**Sensitivity levels:**
-
-| Level | Meaning |
+| Category | Detector ids |
 | --- | --- |
-| Low | May produce false positives (phone numbers, dates) |
-| Medium | Likely PII (emails, medical codes) |
-| High | Definite PII/PHI (SSN, credit card, MRN) |
+| Secret | `secret_aws_access_key_id`, `secret_aws_secret_access_key`, `secret_github_token`, `secret_slack_token`, `secret_slack_webhook`, `secret_gcp_service_account`, `secret_pem_private_key`, `secret_jwt`, `secret_oauth_bearer`, `secret_password_assignment`, `secret_high_entropy_token` |
+| PII | `pii_ssn` (area/group/serial validated), `pii_ssn_compact`, `pii_credit_card` (Luhn validated), `pii_email`, `pii_mrn` |
+| Internal | `internal_private_ip` |
 
-The `min_level` configuration controls the minimum sensitivity threshold.
-Only patterns at or above the threshold trigger the guard.
+**Configuration (`OutputSanitizerConfig`):**
 
-**Actions:**
+| Option | Default | Description |
+| --- | --- | --- |
+| `categories` | all enabled | Toggles for `secrets`, `pii`, `internal` |
+| `redaction_strategies` | Secret `mask`, PII `partial`, Internal `type_label` | Per-category strategy: `mask`, `fingerprint`, `drop`, `tokenize`, `partial`, `type_label`, `keep` |
+| `entropy` | enabled, threshold 4.5, min length 16 | High-entropy token detector |
+| `allowlist` | empty | Exact strings or regexes that suppress findings |
+| `denylist` | empty | Exact strings or regexes that are always redacted |
+| `max_input_bytes` | 1000000 | Input past this bound is truncated and marked unscanned |
+| `include_findings` | `true` | Whether findings are returned to the caller |
 
-| Action | Behavior |
-| --- | --- |
-| `Block` | Deny the response entirely if any pattern matches |
-| `Redact` | Replace matching patterns with their redaction strings and allow the response |
+`pii_mrn` and `secret_gcp_service_account` recommend `drop`, which overrides
+the category strategy, so the whole match is removed (a string that is
+entirely the match becomes `null`).
 
-**Configuration:**
+Operators add deployment-specific identifiers as `denylist.patterns`. An
+invalid allowlist or denylist regex **MUST** reject construction.
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `min_level` | `SensitivityLevel` | `Low` | Minimum sensitivity level to trigger |
-| `action` | `SanitizationAction` | `Block` | Action to take on match (`Block` or `Redact`) |
-| `custom_patterns` | `SensitivePattern[]` | `[]` | Additional regex patterns to scan for |
+**Verdicts:** `Allow` when nothing matches, otherwise `Redact` with the
+sanitized response. Receipt evidence names each detector id and its count
+and never contains the raw matched values. The hook does not block;
+pre-invocation PII checks on outbound message content belong to
+`ContentReviewGuard`.
 
-Operators **MAY** define custom patterns via `build_pattern()`, specifying a
-name, regex, sensitivity level, and redaction string. Invalid regexes are
-silently skipped at load time.
-
-**Dual-phase operation:**
-
-- **Pre-invocation (Guard trait):** Scans request arguments for PII that
-  should not be sent to tool servers. Denies if patterns are found.
-- **Post-invocation (scan_response):** Scans tool response payloads. Returns
-  `ScanResult::Clean`, `ScanResult::Blocked`, or `ScanResult::Redacted`.
-
-**Fail-closed behavior:** If pattern compilation fails at startup, the guard
-**MUST** be constructed without the failed pattern (fail-open for that
-specific pattern). If a scan error occurs at runtime, the guard **MUST**
-block the response.
+**Fail-closed behavior:** If a built-in pattern fails to compile,
+construction **MUST** fail, and a sanitizer that observes the failure at
+scan time **MUST** redact the entire scanned output.
 
 **GuardEvidence output:** On denial or redaction, the evidence includes the
 list of matched pattern names and the action taken.
@@ -748,11 +730,6 @@ guards:
     max_consecutive: 5
     required_first_tool: init
 
-  # Post-invocation
-  response_sanitization:
-    min_level: medium
-    action: redact
-
   # Advisory
   advisory:
     anomaly:
@@ -792,7 +769,7 @@ status does not by itself imply that the guard runs against incoming requests.
 | AgentVelocityGuard | `chio-guards` | Full | Installed by default runtime profile |
 | DataFlowGuard | `chio-guards` | Full | Operator-wired (requires `SessionJournal`) |
 | BehavioralSequenceGuard | `chio-guards` | Full | Operator-wired (requires `SessionJournal`) |
-| ResponseSanitizationGuard | `chio-guards` | Full | Installed by default runtime profile through `SanitizerHook` |
+| SanitizerHook | `chio-guards` | Full | Installed by default runtime profile |
 | PostInvocationPipeline | `chio-guards` | Full | Installed by default runtime profile |
 | AdvisoryPipeline | `chio-guards` | Full | Installed by default runtime profile (session-journal advisory guards remain operator-wired) |
 | AnomalyAdvisoryGuard | `chio-guards` | Full | Operator-wired (requires `SessionJournal`) |

@@ -539,19 +539,6 @@ Enforces tool ordering policies via session journal:
 
 Fails closed if journal is unavailable.
 
-#### `ResponseSanitizationGuard` ("response-sanitization")
-
-**File:** `crates/guards/chio-guards/src/response_sanitization.rs`
-
-PII/PHI pattern detection with configurable sensitivity levels. Scans for
-SSNs, emails, phone numbers, credit cards, dates of birth, medical record
-numbers, ICD-10 codes.
-
-- Three sensitivity levels: Low, Medium, High.
-- Two actions: Block or Redact.
-- When used as a pre-invocation guard (via `Guard` trait), scans the
-  request arguments.
-
 ### 6.2 Advisory Guards (`chio-guards::advisory`)
 
 **File:** `crates/guards/chio-guards/src/advisory.rs`
@@ -647,6 +634,29 @@ pub enum PostInvocationVerdict {
 
 This is not a `Guard` implementation. It runs post-dispatch, not
 pre-dispatch.
+
+#### `SanitizerHook` ("output-sanitizer")
+
+**File:** `crates/guards/chio-guards/src/response_sanitization.rs`
+
+`SanitizerHook` runs `OutputSanitizer` over every string in the tool
+response and returns `PostInvocationVerdict::Redact` with the sanitized
+value when anything matches. The default runtime profile installs it, and
+the policy compiler adds a configured one when `secret_patterns` is
+enabled.
+
+- Built-in detectors: secrets (AWS, GitHub, Slack, GCP service accounts,
+  PEM keys, JWTs, bearer tokens, password assignments, high-entropy
+  tokens), PII (SSN with area validation, Luhn-validated card numbers,
+  email, medical record numbers), and private IPv4 addresses.
+- Per-category redaction strategies (mask, partial, type label,
+  fingerprint, tokenize, drop) and toggles for secrets, PII and internal
+  data.
+- Operator `denylist` patterns are always redacted; `allowlist` entries
+  suppress false positives.
+- Receipt evidence names detector ids and counts, never the raw values.
+- It redacts and does not block. Pre-invocation PII checks on outbound
+  message content belong to `ContentReviewGuard`.
 
 ### 6.6 Test Guards (in kernel tests)
 
