@@ -369,27 +369,34 @@ fn ready_completion_is_durable_before_interruption() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn legacy_create_intent_migrates_without_rejection_authority(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let engine = EngineDouble::new(serde_json::json!({"create": "response_lost"}))?;
-    let (state, plan) = engine.host()?;
-    assert!(super::super::run(&state, &plan).is_err());
-    let db = rusqlite::Connection::open(state.join("runner.db"))?;
-    db.execute_batch("ALTER TABLE run_containers DROP COLUMN create_rejected")?;
-    assert!(super::super::run(&state, &plan).is_err());
-    assert_eq!(
-        db.query_row("SELECT create_rejected FROM run_containers", [], |row| row
-            .get::<_, i64>(
-            0
-        ))?,
-        0
-    );
-    assert_eq!(
-        db.query_row("SELECT attempts FROM run_workers", [], |row| row
-            .get::<_, i64>(0))?,
-        1
-    );
-    assert!(!engine.root.path().join("starts").exists());
+fn journal_without_v1_columns_is_refused_at_open() -> Result<(), Box<dyn std::error::Error>> {
+    for (table, column) in [
+        ("run_containers", "create_rejected"),
+        ("run_workers", "cpu_ms"),
+        ("run_workers", "peak_resident_bytes"),
+    ] {
+        let engine = EngineDouble::new(serde_json::json!({"create": "response_lost"}))?;
+        let (state, plan) = engine.host()?;
+        assert!(super::super::run(&state, &plan).is_err());
+        let db = rusqlite::Connection::open(state.join("runner.db"))?;
+        db.execute_batch(&format!("ALTER TABLE {table} DROP COLUMN {column}"))?;
+        let refusal = match super::super::run(&state, &plan) {
+            Ok(()) => return Err(format!("{table} without {column} was opened").into()),
+            Err(error) => error.to_string(),
+        };
+        assert!(
+            refusal.contains(&format!(
+                "process host: runner journal table {table} does not have the v1 columns"
+            )),
+            "{refusal}"
+        );
+        assert_eq!(
+            db.query_row("SELECT attempts FROM run_workers", [], |row| row
+                .get::<_, i64>(0))?,
+            1
+        );
+        assert!(!engine.root.path().join("starts").exists());
+    }
     Ok(())
 }
 

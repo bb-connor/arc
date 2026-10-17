@@ -238,35 +238,48 @@ def diagnostic_pipe(binary, directory):
                 process.communicate(timeout=10)
 
 
-def legacy_suspensions(binary, directory):
+def pre_v1_journal(binary, directory):
     from failures import prepare as prepare_failure
-    from failures import run, states
+    from failures import run
 
     path = directory / "prepared"
     prepare_failure(binary, path, policy="continue_independent")
-    completed = run(binary, path)
+    run(binary, path)
     database = path / "host/runner.db"
     with sqlite3.connect(database) as db:
         db.execute("ALTER TABLE run_workers DROP COLUMN suspensions")
         db.execute(
             "UPDATE run_workers SET state='running',outcome=NULL WHERE process='first'"
         )
+    started = {p.name: p.read_bytes() for p in path.glob("*-started.json")}
+    refused = subprocess.run(
+        [
+            binary,
+            "process",
+            "run",
+            "--state",
+            path / "host",
+            "--plan",
+            path / "plan.json",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=45,
+        check=False,
+    )
+    assert refused.returncode != 0, (refused.stdout, refused.stderr)
+    assert (
+        "process host: runner journal table run_workers does not have the v1 columns"
+        in refused.stderr
+    ), refused.stderr
+    with sqlite3.connect(database) as db:
         assert "suspensions" not in [
             row[1] for row in db.execute("PRAGMA table_info(run_workers)")
         ]
-    started = {p.name: p.read_bytes() for p in path.glob("*-started.json")}
-    recovered = run(binary, path)
-    with sqlite3.connect(database) as db:
-        assert "suspensions" in [
-            row[1] for row in db.execute("PRAGMA table_info(run_workers)")
-        ]
         assert db.execute(
-            "SELECT suspensions,outcome FROM run_workers WHERE process='first'"
-        ).fetchone() == (0, "host_interrupted")
+            "SELECT state,outcome FROM run_workers WHERE process='first'"
+        ).fetchone() == ("running", None)
     assert {p.name: p.read_bytes() for p in path.glob("*-started.json")} == started
-    expected = states(completed)
-    expected["first"]["outcome"] = "host_interrupted"
-    assert states(recovered) == expected
 
 
 if __name__ == "__main__":
@@ -277,7 +290,7 @@ if __name__ == "__main__":
         "orphan": orphan_sidecar,
         "committed-wal": committed_import_wal,
         "diagnostics": diagnostic_pipe,
-        "legacy": legacy_suspensions,
+        "pre-v1-journal": pre_v1_journal,
     }
     for name, case in cases.items():
         if len(sys.argv) > 2 and sys.argv[2] != name:
