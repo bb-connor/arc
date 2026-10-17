@@ -143,7 +143,7 @@ fn matching_stateful_grants_exclude_retry_but_unrelated_grants_do_not() -> Resul
 #[test]
 fn original_request_bound_artifacts_individually_exclude_new_id_eligibility() -> Result {
     let dir = tempfile::tempdir()?;
-    let kernel = support::kernel_with_dpop(dir.path(), Box::new(ReadServer))?;
+    let kernel = support::kernel(dir.path(), Box::new(ReadServer))?;
     let runtime = ProcessRuntime::open(dir.path().join("process.db"), kernel.clone())?;
     support::root(&runtime, &kernel, 1)?;
     let original = runtime.tool_request("root", "read", "tools", "read", json!({}))?;
@@ -196,7 +196,13 @@ fn original_request_bound_artifacts_individually_exclude_new_id_eligibility() ->
         match artifact {
             "dpop" => request.dpop_proof = Some(chio_kernel::dpop::DpopProof::sign(chio_kernel::dpop::DpopProofBody {
                 schema: chio_kernel::dpop::DPOP_SCHEMA.into(),
-                replay_authority: kernel.operation_owned_dpop_authority().cloned().ok_or("missing activated process DPoP authority")?,
+                replay_authority: serde_json::from_value(json!({
+                    "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+                    "dpop_authority_id": "process-test-dpop",
+                    "expectation_id": "a".repeat(64),
+                    "proof_ttl_secs": 300,
+                    "max_clock_skew_secs": 30
+                }))?,
                 capability_id: request.capability.id.clone(), tool_server: request.server_id.clone(), tool_name: request.tool_name.clone(),
                 action_hash: sha256_hex(&canonical_json_bytes(&request.arguments)?), nonce: request.request_id.clone(),
                 issued_at: request.capability.issued_at, agent_key: key.public_key(),
