@@ -112,3 +112,41 @@ fn process_host_survives_os_death_at_each_dispatch_cutpoint(
     }
     Ok(())
 }
+
+#[test]
+#[cfg(target_os = "linux")]
+fn process_host_keeps_a_durable_stop_across_os_death() -> Result<(), Box<dyn std::error::Error>> {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../..");
+    let output = Command::new("python3")
+        .arg(repository.join("crates/products/chio-cli/tests/process_host/stop_os_death.py"))
+        .arg(env!("CARGO_BIN_EXE_chio"))
+        .env(
+            "PYTHONPATH",
+            repository.join("sdks/python/chio-process/src"),
+        )
+        .output()?;
+    assert!(
+        output.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let evidence: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let cases = evidence["cases"].as_array().ok_or("missing cases")?;
+    let expected = [("hold", 1), ("C7", 0), ("C8", 1)];
+    assert_eq!(cases.len(), expected.len());
+    for (case, (cutpoint, publications)) in cases.iter().zip(expected) {
+        assert_eq!(case["cutpoint"], cutpoint);
+        for raw in case["receipts"].as_array().ok_or("missing receipts")? {
+            let receipt: ChioReceipt = serde_json::from_str(raw.as_str().ok_or("receipt")?)?;
+            assert!(receipt.verify_signature()?, "{cutpoint}");
+            assert_eq!(
+                receipt.kernel_key.to_hex(),
+                case["kernel_key"],
+                "{cutpoint}"
+            );
+        }
+        assert_eq!(case["publications"], publications, "{cutpoint}");
+    }
+    Ok(())
+}
