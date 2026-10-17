@@ -7,7 +7,11 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::PathBuf,
+    time::Duration,
 };
+
+/// Polls of the control file, one millisecond apart, before a hold fails.
+const HOLD_POLLS: u32 = 600_000;
 
 struct Reports {
     publications: PathBuf,
@@ -17,6 +21,30 @@ impl Reports {
     fn control(&self) -> Result<String, ToolError> {
         fs::read_to_string(self.publications.with_extension("control"))
             .map_err(|_| ToolError::Failed("fixture control unavailable".into()))
+    }
+
+    /// Under control `mode`, record the `.held` marker and block until the
+    /// control reads `ready`, so a test can kill the host at this cutpoint.
+    fn hold(&self, mode: &str) -> Result<(), ToolError> {
+        if self.control()? != mode {
+            return Ok(());
+        }
+        OpenOptions::new()
+            .write(true)
+            .open(self.publications.with_extension("held"))
+            .and_then(|mut marker| {
+                marker
+                    .write_all(mode.as_bytes())
+                    .and_then(|()| marker.sync_all())
+            })
+            .map_err(|_| ToolError::Failed("fixture hold marker unavailable".into()))?;
+        for _ in 0..HOLD_POLLS {
+            if self.control()? == "ready" {
+                return Ok(());
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Err(ToolError::Failed("fixture hold was not released".into()))
     }
 }
 
@@ -55,6 +83,7 @@ impl ToolServer for Reports {
                 Ok(ToolOutput::structured(json!({"source":source})))
             }
             "append" => {
+                self.hold("hold-before")?;
                 let mut file = OpenOptions::new()
                     .append(true)
                     .open(&self.publications)
@@ -68,6 +97,7 @@ impl ToolServer for Reports {
                         std::thread::park();
                     }
                 }
+                self.hold("hold-after")?;
                 Ok(ToolOutput::structured(json!({"published":true})))
             }
             _ => Err(ToolError::InvalidArguments(
