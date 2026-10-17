@@ -38,8 +38,7 @@ use crate::settlement::{
     Web3SettlementDispatchArtifact, Web3SettlementExecutionReceiptArtifact,
     Web3SettlementIdentityRegistryEvidence, Web3SettlementIdentityRegistryEvidenceBinding,
     Web3SettlementLifecycleState, Web3SettlementSupportBoundary,
-    CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA, CHIO_WEB3_SETTLEMENT_DISPATCH_V1_SCHEMA,
-    CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA, CHIO_WEB3_SETTLEMENT_RECEIPT_V1_SCHEMA,
+    CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA, CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA,
 };
 use crate::settlement_proof::{
     public_settlement_witness_body_hash, verify_public_settlement_proof,
@@ -66,6 +65,7 @@ use serde_json::json;
 use std::collections::BTreeSet;
 
 mod anchor_versioning;
+mod settlement_versioning;
 
 const SAMPLE_ROOT_REGISTRY_RUNTIME_CODEHASH: &str =
     "0xfc5d76d87b02096c6ae32ce644a2b98ca0bdf3c56700ad16731fad2062e6bd7f";
@@ -1862,19 +1862,6 @@ fn public_settlement_proof_rejects_token_mismatch_against_deployment() {
         verify_sample_public_settlement_proof(&bundle),
         Err(Web3ContractError::InvalidSettlement(message))
             if message.contains("settlement token mismatch")
-    ));
-}
-
-#[test]
-fn public_settlement_proof_rejects_v1_receipt_schema() {
-    let mut bundle = sample_public_settlement_proof_bundle();
-    bundle.settlement_receipt.schema = CHIO_WEB3_SETTLEMENT_RECEIPT_V1_SCHEMA.to_string();
-    bundle.settlement_receipt.dispatch.schema = CHIO_WEB3_SETTLEMENT_DISPATCH_V1_SCHEMA.to_string();
-
-    assert!(matches!(
-        verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
-            if message.contains("requires v2 receipt and dispatch")
     ));
 }
 

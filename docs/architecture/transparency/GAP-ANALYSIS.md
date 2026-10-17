@@ -49,7 +49,6 @@ form before counting coverage produces this inventory:
 | `chio.swarm.route-plan-receipt.v1` | standalone signed receipt | none |
 | `chio.swarm.terminal-graph-receipt.v1` | standalone signed receipt | none |
 | `chio.web3-settlement-execution-receipt.v1` | standalone signed receipt | none |
-| `chio.web3-settlement-execution-receipt.v2` | standalone signed receipt | none |
 | `chio.risk.adjudication-jurisdiction-receipt.v1` | standalone signed receipt | none |
 | `chio.proof-room.receipt-evidence.v1` | derived receipt projection with its own signature | none |
 

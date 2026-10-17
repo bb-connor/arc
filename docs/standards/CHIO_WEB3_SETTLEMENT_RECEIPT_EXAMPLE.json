@@ -1,6 +1,6 @@
 {
   "dispatch": {
-    "schema": "chio.web3-settlement-dispatch.v2",
+    "schema": "chio.web3-settlement-dispatch.v1",
     "dispatch_id": "dispatch-web3-1",
     "issued_at": 1743292800,
     "trust_profile_id": "chio.official-web3-stack",
@@ -264,7 +264,7 @@
     },
     "schema": "chio.anchor-inclusion-proof.v1"
   },
-  "schema": "chio.web3-settlement-execution-receipt.v2",
+  "schema": "chio.web3-settlement-execution-receipt.v1",
   "settled_amount": {
     "currency": "USD",
     "units": 150

@@ -17,7 +17,9 @@
     "escrow_id",
     "escrow_contract",
     "bond_vault_contract",
+    "settlement_token_address",
     "beneficiary_address",
+    "operator_key_hash",
     "support_boundary"
   ],
   "properties": {
@@ -34,7 +36,9 @@
     "escrow_id": { "type": "string", "minLength": 1 },
     "escrow_contract": { "type": "string", "minLength": 1 },
     "bond_vault_contract": { "type": "string", "minLength": 1 },
+    "settlement_token_address": { "type": "string", "minLength": 1 },
     "beneficiary_address": { "type": "string", "minLength": 1 },
+    "operator_key_hash": { "type": "string", "pattern": "^0x[0-9a-fA-F]{64}$" },
     "support_boundary": {
       "type": "object",
       "additionalProperties": false,

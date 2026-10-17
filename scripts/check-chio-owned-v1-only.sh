@@ -191,14 +191,6 @@ while IFS= read -r line; do
     continue
   fi
 
-  if [[ "$text" =~ chio\.web3-settlement-(dispatch|execution-receipt)\.v2|CHIO_WEB3_SETTLEMENT_(DISPATCH|RECEIPT|EXECUTION_RECEIPT)_V2_SCHEMA|WEB3_SETTLEMENT_EXECUTION_RECEIPT_SCHEMA ]]; then
-    continue
-  fi
-  if [[ "$path" == "crates/economy/chio-web3/src/settlement.rs" ]] && \
-     [[ "$text" =~ (dispatch_v2|receipt_v2) ]]; then
-    continue
-  fi
-
   failures+=("$line")
 done <"$tmp"
 

@@ -49,6 +49,32 @@ fn agent_web_envelope_registry_accepts_v1_and_refuses_v2() {
 }
 
 #[test]
+fn web3_settlement_registry_accepts_v1_and_refuses_v2() {
+    for (current, retired) in [
+        (
+            "chio.web3-settlement-dispatch.v1",
+            "chio.web3-settlement-dispatch.v2",
+        ),
+        (
+            "chio.web3-settlement-execution-receipt.v1",
+            "chio.web3-settlement-execution-receipt.v2",
+        ),
+    ] {
+        chio_core_types::validate_signed_artifact_schema(current)
+            .expect("the current settlement schema is supported");
+        let error = chio_core_types::validate_signed_artifact_schema(retired)
+            .expect_err("a retired settlement schema must be refused");
+        let chio_core_types::Error::CanonicalJson(message) = error else {
+            panic!("expected an unsupported schema error, got {error}");
+        };
+        assert_eq!(
+            message,
+            format!("unsupported signed-artifact schema: {retired}")
+        );
+    }
+}
+
+#[test]
 fn economic_continuity_schemas_are_registered() {
     for (schema, artifact_kind) in [
         ("chio.economy.resource-head.v1", "economic_resource_head"),
@@ -1089,7 +1115,7 @@ fn public_settlement_dispatch_and_receipt_schemas_are_supported() {
         })
         .collect();
 
-    assert_eq!(settlement_schemas.len(), 4);
+    assert_eq!(settlement_schemas.len(), 2);
     for schema in settlement_schemas {
         assert!(
             chio_core_types::is_supported_signed_artifact_schema(schema),

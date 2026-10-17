@@ -9,8 +9,8 @@ else, is the target shape. Measured by `scripts/check-wire-schemas.py` on
 numbers and is what the gate enforces. This list is for the owners of the
 declaring crates and is not itself gated.
 
-200 values are declared in more than one file, 199 of them across
-crate boundaries; 57 of the 200 reuse one constant name, the rest carry
+198 values are declared in more than one file, 197 of them across
+crate boundaries; 55 of the 198 reuse one constant name, the rest carry
 different names for the same bytes.
 
 ## `chio.receipt.v1` (6 declarations, 5 crates)
@@ -46,13 +46,13 @@ different names for the same bytes.
 - `crates/products/chio-cli/src/cli/dispatch/proof/risk.rs:14` `RISK_GUARANTEE_DECISION_SCHEMA`
 - `crates/products/chio-proof-room/src/lib.rs:836` `RISK_GUARANTEE_DECISION_SCHEMA`
 
-## `chio.web3-settlement-execution-receipt.v2` (5 declarations, 5 crates)
+## `chio.web3-settlement-execution-receipt.v1` (5 declarations, 5 crates)
 
-- `crates/core/chio-core-types/src/signed_artifact.rs:294` `CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V2_SCHEMA`
-- `crates/economy/chio-web3/src/settlement.rs:29` `CHIO_WEB3_SETTLEMENT_RECEIPT_V2_SCHEMA`
+- `crates/core/chio-core-types/src/signed_artifact.rs:289` `CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V1_SCHEMA`
+- `crates/economy/chio-web3/src/settlement.rs:25` `CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA`
 - `crates/platform/chio-enterprise-export/src/artifacts.rs:33` `WEB3_SETTLEMENT_EXECUTION_RECEIPT_SCHEMA`
 - `crates/products/chio-cli/src/cli/dispatch/proof/risk.rs:18` `WEB3_SETTLEMENT_EXECUTION_RECEIPT_SCHEMA`
-- `crates/products/chio-proof-room/src/lib.rs:840` `WEB3_SETTLEMENT_EXECUTION_RECEIPT_SCHEMA`
+- `crates/products/chio-proof-room/src/lib.rs:825` `WEB3_SETTLEMENT_EXECUTION_RECEIPT_SCHEMA`
 
 ## `chio.web3-settlement-proof-bundle.v1` (5 declarations, 5 crates)
 
@@ -1036,18 +1036,8 @@ different names for the same bytes.
 
 ## `chio.web3-settlement-dispatch.v1` (2 declarations, 2 crates)
 
-- `crates/core/chio-core-types/src/signed_artifact.rs:290` `CHIO_WEB3_SETTLEMENT_DISPATCH_V1_SCHEMA`
-- `crates/economy/chio-web3/src/settlement.rs:24` `CHIO_WEB3_SETTLEMENT_DISPATCH_V1_SCHEMA`
-
-## `chio.web3-settlement-dispatch.v2` (2 declarations, 2 crates)
-
-- `crates/core/chio-core-types/src/signed_artifact.rs:293` `CHIO_WEB3_SETTLEMENT_DISPATCH_V2_SCHEMA`
-- `crates/economy/chio-web3/src/settlement.rs:25` `CHIO_WEB3_SETTLEMENT_DISPATCH_V2_SCHEMA`
-
-## `chio.web3-settlement-execution-receipt.v1` (2 declarations, 2 crates)
-
-- `crates/core/chio-core-types/src/signed_artifact.rs:291` `CHIO_WEB3_SETTLEMENT_EXECUTION_RECEIPT_V1_SCHEMA`
-- `crates/economy/chio-web3/src/settlement.rs:27` `CHIO_WEB3_SETTLEMENT_RECEIPT_V1_SCHEMA`
+- `crates/core/chio-core-types/src/signed_artifact.rs:288` `CHIO_WEB3_SETTLEMENT_DISPATCH_V1_SCHEMA`
+- `crates/economy/chio-web3/src/settlement.rs:24` `CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA`
 
 ## `chio.workflow.preflight-plan.v1` (2 declarations, 2 crates)
 
