@@ -30,7 +30,7 @@ func ParseReceiptJSON(input string) (map[string]any, error) {
 func ReceiptBodyCanonicalJSON(receipt map[string]any) (string, error) {
 	body := make(map[string]any, len(receipt))
 	for key, value := range receipt {
-		if key == "algorithm" || key == "signature" {
+		if key == "algorithm" || key == "signature" || value == nil {
 			continue
 		}
 		body[key] = value
@@ -123,7 +123,10 @@ func VerifyReceiptWithTrustedSigners(
 	if !semanticallySignable(receipt, verdict) {
 		signatureValid = false
 	}
-	semanticAuthorized := receiptKind == "mediated_decision" && boundaryClass == "prevent" && verdict == "allow"
+	semanticAuthorized := receiptKind == "mediated_decision" &&
+		boundaryClass == "prevent" &&
+		receipt["observation_outcome"] == nil &&
+		verdict == "allow"
 	signerTrusted := false
 	if len(trustedSigners) > 0 {
 		for _, signer := range trustedSigners {
@@ -143,7 +146,7 @@ func VerifyReceiptWithTrustedSigners(
 		ParameterHashValid: parameterHashValid,
 		ReceiptIDValid:     receiptIDValid,
 		ReceiptKind:        receiptKind,
-		Result:             resultLabel(receiptKind, boundaryClass, verdict),
+		Result:             resultLabel(semanticAuthorized, receiptKind, verdict),
 		SignerKeyHex:       kernelKey,
 		SignerTrusted:      signerTrusted,
 		SignatureValid:     signatureValid,
@@ -225,8 +228,8 @@ func receiptSemantics(receipt map[string]any) (string, string) {
 	return receiptKind, boundaryClass
 }
 
-func resultLabel(receiptKind string, boundaryClass string, decision string) string {
-	if receiptKind == "mediated_decision" && boundaryClass == "prevent" && decision == "allow" {
+func resultLabel(semanticAuthorized bool, receiptKind string, decision string) string {
+	if semanticAuthorized {
 		return "Authorized"
 	}
 	switch receiptKind {

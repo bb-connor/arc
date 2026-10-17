@@ -28,30 +28,6 @@ impl From<Option<&Decision>> for ReceiptDecisionKind {
     }
 }
 
-fn binding_result_label(
-    receipt_kind: &str,
-    boundary_class: &str,
-    decision: ReceiptDecisionKind,
-) -> &'static str {
-    if receipt_kind == "mediated_decision"
-        && boundary_class == "prevent"
-        && decision == ReceiptDecisionKind::Allow
-    {
-        return "Authorized";
-    }
-    match receipt_kind {
-        "trace_observation" => "Observed",
-        "advisory_evaluation" => "Advisory",
-        _ => match decision {
-            ReceiptDecisionKind::Allow => "Allowed",
-            ReceiptDecisionKind::Deny => "Denied",
-            ReceiptDecisionKind::Cancelled => "Cancelled",
-            ReceiptDecisionKind::Incomplete => "Incomplete",
-            ReceiptDecisionKind::None => "Invalid",
-        },
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReceiptVerification {
     pub signature_valid: bool,
@@ -111,10 +87,12 @@ pub fn verify_receipt_with_trusted_signers(
         parameter_hash_valid,
         receipt_id_valid,
         decision,
-        receipt_kind: receipt_kind.clone(),
-        boundary_class: boundary_class.clone(),
+        receipt_kind,
+        boundary_class,
         trust_level: receipt.trust_level.as_str().to_string(),
-        result: binding_result_label(&receipt_kind, &boundary_class, decision).to_string(),
+        result: semantics
+            .result_label(receipt.decision.as_ref())
+            .to_string(),
         authorized,
         signer_key_hex: receipt.kernel_key.to_hex(),
         signer_trusted,

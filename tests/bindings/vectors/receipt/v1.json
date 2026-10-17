@@ -646,7 +646,7 @@
         "parameter_hash_valid": true,
         "receipt_id_valid": true,
         "receipt_kind": "mediated_decision",
-        "result": "Authorized",
+        "result": "Allowed",
         "signature_valid": false,
         "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
         "signer_trusted": false,
@@ -805,6 +805,69 @@
         "trust_level": "verified"
       },
       "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"boundary_class\":\"cannot_see\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"evidence\":[{\"details\":\"recorded without mediated authorization\",\"guard_name\":\"ObservationRecorder\",\"verdict\":true}],\"id\":\"287f56a03420932e3f61b28b3f2f3d4db0c21c25c5c718ca884ff71c52d749f4\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"surface\":\"bindings-vectors\",\"version\":1},\"observation_outcome\":\"observed\",\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"trace_observation\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"verified\"}"
+    },
+    {
+      "description": "An explicit null observation outcome is absent, so a signed mediated allow keeps its authorization label.",
+      "expected": {
+        "authorized": false,
+        "boundary_class": "prevent",
+        "decision": "allow",
+        "ok": false,
+        "parameter_hash_valid": true,
+        "receipt_id_valid": true,
+        "receipt_kind": "mediated_decision",
+        "result": "Authorized",
+        "signature_valid": true,
+        "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "signer_trusted": false,
+        "trust_level": "mediated"
+      },
+      "id": "mediated_decision_with_null_observation_outcome",
+      "receipt": {
+        "action": {
+          "parameter_hash": "035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929",
+          "parameters": {
+            "mode": "read",
+            "path": "/workspace/docs/roadmap.md"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "verdict": "allow"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "4e04ec88bc4255bd23d289de76ded240f94ec716f789aae30db24804fec78cad",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "rcpt-bindings-null-observation",
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "observation_outcome": null,
+        "policy_hash": "policy-bindings-v1",
+        "receipt_kind": "mediated_decision",
+        "redaction_mode": "none",
+        "signature": "084a1126e3840aec59e4c28132946ef3e6e4ea77e3977a5e4e49aaaa7317c766bf9aa1a1768d4671287e1ebdfc1b5e0e9ec80cd1dadbb71a8d15f263fe72f70d",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"4e04ec88bc4255bd23d289de76ded240f94ec716f789aae30db24804fec78cad\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"chio_receipt_signing_nonce\":\"rcpt-bindings-null-observation\",\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"mediated\"}"
     }
   ],
   "generated_by": "chio-binding-helpers",

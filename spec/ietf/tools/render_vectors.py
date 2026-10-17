@@ -482,8 +482,12 @@ def capability_signing_input(token: Dict[str, Any]) -> str:
 
 
 def receipt_body(receipt: Dict[str, Any]) -> Dict[str, Any]:
-    """The receipt without the members that its id and its signature do not cover."""
-    return without(receipt, "id", "signature", "algorithm", "bbs_signature")
+    """The receipt without the members that its id and its signature do not cover.
+
+    A member whose value is null is absent, as it is for the Rust decoder.
+    """
+    body = without(receipt, "id", "signature", "algorithm", "bbs_signature")
+    return {name: value for name, value in body.items() if value is not None}
 
 
 def receipt_signing_input(receipt: Dict[str, Any]) -> str:
