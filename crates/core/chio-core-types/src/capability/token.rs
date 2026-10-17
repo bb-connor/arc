@@ -114,6 +114,7 @@ fn validate_cumulative_approval_projections(
 /// algorithm declared by the `algorithm` field (defaulting to Ed25519 when
 /// absent).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CapabilityToken {
     /// Versioned signed-artifact schema. Must equal `chio.capability.v1`.
     pub schema: String,
@@ -163,6 +164,7 @@ pub struct CapabilityToken {
 /// self-describing (Ed25519 / P-256 / P-384) via its encoding, and the
 /// `issuer` key encodes its own algorithm.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CapabilityTokenBody {
     pub id: String,
     pub issuer: PublicKey,
@@ -177,7 +179,7 @@ pub struct CapabilityTokenBody {
 }
 
 /// The capability-token signing input.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CapabilityTokenSigningBody {
     pub schema: String,
     #[serde(flatten)]
@@ -193,7 +195,7 @@ pub struct CapabilityTokenSigningBody {
 }
 
 /// Attenuated capability signing input with attenuation and caveat fields.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CapabilityTokenAttenuationBody {
     #[serde(flatten)]
     pub body: CapabilityTokenBody,

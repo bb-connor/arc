@@ -60,6 +60,7 @@ pub struct AttenuationProof {
 /// whose chain links lack this field via
 /// [`validate_delegation_chain_with_trust_root`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DelegationLink {
     /// Capability ID of the ancestor token delegated at this step.
     pub capability_id: String,
@@ -92,6 +93,7 @@ pub struct DelegationLink {
 
 /// The body of a delegation link, used as the signing input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DelegationLinkBody {
     pub capability_id: String,
     pub delegator: PublicKey,
@@ -167,7 +169,7 @@ impl DelegationLink {
 
 /// Describes how a scope was narrowed during delegation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Attenuation {
     /// A tool was removed from the scope.
     RemoveTool {
