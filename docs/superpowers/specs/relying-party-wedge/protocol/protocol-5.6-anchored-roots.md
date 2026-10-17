@@ -40,6 +40,9 @@ intake if it contains a NUL character. Example values below are truncated.
 - `root_anchor` is required on every capability `serve-http` admits. A root
   without it rejects.
 - `kind` is the closed enum of section 5.6.2. Unknown kinds reject at decode.
+- Decoding is strict (section 4.5): an unknown member in `root_anchor`, or
+  anywhere in the capability body, rejects at decode, even when the
+  signature over the padded body verifies.
 - A delegated token copies `root_anchor` byte for byte from its root. Any
   difference denies.
 - A root's `expires_at` must not exceed `assertion_exp`. Verifiers check this
@@ -61,23 +64,26 @@ intake if it contains a NUL character. Example values below are truncated.
 
 The set is closed. Every kind is an exchange kind; there is no self-anchored
 root. Every authentication method `serve-http` accepts maps to exactly one
-kind.
+kind. The provider-backed kinds (`oauth_id_jag`, `entra_jwt`,
+`entra_agent_id`, `oidc_jwt`, `oauth_introspection`) verify against the
+enterprise provider record their rule references (section 5.6.4).
 
 | `kind` | Accepted input | Verified against | Replay key |
 |---|---|---|---|
-| `oauth_id_jag` | `jwt-bearer` assertion, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:id-jag`, from an authenticated confidential client | the rule's pinned `jwks_uri`; `typ` equals the ID-JAG media type; `aud` equals the local authorization server issuer; `client_id` equals the authenticated client; `resource`, when present, equals the advertised protected resource; `exp - iat <= max_assertion_lifetime_secs` | `(issuer, jti)`, single use |
-| `entra_jwt` | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | tenant-specific Entra JWKS; `iss` is a tenant-specific issuer listed in the root policy (`common` and `organizations` issuers reject); `aud` is the provider app ID URI; principal is `oid`, else `sub`, else `azp`, `appid` or `client_id`, and a token with none of them denies | `(issuer, uti)`, one root per token |
+| `oauth_id_jag` | `jwt-bearer` assertion, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:id-jag`, from an authenticated confidential client | the provider record's issuer and `jwks_url`; `typ` equals the ID-JAG media type; `aud` equals the local authorization server issuer; `client_id` equals the authenticated client; `resource`, when present, equals the advertised protected resource; `exp - iat <= max_assertion_lifetime_secs` | `(issuer, jti)`, single use |
+| `entra_jwt` | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | the provider record's tenant-specific Entra `jwks_url`; `iss` equals the record's issuer, which must be tenant-specific (`common` and `organizations` issuers reject); `aud` is in the record's `trust_boundary.allowed_audiences` (the provider app ID URI); principal is the claim the record's `subject_mapping.principal_source` names (`oid` for Entra records), and a token without it denies | `(issuer, uti)`, one root per token |
 | `entra_agent_id` | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | as `entra_jwt`, and the Entra Agent ID agent-identity discriminator claim is present | `(issuer, uti)`, one root per token |
-| `oidc_jwt` | bearer at the edge | the rule's pinned issuer and `jwks_uri` or static key | `(issuer, jti)` when `jti` is present, else the token-bytes digest |
-| `oauth_introspection` | bearer at the edge | RFC 7662 response from the configured endpoint with `active: true`; evidence is the response digest | token-bytes digest |
+| `oidc_jwt` | bearer at the edge | the provider record's issuer, `trust_boundary.allowed_audiences`, and its `jwks_url` or inline `jwks` | `(issuer, jti)` when `jti` is present, else the token-bytes digest |
+| `oauth_introspection` | bearer at the edge | RFC 7662 response from the provider record's `introspection_url` with `active: true`; evidence is the response digest | token-bytes digest |
 | `chio_local_as` | access token from the local authorization server `authorization_code` flow, or RFC 8693 re-exchange of such a token (`subject_token_type=urn:ietf:params:oauth:token-type:access_token`) | local authorization server key | local token `jti`; a re-exchange consumes the subject token's `jti` once |
 | `chio_operator_key` | operator-issued root through the admin route | pinned operator key | admin request id |
 | `operator_static_bearer` | `--auth-token` static bearer at the edge | constant-time comparison against the SHA-256 of the configured token | token-bytes digest plus root expiry, one live root per token |
 
 Matching between the Entra kinds: a token carrying the agent-identity
 discriminator claim matches only `entra_agent_id` rules, and a token without
-it matches only `entra_jwt` rules. An `oidc_jwt` rule naming a Microsoft Entra
-issuer rejects at load, so every Entra token is held to the Entra rules.
+it matches only `entra_jwt` rules. An `oidc_jwt` rule whose provider record
+has a Microsoft Entra issuer rejects at load, so every Entra token is held to
+the Entra rules.
 
 Entra roots: one root per token, keyed by `(issuer, uti)`. A different token
 presenting an already-bound `uti` denies, and a second explicit exchange of
@@ -129,6 +135,8 @@ in the signed root.
   "anchor": {
     "kind": "oauth_id_jag",
     "issuer": "https://acme.okta.com",
+    "provider_record_id": "acme-okta",
+    "provider_identity_digest": "sha256:5c0e...",
     "key_snapshot_digest": "sha256:31bb...",
     "kid": "k-okta-1",
     "alg": "RS256",
@@ -156,6 +164,15 @@ in the signed root.
 ```
 
 - `artifact_digest` is the SHA-256 of the exact compact JWS bytes received.
+- `provider_record_id` and `provider_identity_digest` name the provider
+  record the exchange verified against and the digest of its identity
+  projection (section 5.6.4), which equals the matched rule's. `issuer`
+  equals the record's issuer. Both members are present for provider-backed
+  kinds and absent for `chio_local_as`, `chio_operator_key` and
+  `operator_static_bearer`.
+- Decoding is strict (section 4.5): an unknown member in the context,
+  `anchor`, `exchange`, a commitment object or `claims` rejects. `claims`
+  keys are exactly the rule's `recorded_claims` names.
 - `artifact_retained` is `true` only for `oauth_id_jag` under a rule with
   `retain_idp_artifact: true`. The retained token is stored in the evidence
   store keyed by `artifact_digest`, never in the context, receipts or logs.
@@ -171,7 +188,7 @@ in the signed root.
   with its own 32-byte salt.
 - `holder` is `edge_session` or `caller` (section 5.6.6).
 
-#### 5.6.4 `chio.root-policy.v1` and `chio.idp-key-snapshot.v1`
+#### 5.6.4 `chio.root-policy.v1`, provider records and `chio.idp-key-snapshot.v1`
 
 The root policy is signed by the provider's policy key.
 
@@ -186,12 +203,11 @@ The root policy is signed by the provider's policy key.
       "rule_id": "okta-crm-agents",
       "match": {
         "anchor_kind": "oauth_id_jag",
-        "issuer": "https://acme.okta.com",
-        "jwks_uri": "https://acme.okta.com/oauth2/v1/keys",
+        "provider_record_id": "acme-okta",
+        "provider_identity_digest": "sha256:5c0e...",
         "allowed_algs": ["RS256"],
         "claims": { "client_id": ["mcp-client-claude"] }
       },
-      "tenant_claim": "iss",
       "idp_scope_projection": { "crm.read": ["crm/search", "crm/get"], "crm.write": ["crm/update"] },
       "ceiling_scope": { "grants": ["..."] },
       "ceiling_scope_hash": "sha256:...",
@@ -228,8 +244,13 @@ Policy key and validity:
 
 Rule constraints:
 
-- `jwks_uri` is required for every JWKS-verified kind and must be `https`.
-  Keys are fetched only from it.
+- Provider-backed kinds require `provider_record_id` and
+  `provider_identity_digest` in `match`. The rule holds no issuer, key
+  location, endpoint, audience, tenant claim or principal claim; those come
+  only from the provider record. A token matches a rule only when its `iss`
+  equals the issuer of the rule's provider record and the rule's other
+  `match` members hold. Keys are fetched only from the record's `jwks_url` or
+  taken from its inline `jwks`.
 - The effective root scope is the intersection of `ceiling_scope` and the
   projection of the identity provider's scope values. A scope value absent
   from `idp_scope_projection` denies the exchange. An identity provider that
@@ -239,19 +260,82 @@ Rule constraints:
   defaults to 300 and applies to `oauth_id_jag`; it must be absent on
   `entra_jwt` and `entra_agent_id` rules.
 - `max_clock_skew_secs` is at most 60.
-- `tenant_claim` names the claim that identifies the caller's tenant (`iss`
-  for per-organization Okta issuers, `tid` for Entra). It feeds the tenant tag
-  (section 5.6.8).
 - `retain_idp_artifact` is allowed only on `oauth_id_jag` rules.
 - `principal` and `tenant_value` are required on `operator_static_bearer`
-  rules and rejected on every other kind. `jwks_uri`, `allowed_algs` and
-  `idp_scope_projection` are absent on that kind, and its effective root scope
-  is `ceiling_scope`.
+  rules and rejected on every other kind. `provider_record_id`,
+  `provider_identity_digest`, `allowed_algs` and `idp_scope_projection` are
+  absent on that kind, and its effective root scope is `ceiling_scope`.
+  `chio_local_as` and `chio_operator_key` rules carry no provider members
+  either.
+- An `oidc_jwt` rule whose provider record has a Microsoft Entra issuer
+  rejects.
+- Decoding is strict (section 4.5): an unknown member in the policy, a rule,
+  `match`, `disclosure` or a `tools` entry rejects at load, even under a
+  valid policy signature.
 - `disclosure` is defined in "Committed Receipts And Disclosure" in section 6.
 
 Load rules: the policy loads at startup. A policy that fails signature,
 pinned-key match, validity window, schema, ceiling-hash recomputation, pointer
-syntax or bound checks refuses startup.
+syntax or bound checks refuses startup. A provider-backed rule whose record is
+missing from the registry, of the wrong record kind, invalid, lacking a member
+its kind needs, or whose identity digest differs from
+`provider_identity_digest` also refuses startup. A disabled record does not
+refuse startup; it denies at runtime.
+
+Provider records. The enterprise provider registry
+(`chio.enterprise-providers.v1`, `--enterprise-providers-file`, section 10.3)
+is the one source of provider identity. A record referenced by a rule is
+valid and carries:
+
+- record kind `oidc_jwks` for `oauth_id_jag`, `entra_jwt`, `entra_agent_id`
+  and `oidc_jwt` rules, with `issuer` and exactly one of `jwks_url` (`https`)
+  or an inline `jwks`. The exchange never follows `discovery_url`.
+  `entra_jwt`, `entra_agent_id` and `oidc_jwt` records also carry a
+  non-empty `trust_boundary.allowed_audiences`;
+- record kind `oauth_introspection` for `oauth_introspection` rules, with
+  `issuer` and an `https` `introspection_url`. The credentials the edge
+  presents to that endpoint are `serve-http` secrets and never appear in the
+  registry;
+- `subject_mapping.principal_source`, the one claim that is the principal,
+  and `subject_mapping.tenant_id_field`, the tenant claim (`iss` for
+  per-organization Okta issuers, `tid` for Entra), which feeds the tenant tag
+  (section 5.6.8);
+- `provenance.trust_material_ref`.
+
+`scim` and `saml` records are never referenced by a rule. Records carry no
+`provider_profile` member.
+
+The provider identity projection is unsigned and content-addressed:
+
+```json
+{
+  "schema": "chio.enterprise-provider-identity.v1",
+  "provider_id": "acme-okta",
+  "kind": "oidc_jwks",
+  "issuer": "https://acme.okta.com",
+  "jwks_url": "https://acme.okta.com/oauth2/v1/keys",
+  "audiences": [],
+  "subject_mapping": { "principal_source": "sub", "tenant_id_field": "iss" },
+  "trust_material_ref": "okta-org-acme"
+}
+```
+
+- It holds the record's id, kind, issuer, key source (`jwks_url`, `jwks` or
+  `introspection_url`), audiences, subject mapping and trust material
+  reference. It excludes `enabled`, other provenance labels and validation
+  errors.
+- `provider_identity_digest = SHA-256("chio.enterprise-provider-identity.v1\0" || canonical_json(projection))`.
+- It decodes strictly and is exported in bundles, so a verifier can recompute
+  the digest a rule pins.
+
+Every exchange, and every admission under a root whose anchor names a
+provider record, loads the registry once and checks the record against that
+one version. A missing, disabled or invalid record, a record of the wrong
+kind, or a recomputed identity digest that differs from the rule's denies. An
+unreadable or invalid registry answers HTTP 503 on the token endpoint and
+bearer intake and denies admission. No cached registry or fallback copy is
+used. A change to a record's identity projection takes effect only with a
+root policy re-signed by the policy key.
 
 The identity-provider key snapshot is signed by the exchange key:
 
@@ -267,7 +351,8 @@ The identity-provider key snapshot is signed by the exchange key:
 }
 ```
 
-The exchange writes a snapshot each time its fetched key set changes. A
+The exchange writes a snapshot each time its fetched key set changes. For a
+record with an inline `jwks`, `source` is `registry:<provider_id>`. A
 snapshot is in force from `observed_at` until the next snapshot's
 `observed_at` for the same issuer. Each delegation context names the snapshot
 and `kid` it used. A snapshot is the provider's statement of what the identity
@@ -295,6 +380,8 @@ Carried in MCP `_meta.chioCapability` (WIRE_PROTOCOL section 3.6).
 - `delegation_context` is required when the presenter is not the session
   holder, so the verifier can recompute `context_digest`.
 - The envelope is unsigned. Every member inside is verified independently.
+- Decoding is strict (section 4.5): an unknown member in the envelope or in
+  any member it carries rejects the presentation.
 
 #### 5.6.6 Holder classes
 
@@ -359,7 +446,8 @@ Caller revocation request, signed by `revoker_key`:
 #### 5.6.8 Tenant and subject tags, and verifier trust
 
 - `tenant_tag = HMAC-SHA256(index_key, "chio.tenant-tag.v1\0" || issuer || "\0" || tenant_value)`,
-  where `tenant_value` is the claim named by the rule's `tenant_claim`.
+  where `issuer` is the provider record's issuer and `tenant_value` is the
+  claim named by the record's `subject_mapping.tenant_id_field`.
 - `subject_tag = HMAC-SHA256(index_key, "chio.subject-tag.v1\0" || issuer || "\0" || subject)`.
 - `index_key` is a 32-byte provider secret loaded from a file at startup. It
   never leaves the process and is not a signing key.
@@ -424,8 +512,13 @@ Exchange:
   algorithms are never allowed); `typ` mismatch for `oauth_id_jag`; `kid`
   absent; any of `jku`, `x5u`, `jwk`, `x5c` or `crit` present.
 - `kid` not in the current key set after at most one rate-limited refresh.
-- Signature invalid. `iss` not exactly the rule's issuer. `aud` not exactly
-  the local authorization server issuer (ID-JAG) or the app ID URI (Entra).
+- Provider registry unreadable or invalid (HTTP 503, no exchange); the rule's
+  provider record missing, disabled, invalid or of the wrong kind; the
+  record's recomputed identity digest different from the rule's
+  `provider_identity_digest`.
+- Signature invalid. `iss` not exactly the provider record's issuer. `aud`
+  not exactly the local authorization server issuer (ID-JAG), or not in the
+  record's `trust_boundary.allowed_audiences` (Entra, OIDC JWT).
   ID-JAG `resource` present and not equal to the advertised protected
   resource.
 - Time: `exp` or `iat` missing; `now >= exp + skew`; `iat > now + skew`;
@@ -435,10 +528,12 @@ Exchange:
 - Replay key missing where required, or already bound. The replay store is
   durable and retained until `exp + skew`.
 - ID-JAG `client_id` not equal to the authenticated client.
-- Entra token with none of `oid`, `sub`, `azp`, `appid` or `client_id`. A
-  token carrying the agent-identity discriminator claim matched against an
-  `entra_jwt` rule, or one without it matched against an `entra_agent_id`
-  rule. Any Entra issuer on an `oidc_jwt` rule.
+- Token without the claim the provider record's
+  `subject_mapping.principal_source` names, or without the claim its
+  `tenant_id_field` names. A token carrying the agent-identity discriminator
+  claim matched against an `entra_jwt` rule, or one without it matched
+  against an `entra_agent_id` rule. Any Entra issuer on an `oidc_jwt` rule's
+  provider record.
 - Static bearer token not equal to the configured token.
 - Local re-exchange whose subject token is expired, revoked or already
   re-exchanged, or whose requested scope or `resource` is not a subset of the
@@ -459,6 +554,13 @@ Edge admission:
 - Root without `root_anchor`, signed by a key outside the root policy's
   `exchange_keys`, or naming a `root_policy_digest` that is not the loaded
   policy. Loaded policy outside its validity window.
+- An unknown member at any level of a presented capability, presentation or
+  delegation context, including an added or altered `algorithm` member. The
+  rejection happens at decode, before any verifier is chosen (section 4.5).
+- For a root whose anchor names a provider record: the registry, loaded once
+  for this request, is unreadable or invalid, or the record is missing,
+  disabled, invalid, or its identity digest differs from the one the
+  delegation context names.
 - Root `expires_at > root_anchor.assertion_exp`.
 - `context_digest` mismatch against the presented or stored delegation
   context, or any binding in section 5.6.1 failing.
@@ -473,6 +575,8 @@ Edge admission:
 Startup refusals. `serve-http` refuses to start when:
 
 - no root policy is configured, or it fails any load rule in section 5.6.4;
+- a provider-backed rule exists and `--enterprise-providers-file` is not set,
+  or the registry is unreadable or invalid;
 - the root policy's `policy_key` differs from `--root-policy-key`;
 - the state-directory lock is held by another process, or the state directory
   is on a network filesystem;

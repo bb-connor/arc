@@ -76,6 +76,9 @@ Commitments:
   `(receipt_id, salt_ref)` where a store exists.
 - `chain_digest = SHA-256("chio.receipt.chain-digest.v1\0" || canonical_json([root, ..., parent, leaf]))`
   over the full signed tokens.
+- Decoding is strict (section 4.5): an unknown member in a commitment,
+  `disclosure`, `authority` or its `root_anchor` rejects the receipt at
+  decode. `parameters_inline` and `result_inline` are opaque caller data.
 
 Disclosure:
 
@@ -137,6 +140,8 @@ An unsigned, self-verifying opening:
 - A verifier rejects an opening document in which the same `salt` value appears
   for more than one `salt_ref`, and marks the receipt as tampered disclosure. A
   producer draws a fresh salt for every field.
+- Decoding is strict (section 4.5): an unknown member in the document or in
+  any opening rejects it. `payload` is an opaque value.
 - Deleting a receipt's openings from the disclosure store makes its
   commitments permanently hiding and leaves the signed receipt valid.
 

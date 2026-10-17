@@ -25,6 +25,9 @@ Capability presentation (request):
 - Every capability inside the presentation is verified independently against
   the anchored-root rules of PROTOCOL section 5.6. A presentation whose chain
   fails any of them denies the call.
+- Decoding is strict (PROTOCOL section 4.5): an unknown member at any level
+  of the presentation, including an `algorithm` member on a capability,
+  rejects the request.
 - When the presentation's leaf is bound to a sender key, the request also
   carries `_meta.chioDpopProof` signed by the leaf subject.
 
@@ -39,4 +42,5 @@ Receipt copy (response):
 - The caller holds its own arguments, result and identity, so the copy carries
   no payloads.
 - Callers **MUST** verify `receipt` before relying on it, using the kernel key
-  pinned in their own verifier trust file.
+  pinned in their own verifier trust file, and **MUST** decode `receipt` and
+  `opening` strictly (PROTOCOL section 4.5).

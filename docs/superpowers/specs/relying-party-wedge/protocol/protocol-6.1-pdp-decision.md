@@ -29,6 +29,9 @@ A `pdp_decision` receipt carries a `decision`, has no `content_commitment`
 }
 ```
 
+Decoding is strict (section 4.5): an unknown member in `enforcement` rejects
+the receipt.
+
 Only `mediated_decision` + `prevent` + `Allow` is Chio-enforced
 authorization. A verifier renders a `pdp_decision` Allow as "authorized by
 Chio, enforced by the named PEP", and only when `pep_key` is pinned in its

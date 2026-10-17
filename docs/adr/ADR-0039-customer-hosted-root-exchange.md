@@ -93,8 +93,8 @@ beyond the existing startup client registry.
   matching revocation entry each deny the exchange.
 - Replay keys are single use and namespaced by anchor kind and issuer, so one
   issuer's token identifiers cannot collide with or block another's.
-- Identity-provider keys are fetched only from the `jwks_uri` pinned in the
-  matching rule.
+- Identity-provider keys are fetched only from the enterprise provider record
+  the matching rule references and pins by identity digest.
 - The identity provider is never consulted after the root is minted.
 - A root's lifetime is capped by the expiry of the assertion behind it.
 - The exchange, kernel, policy and local authorization server keys are
@@ -126,9 +126,13 @@ beyond the existing startup client registry.
   seed-derived federation subject keys, and every other direct unanchored
   issuance path. Local authorization server re-exchange stays, as the
   narrowing-only `chio_local_as` re-exchange of an anchored root.
-- The `serve-http` enterprise provider registry file and the
-  `--auth-jwt-provider-profile` flag are replaced by root policy rules and the
-  rule's anchor kind. Trust-control's own provider registry is unchanged.
+- The enterprise provider registry is the one source of provider identity
+  (issuer, keys or introspection endpoint, audience, subject mapping, trust
+  material reference, enabled state). Root policy rules reference a record by
+  id and pin its identity digest. The `--auth-jwt-provider-profile` flag and
+  the `serve-http` provider verification flags are removed. A disabled or
+  removed provider denies the next exchange and the next call under roots it
+  anchors.
 - The `serve-http` per-store database path flags are replaced by one
   `--state-dir`.
 - The static bearer is documented as a development, test and conformance mode

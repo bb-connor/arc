@@ -43,6 +43,8 @@ Receipt `settlement` block:
   `x402.payment_payload`, `x402.settlement_response`. Digests are over the
   canonical JSON of the decoded base64 payloads.
 - Amounts are integer minor units encoded as decimal strings.
+- Decoding is strict (section 4.5): an unknown member in `settlement`, in any
+  `rail_refs` entry or in the closure rejects it.
 
 `chio.settlement-closure.v1`, signed by the kernel key:
 

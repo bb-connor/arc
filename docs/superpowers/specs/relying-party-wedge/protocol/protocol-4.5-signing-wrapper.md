@@ -54,6 +54,35 @@ Rules:
   prefix does not match the pinned key's algorithm rejects before any
   cryptographic check. A verifier holding a pinned hybrid key rejects a bare
   classical signature.
+- Algorithm selection: a verifier derives the signature algorithm only from
+  the pinned, typed key it verifies against. It never reads the algorithm
+  from any member of the artifact being verified, signed or unsigned, and no
+  member of an artifact changes which verifier runs. Signed artifacts carry
+  no `algorithm` member: the top-level `algorithm` member that capability
+  tokens, receipts and other envelopes carried outside the signing body is
+  removed. An artifact that carries an `algorithm` member, added or altered,
+  fails strict decoding before any verifier is chosen.
+- Strict decoding: every artifact defined in sections 5.6, 6 ("Committed
+  Receipts And Disclosure"), 6.1 (`pdp_decision` receipts) and 6.7 rejects
+  an unknown member at every nesting level, even when the signature over the
+  body that carries it verifies. This covers `root_anchor` and the capability
+  body, the delegation context, the root policy, the identity-provider key
+  snapshot, the provider identity projection, the capability presentation,
+  the receipt disclosure document, the receipt's commitment, `disclosure`,
+  `authority`, `enforcement` and `settlement` blocks and the metering and
+  runtime-attestation blocks carried beside them, the settlement closure and
+  the caller revocation request. A tagged union rejects an unknown member in
+  every variant, including variants that carry only the discriminator: a
+  document such as `{"kind": "<variant>", "pad": 0}` rejects.
+  Implementations do not decode these unions as serde internally tagged unit
+  variants, which accept such padding; a closed discriminator is a string
+  member of a closed object, and a union whose variants carry different
+  members decodes as closed per-variant objects or through a lossless round
+  trip in which the decoded value re-encodes to exactly the input value.
+  Duplicate member names reject. Members whose value is caller data by
+  definition (an opening's `payload`, `parameters_inline`, `result_inline`,
+  `metadata`) are opaque values; the rule covers every Chio-defined object
+  around them.
 - Ed25519 signs the 88 wrapper bytes.
 - ML-DSA-65 signs the 88 wrapper bytes with an empty FIPS 204 context string.
 - P-256 signs with ECDSA over SHA-256 of the wrapper. P-384 signs with ECDSA
