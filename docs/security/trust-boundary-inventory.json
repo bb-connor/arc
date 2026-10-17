@@ -17657,7 +17657,7 @@
     "crates/protocol/chio-acp-proxy/src/input.rs::validate_original_authority_fields::from_wire#2::decode_signed",
     "crates/protocol/chio-acp-proxy/src/kernel_checker.rs::parse_token::from_wire#1::decode_signed",
     "crates/protocol/chio-bedrock-converse-adapter/src/transport/bounded_response.rs::poll_frame::from_wire#1::decode_document",
-    "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json::from_wire#1::decode_document",
+    "crates/protocol/chio-egress-contract/src/reqwest_helper.rs::json#1::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-adapter/src/framing.rs::read_jsonrpc_frame_with_admission::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-edge/src/ingress.rs::decode_mcp_request::from_wire#2::decode_signed",
@@ -21952,7 +21952,7 @@
       "gate_sse_stream::shared-reader::crates/protocol/chio-provider-adapter-core/src/sse.rs::parse_sse_frames"
     ],
     "crates/protocol/chio-egress-contract/src/reqwest_helper.rs": [
-      "json::original-json-reader::UntrustedJsonText"
+      "json#1::original-json-reader::UntrustedJsonText"
     ],
     "crates/protocol/chio-gemini-tools-adapter/src/adapter.rs": [
       "lift_batch::shared-reader::crates/protocol/chio-gemini-tools-adapter/src/response.rs::function_calls",
