@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 use chio_core::crypto::PublicKey;
+use chio_did::DidChio;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
@@ -21,8 +22,6 @@ pub const MAX_REVOCATION_FRESHNESS_TTL_SECONDS: u64 = 300;
 
 /// Longest accepted partner id, in bytes.
 pub const MAX_PARTNER_ID_BYTES: usize = 64;
-
-const MAX_REVOCATION_PARTNER_REGISTRY_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum RevocationPartnerError {
@@ -42,6 +41,8 @@ pub enum RevocationPartnerError {
     InvalidIssuer { partner_id: String, reason: String },
     #[error("partners `{first}` and `{second}` share one issuer")]
     DuplicateIssuer { first: String, second: String },
+    #[error("partner `{0}` authorityPublicKey is not an Ed25519 key")]
+    UnsupportedAuthorityKey(String),
     #[error("partner `{0}` has no revocationFreshnessTtlSeconds")]
     MissingRevocationFreshnessTtl(String),
     #[error(
@@ -77,9 +78,18 @@ impl RevocationPartner {
             .saturating_mul(1_000)
     }
 
+    /// The `did:chio` of the authority key: the issuer DID of the native
+    /// passport credentials this partner signs.
+    pub fn issuer_did(&self) -> Result<String, RevocationPartnerError> {
+        DidChio::from_public_key(self.authority_public_key.clone())
+            .map(|did| did.to_string())
+            .map_err(|_| RevocationPartnerError::UnsupportedAuthorityKey(self.partner_id.clone()))
+    }
+
     fn validate(&self) -> Result<(), RevocationPartnerError> {
         validate_partner_id(&self.partner_id)?;
         validate_issuer(&self.partner_id, &self.issuer)?;
+        self.issuer_did()?;
         let ttl = self.revocation_freshness_ttl_seconds.ok_or_else(|| {
             RevocationPartnerError::MissingRevocationFreshnessTtl(self.partner_id.clone())
         })?;
@@ -101,19 +111,17 @@ pub struct RevocationPartnerRegistry {
 }
 
 impl RevocationPartnerRegistry {
-    /// Loads and validates the registry at `path`. A missing file is refused.
+    /// Loads and validates the registry at `path` through the shared bounded
+    /// registry reader. A missing, oversized or invalid file is refused.
     pub fn load(path: &Path) -> Result<Self, RevocationPartnerError> {
-        let bytes = read_bounded(path)?;
+        let bytes = crate::signed_input::read_bounded(path)
+            .map_err(|error| RevocationPartnerError::Unreadable(error.to_string()))?;
         Self::from_json(&bytes)
     }
 
     pub fn from_json(bytes: &[u8]) -> Result<Self, RevocationPartnerError> {
-        let registry: Self = chio_core::canonical::UntrustedJsonText::from_wire(
-            bytes,
-            MAX_REVOCATION_PARTNER_REGISTRY_BYTES,
-        )
-        .and_then(|input| input.decode_signed())
-        .map_err(|error| RevocationPartnerError::Malformed(error.to_string()))?;
+        let registry: Self = crate::signed_input::decode(bytes)
+            .map_err(|error| RevocationPartnerError::Malformed(error.to_string()))?;
         registry.validate()?;
         Ok(registry)
     }
@@ -153,22 +161,19 @@ impl RevocationPartnerRegistry {
     pub fn by_issuer(&self, url: &str) -> Option<&RevocationPartner> {
         self.partners.values().find(|partner| partner.issuer == url)
     }
-}
 
-fn read_bounded(path: &Path) -> Result<Vec<u8>, RevocationPartnerError> {
-    use std::io::Read as _;
-    let unreadable = |error: std::io::Error| RevocationPartnerError::Unreadable(error.to_string());
-    let file = std::fs::File::open(path).map_err(unreadable)?;
-    let mut bytes = Vec::new();
-    file.take(crate::integer::count(MAX_REVOCATION_PARTNER_REGISTRY_BYTES).saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(unreadable)?;
-    if bytes.len() > MAX_REVOCATION_PARTNER_REGISTRY_BYTES {
-        return Err(RevocationPartnerError::Unreadable(format!(
-            "registry exceeds {MAX_REVOCATION_PARTNER_REGISTRY_BYTES} bytes"
-        )));
+    /// Every partner whose authority key issued one of `dids`.
+    #[must_use]
+    pub fn by_issuer_dids(&self, dids: &[String]) -> Vec<&RevocationPartner> {
+        self.partners
+            .values()
+            .filter(|partner| {
+                partner
+                    .issuer_did()
+                    .is_ok_and(|did| dids.iter().any(|issuer| issuer == &did))
+            })
+            .collect()
     }
-    Ok(bytes)
 }
 
 fn validate_partner_id(partner_id: &str) -> Result<(), RevocationPartnerError> {
