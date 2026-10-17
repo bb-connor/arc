@@ -1,12 +1,25 @@
 """Chio-governed Temporal Activity interceptor.
 
 :class:`ChioActivityInterceptor` plugs into a Temporal
-:class:`temporalio.worker.Worker`'s ``interceptors`` list. Each
-activity is evaluated via the Chio sidecar; allow records a
-:class:`WorkflowStepReceipt` and delegates to the next interceptor;
-deny raises non-retryable
-:class:`temporalio.exceptions.ApplicationError` so Temporal records the
-denial in workflow history. HITL approval support is planned for v2.
+:class:`temporalio.worker.Worker`'s ``interceptors`` list. Every
+activity runs through the sidecar's mediated ``chio.caller-delivery.v1``
+lifecycle:
+
+1. ``POST /v1/evaluate`` reserves the call against the workflow's signed
+   capability token. ``deny`` and ``pending_approval`` stop the activity
+   with a non-retryable :class:`temporalio.exceptions.ApplicationError`.
+2. ``POST /v1/caller/start`` commits the reservation and returns a
+   kernel-signed dispatch authorization. The interceptor checks it
+   against the pinned kernel key and its own executor identity before
+   the activity body runs.
+3. The activity runs.
+4. ``POST /v1/caller/report`` delivers an executor-signed report (the
+   SHA-256 of the activity result's payload encoding, or the failure
+   type) so the reservation finalizes. The terminal receipt is recorded
+   on the :class:`WorkflowReceipt` step.
+
+Any sidecar or contract error stops the activity. Pending approvals are
+not resumed by this package.
 """
 
 from __future__ import annotations
@@ -25,12 +38,13 @@ from chio_adapter_base.redact import (
     RedactionPolicy,
     bind_and_redact,
     build_alias_map,
-    redact_args,
 )
+from chio_sdk._generated import ChioSignedCallerDispatchAuthorization
 from chio_sdk.client import ChioClient
-from chio_sdk.errors import ChioDeniedError, ChioError
+from chio_sdk.errors import ChioConnectionError, ChioDeniedError
 from chio_sdk.models import ChioReceipt, Decision, ToolCallAction
 from temporalio import activity
+from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import (
     ActivityInboundInterceptor,
@@ -39,6 +53,7 @@ from temporalio.worker import (
 )
 
 from chio_temporal.errors import ChioTemporalConfigError, ChioTemporalError
+from chio_temporal.executor import CallerExecutor, canonical_json_bytes
 from chio_temporal.grants import ChioClientLike, WorkflowGrant
 from chio_temporal.receipt import WorkflowReceipt
 
@@ -47,6 +62,16 @@ logger = logging.getLogger(__name__)
 #: ``ApplicationError.type`` for denied activities. Saga compensation
 #: matches on this string -- see ``docs/protocols/TEMPORAL-INTEGRATION.md``.
 DENIED_ERROR_TYPE = "ChioCapabilityDenied"
+
+#: ``ApplicationError.type`` when the mediated lifecycle cannot complete.
+SIDECAR_ERROR_TYPE = "ChioSidecarError"
+
+CALLER_DELIVERY_PROTOCOL = "chio.caller-delivery.v1"
+CALLER_DELIVERY_REPORT_SCHEMA = "chio.caller-delivery-report.v1"
+
+
+def _wall_clock_ms() -> int:
+    return time.time_ns() // 1_000_000
 
 # Per-activity grant-override hook; ``None`` falls back to the workflow grant.
 ActivityGrantOverride = Callable[[activity.Info], "WorkflowGrant | None"]
@@ -70,18 +95,36 @@ class ChioActivityInterceptor(Interceptor):
 
     Redaction runs in the activity layer so workflow determinism is
     unaffected. Receipt-sink failures are logged and swallowed.
+
+    ``executor`` and ``control_token`` are required: the interceptor is
+    the caller executor for ``/v1/caller/start`` and
+    ``/v1/caller/report``, which sit behind the sidecar-control bearer.
     """
 
     def __init__(
         self,
         *,
+        executor: CallerExecutor,
+        control_token: str,
         chio_client: ChioClientLike | None = None,
         sidecar_url: str = "http://127.0.0.1:9090",
         default_tool_server: str = "",
         activity_tool_server_map: dict[str, str] | None = None,
         receipt_sink: Callable[[dict[str, Any]], Awaitable[None] | None] | None = None,
         redaction_policy: RedactionPolicy | None = None,
+        clock_ms: Callable[[], int] = _wall_clock_ms,
     ) -> None:
+        if not isinstance(executor, CallerExecutor):
+            raise ChioTemporalConfigError(
+                "executor must implement chio_temporal.CallerExecutor"
+            )
+        if not control_token:
+            raise ChioTemporalConfigError(
+                "control_token (the sidecar-control bearer) must be non-empty"
+            )
+        self._executor = executor
+        self._control_token = control_token
+        self._clock_ms = clock_ms
         self._chio_client = chio_client
         self._owns_client = chio_client is None
         self._sidecar_url = sidecar_url
@@ -260,6 +303,8 @@ class ChioActivityInterceptor(Interceptor):
         self,
         info: activity.Info,
         receipt: ChioReceipt,
+        *,
+        reservation_receipt_id: str | None = None,
     ) -> None:
         key = self._run_key(info.workflow_id, info.workflow_run_id)
         state = self._runs.get(key)
@@ -276,6 +321,7 @@ class ChioActivityInterceptor(Interceptor):
             activity_id=info.activity_id,
             attempt=info.attempt,
             receipt=receipt,
+            reservation_receipt_id=reservation_receipt_id,
         )
 
     @staticmethod
@@ -306,29 +352,6 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
             tool_name=info.activity_type,
             policy=self._parent._redaction_policy,
         )
-
-        receipt = await self._evaluate(
-            info=info,
-            grant=grant,
-            tool_server=tool_server,
-            parameters=parameters,
-        )
-        self._parent._record_step(info, receipt)
-
-        if receipt.is_denied:
-            raise _denied_application_error(info, receipt)
-
-        return await self.next.execute_activity(input)
-
-    async def _evaluate(
-        self,
-        *,
-        info: activity.Info,
-        grant: WorkflowGrant,
-        tool_server: str,
-        parameters: dict[str, Any],
-    ) -> ChioReceipt:
-        """Evaluate via the sidecar; HTTP-403 becomes a synthetic deny receipt."""
         if not grant.capability_id:
             raise _denied_application_error_from_config(
                 info,
@@ -339,28 +362,267 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
             )
 
         client = self._parent._arc()
+        request_id = _request_id(info)
+        reservation = await self._reserve(
+            client,
+            info=info,
+            grant=grant,
+            tool_server=tool_server,
+            parameters=parameters,
+            request_id=request_id,
+        )
+        reservation_receipt = _receipt_from_response(info, reservation)
+        if reservation["status"] != "reserved":
+            self._parent._record_step(info, reservation_receipt)
+            raise _denied_application_error(info, reservation_receipt)
+
+        authorization = await self._start(
+            client,
+            info=info,
+            grant=grant,
+            tool_server=tool_server,
+            parameters=parameters,
+            reservation=reservation,
+            request_id=request_id,
+        )
+        started_at = self._parent._clock_ms()
+        _require_live(info, authorization, started_at)
+
         try:
-            return await client.evaluate_tool_call(
-                capability_id=grant.capability_id,
+            result = await self.next.execute_activity(input)
+            output = {"outcome": "completed", "result_sha256": _result_sha256(result)}
+        except BaseException as activity_error:
+            failure = {"outcome": "failed", "error_type": type(activity_error).__name__}
+            try:
+                response = await self._report(
+                    client,
+                    info=info,
+                    authorization=authorization,
+                    request_id=request_id,
+                    started_at=started_at,
+                    output=failure,
+                )
+            except ApplicationError as report_error:
+                raise report_error from activity_error
+            self._parent._record_step(
+                info,
+                _receipt_from_response(info, response),
+                reservation_receipt_id=reservation_receipt.id,
+            )
+            raise
+
+        response = await self._report(
+            client,
+            info=info,
+            authorization=authorization,
+            request_id=request_id,
+            started_at=started_at,
+            output=output,
+        )
+        terminal = _receipt_from_response(info, response)
+        self._parent._record_step(
+            info, terminal, reservation_receipt_id=reservation_receipt.id
+        )
+        if response["status"] != "reconciled" or terminal.is_denied:
+            raise _denied_application_error(info, terminal)
+        return result
+
+    async def _reserve(
+        self,
+        client: ChioClientLike,
+        *,
+        info: activity.Info,
+        grant: WorkflowGrant,
+        tool_server: str,
+        parameters: dict[str, Any],
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Reserve via ``/v1/evaluate``; a 403 becomes a synthetic deny receipt."""
+        try:
+            return await client.evaluate_tool_call_mediated(
+                capability=grant.token.model_dump(
+                    mode="json", by_alias=True, exclude_none=True
+                ),
                 tool_server=tool_server,
                 tool_name=info.activity_type,
                 parameters=parameters,
+                request_id=request_id,
             )
         except ChioDeniedError as exc:
-            return _deny_receipt_from_error(
+            receipt = _deny_receipt_from_error(
                 info=info,
                 capability_id=grant.capability_id,
                 tool_server=tool_server,
                 parameters=parameters,
                 exc=exc,
             )
-        except ChioError as exc:
-            # Transport failure: retryable; let Temporal apply its policy.
+            self._parent._record_step(info, receipt)
+            raise _denied_application_error(info, receipt) from exc
+        except ChioConnectionError as exc:
+            # The request never reached the sidecar, so no reservation exists
+            # and Temporal's retry policy applies.
             raise ApplicationError(
-                f"Chio sidecar error: {exc}",
-                type="ChioSidecarError",
+                f"Chio sidecar unreachable: {exc}",
+                type=SIDECAR_ERROR_TYPE,
                 non_retryable=False,
             ) from exc
+        except Exception as exc:
+            raise _sidecar_error(f"Chio reservation failed: {exc}") from exc
+
+    async def _start(
+        self,
+        client: ChioClientLike,
+        *,
+        info: activity.Info,
+        grant: WorkflowGrant,
+        tool_server: str,
+        parameters: dict[str, Any],
+        reservation: dict[str, Any],
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Commit the reservation and authenticate the dispatch authorization.
+
+        Every failure is non-retryable: a lost start reply must never lead to
+        an execution on a fresh reservation.
+        """
+        try:
+            started = await client.start_mediated_execution(
+                control_token=self._parent._control_token,
+                execution_nonce=reservation["execution_nonce"],
+                arguments=parameters,
+            )
+        except ChioDeniedError as exc:
+            receipt = _deny_receipt_from_error(
+                info=info,
+                capability_id=grant.capability_id,
+                tool_server=tool_server,
+                parameters=parameters,
+                exc=exc,
+            )
+            self._parent._record_step(info, receipt)
+            raise _denied_application_error(info, receipt) from exc
+        except Exception as exc:
+            raise _sidecar_error(f"Chio caller start failed: {exc}") from exc
+
+        authorization = started.get("authorization")
+        try:
+            ChioSignedCallerDispatchAuthorization.model_validate(authorization)
+        except ValueError as exc:
+            raise _sidecar_error(
+                "Chio caller start returned a malformed dispatch authorization"
+            ) from exc
+        if not isinstance(authorization, dict):
+            raise _sidecar_error("Chio caller start returned no dispatch authorization")
+        body = authorization["authorization"]
+        executor = self._parent._executor
+        invocation = body["invocation"]
+        expected_invocation = {
+            "request_id": request_id,
+            "capability_id": grant.capability_id,
+            "server_id": tool_server,
+            "tool_name": info.activity_type,
+        }
+        if (
+            body["kernel_public_key"] != executor.kernel_public_key
+            or body["executor"] != executor.identity
+            or any(invocation[key] != value for key, value in expected_invocation.items())
+        ):
+            raise _sidecar_error(
+                "Chio dispatch authorization does not bind this executor and activity"
+            )
+        try:
+            signed = executor.verify_kernel_signature(
+                canonical_json_bytes(body), authorization["signature"]
+            )
+        except Exception as exc:
+            raise _sidecar_error(
+                f"Chio dispatch authorization could not be verified: {exc}"
+            ) from exc
+        if signed is not True:
+            raise _sidecar_error(
+                "Chio dispatch authorization is not signed by the pinned kernel key"
+            )
+        return authorization
+
+    async def _report(
+        self,
+        client: ChioClientLike,
+        *,
+        info: activity.Info,
+        authorization: dict[str, Any],
+        request_id: str,
+        started_at: int,
+        output: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Sign and deliver the executor report; every failure is non-retryable."""
+        executor = self._parent._executor
+        try:
+            completed_at = max(self._parent._clock_ms(), started_at)
+            report_body = {
+                "schema": CALLER_DELIVERY_REPORT_SCHEMA,
+                "authorization_digest": hashlib.sha256(
+                    canonical_json_bytes(authorization)
+                ).hexdigest(),
+                "executor": dict(executor.identity),
+                "claim_id": request_id,
+                "execution_started_at_unix_ms": started_at,
+                "completed_at_unix_ms": completed_at,
+                "output": output,
+                "realized_cost": None,
+            }
+            report = {
+                "report": report_body,
+                "signature": executor.sign(canonical_json_bytes(report_body)),
+            }
+            return await client.report_mediated_execution(
+                control_token=self._parent._control_token,
+                authorization=authorization,
+                report=report,
+            )
+        except Exception as exc:
+            raise _sidecar_error(
+                f"Chio caller report for activity {info.activity_id!r} failed: {exc}"
+            ) from exc
+
+
+def _request_id(info: activity.Info) -> str:
+    """Attempt-scoped request id; a Temporal retry is a new reservation."""
+    identity = json.dumps(
+        [info.workflow_id, info.workflow_run_id, info.activity_id, info.attempt],
+        separators=(",", ":"),
+    )
+    return "temporal:" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def _require_live(
+    info: activity.Info, authorization: dict[str, Any], now_ms: int
+) -> None:
+    body = authorization["authorization"]
+    if not body["not_before_unix_ms"] <= now_ms < body["expires_at_unix_ms"]:
+        raise _sidecar_error(
+            f"Chio dispatch authorization for activity {info.activity_id!r} "
+            "is outside its execution interval"
+        )
+
+
+def _result_sha256(result: Any) -> str:
+    """SHA-256 of the result's encoding under Temporal's default payload converter."""
+    payloads = DataConverter.default.payload_converter.to_payloads([result])
+    return hashlib.sha256(payloads[0].data).hexdigest()
+
+
+def _receipt_from_response(info: activity.Info, response: dict[str, Any]) -> ChioReceipt:
+    try:
+        return ChioReceipt.model_validate(response["receipt"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise _sidecar_error(
+            f"Chio sidecar response for activity {info.activity_id!r} "
+            "carried no valid receipt"
+        ) from exc
+
+
+def _sidecar_error(message: str) -> ApplicationError:
+    return ApplicationError(message, type=SIDECAR_ERROR_TYPE, non_retryable=True)
 
 
 def _fixed_positional_param_names(fn: Callable[..., Any] | None) -> tuple[str, ...]:
@@ -587,6 +849,7 @@ def _denied_application_error_from_config(
 
 __all__ = [
     "DENIED_ERROR_TYPE",
+    "SIDECAR_ERROR_TYPE",
     "ActivityGrantOverride",
     "ChioActivityInterceptor",
 ]

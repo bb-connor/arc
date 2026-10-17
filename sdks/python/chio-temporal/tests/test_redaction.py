@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from _mediated_contract import MediatedContractClient, contract_interceptor
 from chio_adapter_base.redact import RedactionPolicy
 from chio_sdk.models import (
     CapabilityToken,
@@ -14,10 +15,9 @@ from chio_sdk.models import (
     Operation,
     ToolGrant,
 )
-from chio_sdk.testing import MockChioClient, allow_all
 from temporalio import activity
 
-from chio_temporal import ChioActivityInterceptor, WorkflowGrant
+from chio_temporal import WorkflowGrant
 from chio_temporal.interceptor import _ChioInboundInterceptor
 
 INVOKE_OPERATION = getattr(Operation, "INVOKE", Operation.invoke)
@@ -116,7 +116,7 @@ def _make_input(*args: Any, fn: Callable[..., Any] | None = None) -> Any:
 
 
 async def _mint_token(
-    chio: MockChioClient,
+    chio: MediatedContractClient,
     *,
     subject: str,
     scope: ChioScope,
@@ -135,7 +135,7 @@ async def _mint_token(
 
 class TestDefaultPolicyRedacts:
     async def test_chio_file_write_content_is_redacted(self) -> None:
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -146,7 +146,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             next_i = _NextInterceptor()
@@ -157,7 +157,7 @@ class TestDefaultPolicyRedacts:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input(payload))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         assert len(evaluate_calls) == 1
         forwarded_args = evaluate_calls[0].parameters["args"]
         assert len(forwarded_args) == 1
@@ -182,7 +182,7 @@ class TestDefaultPolicyRedacts:
         }
 
     async def test_chio_file_edit_patch_is_redacted(self) -> None:
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -193,7 +193,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             next_i = _NextInterceptor()
@@ -204,7 +204,7 @@ class TestDefaultPolicyRedacts:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input(payload))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters["args"][0]
         assert forwarded["path"] == "/tmp/x"
         assert forwarded["patch"] == {
@@ -217,7 +217,7 @@ class TestDefaultPolicyRedacts:
         def write_file(path: str, body: str) -> None:
             del path, body
 
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -228,7 +228,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             next_i = _NextInterceptor()
@@ -239,7 +239,7 @@ class TestDefaultPolicyRedacts:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input(payload, fn=write_file))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters["args"][0]
         assert forwarded["path"] == "/tmp/x"
         assert forwarded["body"] == {
@@ -249,7 +249,7 @@ class TestDefaultPolicyRedacts:
         assert next_i.received_args == [payload]
 
     async def test_unrelated_activity_passes_args_through(self) -> None:
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -260,7 +260,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -269,7 +269,7 @@ class TestDefaultPolicyRedacts:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input(payload))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters["args"][0]
         assert forwarded == {
             "to": "alice@example.com",
@@ -279,7 +279,7 @@ class TestDefaultPolicyRedacts:
     async def test_chio_file_write_positional_args_are_redacted(self) -> None:
         """Regression: positional ``chio_file_write(path, content)`` must not
         leak the body field into the receipt."""
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -290,7 +290,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -302,7 +302,7 @@ class TestDefaultPolicyRedacts:
 
         import json
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters
         assert "PROD_SECRET" not in json.dumps(forwarded)
         # Bound shape: positional args lifted into a single dict under
@@ -327,7 +327,7 @@ class TestDefaultPolicyRedacts:
         shape. The table-named prefix is bound + redacted and any
         trailing positional extras are preserved alongside.
         """
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -338,7 +338,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -350,7 +350,7 @@ class TestDefaultPolicyRedacts:
 
         import json
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters
         assert "PROD_SECRET" not in json.dumps(forwarded)
         assert forwarded["args"] == [
@@ -368,7 +368,7 @@ class TestDefaultPolicyRedacts:
         def chio_file_write(content: str, path: str) -> None:
             del content, path
 
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -379,7 +379,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -395,7 +395,7 @@ class TestDefaultPolicyRedacts:
 
         import json
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters
         assert "PROD_SECRET" not in json.dumps(forwarded)
         assert forwarded["args"] == [
@@ -409,7 +409,7 @@ class TestDefaultPolicyRedacts:
         ]
 
     async def test_chio_file_edit_positional_args_are_redacted(self) -> None:
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -420,7 +420,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -431,7 +431,7 @@ class TestDefaultPolicyRedacts:
 
         import json
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters
         assert "API_TOKEN" not in json.dumps(forwarded)
         assert forwarded["args"] == [
@@ -446,7 +446,7 @@ class TestDefaultPolicyRedacts:
 
     async def test_unknown_tool_positional_args_pass_through(self) -> None:
         """Non-chio-default tools' positional args forward verbatim."""
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -457,7 +457,7 @@ class TestDefaultPolicyRedacts:
                 token=token,
                 tool_server="srv",
             )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
+            interceptor = contract_interceptor(chio)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -465,14 +465,14 @@ class TestDefaultPolicyRedacts:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input("a", "b"))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters["args"]
         assert forwarded == ["a", "b"]
 
 
 class TestCustomPolicy:
     async def test_custom_policy_redacts_only_named_fields(self) -> None:
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -484,10 +484,7 @@ class TestCustomPolicy:
                 tool_server="srv",
             )
             custom = RedactionPolicy(body_fields={"my_activity": ("body",)})
-            interceptor = ChioActivityInterceptor(
-                chio_client=chio,
-                redaction_policy=custom,
-            )
+            interceptor = contract_interceptor(chio, redaction_policy=custom)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -496,7 +493,7 @@ class TestCustomPolicy:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input(payload))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters["args"][0]
         assert forwarded["label"] == "hello"
         assert forwarded["body"] == {
@@ -505,7 +502,7 @@ class TestCustomPolicy:
         }
 
     async def test_custom_policy_does_not_redact_default_fields(self) -> None:
-        async with allow_all() as chio:
+        async with MediatedContractClient() as chio:
             token = await _mint_token(
                 chio,
                 subject="agent:alice",
@@ -517,10 +514,7 @@ class TestCustomPolicy:
                 tool_server="srv",
             )
             custom = RedactionPolicy(body_fields={"my_activity": ("body",)})
-            interceptor = ChioActivityInterceptor(
-                chio_client=chio,
-                redaction_policy=custom,
-            )
+            interceptor = contract_interceptor(chio, redaction_policy=custom)
             interceptor.register_workflow_grant(grant)
 
             inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
@@ -529,13 +523,13 @@ class TestCustomPolicy:
             with _patched_activity_info(info):
                 await inbound.execute_activity(_make_input(payload))
 
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
+        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
         forwarded = evaluate_calls[0].parameters["args"][0]
         assert forwarded["content"] == "not-redacted-now"
 
 
 class TestInterceptorDefaultPolicy:
     def test_default_policy_is_chio_default(self) -> None:
-        interceptor = ChioActivityInterceptor()
+        interceptor = contract_interceptor(MediatedContractClient())
         assert "chio_file_write" in interceptor._redaction_policy.body_fields
         assert "chio_file_edit" in interceptor._redaction_policy.body_fields

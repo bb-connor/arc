@@ -1,10 +1,12 @@
 # chio-temporal
 
 Temporal integration for the [Chio protocol](../../../spec/PROTOCOL.md).
-Plugs into Temporal's Python SDK so every Activity invocation is
-capability-checked via the Chio sidecar kernel, denied activities raise
-non-retryable `temporalio.exceptions.ApplicationError`, and each
-workflow run emits an aggregate `WorkflowReceipt` on completion.
+Plugs into Temporal's Python SDK so every Activity invocation runs
+through the Chio sidecar's mediated caller-delivery route (`chio api
+protect`): reserve, start, run, report. Denied or pending activities
+raise non-retryable `temporalio.exceptions.ApplicationError`, and each
+workflow run collects an unsigned, in-memory `WorkflowReceipt`
+aggregate of the per-activity kernel receipts.
 
 ## Install
 
@@ -21,6 +23,7 @@ The package depends on `chio-sdk-python`, `temporalio>=1.7,<2`, and
 
 ```python
 import asyncio
+import os
 from datetime import timedelta
 
 from chio_sdk.client import ChioClient
@@ -46,6 +49,10 @@ class NotifyWorkflow:
         )
 
 
+SIDECAR_CONTROL_TOKEN = os.environ["CHIO_SIDECAR_CONTROL_TOKEN"]
+my_executor = load_caller_executor()  # your chio_temporal.CallerExecutor
+
+
 async def main() -> None:
     client = await Client.connect("localhost:7233")
     async with ChioClient("http://127.0.0.1:9090") as chio:
@@ -55,8 +62,9 @@ async def main() -> None:
             activities=[send_email],
             workflows=[NotifyWorkflow],
             workflow_id="notify-wf-1",
-            capability_id="",  # ignored when scope is supplied
             chio_client=chio,
+            executor=my_executor,  # implements chio_temporal.CallerExecutor
+            control_token=SIDECAR_CONTROL_TOKEN,
             scope=ChioScope(
                 grants=[
                     ToolGrant(
@@ -90,13 +98,55 @@ asyncio.run(main())
 
 At runtime:
 
-* Each Activity execution is evaluated by the Chio sidecar with the
-  workflow's `capability_id` before the activity body runs.
-* Activities whose tool the grant does not authorise raise
-  `ApplicationError(type="ChioCapabilityDenied", non_retryable=True)` --
-  Temporal records the denial in workflow history and does not retry.
-* Per-activity receipts are aggregated into a single `WorkflowReceipt`
-  and forwarded to the configured `receipt_sink` on completion.
+* `POST /v1/evaluate` reserves the call with the workflow's complete
+  signed capability token. `deny` or `pending_approval` raises
+  `ApplicationError(type="ChioCapabilityDenied", non_retryable=True)`
+  and the activity body never runs.
+* `POST /v1/caller/start` commits the reservation. The interceptor
+  checks the returned dispatch authorization against the pinned kernel
+  key, its own executor identity, the activity's tool and capability,
+  and the authorization's time window before the body runs.
+* After the body returns or raises, `POST /v1/caller/report` delivers an
+  executor-signed report so the reservation finalizes. The report output
+  is `{"outcome": "completed", "result_sha256": ...}` (SHA-256 of the
+  result under Temporal's default payload converter) or
+  `{"outcome": "failed", "error_type": ...}`. Raw results are not sent.
+* A `deny` from the report withholds the result and raises
+  `ChioCapabilityDenied`. Any sidecar, transport or contract error stops
+  the activity with `ApplicationError(type="ChioSidecarError")`. Only an
+  unreachable sidecar before reservation is retryable; every later
+  failure is non-retryable so a lost reply never leads to a second
+  execution.
+* The terminal kernel receipt for each attempt is recorded on the
+  `WorkflowReceipt` step and forwarded to the configured `receipt_sink`
+  on `flush_workflow_receipt`.
+
+## Executor and control token
+
+The interceptor is the caller executor for the sidecar's
+`/v1/caller/start` and `/v1/caller/report` routes, so it needs:
+
+* `control_token` -- the sidecar-control bearer token.
+* `executor` -- an object implementing `chio_temporal.CallerExecutor`:
+  `identity` (the `executor_id` / `public_key` / `key_epoch` the sidecar
+  was configured with), `kernel_public_key` (pinned), `sign(message)`
+  and `verify_kernel_signature(message, signature)`. Key material is
+  supplied by the worker host; this package ships no signer
+  implementation.
+
+The sidecar must be configured with that caller executor. A sidecar
+without one rejects `/v1/caller/start`, and the interceptor then denies
+every activity.
+
+Limits, stated plainly:
+
+* There is no durable executor ledger. A worker that dies between start
+  and report leaves the committed hold for the kernel to expire or
+  recover.
+* Canonical JSON is reproduced locally for strings, integers, booleans
+  and null only; an authorization or report containing floats fails
+  closed.
+* Pending approvals are not resumed; the activity fails non-retryably.
 
 ## Attenuated activity-scoped grants
 
@@ -127,8 +177,10 @@ re-checks the subset invariant before evaluating.
 
 ## WorkflowReceipt envelope
 
-The aggregate emitted on workflow completion is a stable JSON envelope
-(version `chio-temporal/v1`):
+The aggregate is **unsigned** and lives in worker memory until
+`flush_workflow_receipt`; a worker restart loses it. Only the per-step
+kernel receipts it embeds are signed. The envelope (version
+`chio-temporal/v1`):
 
 ```json
 {
@@ -143,7 +195,8 @@ The aggregate emitted on workflow completion is a stable JSON envelope
   "allow_count": 2,
   "deny_count": 0,
   "steps": [
-    {"activity_type": "send_email", "activity_id": "act-1", "attempt": 1, "receipt": {...}},
+    {"activity_type": "send_email", "activity_id": "act-1", "attempt": 1,
+     "reservation_receipt_id": "...", "receipt": {...}},
     ...
   ],
   "metadata": {}
@@ -161,14 +214,17 @@ and content-hash verification are deterministic across runs.
   non-retryable `ApplicationError` before handing control back to
   Temporal.
 * `ChioTemporalConfigError` -- raised on invalid configuration (no
-  `WorkflowGrant` for a workflow_id, empty `capability_id`, attenuation
-  beyond the parent grant's scope).
+  `WorkflowGrant` for a workflow_id, missing `executor` or
+  `control_token`, attenuation beyond the parent grant's scope).
+* `ApplicationError(type="ChioSidecarError")` (`SIDECAR_ERROR_TYPE`) --
+  the mediated lifecycle could not complete; the activity did not run,
+  or its result was withheld.
 
 ## HITL approval path
 
-Human-in-the-loop approval support (pause Activity on a pending
-approval guard, resume via Temporal Signal) lands in a future release.
-This v1 release implements the synchronous allow/deny path only.
+A `pending_approval` reservation stops the activity non-retryably.
+Pausing on approval and resuming via Temporal Signal is not
+implemented.
 
 ## Reference
 
@@ -188,3 +244,7 @@ uv run pytest
 uv run mypy src/
 uv run ruff check src/ tests/
 ```
+
+The tests run against a contract double of the mediated route
+(`tests/_mediated_contract.py`) and the real `ChioClient` over mocked
+HTTP. They do not start a live sidecar.

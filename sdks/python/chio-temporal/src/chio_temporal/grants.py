@@ -11,8 +11,8 @@ Two shapes are supported:
 
 1. *Workflow default* -- the ``WorkflowGrant`` is registered with the
    :class:`chio_temporal.ChioActivityInterceptor` under its ``workflow_id``.
-   Every activity on that workflow uses the grant's capability_id to
-   evaluate through the Chio sidecar.
+   Every activity on that workflow presents the grant's signed token to
+   the sidecar's mediated ``/v1/evaluate`` reservation.
 2. *Activity attenuation* -- callers invoke
    :meth:`WorkflowGrant.attenuate_for_activity` with a narrower
    :class:`ChioScope`; the resulting child :class:`WorkflowGrant` is
@@ -30,14 +30,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from chio_sdk.errors import ChioValidationError
-from chio_sdk.models import ChioScope, CapabilityToken
+from chio_sdk.models import CapabilityToken, ChioScope
 
 from chio_temporal.errors import ChioTemporalConfigError
 
-# Anything that looks like an ``ChioClient`` -- we accept the real client
-# and the ``MockChioClient`` from ``chio_sdk.testing`` interchangeably. A
-# structural type alias keeps the annotation readable without importing
-# the testing helpers in production code.
+# Structural stand-in for ``chio_sdk.client.ChioClient``: anything with its
+# mediated caller-delivery methods and keyword signatures.
 ChioClientLike = Any
 
 
@@ -52,9 +50,10 @@ class WorkflowGrant:
         interceptor looks up grants by this key when evaluating an
         activity execution.
     token:
-        The underlying :class:`CapabilityToken` minted by the Chio
-        capability authority. Its :attr:`CapabilityToken.scope` is the
-        ceiling for every activity in the workflow.
+        The complete signed :class:`CapabilityToken` minted by the Chio
+        capability authority. It is presented to ``/v1/evaluate`` as-is;
+        its :attr:`CapabilityToken.scope` is the ceiling for every
+        activity in the workflow.
     tool_server:
         Default Chio tool server id to use when an activity does not
         explicitly declare one. Activities normally map 1:1 to a tool

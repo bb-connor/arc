@@ -4,17 +4,13 @@
 
 * An :class:`chio_temporal.ChioActivityInterceptor` mounted on the
   Temporal :class:`temporalio.worker.Worker`'s ``interceptors`` list.
-* A :class:`chio_temporal.WorkflowGrant` minted from
-  ``capability_id`` / ``workflow_id`` and pre-registered on the
-  interceptor.
+* A :class:`chio_temporal.WorkflowGrant` holding the signed capability
+  token (supplied, or minted from ``scope``) for ``workflow_id`` and
+  pre-registered on the interceptor.
 
 The function returns ``(worker, interceptor, grant)`` so callers retain
 handles to the interceptor (for per-run :class:`WorkflowReceipt`
 inspection) and the grant (for attenuation).
-
-For tests and offline usage, the returned ``interceptor`` is the same
-one installed on the worker, so you can rebind its Chio client to a
-:class:`chio_sdk.testing.MockChioClient` after construction if needed.
 """
 
 from __future__ import annotations
@@ -22,11 +18,12 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from typing import Any
 
-from chio_sdk.models import ChioScope, CapabilityToken
+from chio_sdk.models import CapabilityToken, ChioScope
 from temporalio.client import Client
 from temporalio.worker import Worker
 
 from chio_temporal.errors import ChioTemporalConfigError
+from chio_temporal.executor import CallerExecutor
 from chio_temporal.grants import ChioClientLike, WorkflowGrant
 from chio_temporal.interceptor import ChioActivityInterceptor
 
@@ -37,9 +34,11 @@ async def build_chio_worker(
     task_queue: str,
     activities: Sequence[Callable[..., Any]],
     workflows: Sequence[type] | None = None,
-    capability_id: str,
     workflow_id: str,
     chio_client: ChioClientLike,
+    executor: CallerExecutor,
+    control_token: str,
+    token: CapabilityToken | None = None,
     scope: ChioScope | None = None,
     subject: str | None = None,
     tool_server: str = "",
@@ -64,24 +63,25 @@ async def build_chio_worker(
     workflows:
         Workflow classes to register. Optional; activity-only workers
         are valid.
-    capability_id:
-        Pre-existing capability token id. When ``scope`` is also
-        supplied, the builder mints a fresh capability via the supplied
-        ``chio_client`` and uses its id instead; ``capability_id`` then
-        acts as a label on the grant metadata for audit correlation.
     workflow_id:
         Temporal workflow identifier the grant is scoped to.
     chio_client:
-        :class:`chio_sdk.ChioClient` (or mock) used to mint the capability
-        token and evaluate activity calls. The interceptor reuses this
-        client; callers own its lifecycle.
+        :class:`chio_sdk.ChioClient` used to mint the capability token
+        and drive the mediated activity lifecycle. The interceptor reuses
+        this client; callers own its lifecycle.
+    executor:
+        :class:`chio_temporal.CallerExecutor` key material matching the
+        sidecar's configured caller executor.
+    control_token:
+        Sidecar-control bearer for ``/v1/caller/start`` and
+        ``/v1/caller/report``.
+    token:
+        The complete signed :class:`CapabilityToken` the workflow runs
+        under. Exactly one of ``token`` and ``scope`` must be supplied.
     scope:
         Optional :class:`ChioScope`. When provided, the builder mints a
         new capability token via ``chio_client.create_capability`` and
-        uses that token. When ``None``, the caller must have already
-        minted the token externally and is responsible for passing its
-        id (the builder then constructs a synthetic stand-in token with
-        an empty scope so the grant envelope still serialises).
+        uses that token.
     subject:
         Hex-encoded Ed25519 public key bound to the minted capability.
         Required when ``scope`` is provided; ignored otherwise.
@@ -117,36 +117,30 @@ async def build_chio_worker(
         on it; ``grant`` is the :class:`WorkflowGrant` registered for
         ``workflow_id``.
     """
-    if not capability_id and scope is None:
-        raise ChioTemporalConfigError(
-            "build_chio_worker requires either capability_id or scope"
-        )
-
-    if scope is not None:
+    if scope is not None and token is None:
         if not subject:
             raise ChioTemporalConfigError(
                 "subject is required when scope is provided"
             )
-        token = await chio_client.create_capability(
+        grant_token: CapabilityToken = await chio_client.create_capability(
             subject=subject, scope=scope, ttl_seconds=ttl_seconds
         )
+    elif token is not None and scope is None:
+        grant_token = token
     else:
-        # No minting requested -- callers supplied a pre-existing
-        # capability id. We construct a stand-in token carrying only
-        # that id so the grant envelope serialises without guessing at
-        # the token body. The interceptor only uses token.id at
-        # evaluate time, so this is safe.
-        token = _standin_token(capability_id)
+        raise ChioTemporalConfigError(
+            "build_chio_worker requires exactly one of token or scope"
+        )
 
-    grant_metadata: dict[str, Any] = {"supplied_capability_id": capability_id}
     grant = WorkflowGrant(
         workflow_id=workflow_id,
-        token=token,
+        token=grant_token,
         tool_server=tool_server,
-        metadata=grant_metadata,
     )
 
     interceptor = ChioActivityInterceptor(
+        executor=executor,
+        control_token=control_token,
         chio_client=chio_client,
         sidecar_url=sidecar_url,
         default_tool_server=default_tool_server,
@@ -168,26 +162,6 @@ async def build_chio_worker(
         **worker_kwargs,
     )
     return worker, interceptor, grant
-
-
-def _standin_token(capability_id: str) -> CapabilityToken:
-    """Build a stand-in :class:`CapabilityToken` for a supplied id.
-
-    The kernel already issued (and is persisting) the real token; we
-    only need its id to address the sidecar on evaluate. The other
-    fields are filled with non-sensitive stand-in values and the
-    ``scope`` is empty, so any attenuation attempt locally will
-    correctly refuse to broaden scope.
-    """
-    return CapabilityToken(
-        id=capability_id,
-        issuer="chio-temporal-standin",
-        subject="chio-temporal-standin",
-        scope=ChioScope(),
-        issued_at=0,
-        expires_at=0,
-        signature="chio-temporal-standin",
-    )
 
 
 __all__ = [

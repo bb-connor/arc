@@ -1,50 +1,61 @@
-"""Unit tests for ChioActivityInterceptor capability enforcement.
+"""Unit tests for ChioActivityInterceptor on the mediated caller-delivery route.
 
-The tests exercise the inbound-interceptor path without a live
-Temporal cluster: we build an :class:`ExecuteActivityInput`, construct
-an :class:`activity.Info`, patch ``activity.info()`` to return it, and
-invoke the ``_ChioInboundInterceptor.execute_activity`` directly.
+The tests exercise the inbound-interceptor path without a live Temporal
+cluster or sidecar: we build an :class:`ExecuteActivityInput`, construct an
+:class:`activity.Info`, patch ``activity.info()`` to return it, and invoke
+``_ChioInboundInterceptor.execute_activity`` directly against
+:class:`MediatedContractClient`. One test drives the real
+:class:`chio_sdk.client.ChioClient` over HTTP with ``respx``.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 import pytest
-from chio_sdk.errors import ChioDeniedError, ChioValidationError
+import respx
+from _mediated_contract import (
+    CONTROL_TOKEN,
+    FIXED_NOW_MS,
+    MediatedContractClient,
+    contract_interceptor,
+)
+from chio_sdk.client import ChioClient
+from chio_sdk.errors import (
+    ChioConnectionError,
+    ChioDeniedError,
+    ChioTimeoutError,
+    ChioValidationError,
+)
 from chio_sdk.models import (
     CapabilityToken,
     ChioScope,
     Operation,
     ToolGrant,
 )
-from chio_sdk.testing import (
-    MockChioClient,
-    MockVerdict,
-    allow_all,
-    deny_all,
-)
 from temporalio import activity
+from temporalio.converter import DataConverter
 from temporalio.exceptions import ApplicationError
 
 from chio_temporal import (
     ChioActivityInterceptor,
+    ChioTemporalConfigError,
     WorkflowGrant,
 )
 from chio_temporal.interceptor import (
     DENIED_ERROR_TYPE,
+    SIDECAR_ERROR_TYPE,
     _ChioInboundInterceptor,
     _deny_receipt_from_error,
     _is_sha256_hex,
 )
 
 INVOKE_OPERATION = getattr(Operation, "INVOKE", Operation.invoke)
-
-# ---------------------------------------------------------------------------
-# Test doubles / helpers
-# ---------------------------------------------------------------------------
 
 
 def _scope_for_tools(*tool_names: str, server_id: str = "srv") -> ChioScope:
@@ -69,10 +80,6 @@ def _default_info(
 ) -> activity.Info:
     """Build a minimal :class:`activity.Info` for direct interceptor testing."""
     utc_zero = datetime.fromtimestamp(0, tz=UTC)
-    # Temporal's Priority type is a dataclass on modern versions; we
-    # replicate its default via an attribute shim that is attribute-
-    # compatible enough for info construction. Falling back to
-    # ``Priority.default`` keeps us aligned with upstream when present.
     import temporalio.common as temporal_common
 
     return activity.Info(
@@ -103,8 +110,9 @@ def _default_info(
 class _NextInterceptor:
     """Stand-in for the downstream :class:`ActivityInboundInterceptor`."""
 
-    def __init__(self, result: Any = "ok") -> None:
+    def __init__(self, result: Any = "ok", error: BaseException | None = None) -> None:
         self.result = result
+        self.error = error
         self.called = False
 
     def init(self, outbound: Any) -> None:  # pragma: no cover -- unused
@@ -112,24 +120,9 @@ class _NextInterceptor:
 
     async def execute_activity(self, input: Any) -> Any:
         self.called = True
+        if self.error is not None:
+            raise self.error
         return self.result
-
-
-class AttenuatingMockChioClient(MockChioClient):
-    async def attenuate_capability(
-        self,
-        token: CapabilityToken,
-        *,
-        new_scope: ChioScope,
-    ) -> CapabilityToken:
-        child = await self.create_capability(
-            subject=getattr(token, "subject", "agent:attenuated"),
-            scope=new_scope,
-        )
-        store: dict[str, Any] = getattr(self, "_tokens", {})
-        store[child.id] = child
-        self._tokens = store  # type: ignore[attr-defined]
-        return child
 
 
 @contextmanager
@@ -158,225 +151,482 @@ def _make_input(*args: Any) -> Any:
     )
 
 
-async def _mint_token(
-    chio: MockChioClient,
-    *,
-    subject: str,
-    scope: ChioScope,
-) -> CapabilityToken:
-    """Mint a capability via the mock and index it for policy lookups."""
-    token = await chio.create_capability(subject=subject, scope=scope)
-    store: dict[str, Any] = getattr(chio, "_tokens", {})
-    store[token.id] = token
-    chio._tokens = store  # type: ignore[attr-defined]
-    return token
+async def _wired(
+    chio: MediatedContractClient,
+    *tools: str,
+    next_interceptor: _NextInterceptor | None = None,
+    **interceptor_kwargs: Any,
+) -> tuple[ChioActivityInterceptor, _ChioInboundInterceptor, _NextInterceptor]:
+    token = await chio.create_capability(
+        subject="agent:alice", scope=_scope_for_tools(*tools)
+    )
+    interceptor = contract_interceptor(chio, **interceptor_kwargs)
+    interceptor.register_workflow_grant(
+        WorkflowGrant(workflow_id="wf-1", token=token, tool_server="srv")
+    )
+    downstream = next_interceptor or _NextInterceptor()
+    return interceptor, _ChioInboundInterceptor(downstream, interceptor), downstream
 
 
-def _install_minting_attenuation(chio: MockChioClient) -> None:
-    async def attenuate_capability(
-        token: CapabilityToken,
-        *,
-        new_scope: ChioScope,
-    ) -> CapabilityToken:
-        if not new_scope.is_subset_of(token.scope):
-            raise ChioValidationError(
-                "new_scope must be a subset of the parent token scope"
-            )
-        return await _mint_token(chio, subject=token.subject, scope=new_scope)
-
-    chio.attenuate_capability = attenuate_capability  # type: ignore[method-assign]
+async def _run(
+    inbound: _ChioInboundInterceptor, activity_type: str = "send_email", *args: Any
+) -> Any:
+    with _patched_activity_info(_default_info(activity_type=activity_type)):
+        return await inbound.execute_activity(_make_input(*args))
 
 
-def _scope_aware_policy(chio: MockChioClient) -> Any:
-    """Policy that enforces the scope bound to the capability_id."""
+def _payload_sha256(value: Any) -> str:
+    payload = DataConverter.default.payload_converter.to_payloads([value])[0]
+    return hashlib.sha256(payload.data).hexdigest()
 
-    def policy(
-        tool_name: str,
-        scope: dict[str, Any],
-        context: dict[str, Any],
-    ) -> MockVerdict:
-        cap_id = context.get("capability_id")
-        token = getattr(chio, "_tokens", {}).get(cap_id)
-        if token is None:
-            return MockVerdict.deny_verdict(
-                f"unknown capability {cap_id!r}",
-                guard="CapabilityGuard",
-            )
-        allowed = {g.tool_name for g in token.scope.grants}
-        if tool_name in allowed or "*" in allowed:
-            return MockVerdict.allow_verdict()
-        return MockVerdict.deny_verdict(
-            f"tool {tool_name!r} not in capability scope",
-            guard="ScopeGuard",
+
+ID_ONLY_METHODS = {"evaluate_tool_call", "evaluate_tool_call_advisory"}
+
+
+# ---------------------------------------------------------------------------
+# Allowed activities run the full reserve -> start -> run -> report lifecycle
+# ---------------------------------------------------------------------------
+
+
+class TestMediatedLifecycle:
+    async def test_allow_reserves_starts_runs_and_reports(self) -> None:
+        chio = MediatedContractClient()
+        interceptor, inbound, downstream = await _wired(
+            chio, "send_email", next_interceptor=_NextInterceptor(result="delivered")
         )
 
-    return policy
-
-
-# ---------------------------------------------------------------------------
-# (a) Allow verdict delegates to the next interceptor
-# ---------------------------------------------------------------------------
-
-
-class TestAllowVerdict:
-    async def test_allow_runs_next_interceptor(self) -> None:
-        async with allow_all() as chio:
-            token = await _mint_token(
-                chio,
-                subject="agent:alice",
-                scope=_scope_for_tools("send_email"),
-            )
-            grant = WorkflowGrant(
-                workflow_id="wf-1",
-                token=token,
-                tool_server="srv",
-            )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
-            interceptor.register_workflow_grant(grant)
-
-            next_interceptor = _NextInterceptor(result="delivered")
-            inbound = _ChioInboundInterceptor(next_interceptor, interceptor)
-
-            info = _default_info(activity_type="send_email")
-            with _patched_activity_info(info):
-                result = await inbound.execute_activity(_make_input("hi"))
+        result = await _run(inbound, "send_email", "hi")
 
         assert result == "delivered"
-        assert next_interceptor.called
+        assert downstream.called
+        assert chio.methods() == [
+            "evaluate_tool_call_mediated",
+            "start_mediated_execution",
+            "report_mediated_execution",
+        ]
+        assert chio.open_holds == set()
+
+        reserve = chio.calls[0]
+        assert reserve.capability["signature"]
+        assert reserve.capability["scope"]["grants"][0]["tool_name"] == "send_email"
+        assert reserve.request_id.startswith("temporal:")
+        assert chio.calls[1].arguments == reserve.parameters
+
+        report = chio.reports[0]["report"]
+        assert report["output"] == {
+            "outcome": "completed",
+            "result_sha256": _payload_sha256("delivered"),
+        }
+        assert report["claim_id"] == reserve.request_id
+        assert report["execution_started_at_unix_ms"] == FIXED_NOW_MS
+        assert report["realized_cost"] is None
 
         receipt = interceptor.workflow_receipt("wf-1", "run-1")
         assert receipt is not None
         assert receipt.step_count == 1
         assert receipt.allow_count == 1
-        assert receipt.deny_count == 0
-        assert receipt.steps[0].activity_type == "send_email"
-        assert receipt.steps[0].activity_id == "act-1"
-        assert receipt.steps[0].receipt.is_allowed
+        step = receipt.steps[0]
+        assert step.activity_type == "send_email"
+        assert step.receipt.is_allowed
+        assert step.reservation_receipt_id is not None
+        assert step.receipt.id != step.reservation_receipt_id
+        assert step.to_dict()["reservation_receipt_id"] == step.reservation_receipt_id
 
     async def test_allow_respects_activity_tool_server_map(self) -> None:
-        async with allow_all() as chio:
-            token = await _mint_token(
-                chio,
-                subject="agent:alice",
-                scope=_scope_for_tools("send_email", server_id="srv"),
-            )
-            grant = WorkflowGrant(
-                workflow_id="wf-1",
-                token=token,
-                tool_server="unused",
-            )
-            interceptor = ChioActivityInterceptor(
-                chio_client=chio,
-                activity_tool_server_map={"send_email": "email-srv"},
-            )
-            interceptor.register_workflow_grant(grant)
+        chio = MediatedContractClient()
+        _, inbound, _ = await _wired(
+            chio,
+            "send_email",
+            activity_tool_server_map={"send_email": "email-srv"},
+        )
 
-            next_interceptor = _NextInterceptor()
-            inbound = _ChioInboundInterceptor(next_interceptor, interceptor)
+        await _run(inbound, "send_email")
 
-            info = _default_info(activity_type="send_email")
-            with _patched_activity_info(info):
-                await inbound.execute_activity(_make_input())
-
-        evaluate_calls = [c for c in chio.calls if c.method == "evaluate_tool_call"]
-        assert len(evaluate_calls) == 1
-        assert evaluate_calls[0].tool_server == "email-srv"
+        assert chio.calls[0].tool_server == "email-srv"
 
     async def test_run_scoped_grant_rejects_missing_run_id(self) -> None:
-        async with allow_all() as chio:
-            token = await _mint_token(
-                chio,
-                subject="agent:alice",
-                scope=_scope_for_tools("send_email"),
-            )
-            grant = WorkflowGrant(
-                workflow_id="wf-1",
-                token=token,
-                tool_server="srv",
-                run_id="run-1",
-            )
+        chio = MediatedContractClient()
+        token = await chio.create_capability(
+            subject="agent:alice", scope=_scope_for_tools("send_email")
+        )
+        grant = WorkflowGrant(
+            workflow_id="wf-1", token=token, tool_server="srv", run_id="run-1"
+        )
 
         assert grant.matches(workflow_id="wf-1", run_id="run-1")
         assert not grant.matches(workflow_id="wf-1", run_id="run-2")
         assert not grant.matches(workflow_id="wf-1", run_id=None)
 
+    async def test_activity_failure_reports_failed_outcome_and_finalizes(self) -> None:
+        chio = MediatedContractClient()
+        interceptor, inbound, _ = await _wired(
+            chio,
+            "send_email",
+            next_interceptor=_NextInterceptor(error=RuntimeError("smtp down")),
+        )
+
+        with pytest.raises(RuntimeError, match="smtp down"):
+            await _run(inbound, "send_email")
+
+        assert chio.methods()[-1] == "report_mediated_execution"
+        assert chio.reports[0]["report"]["output"] == {
+            "outcome": "failed",
+            "error_type": "RuntimeError",
+        }
+        assert chio.open_holds == set()
+        receipt = interceptor.workflow_receipt("wf-1", "run-1")
+        assert receipt is not None
+        assert receipt.steps[0].reservation_receipt_id is not None
+
+    async def test_report_deny_withholds_the_result(self) -> None:
+        chio = MediatedContractClient()
+        chio.report_status = "deny"
+        interceptor, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert downstream.called
+        assert exc_info.value.type == DENIED_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        receipt = interceptor.workflow_receipt("wf-1", "run-1")
+        assert receipt is not None
+        assert receipt.deny_count == 1
+
+    async def test_report_failure_after_success_is_non_retryable(self) -> None:
+        chio = MediatedContractClient()
+        chio.report_error = ChioTimeoutError("lost report reply")
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert downstream.called
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+
+    async def test_report_failure_after_activity_error_is_non_retryable(self) -> None:
+        chio = MediatedContractClient()
+        chio.report_error = ChioTimeoutError("lost report reply")
+        _, inbound, _ = await _wired(
+            chio,
+            "send_email",
+            next_interceptor=_NextInterceptor(error=RuntimeError("smtp down")),
+        )
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert isinstance(exc_info.value.__cause__, RuntimeError)
+
 
 # ---------------------------------------------------------------------------
-# (b) Deny verdict raises non-retryable ApplicationError
+# The id-only evaluate path is gone
 # ---------------------------------------------------------------------------
 
 
-class TestDenyVerdict:
-    async def test_deny_raises_non_retryable_application_error(self) -> None:
-        # raise_on_deny=False -> receipt-based deny path
-        async with deny_all(raise_on_deny=False) as chio:
-            token = await _mint_token(
-                chio,
-                subject="agent:alice",
-                scope=_scope_for_tools("send_email"),
-            )
-            grant = WorkflowGrant(
-                workflow_id="wf-1",
-                token=token,
-                tool_server="srv",
-            )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
-            interceptor.register_workflow_grant(grant)
+class TestIdOnlyPathRemoved:
+    async def test_contract_double_never_sees_id_only_calls(self) -> None:
+        chio = MediatedContractClient()
+        _, inbound, _ = await _wired(chio, "send_email")
 
-            next_interceptor = _NextInterceptor()
-            inbound = _ChioInboundInterceptor(next_interceptor, interceptor)
+        await _run(inbound, "send_email")
+        with pytest.raises(ApplicationError):
+            await _run(inbound, "not_granted")
 
-            info = _default_info(activity_type="send_email")
-            with _patched_activity_info(info):
-                with pytest.raises(ApplicationError) as exc_info:
-                    await inbound.execute_activity(_make_input("payload"))
+        assert ID_ONLY_METHODS.isdisjoint(chio.methods())
+
+    @respx.mock
+    async def test_real_client_drives_mediated_routes_only(self) -> None:
+        contract = MediatedContractClient()
+        base = "http://sidecar.test"
+
+        def _json(request: httpx.Request) -> dict[str, Any]:
+            return json.loads(request.content)
+
+        def _bearer(request: httpx.Request) -> str:
+            return request.headers.get("authorization", "").removeprefix("Bearer ")
+
+        evaluate = respx.post(f"{base}/v1/evaluate").mock(
+            side_effect=lambda request: httpx.Response(
+                200,
+                json=contract.reserve(
+                    capability=_json(request)["capability"],
+                    tool_server=_json(request)["tool_server"],
+                    tool_name=_json(request)["tool_name"],
+                    parameters=_json(request)["parameters"],
+                    request_id=_json(request)["request_id"],
+                ),
+            )
+        )
+        start = respx.post(f"{base}/v1/caller/start").mock(
+            side_effect=lambda request: httpx.Response(
+                200,
+                json=contract.start(
+                    control_token=_bearer(request),
+                    execution_nonce=_json(request)["execution_nonce"],
+                    arguments=_json(request)["arguments"],
+                ),
+            )
+        )
+        report = respx.post(f"{base}/v1/caller/report").mock(
+            side_effect=lambda request: httpx.Response(
+                200,
+                json=contract.report(
+                    control_token=_bearer(request),
+                    authorization=_json(request)["authorization"],
+                    report=_json(request)["report"],
+                ),
+            )
+        )
+        advisory = respx.post(f"{base}/v1/evaluate/advisory").mock(
+            return_value=httpx.Response(500)
+        )
+
+        async with ChioClient(base) as client:
+
+            async def _id_only(**_kwargs: Any) -> Any:
+                raise AssertionError("the id-only evaluate path must never be called")
+
+            client.evaluate_tool_call = _id_only  # type: ignore[method-assign]
+            token = await contract.create_capability(
+                subject="agent:alice", scope=_scope_for_tools("send_email")
+            )
+            interceptor = ChioActivityInterceptor(
+                executor=contract.executor,
+                control_token=CONTROL_TOKEN,
+                chio_client=client,
+                clock_ms=lambda: FIXED_NOW_MS,
+            )
+            interceptor.register_workflow_grant(
+                WorkflowGrant(workflow_id="wf-1", token=token, tool_server="srv")
+            )
+            downstream = _NextInterceptor(result={"sent": True})
+            result = await _run(
+                _ChioInboundInterceptor(downstream, interceptor), "send_email", "hi"
+            )
+
+        assert result == {"sent": True}
+        assert evaluate.call_count == 1
+        assert start.call_count == 1
+        assert report.call_count == 1
+        assert not advisory.called
+        assert contract.open_holds == set()
+        assert start.calls.last.request.headers["authorization"] == f"Bearer {CONTROL_TOKEN}"
+
+
+# ---------------------------------------------------------------------------
+# Deny, pending approval and every error stop the activity
+# ---------------------------------------------------------------------------
+
+
+class TestDenyAndFailClosed:
+    async def test_reservation_deny_is_non_retryable_and_never_starts(self) -> None:
+        chio = MediatedContractClient()
+        interceptor, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "write_file", "payload")
 
         err = exc_info.value
         assert err.non_retryable is True
         assert err.type == DENIED_ERROR_TYPE
         assert "Chio capability denied" in str(err)
-        assert not next_interceptor.called
-
-        # Deny receipt is recorded even though the activity did not run.
+        assert not downstream.called
+        assert chio.methods() == ["evaluate_tool_call_mediated"]
         receipt = interceptor.workflow_receipt("wf-1", "run-1")
         assert receipt is not None
         assert receipt.deny_count == 1
-        assert receipt.allow_count == 0
-        assert receipt.steps[0].receipt.is_denied
+        assert receipt.steps[0].reservation_receipt_id is None
 
-    async def test_deny_from_403_raises_non_retryable(self) -> None:
-        # raise_on_deny=True -> mock raises ChioDeniedError that the
-        # interceptor translates to a non-retryable ApplicationError.
-        async with deny_all(reason="no write perms", guard="ScopeGuard") as chio:
-            token = await _mint_token(
-                chio,
-                subject="agent:alice",
-                scope=_scope_for_tools("send_email"),
-            )
-            grant = WorkflowGrant(
-                workflow_id="wf-1",
-                token=token,
-                tool_server="srv",
-            )
-            interceptor = ChioActivityInterceptor(chio_client=chio)
-            interceptor.register_workflow_grant(grant)
+    async def test_pending_approval_stops_the_activity(self) -> None:
+        chio = MediatedContractClient(policy=lambda _tool, _cap: "pending_approval")
+        _, inbound, downstream = await _wired(chio, "send_email")
 
-            inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
-            info = _default_info(activity_type="send_email")
-            with _patched_activity_info(info):
-                with pytest.raises(ApplicationError) as exc_info:
-                    await inbound.execute_activity(_make_input())
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
 
-        err = exc_info.value
-        assert err.non_retryable is True
-        assert err.type == DENIED_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert exc_info.value.type == DENIED_ERROR_TYPE
+        assert not downstream.called
+        assert chio.methods() == ["evaluate_tool_call_mediated"]
+
+    async def test_reservation_403_records_synthetic_deny(self) -> None:
+        chio = MediatedContractClient(policy=lambda _tool, _cap: "deny_403")
+        interceptor, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.non_retryable is True
+        assert exc_info.value.type == DENIED_ERROR_TYPE
+        assert not downstream.called
         receipt = interceptor.workflow_receipt("wf-1", "run-1")
         assert receipt is not None
-        assert receipt.deny_count == 1
-        assert receipt.allow_count == 0
         assert receipt.steps[0].receipt.is_denied
-        assert receipt.steps[0].receipt.id
+        assert receipt.steps[0].receipt.metadata["synthetic"] is True
 
+    async def test_start_deny_stops_the_activity(self) -> None:
+        chio = MediatedContractClient()
+        chio.start_error = ChioDeniedError("denied", guard="BudgetGuard", reason="over budget")
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == DENIED_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            ChioTimeoutError("reserve reply lost"),
+            ChioValidationError("Invalid caller reservation contract"),
+            RuntimeError("unexpected client failure"),
+        ],
+    )
+    async def test_reservation_errors_deny_non_retryably(self, error: Exception) -> None:
+        chio = MediatedContractClient()
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        async def _fail(**_kwargs: Any) -> dict:
+            raise error
+
+        chio.evaluate_tool_call_mediated = _fail  # type: ignore[method-assign]
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+        assert ID_ONLY_METHODS.isdisjoint(chio.methods())
+
+    async def test_unreachable_sidecar_denies_and_allows_temporal_retry(self) -> None:
+        chio = MediatedContractClient()
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        async def _fail(**_kwargs: Any) -> dict:
+            raise ChioConnectionError("connection refused")
+
+        chio.evaluate_tool_call_mediated = _fail  # type: ignore[method-assign]
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is False
+        assert not downstream.called
+
+    @pytest.mark.parametrize(
+        "error",
+        [ChioTimeoutError("lost start reply"), ChioValidationError("bad start")],
+    )
+    async def test_start_errors_deny_non_retryably(self, error: Exception) -> None:
+        chio = MediatedContractClient()
+        chio.start_error = error
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+
+    @pytest.mark.parametrize(
+        "override",
+        [
+            {"kernel_public_key": "07" * 32},
+            {
+                "executor": {
+                    "executor_id": "someone-else",
+                    "public_key": "01" * 32,
+                    "key_epoch": 1,
+                }
+            },
+            {"not_before_unix_ms": FIXED_NOW_MS + 1},
+            {"expires_at_unix_ms": FIXED_NOW_MS},
+        ],
+    )
+    async def test_unbound_or_expired_authorization_never_runs(
+        self, override: dict[str, Any]
+    ) -> None:
+        chio = MediatedContractClient()
+        chio.authorization_overrides = override
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+
+    async def test_authorization_for_another_tool_never_runs(self) -> None:
+        chio = MediatedContractClient()
+        original_start = chio.start
+
+        def _retarget(**kwargs: Any) -> dict[str, Any]:
+            started = original_start(**kwargs)
+            started["authorization"]["authorization"]["invocation"]["tool_name"] = "other"
+            return started
+
+        chio.start = _retarget  # type: ignore[method-assign]
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert not downstream.called
+
+    async def test_forged_kernel_signature_never_runs(self) -> None:
+        chio = MediatedContractClient()
+        original_start = chio.start
+
+        def _forge(**kwargs: Any) -> dict[str, Any]:
+            started = original_start(**kwargs)
+            started["authorization"]["signature"] = "0" * 128
+            return started
+
+        chio.start = _forge  # type: ignore[method-assign]
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert not downstream.called
+
+
+class TestConfiguration:
+    async def test_missing_workflow_grant_raises_config_error(self) -> None:
+        chio = MediatedContractClient()
+        interceptor = contract_interceptor(chio)
+        inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
+        info = _default_info(activity_type="send_email", workflow_id="wf-missing")
+        with _patched_activity_info(info):
+            with pytest.raises(ChioTemporalConfigError):
+                await inbound.execute_activity(_make_input())
+        assert chio.calls == []
+
+    def test_executor_and_control_token_are_required(self) -> None:
+        chio = MediatedContractClient()
+        with pytest.raises(ChioTemporalConfigError):
+            ChioActivityInterceptor(
+                executor=object(),  # type: ignore[arg-type]
+                control_token=CONTROL_TOKEN,
+                chio_client=chio,
+            )
+        with pytest.raises(ChioTemporalConfigError):
+            ChioActivityInterceptor(
+                executor=chio.executor, control_token="", chio_client=chio
+            )
+
+
+class TestDenyReceiptHelpers:
     def test_deny_receipt_preserves_schema_valid_sidecar_receipt_id(self) -> None:
         sidecar_receipt_id = "a" * 64
         info = _default_info(activity_type="send_email")
@@ -450,143 +700,69 @@ class TestDenyVerdict:
         assert not _is_sha256_hex("not-a-digest")
         assert not _is_sha256_hex("a" * 63)
 
-    async def test_missing_workflow_grant_raises_config_error(self) -> None:
-        """Activities with no registered grant must be refused before dispatch.
-
-        :class:`ChioTemporalConfigError` is used so the failure is a
-        configuration issue surfaced to the operator, not a kernel
-        denial. Temporal's worker treats unhandled exceptions from an
-        interceptor as a (retryable) activity failure unless they are
-        :class:`ApplicationError`; callers that want non-retryable
-        behaviour should raise from their own wiring.
-        """
-        from chio_temporal import ChioTemporalConfigError
-
-        async with allow_all() as chio:
-            interceptor = ChioActivityInterceptor(chio_client=chio)
-            # Deliberately no register_workflow_grant.
-
-            inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
-            info = _default_info(activity_type="send_email", workflow_id="wf-missing")
-            with _patched_activity_info(info):
-                with pytest.raises(ChioTemporalConfigError):
-                    await inbound.execute_activity(_make_input())
-
-
 # ---------------------------------------------------------------------------
-# (c) Attenuated activity-level grant enforcement
+# Attenuated activity-level grant enforcement
 # ---------------------------------------------------------------------------
 
 
 class TestAttenuatedGrant:
     async def test_activity_override_narrows_scope_and_is_enforced(self) -> None:
-        chio = AttenuatingMockChioClient()
-        chio.set_policy(_scope_aware_policy(chio))
-
-        parent = await _mint_token(
-            chio,
-            subject="agent:parent",
-            scope=_scope_for_tools("search", "write"),
+        chio = MediatedContractClient()
+        parent = await chio.create_capability(
+            subject="agent:parent", scope=_scope_for_tools("search", "write")
         )
-        parent_grant = WorkflowGrant(
-            workflow_id="wf-1",
-            token=parent,
-            tool_server="srv",
-        )
-
-        # Child scope only authorises "search". Register it via the
-        # override hook so the interceptor swaps it in for the
-        # ``write`` activity type.
-        child_scope = _scope_for_tools("search")
+        parent_grant = WorkflowGrant(workflow_id="wf-1", token=parent, tool_server="srv")
         child_grant = await parent_grant.attenuate_for_activity(
-            chio, new_scope=child_scope
+            chio, new_scope=_scope_for_tools("search")
         )
 
-        interceptor = ChioActivityInterceptor(chio_client=chio)
+        interceptor = contract_interceptor(chio)
         interceptor.register_workflow_grant(parent_grant)
-        interceptor.register_activity_grant_override(
-            "write", lambda _info: child_grant
-        )
+        interceptor.register_activity_grant_override("write", lambda _info: child_grant)
+        downstream = _NextInterceptor()
+        inbound = _ChioInboundInterceptor(downstream, interceptor)
 
-        inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
-
-        # The ``write`` activity now runs under the attenuated grant
-        # that does NOT include ``write`` -- must be denied.
         info = _default_info(activity_type="write", activity_id="act-write")
         with _patched_activity_info(info):
             with pytest.raises(ApplicationError) as exc_info:
                 await inbound.execute_activity(_make_input("/tmp/x"))
 
-        err = exc_info.value
-        assert err.non_retryable is True
-        assert err.type == DENIED_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert exc_info.value.type == DENIED_ERROR_TYPE
+        assert not downstream.called
+        assert chio.calls[0].capability["id"] == child_grant.capability_id
 
     async def test_attenuation_rejects_broader_scope(self) -> None:
-        chio = MockChioClient()
-        parent = await _mint_token(
-            chio,
-            subject="agent:parent",
-            scope=_scope_for_tools("search"),
+        chio = MediatedContractClient()
+        parent = await chio.create_capability(
+            subject="agent:parent", scope=_scope_for_tools("search")
         )
-        parent_grant = WorkflowGrant(
-            workflow_id="wf-1",
-            token=parent,
-            tool_server="srv",
-        )
+        parent_grant = WorkflowGrant(workflow_id="wf-1", token=parent, tool_server="srv")
 
-        # Broader scope -- must raise ChioValidationError.
-        from chio_sdk.errors import ChioValidationError
-
-        broader = _scope_for_tools("search", "write")
         with pytest.raises(ChioValidationError):
-            await parent_grant.attenuate_for_activity(chio, new_scope=broader)
+            await parent_grant.attenuate_for_activity(
+                chio, new_scope=_scope_for_tools("search", "write")
+            )
 
     async def test_activity_override_rejects_scope_outside_parent(self) -> None:
-        """Override hooks that return a non-subset grant must be refused.
-
-        A hook that smuggles in a broader-than-workflow grant (e.g. by
-        bypassing attenuate_for_activity) is caught by the interceptor's
-        subset check before any evaluation occurs.
-        """
-        chio = MockChioClient()
-        chio.set_policy(_scope_aware_policy(chio))
-
-        parent = await _mint_token(
-            chio,
-            subject="agent:parent",
-            scope=_scope_for_tools("search"),
+        chio = MediatedContractClient()
+        parent: CapabilityToken = await chio.create_capability(
+            subject="agent:parent", scope=_scope_for_tools("search")
         )
-        parent_grant = WorkflowGrant(
-            workflow_id="wf-1",
-            token=parent,
-            tool_server="srv",
-        )
-
-        # Craft a rogue grant whose scope exceeds the parent's. This
-        # should never happen via attenuate_for_activity, but a buggy
-        # hook could produce one.
-        rogue_token = parent.model_copy(
-            update={"scope": _scope_for_tools("search", "write")}
-        )
+        parent_grant = WorkflowGrant(workflow_id="wf-1", token=parent, tool_server="srv")
         rogue_grant = WorkflowGrant(
             workflow_id="wf-1",
-            token=rogue_token,
+            token=parent.model_copy(update={"scope": _scope_for_tools("search", "write")}),
             tool_server="srv",
         )
 
-        interceptor = ChioActivityInterceptor(chio_client=chio)
+        interceptor = contract_interceptor(chio)
         interceptor.register_workflow_grant(parent_grant)
-        interceptor.register_activity_grant_override(
-            "write", lambda _info: rogue_grant
-        )
-
+        interceptor.register_activity_grant_override("write", lambda _info: rogue_grant)
         inbound = _ChioInboundInterceptor(_NextInterceptor(), interceptor)
+
         info = _default_info(activity_type="write")
         with _patched_activity_info(info):
-            with pytest.raises(Exception) as exc_info:
+            with pytest.raises(ChioTemporalConfigError):
                 await inbound.execute_activity(_make_input())
-
-        # ChioTemporalConfigError expected; not an ApplicationError.
-        from chio_temporal import ChioTemporalConfigError
-
-        assert isinstance(exc_info.value, ChioTemporalConfigError)
+        assert chio.calls == []
