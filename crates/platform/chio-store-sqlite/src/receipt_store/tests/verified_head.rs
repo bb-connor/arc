@@ -1676,6 +1676,74 @@ fn divergent_newly_projected_row_is_rejected_before_head_advance(
         "the head must not advance past a divergent newly-projected row"
     );
 
+    // The rejection poisons the head. After the faithful projection is
+    // restored and the head is reseeded, the next clean append must land at
+    // last-clean max_seq + 1, which fails if the reseeded head drifted past
+    // the rolled-back row.
+    let connection = store.connection()?;
+    connection.execute_batch(
+        r#"
+        DROP TRIGGER IF EXISTS chio_tool_receipts_project_claim_log_entry;
+        CREATE TRIGGER chio_tool_receipts_project_claim_log_entry
+        AFTER INSERT ON chio_tool_receipts
+        BEGIN
+            INSERT INTO claim_receipt_log_entries (
+                receipt_id,
+                receipt_kind,
+                source_seq,
+                timestamp,
+                capability_id,
+                session_id,
+                parent_request_id,
+                request_id,
+                subject_key,
+                issuer_key,
+                tool_server,
+                tool_name,
+                raw_json
+            ) VALUES (
+                NEW.receipt_id,
+                'tool_receipt',
+                NEW.seq,
+                NEW.timestamp,
+                NEW.capability_id,
+                NULL,
+                NULL,
+                NULL,
+                NEW.subject_key,
+                NEW.issuer_key,
+                NEW.tool_server,
+                NEW.tool_name,
+                NEW.raw_json
+            );
+        END;
+        "#,
+    )?;
+    drop(connection);
+
+    let clean = sample_receipt_with_keypair("rcpt-newproj-clean", 5, &keypair);
+    let poisoned = store
+        .append_chio_receipt_returning_seq(&clean)
+        .err()
+        .ok_or("a poisoned head must refuse appends until it is reseeded")?;
+    assert!(
+        poisoned
+            .to_string()
+            .contains("verified head is unavailable"),
+        "expected the poisoned-head refusal, got {poisoned:?}"
+    );
+    store.reseed_verified_head()?;
+    let clean_seq = store.append_chio_receipt_returning_seq(&clean)?;
+    assert_eq!(clean_seq, max_seq_before + 1);
+    store.flush_receipt_writes()?;
+    let connection = store.connection()?;
+    let (count, max_seq) = claim_log_delta_count_and_max_seq(&connection, 0)?;
+    assert_eq!((count, max_seq), (max_seq_before + 1, max_seq_before + 1));
+    let reference = seed_verified_head(&connection)?;
+    assert_eq!(reference.claim_log_count, count);
+    assert_eq!(reference.claim_log_max_seq, max_seq);
+    drop(connection);
+
     let _ = fs::remove_file(path);
     Ok(())
 }
