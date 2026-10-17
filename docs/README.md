@@ -171,7 +171,7 @@ The primary live release documents. Auditors and operators start here.
 - [Hermes Integration](integrations/HERMES.md) - wire Chio into the Hermes Agent via MCP server (Path A) or the native `chio-hermes` plugin (Path B)
 - [chio-adapter-base Integration](integrations/CHIO-ADAPTER-BASE.md) - shared security and receipt primitives every Chio Python adapter depends on
 - [Choosing the Redaction Boundary](integrations/CHOOSING_REDACTION_BOUNDARY.md) - decision tree for pre-evaluation vs post-tool-call redaction
-- [Adapter Migration Guide](integrations/MIGRATION_GUIDE.md) - adapter-author migration recipe for `chio-adapter-base 0.1.x` to `0.2.0`
+- [Writing a Chio Adapter](../sdks/python/chio-adapter-base/AUTHORING.md) - authoring guide for Python adapters on `chio-adapter-base`
 - [chio-adapter-base 0.2.0 Release Notes](integrations/RELEASE_NOTES_v0.2.0.md)
 
 ## Conformance and replay

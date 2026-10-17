@@ -64,15 +64,15 @@ PR #679 is the source-of-truth commit that bundles:
   byte-identical across 0.1.x and 0.2.0. Stay on
   `>=0.1.0,<0.2` until you touch the wrapper next.
 - Adapters that pass a custom `positional_table`: read
-  [`ADAPTER-MIGRATION.md` section 5](../../sdks/python/chio-adapter-base/ADAPTER-MIGRATION.md)
-  for the spread-the-default migration recipe.
+  [`AUTHORING.md` "Positional tables"](../../sdks/python/chio-adapter-base/AUTHORING.md)
+  for the spread-the-default recipe.
 
 ## Cross-links
 
 - Single source of truth (in-package CHANGELOG):
   [`sdks/python/chio-adapter-base/CHANGELOG.md`](../../sdks/python/chio-adapter-base/CHANGELOG.md)
-- Adapter-author migration recipe:
-  [`sdks/python/chio-adapter-base/ADAPTER-MIGRATION.md`](../../sdks/python/chio-adapter-base/ADAPTER-MIGRATION.md)
+- Adapter authoring guide:
+  [`sdks/python/chio-adapter-base/AUTHORING.md`](../../sdks/python/chio-adapter-base/AUTHORING.md)
 - Pattern selection (decision tree):
   [`docs/integrations/CHOOSING_REDACTION_BOUNDARY.md`](CHOOSING_REDACTION_BOUNDARY.md)
 - Integration overview and per-adapter pin matrix:

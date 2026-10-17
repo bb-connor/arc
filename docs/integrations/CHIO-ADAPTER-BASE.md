@@ -11,9 +11,9 @@ between the Chio sidecar contract and the framework integrations
 
 This page is for users browsing the Chio docs who want to know what
 `chio-adapter-base` is, why it exists, and which adapter consumes
-which primitive. Adapter authors who are migrating an existing
-adapter onto the helper should read
-`sdks/python/chio-adapter-base/ADAPTER-MIGRATION.md` instead.
+which primitive. Adapter authors who are writing an adapter
+on the helper should read
+`sdks/python/chio-adapter-base/AUTHORING.md` instead.
 
 ## 1. Purpose
 
@@ -151,7 +151,7 @@ The chio-default positional-name table
 policy). Adapters with custom tools pass their own table; that
 custom table REPLACES the default rather than extending it (this
 is the behaviour that shipped in v0.1.1 and that v0.3 now
-explicitly documents). See `ADAPTER-MIGRATION.md` section 5 for
+explicitly documents). See `AUTHORING.md` ("Positional tables") for
 the merge recipe when both the chio-default tools and custom
 tools need coverage from a single table.
 

@@ -52,8 +52,8 @@ answer constrains Q2.
 
 - README source of truth:
   [`sdks/python/chio-adapter-base/README.md`](../../sdks/python/chio-adapter-base/README.md#where-to-redact-pre-evaluation-vs-post-tool-call)
-- Adapter-author migration recipe:
-  [`sdks/python/chio-adapter-base/ADAPTER-MIGRATION.md`](../../sdks/python/chio-adapter-base/ADAPTER-MIGRATION.md)
+- Adapter authoring guide:
+  [`sdks/python/chio-adapter-base/AUTHORING.md`](../../sdks/python/chio-adapter-base/AUTHORING.md)
 - Integration overview and per-adapter pin matrix:
   [`docs/integrations/CHIO-ADAPTER-BASE.md`](CHIO-ADAPTER-BASE.md)
 - Release notes for the 0.2.0 helper hardening:
