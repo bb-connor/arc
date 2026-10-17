@@ -34,7 +34,9 @@ fn fixed_iat() -> chrono::DateTime<Utc> {
 
 fn signed_capability(audience: &str) -> (PasskeyCapability, PublicKey) {
     let backend = Ed25519Backend::new(Keypair::from_seed(&[0x31; 32]));
-    let public_key = backend.public_key().unwrap();
+    let public_key = backend
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
     let service = IssuerService::with_signer(audience, Arc::new(backend));
     let assertion = VerifiedAssertion {
         credential_id_b64: "AAAA".to_string(),
