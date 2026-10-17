@@ -394,22 +394,29 @@ mod tests {
 
         const ROUNDS: usize = 2_000;
         let hook = Arc::new(SanitizerHook::new());
+        let redaction = |details: &str| {
+            vec![GuardEvidence {
+                guard_name: "output-sanitizer".to_string(),
+                verdict: true,
+                details: Some(details.to_string()),
+            }]
+        };
         let calls = [
             (
                 serde_json::json!({"token": format!("ghp_{}", "a".repeat(36))}),
-                Some("secret_github_token"),
+                redaction("sanitizer detected 1 findings (secret_github_token:1)"),
             ),
             (
                 serde_json::json!({"contact": "alice@example.com"}),
-                Some("pii_email"),
+                redaction("sanitizer detected 1 findings (pii_email:1)"),
             ),
-            (serde_json::json!({"message": "nothing to see"}), None),
+            (serde_json::json!({"message": "nothing to see"}), Vec::new()),
         ];
         let barrier = Arc::new(Barrier::new(calls.len()));
 
         let workers: Vec<_> = calls
             .into_iter()
-            .map(|(response, expected_finding)| {
+            .map(|(response, expected_evidence)| {
                 let hook = Arc::clone(&hook);
                 let barrier = Arc::clone(&barrier);
                 std::thread::spawn(move || {
@@ -418,19 +425,7 @@ mod tests {
                     for _ in 0..ROUNDS {
                         barrier.wait();
                         let inspection = hook.inspect_with_evidence(&ctx, &response);
-                        let own = match expected_finding {
-                            Some(finding) => {
-                                inspection.evidence.len() == 1
-                                    && inspection.evidence[0].details.as_deref().is_some_and(
-                                        |details| {
-                                            details.contains(finding)
-                                                && details.contains("1 findings")
-                                        },
-                                    )
-                            }
-                            None => inspection.evidence.is_empty(),
-                        };
-                        if !own {
+                        if inspection.evidence != expected_evidence {
                             foreign += 1;
                         }
                     }
