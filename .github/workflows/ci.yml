@@ -324,6 +324,7 @@ jobs:
           run_gate bash scripts/tests/run-miri-crates.test.sh
           run_gate bash ./scripts/check-release-overflow.sh
           run_gate bash ./scripts/tests/check-release-overflow.test.sh
+          run_gate python3 scripts/tests/check-standalone-release-overflow.test.py
           finish_gates
 
       - name: Formal traceability gate
@@ -455,6 +456,12 @@ jobs:
           CARGO_BUILD_JOBS: "1"
           RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
         run: ./scripts/check-consumer-boundaries.sh
+
+      - name: Authenticated caller delivery
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: ./scripts/check-authenticated-caller-delivery.sh
 
       - name: chio-cli default build excludes iroh
         env:
