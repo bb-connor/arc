@@ -24,7 +24,7 @@ External standards carry a pin note. "Pin at build start" means the builder read
 
 ### 1.1 The product in one paragraph
 
-A company that exposes an MCP server or a paid HTTP API puts Chio in front of it. Chio accepts the caller's enterprise identity (an Okta Cross App Access ID-JAG from M1, a Microsoft Entra Agent ID token from M2), exchanges it for a short-lived, attenuating Chio capability rooted in that identity, mediates every tool call against the capability, and signs one receipt per call. The provider keeps the receipt for its own audit, billing reconciliation and disputes. From M2 the caller also gets its own copy of each receipt with the tool response. The provider can hand a customer tenant a receipt bundle, and the customer verifies it offline with an Apache-2.0 CLI that does not need network access or trust in the provider's database.
+A company that exposes an MCP server or a paid HTTP API puts Chio in front of it. Chio accepts the caller's enterprise identity (an Okta Cross App Access ID-JAG or an ordinary Microsoft Entra application token from M1, a Microsoft Entra Agent ID token from M2), exchanges it for a short-lived, attenuating Chio capability rooted in that identity, mediates every tool call against the capability, and signs one receipt per call. The provider keeps the receipt for its own audit, billing reconciliation and disputes. From M2 the caller also gets its own copy of each receipt with the tool response. The provider can hand a customer tenant a receipt bundle, and the customer verifies it offline with an Apache-2.0 CLI that does not need network access or trust in the provider's database.
 
 ### 1.2 Why the relying party
 
@@ -51,12 +51,12 @@ It turns the recommended designs A-3 (anchored roots), D-2 (terminal receipt plu
 | F7 | P-256 is allowed through a remote KMS signer. Ed25519 stays the default. | AWS KMS backend in M2 (F11). P-256 verification moves into default builds in M2 (section 10.1). |
 | F8 | No escrow and no custody. | Chio never holds wallet keys, funds or payment instruments. x402 settlement goes from the caller's wallet to the provider's `payTo` through a third-party facilitator. |
 | F9 | `pdp_decision` receipts are signed as a distinct class. | `receipt_kind = "pdp_decision"`, `boundary_class = "prevent_external"`, `trust_level = "delegated"` (section 7.9). |
-| F10 | Pilots run on what is already qualified (`chio mcp serve-http`, current receipts, the current verifier) in parallel with M1. M1 does not gate discovery. | Section 13.0. |
-| F11 | Apply the second-line cuts: the caller copy in `_meta.chioReceipt` moves to M2; AWS KMS P-256 moves to M2, M1 uses seed-file keys only and makes no custody claim; Entra Agent ID moves to M2, so ID-JAG is the only external IdP in M1. M1 is re-sized. | Sections 12, 13. |
+| F11 | Apply the second-line cuts: the caller copy in `_meta.chioReceipt` moves to M2; AWS KMS P-256 moves to M2, M1 uses seed-file keys only and makes no custody claim; Entra Agent ID moves to M2. M1 is re-sized. | Sections 12, 13. |
 | F12 | Entra Continuous Access Evaluation is not scheduled before M3 completes and stays unscheduled roadmap. | Section 3.2. |
 | F13 | Public docs and the README state the hosted-edge qualified-label suspension for the whole re-qualification window. | Section 10.10. |
+| F14 | Keep useful paths; no compat hacks. Chio has no backward compatibility and every format is v1, but a path that is useful and planned for v1 is kept and mapped onto anchored roots. Only hacks and duplicates are deleted. | The `--auth-token` static bearer stays as the `operator_static_bearer` kind and generic Entra intake stays as the `entra_jwt` kind, both in M1 (D1, D14). Entra Agent ID is added in M2 beside `entra_jwt`. Section 2.4 records the keep-or-delete decision for every existing `serve-http` path. |
 
-F10 to F13 are recorded as: Decided 2026-10-17 (founder).
+F11 to F13 are recorded as: Decided 2026-10-17 (founder). F14 is recorded as: Decided 2026-10-17 (founder): keep useful paths; no compat hacks.
 
 ### 2.2 Coordinator decisions
 
@@ -64,11 +64,11 @@ Each row below is recorded as: Decided 2026-10-17 (coordinator call; founder may
 
 | # | Decision | Where it lands |
 |---|---|---|
-| D1 | The relying-party behaviour replaces current `serve-http` issuance for every deployment. No dual paths. Self-exchange, seed-derived federation subject keys, direct session issuance, the static shared bearer mode, the enterprise provider registry file and the per-store database path flags are deleted for everyone. The qualified hosted-edge lane re-runs inside M1; the qualified label is suspended until it passes. | Sections 6, 7.2, 10.5, 12 (M1), 13 |
+| D1 | The relying-party behaviour replaces current `serve-http` issuance for every deployment. No dual paths: every surviving authentication path ends in an exchange-issued anchored root. Under F14 the useful paths are kept and mapped (static bearer, generic OIDC JWT, introspection, generic Entra, the local AS login and re-exchange, trust-control as an exchange signer), and the hacks and duplicates are deleted (seed-derived federation subject keys, session issuance that bypasses the exchange, the `serve-http` enterprise provider registry file and provider-profile flag, the per-store database path flags). Section 2.4 lists each. The qualified hosted-edge lane re-runs inside M1; the qualified label is suspended until it passes. Revised: Decided 2026-10-17 (founder): keep useful paths; no compat hacks. | Sections 2.4, 6, 7.2, 10.5, 12 (M1), 13 |
 | D2 | Committed receipts are protocol-wide: one receipt format. Every producer gets a salt source from the host RNG through the existing `Rng` seam, including the FFI and WASM signers. Inline-versus-committed disclosure per tool and per field lives in the signed root policy, so a verifier can see that plaintext was authorized. Default is committed. | Sections 7.6, 7.7, 10.2, 10.3, 13 |
 | D3 | Revocation v1 extends the existing SQLite revocation store inside the provider process and is read in the admission transaction. Provider-side revocation and IdP-driven expiry land in M1. Caller-side revocation of its own delegated descendants, by a signed revocation request submitted to the provider, lands in M2. | Sections 7.11, 8.2, 10.7 |
 | D4 | v1 is single-instance per provider. This is a deployment limit. A shared replay, root and revocation store is roadmap. | Sections 6.1, 8.3, 9.5 |
-| D5 | The 300 s IdP-revocation claim covers ID-JAG only. Entra (M2): one root per Entra token keyed by `uti`, root lifetime capped at `min(300 s, token exp)`, no re-exchange of the same token. IdP revocation of an Entra principal takes effect at token expiry (about one hour). | Sections 6.3, 9.1, 12 |
+| D5 | The 300 s IdP-revocation claim covers ID-JAG only. Entra (`entra_jwt` from M1, `entra_agent_id` from M2): one root per Entra token keyed by `uti`, root lifetime capped at `min(300 s, token exp)`, no re-exchange of the same token. IdP revocation of an Entra principal takes effect at token expiry (about one hour). | Sections 6.3, 9.1, 12 |
 | D6 | Signing preimage: a fixed-size, domain-separated signing wrapper for every Chio canonical-JSON signature. PROTOCOL text, schemas and conformance vectors land in M0. | Sections 7.0, 10.1, 13 |
 | D7 | ID-JAG retention is opt-in per root policy rule, default off. M0 schemas carry the optional slot. | Sections 7.3, 7.4, 11.4 |
 | D8 | Export scope: "one customer" means one tenant. The provider keeps an HMAC-keyed tenant index with no plaintext tenant ids. Caller bundles include salts only for that tenant's receipts and principals. | Sections 7.12, 10.7 |
@@ -77,7 +77,7 @@ Each row below is recorded as: Decided 2026-10-17 (coordinator call; founder may
 | D11 | Every MCP tool response carries the signed receipt and the caller's salts in `_meta.chioReceipt` by default, from M2 (F11). | Section 7.6 |
 | D12 | Accept a customer-hosted root exchange ADR in M0. Its outline is section 15. | Sections 10.10, 15 |
 | D13 | In v1, caps must be denominated in the same asset as the tool price. No conversion and no peg. | Sections 6.7, 8.6 |
-| D14 | Accept Entra Agent ID agent identities only in v1. Generic Entra workload or application tokens deny, including through the `oidc_jwt` kind. | Sections 7.2, 8.1 |
+| D14 | Entra is admitted through two dedicated kinds. `entra_jwt` (M1) admits ordinary Entra application and workload tokens, with the principal taken from `oid`, else `sub`, else `azp`, `appid` or `client_id` (today's `JwtProviderProfile::AzureAd` mapping). `entra_agent_id` (M2) admits Entra Agent ID agent identities and is added beside `entra_jwt`, not in place of it. An `oidc_jwt` rule naming a Microsoft Entra issuer rejects at load, so every Entra token is held to the D5 rules. Revised: Decided 2026-10-17 (founder): keep useful paths; no compat hacks. | Sections 6.3, 7.2, 8.1 |
 | D15 | This spec stays in `docs/superpowers/specs/`, with milestone labels instead of calendar dates. | Header |
 | D16 | The `SigningBackend` collapse (`public_key() -> Result<PublicKey>`, `algorithm()` and `current_public_key()` deleted, per the parallel lead's plan) folds into M0 as its only Rust code item. It is byte-neutral and lands as one PR before M1 item 1. The signing wrapper, the `sign_canonical_bytes` replacement, the committed receipt fields and `root_anchor` stay in M1; `ClassicalSigner` and KMS stay in M2. | Sections 10.1, 12 (M0), 13 |
 | D17 | M0 code starts after #1496 and #1489 land. Any change to `chio.receipt.v1` bytes or the capability signing bytes is coordinated with the parallel lead before its PR opens, because #1489 (DPoP) and coop2c (revocation roots) produce signed artifacts whose fixtures regenerate with it. | Sections 12 (M0), 13.3 |
@@ -93,11 +93,30 @@ D16 rationale: the wrapper and committed receipts both replace the trait's canon
 - **Readiness.** With one instance (D4) there is no failover. Readiness only signals that every call is being denied.
 - **M1 custody.** With seed-file keys only in M1 (F11), an attacker who reads the seed files can forge receipts and roots for any time until the key is replaced. Section 9.5 states this, and M1 makes no key-custody claim.
 
+### 2.4 Keep-or-delete decisions for existing `serve-http` paths (F14)
+
+Usage counts are from `git grep` on `origin/main` at `6c76fafe95`, outside `docs/superpowers/`.
+
+| Path today | Used by | Decision | Reason |
+|---|---|---|---|
+| `--auth-token` static bearer (`RemoteAuthMode::StaticBearer`) | progressive tutorial, cpp, js, go and python conformance peers, TypeScript, Go, C++ and Python SDK tests, five example networks, `examples/docker`, `scripts/check-sdk-publication-examples.sh`, `scripts/check-sdk-release.sh` | keep and map: `operator_static_bearer` (M1) | dev, test and conformance on-ramp; the token resolves to an operator-issued root naming an operator-configured principal |
+| Generic Entra intake (`JwtProviderProfile::AzureAd`) | `chio-mcp-remote` bearer path and tests | keep and map: `entra_jwt` (M1) | dominant enterprise IdP; most agents present ordinary Entra application tokens |
+| Generic OIDC JWT bearer (`--auth-jwt-public-key`, discovery) | operator runbook onboarding, operations and security docs, `chio-mcp-remote` tests | keep and map: `oidc_jwt` (M1) | standard bearer intake for non-Entra issuers |
+| Introspection bearer (`--auth-introspection-url`) | operations and reference docs, `chio-mcp-remote` tests | keep and map: `oauth_introspection` (M1) | opaque-token issuers have no other path |
+| Local AS `authorization_code` login | cpp, js, go and python conformance peers, Go, Python and C++ SDK auth clients, `integrations/mcp-adapter` | keep and map: `chio_local_as` (M1) | local users and the conformance auth scenarios |
+| Local AS token re-exchange (RFC 8693, `subject_token_type` access token) | `auth-token-exchange-initialize` in the cpp, js and go peers, Go and Python SDK `exchange_token`, the QUALIFICATION hosted-edge row | keep and map: `chio_local_as` re-exchange (M1) | resource and scope narrowing of a local AS token; the exchanged token gets a narrower root (section 7.2) |
+| Pinned remote trust-control authority (`--control-url`, `--control-authority-public-key`) | `deploy/reference-runtime` systemd unit, `scripts/check-sdk-publication-examples.sh`, example networks, operator runbook | keep and map: `--exchange-signer trust-control` (M1) | operators already run `serve-http` against trust-control; it becomes a signer for exchange roots |
+| Session capability issuance that bypasses the exchange (`configure_capability_authority` path in `factory.rs`) | `serve-http` internals only | delete | a second issuance path beside the exchange, excluded by D1 |
+| Seed-derived federation subject keys (`derive_federated_agent_keypair`, `derive_enterprise_subject_key` in `chio-mcp-remote`) | `serve-http` session identity and resume only | delete | anyone holding the authority seed can derive every principal's key; session-held roots (section 6.5) replace it. The separate copy in `chio-control-plane` SCIM lifecycle is outside this spec |
+| `serve-http` `--enterprise-providers-file` | `chio-mcp-remote` tests | delete for `serve-http` | duplicates root policy rules. Trust-control's provider registry and admin are unchanged |
+| `serve-http` `--auth-jwt-provider-profile` | `chio-mcp-remote` and `chio-cli` tests | delete | duplicates the rule's `anchor_kind`; the AzureAd claim mapping moves into `entra_jwt` |
+| `serve-http` per-store path flags (`--session-db`, `--receipt-db`, `--revocation-db`, `--authority-db`, `--budget-db` and the others) | `deploy/reference-runtime`, the SDK publication script, example networks | delete for `serve-http`; callers move to `--state-dir` | a second way to place stores; the single-instance lock needs one directory. `chio trust serve` flags are unchanged |
+
 ## 3. Goals, non-goals, anti-goals
 
 ### 3.1 Goals
 
-1. **G1 External roots.** ID-JAG (M1) and Entra Agent ID (M2) tokens become verified delegation roots at the MCP edge, recorded in every capability and receipt derived from them.
+1. **G1 External roots.** ID-JAG and ordinary Entra tokens (M1) and Entra Agent ID tokens (M2) become verified delegation roots at the MCP edge, recorded in every capability and receipt derived from them.
 2. **G2 Key custody (M2).** Receipts and exchange-issued roots can be signed by an AWS KMS key the process never holds.
 3. **G3 Privacy by default.** Every Chio receipt carries salted commitments to arguments and results. Plaintext appears in a receipt only where the signed root policy authorizes it for that tool and field (M2).
 4. **G4 Interop (M2).** Incumbent gateways call Chio through an AuthZEN 1.0 decision endpoint. SIEMs ingest OCSF 1.9 API Activity events carrying the delegation and record-integrity objects.
@@ -134,7 +153,7 @@ These are outcomes the design must actively prevent.
 
 ### 4.1 Tool provider (platform or security engineer at the company running the MCP server or API)
 
-- P1. As the provider, I configure my callers' Okta (M1) and Entra (M2) tenants once in a signed root policy, and any agent from those tenants can call my tools under a ceiling I set, without per-agent provisioning.
+- P1. As the provider, I configure my callers' Okta and Entra tenants (M1; Entra Agent ID from M2) once in a signed root policy, and any agent from those tenants can call my tools under a ceiling I set, without per-agent provisioning.
 - P2. As the provider, I see for every call which IdP authenticated which principal, under which root policy, through which delegation chain, and what my server returned, in a record I can show my auditor.
 - P3. (M2) As the provider, my receipt signing key lives in AWS KMS, so a compromise of the edge host does not let the attacker forge past receipts.
 - P4. As the provider, my receipt store holds no customer plaintext unless my signed policy says so for a named tool and field.
@@ -143,14 +162,15 @@ These are outcomes the design must actively prevent.
 - P7. (M2) As the provider, my SIEM receives OCSF events without plaintext arguments.
 - P8. (M3) As the provider, I price a tool per call and Chio refuses to run it until an x402 payment settles to my address.
 - P9. As the provider, I export a bundle for one tenant containing only that tenant's receipts.
+- P10. As the provider, for development, tests and conformance I start `serve-http` with a static `--auth-token` that maps to one principal I name in the root policy, and the receipts say that identity is operator-attested.
 
 ### 4.2 Calling agent's operator (the company whose agents call the provider)
 
-- C1. As the caller, my agents use our Okta (M1) or Entra (M2) identity. I do not create accounts at every provider.
+- C1. As the caller, my agents use our Okta or Entra identity (M1; Entra Agent ID from M2). I do not create accounts at every provider.
 - C2. (M2) As the caller, my orchestrator receives a capability from the provider and delegates a narrower one to a sub-agent, and the provider enforces the narrower one.
 - C3. (M2) As the caller, each tool response carries the signed receipt and the opening material for my own call, so I keep my copy without asking the provider later.
 - C4. As the caller, when the provider bills me or disputes a call, I verify the provider's bundle offline and see whether each call was authorized, which of my principals it was attributed to, and whether the result matches what I received.
-- C5. As the caller, I disable a principal in Okta and the provider stops honoring capabilities rooted in it within 300 s plus the configured clock skew. For Entra principals (M2) I know the bound is the token's expiry.
+- C5. As the caller, I disable a principal in Okta and the provider stops honoring capabilities rooted in it within 300 s plus the configured clock skew. For Entra principals I know the bound is the token's expiry.
 - C6. (M2) As the caller, I revoke a capability I delegated to a sub-agent by sending the provider a signed revocation request.
 
 ### 4.3 Auditor (internal audit at either party, or an external assessor)
@@ -207,13 +227,13 @@ Line numbers are at `d0482967b8`.
  |                                                                             |
  |  [local AS]  /oauth/token  (confidential client authentication)            |
  |     jwt-bearer grant (ID-JAG)                                               |
- |     token-exchange (ID-JAG in M1, Entra in M2; capability out)              |
+ |     token-exchange (ID-JAG, Entra, local AS re-exchange; capability out)    |
  |     authorization_code (local AS users)                                     |
  |                                  |                                          |
- |  [bearer intake]  OIDC JWT / introspection (M1), Entra (M2)                 |
+ |  [bearer intake]  static bearer, OIDC JWT, introspection, Entra (M1)        |
  |                                  v                                          |
  |  [root exchange]  verify assertion -> one root policy rule -> mint root     |
- |     signs with EXCHANGE key (seed file in M1; seed file or KMS from M2)     |
+ |     signs with EXCHANGE key (seed file or trust-control; KMS from M2)       |
  |                                  |                                          |
  |                                  v                                          |
  |  [MCP edge + kernel]  verify chain (anchored trust root), revocation read   |
@@ -233,7 +253,7 @@ Line numbers are at `d0482967b8`.
  chio api protect  (HTTP APIs; committed receipts from M1, anchored roots and x402 in M3)
  chio-verify       (tenant's or auditor's machine, offline)
  AWS KMS           (M2: two keys, exchange role and kernel role)
- Okta / Entra      (JWKS fetched online by the exchange only; Entra from M2)
+ Okta / Entra      (JWKS fetched online by the exchange only)
  x402 facilitator  (third party, /verify and /settle, M3)
 ```
 
@@ -269,9 +289,11 @@ Pin at build start: MCP ext-auth `specification/stable/enterprise-managed-author
 
 Kill latency (D5): each ID-JAG is single-use and yields one root that ends at or before the ID-JAG's own `exp`. Once the IdP stops issuing ID-JAGs for a principal, no root for that principal outlives `max_assertion_lifetime_secs` (300 s default) plus the clock offset between the IdP and the provider, which the `iat` check bounds by `max_clock_skew_secs`. Provider-side revocation (section 7.11) takes effect for every call admitted after it commits.
 
-### 6.3 Flow B: Entra Agent ID (M2)
+### 6.3 Flow B: Entra (`entra_jwt` in M1, `entra_agent_id` in M2)
 
-Pin at build start: Microsoft Learn Entra Agent ID token reference (claims that identify an agent identity and its blueprint, token version, per-tenant issuer format, and the `uti` claim).
+Pin at build start: Microsoft identity platform access token reference (token version, per-tenant issuer format, `oid`, `azp`, `appid`, `tid` and `uti` claims) for M1, and the Microsoft Learn Entra Agent ID token reference (claims that identify an agent identity and its blueprint) for M2.
+
+Ordinary Entra application and workload tokens take the `entra_jwt` kind from M1. From M2, a token carrying the agent-identity discriminator claim is matched only against `entra_agent_id` rules, and a token without it only against `entra_jwt` rules, so exactly-one-rule matching holds with both kinds configured. Both kinds follow the flow and rules below.
 
 Two entry points produce the same anchored root:
 
@@ -284,9 +306,9 @@ Rules (D5):
 - Root lifetime is `min(capability_ttl_secs, token exp - now)`, so at most 300 s by default.
 - After the root expires, requests carrying the same token get HTTP 401 with RFC 6750 `error="invalid_token"`, which prompts token libraries to acquire a new token.
 
-Kill latency: Chio does not observe Entra revocation in v1. An agent that already holds several unexchanged Entra tokens can exchange each once until it expires. The claim is therefore that IdP revocation of an Entra principal takes effect at the expiry of tokens issued before it, about one hour for typical Entra access tokens. Provider-side revocation of the principal (section 7.11) takes effect for every call admitted after it commits.
+Kill latency: Chio does not observe Entra revocation in v1. A caller that already holds several unexchanged Entra tokens can exchange each once until it expires. The claim is therefore that IdP revocation of an Entra principal takes effect at the expiry of tokens issued before it, about one hour for typical Entra access tokens. Provider-side revocation of the principal (section 7.11) takes effect for every call admitted after it commits.
 
-Until M2, an `oidc_jwt` rule whose issuer is a Microsoft Entra issuer rejects at policy load (D14), so no Entra token is admitted in M1.
+An `oidc_jwt` rule whose issuer is a Microsoft Entra issuer rejects at policy load (D14), so every Entra token is held to these rules.
 
 ### 6.4 Flow C: multi-hop delegation (G5, M2)
 
@@ -374,22 +396,32 @@ Rules:
 - `context_digest` = SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
 - `root_policy_digest` = SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
 - Binding to the delegation context, checked at admission and offline: `assertion_exp` equals `anchor.token_exp`; `anchored_at` equals `exchange.exchanged_at`; the root's issuer key equals `exchange.exchange_key`; the root's scope hash equals `effective_root_scope_hash`; the root's subject is consistent with `exchange.holder` (a `caller` root's subject is the sender key; an `edge_session` root has no `cnf.chioSenderKey`).
-- For kinds without an external assertion lifetime (`chio_local_as`, `chio_operator_key`), `assertion_exp` equals the local token's or admin request's own expiry.
+- For kinds without an external assertion lifetime (`chio_local_as`, `chio_operator_key`, `operator_static_bearer`), `assertion_exp` equals the local token's, admin request's or minted root's own expiry.
 
 ### 7.2 Anchor kinds (closed, v1)
 
-All v1 kinds are exchange kinds (F3). There is no `class` member. Every `serve-http` authentication method that survives D1 maps to exactly one kind. `StaticBearer` (T26) is deleted in M1: a shared secret names no principal and cannot anchor a root. Deployments that used it move to the local AS `authorization_code` flow or to operator-issued roots. The enterprise provider registry file and `--auth-jwt-provider-profile` are deleted in M1; root policy rules replace them.
+All v1 kinds are exchange kinds (F3). There is no `class` member. Every `serve-http` authentication method kept under D1 and F14 maps to exactly one kind (section 2.4). The `serve-http` enterprise provider registry file and `--auth-jwt-provider-profile` are deleted in M1; root policy rules and the rule's `anchor_kind` replace them.
 
 | `kind` | Milestone | Accepted input | Verified against | Replay key | Notes |
 |---|---|---|---|---|---|
 | `oauth_id_jag` | M1 | `jwt-bearer` assertion, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:id-jag`, from an authenticated confidential client | the rule's pinned `jwks_uri`; `typ` equals the ID-JAG media type from the pinned draft; `aud` equals the local AS issuer; `client_id` equals the authenticated client; `resource`, when present, equals the advertised protected resource | `(issuer, jti)`, single use | `exp - iat <= max_assertion_lifetime_secs` |
-| `entra_agent_id` | M2 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | tenant-specific Entra JWKS; `iss` is a tenant-specific issuer listed in the root policy (multi-tenant `common` or `organizations` issuers reject); `aud` is the provider app ID URI; the agent-identity discriminator claim is present (D14) | `(issuer, uti)`, one root per token | discriminator claim name pinned at build start; rules of this kind reject at load before M2 |
+| `entra_jwt` | M1 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | tenant-specific Entra JWKS; `iss` is a tenant-specific issuer listed in the root policy (multi-tenant `common` or `organizations` issuers reject); `aud` is the provider app ID URI; principal is `oid`, else `sub`, else `azp`, `appid` or `client_id`, and a token with none of them denies | `(issuer, uti)`, one root per token | ordinary Entra application and workload tokens; D5 lifetime and kill latency |
+| `entra_agent_id` | M2 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | tenant-specific Entra JWKS; `iss` is a tenant-specific issuer listed in the root policy (multi-tenant `common` or `organizations` issuers reject); `aud` is the provider app ID URI; the agent-identity discriminator claim is present (D14) | `(issuer, uti)`, one root per token | added beside `entra_jwt`; discriminator claim name pinned at build start; rules of this kind reject at load before M2 |
 | `oidc_jwt` | M1 | bearer at the edge (today's generic OIDC JWT path) | the rule's pinned issuer and `jwks_uri` or static key | `(issuer, jti)` when present, else the token-bytes digest | Microsoft Entra issuers reject at load (D14) |
 | `oauth_introspection` | M1 | bearer at the edge (today's introspection path) | RFC 7662 response from the configured endpoint, `active: true` | token-bytes digest | evidence is the introspection response digest |
-| `chio_local_as` | M1 | access token from the local AS `authorization_code` flow | local AS key | local token `jti` | today's local OAuth path |
+| `chio_local_as` | M1 | access token from the local AS `authorization_code` flow, or RFC 8693 re-exchange of such a token (`subject_token_type=urn:ietf:params:oauth:token-type:access_token`) | local AS key | local token `jti`; a re-exchange consumes the subject token's `jti` once | today's local OAuth path. A re-exchanged root's scope is the subject root's scope narrowed by the requested `scope` and `resource`, and its `assertion_exp` equals the subject root's. Re-exchange is open to the client the subject token was issued to, including public clients, because it can only narrow |
 | `chio_operator_key` | M1 | operator-issued root through the admin route | pinned operator key | admin request id | replaces direct unanchored issuance |
+| `operator_static_bearer` | M1 | `--auth-token` static bearer at the edge | constant-time comparison against the SHA-256 of the configured token | token-bytes digest plus root expiry, one live root per token | operator-issued root naming the rule's operator-configured `principal`; a fresh root is minted when the previous one expires. Identity is operator-attested and carries no IdP evidence. Scope: development, tests and conformance |
 
-Bearer intake (`oidc_jwt`, `oauth_introspection`, `entra_agent_id`) maps a token to its root by the SHA-256 of the exact token bytes. The replay key separately enforces at most one root per assertion: a different token whose replay key is already bound denies. Replay keys are namespaced by kind and issuer, so one issuer's `jti` values cannot collide with or block another's.
+Bearer intake (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `entra_jwt`, `entra_agent_id`) maps a token to its root by the SHA-256 of the exact token bytes. The replay key separately enforces at most one root per assertion: a different token whose replay key is already bound denies. Replay keys are namespaced by kind and issuer, so one issuer's `jti` values cannot collide with or block another's.
+
+`operator_static_bearer` rules:
+
+- The rule names `principal` (an operator-chosen identifier such as `dev:alice`) and `tenant_value`. The token alone never confers a principal. With `--auth-token` set and no `operator_static_bearer` rule, or a rule without `principal`, startup refuses. A rule of this kind without `--auth-token` also refuses startup.
+- Exactly one `operator_static_bearer` rule may exist. `serve-http` holds only the token's SHA-256 after startup; the token is never written to the state directory, receipts or logs.
+- The delegation context records `issuer = "urn:chio:operator"`, the committed principal and tenant, and no `key_snapshot_digest`, `kid`, `alg` or `artifact_digest`.
+- The verifier's identity root column for this kind is at most `asserted`: the provider's operator states the principal.
+- Revocation by `anchor_subject` or `root_policy_rule` denies the token's next root and every call under the live one (section 7.11).
 
 ### 7.3 `chio.delegation-context.v1` (content-addressed, unsigned, bound through the root signature)
 
@@ -486,11 +518,12 @@ Anchor rules:
 - `jwks_uri` is required for every JWKS-verified kind and must be `https`. Keys are fetched only from it. Token header members that name key material (`jku`, `x5u`, `jwk`, `x5c`) and any `crit` member reject.
 - The effective root scope is `ceiling_scope ∩ projection(idp scope values)`. A scope value absent from `idp_scope_projection` denies the exchange. An IdP that sends no scope gets the empty projection, which denies.
 - Exactly one rule must match. Zero or more than one denies.
-- `capability_ttl_secs` defaults to 300. `max_assertion_lifetime_secs` defaults to 300 and applies to `oauth_id_jag`; for `entra_agent_id` it must be absent (Entra lifetimes are set by Entra, and D5 governs).
+- `capability_ttl_secs` defaults to 300. `max_assertion_lifetime_secs` defaults to 300 and applies to `oauth_id_jag`; for `entra_jwt` and `entra_agent_id` it must be absent (Entra lifetimes are set by Entra, and D5 governs).
 - `max_clock_skew_secs` is bounded to at most 60 at load time.
 - `tenant_claim` names the claim that identifies the caller's tenant (`iss` for per-org Okta issuers, `tid` for Entra). It feeds the tenant tag (section 7.12).
 - `retain_idp_artifact` is allowed only on `oauth_id_jag` rules (D7) and rejects at load before M2.
 - `entra_agent_id` rules reject at load before M2. `oidc_jwt` rules naming a Microsoft Entra issuer always reject (D14).
+- `principal` and `tenant_value` are required on `operator_static_bearer` rules and rejected on every other kind. `jwks_uri`, `allowed_algs` and `idp_scope_projection` are absent on that kind; its effective root scope is `ceiling_scope`.
 
 Disclosure rules (D2):
 
@@ -789,11 +822,12 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 - Client authentication: a `jwt-bearer` or `token-exchange` request from a public client, without a client assertion, with an assertion whose signature fails against the registered client key, whose `aud` is not the token endpoint URL, whose lifetime exceeds 60 s, or whose `jti` was already used.
 - JWT header: `alg` not in the rule's `allowed_algs` (`none` and HMAC algorithms are never allowed); `typ` mismatch for `oauth_id_jag`; `kid` absent; any of `jku`, `x5u`, `jwk`, `x5c` or `crit` present.
 - `kid` not in the current key set after at most one rate-limited refresh (section 9.2).
-- Signature invalid. `iss` not exactly the rule's issuer. `aud` not exactly the local AS issuer (ID-JAG) or app ID URI (Entra, M2). ID-JAG `resource` present and not equal to the advertised protected resource.
+- Signature invalid. `iss` not exactly the rule's issuer. `aud` not exactly the local AS issuer (ID-JAG) or app ID URI (Entra). ID-JAG `resource` present and not equal to the advertised protected resource.
 - Time: `exp` or `iat` missing; `now >= exp + skew`; `iat > now + skew`; `nbf > now + skew`; for ID-JAG, `exp - iat > max_assertion_lifetime_secs`; computed root `expires_at <= now`. All time reads go through the injected authority clock.
 - Replay key (section 7.2) missing where required, or already bound. The replay store is durable and retained until `exp + skew`.
 - ID-JAG `client_id` not equal to the authenticated client.
-- Entra token without the agent-identity discriminator claim (D14, M2). Any Entra issuer on an `oidc_jwt` rule.
+- Entra token with none of `oid`, `sub`, `azp`, `appid` or `client_id`. From M2, a token with the agent-identity discriminator claim matched against an `entra_jwt` rule, or one without it matched against an `entra_agent_id` rule. Any Entra issuer on an `oidc_jwt` rule.
+- Static bearer token not equal to the configured token. Local AS re-exchange whose subject token is expired, revoked or already re-exchanged, or whose requested scope or `resource` is not a subset of the subject root's.
 - Any string feeding a tag or commitment that contains a NUL character.
 - Root policy: outside `valid_from`/`valid_until`; zero or more than one matching rule; a scope value missing from the projection; effective scope empty; requested holder class not in `holder_classes`; DPoP-required grants for a session-held root.
 - JWKS endpoint unreachable, oversized or invalid: no exchange. Existing roots live until their expiry.
@@ -811,7 +845,7 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 
 ### 8.3 Startup refusals
 
-`serve-http` refuses to start when: no root policy is configured, or it fails any load rule in section 7.4; the root policy's `policy_key` differs from `--root-policy-key`; the state-directory lock is held by another process or the state directory is on a network filesystem (D4); the kernel signer is ephemeral (T7) or missing; any two of the exchange, kernel, policy and local AS keys are equal; a seed file is readable by group or other or not owned by the process user; the tenant index key is missing or not 32 bytes; a manifest price uses a chain id outside the testnet allowlist; durable admission is off. From M2: a KMS key's `GetPublicKey` result differs from the pinned public key in config. `api protect` gains the same refusals in M3.
+`serve-http` refuses to start when: no root policy is configured, or it fails any load rule in section 7.4; the root policy's `policy_key` differs from `--root-policy-key`; the state-directory lock is held by another process or the state directory is on a network filesystem (D4); the kernel signer is ephemeral (T7) or missing; any two of the exchange, kernel, policy and local AS keys are equal; a seed file is readable by group or other or not owned by the process user; the tenant index key is missing or not 32 bytes; a manifest price uses a chain id outside the testnet allowlist; durable admission is off; `--auth-token` is set without exactly one `operator_static_bearer` rule naming a `principal`, or such a rule exists without `--auth-token`; `--exchange-signer trust-control` is set and the trust-control authority key differs from `--control-authority-public-key`. From M2: a KMS key's `GetPublicKey` result differs from the pinned public key in config. `api protect` gains the same refusals in M3.
 
 ### 8.4 Privacy
 
@@ -824,6 +858,7 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 ### 8.5 Signer
 
 - Seed-file signer (M1): a missing, unreadable or wrongly permissioned seed file refuses startup; there is no generated fallback key.
+- Trust-control exchange signer (M1): an unreachable trust-control or a returned signature that fails verification against the pinned authority key fails the mint; no root is issued and there is no local fallback key.
 - KMS signer (M2): call error, timeout, throttle, or a returned signature that fails local verification against the pinned key: signing fails, the call denies, readiness reports false. There is no local fallback key.
 
 ### 8.6 PDP and payment
@@ -846,7 +881,8 @@ Adversaries: an external agent with a stolen or replayed token; a malicious call
 ### 9.1 Token replay
 
 - **ID-JAG replay to the exchange.** `(issuer, jti)` single use with a durable replay store retained to `exp + skew`; `aud` pinned to the local AS issuer; confidential client authentication with replay-protected client assertions; `client_id` match. A stolen ID-JAG is useless without the client's private key, and a replayed ID-JAG denies across restarts.
-- **Entra token replay (M2).** Entra access tokens are bearer tokens. One root per `uti` means a stolen token yields at most one root lifetime (300 s default) of authority. Residual risk: a thief holding the token during that window has the agent's authority, and a thief holding several stolen unexchanged tokens gets one root per token until each expires. This is stated in copy (D5).
+- **Entra token replay.** Entra access tokens are bearer tokens. One root per `uti` means a stolen token yields at most one root lifetime (300 s default) of authority. Residual risk: a thief holding the token during that window has the agent's authority, and a thief holding several stolen unexchanged tokens gets one root per token until each expires. This is stated in copy (D5).
+- **Static bearer.** Anyone holding the `--auth-token` value acts as the configured principal until the token is changed and the process restarted, or the principal is revoked. The identity is operator-attested only. Docs scope the mode to development, tests and conformance, and the M1 claims never describe it as an identity provider.
 - **Capability replay.** Session-held roots never leave the edge. Caller-held roots require `_meta.chioDpopProof` for DPoP-required grants (existing per-call proof binding capability, tool, canonical arguments and sender key).
 - **Access-token replay.** The access token is a handle; its lifetime equals the root's, and existing local AS sender constraints apply when the client uses them.
 - **Single instance.** The replay store is correct only because there is one process (D4). The state-directory lock enforces that. Restoring a backup rewinds it (section 6.1).
@@ -943,15 +979,15 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `RemoteSigningKey` accepts P-256 pins. README "Guarantees" updated.
 - Add `crates/trust/chio-signing-remote/` to the clock gate's fixed roots (T25); SigV4 request time reads the injected clock.
 
-### 10.5 `crates/protocol/chio-mcp-remote` [M1, full migration per D1; Entra M2]
+### 10.5 `crates/protocol/chio-mcp-remote` [M1, full migration per D1; Entra Agent ID M2]
 
-- `src/remote_mcp/oauth/local_server.rs`: add the `jwt-bearer` grant; replace `exchange_subject_token` and `validate_subject_token` with the anchored exchange for the subject token types in section 7.2; delete the self-exchange path (T1); add `requested_token_type` handling; confidential client authentication (`private_key_jwt`) for `jwt-bearer` and `token-exchange`. The `authorization_code` flow now yields `chio_local_as` anchored roots.
-- `src/remote_mcp/session_core.rs`: `OAuthClientRegistration` gains the client public JWK and `token_endpoint_auth_method`; `JwtHeader` gains `typ` and rejects key-location members and `crit`; claims gain `iat`, `uti` and `resource`; `RemoteAuthMode::StaticBearer` and `auth_token` deleted; per-store path fields replaced by `state_dir`.
-- `src/remote_mcp/oauth/root_exchange.rs` (new): verification per anchor kind, replay keys, root policy matching, root minting through the exchange `SigningBackend`, delegation-context, snapshot and tag writes, optional ID-JAG retention [M2], Entra [M2].
-- `src/remote_mcp/oauth/bearer_auth.rs` and introspection paths: every bearer intake (generic OIDC JWT, introspection, Entra in M2) ends in the exchange and binds an anchored root through the token-digest mapping; no session authority is created any other way.
-- `src/remote_mcp/session_identity.rs`: JWKS from the rule's pinned `jwks_uri`, refresh on unknown `kid` with rate limit, scheduled refresh, JWKS document checks, snapshot emission; delete `derive_federated_agent_keypair`, `derive_enterprise_subject_key` (T8), the enterprise provider registry and the provider-profile claim mapping.
+- `src/remote_mcp/oauth/local_server.rs`: add the `jwt-bearer` grant; replace `exchange_subject_token` and `validate_subject_token` with the anchored exchange for the subject token types in section 7.2, keeping local AS re-exchange as a `chio_local_as` narrowing (T1); add `requested_token_type` handling; confidential client authentication (`private_key_jwt`) for `jwt-bearer` and `token-exchange`. The `authorization_code` flow now yields `chio_local_as` anchored roots.
+- `src/remote_mcp/session_core.rs`: `OAuthClientRegistration` gains the client public JWK and `token_endpoint_auth_method`; `JwtHeader` gains `typ` and rejects key-location members and `crit`; claims gain `iat`, `uti` and `resource`; `RemoteAuthMode::StaticBearer` keeps `auth_token` and resolves through the exchange to an `operator_static_bearer` root; per-store path fields replaced by `state_dir`.
+- `src/remote_mcp/oauth/root_exchange.rs` (new): verification per anchor kind, replay keys, root policy matching, root minting through the exchange `SigningBackend`, delegation-context, snapshot and tag writes, optional ID-JAG retention [M2], `entra_jwt` [M1], `entra_agent_id` [M2].
+- `src/remote_mcp/oauth/bearer_auth.rs` and introspection paths: every bearer intake (static bearer, generic OIDC JWT, introspection, Entra) ends in the exchange and binds an anchored root through the token-digest mapping; no session authority is created any other way.
+- `src/remote_mcp/session_identity.rs`: JWKS from the rule's pinned `jwks_uri`, refresh on unknown `kid` with rate limit, scheduled refresh, JWKS document checks, snapshot emission; delete `derive_federated_agent_keypair`, `derive_enterprise_subject_key` (T8), the enterprise provider registry and `JwtProviderProfile`; the `AzureAd` principal mapping (`oid`, `sub`, then `azp`, `appid` or `client_id`) moves into `entra_jwt` verification.
 - `src/remote_mcp/http_service_auth.rs`: AS metadata advertises `urn:ietf:params:oauth:grant-type:jwt-bearer`, the supported token types and `private_key_jwt`.
-- `src/remote_mcp/session_core/factory.rs`: delete the direct `configure_capability_authority` session issuance path and the pinned-remote-authority session issuance path; sessions receive roots only from the exchange; ephemeral kernel keys refuse startup.
+- `src/remote_mcp/session_core/factory.rs`: delete the direct `configure_capability_authority` session issuance path; the pinned remote trust-control authority becomes the `trust-control` exchange signer; sessions receive roots only from the exchange; ephemeral kernel keys refuse startup.
 - `src/remote_mcp/admin.rs`: revocation targets from section 7.11 on `/admin/revocations` [M1]; `POST /v1/revocations` for caller requests [M2].
 - State-directory lock at startup (D4).
 
@@ -970,7 +1006,7 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 
 ### 10.8 `crates/products`
 
-- `chio-cli` [M1]: `serve-http --root-policy`, `--root-policy-key`, `--exchange-signer`, `--kernel-signer` (value `seed-file:<path>` in M1; `aws-kms:<arn>` added in M2), `--tenant-index-key`, `--state-dir`; the per-store database path flags and `--auth-token`, `--enterprise-providers-file` and `--auth-jwt-provider-profile` deleted. `chio evidence verify` delegates to `chio-bundle-verify`. `chio evidence export --disclosure-profile --tenant`. `chio revoke` admin subcommands.
+- `chio-cli` [M1]: `serve-http --root-policy`, `--root-policy-key`, `--exchange-signer`, `--kernel-signer` (value `seed-file:<path>` in M1, `--exchange-signer` also `trust-control` with the existing `--control-url` and `--control-authority-public-key`; `aws-kms:<arn>` added in M2), `--tenant-index-key`, `--state-dir`; `--auth-token` kept (section 7.2); the per-store database path flags, `--enterprise-providers-file` and `--auth-jwt-provider-profile` deleted. The progressive tutorial, conformance peers, examples, deploy units and SDK publication scripts gain a root policy file and move to `--state-dir` in the same PR. `chio evidence verify` delegates to `chio-bundle-verify`. `chio evidence export --disclosure-profile --tenant`. `chio revoke` admin subcommands.
 - `chio-api-protect` [M1]: committed receipts through the shared kernel signer (no root policy, no inline fields). [M3]: anchored roots, root policy and disclosure, tenant index and export, x402 HTTP 402 challenge, the section 8.3 startup refusals.
 
 ### 10.9 New crates
@@ -985,7 +1021,7 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `spec/schemas/chio-wire/v1/` [M0]: schemas for every artifact in section 7, including the optional ID-JAG retention slot (D7) and the M2 and M3 artifacts; `registry.json` entries.
 - `docs/adr/` [M0]: the customer-hosted root exchange ADR outlined in section 15 (next free number), accepted before M1 code merges (T22, D12).
 - `docs/reference/CLAIM_REGISTRY.md`: one row per acceptance statement in section 12, added only when its evidence exists.
-- `docs/release/QUALIFICATION.md` [M1]: the hosted authorization edge rows (including the row whose command runs `mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange`, which exercises the deleted self-exchange) are marked suspended at the M1 migration merge and rewritten against the anchored flow when the lane re-passes (D1).
+- `docs/release/QUALIFICATION.md` [M1]: the hosted authorization edge rows (including the row whose command runs `mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange`, which exercises local AS re-exchange) are marked suspended at the M1 migration merge and rewritten against the anchored flow when the lane re-passes (D1).
 - `README.md` and public docs [M1]: state the hosted-edge qualified-label suspension from the M1 migration merge until the lane re-passes, and remove the statement when it does (F13).
 
 ## 11. Test plan
@@ -995,8 +1031,11 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - Signing wrapper: every registered signed artifact type signs and verifies through the one helper; a signature over one schema id fails as another; the verifier ignores any schema member inside the artifact and uses its call-site schema id; a signature prefix that does not match the pinned key's algorithm rejects; a stripped hybrid signature fails against a pinned hybrid key; ML-DSA-65 with a non-empty context fails; Ed25519, P-256 (both backends, M2 for default builds), P-384 and hybrid vectors.
 - Trait collapse [M0]: every changed crate suite green with no byte change in any fixture (fixture digests compared before and after).
 - Client authentication: public client on `jwt-bearer` denies; missing, expired, wrong-`aud`, wrong-key and replayed client assertions deny.
-- Anchor verification per kind: valid, expired, future `iat`, wrong `aud`, wrong `typ`, wrong `resource`, unknown `kid`, rotated key, `alg` outside `allowed_algs`, HMAC `alg`, `jku`/`x5u`/`jwk`/`x5c`/`crit` headers, JWKS key with `use: enc`, RSA modulus below 2048 bits, oversized JWKS, ID-JAG lifetime above the cap, computed `expires_at <= now`, replayed `jti` (including after restart against SQLite), the same `jti` under two issuers (both accepted), NUL in issuer or subject, Entra issuer on an `oidc_jwt` rule rejects at load. M2: multi-tenant Entra issuer, Entra token without the agent discriminator, reused `uti`, a second token with a bound `uti`.
-- Bearer intake: the same token in two sessions maps to one root; a different token with the same `(iss, sub, iat, exp)` and no `jti` gets its own root; `--auth-token` is not a recognized flag.
+- Anchor verification per kind: valid, expired, future `iat`, wrong `aud`, wrong `typ`, wrong `resource`, unknown `kid`, rotated key, `alg` outside `allowed_algs`, HMAC `alg`, `jku`/`x5u`/`jwk`/`x5c`/`crit` headers, JWKS key with `use: enc`, RSA modulus below 2048 bits, oversized JWKS, ID-JAG lifetime above the cap, computed `expires_at <= now`, replayed `jti` (including after restart against SQLite), the same `jti` under two issuers (both accepted), NUL in issuer or subject, Entra issuer on an `oidc_jwt` rule rejects at load; `entra_jwt`: multi-tenant issuer, principal from `oid` then `sub` then `azp`/`appid`/`client_id`, no principal claim denies, reused `uti`, a second token with a bound `uti`, root lifetime `min(ttl, token exp)`. M2: agent-identity token routed to `entra_agent_id` and denied by an `entra_jwt`-only policy, token without the discriminator denied by an `entra_agent_id`-only policy.
+- Bearer intake: the same token in two sessions maps to one root; a different token with the same `(iss, sub, iat, exp)` and no `jti` gets its own root.
+- Static bearer: `--auth-token` without an `operator_static_bearer` rule refuses startup; a rule without `principal` refuses startup; a wrong token denies; the root names the configured principal and the receipt's identity column verifies as `asserted`; the token never appears in the state directory or logs; a new root is minted after expiry.
+- Local AS re-exchange: narrowed scope and `resource` succeed; widening, an expired or revoked subject token, and a second re-exchange of the same token deny.
+- Trust-control exchange signer: a root signed through a trust-control stub verifies against the pinned authority key; a wrong-key signature and an unreachable stub fail the mint.
 - Root lifetime: `expires_at == min(now + ttl, assertion exp)` for every kind; a root with `expires_at > assertion_exp` denies.
 - Root binding: issuer key differs from `exchange_key`; scope hash differs from `effective_root_scope_hash`; `assertion_exp` differs from `token_exp`; `edge_session` root with a sender key; each denies.
 - Root policy: zero, one and two matching rules; projection removes and never adds (proptest: for random IdP scopes, effective scope is a subset of the ceiling); unknown scope value denies; disclosure pointers parse and reject malformed input; `policy_key` mismatch with the pinned key refuses startup; policy outside its validity window refuses startup and denies at runtime.
@@ -1014,7 +1053,7 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 
 - `tests/bindings/vectors/signing/` [M0]: signing-wrapper vectors for each registered schema id and algorithm, including negative vectors for schema-id substitution and algorithm-prefix mismatch, generated in M0 by a small reference script (Python standard library plus a pinned Ed25519 and ECDSA library) and cross-checked by the Rust implementation in M1.
 - `tests/bindings/vectors/receipt/` [M0, M1]: committed receipts with openings, inline fields with a referenced policy [M2], `pdp_decision` receipts [M2], settlement blocks and closures [M3]. TS, Python and Go verifiers run them.
-- `tests/bindings/vectors/capability/` [M1, M2]: anchored roots per M1 kind, negative vectors for each section 8.2 rule; Entra roots [M2]; chains of depth 1, 2 and 4 [M2].
+- `tests/bindings/vectors/capability/` [M1, M2]: anchored roots per M1 kind (including `operator_static_bearer` and `entra_jwt`), negative vectors for each section 8.2 rule; Entra Agent ID roots [M2]; chains of depth 1, 2 and 4 [M2].
 
 ### 11.3 Verdict-matrix additions
 
@@ -1022,14 +1061,14 @@ New categories under `crates/tooling/chio-conformance/verdict_matrix/scenarios/`
 
 | Category | Milestone | Covers |
 |---|---|---|
-| `anchored_root` | M1 (12), M2 (+4) | each M1 anchor kind allow; each section 8.1 and 8.2 deny; client authentication denials. M2 adds Entra allow, multi-tenant issuer, missing discriminator, `uti` reuse after root expiry |
+| `anchored_root` | M1 (16), M2 (+4) | each M1 anchor kind allow, including static bearer and `entra_jwt`; each section 8.1 and 8.2 deny; client authentication denials; `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry. M2 adds Entra Agent ID allow, discriminator routing in both directions, and agent `uti` reuse |
 | `receipt_disclosure` | M1 (12) | committed default; evidence allowlist drop; `tenant_id` exclusion; salt-only opening rejected in auditor profile; inline-field scenarios written in M1 as expected-deny at policy load and flipped in M2 |
 | `revocation_local` | M1 (12) | each provider revocation target denies the next call; cascade; concurrent revocation and admission |
 | `delegation_chain` | M2 (12) | depth 1-4 allow; reorder, gap, widened hop, mismatched anchor deny; offline verify equals online verdict; caller revocation of a descendant |
 | `pdp_decision` | M2 (12) | allow and deny with signed receipt; unlisted PEP; spend-bearing grant denied |
 | `x402_challenge` | M3 (12) | challenge issued; paid call allowed; over-cap and asset-mismatch denied before challenge; settle timeout to closure; same scenarios through `api protect` |
 
-`category` in `SCENARIOS.md` gains the six values. Existing scenarios that assert `parameter_hash` or `content_hash` are rewritten for commitments in M1. `rust-kernel` stays the required driver. A new driver `rust-mcp-serve-http` runs the M1, M2 and M3 categories through a real `serve-http` process with a local IdP stub (JWKS server minting ID-JAG, and from M2 Entra-shaped, tokens with fixed timestamps, plus a registered confidential client key) and a local facilitator stub.
+`category` in `SCENARIOS.md` gains the six values. Existing scenarios that assert `parameter_hash` or `content_hash` are rewritten for commitments in M1. `rust-kernel` stays the required driver. A new driver `rust-mcp-serve-http` runs the M1, M2 and M3 categories through a real `serve-http` process with a local IdP stub (JWKS server minting ID-JAG and Entra-shaped tokens, and Entra agent-identity tokens from M2, with fixed timestamps, plus a registered confidential client key) and a local facilitator stub.
 
 ### 11.4 `chio-verify` column report tests
 
@@ -1056,6 +1095,7 @@ For each column, a bundle that yields each evidence class (`verified`, `observed
 - Okta developer tenant with Cross App Access (pin plan availability at build start) issuing a real ID-JAG to a real MCP client, registered as a confidential client, against a staged `serve-http` [M1].
 - The hosted-edge qualification lane re-run on the migrated `serve-http` [M1].
 - A second person on a separate machine with no network runs `chio-verify` on an exported `caller` bundle and an `auditor_hash_only` bundle [M1].
+- Entra test tenant with an ordinary application token calling the staged edge [M1].
 - Entra test tenant with an agent identity calling the staged edge [M2].
 - AWS KMS P-256 and Ed25519 keys in one region; latency and quota measurements [M2].
 - x402 on Base Sepolia with a public testnet facilitator [M3]; no mainnet.
@@ -1072,27 +1112,28 @@ Exit: ADR accepted (section 15); PROTOCOL and WIRE_PROTOCOL text for the signing
 
 May say: nothing externally.
 
-### M1: ID-JAG intake, full migration, committed receipts, local revocation, verifier
+### M1: ID-JAG and Entra intake, full migration, committed receipts, local revocation, verifier
 
-Evidence: section 11 tests for M1 green on `main`; the three M1 verdict-matrix categories pass in `rust-kernel` and `rust-mcp-serve-http`; every SDK verifier passes the new vectors; live Okta run recorded; the hosted-edge qualification lane re-passes on the migrated `serve-http`.
+Evidence: section 11 tests for M1 green on `main`; the three M1 verdict-matrix categories pass in `rust-kernel` and `rust-mcp-serve-http`; every SDK verifier passes the new vectors; live Okta and Entra runs recorded; the conformance peers pass against the migrated edge with `--auth-token`; the hosted-edge qualification lane re-passes on the migrated `serve-http`.
 
 May say (shipped; `serve-http` qualified again only after the lane re-passes):
 
 - "`chio mcp serve-http` accepts Okta Cross App Access ID-JAG assertions from authenticated clients, verifies them against the IdP's published keys, and roots every capability it issues in an exchange recorded under a provider-signed root policy."
+- "`chio mcp serve-http` accepts Microsoft Entra access tokens from tenant-specific issuers and roots each one in an exchange recorded under the provider's root policy. Disabling an Entra principal takes effect at the provider when its already-issued tokens expire, typically about one hour."
 - "For Okta ID-JAG principals, disabling the principal at the IdP takes effect at the provider within 300 seconds plus the configured clock skew (at most 60 seconds), by default."
 - "The provider can revoke a capability, a principal, a policy rule or a tenant. Every call admitted after the revocation is recorded denies."
 - "Every Chio receipt contains salted commitments to tool arguments and results instead of plaintext."
 - "A provider can export a bundle for one customer tenant that the tenant verifies offline with the Apache-2.0 `chio-verify` tool."
 
-May not say: "any IdP"; anything about Microsoft Entra; "IdP-verified receipts"; "multi-hop offline verification"; "real-time revocation"; "highly available" or any multi-instance wording; "zero-knowledge" or "anonymous"; "KMS", "HSM-backed", "keys the process never holds" or any custody or host-compromise wording; "each tool response carries a receipt"; plaintext or inline disclosure wording; anything about `chio api protect` beyond committed receipts.
+May not say: "any IdP"; anything about Entra Agent ID; "real-time Entra revocation"; static bearer as production identity or as IdP-backed; "IdP-verified receipts"; "multi-hop offline verification"; "real-time revocation"; "highly available" or any multi-instance wording; "zero-knowledge" or "anonymous"; "KMS", "HSM-backed", "keys the process never holds" or any custody or host-compromise wording; "each tool response carries a receipt"; plaintext or inline disclosure wording; anything about `chio api protect` beyond committed receipts.
 
-### M2: Entra, KMS, caller copy, AuthZEN, OCSF, portable chains, caller revocation, deferred M1 items
+### M2: Entra Agent ID, KMS, caller copy, AuthZEN, OCSF, portable chains, caller revocation, deferred M1 items
 
-Evidence: Entra additions to `anchored_root`, `delegation_chain` and `pdp_decision` categories pass; live Entra and KMS runs recorded; OCSF output validated against the pinned 1.9.0 schema; a depth-4 chain bundle verifies on an offline machine with the same verdict as the online edge; caller revocation exercised; caller copy, inline disclosure, `auditor_full` export and ID-JAG retention tests green.
+Evidence: Entra Agent ID additions to `anchored_root`, `delegation_chain` and `pdp_decision` categories pass; live Entra Agent ID and KMS runs recorded; OCSF output validated against the pinned 1.9.0 schema; a depth-4 chain bundle verifies on an offline machine with the same verdict as the online edge; caller revocation exercised; caller copy, inline disclosure, `auditor_full` export and ID-JAG retention tests green.
 
 May say (shipped):
 
-- "`chio mcp serve-http` accepts Microsoft Entra Agent ID agent-identity tokens. Disabling an Entra principal takes effect at the provider when the agent's already-issued tokens expire, typically about one hour."
+- "`chio mcp serve-http` also accepts Microsoft Entra Agent ID agent-identity tokens. Disabling an Entra principal takes effect at the provider when the agent's already-issued tokens expire, typically about one hour."
 - "Receipts and capabilities can be signed by an AWS KMS key that the Chio process never holds."
 - "Each tool response carries the caller's own signed receipt and the material to open it."
 - "Plaintext appears in a receipt only for fields the provider's signed policy names."
@@ -1119,14 +1160,6 @@ May not say: "x402 support" without "testnet"; "Chio processes payments"; "refun
 
 Sizes are engineer-days. S is 5 or fewer, M is 6 to 15, L is more than 15; a range that straddles a boundary takes the larger label. Staffing (D10): one engineer plus coding agents. Agents write code and tests; the engineer reviews, integrates, runs heavy builds and owns live runs. The sizes count the engineer's days, with agent assistance already assumed.
 
-### 13.0 Pilots in parallel with M1 (F10)
-
-- Pilots run on a `serve-http` build from `main` before the first M1 format or migration merge, recorded by commit. That build is inside the qualified boundary; M1 builds are not until the lane re-passes.
-- Pilots use current receipts and the current verifier (`chio evidence verify`, `chio receipt verify`). Pilot copy uses only already-qualified or already-approved claims; no relying-party claim from section 12 is used until its evidence exists.
-- Pilot receipts and state are not converted to the M1 formats (no migration from unshipped formats). A pilot that continues past M1 re-deploys on M1 with fresh state.
-- M1 does not wait on pilot findings. Pilot findings that change a wire format are handled as spec revisions before the affected M1 step starts.
-- Pilot support time is not in the M1 sizes. With one engineer, every pilot day moves the M1 finish one day.
-
 ### 13.1 Cuts applied from day one of M1
 
 These are out of M1 before M1 starts. Each is scheduled in M2.
@@ -1138,9 +1171,9 @@ These are out of M1 before M1 starts. Each is scheduled in M2.
 5. Presented chains deeper than the root (section 6.4).
 6. Caller-side revocation requests (D3).
 7. The caller copy in `_meta.chioReceipt` (F11). In M1 callers rely on `caller` bundles.
-8. Entra Agent ID intake (F11). ID-JAG is the only external IdP kind in M1; `entra_agent_id` rules reject at load.
+8. Entra Agent ID intake (F11). `entra_agent_id` rules reject at load in M1; ordinary Entra tokens use `entra_jwt`.
 
-Not available as cuts: the generic `oidc_jwt` and `oauth_introspection` kinds and the `chio_local_as` and `chio_operator_key` kinds (D1 requires every surviving auth path to migrate in M1), confidential client authentication for ID-JAG (without it a stolen ID-JAG is redeemable by anyone who knows the `client_id`), protocol-wide commitments (D2), and the signing wrapper (D6).
+Not available as cuts: the `operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `entra_jwt`, `chio_local_as` and `chio_operator_key` kinds and the trust-control exchange signer (D1 and F14 require every kept auth path to migrate in M1), confidential client authentication for ID-JAG (without it a stolen ID-JAG is redeemable by anyone who knows the `client_id`), protocol-wide commitments (D2), and the signing wrapper (D6).
 
 ### 13.2 Sizes
 
@@ -1153,12 +1186,12 @@ Not available as cuts: the generic `oidc_jwt` and `oauth_introspection` kinds an
 | M1 | 1. Signing wrapper in `chio-core-types` (`sign_wrapped`, algorithm binding), all signing call sites, Rust and SDK verifiers, fixture regeneration | L, 15-20 |
 | M1 | 2. Committed receipts in every producer (kernel-core signer, hosted kernel, `api protect`, FFI, WASM, mobile, security producers, Lambda extension), `tenant_id` exclusion, guard evidence allowlist, disclosure store, SDK verifiers, scenario and fixture rewrites | L, 20-28 |
 | M1 | 3. Anchored-root types, section 7.1 bindings and `AnchoredTrustRoot` (depth 0) | M, 6-8 |
-| M1 | 4. Exchange: ID-JAG with confidential client authentication and the four existing kinds; full `serve-http` migration and deletions (self-exchange, seed-derived keys, direct issuance, static bearer, enterprise provider registry, per-store path flags); pinned JWKS with refresh and snapshots; replay keys; tenant and subject tags; state-directory lock | L, 20-27 |
+| M1 | 4. Exchange: ID-JAG with confidential client authentication; the kept kinds (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `entra_jwt`, `chio_local_as` with re-exchange, `chio_operator_key`); trust-control exchange signer; deletions (seed-derived keys, bypass issuance, `serve-http` enterprise provider registry and provider profile, per-store path flags) with tutorial, peer, example and deploy updates; pinned JWKS with refresh and snapshots; replay keys; tenant and subject tags; state-directory lock | L, 25-35 |
 | M1 | 5. Revocation target kinds on the existing store, linearized with admission, provider revocation admin | M, 4-6 |
 | M1 | 6. `chio-bundle-verify`, `caller` and `auditor_hash_only` export | M, 7-10 |
-| M1 | 7. Tests, vectors, `rust-mcp-serve-http` driver, live Okta run, hosted-edge qualification lane re-run, QUALIFICATION and README updates | M, 9-13 |
-| M1 total | | 81-112 |
-| M2 | Entra Agent ID intake (D5, D14) and live run | M, 6-8 |
+| M1 | 7. Tests, vectors, `rust-mcp-serve-http` driver, live Okta and Entra runs, conformance peers on the migrated edge, hosted-edge qualification lane re-run, QUALIFICATION and README updates | M, 10-15 |
+| M1 total | | 87-122 |
+| M2 | Entra Agent ID intake beside `entra_jwt` (D5, D14), discriminator routing and live run | S, 3-5 |
 | M2 | `ClassicalSigner` plumbing, default-build P-256 verification (Rust and SDKs), AWS KMS P-256 backend, live KMS run | M, 10-13 |
 | M2 | KMS Ed25519 | S, 3-4 |
 | M2 | Caller copy in `_meta.chioReceipt` | S, 2-3 |
@@ -1168,12 +1201,12 @@ Not available as cuts: the generic `oidc_jwt` and `oauth_introspection` kinds an
 | M2 | Caller-side revocation requests | M, 6-8 |
 | M2 | AuthZEN endpoints on `serve-http`, `pdp_decision` class, PEP allowlist | M, 8-12 |
 | M2 | OCSF 1.9 projection | S, 3-5 |
-| M2 total | | 58-81 |
+| M2 total | | 55-78 |
 | M3 | `api protect`: anchored roots, root policy and disclosure, tenant index and export, startup refusals | M, 10-14 |
 | M3 | Typed `Asset` (in place, all callers), manifest pricing, facilitator adapter, x402 challenge on MCP and HTTP, settlement block and closure | L, 18-25 |
 | M3 total | | 28-39 |
 
-M1 is 81-112 engineer-days after the day-one and second-line cuts. At about 21 working days a month that is roughly four to five and a half months for one engineer, before pilot support time (section 13.0) and before any wait for the D17 byte-change coordination. The M1 window in the private schedule is set against this number.
+M1 is 87-122 engineer-days after the day-one and second-line cuts. At about 21 working days a month that is roughly four to six months for one engineer, before any wait for the D17 byte-change coordination. The M1 window in the private schedule is set against this number.
 
 ### 13.3 M1 order for one engineer
 
@@ -1182,7 +1215,7 @@ Ordered so each step lands on `main` green and later steps build on it:
 1. Signing wrapper (item 1), on the collapsed trait from M0. It touches every signed fixture, so it goes first while the tree is otherwise stable. Its PR opens only after the D17 coordination.
 2. Committed receipts (item 2), producer by producer in the M0 inventory order, with the format change itself in one PR that updates all verifiers. Same D17 coordination.
 3. Anchored-root types and resolver (item 3).
-4. Exchange and migration (item 4): ID-JAG with client authentication first, then the four existing auth kinds, then the deletions in the final PR of the step.
+4. Exchange and migration (item 4): ID-JAG with client authentication first, then the kept auth kinds and the trust-control signer, then the deletions in the final PR of the step.
 5. Revocation (item 5), after reconciling the store shape with coop2c (section 7.11).
 6. Verifier and export (item 6).
 7. Qualification lane re-run and live run (item 7), with unit and vector tests landing inside each earlier step.
@@ -1197,8 +1230,7 @@ No further cut is pre-approved. Any cut below removes an M1 deliverable and need
 
 ### 14.1 For the founder
 
-- **Q-F12 Static bearer and generic Entra deletion in M1.** Decided 2026-10-17 (coordinator call; founder may override): confirmed. Chio has not shipped, so no deployment depends on the `--auth-token` shared-bearer mode or on generic Entra admission. Both are deleted in M1, and Entra returns as the `entra_agent_id` kind in M2.
-- **Q-F13 Pilot support budget.** Decided 2026-10-17 (coordinator call; founder may override): pilot support is capped at one engineer-day per week while M1 is in progress. Support beyond the cap moves to the following week rather than extending M1, and the M1 finish date carries a 20 percent allowance for it.
+- **Q-F12 Static bearer and generic Entra in M1.** Decided 2026-10-17 (founder): keep useful paths; no compat hacks. Both are kept and mapped onto anchored roots in M1: `--auth-token` as `operator_static_bearer` (dev, test and conformance; operator-attested identity; no IdP evidence) and generic Entra as `entra_jwt` under the D5 rules. Entra Agent ID is added in M2 beside `entra_jwt`.
 
 ### 14.2 For the builder
 
@@ -1219,9 +1251,9 @@ No further cut is pre-approved. Any cut below removes an M1 deliverable and need
 To be written as `docs/adr/ADR-<next>-customer-hosted-root-exchange.md` in M0.
 
 1. **Context.** PROTOCOL 8.2 blocks hosted OAuth authorization-server product work pending an ADR. The relying-party wedge needs the local AS in `serve-http` to accept external IdP assertions and issue anchored Chio roots. Today the local AS exchanges only its own tokens (T1) and every registered client is public (T26).
-2. **Decision.** The provider runs the root exchange inside its own `serve-http` process, on the existing local AS, using provider-controlled exchange and policy keys. Backbay operates no exchange in v1. Every `serve-http` root is exchange-issued and anchored; direct issuance and the static shared bearer are removed.
-3. **Scope.** Grants: `authorization_code` (local users, `chio_local_as`), `jwt-bearer` (ID-JAG), `token-exchange` (ID-JAG in M1, Entra in M2; capability out). `jwt-bearer` and `token-exchange` require confidential client authentication (`private_key_jwt`, or the method the stable MCP profile requires). Bearer intake for generic OIDC JWT, introspection and (M2) Entra ends in the same exchange. No refresh tokens. No dynamic client registration beyond the existing startup registry.
+2. **Decision.** The provider runs the root exchange inside its own `serve-http` process, on the existing local AS, using provider-controlled exchange and policy keys. Backbay operates no exchange in v1. Every `serve-http` root is exchange-issued and anchored, including roots for the static bearer, generic OIDC, introspection, Entra and local AS paths; session issuance that bypasses the exchange is removed. The exchange signer is a local seed file or the pinned remote trust-control authority.
+3. **Scope.** Grants: `authorization_code` (local users, `chio_local_as`), `jwt-bearer` (ID-JAG), `token-exchange` (ID-JAG and Entra, capability out; local AS re-exchange, narrowing only). `jwt-bearer` and `token-exchange` with an external subject token require confidential client authentication (`private_key_jwt`, or the method the stable MCP profile requires). Bearer intake for the static bearer, generic OIDC JWT, introspection and Entra ends in the same exchange. No refresh tokens. No dynamic client registration beyond the existing startup registry.
 4. **Security properties.** Fail-closed rules from section 8.1; single-use replay keys namespaced by issuer; keys only from pinned `jwks_uri`; IdP never consulted after the root; root lifetime capped by assertion `exp`; exchange, kernel, policy and local AS keys distinct; policy key pinned in configuration; single instance per state directory.
 5. **Standards pinned.** RFC 6749, RFC 7523 (grant and client authentication), RFC 8693, RFC 8707, RFC 9728 metadata, MCP Enterprise-Managed Authorization (stable profile) and the ID-JAG draft revision recorded at build start.
-6. **Consequences.** PROTOCOL 8.2 unblocked for this scope only; the hosted-edge qualification lane re-runs in M1 and the label is suspended, publicly, until it passes; seed-derived federation keys, self-exchange, the static shared bearer and the enterprise provider registry are deleted; a Backbay-hosted exchange requires a new ADR.
+6. **Consequences.** PROTOCOL 8.2 unblocked for this scope only; the hosted-edge qualification lane re-runs in M1 and the label is suspended, publicly, until it passes; seed-derived federation keys, bypass issuance and the `serve-http` enterprise provider registry are deleted; the static bearer is documented as a development, test and conformance mode with operator-attested identity; a Backbay-hosted exchange requires a new ADR.
 7. **Alternatives rejected.** Trust-control as the exchange (a second deployable for every provider); self-anchored roots at the edge (excluded by F3); keeping direct issuance beside the exchange (excluded by D1 and the no-compat rule); public clients on the assertion grants (a stolen assertion would be redeemable by anyone knowing the `client_id`).
