@@ -957,7 +957,7 @@ const RUNTIME_PREPARATION_SOURCES: &[RequiredSource] = &[
     },
     RequiredSource {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
-        symbols: &["verify_swarm_authority_reference_from_store"],
+        symbols: &["verify_swarm_authority_reference"],
     },
 ];
 

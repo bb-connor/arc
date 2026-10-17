@@ -1,8 +1,6 @@
 use super::json_file::{read_json_store, write_json_store};
 use super::traits::RuntimeAdmissionStore;
-use crate::validation::validate_non_empty;
 use crate::*;
-use chio_swarm_authority::SwarmAuthorityBundle;
 
 /// JSON-backed state with trust-floor transitions serialized across clones of one instance.
 /// Independently opened handles and other processes are not coordinated. Use the SQLite
@@ -18,8 +16,6 @@ pub struct JsonRuntimeAdmissionStore {
 struct JsonRuntimeAdmissionStoreState {
     schema: String,
     bundles: Vec<RuntimeAdmissionBundle>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    swarm_authority_bundles: Vec<SwarmAuthorityBundle>,
     consumed_lease_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     consumed_treaty_continuation_ids: Vec<String>,
@@ -34,7 +30,6 @@ impl Default for JsonRuntimeAdmissionStoreState {
         Self {
             schema: CHIO_RUNTIME_ADMISSION_STORE_SCHEMA.to_string(),
             bundles: Vec::new(),
-            swarm_authority_bundles: Vec::new(),
             consumed_lease_ids: Vec::new(),
             consumed_treaty_continuation_ids: Vec::new(),
             consumed_swarm_continuation_ids: Vec::new(),
@@ -89,36 +84,6 @@ impl JsonRuntimeAdmissionStore {
         self.commit(&mut state, candidate)
     }
 
-    pub fn insert_swarm_authority_bundle(
-        &self,
-        bundle: SwarmAuthorityBundle,
-    ) -> Result<(), ChioRuntimeError> {
-        validate_non_empty(
-            &bundle.task_graph.graph_id,
-            "runtime_swarm_authority_empty_graph_id",
-        )?;
-        let bundle_sha256 = canonical_sha256(&bundle)?;
-        let mut state = self.lock_state()?;
-        if let Some(existing) = state
-            .swarm_authority_bundles
-            .iter()
-            .find(|existing| existing.task_graph.graph_id == bundle.task_graph.graph_id)
-        {
-            if canonical_sha256(existing)? == bundle_sha256 {
-                return Ok(());
-            }
-            return Err(ChioRuntimeError::Rejected {
-                code: "duplicate_swarm_authority_bundle_mismatch",
-                detail:
-                    "runtime swarm authority bundle graph id already exists with a different hash"
-                        .to_string(),
-            });
-        }
-        let mut candidate = state.clone();
-        candidate.swarm_authority_bundles.push(bundle);
-        self.commit(&mut state, candidate)
-    }
-
     fn validate_locked_state(&self) -> Result<(), ChioRuntimeError> {
         let state = self.lock_state()?;
         Self::validate_state(&state)
@@ -129,22 +94,6 @@ impl JsonRuntimeAdmissionStore {
         for bundle in &state.bundles {
             if !admission_ids.insert(bundle.admission_id.as_str()) {
                 return Err(ChioRuntimeError::DuplicateAdmissionBundle);
-            }
-        }
-        let mut swarm_graph_ids = BTreeSet::new();
-        for bundle in &state.swarm_authority_bundles {
-            validate_non_empty(
-                &bundle.task_graph.graph_id,
-                "runtime_swarm_authority_empty_graph_id",
-            )?;
-            if !swarm_graph_ids.insert(bundle.task_graph.graph_id.as_str()) {
-                return Err(ChioRuntimeError::Rejected {
-                    code: "duplicate_swarm_authority_bundle",
-                    detail: format!(
-                        "runtime admission store repeats swarm authority bundle {}",
-                        bundle.task_graph.graph_id
-                    ),
-                });
             }
         }
         let mut lease_ids = BTreeSet::new();
@@ -233,26 +182,6 @@ impl RuntimeAdmissionStore for JsonRuntimeAdmissionStore {
             .iter()
             .find(|bundle| bundle.admission_id == admission_id)
             .cloned())
-    }
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        let state = self.lock_state()?;
-        Ok(state
-            .swarm_authority_bundles
-            .iter()
-            .find(|bundle| bundle.task_graph.graph_id == task_graph_id)
-            .cloned())
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        _graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.swarm_authority_bundle(task_graph_id)
     }
 
     fn consume_destructive_lease(

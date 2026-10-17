@@ -7,7 +7,7 @@ use crate::{
     RuntimeEvidenceManifestEntry, RuntimeOpsStatusReport, RuntimeOrchestrationProfile,
     RuntimeOrchestrationStatusReport, RuntimeOrchestrationStepState, RuntimeRecoveryDrillReport,
     RuntimeRunLease, RuntimeSchedulerTickReport, RuntimeSupervisorProfile, RuntimeTrustFloorEntry,
-    SwarmAuthorityBundle, TreatyRuntimeArtifactRecord,
+    TreatyRuntimeArtifactRecord,
 };
 
 pub trait ChioRuntimeAdmissionStore: Send + Sync {
@@ -31,17 +31,6 @@ pub trait ChioRuntimeAdmissionStore: Send + Sync {
         evidence_kind: &str,
         evidence_id: &str,
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError>;
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError>;
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError>;
 
     fn consume_destructive_lease(
         &self,
@@ -126,13 +115,6 @@ impl InMemoryRuntimeAdmissionStore {
             artifact,
         ))
     }
-
-    pub fn insert_swarm_authority_bundle(
-        &self,
-        bundle: SwarmAuthorityBundle,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
-    }
 }
 
 impl ChioRuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
@@ -156,32 +138,6 @@ impl ChioRuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
                 &self.inner,
                 evidence_kind,
                 evidence_id,
-            ),
-        )
-    }
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::swarm_authority_bundle(
-                &self.inner,
-                task_graph_id,
-            ),
-        )
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        wrap_runtime(
-            chio_runtime_core::RuntimeAdmissionStore::swarm_authority_bundle_for_graph(
-                &self.inner,
-                task_graph_id,
-                graph_sha256,
             ),
         )
     }
@@ -376,13 +332,6 @@ impl JsonRuntimeAdmissionStore {
     pub fn insert_bundle(&self, bundle: RuntimeAdmissionBundle) -> Result<(), ChioRuntimeError> {
         wrap_runtime(self.inner.insert_bundle(bundle))
     }
-
-    pub fn insert_swarm_authority_bundle(
-        &self,
-        bundle: SwarmAuthorityBundle,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
-    }
 }
 
 pub struct JsonRuntimeTrustFloorStateStore {
@@ -466,26 +415,6 @@ impl SqliteRuntimeOrchestrationStore {
             evidence_kind,
             evidence_id,
             artifact,
-        ))
-    }
-
-    pub fn insert_swarm_authority_bundle(
-        &self,
-        bundle: SwarmAuthorityBundle,
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.insert_swarm_authority_bundle(bundle))
-    }
-
-    pub fn extend_swarm_authority_bundle(
-        &self,
-        expected_bundle_sha256: &str,
-        candidate: SwarmAuthorityBundle,
-        trusted_keys: &[chio_core_types::PublicKey],
-    ) -> Result<(), ChioRuntimeError> {
-        wrap_runtime(self.inner.extend_swarm_authority_bundle(
-            expected_bundle_sha256,
-            candidate,
-            trusted_keys,
         ))
     }
 
@@ -684,32 +613,6 @@ macro_rules! impl_chio_runtime_admission_store_for_inner {
                 )
             }
 
-            fn swarm_authority_bundle(
-                &self,
-                task_graph_id: &str,
-            ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::swarm_authority_bundle(
-                        &self.inner,
-                        task_graph_id,
-                    ),
-                )
-            }
-
-            fn swarm_authority_bundle_for_graph(
-                &self,
-                task_graph_id: &str,
-                graph_sha256: &str,
-            ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-                wrap_runtime(
-                    chio_runtime_core::RuntimeAdmissionStore::swarm_authority_bundle_for_graph(
-                        &self.inner,
-                        task_graph_id,
-                        graph_sha256,
-                    ),
-                )
-            }
-
             fn consume_destructive_lease(
                 &self,
                 lease_id: &str,
@@ -855,22 +758,6 @@ impl ChioRuntimeAdmissionStore for LayeredRuntimeAdmissionStore<'_> {
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
         self.admission_store
             .treaty_runtime_artifact(evidence_kind, evidence_id)
-    }
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.admission_store.swarm_authority_bundle(task_graph_id)
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.admission_store
-            .swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
     }
 
     fn consume_destructive_lease(
@@ -1022,24 +909,6 @@ impl chio_runtime_core::RuntimeAdmissionStore for RuntimeCoreAdmissionStoreAdapt
         unwrap_runtime(
             self.inner
                 .treaty_runtime_artifact(evidence_kind, evidence_id),
-        )
-    }
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, RuntimeCoreError> {
-        unwrap_runtime(self.inner.swarm_authority_bundle(task_graph_id))
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, RuntimeCoreError> {
-        unwrap_runtime(
-            self.inner
-                .swarm_authority_bundle_for_graph(task_graph_id, graph_sha256),
         )
     }
 

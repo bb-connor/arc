@@ -35,12 +35,13 @@ fn native_swarm_evolution_preserves_treaty_and_original_physical_claim() -> Test
     let (source, intent) = physical_input(&fixture.inner)?;
     assert_eq!(intent.resources().len(), 3);
     let before = faults::history(&fixture.inner)?;
-    crate::swarm_evolution::open(&fixture.inner._directory.path().join("runtime.sqlite3"))?
-        .extend_swarm_authority_bundle(
-            &canonical_test_hash(&prior)?,
-            next,
-            &trusted_swarm_witness_keys(),
-        )?;
+    fixture.inner.authority.work_graph_store().advance(
+        &canonical_test_hash(&prior)?,
+        next,
+        &trusted_swarm_witness_keys(),
+        &fixture.inner.authority.mutation_fence(),
+        NOW,
+    )?;
     // This explicitly exercises historical artifact resolution; a completed
     // request's fast receipt replay alone would not test the changed resolver.
     hook.revalidate_operation_owned_for_native_capture(

@@ -18,7 +18,7 @@ assumptions. The implementation adds no distributed consensus.
 | Existing component | Responsibility retained | Added connection |
 | --- | --- | --- |
 | `chio-swarm-authority` | Signed graphs, scopes, witness chains, routes, joins, budget arithmetic, revocation | A pure verifier checks preservation between two ordinarily valid bundles |
-| SQLite runtime orchestration store | Protected admission evidence | One transaction archives the old version and installs a checked successor |
+| Qualified S1 graph issuer (`SqliteWorkGraphStore`) | Serving-authority graph heads, archived versions and issuances | One fenced transaction archives the old version and installs a checked successor |
 | Runtime admission hook | Exact request binding, local capability and freshness checks | Resolves the existing graph digest to its exact stored version |
 | Native operation-owned custody | Owns continuation resources and physical claims | Same continuation ID is used across graph versions |
 | Bilateral treaty admission | Receiver-selected treaty evidence and destructive lease | Remains a required independent gate; old claims resolve old swarm evidence |
@@ -52,24 +52,23 @@ cannot serialize writers. Two proposals can both be individually valid.
 
 ## Durable installation and historical resolution
 
-`extend_swarm_authority_bundle(expected_bundle_sha256, candidate, trusted_keys)`
-opens an immediate SQLite transaction. It validates the stored head's full
-digest, compares the expected digest, runs the extension verifier using the
-store clock, archives the parent, updates the head and commits. Any failure
-leaves head and history unchanged. Only one contender using an old expected
-head can succeed; another must read and preserve the installed successor.
+`SqliteWorkGraphStore::advance(expected_bundle_sha256, candidate, trusted_keys,
+fence, trusted_now_unix_ms)` runs one immediate transaction behind the serving
+fence. It validates the stored head's full digest, compares the expected
+digest, runs the extension verifier at the trusted time, archives the parent,
+updates the head, retains the issuance and appends one global authority commit.
+Any failure leaves head and history unchanged. Only one contender using an old
+expected head can succeed; another must read and preserve the installed
+successor. `provision_root` installs the first version; it cannot replace an
+issued root.
 
-The archive index is `(task_graph_id, signed_graph_sha256)`. Historical reads
-validate strict JSON, the full bundle digest, graph ID and signed graph digest.
-The admission hook already receives a graph digest in its request reference;
-the new lookup uses it without adding a caller-controlled authority field.
-Unknown hashes still fail normal reference binding. The original immutable
-insert API remains immutable and idempotent.
-
-The default lookup on other store implementations preserves their existing
-single-version behavior. Exact historical resolution is provided by SQLite and
-forwarded by the existing layered store. An alternate backend must implement
-equivalent protected serialization and historical binding before claiming S1.
+The archive index is `(graph_id, graph_sha256)`. Historical reads validate the
+full bundle digest, graph ID and signed graph digest. The admission hook
+already receives a graph digest in its request reference and resolves exactly
+that version through `SwarmGraphSource`, served by `IssuedSwarmGraphs`. A
+version the issuer has not issued is refused as missing evidence. Runtime
+stores hold no swarm graphs, and a hook configured without the issuer refuses
+every swarm-bound request.
 
 ## Why concurrent old dispatch remains safe
 

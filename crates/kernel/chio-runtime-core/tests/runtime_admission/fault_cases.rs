@@ -130,22 +130,6 @@ impl RuntimeAdmissionStore for FaultInjectingAdmissionStore {
         Ok(record)
     }
 
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.inner.swarm_authority_bundle(task_graph_id)
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.inner
-            .swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
-    }
-
     fn consume_destructive_lease(
         &self,
         lease_id: &str,
@@ -421,7 +405,6 @@ fn runtime_hook_cleanup_request(
     }
 
     let swarm_bundle = runtime_swarm_bundle(false)?;
-    store.insert_swarm_authority_bundle(swarm_bundle.clone())?;
     let mut request =
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
     request.federated_origin_kernel_id = Some("kernel.buyer".to_string());
@@ -527,8 +510,9 @@ fn assert_swarm_consume_fault_releases_treaty_and_preserves_same_admission_marke
     let mut store = FaultInjectingAdmissionStore::new(inner.clone());
     store.swarm_consume_fault = Some(fault);
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
@@ -616,8 +600,9 @@ fn destructive_consume_panic_releases_only_observed_continuation_reservations(
     let mut store = FaultInjectingAdmissionStore::new(inner.clone());
     store.destructive_consume_fault = Some(ConsumeFault::PanicAfterConsume);
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
@@ -679,8 +664,9 @@ fn assert_destructive_release_fault_does_not_block_other_releases(
     store.reject_trust_floor = true;
     store.destructive_release_fault = Some(release_fault);
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
@@ -760,8 +746,9 @@ fn mixed_release_failures_preserve_each_failed_id_and_reason(
     store.destructive_release_fault = Some(ReleaseFault::Error);
     store.treaty_release_error = true;
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
@@ -823,8 +810,9 @@ fn ambiguous_release_failure_is_not_retried_after_same_admission_reacquire(
     store.reject_trust_floor = true;
     store.destructive_release_fault = Some(ReleaseFault::PanicAfterReacquire);
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = hook.evaluate(&RuntimeAdmissionContext {
         request: &request,
@@ -928,7 +916,8 @@ fn consume_then_error_or_panic_keeps_ambiguous_marker_and_releases_only_prior_pa
             };
             let observer = store.clone();
             let hook = allowing_chio_policy_hook(store)?
-                .with_swarm_witness_keys(trusted_swarm_witness_keys());
+                .with_swarm_witness_keys(trusted_swarm_witness_keys())
+                .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
             let decision = hook.evaluate(&RuntimeAdmissionContext {
                 request: &request,
                 extra_metadata: extra_metadata.as_ref(),

@@ -149,7 +149,8 @@ fn invalid_core_preparation_never_consumes_continuations_or_updates_trust_floor(
             .with_runtime_trust_input(signed_trust, trusted)
             .with_pheromone_query_report(advisory)
             .with_runtime_pheromone_policy(signed_policy, signed_weights)
-            .with_swarm_witness_keys(trusted_swarm_witness_keys());
+            .with_swarm_witness_keys(trusted_swarm_witness_keys())
+            .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
         let decision = evaluate(&hook, &request, extra_metadata.as_ref())?;
         assert_no_reservation_claims(&decision)?;
@@ -177,8 +178,9 @@ fn first_bundle_lookup_panic_never_enters_participant_commit() -> TestResult {
     let mut store = FaultInjectingAdmissionStore::new(inner.clone());
     store.panic_bundle_on_call = Some(0);
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = evaluate(&hook, &request, extra_metadata.as_ref())?;
     assert_no_reservation_claims(&decision)?;
@@ -213,8 +215,9 @@ fn pinned_bundle_is_the_only_snapshot_used_by_treaty_and_core_admission() -> Tes
         store.bundle_snapshots = Some((original.clone(), substituted));
         store.panic_bundle_on_call = panic_on_second_read.then_some(1);
         let observer = store.clone();
-        let hook =
-            allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+        let hook = allowing_chio_policy_hook(store)?
+            .with_swarm_witness_keys(trusted_swarm_witness_keys())
+            .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
         let decision = evaluate(&hook, &request, extra_metadata.as_ref())?;
         assert!(decision.allowed, "{decision:?}");
@@ -260,8 +263,9 @@ fn trust_floor_write_then_panic_denies_and_releases_only_confirmed_reservations(
     let mut store = FaultInjectingAdmissionStore::new(inner.clone());
     store.panic_trust_floor = true;
     let observer = store.clone();
-    let hook =
-        allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+    let hook = allowing_chio_policy_hook(store)?
+        .with_swarm_witness_keys(trusted_swarm_witness_keys())
+        .with_swarm_graph_source(retained_swarm_graphs(&runtime_swarm_bundle(false)?));
 
     let decision = evaluate(&hook, &request, extra_metadata.as_ref())?;
     assert_no_reservation_claims(&decision)?;

@@ -73,21 +73,6 @@ impl SqliteRuntimeOrchestrationStore {
                     created_at_unix_ms INTEGER NOT NULL,
                     PRIMARY KEY (evidence_kind, evidence_id)
                 );
-                CREATE TABLE IF NOT EXISTS runtime_swarm_authority_bundles (
-                    task_graph_id TEXT PRIMARY KEY NOT NULL,
-                    bundle_sha256 TEXT NOT NULL,
-                    raw_json TEXT NOT NULL,
-                    created_at_unix_ms INTEGER NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS runtime_swarm_authority_versions (
-                    task_graph_id TEXT NOT NULL,
-                    graph_sha256 TEXT NOT NULL,
-                    bundle_sha256 TEXT NOT NULL,
-                    raw_json TEXT NOT NULL,
-                    archived_at_unix_ms INTEGER NOT NULL,
-                    successor_bundle_sha256 TEXT NOT NULL,
-                    PRIMARY KEY (task_graph_id, graph_sha256)
-                );
                 CREATE TABLE IF NOT EXISTS runtime_run_leases (
                     run_id TEXT PRIMARY KEY NOT NULL,
                     lease_id TEXT NOT NULL,

@@ -48,13 +48,14 @@ impl BindingFixture {
         admission.binding.capability_id = capability.id.clone();
         let bundle_hash = runtime_admission_bundle_sha256(&admission)?;
         store.insert_bundle(admission)?;
-        store.insert_swarm_authority_bundle(swarm.clone())?;
+        let graphs = retained_swarm_graphs(&swarm);
         let mut request =
             chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm)?)?;
         request.agent_id = capability.subject.to_hex();
         request.capability = capability;
-        let hook =
-            allowing_chio_policy_hook(store)?.with_swarm_witness_keys(trusted_swarm_witness_keys());
+        let hook = allowing_chio_policy_hook(store)?
+            .with_swarm_witness_keys(trusted_swarm_witness_keys())
+            .with_swarm_graph_source(graphs);
         Ok(Self {
             hook,
             request,

@@ -29,7 +29,9 @@ The facade converts errors while preserving their codes.
 Store wrappers forward insertion and orchestration operations to their inner stores.
 The hook retains profile and trust/policy configuration.
 It forwards kernel admission and dispatch-revalidation work to the core verifier.
-`with_swarm_witness_keys` supplies pinned keys for stored swarm evidence.
+`with_swarm_witness_keys` supplies pinned keys for swarm evidence.
+`with_swarm_graphs` supplies `IssuedSwarmGraphs`, the qualified S1 issuer's current and archived graphs.
+Runtime stores hold no swarm graphs; a hook without the issuer refuses swarm-bound requests.
 `with_operation_owned_runtime_replay` supplies an explicit participant binding.
 JSON and SQLite wrappers expose distinct persistence and concurrency boundaries.
 `LayeredRuntimeAdmissionStore` separates admission evidence from trust-floor storage.

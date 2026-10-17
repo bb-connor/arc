@@ -15,13 +15,13 @@ name = "chio_runtime"
 chio-runtime-core = { workspace = true }
 chio-core-types = { workspace = true }
 chio-kernel = { workspace = true }
+chio-store-sqlite = { workspace = true }
 chio-swarm-authority = { workspace = true }
 chio-weights = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 tempfile = { workspace = true }
 

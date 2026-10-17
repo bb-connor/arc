@@ -136,8 +136,8 @@ impl<S: RuntimeAdmissionStore + Send + Sync> ChioRuntimeAdmissionHook<S> {
             }
         };
         if let Some(reference) = swarm_reference.as_ref() {
-            match verify_swarm_authority_reference_from_store(
-                &self.store,
+            match verify_swarm_authority_reference(
+                self.swarm_graphs.as_deref(),
                 reference,
                 context.request,
                 &self.swarm_witness_keys,

@@ -1,7 +1,5 @@
 use rusqlite::{params, OptionalExtension, TransactionBehavior};
 
-use chio_swarm_authority::SwarmAuthorityBundle;
-
 use super::{sqlite_error, SqliteRuntimeOrchestrationStore};
 use crate::hash::runtime_admission_bundle_sha256;
 use crate::store::traits::RuntimeAdmissionStore;
@@ -91,21 +89,6 @@ impl RuntimeAdmissionStore for SqliteRuntimeOrchestrationStore {
         evidence_id: &str,
     ) -> Result<Option<TreatyRuntimeArtifactRecord>, ChioRuntimeError> {
         SqliteRuntimeOrchestrationStore::treaty_runtime_artifact(self, evidence_kind, evidence_id)
-    }
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.load_swarm_authority_bundle(task_graph_id)
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.load_swarm_authority_bundle_for_graph(task_graph_id, graph_sha256)
     }
 
     fn consume_destructive_lease(

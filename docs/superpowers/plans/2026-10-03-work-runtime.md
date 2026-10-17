@@ -60,7 +60,7 @@ Acceptance: an implementer can identify the real construction and mutation bound
 
 **Interfaces:**
 
-- Public SQLite wrapper: extend_swarm_authority_bundle(&self, expected_bundle_sha256: &str, candidate: SwarmAuthorityBundle, trusted_keys: &[PublicKey]) -> Result<(), ChioRuntimeError>, delegating to the existing implementation.
+- Graph extension goes through the qualified issuer, SqliteWorkGraphStore::advance; runtime admission reads issued versions through chio_runtime::IssuedSwarmGraphs.
 - Checked WorkPreparationV1, WorkPreparedV1, WorkCommandV1, WorkActionV1, WorkCommandResultV1, WorkQueryV1, WorkHandleV1, WorkGraphDraftRefV1, WorkCommitmentV1, WorkFundingRefV1 and WorkViewV1 follow the spec's closed outcomes.
 - Add checked WorkProfileRefV1, WorkProfileV1, WorkCatalogPageV1, WorkAcceptanceV1, WorkRecoveryLinkV1, WorkJoinDraftRefV1 and WorkJoinInputsV1 using the spec's exact field/binding contracts. Native artifact/recovery reference representations stay owned by the recovery lane.
 - WorkRequestV1 is the shared Prepare/Submit/Query transport body; WorkResponseV1 has the matching Prepared/Command/Query results. Use these same closed envelopes in every transport and SDK.

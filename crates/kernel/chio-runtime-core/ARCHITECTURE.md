@@ -45,8 +45,9 @@ Report generators consume evidence and observations supplied by the caller.
 
 A successful function return can contain `accepted: false`; callers inspect the report.
 Missing bundles produce `missing_admission_bundle`.
-`verify_swarm_authority_reference_from_store` rejects absent evidence and replaces
-bundle evaluation time with the verifier's current time before verification.
+`verify_swarm_authority_reference` resolves the referenced graph version from the
+qualified S1 issuer (`SwarmGraphSource`), rejects absent evidence or a missing issuer,
+and replaces bundle evaluation time with the verifier's current time before verification.
 Canonical digests bind structured artifacts and exact request argument hashes.
 Trust-floor validation and recording must be atomic at the backend boundary.
 Unsupported trait defaults reject trust-floor mutation and continuation consumption.

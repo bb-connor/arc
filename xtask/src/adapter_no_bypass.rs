@@ -324,19 +324,19 @@ const CALL_CONTRACTS: &[CallContract] = &[
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
-        function: "verify_swarm_authority_reference_from_store",
+        function: "verify_swarm_authority_reference",
         target: "verify_route_metadata_matches",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
-        function: "verify_swarm_authority_reference_from_store",
+        function: "verify_swarm_authority_reference",
         target: "verify_swarm_authority_for_admission",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs",
-        function: "verify_swarm_authority_reference_from_store",
+        function: "verify_swarm_authority_reference",
         target: "verify_swarm_request_binding",
         minimum: 1,
     },
@@ -355,7 +355,7 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-runtime-core/src/admission_hook/preparation.rs",
         function: "ChioRuntimeAdmissionHook::prepare_request",
-        target: "verify_swarm_authority_reference_from_store",
+        target: "verify_swarm_authority_reference",
         minimum: 1,
     },
     CallContract {
@@ -460,7 +460,7 @@ fn validate_workspace(root: &Path) -> Result<(), String> {
         parsed
             .get("crates/kernel/chio-runtime-core/src/admission_hook/swarm_authority.rs")
             .ok_or_else(|| "swarm authority source was not parsed".to_string())?,
-        "verify_swarm_authority_reference_from_store",
+        "verify_swarm_authority_reference",
         &[
             "continuation.route_plan_receipt_id",
             "reference.route_plan_receipt.evidence_id",
@@ -1513,7 +1513,7 @@ mod tests {
                     contract.target,
                     "self.prepare_request"
                         | "prepared.reserve"
-                        | "verify_swarm_authority_reference_from_store"
+                        | "verify_swarm_authority_reference"
                         | "verify_swarm_authority_for_admission"
                         | "verify_swarm_request_binding"
                         | "hook.store.consume_swarm_continuation"
