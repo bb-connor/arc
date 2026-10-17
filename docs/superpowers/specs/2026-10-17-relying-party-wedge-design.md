@@ -112,6 +112,27 @@ Usage counts are from `git grep` on `origin/main` at `6c76fafe95`, outside `docs
 | `serve-http` `--auth-jwt-provider-profile` | `chio-mcp-remote` and `chio-cli` tests | delete | duplicates the rule's `anchor_kind`; the AzureAd claim mapping moves into `entra_jwt` |
 | `serve-http` per-store path flags (`--session-db`, `--receipt-db`, `--revocation-db`, `--authority-db`, `--budget-db` and the others) | `deploy/reference-runtime`, the SDK publication script, example networks | delete for `serve-http`; callers move to `--state-dir` | a second way to place stores; the single-instance lock needs one directory. `chio trust serve` flags are unchanged |
 
+### 2.5 M0 inventory gap decisions
+
+The M0 producer inventory (`docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md`, section "Spec gaps found") listed twelve gaps, and the staged verdict-matrix README listed a scenario count mismatch. Each row below is recorded as: Decided 2026-10-17 (coordinator call; founder may override). The sections named in the last column carry the decision in full.
+
+| # | Decision | Where it lands |
+|---|---|---|
+| G1 | Committed receipts land in one squash-merged PR (M1 item 2). `ChioReceiptBody` and `ToolCallAction` are single structs, so the format change and every producer change together. Inside the PR, commits follow the inventory's commit groups (1 core types and the portable signer, 2 hosted kernel, 3 FFI, WASM and mobile, 4 security, control-plane, HTTP and proxy producers, 5 observability, products, harnesses and fixtures), and each producer's salt-source wiring is its own commit. Intermediate commits need not build; the PR tip is the verified unit, as for the M0 trait collapse. No producer-by-producer PRs follow it. | Sections 13.3, 10.3 |
+| G2 | Every signature over bytes Chio defines signs the section 7.0 wrapper. This includes raw `Keypair::sign` and `SigningBackend::sign_bytes` sites, the kernel checkpoint, domain-prefixed messages, digest signatures, challenge signatures and fixed readiness probes. Only external formats whose signing bytes an external standard fixes are exempt, and the exempt set is closed: JWS signing inputs (RFC 7515, including JWTs and SD-JWT), DSSE pre-authentication encoding, Sigstore Rekor entries, and HTTP message signatures (RFC 9421, no site today). A signature over a digest of a Chio object signs the wrapper over that object's canonical body instead. Both readiness probes sign `chio.signer-readiness-probe.v1` over `{"probe": <name>, "schema": "chio.signer-readiness-probe.v1"}`. The inventory's raw-site table resolves every site to an artifact type and id or to an exemption. | Section 7.0; inventory "Signing sites outside the named helpers" |
+| G3 | Salt sources follow one rule: a producer draws salts from the `Rng` seam of the process that signs. A std process (hosted kernel, control plane, proxies, product CLIs, exporters) injects the OS RNG; the portable core, WASM, mobile and C ABI rows are unchanged; harness, conformance and fixture producers inject a seeded deterministic `Rng` and their output is fixture material only. Every inventory producer is assigned to one row. A producer that holds only a hash today receives the preimage over its existing channel; no signing path accepts a caller-supplied hash or commitment. A fixture that re-signs a recorded hash is regenerated from its recorded preimage. | Section 7.8 |
+| G4 | `HttpReceipt` is a receipt: it carries `receipt_kind`, `boundary_class`, `verdict`, `trust_level`, `redaction_mode` and `content_hash`, and chio-http-core already projects it into a `ChioReceipt` that embeds the whole `HttpReceipt` in `metadata` (`receipt.rs:350`), so one record has two signed forms today. It is deleted. chio-http-core signs `chio.receipt.v1` directly through the shared kernel signer: `tool_server = "http"`, `tool_name = "<METHOD> <route_pattern>"`, the canonical HTTP request (method, route, request id and the request body preimage) is the parameter preimage, and the response status with the response body preimage is the content preimage. `caller_identity_hash` is dropped; the caller is covered by the committed parameters and, from M3, by `authority`. The SDK middleware types (Python, JVM, .NET, `chio-tower`, `api protect`) change in the same PR. No `chio.http-receipt.v1` id exists. The ACP proxy, SCIM deprovision and verified-fix paths follow the G3 preimage rule. | Sections 7.6, 10.3 |
+| G5 | Existing signature domain prefixes are dropped. The wrapper's schema id is the only signature domain separation. `canonical_body` is the RFC 8785 canonical JSON of the artifact's signing body: for a NUL-terminated byte prefix before canonical JSON, the JSON after the prefix; for a `{domain, body}` object, `body`; for a `(DOMAIN, signer, body)` tuple, the object `{"body": body, "signer": signer}`, so every non-domain member of today's signed tuple stays signed. Hash and commitment domains that are not signature prefixes (digest, id, key-id, envelope-hash and commitment domains) are unchanged. `scripts/check-domain-separation.py` keeps covering the remaining hash domains. | Section 7.0 |
+| G6, G8 | One schema id per signed artifact. The wrapper id is the signed artifact's id, never a payload or body id. A request and its response are two artifacts with two ids: the broker authority RPC uses the registered `chio.broker-authority-request.v1` and `chio.broker-authority-response.v1`, and the control-plane active-response authority uses `chio.active-response-policy-authority-request.v1` and `chio.active-response-policy-authority-response.v1`. Where an artifact carries a `schema` member, it equals its wrapper id, so the shared `chio.broker-authority-rpc.v1` and `chio.active-response-policy-authority.v1` member values are replaced in M1 item 1. The four `SignedKeyLogEvent` authorization roles keep one id, `chio.key-log.event.v1`: each role is checked against a distinct expected key and all four state the same thing (this key approves this exact event body), as today. Security events use `chio.signed-security-event.v1`; the separate `chio.security-event-body.v1` registry row is a payload schema already named as that row's `payloadSchemaFile`, and M0 PR 4 removes it (the schema file stays). | Section 7.0; plan Task 6 |
+| G7 | Generic SDK signing takes a schema id. `chio-binding-helpers` `sign_json_str_ed25519` and its FFI, C++, Python and TypeScript wrappers become one wrapped signer `(schema_id, json, seed)` and one verifier `(schema_id, json, public_key, signature)`; an id outside the registry fails. `sign_utf8_message_ed25519` and its wrappers are deleted, because no Chio key signs raw text; its one non-test caller (`sdks/cpp/chio-cpp/src/dpop.cpp:101`) moves to a wrapped artifact in M1 item 1. | Section 7.0, 10.10 |
+| G9 | One signed tool manifest. The `chio-core-types` `ToolManifest`, `ToolManifestBody` and `ToolManifest::sign` have no non-test producer outside their own crate and are deleted in M1 item 1. chio-manifest `SignedManifest` (`chio.manifest.v1`) is the only signed manifest. The shared tool types (`ToolDefinition` and the others chio-manifest re-exports) stay in core-types. No `chio.core-tool-manifest.v1` id exists. | Section 10.1 |
+| G10 | Chio DPoP proofs use `chio.dpop_proof.v1`. On `main` the registry, schema, kernel, C++ and TypeScript code still carry `chio.dpop_proof.v2` for the durable replay-authority profile. #1489 (parallel lead) is open and requires one activated profile; the removal of `chio.dpop_proof.v2` follows #1489 in the lead's lane, with the surviving profile under `chio.dpop_proof.v1`. M0 does not edit the DPoP rows. | Section 7.0; D17 |
+| G11 | Every wrapper id is registered before the wrapper verifies it, and registration lands with the Rust type in M1 item 1, in the same PR as the wrapper. Registering in M0 was rejected: every `registry.json` row needs a hashed `schemaFile`, and a schema under `spec/schemas/chio-wire/v1/` regenerates code in four languages, so M0 would hand-write about fifty schemas for existing types that no test validates against their serialization until M1. M1 item 1 registers the 51 unregistered ids in the inventory's wrapper table (53 less the two deleted by G4 and G9), the unregistered ids in the raw-site table, and the id of every `SignedExportEnvelope<T>` payload type, and adds each to `KNOWN_SIGNED_ARTIFACT_SCHEMAS`. The wrapper's verification helper refuses any id outside that list. M0 publishes the complete id table in staged PROTOCOL 4.5. | Sections 7.0, 13.2; plan Task 6 |
+| G12 | No new error domain. The proposed codes move into existing domains whose descriptions already cover them: exchange failures under `transport` (token endpoint authentication), anchor and root failures under `capability`, root-policy load failures under `policy`, receipt signing and export failures under `attest`. Each code is registered in `spec/errors/registry.yaml` by the M1 PR that first emits it. `CHIO-KERNEL-REVOCATION-STORE` becomes `urn:chio:error:kernel:revocation-store` in M1 item 5. The staged scenarios use the renamed codes. | Verdict-matrix README |
+| Count | `anchored_root` is 16 in M1, as section 11.3 says. The staged corpus gains four scenarios (013 Entra multi-tenant issuer deny, 014 Entra `uti` reuse after root expiry deny, 015 Entra issuer on an `oidc_jwt` rule rejected at load, 016 root signed by a key outside `exchange_keys` deny), for 16, 12 and 12 (40 files). | Section 11.3; plan Task 3 |
+
+Size effect: M1 item 1 grows by the raw-site resolution, the id registration with schemas, the binding signer change and the core manifest deletion; M1 item 2 grows by the `HttpReceipt` deletion with its SDK middleware and by the preimage plumbing for hash-relaying producers. M0 is unchanged. Section 13.2 carries the new sizes.
+
 ## 3. Goals, non-goals, anti-goals
 
 ### 3.1 Goals
@@ -351,7 +372,7 @@ All signed bodies use RFC 8785 canonical JSON and the signing wrapper in section
 
 ### 7.0 Signing wrapper (protocol-wide, D6, M0 contract, M1 code)
 
-Every Chio signature over a canonical-JSON body (capabilities, delegation links, Chio DPoP proofs, receipts, closures, root policies, snapshots, checkpoints, export commitments and every other registered signed artifact) signs this 88-byte wrapper instead of the body:
+Every Chio signature over bytes Chio defines (capabilities, delegation links, Chio DPoP proofs, receipts, closures, root policies, snapshots, checkpoints, export commitments, readiness probes, challenges and every other registered signed artifact) signs this 88-byte wrapper instead of the body (G2):
 
 ```text
 wrapper = "chio.signing-wrapper.v1" || 0x00          (24 bytes)
@@ -361,14 +382,16 @@ wrapper = "chio.signing-wrapper.v1" || 0x00          (24 bytes)
 
 What is signed and why:
 
-- `schema_id` is the artifact's registered schema id (for receipts `chio.receipt.v1`, for capabilities `chio.capability.v1`). Binding it prevents a signature over one artifact type from verifying as another. A verifier takes `schema_id` from its verification context (the artifact type it expects at that call site), never from a member of the artifact being verified.
-- `canonical_body` is exactly the bytes signed today. For receipts that is the canonical `ChioReceiptSigningBody { id, body, bbs_signature? }`, so BBS signature material stays covered by the authoritative signature through this hash.
-- Domain separation: no Chio key signs any message other than wrapper bytes, except the local AS key, which signs JWS signing inputs. A JWS signing input is base64url text plus `.` and never contains `0x00`, while byte 23 of every wrapper is `0x00`, so the two message spaces are disjoint. The local AS key is still required to differ from every wrapper-signing key (section 6.1).
+- `schema_id` is the signed artifact's registered schema id (for receipts `chio.receipt.v1`, for capabilities `chio.capability.v1`), never a payload or body id. Each signed artifact has exactly one id, and a request and its response are two artifacts (G6, G8). Binding it prevents a signature over one artifact type from verifying as another. A verifier takes `schema_id` from its verification context (the artifact type it expects at that call site), never from a member of the artifact being verified.
+- `canonical_body` is the RFC 8785 canonical JSON of the artifact's signing body. For receipts that is the canonical `ChioReceiptSigningBody { id, body, bbs_signature? }`, so BBS signature material stays covered by the authoritative signature through this hash. Existing signature domain prefixes are dropped, because the schema id replaces them (G5): after a NUL-terminated byte prefix the body is the canonical JSON that followed it; for a `{domain, body}` object it is `body`; for a `(DOMAIN, signer, body)` tuple it is `{"body": body, "signer": signer}`. A signature over a digest of a Chio object signs the wrapper over the object's canonical body instead. Hash and commitment domains that are not signature prefixes are unchanged.
+- Domain separation: no Chio key signs any message other than wrapper bytes, except the local AS key, which signs JWS signing inputs, and keys used only for the exempt formats below. A JWS signing input is base64url text plus `.` and never contains `0x00`, while byte 23 of every wrapper is `0x00`, so the two message spaces are disjoint. The local AS key is still required to differ from every wrapper-signing key (section 6.1).
 - Algorithm binding: every pinned key admits exactly one signature algorithm, derived from its self-describing encoding. A signature whose prefix does not match the pinned key's algorithm rejects before any cryptographic check. A verifier holding a pinned hybrid key rejects a bare classical signature, so stripping the post-quantum half yields nothing.
 - Algorithms: Ed25519 signs the wrapper bytes. ML-DSA-65 signs the wrapper bytes with an empty FIPS 204 context string. P-256 and P-384 sign the wrapper with ECDSA over SHA-256 or SHA-384 of the wrapper, so a KMS can be sent the digest (`MessageType=DIGEST`). Hybrid signatures sign the same 88 bytes with both halves.
 - Hash choice: both inner hashes are SHA-256, which caps every signature's collision resistance at 128 bits, including P-384 and ML-DSA-65. This is accepted for v1. Changing the hash or the layout requires a new prefix string and a PROTOCOL change.
 - Signature encodings are unchanged (bare 128-hex Ed25519, `p256:<DER hex>`, `p384:<DER hex>`, hybrid form).
-- JWS objects (local AS tokens, JWTs) are not Chio canonical-JSON signatures and are unaffected.
+- Exempt formats (closed list, G2): JWS signing inputs (RFC 7515, including local AS tokens, JWTs and SD-JWT), DSSE pre-authentication encoding, Sigstore Rekor entries and HTTP message signatures (RFC 9421). Their signing bytes are fixed by the external standard and they do not use the wrapper. Every other signing site does.
+- Generic SDK signing (`chio-binding-helpers` and its FFI and language wrappers) takes the schema id as an argument and rejects an unregistered id. No API signs raw caller text (G7).
+- Every wrapper id is in `spec/schemas/registry.json` and `KNOWN_SIGNED_ARTIFACT_SCHEMAS` before the wrapper signs or verifies it; the verification helper refuses any other id (G11).
 - One signing helper (`sign_wrapped(schema_id, canonical)` on the collapsed `SigningBackend`, returning a `SigningOutcome`) and one verification helper implement the wrapper in `chio-core-types`. `sign_canonical_bytes` is deleted in the same PR. No path signs bodies directly after the change.
 
 Effect: every signing preimage is 88 bytes, so the AWS KMS 4096-byte raw-message limit for Ed25519 no longer constrains any artifact.
@@ -574,7 +597,7 @@ JWKS documents are accepted only when they parse within a size cap, every used k
 Changes to `ChioReceiptBody` (`crates/core/chio-core-types/src/receipt/body.rs`) and `ToolCallAction` (`receipt/decision.rs`) apply to every producer (D2):
 
 1. `action.parameters` and `action.parameter_hash` are replaced by `action.parameter_commitment` and optional `action.parameters_inline`.
-2. `content_hash` is replaced by `content_commitment` and optional `result_inline`. The signer recomputes the commitment from the content preimage and the salt inside its own trust boundary. WYSIWYS is kept.
+2. `content_hash` is replaced by `content_commitment` and optional `result_inline`. The signer recomputes the commitment from the content preimage and the salt inside its own trust boundary. WYSIWYS is kept. No signing path accepts a caller-supplied hash or commitment; a producer that holds only a hash today receives the preimage (G3).
 3. `redaction_mode` is replaced by a `disclosure` block. `RedactionMode` is deleted. Builder task in M0: inventory every producer of `summary` and `redacted` and record how each maps to committed-with-inline-fields or fully committed.
 4. New top-level `authority` block, present whenever the exercised capability carries `root_anchor`.
 5. A receipt with an `authority` block must omit `tenant_id` (T27); signing fails otherwise. The tenant is carried only as the delegation context commitment and the unsigned tenant tag.
@@ -641,6 +664,10 @@ Caller copy (D11, M2): every MCP `tools/call` response from `serve-http` carries
 | Mobile (`chio-kernel-mobile`, UniFFI) | OS RNG |
 | C ABI (`chio-cpp-kernel-ffi`) | OS RNG inside the library |
 | Security producers (cage, secret broker, other `chio.receipt.v1` emitters) | host `Rng` passed into their signing path |
+| Other std processes: control plane (keyring projection, native evidence, response simulation, SCIM deprovision, verified-fix evidence), `chio-http-core`, `chio-acp-proxy`, `chio-otel-receipt-exporter`, `chio-mercury`, `chio-wall` | OS RNG through the `Rng` seam |
+| Harness, conformance and fixture producers (`chio-runtime-harness`, `chio-conformance` native suite, `chio-attest-loopback`, `chio proof fixture` generators) | seeded deterministic `Rng` injected through the same seam; output is fixture material only |
+
+Rule (G3): a producer draws salts from the `Rng` seam of the process that signs. The inventory assigns every producer to one row. A producer that holds only a hash today (ACP relays, verified-fix evidence, fixture re-signers) receives the preimage over its existing channel, and a fixture that re-signs a recorded hash is regenerated from its recorded preimage.
 
 The FFI and WASM relay seam (T14) is replaced: those adapters pass the unsigned body plus the parameter and content preimages, and the core computes commitments and salts. `sign_receipt_relaying_trusted_body` is deleted, which also removes the one place where a caller-asserted content hash was trusted. Out-of-workspace emitters (the Lambda extension under `sdks/lambda/`) adopt the format in the same PR or are deleted.
 
@@ -955,7 +982,8 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `src/receipt/kinds.rs` [M1, M2]: delete `RedactionMode` [M1]; add `PdpDecision`, `PreventExternal`, `Delegated` [M2].
 - `src/receipt/disclosure.rs` (new) [M1]: `Commitment`, `ReceiptDisclosure`, open and verify.
 - `src/receipt/settlement.rs` (new) [M3]: `SettlementBlock`, `SettlementClosure`, `RailRef`.
-- `src/signed_artifact.rs`: register new signed schemas.
+- `src/signed_artifact.rs` [M1]: register new signed schemas and every existing wrapper id that is not yet registered (G11).
+- `src/manifest.rs` [M1]: delete `ToolManifest`, `ToolManifestBody` and `ToolManifest::sign`; chio-manifest `SignedManifest` is the only signed manifest (G9).
 
 ### 10.2 `crates/kernel/chio-kernel-core` [M1 unless noted]
 
@@ -970,7 +998,9 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `crates/kernel/chio-kernel-mobile`, `crates/sdk/chio-cpp-kernel-ffi`, `crates/sdk/chio-bindings-ffi`: relay API takes preimages; OS RNG.
 - Security producers under `crates/security/` that emit `chio.receipt.v1`: pass the host `Rng` and preimages.
 - `sdks/lambda/chio-lambda-extension`: adopt the format or delete the receipt path.
-- M0 task: a complete inventory of `chio.receipt.v1` producers (grep for receipt construction and every signing entry point), checked in with the M0 PROTOCOL text, so the M1 PR set is known.
+- `crates/platform/chio-http-core`, `chio-api-protect`, `chio-tower` and the HTTP middleware SDKs (Python, JVM, .NET): delete `HttpReceipt`; sign `chio.receipt.v1` through the shared kernel signer with the HTTP request as parameter preimage and the response as content preimage (G4).
+- `chio-acp-proxy`, control-plane SCIM and verified-fix producers, and fixture re-signers: pass preimages instead of hashes (G3).
+- M0 task (done, #1531): a complete inventory of `chio.receipt.v1` producers, checked in at `docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md`. Its gaps are decided in section 2.5.
 
 ### 10.4 `crates/trust/chio-signing-remote` [M2]
 
@@ -1019,7 +1049,7 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `sdks/typescript`, `sdks/python`, `sdks/go` verifiers [M1]: signing wrapper, commitments, openings, new vectors. These change in the same PRs as the Rust format change. Default-build P-256 verification in the SDKs [M2].
 - `spec/PROTOCOL.md` [M0]: section 4 (signing wrapper, algorithm binding); new subsection 5.6 "Anchored roots and the relying-party exchange"; section 6 table and WYSIWYS text for commitments, the `tenant_id` exclusion and producer salt sources; 6.1 for `pdp_decision`; new 6.7 "Settlement block and closure"; 8.2 updated once the ADR is accepted; 10.3 rewritten for root policy rules (the enterprise provider registry is deleted); the section 14 gap line on enterprise identity propagation narrowed to "outside exchange-issued roots"; a deployment-limits note for single-instance edges. `spec/WIRE_PROTOCOL.md` [M0]: `_meta.chioCapability` and `_meta.chioReceipt`.
 - `spec/schemas/chio-wire/v1/` [M0]: schemas for every artifact in section 7, including the optional ID-JAG retention slot (D7) and the M2 and M3 artifacts; `registry.json` entries.
-- `docs/adr/` [M0]: the customer-hosted root exchange ADR outlined in section 15 (next free number), accepted before M1 code merges (T22, D12).
+- `docs/adr/` [M0]: the customer-hosted root exchange ADR outlined in section 15 (`docs/adr/ADR-0039-customer-hosted-root-exchange.md`, #1533), accepted before M1 code merges (T22, D12).
 - `docs/reference/CLAIM_REGISTRY.md`: one row per acceptance statement in section 12, added only when its evidence exists.
 - `docs/release/QUALIFICATION.md` [M1]: the hosted authorization edge rows (including the row whose command runs `mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange`, which exercises local AS re-exchange) are marked suspended at the M1 migration merge and rewritten against the anchored flow when the lane re-passes (D1).
 - `README.md` and public docs [M1]: state the hosted-edge qualified-label suspension from the M1 migration merge until the lane re-passes, and remove the statement when it does (F13).
@@ -1061,7 +1091,7 @@ New categories under `crates/tooling/chio-conformance/verdict_matrix/scenarios/`
 
 | Category | Milestone | Covers |
 |---|---|---|
-| `anchored_root` | M1 (16), M2 (+4) | each M1 anchor kind allow, including static bearer and `entra_jwt`; each section 8.1 and 8.2 deny; client authentication denials; `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry. M2 adds Entra Agent ID allow, discriminator routing in both directions, and agent `uti` reuse |
+| `anchored_root` | M1 (16), M2 (+4) | each M1 anchor kind allow, including static bearer and `entra_jwt`; section 8.1 and 8.2 denies (client authentication, replay, missing anchor, lifetime, unlisted exchange key, Entra issuer on an `oidc_jwt` rule); `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry. All 16 are staged in M0 (section 2.5). M2 adds Entra Agent ID allow, discriminator routing in both directions, and agent `uti` reuse |
 | `receipt_disclosure` | M1 (12) | committed default; evidence allowlist drop; `tenant_id` exclusion; salt-only opening rejected in auditor profile; inline-field scenarios written in M1 as expected-deny at policy load and flipped in M2 |
 | `revocation_local` | M1 (12) | each provider revocation target denies the next call; cascade; concurrent revocation and admission |
 | `delegation_chain` | M2 (12) | depth 1-4 allow; reorder, gap, widened hop, mismatched anchor deny; offline verify equals online verdict; caller revocation of a descendant |
@@ -1183,14 +1213,14 @@ Not available as cuts: the `operator_static_bearer`, `oidc_jwt`, `oauth_introspe
 | M0 | Signing-wrapper and committed-receipt reference script and vectors | S, 4-5 |
 | M0 | `SigningBackend` collapse (D16): trait, 36 impls, fallible wrappers, about 1.5k-2.5k changed lines, byte-neutral | M, 5-7 |
 | M0 total | | 17-22 |
-| M1 | 1. Signing wrapper in `chio-core-types` (`sign_wrapped`, algorithm binding), all signing call sites, Rust and SDK verifiers, fixture regeneration | L, 15-20 |
-| M1 | 2. Committed receipts in every producer (kernel-core signer, hosted kernel, `api protect`, FFI, WASM, mobile, security producers, Lambda extension), `tenant_id` exclusion, guard evidence allowlist, disclosure store, SDK verifiers, scenario and fixture rewrites | L, 20-28 |
+| M1 | 1. Signing wrapper in `chio-core-types` (`sign_wrapped`, algorithm binding), all signing call sites including the raw-site table, registration of every unregistered wrapper id with its schema, the schema-id binding signer, deletion of the core-types `ToolManifest`, Rust and SDK verifiers, fixture regeneration | L, 22-30 |
+| M1 | 2. Committed receipts in every producer (kernel-core signer, hosted kernel, `api protect`, FFI, WASM, mobile, security producers, Lambda extension), `HttpReceipt` deletion with the HTTP middleware SDKs, preimage plumbing for hash-relaying producers, `tenant_id` exclusion, guard evidence allowlist, disclosure store, SDK verifiers, scenario and fixture rewrites | L, 26-37 |
 | M1 | 3. Anchored-root types, section 7.1 bindings and `AnchoredTrustRoot` (depth 0) | M, 6-8 |
 | M1 | 4. Exchange: ID-JAG with confidential client authentication; the kept kinds (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `entra_jwt`, `chio_local_as` with re-exchange, `chio_operator_key`); trust-control exchange signer; deletions (seed-derived keys, bypass issuance, `serve-http` enterprise provider registry and provider profile, per-store path flags) with tutorial, peer, example and deploy updates; pinned JWKS with refresh and snapshots; replay keys; tenant and subject tags; state-directory lock | L, 25-35 |
 | M1 | 5. Revocation target kinds on the existing store, linearized with admission, provider revocation admin | M, 4-6 |
 | M1 | 6. `chio-bundle-verify`, `caller` and `auditor_hash_only` export | M, 7-10 |
 | M1 | 7. Tests, vectors, `rust-mcp-serve-http` driver, live Okta and Entra runs, conformance peers on the migrated edge, hosted-edge qualification lane re-run, QUALIFICATION and README updates | M, 10-15 |
-| M1 total | | 87-122 |
+| M1 total | | 100-141 |
 | M2 | Entra Agent ID intake beside `entra_jwt` (D5, D14), discriminator routing and live run | S, 3-5 |
 | M2 | `ClassicalSigner` plumbing, default-build P-256 verification (Rust and SDKs), AWS KMS P-256 backend, live KMS run | M, 10-13 |
 | M2 | KMS Ed25519 | S, 3-4 |
@@ -1206,14 +1236,14 @@ Not available as cuts: the `operator_static_bearer`, `oidc_jwt`, `oauth_introspe
 | M3 | Typed `Asset` (in place, all callers), manifest pricing, facilitator adapter, x402 challenge on MCP and HTTP, settlement block and closure | L, 18-25 |
 | M3 total | | 28-39 |
 
-M1 is 87-122 engineer-days after the day-one and second-line cuts. At about 21 working days a month that is roughly four to six months for one engineer, before any wait for the D17 byte-change coordination. The M1 window in the private schedule is set against this number.
+M1 is 100-141 engineer-days after the day-one and second-line cuts and the section 2.5 decisions (previously 87-122). At about 21 working days a month that is roughly five to seven months for one engineer, before any wait for the D17 byte-change coordination. The M1 window in the private schedule is set against this number.
 
 ### 13.3 M1 order for one engineer
 
 Ordered so each step lands on `main` green and later steps build on it:
 
 1. Signing wrapper (item 1), on the collapsed trait from M0. It touches every signed fixture, so it goes first while the tree is otherwise stable. Its PR opens only after the D17 coordination.
-2. Committed receipts (item 2), producer by producer in the M0 inventory order, with the format change itself in one PR that updates all verifiers. Same D17 coordination.
+2. Committed receipts (item 2) in one squash-merged PR that changes the format, every producer and every verifier. Commits follow the inventory's commit groups, with each producer's salt-source wiring in its own commit (G1). Same D17 coordination.
 3. Anchored-root types and resolver (item 3).
 4. Exchange and migration (item 4): ID-JAG with client authentication first, then the kept auth kinds and the trust-control signer, then the deletions in the final PR of the step.
 5. Revocation (item 5), after reconciling the store shape with coop2c (section 7.11).
@@ -1248,7 +1278,7 @@ No further cut is pre-approved. Any cut below removes an M1 deliverable and need
 
 ## 15. ADR outline: customer-hosted root exchange (D12)
 
-To be written as `docs/adr/ADR-<next>-customer-hosted-root-exchange.md` in M0.
+Written as `docs/adr/ADR-0039-customer-hosted-root-exchange.md` in M0 (#1533). ADR-0038 reserves 0023 to 0037.
 
 1. **Context.** PROTOCOL 8.2 blocks hosted OAuth authorization-server product work pending an ADR. The relying-party wedge needs the local AS in `serve-http` to accept external IdP assertions and issue anchored Chio roots. Today the local AS exchanges only its own tokens (T1) and every registered client is public (T26).
 2. **Decision.** The provider runs the root exchange inside its own `serve-http` process, on the existing local AS, using provider-controlled exchange and policy keys. Backbay operates no exchange in v1. Every `serve-http` root is exchange-issued and anchored, including roots for the static bearer, generic OIDC, introspection, Entra and local AS paths; session issuance that bypasses the exchange is removed. The exchange signer is a local seed file or the pinned remote trust-control authority.

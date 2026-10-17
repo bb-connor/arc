@@ -46,16 +46,16 @@
 | `crates/core/chio-core-types/tests/signing_backend_identity.rs` (new) | 1 | Fallible-identity contract tests |
 | 26 further crates per the trait-plan census | 1 | Callers and impls of the collapsed trait |
 | `docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md` (new) | 2 | Receipt producers, `RedactionMode` mapping, wrapper schema-id table |
-| `docs/superpowers/specs/relying-party-wedge/verdict-matrix/{anchored_root,receipt_disclosure,revocation_local}/*.json` (new, 36 files) | 2 | Staged M1 scenarios |
+| `docs/superpowers/specs/relying-party-wedge/verdict-matrix/{anchored_root,receipt_disclosure,revocation_local}/*.json` (new, 40 files: 16, 12, 12) | 2 | Staged M1 scenarios |
 | `docs/superpowers/specs/relying-party-wedge/verdict-matrix/README.md` (new) | 2 | Script vocabulary, proposed reason URNs, move-in instructions |
-| `docs/adr/ADR-0023-customer-hosted-root-exchange.md` (new), `docs/adr/README.md` | 3 | ADR (D12) |
+| `docs/adr/ADR-0039-customer-hosted-root-exchange.md` (new), `docs/adr/README.md` | 3 | ADR (D12) |
 | `spec/PROTOCOL.md`, `spec/WIRE_PROTOCOL.md` | 3 | Contract text with status lines |
 | `spec/schemas/chio-wire/v1/root-authority/*.schema.json` (new) | 4 | Root policy, delegation context, IdP key snapshot, verifier trust, revocation request |
 | `spec/schemas/chio-wire/v1/capability/presentation.schema.json` (new) | 4 | Capability presentation |
 | `spec/schemas/chio-wire/v1/receipt/{disclosure,settlement-closure}.schema.json` (new) | 4 | Receipt disclosure opening, settlement closure |
 | `spec/schemas/chio-wire/v1/root-authority/examples/{valid,invalid}/*.json` (new) | 4 | Positive and negative schema instances |
 | `scripts/check-root-authority-schema-examples.py` (new), `.github/workflows/ci.yml` (one line) | 4 | Validates the examples |
-| `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, generated code in four languages | 4 | Registration and codegen |
+| `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, generated code in four languages | 4 | Registration and codegen; removal of the `chio.security-event-body.v1` row (spec 2.5 G8) |
 | `docs/superpowers/specs/relying-party-wedge/in-place-schemas/*.schema.json` (new) | 4 | Staged target shapes of existing v1 schemas |
 | `scripts/gen-signing-wrapper-vectors.py` (new) | 5 | Reference generator and checker |
 | `tests/bindings/vectors/signing/wrapper-v1.json`, `tests/bindings/vectors/receipt/committed-v1.json` (new), `tests/bindings/vectors/MANIFEST.sha256` | 5 | Vectors |
@@ -98,8 +98,8 @@ python3 -I -c 'import json,pathlib,sys; [json.loads(p.read_bytes()) for p in pat
 
 **PR 3**
 ```bash
-grep -n $'\xe2\x80\x94' spec/PROTOCOL.md spec/WIRE_PROTOCOL.md docs/adr/ADR-0023-customer-hosted-root-exchange.md docs/adr/README.md ; test $? -eq 1
-grep -n -i -E '\bM[0-3]\b|wedge|pilot|docs/superpowers' spec/PROTOCOL.md spec/WIRE_PROTOCOL.md docs/adr/ADR-0023-customer-hosted-root-exchange.md ; test $? -eq 1
+grep -n $'\xe2\x80\x94' spec/PROTOCOL.md spec/WIRE_PROTOCOL.md docs/adr/ADR-0039-customer-hosted-root-exchange.md docs/adr/README.md ; test $? -eq 1
+grep -n -i -E '\bM[0-3]\b|wedge|pilot|docs/superpowers' spec/PROTOCOL.md spec/WIRE_PROTOCOL.md docs/adr/ADR-0039-customer-hosted-root-exchange.md ; test $? -eq 1
 bash scripts/check-chio-owned-v1-only.sh && python3 scripts/check-native-host-docs.py
 CARGO_TARGET_DIR=$T cs cargo test -p chio-spec-validate --no-fail-fast
 CARGO_TARGET_DIR=$T cs cargo test -p chio-core-types --test claim_registry_integrity --no-fail-fast
@@ -237,9 +237,9 @@ Spec 7.6 item 3, 10.3 "M0 task", 12 M0 exit "producer inventory checked in".
 **Interfaces:**
 - Consumes: nothing.
 - Produces three tables later tasks read by heading name:
-  - `## Receipt producers`: columns `producer | crate:file:line | signing entry point | holds content preimage (yes/no) | salt source (spec 7.8 row) | commit order`. "Commit order" is the M1 item 2 PR order.
+  - `## Receipt producers`: columns `producer | crate:file:line | signing entry point | holds content preimage (yes/no) | salt source (spec 7.8 row) | commit order`. "Commit order" is the commit group inside the single squash-merged M1 item 2 PR (spec 2.5 G1).
   - `## RedactionMode mapping`: one row per non-test `RedactionMode::Summary` or `RedactionMode::Redacted` producer or reader, columns `file:line | current mode | target (fully committed, or committed with inline fields after inline disclosure exists) | reason`. Known rows at `d0482967b8`: `receipt/metadata.rs:63,75`, `chio-kernel/.../execution_validation.inc:494,675`, `response_simulation_report.rs:130`, `chio-lineage/src/ingest_active_defense.rs:199`, `chio-otel-receipt-exporter/src/sink.rs:268`, `chio-control-plane/src/keyring_runtime.rs:1129`, `security/adapters/native_evidence.rs:112,584`, `security/event_consumer/verification.rs:319`, `chio-cage/src/receipt.rs:345,421`.
-  - `## Wrapper schema ids`: columns `signed artifact type | signing helper or call site | wrapper schema_id | registered in registry.json (yes / assign)`. Every signed canonical-JSON artifact type reached through `sign_canonical_with_backend*`, `sign_shared_canonical_with_backend`, `sign_canonical_bytes`, `sign_bytes_with_identity` over canonical bytes, or `Keypair` canonical signing. Types with no registered id get an assigned `chio.<name>.v1` id (at least `DelegationLink` -> `chio.delegation-link.v1`; Chio DPoP proofs use whatever single v1 id #1489 leaves). Task 5 copies this table into PROTOCOL 4.5; Task 8 uses its ids.
+  - `## Wrapper schema ids`: columns `signed artifact type | signing helper or call site | wrapper schema_id | registered in registry.json (yes / assign)`. Every signed canonical-JSON artifact type reached through `sign_canonical_with_backend*`, `sign_shared_canonical_with_backend`, `sign_canonical_bytes`, `sign_bytes_with_identity` over canonical bytes, or `Keypair` canonical signing. Types with no registered id get an assigned `chio.<name>.v1` id (at least `DelegationLink` -> `chio.delegation-link.v1`; Chio DPoP proofs use `chio.dpop_proof.v1`, spec 2.5 G10). Task 5 copies this table into PROTOCOL 4.5; Task 8 uses its ids. The spec 2.5 decisions reconcile the table and the staged 4.5 table.
 
 - [ ] **Step 1: Generate the raw lists** on ws2 at the rebased `origin/main`:
 ```bash
@@ -261,13 +261,13 @@ Spec 11.3, 12 M0 exit "scenario files written (expected to fail)". The live corp
 
 **Files:**
 - Create: `docs/superpowers/specs/relying-party-wedge/verdict-matrix/README.md`
-- Create: 12 files each under `.../verdict-matrix/anchored_root/`, `.../receipt_disclosure/`, `.../revocation_local/`
+- Create: 16 files under `.../verdict-matrix/anchored_root/` and 12 each under `.../receipt_disclosure/` and `.../revocation_local/` (anchored_root 013 to 016 added by the gap PR, spec 2.5 "Count")
 
 **Interfaces:**
 - Consumes: anchor-kind names from the spec fix PR (Global Constraints).
 - Produces: scenario files in the existing `chio.verdict-matrix.scenario.v1` shape (`schema, id, title, category, description, tags, requires, script, expected{verdict, reason_code, scope_set}`), one JSON object per line-free file, with `category` set to the new value (`anchored_root`, `receipt_disclosure`, `revocation_local`) and `requires: ["rust-kernel", "rust-mcp-serve-http"]`. `script` uses `{"operation": "tool.call" | "exchange" | "export" | "policy.load", "setup": [<named fixtures>], "mutation": <named mutation or null>}`; the README defines every fixture and mutation name used. M1 moves each directory into `verdict_matrix/scenarios/`, adds the enum variants and `SCENARIOS.md` values, and re-pins `manifest.toml`.
 
-Scenario ids and expected verdicts (reason URNs are proposals registered in `spec/errors/registry.yaml` by M1):
+Scenario ids and expected verdicts (reason URNs use existing error domains per spec 2.5 G12 and are registered in `spec/errors/registry.yaml` by the M1 PR that first emits each):
 
 | Category | Id suffix | Verdict | reason_code |
 |---|---|---|---|
@@ -278,22 +278,26 @@ Scenario ids and expected verdicts (reason URNs are proposals registered in `spe
 | | 005-operator-root-allow | allow | same |
 | | 006-static-bearer-configured-principal-allow | allow | same |
 | | 007-entra-generic-one-root-per-uti-allow | allow | same |
-| | 008-public-client-jwt-bearer-deny | deny | `urn:chio:error:root-exchange:client-unauthenticated` |
-| | 009-replayed-id-jag-jti-deny | deny | `urn:chio:error:root-exchange:replay` |
-| | 010-root-without-anchor-deny | deny | `urn:chio:error:root-anchor:missing` |
-| | 011-expires-after-assertion-exp-deny | deny | `urn:chio:error:root-anchor:lifetime` |
-| | 012-entra-uti-bound-to-other-token-deny | deny | `urn:chio:error:root-exchange:replay` |
+| | 008-public-client-jwt-bearer-deny | deny | `urn:chio:error:transport:exchange-client-unauthenticated` |
+| | 009-replayed-id-jag-jti-deny | deny | `urn:chio:error:transport:exchange-replay` |
+| | 010-root-without-anchor-deny | deny | `urn:chio:error:capability:root-anchor-missing` |
+| | 011-expires-after-assertion-exp-deny | deny | `urn:chio:error:capability:root-anchor-lifetime` |
+| | 012-entra-uti-bound-to-other-token-deny | deny | `urn:chio:error:transport:exchange-replay` |
+| | 013-entra-multi-tenant-issuer-deny | deny | `urn:chio:error:transport:exchange-issuer-not-allowed` |
+| | 014-entra-uti-reuse-after-root-expiry-deny | deny | `urn:chio:error:transport:exchange-replay` |
+| | 015-entra-issuer-on-oidc-jwt-rule-rejected-at-load | deny | `urn:chio:error:policy:root-policy-entra-issuer-on-oidc-rule` |
+| | 016-root-signed-by-unlisted-exchange-key-deny | deny | `urn:chio:error:capability:root-exchange-key-untrusted` |
 | receipt_disclosure | 001-allow-receipt-fully-committed | allow | allow code |
 | | 002-deny-receipt-fully-committed | deny | existing scope-deny code |
 | | 003-undeclared-guard-evidence-field-dropped | allow | allow code |
 | | 004-argument-marker-absent-from-metadata | allow | allow code |
-| | 005-tenant-id-with-authority-fails-signing | deny | `urn:chio:error:receipt:tenant-id-with-authority` |
+| | 005-tenant-id-with-authority-fails-signing | deny | `urn:chio:error:attest:receipt-tenant-id-with-authority` |
 | | 006-stream-chunk-digests-absent | allow | allow code |
 | | 007-auditor-hash-only-export-has-no-salts | allow | allow code |
-| | 008-auditor-salt-only-opening-refused | deny | `urn:chio:error:export:salt-only-opening` |
-| | 009-caller-export-requires-tenant-tag | deny | `urn:chio:error:export:tenant-tag-required` |
+| | 008-auditor-salt-only-opening-refused | deny | `urn:chio:error:attest:export-salt-only-opening` |
+| | 009-caller-export-requires-tenant-tag | deny | `urn:chio:error:attest:export-tenant-tag-required` |
 | | 010-caller-export-contains-only-own-tenant | allow | allow code |
-| | 011-inline-tools-map-rejected-at-load | deny | `urn:chio:error:root-policy:inline-disclosure-unavailable` |
+| | 011-inline-tools-map-rejected-at-load | deny | `urn:chio:error:policy:root-policy-inline-disclosure-unavailable` |
 | | 012-inline-pointer-rejected-at-load | deny | same as 011 |
 | revocation_local | 001-capability-id-denies-next-call | deny | existing capability-revoked code |
 | | 002-capability-cascade-denies-descendant | deny | same |
@@ -301,8 +305,8 @@ Scenario ids and expected verdicts (reason URNs are proposals registered in `spe
 | | 004-anchor-subject-denies | deny | same |
 | | 005-tenant-tag-denies | deny | same |
 | | 006-replay-key-denies | deny | same |
-| | 007-matching-revocation-blocks-mint | deny | `urn:chio:error:root-exchange:revoked` |
-| | 008-store-error-denies | deny | existing revocation-store error code |
+| | 007-matching-revocation-blocks-mint | deny | `urn:chio:error:transport:exchange-revoked` |
+| | 008-store-error-denies | deny | `urn:chio:error:kernel:revocation-store` (converted from `CHIO-KERNEL-REVOCATION-STORE` in M1 item 5) |
 | | 009-acknowledged-revocation-seen-by-later-admission | deny | capability-revoked code |
 | | 010-admission-committed-before-revocation-completes | allow | allow code |
 | | 011-subject-revocation-stores-tag-only | deny | capability-revoked code |
@@ -311,16 +315,16 @@ Scenario ids and expected verdicts (reason URNs are proposals registered in `spe
 Scenarios 011 and 012 of `receipt_disclosure` flip to allow when inline disclosure lands (README states this). Fixture timestamps are fixed (`issued_at = 1792234800`).
 
 - [ ] **Step 1: Write README.md** defining the fixture names (IdP stub JWKS, ID-JAG minter, confidential client key, static bearer token plus configured principal, generic Entra token with `uti`, root policy fixture), the mutation names, the URN proposals above, and the move-in checklist for M1.
-- [ ] **Step 2: Write the 36 files.** Copy existing `reason_code` values for allow and revocation denies from `verdict_matrix/scenarios/capability_subset/` and `revocation_propagation/`.
+- [ ] **Step 2: Write the 40 files.** Copy existing `reason_code` values for allow and revocation denies from `verdict_matrix/scenarios/capability_subset/` and `revocation_propagation/`.
 - [ ] **Step 3: Validate** with the PR 2 JSON-parse command plus: every file has `schema == "chio.verdict-matrix.scenario.v1"`, a unique `id`, and the category of its directory (one `python3 -I -c` loop; expected: no output).
 - [ ] **Step 4: Commit** (`docs(superpowers): stage root-authority verdict-matrix scenarios`), then open PR 2. No REVIEW? needed (not a shared surface).
 
 ---
 
-### Task 4: ADR-0023 customer-hosted root exchange (PR 3, D12)
+### Task 4: ADR-0039 customer-hosted root exchange (PR 3, D12, merged as #1533)
 
 **Files:**
-- Create: `docs/adr/ADR-0023-customer-hosted-root-exchange.md` (use the next free number at execution time if 0023 is taken: `ls docs/adr` plus open PRs)
+- Create: `docs/adr/ADR-0039-customer-hosted-root-exchange.md` (0039, because ADR-0038 reserves 0023 to 0037)
 - Modify: `docs/adr/README.md` (append item 22)
 
 **Interfaces:**
@@ -382,12 +386,15 @@ Existing text that describes current behavior (section 6 field table, WYSIWYS ex
   - Every object `additionalProperties: false`; `schema` member `const` to its id; closed enums for `kind`, `holder` (`edge_session`, `caller`), `disclosure.default` (`committed` only), `recorded_claims` values (`plain`, `committed`), settlement `state` and `rail_refs[].kind`; digests `^sha256:[0-9a-f]{64}$`; salts `^b64u:[A-Za-z0-9_-]{43}$` (32 bytes, unpadded); amounts `^(0|[1-9][0-9]*)$`; timestamps non-negative integers; `max_clock_skew_secs` maximum 60; `jwks_uri` pattern `^https://`; `allowed_algs` items exclude `none` and `HS*`; public keys reuse the issuer-key pattern from `capability/token.schema.json`.
   - Optional ID-JAG retention slot present (D7): `retain_idp_artifact` on rules, `artifact_retained` in the context anchor.
   - Registry rows (signed artifacts only), `introducedBy: "root-authority-v1"`: `chio.root-policy.v1` (`root_policy`), `chio.idp-key-snapshot.v1` (`idp_key_snapshot`), `chio.revocation-request.v1` (`revocation_request`), `chio.settlement-closure.v1` (`settlement_closure`). `KNOWN_SIGNED_ARTIFACT_SCHEMAS` is not touched (Rust lands with the types; the parity tests only check Rust-to-registry).
+  - Registry removal (spec 2.5 G8): delete the `chio.security-event-body.v1` row. The body schema file stays; it is already the `payloadSchemaFile` of `chio.signed-security-event.v1`, and no Rust constant names the body id. The `chio.dpop_proof.v2` row is not touched here; its removal follows #1489 in the parallel lead's lane (spec 2.5 G10).
+  - Not registered here (spec 2.5 G11): the existing wrapper ids that are not yet in the registry. M1 item 1 registers each with its Rust type and schema, in the wrapper PR.
+  - No error-domain change (spec 2.5 G12).
   - `check-root-authority-schema-examples.py`: validates every `examples/valid/*.json` against the schema named by its `schema` member (Draft 2020-12, local `referencing` registry over `spec/schemas/chio-wire/v1`) and requires every `examples/invalid/*.json` to fail; exits non-zero otherwise.
 
 - [ ] **Step 1: Write the invalid examples first** (one file per rule): root policy with `default: "inline"`; rule with `allowed_algs: ["HS256"]`; `max_clock_skew_secs: 61`; `jwks_uri` over `http`; unknown anchor kind; delegation context with an extra member; salt with `=` padding; salt of 31 bytes; digest in uppercase hex; settlement closure with `state: "refunded"`; presentation missing `leaf`; verifier trust with unknown member.
 - [ ] **Step 2: Write the check script and run it.** `uv run --with jsonschema==4.26.0 --with referencing==0.37.0 python3 -I scripts/check-root-authority-schema-examples.py`. Expected: FAIL (schemas missing).
 - [ ] **Step 3: Write the schemas and the valid examples** (one per schema, using the spec section 7 examples with corrected key encoding and fixed timestamps). Run the check. Expected: PASS.
-- [ ] **Step 4: Register and hash.** Add the four registry rows (keep the file's ordering), regenerate `MANIFEST.sha256` deterministically (the format `check-chio-schema-registry.sh` recomputes), update the v1 README index.
+- [ ] **Step 4: Register and hash.** Add the four registry rows and remove the `chio.security-event-body.v1` row (keep the file's ordering), regenerate `MANIFEST.sha256` deterministically (the format `check-chio-schema-registry.sh` recomputes), update the v1 README index.
 - [ ] **Step 5: Regenerate code.** `bash -lc "cd $W && cargo xtask codegen --lang rust && cargo xtask codegen --lang python && cargo xtask codegen --lang ts && cargo xtask codegen --lang go"`. If a generator needs xtask post-processing changes for a new schema, simplify the schema construct instead; if that is impossible, stop and report to the coordinator (no hand edits to generated files or xtask in M0).
 - [ ] **Step 6: Run the PR 4 verify commands.** Expected: all pass; `wire_protocol_schema.rs` unchanged and green (live receipts still validate against the unchanged `record.schema.json`).
 - [ ] **Step 7: Commit** (`feat(schemas): add root-authority artifact schemas`).
@@ -425,7 +432,7 @@ These existing v1 schemas change in place, and `crates/core/chio-core-types/test
   - `canonical_json(value) -> bytes`: RFC 8785 restricted to objects with ASCII keys, strings, booleans, null and integers in `[-(2**53-1), 2**53-1]`; raises `ValueError` on floats, larger integers or non-ASCII keys.
   - `wrapper(schema_id: str, canonical_body: bytes) -> bytes` (88 bytes).
   - `wrapper-v1.json`: `{"generated_by": "scripts/gen-signing-wrapper-vectors.py", "prefix_hex": "<hex of chio.signing-wrapper.v1 NUL>", "keys": {"ed25519": {"seed_hex", "public_key"}, "p256": {"scalar_hex", "public_key"}, "p384": {...}}, "wrapper_cases": [{"id", "schema_id", "canonical_body", "wrapper_hex"}], "signature_cases": [{"id", "description", "algorithm", "signed_schema_id", "verify_schema_id", "canonical_body", "public_key", "signature", "expected_verify"}]}`. Keys and signatures use Chio `to_hex` encodings. Fixed keys: Ed25519 seed `0x01 * 32`, P-256 scalar `0x02 * 32`, P-384 scalar `0x03 * 48`.
-  - `wrapper_cases`: one per schema id in `spec/schemas/registry.json` plus every assigned id in the Task 2 table, over the fixed body `{"a":1}`.
+  - `wrapper_cases`: one per schema id in `spec/schemas/registry.json` plus every id in the staged PROTOCOL 4.5 table (`docs/superpowers/specs/relying-party-wedge/protocol/protocol-4.5-signing-wrapper.md`), over the fixed body `{"a":1}`. Excluded: `chio.security-event-body.v1` and `chio.dpop_proof.v2` (spec 2.5 G8, G10) and the exempt formats (G2), which have no wrapper.
   - `signature_cases`: for each of `ed25519`, `p256`, `p384` and each of `chio.receipt.v1`, `chio.capability.v1`, `chio.delegation-link.v1`, `chio.root-policy.v1`, `chio.idp-key-snapshot.v1`, `chio.revocation-request.v1`, `chio.settlement-closure.v1`: one positive case; plus negatives: schema-id substitution (signed as `chio.capability.v1`, verified as `chio.receipt.v1`), algorithm-prefix mismatch (Ed25519 key, `p256:` signature), signature over the raw body instead of the wrapper, one-bit body change, P-256 signature over `SHA-256(wrapper)` hashed again (double hash).
   - ML-DSA-65 and hybrid cases are not generated here (no ML-DSA in `cryptography==44.0.3`); M1 adds them from Rust in `signing/wrapper-pq-v1.json`.
 
@@ -479,3 +486,4 @@ These existing v1 schemas change in place, and `crates/core/chio-core-types/test
 6. Spec examples write keys as `ed25519:<hex>`; Chio's encoding is bare 64-hex for Ed25519. Schemas and vectors use `PublicKey::to_hex`.
 7. New `chio-wire/v1` schemas regenerate code in four languages. Generated output only; no hand-written code.
 8. Founder correction: static bearer and generic Entra stay and gain anchor kinds. All M0 artifacts follow the correction; kind names come from the spec fix PR.
+9. The twelve inventory gaps (G1 to G12) and the `anchored_root` count are decided in spec section 2.5. Effect on this plan: Task 3 stages 40 scenarios with reason codes in existing error domains; Task 6 removes the `chio.security-event-body.v1` registry row and registers no existing wrapper id (M1 item 1 does, with the Rust types); Task 8 takes its ids from the reconciled staged 4.5 table. M0 size is unchanged; M1 grows to 100-141 engineer-days.
