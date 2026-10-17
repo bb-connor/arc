@@ -488,7 +488,7 @@ async fn mediated_governed_capability_requires_retained_approval() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
         rejected["message"],
-        "use approval_id to redeem the retained server-built approval"
+        "urn:chio:error:attest:signed-json-invalid-shape"
     );
     assert!(budget.get_usage(&cap.id, 0).test_unwrap().is_none());
 }
@@ -532,7 +532,7 @@ async fn mediated_governed_direct_token_rejected_even_with_payment_adapter() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
         json["message"],
-        "use approval_id to redeem the retained server-built approval"
+        "urn:chio:error:attest:signed-json-invalid-shape"
     );
     assert!(budget.get_usage(&cap.id, 0).test_unwrap().is_none());
 }
@@ -567,7 +567,7 @@ async fn mediated_governed_direct_token_rejected_without_payment_adapter() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
         json["message"],
-        "use approval_id to redeem the retained server-built approval"
+        "urn:chio:error:attest:signed-json-invalid-shape"
     );
     assert!(budget.get_usage(&cap_id, 0).test_unwrap().is_none());
 }

@@ -862,7 +862,7 @@ async fn mediated_invocation_receipt_persistence_failure_returns_nonce_and_keeps
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn mediated_direct_approval_rejects_before_payment_and_receipt_side_effects() {
-    // A legacy approval envelope is rejected before payment or receipt storage.
+    // A request carrying approval_token is refused before payment or receipt storage.
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let budget: Arc<dyn BudgetStore> = Arc::new(InMemoryBudgetStore::new());
@@ -908,7 +908,7 @@ async fn mediated_direct_approval_rejects_before_payment_and_receipt_side_effect
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(
         json["message"],
-        "use approval_id to redeem the retained server-built approval"
+        "urn:chio:error:attest:signed-json-invalid-shape"
     );
     assert_eq!(captures.load(std::sync::atomic::Ordering::SeqCst), 0);
     assert_eq!(refunds.load(std::sync::atomic::Ordering::SeqCst), 0);

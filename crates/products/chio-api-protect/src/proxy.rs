@@ -18,7 +18,6 @@ use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use chio_core_types::capability::{
-    governance::GovernedApprovalToken,
     scope::{ChioScope, Operation, PromptGrant, ResourceGrant, ToolGrant},
     token::{CapabilityToken, CapabilityTokenBody},
 };
