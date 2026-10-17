@@ -12,6 +12,7 @@ use super::runtime_attestation::RuntimeAssuranceTier;
 
 /// What a capability token authorizes.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChioScope {
     /// Individual tool grants.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -92,6 +93,7 @@ pub struct MonetaryAmount {
 
 /// Authorization for a single tool on a single server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolGrant {
     /// Which tool server (by server_id from the manifest).
     pub server_id: String,
@@ -205,6 +207,7 @@ impl ToolGrant {
 
 /// Authorization for reading or subscribing to a resource.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResourceGrant {
     /// URI pattern identifying which resources are in scope.
     pub uri_pattern: String,
@@ -225,6 +228,7 @@ impl ResourceGrant {
 
 /// Authorization for retrieving a prompt by name.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PromptGrant {
     /// Prompt name pattern.
     pub prompt_name: String,
@@ -326,7 +330,8 @@ pub enum ModelSafetyTier {
     tag = "type",
     content = "value",
     rename_all = "snake_case",
-    deny_unknown_fields
+    deny_unknown_fields,
+    remote = "Self"
 )]
 pub enum Constraint {
     /// File path parameter must start with this prefix.
@@ -453,6 +458,7 @@ pub enum Constraint {
     /// recovery-aware admission reject the marker before dispatch.
     RequireFindingRecovery(Box<FindingRecoveryMarkerV1>),
 }
+chio_security_types::lossless_serde!(Constraint);
 
 /// Closed settlement selector for a purchased finding reveal.
 ///

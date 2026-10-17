@@ -620,20 +620,35 @@ pub(crate) async fn sidecar_capabilities_alias_handler(
 // Capability validation
 // ---------------------------------------------------------------------------
 
-/// `POST /v1/capabilities/validate` request shape.
-///
-/// The SDK posts the full `CapabilityToken` JSON; the optional
-/// `expected_subject` and `expected_scope` fields are accepted for forward
-/// compatibility but not enforced today (the route reports them in the
-/// response so callers can audit if they were ignored).
-#[derive(Debug, Deserialize)]
+/// `POST /v1/capabilities/validate` request shape: the full `CapabilityToken`
+/// JSON plus optional `expected_subject` and `expected_scope` members. The
+/// token decodes strictly from every other member.
+#[derive(Debug)]
 pub(crate) struct SidecarValidateCapabilityRequest {
-    #[serde(flatten)]
     token: CapabilityToken,
-    #[serde(default)]
     expected_subject: Option<String>,
-    #[serde(default)]
     expected_scope: Option<ChioScope>,
+}
+
+impl<'de> Deserialize<'de> for SidecarValidateCapabilityRequest {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let mut members = serde_json::Map::deserialize(deserializer)?;
+        let mut member = |name: &str| members.remove(name).unwrap_or(serde_json::Value::Null);
+        let expected_subject =
+            serde_json::from_value(member("expected_subject")).map_err(D::Error::custom)?;
+        let expected_scope =
+            serde_json::from_value(member("expected_scope")).map_err(D::Error::custom)?;
+        let token =
+            serde_json::from_value(serde_json::Value::Object(members)).map_err(D::Error::custom)?;
+        Ok(Self {
+            token,
+            expected_subject,
+            expected_scope,
+        })
+    }
 }
 
 #[derive(Debug, Serialize)]

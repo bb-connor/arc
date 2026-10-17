@@ -2419,6 +2419,46 @@ async fn sidecar_validate_capability_returns_valid_for_freshly_minted_token() {
 }
 
 #[tokio::test]
+async fn sidecar_validate_capability_refuses_a_padded_token() {
+    let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
+    let mint_body = serde_json::json!({
+        "subject": Keypair::generate().public_key().to_hex(),
+        "scope": { "grants": [], "resource_grants": [], "prompt_grants": [] },
+        "ttl_seconds": 600,
+    });
+    let mint_response = build_app(Arc::clone(&state))
+        .oneshot(loopback_post("/v1/capabilities", mint_body))
+        .await
+        .test_unwrap();
+    let mint_bytes = to_bytes(mint_response.into_body(), 1024 * 1024)
+        .await
+        .test_unwrap();
+    let token: CapabilityToken = serde_json::from_slice(&mint_bytes).test_unwrap();
+
+    for path in ["", "/scope"] {
+        let mut validate_body = serde_json::to_value(&token).test_unwrap();
+        validate_body
+            .pointer_mut(path)
+            .and_then(serde_json::Value::as_object_mut)
+            .test_unwrap()
+            .insert("pad".to_string(), serde_json::json!(0));
+        let validate_response = build_app(Arc::clone(&state))
+            .oneshot(loopback_post("/v1/capabilities/validate", validate_body))
+            .await
+            .test_unwrap();
+        assert_eq!(validate_response.status(), StatusCode::BAD_REQUEST);
+        let bytes = to_bytes(validate_response.into_body(), 1024 * 1024)
+            .await
+            .test_unwrap();
+        let json: serde_json::Value = serde_json::from_slice(&bytes).test_unwrap();
+        assert_eq!(
+            json["message"].as_str(),
+            Some("urn:chio:error:attest:signed-json-invalid-shape")
+        );
+    }
+}
+
+#[tokio::test]
 async fn sidecar_validate_capability_rejects_relaxed_expected_scope_constraints() {
     let state = test_state(Vec::new(), "http://127.0.0.1:1".to_string());
     let mint_body = serde_json::json!({

@@ -2873,6 +2873,10 @@
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_slice",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_governed_fields::from_str",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_governed_fields::from_str",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs::deserialize::from_value",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs::deserialize::from_value",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs::deserialize::from_value",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs::sidecar_capabilities_alias_handler::custom_deserialize",
     "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value",
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice",
@@ -5375,6 +5379,8 @@
     "crates/platform/chio-trust-market-context/src/evidence.rs::parse_artifact_from_value::from_value": "Original graphs, receipts and signed context artifacts use bounded native input. Graph cardinality is bounded before traversal. Fallible auxiliary receipt and risk lookups preserve native parsing causes. Selected signatures, signer roles, digests, terminal state and claim bindings remain mandatory.",
     "crates/products/chio-api-protect/src/proxy/input.rs::decode_arguments::from_slice": "Bounded original RawValue slices preserve strict decoding for capability, nonce, approval, signed plan/outcome and delivery credentials. Arguments, parameters, governed context and normalized runtime evidence use unsigned document numbers. Reserved callChainUpstreamProof and callChainContinuation context members are validated from their original signed slices. Complete-document duplicate rejection precedes typed projection or authority; raw field maps never authorize requests.",
     "crates/products/chio-api-protect/src/proxy/input.rs::validate_governed_fields::from_str": "Bounded original RawValue slices preserve strict decoding for capability, nonce, approval, signed plan/outcome and delivery credentials. Arguments, parameters, governed context and normalized runtime evidence use unsigned document numbers. Reserved callChainUpstreamProof and callChainContinuation context members are validated from their original signed slices. Complete-document duplicate rejection precedes typed projection or authority; raw field maps never authorize requests.",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs::deserialize::from_value": "The capability validate request is read by the bounded original-byte reader; its Deserialize splits expected_subject and expected_scope from the members and decodes the rest as a strict CapabilityToken, so no unknown member reaches the signed token. Signature, issuer trust and revocation checks follow.",
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs::sidecar_capabilities_alias_handler::custom_deserialize": "The capability validate request is read by the bounded original-byte reader; its Deserialize splits expected_subject and expected_scope from the members and decodes the rest as a strict CapabilityToken, so no unknown member reaches the signed token. Signature, issuer trust and revocation checks follow.",
     "crates/products/chio-cli/src/active_defense_migration.rs::strict_typed_value::from_value": "Bounded original strict I-JSON feeds typed migration records. Only signed chio.manifest.v1 in the closed shape is accepted with registered pinned keys; no conversion or unsigned-output API exists. Shadow telemetry remains diagnostic and cannot grant enforcement authority.",
     "crates/products/chio-cli/src/cli/chio/dispatch/pheromone/directory.rs::parse_relay_peer_directory_json::from_value": "CLI directory schema selection uses bounded original native JSON and forwards the native input cause to the relay error. Existing signed directory/trusted issuer validation remains mandatory.",
     "crates/products/chio-cli/src/cli/dispatch/finding/verified_fix.rs::load_verification_market::from_slice": "Bounded exact canonical admission jobs preserve requested package/finding bindings. HTTP responses have actual-byte limits and request deadlines; oversized prefixes cannot decode as complete replies. Collateral evaluation increment is checked; existing profile, retained bundle and activation identities remain checked before completion.",
@@ -7180,6 +7186,12 @@
       "decode_arguments::from_slice",
       "validate_governed_fields::from_str",
       "validate_governed_fields::from_str"
+    ],
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs": [
+      "deserialize::from_value",
+      "deserialize::from_value",
+      "deserialize::from_value",
+      "sidecar_capabilities_alias_handler::custom_deserialize"
     ],
     "crates/products/chio-cli/src/active_defense_migration.rs": [
       "strict_typed_value::from_value"
@@ -10149,6 +10161,26 @@
           ],
           "apis": [
             "call::validate_signed_value::UntrustedJsonText::from_wire#1::decode_signed"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/products/chio-api-protect/src/proxy/sidecar.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "The capability validate request is read by the bounded original-byte reader; its Deserialize splits expected_subject and expected_scope from the members and decodes the rest as a strict CapabilityToken, so no unknown member reaches the signed token. Signature, issuer trust and revocation checks follow.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize",
+            "from_value",
+            "from_value",
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value",
+            "serde::Deserializer"
           ],
           "checked": true
         }
