@@ -589,6 +589,64 @@ fn corpus() -> TestResult<Corpus> {
         Some("work.bounds"),
     )?);
 
+    let worked = |view: Value| {
+        json!({"schema": "chio.work.response.v1", "version": 1,
+        "body": {"kind": "query", "result": {"kind": "work", "view": view}}})
+    };
+    for slot in [
+        "execution",
+        "acceptance",
+        "result_reference",
+        "recovery",
+        "settlement",
+        "bilateral_delivery",
+    ] {
+        let name = slot.replace('_', "-");
+        let mut unit = view();
+        unit[slot] = json!({"kind": "not_applicable"});
+        vectors.push(vector(
+            &format!("observation-{name}-not-applicable"),
+            "response",
+            &worked(unit.clone()),
+            true,
+            None,
+        )?);
+        unit[slot]["pad"] = json!(0);
+        vectors.push(vector(
+            &format!("observation-{name}-not-applicable-unknown-field"),
+            "response",
+            &worked(unit),
+            false,
+            Some("work.malformed"),
+        )?);
+    }
+    let mut reconciled_unit = view();
+    reconciled_unit["settlement"] = json!({"kind": "not_applicable", "pad": 0});
+    vectors.push(vector(
+        "reconciled-observation-not-applicable-unknown-field",
+        "response",
+        &reconciled(reconciled_unit),
+        false,
+        Some("work.malformed"),
+    )?);
+    let mut never_admitted = view();
+    never_admitted["execution"]["value"] = json!({"kind": "never_admitted"});
+    vectors.push(vector(
+        "execution-never-admitted",
+        "response",
+        &worked(never_admitted.clone()),
+        true,
+        None,
+    )?);
+    never_admitted["execution"]["value"]["pad"] = json!(0);
+    vectors.push(vector(
+        "execution-never-admitted-unknown-field",
+        "response",
+        &worked(never_admitted),
+        false,
+        Some("work.malformed"),
+    )?);
+
     let mut unsorted = (1..=3).map(join_parent).collect::<Vec<_>>();
     unsorted.swap(0, 1);
     vectors.push(vector(
