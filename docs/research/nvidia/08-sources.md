@@ -1265,7 +1265,7 @@ Code citations are grouped by crate. The Files column lists the paths cited insi
 | [`examples/chio-3vendor`](../../../examples/chio-3vendor) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 07 |
 | [`examples/istio-ext-authz/00-chio-sidecar-deployment.yaml`](../../../examples/istio-ext-authz/00-chio-sidecar-deployment.yaml) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 06 |
 | [`integrations/mcp-adapter/registry/server.json`](../../../integrations/mcp-adapter/registry/server.json) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 06 |
-| [`integrations/mcp-adapter/tests/agentcore_gateway_consumer.rs`](../../../integrations/mcp-adapter/tests/agentcore_gateway_consumer.rs) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 02, 05, 06 |
+| [`integrations/mcp-adapter/tests/agentcore_gateway_consumer.rs`](../../../integrations/mcp-adapter/tests/agentcore_gateway_consumer.rs) (renamed in #1514) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 02, 05, 06 |
 | [`scripts/check-chio-treaty-bound-provenance.sh`](../../../scripts/check-chio-treaty-bound-provenance.sh) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 02 |
 | [`scripts/check-chio-treaty-buyer-hero-loop.sh`](../../../scripts/check-chio-treaty-buyer-hero-loop.sh) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 02 |
 | [`sdks/k8s`](../../../sdks/k8s) | the path itself | f5566d9a76, 2026-09-03 | Read at main | 06 |

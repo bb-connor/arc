@@ -22,8 +22,8 @@ diagrams) that has to ship alongside an AWS Marketplace listing.
 
 - `mcp-adapter/` (`chio-mcp-adapter-integration`): the distribution packaging
   for Chio's registry-listed MCP server. It extends the core MCP edge transport
-  with Streamable HTTP, OAuth 2.1 + PKCE, RFC 9728 Protected Resource Metadata,
-  and receipt emission. The core MCP edge transport lives in
+  with Streamable HTTP, OAuth 2.1 + PKCE, and RFC 9728 Protected Resource
+  Metadata. The core MCP edge transport lives in
   `crates/protocol/chio-mcp-edge`.
 
 These two crates live here rather than under `crates/` because they are

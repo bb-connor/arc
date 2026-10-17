@@ -5,7 +5,7 @@
 `chio-mcp-adapter-integration` is the distribution packaging layer for the
 registry-listed MCP server. It extends the core `chio-mcp-edge` transport
 contract with marketplace-facing Streamable HTTP, OAuth 2.1 with PKCE, RFC 9728
-protected resource metadata, and local receipt-emission helpers.
+protected resource metadata.
 
 It should not own the core MCP edge runtime, kernel admission, policy
 evaluation, durable receipt storage, or hosted OAuth issuer behavior. Those live
@@ -15,11 +15,9 @@ in `chio-mcp-edge`, `chio-kernel`, `chio-policy`, storage crates, and
 ## Module Boundaries
 
 - `transport.rs` owns the local Streamable HTTP exchange facade used by the
-  registry and AgentCore packaging tests.
+  registry packaging tests.
 - `oauth.rs` owns PKCE challenge generation and authorization URL construction.
 - `prm.rs` owns the protected-resource metadata shape exposed to clients.
-- `receipt_emit.rs` owns the local receipt JSON facade used by the distribution
-  fixture lane.
 - `lib.rs` is the public facade over those surfaces.
 
 ## Credential Boundary

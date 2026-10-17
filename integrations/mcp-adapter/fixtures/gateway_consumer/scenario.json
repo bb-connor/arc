@@ -1,5 +1,5 @@
 {
-  "consumer": "aws-bedrock-agentcore-gateway",
+  "consumer": "mcp-gateway-consumer",
   "resource": "https://mcp.chio.example/mcp",
   "authorization_server": "https://auth.chio.example",
   "oauth": {
@@ -11,7 +11,6 @@
     ]
   },
   "tool_call": {
-    "name": "chio.bedrock.invoke",
-    "receipt_required": true
+    "name": "chio.example.invoke"
   }
 }

@@ -304,7 +304,7 @@ DOMAIN_TEST_HINTS: list[tuple[set[str], list[str]]] = [
         {"mcp", "adapter"},
         [
             "integrations/mcp-adapter/tests/transport_round_trip.rs",
-            "integrations/mcp-adapter/tests/conformance_suite.rs",
+            "integrations/mcp-adapter/tests/streamable_http_contract.rs",
             "crates/protocol/chio-mcp-adapter/tests/integration_smoke.rs",
             "crates/products/chio-cli/tests/mcp_wrap_e2e.rs",
         ],
