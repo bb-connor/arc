@@ -95,7 +95,12 @@ pub struct IssuanceFreezePendingRelease {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "status", deny_unknown_fields)]
+#[serde(
+    rename_all = "snake_case",
+    tag = "status",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum IssuanceFreezeOperationStatus {
     NotExecuted,
     ReleasePending {
@@ -105,6 +110,7 @@ pub enum IssuanceFreezeOperationStatus {
         result: EffectResult,
     },
 }
+crate::lossless_serde!(IssuanceFreezeOperationStatus);
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

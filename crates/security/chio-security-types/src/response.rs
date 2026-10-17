@@ -69,11 +69,17 @@ pub enum ResponseTarget {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(tag = "approval_type", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "approval_type",
+    rename_all = "snake_case",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum ResponseApprovalRequirement {
     Automatic,
     Governed { policy_id: RecordId },
 }
+crate::lossless_serde!(ResponseApprovalRequirement);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -437,12 +443,18 @@ pub struct ResponseEffectFailedRecord {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "outcome", deny_unknown_fields)]
+#[serde(
+    rename_all = "snake_case",
+    tag = "outcome",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum ResponseRollbackOutcome {
     Requested,
     Restored { resulting_version_hash: Digest32 },
     Failed { error_code: ErrorCode },
 }
+crate::lossless_serde!(ResponseRollbackOutcome);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

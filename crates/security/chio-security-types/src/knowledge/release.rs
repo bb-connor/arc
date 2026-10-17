@@ -16,12 +16,18 @@ pub struct ModelContextV1 {
 }
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "kind",
+    rename_all = "snake_case",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum ArtifactSinkV1 {
     Agent,
     Model { context: ModelContextV1 },
     Archive,
 }
+crate::lossless_serde!(ArtifactSinkV1);
 
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
