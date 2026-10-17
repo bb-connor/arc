@@ -106,7 +106,7 @@ fn build_remote_auth_state(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
 ) -> Result<(RemoteAuthMode, Option<Arc<str>>), CliError> {
     let auth_mode = build_remote_auth_mode(
         config,
@@ -449,7 +449,7 @@ fn build_remote_auth_mode(
     config: &RemoteServeHttpConfig,
     local_addr: SocketAddr,
     discovered_identity_provider: Option<&DiscoveredIdentityProvider>,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
 ) -> Result<RemoteAuthMode, CliError> {
     let has_external_discovery = discovered_identity_provider.is_some()
         || config.auth_jwt_discovery_url.is_some()

@@ -10,7 +10,7 @@ const MCP_MAX_POST_BODY_BYTES: usize = 8 * 1024 * 1024;
 fn load_enterprise_provider_registry(
     path: Option<&FsPath>,
     surface: &str,
-) -> Result<Option<Arc<EnterpriseProviderRegistry>>, CliError> {
+) -> Result<Option<EnterpriseProviderRegistryFile>, CliError> {
     let Some(path) = path else {
         return Ok(None);
     };
@@ -25,7 +25,9 @@ fn load_enterprise_provider_registry(
             );
         }
     }
-    Ok(Some(Arc::new(registry)))
+    Ok(Some(EnterpriseProviderRegistryFile {
+        path: Arc::new(path.to_path_buf()),
+    }))
 }
 
 async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {

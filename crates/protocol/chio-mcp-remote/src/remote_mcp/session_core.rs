@@ -250,12 +250,25 @@ pub struct RemoteServeHttpConfig {
     pub egress_contract: Option<HttpEgressContract>,
 }
 
+/// The enterprise provider registry file that bearer admission reads once per
+/// authenticated request.
+#[derive(Clone, Debug)]
+struct EnterpriseProviderRegistryFile {
+    path: Arc<PathBuf>,
+}
+
+impl EnterpriseProviderRegistryFile {
+    fn load(&self) -> Result<EnterpriseProviderRegistry, CliError> {
+        EnterpriseProviderRegistry::load(&self.path)
+    }
+}
+
 #[derive(Clone)]
 struct RemoteAppState {
     sessions: Arc<RemoteSessionLedger>,
     factory: Arc<RemoteSessionFactory>,
     auth_mode: Arc<RemoteAuthMode>,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
     admin_token: Option<Arc<str>>,
     protected_resource_metadata: Option<Arc<ProtectedResourceMetadata>>,
     authorization_server_metadata: Option<Arc<AuthorizationServerMetadata>>,
@@ -854,7 +867,7 @@ struct JwtBearerVerifier {
     audience: Option<String>,
     required_scopes: Vec<String>,
     provider_profile: JwtProviderProfile,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
     sender_dpop_nonce_store: Arc<DpopNonceStore>,
     sender_dpop_config: DpopConfig,
 }
@@ -870,7 +883,7 @@ struct IntrospectionBearerVerifier {
     audience: Option<String>,
     required_scopes: Vec<String>,
     provider_profile: JwtProviderProfile,
-    enterprise_provider_registry: Option<Arc<EnterpriseProviderRegistry>>,
+    enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
     sender_dpop_nonce_store: Arc<DpopNonceStore>,
     sender_dpop_config: DpopConfig,
     /// Typed HTTP egress contract that gates every introspection-endpoint
@@ -912,26 +925,6 @@ struct LocalAuthorizationServer {
     clients: Arc<HashMap<String, HashSet<String>>>,
     sender_dpop_nonce_store: Arc<DpopNonceStore>,
     sender_dpop_config: DpopConfig,
-}
-
-impl RemoteAppState {
-    // Retained for enterprise-provider validation paths shared with the local
-    // trust-control surface even though the current remote flow does not call it.
-    #[allow(dead_code)]
-    fn enterprise_provider_registry(&self) -> Option<&EnterpriseProviderRegistry> {
-        self.enterprise_provider_registry.as_deref()
-    }
-
-    // Retained for enterprise-provider validation paths shared with the local
-    // trust-control surface even though the current remote flow does not call it.
-    #[allow(dead_code)]
-    fn validated_enterprise_provider(
-        &self,
-        provider_id: &str,
-    ) -> Option<&EnterpriseProviderRecord> {
-        self.enterprise_provider_registry()
-            .and_then(|registry| registry.validated_provider(provider_id))
-    }
 }
 
 /// An authorization request whose consent page was rendered and not yet

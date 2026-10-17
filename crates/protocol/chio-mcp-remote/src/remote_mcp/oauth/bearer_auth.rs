@@ -552,8 +552,19 @@ impl JwtBearerVerifier {
                     error,
                 )
             })?;
+        let provider_registry = self
+            .enterprise_provider_registry
+            .as_ref()
+            .map(EnterpriseProviderRegistryFile::load)
+            .transpose()
+            .map_err(|error| {
+                input::with_source(
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+                    error,
+                )
+            })?;
         let matched_provider = matched_bearer_enterprise_provider(
-            self.enterprise_provider_registry.as_deref(),
+            provider_registry.as_ref(),
             claims.iss.as_deref().or(self.issuer.as_deref()),
             EnterpriseProviderKind::OidcJwks,
         );
@@ -825,8 +836,19 @@ impl IntrospectionBearerVerifier {
                     error,
                 )
             })?;
+        let provider_registry = self
+            .enterprise_provider_registry
+            .as_ref()
+            .map(EnterpriseProviderRegistryFile::load)
+            .transpose()
+            .map_err(|error| {
+                input::with_source(
+                    plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()),
+                    error,
+                )
+            })?;
         let matched_provider = matched_bearer_enterprise_provider(
-            self.enterprise_provider_registry.as_deref(),
+            provider_registry.as_ref(),
             claims.iss.as_deref().or(self.issuer.as_deref()),
             EnterpriseProviderKind::OauthIntrospection,
         );
