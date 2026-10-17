@@ -330,7 +330,8 @@ pub enum ModelSafetyTier {
     tag = "type",
     content = "value",
     rename_all = "snake_case",
-    deny_unknown_fields
+    deny_unknown_fields,
+    remote = "Self"
 )]
 pub enum Constraint {
     /// File path parameter must start with this prefix.
@@ -457,6 +458,7 @@ pub enum Constraint {
     /// recovery-aware admission reject the marker before dispatch.
     RequireFindingRecovery(Box<FindingRecoveryMarkerV1>),
 }
+chio_security_types::lossless_serde!(Constraint);
 
 /// Closed settlement selector for a purchased finding reveal.
 ///
