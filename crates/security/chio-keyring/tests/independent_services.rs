@@ -1355,7 +1355,8 @@ fn authority_current_selector_refuses_after_router_poison() {
         Err(chio_keyring::KeyringError::Synchronization)
     ));
 
-    assert_eq!(authority.public_key(), original);
+    assert_eq!(authority.public_key(), rotated.public_key());
+    assert_ne!(authority.public_key(), original);
     assert!(matches!(
         authority.current_public_key(),
         Err(chio_core_types::Error::InvalidPublicKey(message))

@@ -1,4 +1,4 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
+use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use chio_core_types::{
     canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
@@ -485,6 +485,16 @@ impl KeyringSigningRouter {
         Ok(self.read_state()?.active.public_key())
     }
 
+    /// Key held by the selector, read even after a panic poisoned the lock.
+    /// Signing and [`Self::active_public_key`] still refuse a poisoned selector.
+    fn selected_public_key(&self) -> PublicKey {
+        self.state
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .active
+            .public_key()
+    }
+
     pub fn activate_rotation(
         &self,
         staged: &mut StagedPendingBackend,
@@ -592,9 +602,6 @@ impl KeyringSigningRouter {
 
 pub struct KeyringAuthoritySigningBackend {
     router: Arc<KeyringSigningRouter>,
-    /// Identity active at construction. It answers only the infallible
-    /// compatibility accessors and never a current-identity read.
-    compatibility_identity: PublicKey,
     _independent_services: Arc<IndependentKeyLogServices>,
 }
 
@@ -613,10 +620,8 @@ impl KeyringAuthoritySigningBackend {
                 "authority router and independent services use different policy bindings",
             ));
         }
-        let compatibility_identity = router.active_public_key()?;
         Ok(Self {
             router,
-            compatibility_identity,
             _independent_services: independent_services,
         })
     }
@@ -624,16 +629,11 @@ impl KeyringAuthoritySigningBackend {
 
 impl SigningBackend for KeyringAuthoritySigningBackend {
     fn algorithm(&self) -> SigningAlgorithm {
-        self.router
-            .active_public_key()
-            .map(|key| key.algorithm())
-            .unwrap_or_else(|_| self.compatibility_identity.algorithm())
+        self.router.selected_public_key().algorithm()
     }
 
     fn public_key(&self) -> PublicKey {
-        self.router
-            .active_public_key()
-            .unwrap_or_else(|_| self.compatibility_identity.clone())
+        self.router.selected_public_key()
     }
 
     fn current_public_key(&self) -> chio_core_types::Result<PublicKey> {
