@@ -14,8 +14,8 @@ lifecycle:
    the activity body runs.
 3. The activity runs.
 4. ``POST /v1/caller/report`` delivers an executor-signed report (the
-   SHA-256 of the activity result's payload encoding, or the failure
-   type) so the reservation finalizes. The terminal receipt is recorded
+   SHA-256 of the result's bytes under the worker's payload converter, or
+   the failure type) so the reservation finalizes. The terminal receipt is recorded
    on the :class:`WorkflowReceipt` step.
 
 Any sidecar or contract error stops the activity. Pending approvals are
@@ -24,6 +24,7 @@ not resumed by this package.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import inspect
 import json
@@ -41,10 +42,10 @@ from chio_adapter_base.redact import (
 )
 from chio_sdk._generated import ChioSignedCallerDispatchAuthorization
 from chio_sdk.client import ChioClient
-from chio_sdk.errors import ChioConnectionError, ChioDeniedError
+from chio_sdk.errors import ChioConnectionError, ChioDeniedError, ChioError
 from chio_sdk.models import ChioReceipt, Decision, ToolCallAction
 from temporalio import activity
-from temporalio.converter import DataConverter
+from temporalio.converter import PayloadConverter
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import (
     ActivityInboundInterceptor,
@@ -371,7 +372,7 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
             parameters=parameters,
             request_id=request_id,
         )
-        reservation_receipt = _receipt_from_response(info, reservation)
+        reservation_receipt = self._verified_receipt(info, reservation)
         if reservation["status"] != "reserved":
             self._parent._record_step(info, reservation_receipt)
             raise _denied_application_error(info, reservation_receipt)
@@ -390,26 +391,45 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
 
         try:
             result = await self.next.execute_activity(input)
-            output = {"outcome": "completed", "result_sha256": _result_sha256(result)}
+        except activity._CompleteAsyncError:
+            # Completion happens outside this worker, so there is no outcome to
+            # report here; the committed hold is left for the kernel to expire.
+            raise
         except BaseException as activity_error:
-            failure = {"outcome": "failed", "error_type": type(activity_error).__name__}
-            try:
-                response = await self._report(
-                    client,
-                    info=info,
-                    authorization=authorization,
-                    request_id=request_id,
-                    started_at=started_at,
-                    output=failure,
-                )
-            except ApplicationError as report_error:
-                raise report_error from activity_error
-            self._parent._record_step(
-                info,
-                _receipt_from_response(info, response),
+            await self._report_failure(
+                client,
+                info=info,
+                authorization=authorization,
+                request_id=request_id,
+                started_at=started_at,
                 reservation_receipt_id=reservation_receipt.id,
+                activity_error=activity_error,
             )
             raise
+
+        try:
+            result_sha256 = _result_sha256(activity.payload_converter(), result)
+        except Exception as encode_error:
+            response = await self._report(
+                client,
+                info=info,
+                authorization=authorization,
+                request_id=request_id,
+                started_at=started_at,
+                output={
+                    "outcome": "completed_unencodable",
+                    "error_type": type(encode_error).__name__,
+                },
+            )
+            self._parent._record_step(
+                info,
+                self._verified_receipt(info, response),
+                reservation_receipt_id=reservation_receipt.id,
+            )
+            raise _sidecar_error(
+                f"result of activity {info.activity_id!r} could not be encoded by the "
+                "worker payload converter; it ran once and will not be retried"
+            ) from encode_error
 
         response = await self._report(
             client,
@@ -417,15 +437,76 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
             authorization=authorization,
             request_id=request_id,
             started_at=started_at,
-            output=output,
+            output={"outcome": "completed", "result_sha256": result_sha256},
         )
-        terminal = _receipt_from_response(info, response)
+        terminal = self._verified_receipt(info, response)
         self._parent._record_step(
             info, terminal, reservation_receipt_id=reservation_receipt.id
         )
         if response["status"] != "reconciled" or terminal.is_denied:
             raise _denied_application_error(info, terminal)
         return result
+
+    async def _report_failure(
+        self,
+        client: ChioClientLike,
+        *,
+        info: activity.Info,
+        authorization: dict[str, Any],
+        request_id: str,
+        started_at: int,
+        reservation_receipt_id: str,
+        activity_error: BaseException,
+    ) -> None:
+        """Report a raised activity so the kernel finalizes the reservation.
+
+        The kernel accounts this as a completed call whose output is the
+        failure record. Cancellation always propagates as cancellation: a
+        report failure during cancellation is logged, never substituted.
+        """
+        try:
+            response = await self._report(
+                client,
+                info=info,
+                authorization=authorization,
+                request_id=request_id,
+                started_at=started_at,
+                output={"outcome": "failed", "error_type": type(activity_error).__name__},
+            )
+            receipt = self._verified_receipt(info, response)
+        except ApplicationError as report_error:
+            if isinstance(activity_error, asyncio.CancelledError):
+                logger.error(
+                    "chio-temporal: failure report for cancelled activity %s failed: %s",
+                    info.activity_id,
+                    report_error,
+                )
+                return
+            raise report_error from activity_error
+        self._parent._record_step(
+            info, receipt, reservation_receipt_id=reservation_receipt_id
+        )
+
+    def _verified_receipt(
+        self, info: activity.Info, response: dict[str, Any]
+    ) -> ChioReceipt:
+        """Parse a sidecar receipt and require the pinned kernel's signature."""
+        raw = response.get("receipt") if isinstance(response, dict) else None
+        executor = self._parent._executor
+        try:
+            if not isinstance(raw, dict) or raw.get("kernel_key") != executor.kernel_public_key:
+                raise ValueError("receipt is not issued by the pinned kernel key")
+            signing_bytes, id_input = _kernel_receipt_signing_bytes(raw)
+            if hashlib.sha256(id_input).hexdigest() != raw.get("id"):
+                raise ValueError("receipt id is not content-addressed")
+            if executor.verify_kernel_signature(signing_bytes, raw["signature"]) is not True:
+                raise ValueError("receipt signature does not verify")
+            return ChioReceipt.model_validate(raw)
+        except Exception as exc:
+            raise _sidecar_error(
+                f"Chio sidecar receipt for activity {info.activity_id!r} failed "
+                f"verification: {exc}"
+            ) from exc
 
     async def _reserve(
         self,
@@ -579,6 +660,18 @@ class _ChioInboundInterceptor(ActivityInboundInterceptor):
                 authorization=authorization,
                 report=report,
             )
+        except ChioError as exc:
+            if exc.code == "HTTP_409":
+                raise _sidecar_error(
+                    f"Chio sidecar rejected the caller report for activity "
+                    f"{info.activity_id!r} (HTTP 409). The route does not name the "
+                    "cause; one cause is a completed_at_unix_ms from this worker's "
+                    "clock that is later than the kernel's trusted time, so keep "
+                    "worker and sidecar clocks synchronized"
+                ) from exc
+            raise _sidecar_error(
+                f"Chio caller report for activity {info.activity_id!r} failed: {exc}"
+            ) from exc
         except Exception as exc:
             raise _sidecar_error(
                 f"Chio caller report for activity {info.activity_id!r} failed: {exc}"
@@ -605,20 +698,28 @@ def _require_live(
         )
 
 
-def _result_sha256(result: Any) -> str:
-    """SHA-256 of the result's encoding under Temporal's default payload converter."""
-    payloads = DataConverter.default.payload_converter.to_payloads([result])
+def _result_sha256(converter: PayloadConverter, result: Any) -> str:
+    """SHA-256 of the result's payload bytes under the worker's payload converter."""
+    payloads = converter.to_payloads([result])
     return hashlib.sha256(payloads[0].data).hexdigest()
 
 
-def _receipt_from_response(info: activity.Info, response: dict[str, Any]) -> ChioReceipt:
-    try:
-        return ChioReceipt.model_validate(response["receipt"])
-    except (KeyError, TypeError, ValueError) as exc:
-        raise _sidecar_error(
-            f"Chio sidecar response for activity {info.activity_id!r} "
-            "carried no valid receipt"
-        ) from exc
+def _kernel_receipt_signing_bytes(raw: dict[str, Any]) -> tuple[bytes, bytes]:
+    """Canonical ``ChioReceiptSigningBody`` bytes and receipt-id input bytes.
+
+    The id input is every receipt field except ``id``, ``signature``,
+    ``algorithm`` and ``bbs_signature``; the signing body is
+    ``{"id", "body": <id input>, "bbs_signature"?}``.
+    """
+    id_input = {
+        key: value
+        for key, value in raw.items()
+        if key not in {"id", "signature", "algorithm", "bbs_signature"}
+    }
+    signing: dict[str, Any] = {"id": raw["id"], "body": id_input}
+    if raw.get("bbs_signature") is not None:
+        signing["bbs_signature"] = raw["bbs_signature"]
+    return canonical_json_bytes(signing), canonical_json_bytes(id_input)
 
 
 def _sidecar_error(message: str) -> ApplicationError:

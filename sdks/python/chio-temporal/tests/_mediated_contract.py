@@ -11,19 +11,24 @@ The id-only evaluation methods raise, so any call into them fails the test.
 
 Signatures are modelled with SHA-512 over a role-tagged message. They are
 the right length for the wire schema and bind the exact canonical bytes,
-but they are not Ed25519.
+but they are not Ed25519; ``test_kernel_golden_vector.py`` checks the
+canonical bytes, digests and Ed25519 signatures against vectors produced by
+the Rust kernel.
 """
 
 from __future__ import annotations
 
 import hashlib
 import itertools
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from types import SimpleNamespace
 from typing import Any
 
 from chio_sdk.errors import ChioDeniedError, ChioError
 from chio_sdk.models import CapabilityToken, ChioScope
+from temporalio import activity
+from temporalio.converter import DataConverter, PayloadConverter
 
 from chio_temporal import ChioActivityInterceptor
 from chio_temporal.executor import canonical_json_bytes
@@ -100,6 +105,9 @@ class MediatedContractClient:
         self.start_error: Exception | None = None
         self.report_error: Exception | None = None
         self.report_status = "reconciled"
+        self.revoked: set[str] = set()
+        self.start_denied = False
+        self.receipt_tamper: Callable[[dict[str, Any]], None] | None = None
 
     async def __aenter__(self) -> MediatedContractClient:
         return self
@@ -315,6 +323,15 @@ class MediatedContractClient:
     ) -> dict[str, Any]:
         if control_token != CONTROL_TOKEN:
             raise ChioDeniedError("sidecar control token required")
+        if execution_nonce["nonce"]["bound_to"]["capability_id"] in self.revoked:
+            # The start route answers a revoked capability with its generic 409.
+            raise ChioError(
+                "Chio sidecar returned 409: chio_caller_delivery_rejected", code="HTTP_409"
+            )
+        if self.start_denied:
+            # A kernel deny at start is HTTP 403, which ChioClient raises as
+            # ChioDeniedError without the receipt body.
+            raise ChioDeniedError("denied", reason="denied at caller start")
         nonce_id = execution_nonce["nonce"]["nonce_id"]
         reservation = self._reservations.get(nonce_id)
         if reservation is None or reservation["parameters"] != arguments:
@@ -436,7 +453,7 @@ class MediatedContractClient:
         parameters: dict[str, Any],
         verdict: str,
     ) -> dict[str, Any]:
-        receipt_id = hashlib.sha256(f"receipt-{next(self._ids)}".encode()).hexdigest()
+        content_hash = hashlib.sha256(f"content-{next(self._ids)}".encode()).hexdigest()
         if verdict == "allow":
             decision: dict[str, Any] = {"verdict": "allow"}
         elif verdict == "pending_approval":
@@ -451,8 +468,7 @@ class MediatedContractClient:
                 "reason": f"tool {tool_name!r} not in capability scope",
                 "guard": "ScopeGuard",
             }
-        return {
-            "id": receipt_id,
+        body = {
             "timestamp": FIXED_NOW_MS // 1000,
             "capability_id": capability_id,
             "tool_server": tool_server,
@@ -468,12 +484,17 @@ class MediatedContractClient:
             "boundary_class": "prevent",
             "tool_origin": "caller_executed",
             "redaction_mode": "none",
-            "content_hash": "3" * 64,
+            "content_hash": content_hash,
             "policy_hash": "4" * 64,
             "trust_level": "mediated",
             "kernel_key": KERNEL_PUBLIC_KEY,
-            "signature": "6" * 128,
         }
+        receipt_id = hashlib.sha256(canonical_json_bytes(body)).hexdigest()
+        signing = canonical_json_bytes({"id": receipt_id, "body": body})
+        receipt = {"id": receipt_id, **body, "signature": _role_signature("kernel", signing)}
+        if self.receipt_tamper is not None:
+            self.receipt_tamper(receipt)
+        return receipt
 
 
 def contract_interceptor(
@@ -487,3 +508,20 @@ def contract_interceptor(
         chio_client=chio,
         **kwargs,
     )
+
+
+@contextmanager
+def activity_context(
+    info: activity.Info, converter: PayloadConverter | None = None
+) -> Iterator[None]:
+    """Patch ``activity.info()`` and ``activity.payload_converter()`` for one call."""
+    original_info = activity.info
+    original_converter = activity.payload_converter
+    chosen = converter or DataConverter.default.payload_converter
+    activity.info = lambda: info  # type: ignore[assignment]
+    activity.payload_converter = lambda: chosen  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        activity.info = original_info  # type: ignore[assignment]
+        activity.payload_converter = original_converter  # type: ignore[assignment]

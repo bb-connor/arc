@@ -1,0 +1,109 @@
+{
+  "authorization": {
+    "authorization": {
+      "committed": {
+        "budget_hold_id": "hold",
+        "dispatch_commit": {
+          "committed_version": 9,
+          "coordinator_lease_epoch": 3,
+          "coordinator_lease_id": "coordinator",
+          "dispatch_launch": {
+            "native_launch": null,
+            "worker_profile": null
+          },
+          "provider_attempt": {
+            "attempt_id": "attempt",
+            "operation_id": "94e4e9ba8884c9e0aa71809fba9cffecfe7e2ea49beee00a0aa3e6cbbab52a40",
+            "transport_id": "caller-report:server",
+            "transport_key_epoch": 7
+          },
+          "store_fence": {
+            "lease_id": "serving-owner",
+            "owner_epoch": 3,
+            "store_uuid": "authority"
+          }
+        },
+        "execution_nonce_id": "nonce",
+        "frozen_context_digest": "57df0e7c771eb3f0ba141ea9899c8335b0606d25cb8e7b6a1a51536d8742d9ac"
+      },
+      "executor": {
+        "executor_id": "caller-worker",
+        "key_epoch": 7,
+        "public_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+      },
+      "expires_at_unix_ms": 2000,
+      "invocation": {
+        "capability_digest": "38a5be91af79d7e5ba9809bf383c699b6864ee50446239fe56a45e32b84638fe",
+        "capability_id": "capability",
+        "operation_id": "94e4e9ba8884c9e0aa71809fba9cffecfe7e2ea49beee00a0aa3e6cbbab52a40",
+        "parameters_digest": "f528212a496dc7a0e9a57c129b561aa4609364d70f886c09d668e00797521eb5",
+        "request_binding_hash": "b79a06d4d63cba6c251b5af025eea28803678d9c0d4922db585185af7bd7b2ae",
+        "request_id": "request",
+        "server_id": "server",
+        "tool_name": "mutate"
+      },
+      "kernel_public_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+      "not_before_unix_ms": 1000,
+      "schema": "chio.caller-dispatch-authorization.v1"
+    },
+    "signature": "55fd565ef458266b4ab1b9631e6953a73b50dc8f2992d7a0b1c34745a607cfc7fc66c0cd25402f89df45d476c287b7827b923b754f96c3ac9839b8580f5f7802"
+  },
+  "authorization_body_canonical": "{\"committed\":{\"budget_hold_id\":\"hold\",\"dispatch_commit\":{\"committed_version\":9,\"coordinator_lease_epoch\":3,\"coordinator_lease_id\":\"coordinator\",\"dispatch_launch\":{\"native_launch\":null,\"worker_profile\":null},\"provider_attempt\":{\"attempt_id\":\"attempt\",\"operation_id\":\"94e4e9ba8884c9e0aa71809fba9cffecfe7e2ea49beee00a0aa3e6cbbab52a40\",\"transport_id\":\"caller-report:server\",\"transport_key_epoch\":7},\"store_fence\":{\"lease_id\":\"serving-owner\",\"owner_epoch\":3,\"store_uuid\":\"authority\"}},\"execution_nonce_id\":\"nonce\",\"frozen_context_digest\":\"57df0e7c771eb3f0ba141ea9899c8335b0606d25cb8e7b6a1a51536d8742d9ac\"},\"executor\":{\"executor_id\":\"caller-worker\",\"key_epoch\":7,\"public_key\":\"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61\"},\"expires_at_unix_ms\":2000,\"invocation\":{\"capability_digest\":\"38a5be91af79d7e5ba9809bf383c699b6864ee50446239fe56a45e32b84638fe\",\"capability_id\":\"capability\",\"operation_id\":\"94e4e9ba8884c9e0aa71809fba9cffecfe7e2ea49beee00a0aa3e6cbbab52a40\",\"parameters_digest\":\"f528212a496dc7a0e9a57c129b561aa4609364d70f886c09d668e00797521eb5\",\"request_binding_hash\":\"b79a06d4d63cba6c251b5af025eea28803678d9c0d4922db585185af7bd7b2ae\",\"request_id\":\"request\",\"server_id\":\"server\",\"tool_name\":\"mutate\"},\"kernel_public_key\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\",\"not_before_unix_ms\":1000,\"schema\":\"chio.caller-dispatch-authorization.v1\"}",
+  "authorization_canonical": "{\"authorization\":{\"committed\":{\"budget_hold_id\":\"hold\",\"dispatch_commit\":{\"committed_version\":9,\"coordinator_lease_epoch\":3,\"coordinator_lease_id\":\"coordinator\",\"dispatch_launch\":{\"native_launch\":null,\"worker_profile\":null},\"provider_attempt\":{\"attempt_id\":\"attempt\",\"operation_id\":\"94e4e9ba8884c9e0aa71809fba9cffecfe7e2ea49beee00a0aa3e6cbbab52a40\",\"transport_id\":\"caller-report:server\",\"transport_key_epoch\":7},\"store_fence\":{\"lease_id\":\"serving-owner\",\"owner_epoch\":3,\"store_uuid\":\"authority\"}},\"execution_nonce_id\":\"nonce\",\"frozen_context_digest\":\"57df0e7c771eb3f0ba141ea9899c8335b0606d25cb8e7b6a1a51536d8742d9ac\"},\"executor\":{\"executor_id\":\"caller-worker\",\"key_epoch\":7,\"public_key\":\"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61\"},\"expires_at_unix_ms\":2000,\"invocation\":{\"capability_digest\":\"38a5be91af79d7e5ba9809bf383c699b6864ee50446239fe56a45e32b84638fe\",\"capability_id\":\"capability\",\"operation_id\":\"94e4e9ba8884c9e0aa71809fba9cffecfe7e2ea49beee00a0aa3e6cbbab52a40\",\"parameters_digest\":\"f528212a496dc7a0e9a57c129b561aa4609364d70f886c09d668e00797521eb5\",\"request_binding_hash\":\"b79a06d4d63cba6c251b5af025eea28803678d9c0d4922db585185af7bd7b2ae\",\"request_id\":\"request\",\"server_id\":\"server\",\"tool_name\":\"mutate\"},\"kernel_public_key\":\"fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565\",\"not_before_unix_ms\":1000,\"schema\":\"chio.caller-dispatch-authorization.v1\"},\"signature\":\"55fd565ef458266b4ab1b9631e6953a73b50dc8f2992d7a0b1c34745a607cfc7fc66c0cd25402f89df45d476c287b7827b923b754f96c3ac9839b8580f5f7802\"}",
+  "authorization_digest": "7cbee8475148acfa671ee593a6d2ac748cce9c66bfb23aeb88bf6f9b65056c26",
+  "executor_seed_byte": 42,
+  "generator": "chio-kernel caller_delivery fixture (seeds 0x29 kernel, 0x2a executor): SignedCallerDispatchAuthorizationV1::sign, SignedCallerDeliveryReportV1::sign, ChioReceipt::sign",
+  "kernel_seed_byte": 41,
+  "receipt": {
+    "action": {
+      "parameter_hash": "bd2f7f69f3b59f053a5fab80767d2d212f211801ef63a17d009f8ebadd18b57e",
+      "parameters": {
+        "args": [
+          "x",
+          1
+        ]
+      }
+    },
+    "boundary_class": "prevent",
+    "capability_id": "capability",
+    "content_hash": "ed7002b439e9ac845f22357d822bac1444730fbdb6016d3ec9432297b9ec9f73",
+    "decision": {
+      "verdict": "allow"
+    },
+    "id": "d77bdcee9002c83a9b9196c25d16ba62a9014e099d7006e81c06c0575c6babb6",
+    "kernel_key": "fa4834147f6e690c3693eff61336046403cd8ae2a14f31b3c407358569239565",
+    "metadata": {
+      "chio_receipt_signing_nonce": "temporal-golden"
+    },
+    "policy_hash": "823412d1eacb67956220e532959f0104603057c88704863ca38e7cd188fda812",
+    "receipt_kind": "mediated_decision",
+    "redaction_mode": "none",
+    "signature": "6843642bcf145c8ec4211531aa3ac7700c532d2e58df56b075f9e420904a750a5e936b7787bfb43dd3e1233a028015b092ae3559abc4e02152bbdbdff4b67f09",
+    "timestamp": 1700000000,
+    "tool_name": "mutate",
+    "tool_origin": "caller_executed",
+    "tool_server": "server",
+    "trust_level": "mediated"
+  },
+  "report": {
+    "report": {
+      "authorization_digest": "7cbee8475148acfa671ee593a6d2ac748cce9c66bfb23aeb88bf6f9b65056c26",
+      "claim_id": "temporal:claim",
+      "completed_at_unix_ms": 1200,
+      "execution_started_at_unix_ms": 1100,
+      "executor": {
+        "executor_id": "caller-worker",
+        "key_epoch": 7,
+        "public_key": "197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+      },
+      "output": {
+        "outcome": "completed",
+        "result_sha256": "f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68"
+      },
+      "realized_cost": null,
+      "schema": "chio.caller-delivery-report.v1"
+    },
+    "signature": "e80a0c8266693e461d0882b5b987c1016d276a4865bccf70e2b5241b06eb9987ad7abc240db437dd0cd148ed778032b14dba7290935af5723d6db213f835af02"
+  },
+  "report_body_canonical": "{\"authorization_digest\":\"7cbee8475148acfa671ee593a6d2ac748cce9c66bfb23aeb88bf6f9b65056c26\",\"claim_id\":\"temporal:claim\",\"completed_at_unix_ms\":1200,\"execution_started_at_unix_ms\":1100,\"executor\":{\"executor_id\":\"caller-worker\",\"key_epoch\":7,\"public_key\":\"197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61\"},\"output\":{\"outcome\":\"completed\",\"result_sha256\":\"f6a214f7a5fcda0c2cee9660b7fc29f5649e3c68aad48e20e950137c98913a68\"},\"realized_cost\":null,\"schema\":\"chio.caller-delivery-report.v1\"}"
+}

@@ -10,10 +10,12 @@ cluster or sidecar: we build an :class:`ExecuteActivityInput`, construct an
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -23,6 +25,7 @@ from _mediated_contract import (
     CONTROL_TOKEN,
     FIXED_NOW_MS,
     MediatedContractClient,
+    activity_context,
     contract_interceptor,
 )
 from chio_sdk.client import ChioClient
@@ -127,13 +130,8 @@ class _NextInterceptor:
 
 @contextmanager
 def _patched_activity_info(info: activity.Info):
-    """Temporarily patch ``activity.info()`` to return ``info``."""
-    original = activity.info
-    activity.info = lambda: info  # type: ignore[assignment]
-    try:
+    with activity_context(info):
         yield
-    finally:
-        activity.info = original  # type: ignore[assignment]
 
 
 def _make_input(*args: Any) -> Any:
@@ -766,3 +764,280 @@ class TestAttenuatedGrant:
             with pytest.raises(ChioTemporalConfigError):
                 await inbound.execute_activity(_make_input())
         assert chio.calls == []
+
+
+# ---------------------------------------------------------------------------
+# Result encoding, cancellation, async completion and retries
+# ---------------------------------------------------------------------------
+
+
+class _FailingConverter:
+    """Payload converter whose encoding fails, as for an unsupported type."""
+
+    def to_payloads(self, values: Any) -> Any:
+        raise TypeError("Object of type Decimal is not JSON serializable")
+
+
+class TestResultEncodingAndCancellation:
+    async def test_hash_failure_after_success_reports_and_is_non_retryable(self) -> None:
+        chio = MediatedContractClient()
+        interceptor, inbound, downstream = await _wired(chio, "send_email")
+
+        with activity_context(
+            _default_info(activity_type="send_email"), _FailingConverter()  # type: ignore[arg-type]
+        ):
+            with pytest.raises(ApplicationError) as exc_info:
+                await inbound.execute_activity(_make_input())
+
+        assert downstream.called
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert isinstance(exc_info.value.__cause__, TypeError)
+        assert chio.reports[0]["report"]["output"] == {
+            "outcome": "completed_unencodable",
+            "error_type": "TypeError",
+        }
+        assert chio.open_holds == set()
+        receipt = interceptor.workflow_receipt("wf-1", "run-1")
+        assert receipt is not None
+        assert receipt.step_count == 1
+
+    async def test_result_hash_uses_the_worker_payload_converter(self) -> None:
+        class _TaggingConverter:
+            def to_payloads(self, values: Any) -> Any:
+                return [SimpleNamespace(data=b"worker-encoding")]
+
+        chio = MediatedContractClient()
+        _, inbound, _ = await _wired(chio, "send_email")
+        with activity_context(
+            _default_info(activity_type="send_email"), _TaggingConverter()  # type: ignore[arg-type]
+        ):
+            await inbound.execute_activity(_make_input())
+
+        assert chio.reports[0]["report"]["output"]["result_sha256"] == (
+            hashlib.sha256(b"worker-encoding").hexdigest()
+        )
+
+    async def test_cancellation_reports_and_stays_cancellation(self) -> None:
+        chio = MediatedContractClient()
+        _, inbound, _ = await _wired(
+            chio, "send_email", next_interceptor=_NextInterceptor(error=asyncio.CancelledError())
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await _run(inbound, "send_email")
+
+        assert chio.reports[0]["report"]["output"] == {
+            "outcome": "failed",
+            "error_type": "CancelledError",
+        }
+        assert chio.open_holds == set()
+
+    async def test_cancellation_is_not_replaced_when_the_report_fails(self) -> None:
+        chio = MediatedContractClient()
+        chio.report_error = ChioTimeoutError("lost report reply")
+        _, inbound, _ = await _wired(
+            chio, "send_email", next_interceptor=_NextInterceptor(error=asyncio.CancelledError())
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await _run(inbound, "send_email")
+
+    async def test_async_completion_is_not_reported_as_failure(self) -> None:
+        chio = MediatedContractClient()
+        _, inbound, _ = await _wired(
+            chio, "send_email", next_interceptor=_NextInterceptor(error=activity._CompleteAsyncError())
+        )
+
+        with pytest.raises(activity._CompleteAsyncError):
+            await _run(inbound, "send_email")
+
+        assert "report_mediated_execution" not in chio.methods()
+        assert len(chio.open_holds) == 1
+
+    async def test_retry_attempt_is_a_new_reservation_and_the_old_hold_stays_open(
+        self,
+    ) -> None:
+        chio = MediatedContractClient()
+        interceptor, _, _ = await _wired(chio, "send_email")
+
+        chio.report_error = ChioTimeoutError("worker lost the sidecar mid-attempt")
+        first = _ChioInboundInterceptor(
+            _NextInterceptor(error=asyncio.CancelledError()), interceptor
+        )
+        with activity_context(_default_info(activity_type="send_email", attempt=1)):
+            with pytest.raises(asyncio.CancelledError):
+                await first.execute_activity(_make_input())
+        first_request = chio.calls[0].request_id
+        stale_holds = set(chio.open_holds)
+        assert len(stale_holds) == 1
+
+        chio.report_error = None
+        second_downstream = _NextInterceptor(result="ok")
+        second = _ChioInboundInterceptor(second_downstream, interceptor)
+        with activity_context(_default_info(activity_type="send_email", attempt=2)):
+            assert await second.execute_activity(_make_input()) == "ok"
+
+        reserves = [c for c in chio.calls if c.method == "evaluate_tool_call_mediated"]
+        assert len(reserves) == 2
+        assert reserves[1].request_id != first_request
+        assert second_downstream.called
+        # Attempt 1 was started but never reported; its hold is only released
+        # by kernel expiry or recovery, never by attempt 2.
+        assert chio.open_holds == stale_holds
+
+
+# ---------------------------------------------------------------------------
+# Receipt verification and start-route rejections
+# ---------------------------------------------------------------------------
+
+
+class TestReceiptVerification:
+    async def test_forged_reservation_receipt_never_runs(self) -> None:
+        chio = MediatedContractClient()
+        chio.receipt_tamper = lambda receipt: receipt.update(signature="0" * 128)
+        _, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+        assert "start_mediated_execution" not in chio.methods()
+
+    @pytest.mark.parametrize(
+        "tamper",
+        [
+            lambda receipt: receipt.update(signature="0" * 128),
+            lambda receipt: receipt.update(kernel_key="07" * 32),
+            lambda receipt: receipt.update(tool_name="other"),
+        ],
+    )
+    async def test_forged_terminal_receipt_fails_closed(self, tamper: Any) -> None:
+        chio = MediatedContractClient()
+        interceptor, inbound, downstream = await _wired(chio, "send_email")
+        original_report = chio.report
+
+        def _forged_report(**kwargs: Any) -> dict[str, Any]:
+            response = original_report(**kwargs)
+            tamper(response["receipt"])
+            return response
+
+        chio.report = _forged_report  # type: ignore[method-assign]
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert downstream.called
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        receipt = interceptor.workflow_receipt("wf-1", "run-1")
+        assert receipt is not None
+        assert receipt.step_count == 0
+
+
+class TestStartRejections:
+    async def test_revoked_capability_409_at_start_never_runs(self) -> None:
+        chio = MediatedContractClient()
+        _, inbound, downstream = await _wired(chio, "send_email")
+        chio.revoked.add("cap-1")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == SIDECAR_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+
+    async def test_kernel_deny_at_start_never_runs(self) -> None:
+        chio = MediatedContractClient()
+        chio.start_denied = True
+        interceptor, inbound, downstream = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.type == DENIED_ERROR_TYPE
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+        receipt = interceptor.workflow_receipt("wf-1", "run-1")
+        assert receipt is not None
+        assert receipt.deny_count == 1
+
+    @pytest.mark.parametrize(
+        ("status", "body", "error_type"),
+        [
+            (
+                403,
+                {"status": "deny", "protocol": "chio.caller-delivery.v1", "receipt": {}},
+                DENIED_ERROR_TYPE,
+            ),
+            (
+                409,
+                {
+                    "error": "chio_caller_delivery_rejected",
+                    "message": "original committed caller delivery could not be "
+                    "authenticated or finalized",
+                },
+                SIDECAR_ERROR_TYPE,
+            ),
+        ],
+    )
+    @respx.mock
+    async def test_real_client_start_route_rejections(
+        self, status: int, body: dict[str, Any], error_type: str
+    ) -> None:
+        contract = MediatedContractClient()
+        base = "http://sidecar.test"
+        respx.post(f"{base}/v1/evaluate").mock(
+            side_effect=lambda request: httpx.Response(
+                200,
+                json=contract.reserve(
+                    capability=json.loads(request.content)["capability"],
+                    tool_server=json.loads(request.content)["tool_server"],
+                    tool_name=json.loads(request.content)["tool_name"],
+                    parameters=json.loads(request.content)["parameters"],
+                    request_id=json.loads(request.content)["request_id"],
+                ),
+            )
+        )
+        respx.post(f"{base}/v1/caller/start").mock(
+            return_value=httpx.Response(status, json=body)
+        )
+        report = respx.post(f"{base}/v1/caller/report").mock(
+            return_value=httpx.Response(500)
+        )
+        async with ChioClient(base) as client:
+            token = await contract.create_capability(
+                subject="agent:alice", scope=_scope_for_tools("send_email")
+            )
+            interceptor = ChioActivityInterceptor(
+                executor=contract.executor,
+                control_token=CONTROL_TOKEN,
+                chio_client=client,
+                clock_ms=lambda: FIXED_NOW_MS,
+            )
+            interceptor.register_workflow_grant(
+                WorkflowGrant(workflow_id="wf-1", token=token, tool_server="srv")
+            )
+            downstream = _NextInterceptor()
+            with pytest.raises(ApplicationError) as exc_info:
+                await _run(_ChioInboundInterceptor(downstream, interceptor), "send_email")
+
+        assert exc_info.value.type == error_type
+        assert exc_info.value.non_retryable is True
+        assert not downstream.called
+        assert not report.called
+
+    async def test_report_409_names_the_clock_skew_cause(self) -> None:
+        chio = MediatedContractClient()
+        from chio_sdk.errors import ChioError
+
+        chio.report_error = ChioError("Chio sidecar returned 409", code="HTTP_409")
+        _, inbound, _ = await _wired(chio, "send_email")
+
+        with pytest.raises(ApplicationError) as exc_info:
+            await _run(inbound, "send_email")
+
+        assert exc_info.value.non_retryable is True
+        assert "clocks synchronized" in str(exc_info.value)

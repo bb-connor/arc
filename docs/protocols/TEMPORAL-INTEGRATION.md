@@ -22,6 +22,12 @@ There is no Rust Temporal integration.
   sit behind the sidecar-control bearer.
 - **A complete signed capability token** per workflow (`WorkflowGrant.token`).
   A bare capability id cannot authorize anything.
+- **Synchronized clocks.** The report's start and completion times come from
+  the worker clock. If the worker clock is behind the kernel, the local
+  window check fails. If it is ahead, the kernel rejects the report because
+  the completion time is later than its trusted time. The sidecar answers
+  that with a generic HTTP 409, and the interceptor's error names clock skew
+  as a cause.
 
 ## 2. Topology
 
@@ -55,15 +61,35 @@ For each activity attempt, `ChioActivityInterceptor`:
 3. **Runs** the activity.
 4. **Reports.** `POST /v1/caller/report` with an executor-signed report. The
    report output is `{"outcome": "completed", "result_sha256": ...}` (SHA-256
-   of the result under Temporal's default payload converter) or
+   of the result's payload bytes under the worker's payload converter) or
    `{"outcome": "failed", "error_type": ...}`. Raw results are not sent. A
    failed activity is still reported so the reservation finalizes, and then
-   the original exception is re-raised. A report `deny` withholds the result
-   and raises `ChioCapabilityDenied`.
+   the original exception is re-raised. The kernel accounts a failure report
+   as a completed call whose output is the failure record. Cancellation is
+   reported the same way and always propagates as cancellation. A result
+   the converter cannot encode is reported as `completed_unencodable` and
+   fails the activity non-retryably. An activity that calls
+   `activity.raise_complete_async()` is not reported; its hold is left for
+   the kernel to expire. A report `deny` withholds the result and raises
+   `ChioCapabilityDenied`.
+
+Reservation and terminal receipts are verified before they are recorded:
+`kernel_key` must equal the pinned kernel key, the id must be the SHA-256 of
+the canonical receipt body, and the signature must verify over the canonical
+signing body. A forged receipt fails closed. Synthetic deny receipts built
+from an HTTP 403 carry `metadata.synthetic = true` and no kernel signature.
 
 Errors fail closed with `ApplicationError(type="ChioSidecarError")`. Only an
-unreachable sidecar before reservation is retryable. Every later failure is
-non-retryable, so a lost reply never leads to a second execution.
+unreachable sidecar before reservation is retryable.
+
+Errors the interceptor itself raises after reservation are non-retryable. That
+does not make an activity run at most once. A start-to-close or heartbeat
+timeout, or a worker crash after start, makes Temporal retry the activity as a
+new attempt. The new attempt gets a new `request_id` and a new reservation, so
+the side effects can run again. When the earlier attempt is cancelled in a
+live worker, the interceptor still reports it. After a crash nothing is
+reported, and that committed hold stays open until the kernel expires or
+recovers it.
 
 Pending approvals are not resumed.
 
@@ -151,8 +177,8 @@ infrastructure failure, not a policy decision.
   report leaves the committed hold for the kernel to expire or recover.
 - Canonical JSON is reproduced locally only for strings, integers, booleans
   and null. Authorizations or reports containing floats fail closed.
-- The result digest uses Temporal's default payload converter, not a custom
-  worker data converter.
+- The result digest covers payload-converter bytes. A payload codec (for
+  example encryption) is not applied.
 - Capability revocation does not cancel a running workflow. It denies the
   next reservation or start.
 

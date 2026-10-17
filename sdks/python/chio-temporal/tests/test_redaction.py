@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from _mediated_contract import MediatedContractClient, contract_interceptor
+from _mediated_contract import MediatedContractClient, activity_context, contract_interceptor
 from chio_adapter_base.redact import RedactionPolicy
 from chio_sdk.models import (
     CapabilityToken,
@@ -90,12 +90,8 @@ class _NextInterceptor:
 
 @contextmanager
 def _patched_activity_info(info: activity.Info):
-    original = activity.info
-    activity.info = lambda: info  # type: ignore[assignment]
-    try:
+    with activity_context(info):
         yield
-    finally:
-        activity.info = original  # type: ignore[assignment]
 
 
 def _make_input(*args: Any, fn: Callable[..., Any] | None = None) -> Any:

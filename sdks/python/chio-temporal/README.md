@@ -109,14 +109,22 @@ At runtime:
 * After the body returns or raises, `POST /v1/caller/report` delivers an
   executor-signed report so the reservation finalizes. The report output
   is `{"outcome": "completed", "result_sha256": ...}` (SHA-256 of the
-  result under Temporal's default payload converter) or
+  result's payload bytes under the worker's payload converter) or
   `{"outcome": "failed", "error_type": ...}`. Raw results are not sent.
+  The kernel accounts a failure report as a completed call whose output
+  is the failure record. If the result cannot be encoded, the outcome
+  `completed_unencodable` is reported and the activity fails
+  non-retryably. Cancellation is reported and still propagates as
+  cancellation. An activity that calls `activity.raise_complete_async()`
+  is not reported, and its hold is left for the kernel to expire.
 * A `deny` from the report withholds the result and raises
   `ChioCapabilityDenied`. Any sidecar, transport or contract error stops
   the activity with `ApplicationError(type="ChioSidecarError")`. Only an
-  unreachable sidecar before reservation is retryable; every later
-  failure is non-retryable so a lost reply never leads to a second
-  execution.
+  unreachable sidecar before reservation is retryable.
+* Reservation and terminal receipts must be signed by the pinned kernel
+  key and be content-addressed. Otherwise the activity fails closed and
+  nothing is recorded. Synthetic deny receipts built from an HTTP 403
+  carry `metadata.synthetic = true` and no kernel signature.
 * The terminal kernel receipt for each attempt is recorded on the
   `WorkflowReceipt` step and forwarded to the configured `receipt_sink`
   on `flush_workflow_receipt`.
@@ -147,6 +155,19 @@ Limits, stated plainly:
   and null only; an authorization or report containing floats fails
   closed.
 * Pending approvals are not resumed; the activity fails non-retryably.
+* Retries are not at-most-once. Errors the interceptor raises after
+  reservation are non-retryable. That does not make an activity run at
+  most once. A start-to-close or heartbeat timeout, or a worker crash
+  after start, makes Temporal retry the activity as a new attempt. The
+  new attempt gets a new `request_id` and a new reservation, so the side
+  effects can run again. When the earlier attempt is cancelled in a live
+  worker, the interceptor still reports it. After a crash nothing is
+  reported, and that committed hold stays open until the kernel expires
+  or recovers it.
+* Clocks must be synchronized. The report's start and completion times
+  come from the worker clock. A worker clock behind the kernel fails the
+  local window check; a worker clock ahead makes the kernel reject the
+  report (HTTP 409), and the interceptor names that cause in its error.
 
 ## Attenuated activity-scoped grants
 
