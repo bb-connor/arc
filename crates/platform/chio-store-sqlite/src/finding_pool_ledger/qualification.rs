@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use chio_core::crypto::{PublicKey, SigningAlgorithm, SigningBackend};
-use chio_core::receipt::body::ChioReceipt;
 use chio_kernel::finding_pool::FindingPoolLedgerError;
 use rand_core::{OsRng, RngCore};
 use rusqlite::{Transaction, TransactionBehavior};
@@ -351,7 +350,7 @@ pub(super) fn bind_receipt_authority(
             return Err(FindingPoolLedgerError::ReceiptAuthorityMismatch);
         }
     } else {
-        verify_legacy_outbox_authority(transaction, &authority_json)?;
+        refuse_unauthored_receipt_outbox(transaction)?;
     }
     transaction
         .execute(
@@ -406,7 +405,7 @@ pub(super) fn bind_receipt_configuration(
         return Err(FindingPoolLedgerError::ReceiptAuthorityMismatch);
     }
     if persisted_authority.is_none() {
-        verify_legacy_outbox_authority(transaction, &authority_json)?;
+        refuse_unauthored_receipt_outbox(transaction)?;
     }
     transaction
         .execute(
@@ -576,32 +575,20 @@ fn append_binding_part(target: &mut Vec<u8>, value: &[u8]) {
     target.extend_from_slice(value);
 }
 
-fn verify_legacy_outbox_authority(
-    transaction: &rusqlite::Transaction<'_>,
-    authority_json: &str,
+pub(super) fn refuse_unauthored_receipt_outbox(
+    connection: &rusqlite::Connection,
 ) -> Result<(), FindingPoolLedgerError> {
-    let mut statement = transaction
-        .prepare("SELECT signed_receipt_json FROM finding_pool_receipt_outbox ORDER BY rowid")
-        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-    let mut rows = statement
-        .query([])
-        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-    while let Some(row) = rows
-        .next()
-        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?
-    {
-        let receipt_json = row
-            .get::<_, String>(0)
-            .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
-        let receipt = chio_core::canonical::UntrustedJsonText::from_wire(
-            receipt_json.as_bytes(),
-            64 * 1024 * 1024,
+    let unauthored = connection
+        .query_row(
+            "SELECT receipt_authority_json IS NULL \
+                    AND EXISTS(SELECT 1 FROM finding_pool_receipt_outbox LIMIT 1) \
+             FROM finding_pool_ledger_metadata WHERE singleton = 1",
+            [],
+            |row| row.get::<_, bool>(0),
         )
-        .and_then(|input| input.decode_signed::<ChioReceipt>())
-        .map_err(FindingPoolLedgerError::from)?;
-        if canonical_receipt_authority_json(&receipt.kernel_key)? != authority_json {
-            return Err(FindingPoolLedgerError::ReceiptAuthorityMismatch);
-        }
+        .map_err(|error| FindingPoolLedgerError::Storage(error.to_string()))?;
+    if unauthored {
+        return Err(FindingPoolLedgerError::UnauthoredReceiptOutbox);
     }
     Ok(())
 }

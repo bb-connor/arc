@@ -1054,15 +1054,6 @@ fn cognition_market_pool_receipt_authority_is_pinned_ledger_wide() {
     debit(&ledger, &first, "purchase:receipt-authority-one", 10)
         .test_expect("record the first ledger authority");
 
-    let connection = rusqlite::Connection::open(&database).test_expect("open ledger metadata");
-    connection
-        .execute(
-            "UPDATE finding_pool_ledger_metadata SET receipt_authority_json = NULL",
-            [],
-        )
-        .test_expect("simulate the pre-binding schema migration");
-    drop(connection);
-
     let second = fixture_for_pool(100, 10_000, "receipt-authority-two", 73, 74, &ledger);
     assert_eq!(
         ledger.bind_receipt_authority(&second.receipt_authority.public_key()),
@@ -1076,13 +1067,51 @@ fn cognition_market_pool_receipt_authority_is_pinned_ledger_wide() {
 }
 
 #[test]
+fn cognition_market_pool_refuses_outbox_receipts_without_bound_authority() {
+    let directory = tempfile::tempdir().test_expect("create ledger directory");
+    let database = directory.path().join("finding-pool.sqlite3");
+    let ledger = open_qualified(&database, ledger_domain()).test_expect("open qualified ledger");
+    let fixture = fixture_for_pool(100, 10_000, "receipt-authority-unauthored", 71, 72, &ledger);
+    debit(
+        &ledger,
+        &fixture,
+        "purchase:receipt-authority-unauthored",
+        10,
+    )
+    .test_expect("record an outbox receipt under the bound authority");
+
+    let connection = rusqlite::Connection::open(&database).test_expect("open ledger metadata");
+    connection
+        .execute(
+            "UPDATE finding_pool_ledger_metadata SET receipt_authority_json = NULL",
+            [],
+        )
+        .test_expect("clear the bound receipt authority");
+    drop(connection);
+
+    let authority = fixture.receipt_authority.public_key();
+    assert_eq!(
+        ledger.bind_receipt_authority(&authority),
+        Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
+    );
+    assert_eq!(
+        ledger.bind_receipt_configuration(&authority, "receipt-sink:unauthored"),
+        Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
+    );
+    assert!(matches!(
+        open_qualified(&database, ledger_domain()),
+        Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
+    ));
+}
+
+#[test]
 fn cognition_market_pool_configuration_failure_is_atomic() {
     let directory = tempfile::tempdir().test_expect("create ledger directory");
     let ledger = open_qualified(directory.path().join("pool.sqlite3"), ledger_domain())
         .test_expect("open qualified ledger");
     ledger
         .bind_receipt_sink("receipt-sink:existing")
-        .test_expect("simulate legacy sink-only binding");
+        .test_expect("bind the receipt sink alone");
     let rejected_authority = Keypair::from_seed(&[73_u8; 32]).public_key();
     assert_eq!(
         ledger.bind_receipt_configuration(&rejected_authority, "receipt-sink:wrong"),

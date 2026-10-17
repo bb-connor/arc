@@ -53,6 +53,8 @@ pub enum FindingPoolLedgerError {
     StartupAlreadyReconciled,
     #[error("finding pool mutation receipt authority is not configured")]
     ReceiptAuthorityMissing,
+    #[error("finding pool receipt outbox has receipts but no bound receipt authority")]
+    UnauthoredReceiptOutbox,
     #[error("finding pool mutation receipt authority is already configured for this kernel")]
     ReceiptAuthorityAlreadyConfigured,
     #[error("finding pool mutation receipts require a durable ordinary receipt store")]
