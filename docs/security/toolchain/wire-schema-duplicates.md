@@ -319,10 +319,10 @@ different names for the same bytes.
 - `crates/core/chio-core-types/src/signed_artifact.rs:229` `CHIO_ATTEST_SELECTIVE_DISCLOSURE_PROOF_V1_SCHEMA`
 - `crates/trust/chio-selective-disclosure/src/lib.rs:64` `SELECTIVE_DISCLOSURE_PROOF_SCHEMA_V1`
 
-## `chio.bbs-projection.manifest.v2` (2 declarations, 2 crates)
+## `chio.bbs-projection.manifest.v1` (2 declarations, 2 crates)
 
-- `crates/core/chio-core-types/src/signed_artifact.rs:231` `CHIO_BBS_PROJECTION_MANIFEST_V2_SCHEMA`
-- `crates/trust/chio-selective-disclosure/src/projection_manifest.rs:4` `BBS_PROJECTION_MANIFEST_SCHEMA_V2`
+- `crates/core/chio-core-types/src/signed_artifact.rs:231` `CHIO_BBS_PROJECTION_MANIFEST_V1_SCHEMA`
+- `crates/trust/chio-selective-disclosure/src/projection_manifest.rs:4` `BBS_PROJECTION_MANIFEST_SCHEMA_V1`
 
 ## `chio.bbs-projection.receipt.v1` (2 declarations, 2 crates)
 

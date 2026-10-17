@@ -493,7 +493,7 @@ fn projection_manifest_uses_v2_slot_class_and_sensitivity() {
     let manifest_json = serde_json::to_value(&manifest).expect("serialize projection manifest");
 
     assert_eq!(
-        manifest_json["schema"], "chio.bbs-projection.manifest.v2",
+        manifest_json["schema"], "chio.bbs-projection.manifest.v1",
         "launch BBS projection manifests must be v2"
     );
     for slot in manifest_json["message_slots"]

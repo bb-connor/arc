@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Schema for the BBS projection manifest that binds proof slots to policy.
-pub const BBS_PROJECTION_MANIFEST_SCHEMA_V2: &str = "chio.bbs-projection.manifest.v2";
+pub const BBS_PROJECTION_MANIFEST_SCHEMA_V1: &str = "chio.bbs-projection.manifest.v1";
 
 /// Per-slot disclosure policy in a BBS projection manifest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

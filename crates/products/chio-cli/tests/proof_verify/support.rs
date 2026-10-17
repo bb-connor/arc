@@ -662,7 +662,7 @@ pub(crate) fn add_valid_disclosure_selective_disclosure_proof(bundle_dir: &std::
     });
     nodes.push(serde_json::json!({
         "id": "bbs-projection-manifest",
-        "schema": "chio.bbs-projection.manifest.v2",
+        "schema": "chio.bbs-projection.manifest.v1",
         "path": "bbs-projection-manifest.json",
         "sha256": projection_manifest_digest,
         "role": "bbs-projection-manifest"
@@ -762,7 +762,7 @@ pub(crate) fn add_disclosure_bbs_projection_manifest(
         })
         .unwrap_or_default();
     let manifest = serde_json::json!({
-        "schema": "chio.bbs-projection.manifest.v2",
+        "schema": "chio.bbs-projection.manifest.v1",
         "manifest_id": "chio.bbs-projection.receipt.v1",
         "artifact_ref": proof_subject,
         "canonicalization": "jcs",
@@ -789,7 +789,7 @@ pub(crate) fn add_disclosure_bbs_projection_manifest(
     });
     nodes.push(serde_json::json!({
         "id": "bbs-projection-manifest",
-        "schema": "chio.bbs-projection.manifest.v2",
+        "schema": "chio.bbs-projection.manifest.v1",
         "path": "bbs-projection-manifest.json",
         "sha256": manifest_digest,
         "role": "bbs-projection-manifest"

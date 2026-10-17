@@ -2,7 +2,7 @@ use chio_selective_disclosure::{
     verify_bbs_projection_manifest, verify_transparency_inclusion_proof, BbsProjectionDisclosure,
     BbsProjectionManifest, BbsProjectionMessageSlot, DisclosedMessage, Projection,
     ProjectionMessage, SelectiveDisclosureError, SelectiveDisclosureProof,
-    TransparencyInclusionProof, BBS_CIPHERSUITE_SHA256, BBS_PROJECTION_MANIFEST_SCHEMA_V2,
+    TransparencyInclusionProof, BBS_CIPHERSUITE_SHA256, BBS_PROJECTION_MANIFEST_SCHEMA_V1,
     SELECTIVE_DISCLOSURE_PROOF_SCHEMA_V1, TRANSPARENCY_INCLUSION_PROOF_SCHEMA_V1,
 };
 use sha2::{Digest, Sha256};
@@ -29,6 +29,51 @@ fn projection_manifest_rejects_missing_required_disclosed_slot() {
         SelectiveDisclosureError::ProjectionManifestInvalid(message)
             if message.contains("slot 1 is marked disclosed but missing from proof")
     ));
+}
+
+#[test]
+fn projection_manifest_rejects_retired_v2_schema_id() {
+    let proof = sample_proof(Vec::new());
+    let mut manifest = sample_manifest(vec![
+        message_slot(0, "capability_id", BbsProjectionDisclosure::Hidden),
+        message_slot(1, "tool_name", BbsProjectionDisclosure::Hidden),
+    ]);
+    manifest.schema = "chio.bbs-projection.manifest.v2".to_string();
+
+    let error = verify_bbs_projection_manifest(&proof, &manifest)
+        .err()
+        .unwrap_or_else(|| panic!("retired v2 projection manifest verified"));
+
+    assert!(matches!(
+        error,
+        SelectiveDisclosureError::ProjectionManifestInvalid(message)
+            if message == "schema expected chio.bbs-projection.manifest.v1"
+    ));
+}
+
+#[test]
+fn projection_manifest_rejects_untyped_slot_shape_under_v1_id() {
+    let manifest = serde_json::json!({
+        "schema": BBS_PROJECTION_MANIFEST_SCHEMA_V1,
+        "manifest_id": "projection-manifest-test",
+        "artifact_ref": sha256_hex(b"subject"),
+        "canonicalization": "jcs",
+        "hash_algorithm": "sha-256",
+        "message_slots": [{
+            "slot": 0,
+            "field": "capability_id",
+            "encoding": "utf8",
+            "wholesale_only": false,
+            "disclosure": "disclosed"
+        }],
+        "hidden_predicates": []
+    });
+
+    let error = serde_json::from_value::<BbsProjectionManifest>(manifest)
+        .err()
+        .unwrap_or_else(|| panic!("untyped projection manifest slot deserialized"));
+
+    assert_eq!(error.to_string(), "missing field `message_class`");
 }
 
 #[test]
@@ -67,7 +112,7 @@ fn projection_manifest_rejects_exact_duration_disclosure_by_default() {
 #[test]
 fn generated_projection_manifest_hides_exact_duration_by_default() {
     let projection = Projection {
-        version: "projection-manifest-v2-test".to_string(),
+        version: "projection-manifest-test".to_string(),
         subject_sha256_hex: sha256_hex(b"subject"),
         messages: vec![ProjectionMessage {
             index: 0,
@@ -118,7 +163,7 @@ fn transparency_inclusion_rejects_truncated_path_before_root_width() {
 fn sample_proof(disclosed: Vec<DisclosedMessage>) -> SelectiveDisclosureProof {
     SelectiveDisclosureProof {
         schema: SELECTIVE_DISCLOSURE_PROOF_SCHEMA_V1.to_string(),
-        projection_version: "projection-manifest-v2-test".to_string(),
+        projection_version: "projection-manifest-test".to_string(),
         subject_sha256_hex: sha256_hex(b"subject"),
         ciphersuite: BBS_CIPHERSUITE_SHA256.to_string(),
         issuer_fingerprint: "issuer-1".to_string(),
@@ -133,8 +178,8 @@ fn sample_proof(disclosed: Vec<DisclosedMessage>) -> SelectiveDisclosureProof {
 
 fn sample_manifest(message_slots: Vec<BbsProjectionMessageSlot>) -> BbsProjectionManifest {
     BbsProjectionManifest {
-        schema: BBS_PROJECTION_MANIFEST_SCHEMA_V2.to_string(),
-        manifest_id: "projection-manifest-v2-test".to_string(),
+        schema: BBS_PROJECTION_MANIFEST_SCHEMA_V1.to_string(),
+        manifest_id: "projection-manifest-test".to_string(),
         artifact_ref: sha256_hex(b"subject"),
         canonicalization: "jcs".to_string(),
         hash_algorithm: "sha-256".to_string(),
