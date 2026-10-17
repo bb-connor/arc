@@ -49,9 +49,8 @@
 > A2A tells agents how to talk to each other.<br>
 > **Chio proves what an agent was allowed to do, what it cost, and what happened.**
 
-Chio is a Rust kernel that sits between an AI agent and everything it touches. Every tool
-call, file read, API request, and payment goes through it, the same way every syscall goes
-through an operating system kernel.
+Chio is a Rust kernel that sits between an AI agent and the tools you connect through it.
+It checks every tool call, file read, API request, and payment the agent sends it.
 
 Before an agent can do anything, it presents a [signed token](spec/PROTOCOL.md#5-capability-contract) that says who it is, what it
 may call, and how much it may spend. Chio checks the token, runs the call, and writes a
@@ -73,9 +72,10 @@ chain against a [Merkle revocation oracle](crates/trust/chio-revocation-oracle) 
 sub-agents never holds more authority than the agent that spawned it, and
 [one hop is shown in full below](#delegation-and-swarms).
 
-Every receipt records what the call cost and who paid. That is enough to give an agent a
-balance, [bill it per call](crates/economy/chio-metering), and let agents pay each other for work.
+The receipt for a metered call records what it cost and which budget holder it was charged to.
+That is enough to give an agent a balance and [bill it per call](crates/economy/chio-metering).
 [Markets, credit, and insurance](crates/economy) in Chio are built on those receipts.
+Payment adapters default to a local simulator.
 
 Agent swarms, security tooling, and cognition markets are built on those three things: the
 token, the kernel, and the receipt.
@@ -140,7 +140,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 
 | In an operating system | In Chio |
 | --- | --- |
-| **[Syscalls](crates/kernel/chio-kernel)** | Every tool call, file read, API request, and payment is dispatched by the kernel. An agent never holds a direct handle to a tool. |
+| **[Syscalls](crates/kernel/chio-kernel)** | Every tool call, file read, API request, and payment routed through Chio is dispatched by the kernel. An agent never holds a direct handle to a tool. |
 | **[Process isolation](spec/PROTOCOL.md#3-components-and-trust-boundaries)** | The kernel is the only trusted component. Agents and tool servers run as untrusted, sandboxed processes, isolated from each other and from the agent. |
 | **[Permissions](spec/PROTOCOL.md#5-capability-contract)** | Capability tokens: signed, expiring, budgeted, and only ever narrowable. |
 | **[Syscall filters](crates/guards)** | A guard pipeline screens every request and every result. Custom guards run as [fuel-metered WASM](crates/guards/chio-wasm-guards) with no host access. |
@@ -162,7 +162,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 - **You do not write permissions, delegation, audit, metering, or billing for your agent system.** The kernel does them, and they behave the same over every protocol and provider it speaks.
 - **Sub-agents cannot escalate.** A swarm holds at most the authority of the agent that spawned it, because every [delegation proves it is a subset of its parent](spec/PROTOCOL.md#capability-attenuation).
 - **Actions leave a receipt that verifies offline.** Anyone with the public key can [check what an agent did](examples/hello-receipt-verify) without access to your runtime.
-- **Agents can pay each other.** [Metering, budgets, markets, credit, and insurance](docs/guides/ECONOMIC-LAYER.md) clear on receipts the kernel already writes, and [two agents procuring a service](examples/agent-commerce-network) is a worked example.
+- **Agent spend is metered and budgeted.** [Metering, budgets, markets, credit, and insurance](docs/guides/ECONOMIC-LAYER.md) run on receipts the kernel already writes, and [two agents procuring a service](examples/agent-commerce-network) is a worked example.
 - **The model, the framework, and the tool servers are all swappable.** The kernel and the receipts do not change when you change any of them. See the [protocol adapters](crates/protocol) and [integrations](#integrations-and-sdks).
 - **Deny is the default.** A token that does not verify, a budget that cannot be held, or a result that cannot be signed is a call that does not run.
 
@@ -241,14 +241,14 @@ receipt.
 
 ### Economic protocol
 
-> Every tool call is a priced, budgeted, metered transaction that settles into a signed receipt.
+> Every metered tool call is priced, held against a budget, and recorded in a signed receipt.
 
 | Capability | What it does |
 | --- | --- |
 | **[Metering and budgets](crates/economy/chio-metering)** | Per-call compute, data, and API cost, with durable pre-execution budget holds against a capability's caps, sealed into signed economic receipt metadata. |
-| **[Proof-carrying commerce](docs/guides/ECONOMIC-LAYER.md)** | One signed receipt binds what was authorized, how it was priced, what it metered, and how it settled, so credit and insurance decisions cite prior signed truth. |
+| **[Proof-carrying commerce](docs/guides/ECONOMIC-LAYER.md)** | One signed receipt binds what was authorized, how it was priced, what it metered, and its settlement status, so credit and insurance decisions cite prior signed truth. |
 | **[Markets, credit, and insurance](crates/economy/chio-market)** | Discoverable service markets with open bidding and reputation-tiered pricing, credit lines and bonded execution, and liability underwriting and insurance. |
-| **[Settlement and anchoring](crates/economy/chio-settle)** | On-chain settlement with cross-chain checkpoint anchoring across EVM, Bitcoin, and Solana, backed by the Chio settlement contracts. |
+| **[Settlement and anchoring](crates/economy/chio-settle)** | Settlement and checkpoint-anchoring runtimes for EVM, Bitcoin, and Solana, with the Chio settlement contracts. They are qualified on local devnets as rehearsal evidence only; mainnet deployment and custody are blocked on external audit. |
 
 ## Quickstart
 
@@ -390,8 +390,8 @@ cross operator boundaries.
 
 ### 6. Budget, meter, and settle
 
-A capability caps what the agent may spend, and the kernel holds funds before each call and
-denies anything over budget. Add ceilings to your policy (amounts in minor units, e.g. cents):
+A capability caps what the agent may spend, and the kernel places a budget hold before each
+priced call and denies anything over budget. Add ceilings to your policy (amounts in minor units, e.g. cents):
 
 ```yaml
 # policy.yaml, under `rules:`
@@ -501,9 +501,9 @@ authority for the surfaces it mediates.
 | **Provider dialects** | Anthropic &middot; Bedrock &middot; OpenAI\* &middot; Gemini &middot; Groq &middot; Cohere &middot; Mistral &middot; Ollama |
 | **Agent frameworks** | Hermes &middot; LangChain &middot; LangGraph &middot; LlamaIndex &middot; CrewAI &middot; AutoGen &middot; Vercel AI SDK |
 | **Language SDKs** | TypeScript &middot; Python &middot; Go &middot; Rust &middot; C++ &middot; JVM/Kotlin &middot; Swift &middot; .NET |
-| **Web and runtime** | FastAPI &middot; Django &middot; Next.js &middot; Express &middot; Fastify &middot; Elysia &middot; Spring Boot &middot; ASP.NET &middot; Cloudflare Workers &middot; Vercel Edge &middot; Deno |
+| **Web and runtime** | FastAPI &middot; Django &middot; Next.js &middot; Express &middot; Fastify &middot; Elysia &middot; Spring Boot &middot; ASP.NET &middot; Cloudflare Workers, Vercel Edge, and Deno (verify/sign only, never returns allow) |
 | **Data and orchestration** | Temporal &middot; Airflow &middot; Dagster &middot; Prefect &middot; Ray &middot; Flink &middot; Kafka/NATS |
-| **Infra and mesh** | Kubernetes &middot; AWS Lambda &middot; AWS Bedrock Marketplace &middot; VS Code &middot; Zed |
+| **Infra and mesh** | Kubernetes &middot; AWS Lambda &middot; AWS Bedrock Marketplace (listing package) &middot; VS Code &middot; Zed |
 | **Agent and chat plugins** | Claude Code &middot; Cursor &middot; Codex &middot; OpenCode &middot; OpenClaw (Slack/Discord/Telegram) |
 
 <sub>\* OpenAI interception is implemented; outbound execution is deferred (trace-only, not authoritative). Anthropic and Bedrock are the release-qualified providers.</sub>
@@ -549,7 +549,7 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 
 | Framework | Package | Status |
 | --- | --- | --- |
-| Hermes Agent (NousResearch) | `chio-hermes` ([HERMES.md](docs/integrations/HERMES.md)) | Shipping (pre-1.0) |
+| Hermes Agent (NousResearch) | `chio-hermes` ([HERMES.md](docs/integrations/HERMES.md)) | Source install, pre-1.0 (not yet on PyPI) |
 | LangChain | `chio-langchain` | Shipping |
 | LangGraph | `chio-langgraph` | Shipping |
 | LlamaIndex | `chio-llamaindex` | Shipping |
@@ -590,8 +590,8 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 | Next.js / Express / Fastify | `@chio-protocol/next`, `@chio-protocol/express`, `@chio-protocol/fastify` | Shipping |
 | Elysia (Bun) | `@chio-protocol/elysia` | Shipping |
 | Spring Boot / ASP.NET / Drogon | `chio-spring-boot`, `Backbay.Chio.Middleware`, `chio-drogon` | Shipping |
-| Cloudflare Workers / Vercel Edge / Deno | `@chio-protocol/workers`, `@chio-protocol/edge`, `@chio-protocol/deno` | Shipping |
-| Browser / Passkey | `@chio-protocol/browser`, `@chio-protocol/passkey` | Shipping |
+| Cloudflare Workers / Vercel Edge / Deno | `@chio-protocol/workers`, `@chio-protocol/edge`, `@chio-protocol/deno` | Capability and receipt verify/sign; never returns allow (no guards, revocation, or durable budgets at the edge) |
+| Browser / Passkey | `@chio-protocol/browser`, `@chio-protocol/passkey` | Receipt verify and passkey capability requests; no authorization |
 | Scaffolder | `create-chio-app` | Shipping |
 
 #### Data, orchestration, and infrastructure
@@ -604,7 +604,7 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 | Infrastructure-as-Code (Terraform, Pulumi) | `chio-iac` | Shipping |
 | Kubernetes (controller, CRDs, webhooks) | `sdks/k8s` | Shipping |
 | AWS Lambda (Rust + Python) | `chio-lambda-extension`, `chio-lambda-python` | Shipping |
-| AWS Bedrock Marketplace | `chio-bedrock-control-plane` (`us-east-1`) | Shipping |
+| AWS Bedrock Marketplace | `chio-bedrock-control-plane` (`us-east-1`) | Listing package; entitlement and metering helpers, no AWS calls |
 | Editors | `vscode-chio`, `zed-chio` (LSP-backed) | Shipping |
 
 #### Products (`crates/products/`)
@@ -653,7 +653,8 @@ receipts).
 The kernel is the entire trusted base. Around it, five layers of defense, each one fail-closed:
 
 - **Trusted core.** Only the Runtime Kernel is trusted (the TCB). The agent and tool servers are
-  untrusted and isolated, and the kernel never leaks its address or signing key.
+  untrusted and isolated, and the kernel never leaks its address or signing key. The kernel
+  checks and receipts only the calls routed through it.
 - **Fail-closed by construction.** Errors deny access, invalid policy is rejected at load, and
   the kernel will not allow a call it cannot also sign a receipt for.
 - **Guard pipeline.** Native, data-layer, sandboxed WASM, and external guards screen every input
