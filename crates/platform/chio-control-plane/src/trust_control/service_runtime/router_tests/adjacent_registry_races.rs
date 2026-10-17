@@ -10,6 +10,9 @@ use crate::passport_verifier::{
     RegistryUpdateError,
 };
 
+#[path = "enterprise_provider_races.rs"]
+mod enterprise_provider_races;
+
 const HANG_GUARD: Duration = Duration::from_secs(30);
 const PAUSE_BOUND: Duration = HANG_GUARD;
 use chio_credentials::{

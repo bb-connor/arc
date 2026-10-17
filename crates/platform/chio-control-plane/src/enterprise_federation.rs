@@ -4,6 +4,7 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use crate::passport_verifier::RegistryTransactionError;
 use crate::CliError;
 use crate::JwtProviderProfile;
 
@@ -282,25 +283,30 @@ impl EnterpriseProviderRegistry {
         registry.with_revalidated_records()
     }
 
+    /// Updates the latest registry under its stable writer lock, returning the
+    /// outcome only after durable bounded persistence. A missing file starts
+    /// empty.
+    pub fn update<R, E>(
+        path: &Path,
+        change: impl FnOnce(&mut Self) -> Result<R, E>,
+    ) -> Result<R, RegistryTransactionError<E>> {
+        crate::signed_input::update_bounded_registry(
+            path,
+            |path| {
+                if path.exists() {
+                    Self::load(path)
+                } else {
+                    Ok(Self::default())
+                }
+            },
+            crate::signed_input::MAX_SIGNED_FILE_BYTES,
+            change,
+        )
+    }
+
+    #[cfg(test)]
     pub fn save(&self, path: &Path) -> Result<(), CliError> {
-        let registry = self.clone().with_revalidated_records()?;
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|error| {
-                    CliError::cli_io_error(format!(
-                        "failed to create enterprise provider registry directory {}: {error}",
-                        parent.display()
-                    ))
-                })?;
-            }
-        }
-        let serialized = serde_json::to_vec_pretty(&registry).map_err(|error| {
-            CliError::cli_json_error(format!(
-                "failed to serialize enterprise provider registry {}: {error}",
-                path.display()
-            ))
-        })?;
-        crate::signed_input::replace_file(path, &serialized)
+        crate::signed_input::write_bounded_json(path, &self.clone().with_revalidated_records()?)
     }
 
     pub fn validated_provider(&self, provider_id: &str) -> Option<&EnterpriseProviderRecord> {
@@ -309,10 +315,14 @@ impl EnterpriseProviderRegistry {
             .filter(|record| record.is_validated_enabled())
     }
 
-    pub fn upsert(&mut self, mut record: EnterpriseProviderRecord) {
+    /// Stores `record` with its validation errors recomputed and returns the
+    /// stored copy.
+    pub fn upsert(&mut self, mut record: EnterpriseProviderRecord) -> EnterpriseProviderRecord {
         record.validation_errors = record.validate();
         self.version = ENTERPRISE_PROVIDER_REGISTRY_VERSION.to_string();
-        self.providers.insert(record.provider_id.clone(), record);
+        self.providers
+            .insert(record.provider_id.clone(), record.clone());
+        record
     }
 
     pub fn remove(&mut self, provider_id: &str) -> bool {
