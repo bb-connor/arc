@@ -7,7 +7,8 @@
 //! long-lived kernel key, and to mint receipt identifiers.
 //!
 //! The adapter fails closed: if the runtime has no `globalThis.crypto`
-//! global (e.g. a wasm32 host that does not provide the Web Crypto API), the [`WebCryptoRng::try_new`] constructor returns
+//! global (e.g. a wasm32 host that does not provide the Web Crypto API), the
+//! [`WebCryptoRng::try_new`] constructor returns
 //! [`WebCryptoRngError::Unavailable`]. The kernel-core `Rng` trait's
 //! `fill_bytes` has no error channel, so once the adapter is constructed
 //! a later `fill_bytes` call that fails for any reason falls back to
@@ -53,8 +54,9 @@ const MAX_GET_RANDOM_VALUES_BYTES: usize = 65_536;
 ///
 /// Constructing the adapter caches a handle to the browser `Crypto`
 /// object so `fill_bytes` is a straight FFI call. The adapter is
-/// cheap to construct -- two global property lookups -- but the caller should still hold one per wasm entry-point call
-/// instead of per-receipt to avoid redundant globals lookups.
+/// cheap to construct -- two global property lookups -- but the caller should
+/// still hold one per wasm entry-point call instead of per-receipt to avoid
+/// redundant globals lookups.
 #[cfg(target_arch = "wasm32")]
 pub struct WebCryptoRng {
     crypto: web_sys::Crypto,
