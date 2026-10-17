@@ -49,7 +49,7 @@ Receipt `settlement` block:
 ```json
 {
   "schema": "chio.settlement-closure.v1",
-  "terminal_receipt_id": "rcpt_sha256:...",
+  "terminal_receipt_id": "5a1f...c4",
   "hold_id": "hold_01J...",
   "rail": "x402",
   "state": "settled",
