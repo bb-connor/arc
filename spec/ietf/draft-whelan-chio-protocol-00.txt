@@ -5071,9 +5071,8 @@ Internet-Draft                Chio Protocol               September 2026
     | Last-Event-ID        | GET        | Replay cursor               |
     |                      |            | (Section 11.5)              |
     +----------------------+------------+-----------------------------+
-    | DPoP                 | any        | Sender proof, when the      |
-    |                      | request    | access token requires one   |
-    |                      |            | (Section 11.2)              |
+    | DPoP                 | any        | Refused with 401            |
+    |                      | request    | (Section 11.2)              |
     +----------------------+------------+-----------------------------+
 
                       Table 38: Hosted Request Headers
@@ -5089,6 +5088,7 @@ Internet-Draft                Chio Protocol               September 2026
 
    3.  Accept lacks either media type: 406.  Content-Type does not begin
        with application/json: 415.
+
 
 
 
@@ -5178,10 +5178,10 @@ Internet-Draft                Chio Protocol               September 2026
    members of its cnf claim.  For x5t#S256 and chioAttestationSha256,
    the request MUST carry the header x-chio-mtls-thumbprint-sha256 or x-
    chio-runtime-attestation-sha256, respectively, with a value equal to
-   the claim.  A failed check is 401.  Chio DPoP sender binding is
-   unavailable on this edge: it MUST reject with 401 a token whose cnf
-   carries chioSenderKey and any request that carries a DPoP header, and
-   MUST NOT admit either as a bearer.
+   the claim.  A failed check is 401.  This edge refuses Chio DPoP
+   sender binding: it MUST reject with 401 a token whose cnf carries
+   chioSenderKey and any request that carries a DPoP header, and MUST
+   NOT admit either as a bearer.
 
    The edge binds the authentication context of initialize to the
    session.  Every later request of the session MUST present the same
