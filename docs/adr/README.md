@@ -33,5 +33,6 @@ Current ADR set:
 19. [ADR-0019 Kernel Delivery Contract](ADR-0019-kernel-delivery-contract.md)
 20. [ADR-0020 Finding Status Feed Governance](ADR-0020-finding-status-feed-governance.md)
 21. [ADR-0021 Hosted Market Storage Authority And Transition-Rule Ownership](ADR-0021-hosted-market-storage-authority.md)
+22. [ADR-0039 Customer-Hosted Root Exchange](ADR-0039-customer-hosted-root-exchange.md) - proposed; every `serve-http` root is exchange-issued and anchored, with the exchange run by the provider.
 
 - [ADR-0038 Native Host Program](ADR-0038-native-host-program.md) - accepted for planning; north star, three flows and native host services.
