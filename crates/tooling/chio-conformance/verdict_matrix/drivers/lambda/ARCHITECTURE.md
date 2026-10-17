@@ -10,8 +10,8 @@ response projection, expected-tuple indexing, and a complete driver run.
 
 The sidecar owns policy, guard, and capability evaluation.
 The driver owns fixture translation and comparison.
-The Lambda extension association comes from the matrix registry;
-this binary does not invoke AWS Lambda or package an extension.
+This binary does not invoke AWS Lambda or exercise the Lambda extension;
+the matrix registry lists this driver crate as its package.
 
 ## Structure
 

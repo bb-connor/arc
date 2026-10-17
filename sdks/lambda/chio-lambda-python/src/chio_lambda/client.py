@@ -140,7 +140,6 @@ class ChioLambdaClient:
         capability_id: str,
         tool_server: str,
         tool_name: str,
-        scope: str | None = None,
         arguments: dict[str, Any] | None = None,
     ) -> EvaluateVerdict:
         """Ask the extension to evaluate a single tool call.
@@ -154,10 +153,9 @@ class ChioLambdaClient:
             Tool server identifier.
         tool_name:
             Name of the invoked tool. Must be non-empty.
-        scope:
-            Optional scope name (e.g. ``"db:read"``) surfaced in the observation.
         arguments:
-            Optional tool arguments, forwarded verbatim in the observation.
+            Optional tool arguments passed to capability evaluation. They are
+            not echoed in the response or stored in the observation.
 
         Returns
         -------
@@ -175,8 +173,6 @@ class ChioLambdaClient:
             "tool_server": tool_server,
             "tool_name": tool_name,
         }
-        if scope is not None:
-            body["scope"] = scope
         if arguments is not None:
             body["arguments"] = arguments
 
@@ -200,7 +196,7 @@ class ChioLambdaClient:
                 capability_id=str(data.get("capability_id", capability_id)),
                 tool_server=str(data.get("tool_server", tool_server)),
                 tool_name=str(data.get("tool_name", tool_name)),
-                timestamp=int(data.get("timestamp", 0)),
+                timestamp=int(data["timestamp"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ChioLambdaError(

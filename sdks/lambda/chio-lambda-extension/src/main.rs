@@ -7,10 +7,10 @@
 //!
 //! The extension is a detect-only observer. Each evaluation yields an
 //! unsigned observation record with `authorized: false`, never a Chio
-//! receipt and never an authorization. Observations are buffered in a bounded
-//! channel and drained to DynamoDB on SHUTDOWN. A full buffer or an
-//! unreadable clock fails the evaluate request instead of dropping the record
-//! or stamping a fallback time.
+//! receipt and never an authorization. Each observation is written through to
+//! DynamoDB before the evaluator answers. A failed or timed-out write, or an
+//! unreadable clock, fails the evaluate request instead of answering without a
+//! stored record or stamping a fallback time.
 //!
 //! All configuration comes from environment variables so a Lambda function
 //! can opt in purely through the AWS Console or IaC. Missing or malformed
@@ -33,8 +33,6 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto::Builder as ServerBuilder;
 use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
-use tokio::sync::mpsc::error::TrySendError;
-use tokio::sync::{mpsc, Mutex};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -49,11 +47,10 @@ use chio_kernel_core::{
 #[cfg(test)]
 use chio_core_types::crypto::Keypair;
 
-mod dynamodb_flush;
 mod lifecycle;
+mod observation_store;
 
-use dynamodb_flush::{DynamoFlusher, ObservationRecord};
-use lifecycle::ShutdownEvent;
+use observation_store::{DynamoStore, ObservationRecord, ObservationStore, WRITE_TIMEOUT};
 
 /// Name the extension registers as with the Runtime API. The Lambda
 /// Extensions contract requires this to match the filename of the binary
@@ -64,11 +61,7 @@ const EXTENSION_NAME: &str = "chio";
 /// 9090 so SDKs can hard-code their base URL.
 const DEFAULT_LISTEN_ADDR: &str = "127.0.0.1:9090";
 
-/// Observations buffered before evaluate requests are refused with
-/// `observation_unrecorded`.
-const OBSERVATION_BUFFER_CAPACITY: usize = 1024;
-
-/// Environment variable naming the DynamoDB table observations are flushed to.
+/// Environment variable naming the DynamoDB table observations are written to.
 const OBSERVATION_TABLE_ENV: &str = "CHIO_OBSERVATION_TABLE";
 
 /// Environment variable selecting the guard pipeline. Required.
@@ -176,11 +169,12 @@ async fn run() -> Result<(), BootError> {
         "chio-lambda-extension starting"
     );
 
-    let (observation_tx, observation_rx) =
-        mpsc::channel::<ObservationRecord>(OBSERVATION_BUFFER_CAPACITY);
+    let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
     let state = Arc::new(AppState {
-        observation_tx,
-        buffer: Mutex::new(ObservationBuffer::new(observation_rx)),
+        store: Box::new(DynamoStore::new(
+            aws_sdk_dynamodb::Client::new(&config),
+            table,
+        )),
         clock: native_clock(),
         guards,
     });
@@ -205,32 +199,7 @@ async fn run() -> Result<(), BootError> {
         }
     });
 
-    // Build the DynamoDB flusher lazily: the AWS SDK reads IAM credentials
-    // from the Lambda execution role which is always present, but we still
-    // bubble up any failures.
-    let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-    let dynamo = DynamoFlusher::new(aws_sdk_dynamodb::Client::new(&config), table.clone());
-
-    // Run the lifecycle loop; on SHUTDOWN drain buffered observations.
-    let flush_state = state.clone();
-    let flush_dynamo = dynamo.clone();
-    let lifecycle_result = lifecycle::run_loop(handle, move |event: ShutdownEvent| {
-        let flush_state = flush_state.clone();
-        let flush_dynamo = flush_dynamo.clone();
-        async move {
-            let drained = flush_state.buffer.lock().await.drain_available();
-            info!(
-                count = drained.len(),
-                reason = %event.shutdown_reason,
-                "draining observation buffer"
-            );
-            match flush_dynamo.flush(drained).await {
-                Ok(written) => info!(written, "shutdown flush complete"),
-                Err(err) => warn!(?err, "shutdown flush failed"),
-            }
-        }
-    })
-    .await;
+    let lifecycle_result = lifecycle::run_loop(handle).await;
 
     // Best-effort: once we've returned from the lifecycle loop the Runtime
     // API is done with us. Aborting the server keeps the Tokio runtime from
@@ -246,30 +215,9 @@ fn native_clock() -> Box<dyn Clock> {
 
 /// Shared state between the lifecycle loop and the HTTP evaluator.
 struct AppState {
-    observation_tx: mpsc::Sender<ObservationRecord>,
-    buffer: Mutex<ObservationBuffer>,
+    store: Box<dyn ObservationStore>,
     clock: Box<dyn Clock>,
     guards: GuardSet,
-}
-
-/// Wraps the receiver half of the bounded channel and exposes a non-blocking
-/// `drain_available` used from the SHUTDOWN hook.
-struct ObservationBuffer {
-    rx: mpsc::Receiver<ObservationRecord>,
-}
-
-impl ObservationBuffer {
-    fn new(rx: mpsc::Receiver<ObservationRecord>) -> Self {
-        Self { rx }
-    }
-
-    fn drain_available(&mut self) -> Vec<ObservationRecord> {
-        let mut out = Vec::new();
-        while let Ok(record) = self.rx.try_recv() {
-            out.push(record);
-        }
-        out
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -289,14 +237,7 @@ struct EvaluateRequest {
     #[serde(default)]
     capability: Option<serde_json::Value>,
     #[serde(default)]
-    // Wire-compatible, but ignored for trust decisions. Trusted issuers are
-    // sourced from deployment configuration only.
-    trusted_issuers: Vec<String>,
-    #[serde(default)]
     metadata: Option<serde_json::Value>,
-    #[serde(default)]
-    #[allow(dead_code)]
-    scope: Option<String>,
     #[serde(default)]
     arguments: Option<serde_json::Value>,
 }
@@ -476,22 +417,18 @@ async fn evaluate(request: EvaluateRequest, state: Arc<AppState>) -> Response<Fu
         payload_json,
     };
 
-    // An observation that cannot be buffered fails the request; it is never
-    // dropped behind a successful response.
-    if let Err(err) = state.observation_tx.try_send(record) {
-        let message = match err {
-            TrySendError::Full(_) => "observation buffer full",
-            TrySendError::Closed(_) => "observation buffer closed",
-        };
-        warn!(message, "refusing evaluate request");
-        return error_json(
-            StatusCode::SERVICE_UNAVAILABLE,
-            "observation_unrecorded",
-            message.to_string(),
-        );
-    }
-
-    ok_json(&response)
+    // The observation is stored before the caller hears the outcome.
+    let message = match tokio::time::timeout(WRITE_TIMEOUT, state.store.put(&record)).await {
+        Ok(Ok(())) => return ok_json(&response),
+        Ok(Err(err)) => err.to_string(),
+        Err(_) => format!("observation write exceeded {WRITE_TIMEOUT:?}"),
+    };
+    warn!(%message, "refusing evaluate request");
+    error_json(
+        StatusCode::SERVICE_UNAVAILABLE,
+        "observation_unrecorded",
+        message,
+    )
 }
 
 fn evaluate_request(
@@ -520,7 +457,7 @@ fn evaluate_request(
         );
     }
 
-    let trusted_issuers = match resolve_trusted_issuers(request) {
+    let trusted_issuers = match resolve_trusted_issuers() {
         Ok(trusted_issuers) if !trusted_issuers.is_empty() => trusted_issuers,
         Ok(_) => return ("deny", Some("missing trusted_issuers".into())),
         Err(reason) => return ("deny", Some(reason)),
@@ -576,13 +513,7 @@ fn resolve_capability(request: &EvaluateRequest) -> Result<CapabilityToken, Stri
     })
 }
 
-fn resolve_trusted_issuers(request: &EvaluateRequest) -> Result<Vec<PublicKey>, String> {
-    if !request.trusted_issuers.is_empty() {
-        warn!(
-            ignored_count = request.trusted_issuers.len(),
-            "ignoring request-supplied trusted_issuers; using deployment configuration only"
-        );
-    }
+fn resolve_trusted_issuers() -> Result<Vec<PublicKey>, String> {
     let raw = std::env::var(TRUSTED_ISSUERS_ENV)
         .map_err(|_| format!("missing {TRUSTED_ISSUERS_ENV} deployment configuration"))?;
     let issuer_values = serde_json::from_str::<Vec<String>>(&raw)
@@ -626,10 +557,13 @@ fn build_response(status: StatusCode, bytes: Vec<u8>) -> Response<Full<Bytes>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::observation_store::{StoreError, StoreFuture};
     use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
     use chio_core_types::capability::token::CapabilityTokenBody;
     use std::ffi::OsString;
     use std::future::Future;
+    use std::sync::Mutex as StdMutex;
+    use tokio::sync::Mutex;
 
     /// Fixed evaluation time inside every fixture capability window.
     const FIXTURE_NOW_SECS: u64 = 1_760_000_000;
@@ -652,18 +586,50 @@ mod tests {
         }
     }
 
-    fn state_with(capacity: usize, clock: FixedClock) -> Arc<AppState> {
-        let (tx, rx) = mpsc::channel(capacity);
+    #[derive(Clone, Default)]
+    struct RecordingStore(Arc<StdMutex<Vec<ObservationRecord>>>);
+
+    impl RecordingStore {
+        fn records(&self) -> Vec<ObservationRecord> {
+            self.0.lock().unwrap().clone()
+        }
+    }
+
+    impl ObservationStore for RecordingStore {
+        fn put<'a>(&'a self, record: &'a ObservationRecord) -> StoreFuture<'a> {
+            self.0.lock().unwrap().push(record.clone());
+            Box::pin(async { Ok(()) })
+        }
+    }
+
+    struct FailingStore;
+
+    impl ObservationStore for FailingStore {
+        fn put<'a>(&'a self, _record: &'a ObservationRecord) -> StoreFuture<'a> {
+            Box::pin(async { Err(StoreError("table unavailable".into())) })
+        }
+    }
+
+    struct HangingStore;
+
+    impl ObservationStore for HangingStore {
+        fn put<'a>(&'a self, _record: &'a ObservationRecord) -> StoreFuture<'a> {
+            Box::pin(std::future::pending())
+        }
+    }
+
+    fn state_with(store: impl ObservationStore + 'static, clock: FixedClock) -> Arc<AppState> {
         Arc::new(AppState {
-            observation_tx: tx,
-            buffer: Mutex::new(ObservationBuffer::new(rx)),
+            store: Box::new(store),
             clock: Box::new(clock),
             guards: GuardSet::None,
         })
     }
 
-    fn state() -> Arc<AppState> {
-        state_with(16, FixedClock::new(FIXTURE_NOW_SECS))
+    fn recording_state() -> (Arc<AppState>, RecordingStore) {
+        let store = RecordingStore::default();
+        let state = state_with(store.clone(), FixedClock::new(FIXTURE_NOW_SECS));
+        (state, store)
     }
 
     fn signed_capability(issuer: &Keypair) -> CapabilityToken {
@@ -703,9 +669,7 @@ mod tests {
             tool_server: "srv".into(),
             tool_name: "tool".into(),
             capability: Some(serde_json::to_value(capability).unwrap()),
-            trusted_issuers: Vec::new(),
             metadata: None,
-            scope: None,
             arguments: None,
         }
     }
@@ -724,25 +688,13 @@ mod tests {
         serde_json::from_slice(&body).unwrap()
     }
 
-    fn sample_record() -> ObservationRecord {
-        ObservationRecord {
-            observation_id: "o-0".into(),
-            timestamp: FIXTURE_NOW_SECS,
-            capability_id: "cap".into(),
-            tool_server: "srv".into(),
-            tool_name: "tool".into(),
-            decision: "allow".into(),
-            reason: None,
-            payload_json: "{}".into(),
-        }
-    }
-
     #[tokio::test]
     async fn evaluate_denies_missing_capability_id() {
         let issuer = Keypair::generate();
         let mut request = request_for(&signed_capability(&issuer));
         request.capability_id = String::new();
-        let response = evaluate(request, state()).await;
+        let (state, _) = recording_state();
+        let response = evaluate(request, state).await;
         assert_eq!(response.status(), StatusCode::OK);
         let parsed = body_json(response).await;
         assert_eq!(parsed["decision"], "deny");
@@ -754,7 +706,8 @@ mod tests {
         let issuer = Keypair::generate();
         let mut request = request_for(&signed_capability(&issuer));
         request.tool_name = String::new();
-        let parsed = body_json(evaluate(request, state()).await).await;
+        let (state, _) = recording_state();
+        let parsed = body_json(evaluate(request, state).await).await;
         assert_eq!(parsed["decision"], "deny");
     }
 
@@ -762,10 +715,10 @@ mod tests {
     async fn evaluate_observes_well_formed_request_without_authorizing() {
         let issuer = Keypair::generate();
         let mut request = request_for(&signed_capability(&issuer));
-        request.scope = Some("read".into());
         request.arguments = Some(serde_json::json!({"q": "hello"}));
         request.metadata = Some(serde_json::json!({"trace_id": "trace-1"}));
-        let parsed = body_json(evaluate_trusting(&issuer, request, state()).await).await;
+        let (state, _) = recording_state();
+        let parsed = body_json(evaluate_trusting(&issuer, request, state).await).await;
         assert_eq!(parsed["decision"], "allow");
         assert_eq!(parsed["authorized"], false);
         assert_eq!(parsed["authoritative"], false);
@@ -778,64 +731,103 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn evaluate_buffers_observation() {
+    async fn evaluate_writes_observation_before_answering() {
         let issuer = Keypair::generate();
-        let state = state();
+        let (state, store) = recording_state();
         let request = request_for(&signed_capability(&issuer));
-        let response = evaluate_trusting(&issuer, request, state.clone()).await;
+        let response = evaluate_trusting(&issuer, request, state).await;
         assert_eq!(response.status(), StatusCode::OK);
-        let drained = state.buffer.lock().await.drain_available();
-        assert_eq!(drained.len(), 1);
-        assert_eq!(drained[0].decision, "allow");
-        assert_eq!(drained[0].timestamp, FIXTURE_NOW_SECS);
+        let parsed = body_json(response).await;
+        let records = store.records();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].observation_id, parsed["observation_id"]);
+        assert_eq!(records[0].decision, "allow");
+        assert_eq!(records[0].timestamp, FIXTURE_NOW_SECS);
     }
 
     #[tokio::test]
-    async fn evaluate_fails_closed_when_buffer_is_full() {
+    async fn evaluate_records_every_sequential_call_without_capacity_limit() {
         let issuer = Keypair::generate();
-        let state = state_with(1, FixedClock::new(FIXTURE_NOW_SECS));
-        state.observation_tx.try_send(sample_record()).unwrap();
+        let (state, store) = recording_state();
+        let capability = signed_capability(&issuer);
+        let trusted = serde_json::to_string(&vec![issuer.public_key().to_hex()]).unwrap();
+        let calls = 2_500;
+        with_env_var(TRUSTED_ISSUERS_ENV, &trusted, async {
+            for _ in 0..calls {
+                let response = evaluate(request_for(&capability), state.clone()).await;
+                assert_eq!(response.status(), StatusCode::OK);
+            }
+        })
+        .await;
+        assert_eq!(store.records().len(), calls);
+    }
+
+    #[tokio::test]
+    async fn evaluate_fails_closed_when_write_fails() {
+        let issuer = Keypair::generate();
+        let state = state_with(FailingStore, FixedClock::new(FIXTURE_NOW_SECS));
         let request = request_for(&signed_capability(&issuer));
-        let response = evaluate_trusting(&issuer, request, state.clone()).await;
+        let response = evaluate_trusting(&issuer, request, state).await;
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         let parsed = body_json(response).await;
         assert_eq!(parsed["error"], "observation_unrecorded");
-        assert_eq!(parsed["message"], "observation buffer full");
+        assert_eq!(
+            parsed["message"],
+            "observation write failed: table unavailable"
+        );
         assert!(parsed.get("decision").is_none());
-        let drained = state.buffer.lock().await.drain_available();
-        assert_eq!(drained.len(), 1);
-        assert_eq!(drained[0].observation_id, "o-0");
+        assert!(parsed.get("observation_id").is_none());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn evaluate_fails_closed_when_write_times_out() {
+        let issuer = Keypair::generate();
+        let state = state_with(HangingStore, FixedClock::new(FIXTURE_NOW_SECS));
+        let request = request_for(&signed_capability(&issuer));
+        let response = evaluate_trusting(&issuer, request, state).await;
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        let parsed = body_json(response).await;
+        assert_eq!(parsed["error"], "observation_unrecorded");
+        assert!(parsed["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("exceeded"));
+        assert!(parsed.get("decision").is_none());
     }
 
     #[tokio::test]
     async fn evaluate_fails_closed_when_clock_is_unreadable() {
         let issuer = Keypair::generate();
-        let state = state_with(16, FixedClock::new(u64::MAX));
+        let store = RecordingStore::default();
+        let state = state_with(store.clone(), FixedClock::new(u64::MAX));
         let request = request_for(&signed_capability(&issuer));
-        let response = evaluate_trusting(&issuer, request, state.clone()).await;
+        let response = evaluate_trusting(&issuer, request, state).await;
         assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
         let parsed = body_json(response).await;
         assert_eq!(parsed["error"], "clock_unavailable");
         assert_eq!(parsed["message"], "urn:chio:error:kernel:clock-overflow");
-        assert!(state.buffer.lock().await.drain_available().is_empty());
+        assert!(store.records().is_empty());
     }
 
     #[tokio::test]
     async fn evaluate_denies_expired_capability_at_injected_time() {
         let issuer = Keypair::generate();
-        let state = state_with(16, FixedClock::new(FIXTURE_NOW_SECS + 7_200));
+        let state = state_with(
+            RecordingStore::default(),
+            FixedClock::new(FIXTURE_NOW_SECS + 7_200),
+        );
         let request = request_for(&signed_capability(&issuer));
         let parsed = body_json(evaluate_trusting(&issuer, request, state).await).await;
         assert_eq!(parsed["decision"], "deny");
     }
 
     #[tokio::test]
-    async fn evaluate_ignores_request_supplied_trusted_issuers() {
+    async fn evaluate_denies_issuer_outside_deployment_configuration() {
         let trusted_issuer = Keypair::generate();
         let untrusted_issuer = Keypair::generate();
-        let mut request = request_for(&signed_capability(&untrusted_issuer));
-        request.trusted_issuers = vec![untrusted_issuer.public_key().to_hex()];
-        let parsed = body_json(evaluate_trusting(&trusted_issuer, request, state()).await).await;
+        let request = request_for(&signed_capability(&untrusted_issuer));
+        let (state, _) = recording_state();
+        let parsed = body_json(evaluate_trusting(&trusted_issuer, request, state).await).await;
         assert_eq!(parsed["decision"], "deny");
         let reason = parsed["reason"].as_str().unwrap_or_default();
         assert!(
@@ -851,12 +843,11 @@ mod tests {
             tool_server: "srv".into(),
             tool_name: "tool".into(),
             capability: None,
-            trusted_issuers: Vec::new(),
             metadata: None,
-            scope: None,
             arguments: None,
         };
-        let parsed = body_json(evaluate(request, state()).await).await;
+        let (state, _) = recording_state();
+        let parsed = body_json(evaluate(request, state).await).await;
         assert_eq!(parsed["decision"], "deny");
         assert!(parsed["reason"]
             .as_str()
@@ -898,29 +889,19 @@ mod tests {
     }
 
     #[test]
-    fn evaluate_request_rejects_parameters_field() {
-        let err = serde_json::from_value::<EvaluateRequest>(serde_json::json!({
-            "tool_server": "srv",
-            "tool_name": "tool",
-            "parameters": { "q": "hello" }
-        }))
-        .unwrap_err();
-        assert!(
-            err.to_string().starts_with("unknown field `parameters`"),
-            "{err}"
-        );
-    }
-
-    #[tokio::test]
-    async fn observation_buffer_drains_available_without_blocking() {
-        let (tx, rx) = mpsc::channel(4);
-        let mut buffer = ObservationBuffer::new(rx);
-        for i in 0..3 {
-            let mut record = sample_record();
-            record.observation_id = format!("o-{i}");
-            tx.send(record).await.unwrap();
+    fn evaluate_request_rejects_unknown_fields() {
+        for field in ["parameters", "trusted_issuers", "scope"] {
+            let err = serde_json::from_value::<EvaluateRequest>(serde_json::json!({
+                "tool_server": "srv",
+                "tool_name": "tool",
+                field: "x"
+            }))
+            .unwrap_err();
+            assert!(
+                err.to_string()
+                    .starts_with(&format!("unknown field `{field}`")),
+                "{err}"
+            );
         }
-        assert_eq!(buffer.drain_available().len(), 3);
-        assert!(buffer.drain_available().is_empty());
     }
 }

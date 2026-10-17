@@ -2,8 +2,8 @@
 
 A detect-only Chio observer packaged as an **AWS Lambda Extension**. It runs
 alongside the function handler, exposes a localhost HTTP evaluator that runs
-portable capability evaluation, and flushes unsigned observation records to
-DynamoDB when the Lambda execution environment is recycled.
+portable capability evaluation, and writes each unsigned observation record
+to DynamoDB before answering.
 
 ## Status: detect-only
 
@@ -23,14 +23,15 @@ DynamoDB when the Lambda execution environment is recycled.
 * **Registers** with the Lambda Extensions Runtime API for the `INVOKE` and
   `SHUTDOWN` lifecycle events.
 * **Serves** an HTTP evaluator on `127.0.0.1:9090` that accepts JSON tool
-  call descriptions, returns the observed allow / deny outcome with an
-  observation ID, and buffers the observation for batch persistence.
-* **Flushes** buffered observations to a configurable DynamoDB table when
-  the `SHUTDOWN` event arrives.
+  call descriptions and returns the observed allow / deny outcome with an
+  observation ID.
+* **Writes through** each observation to a configurable DynamoDB table with
+  one `PutItem` before the response is sent. Nothing is buffered, so there
+  is no capacity limit and nothing to flush on `SHUTDOWN`.
 * **Fails closed**: missing or malformed configuration, or an unreachable
   Runtime API, exits non-zero at boot. An unreadable trusted clock, or an
-  observation that cannot be buffered (buffer full or closed), fails the
-  evaluate request with HTTP 503 instead of answering without a record.
+  observation write that fails or exceeds 2 seconds, fails the evaluate
+  request with HTTP 503 instead of answering without a stored record.
 
 This crate is **outside** the main Chio Cargo workspace (it declares its own
 `[workspace]` and lock file). CI builds, lints and tests it through its own
@@ -40,7 +41,7 @@ manifest.
 
 | Variable                      | Required | Default             | Meaning                                         |
 |-------------------------------|----------|---------------------|-------------------------------------------------|
-| `CHIO_OBSERVATION_TABLE`      | yes      | _(none)_            | DynamoDB table observations are flushed into.   |
+| `CHIO_OBSERVATION_TABLE`      | yes      | _(none)_            | DynamoDB table observations are written to.     |
 | `CHIO_GUARDS`                 | yes      | _(none)_            | Guard set. The only accepted value is `none`.   |
 | `CHIO_TRUSTED_ISSUERS`        | yes      | _(none)_            | JSON array of trusted issuer public keys (hex). |
 | `CHIO_CAPABILITY_TOKENS_JSON` | no       | _(none)_            | JSON object of capability tokens by ID, used when a request carries no inline token. |
@@ -83,9 +84,8 @@ Every item written by the extension carries:
 | `reason`         | S    | Optional deny reason.                      |
 | `payload`        | S    | JSON of the full observation response.     |
 
-Throttled writes (`ProvisionedThroughputExceededException`) and any items
-returned in `UnprocessedItems` are retried with exponential backoff up to
-five attempts, capped well under the ~2 second SHUTDOWN budget.
+Each write uses the AWS SDK's standard retry policy, bounded by the 2 second
+write timeout.
 
 ## Evaluator HTTP surface
 
@@ -107,13 +107,14 @@ Request:
   "capability_id": "cap-01HW...",
   "tool_server":  "tools.example",
   "tool_name":    "database-query",
-  "scope":        "db:read",
   "arguments":    {"sql": "SELECT 1"}
 }
 ```
 
 The capability token is supplied inline as `capability`, in the
 `x-chio-capability` header, or by ID through `CHIO_CAPABILITY_TOKENS_JSON`.
+Trusted issuers come only from `CHIO_TRUSTED_ISSUERS`. Unknown fields,
+including `scope` and `trusted_issuers`, are rejected with HTTP 400.
 
 Response (HTTP 200):
 
@@ -142,7 +143,7 @@ Error responses (HTTP 503, no observation is recorded):
 | `error`                  | Meaning                                         |
 |--------------------------|-------------------------------------------------|
 | `clock_unavailable`      | The trusted clock could not be read; `message` is the clock error code. |
-| `observation_unrecorded` | The observation buffer is full or closed.       |
+| `observation_unrecorded` | The DynamoDB write failed or timed out.         |
 
 ## Build
 
@@ -200,7 +201,7 @@ aws lambda publish-layer-version \
 ```
 
 Then reference the layer ARN on your function and grant the function's
-execution role `dynamodb:BatchWriteItem` on `CHIO_OBSERVATION_TABLE`.
+execution role `dynamodb:PutItem` on `CHIO_OBSERVATION_TABLE`.
 
 ## Using from Python
 
@@ -221,14 +222,13 @@ verdict = client.evaluate(
     capability_id="cap-01HW...",
     tool_server="tools.example",
     tool_name="database-query",
-    scope="db:read",
     arguments={"sql": "SELECT 1"},
 )
 if verdict.denied:
     return {"statusCode": 403, "body": verdict.reason}
 
 # Option 2: decorator (evaluates before the function body runs)
-@chio_tool(scope="db:read", tool_server="tools.example", tool_name="database-query")
+@chio_tool(tool_server="tools.example", tool_name="database-query")
 def handler(event, context, capability_id):
     # Body only runs on an authoritative prevent allow
     return run_query(event["body"])

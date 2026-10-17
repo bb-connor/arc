@@ -40,7 +40,6 @@ def handler(event, context):
             capability_id=event["chio_capability_id"],
             tool_server="tools.example",
             tool_name="database-query",
-            scope="db:read",
             arguments={"sql": event["body"]},
         )
     except ChioLambdaError as exc:
@@ -67,12 +66,11 @@ def handler(event, context):
 from chio_lambda import chio_tool
 
 @chio_tool(
-    scope="db:read",
     tool_server="tools.example",
     tool_name="database-query",
 )
 def handler(event, context, capability_id, verdict):
-    # Runs only if the extension returns allow. The decorator injects
+    # Runs only on an authoritative prevent allow. The decorator injects
     # `capability_id` and `verdict` if the wrapped function declares them.
     return run_query(event["body"])
 ```

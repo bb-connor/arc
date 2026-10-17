@@ -131,7 +131,7 @@ def test_evaluate_deny_reports_reason() -> None:
     assert verdict.reason == "missing tool_name"
 
 
-def test_evaluate_forwards_scope_and_arguments() -> None:
+def test_evaluate_forwards_arguments_only() -> None:
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -157,11 +157,10 @@ def test_evaluate_forwards_scope_and_arguments() -> None:
             capability_id="c",
             tool_server="s",
             tool_name="t",
-            scope="db:read",
             arguments={"sql": "SELECT 1"},
         )
 
-    assert captured["scope"] == "db:read"
+    assert set(captured) == {"capability_id", "tool_server", "tool_name", "arguments"}
     assert captured["arguments"] == {"sql": "SELECT 1"}
 
 
@@ -261,3 +260,24 @@ def test_health_returns_payload() -> None:
         payload = client.health()
 
     assert payload["status"] == "ok"
+
+
+def test_evaluate_missing_timestamp_is_malformed() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "decision": "deny",
+                "observation_id": "obs-no-time",
+                "reason": None,
+                "capability_id": "c",
+                "tool_server": "s",
+                "tool_name": "t",
+            },
+        )
+
+    with (
+        ChioLambdaClient(transport=_mock_transport(handler)) as client,
+        pytest.raises(ChioLambdaError, match="malformed"),
+    ):
+        client.evaluate(capability_id="c", tool_server="s", tool_name="t")
