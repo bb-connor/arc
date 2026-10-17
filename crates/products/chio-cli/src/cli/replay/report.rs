@@ -175,9 +175,7 @@ pub fn exit_code_for(kind: DivergenceKind) -> i32 {
 /// Render `report` to `writer` as a single line of JSON followed by a
 /// trailing newline.
 ///
-/// The output is `serde_json::to_writer(...)` plus a `\n`: callers that
-/// want pretty-printed output should round-trip through
-/// [`render_json_string`] and re-pretty-print themselves. The
+/// The output is `serde_json::to_writer(...)` plus a `\n`. The
 /// single-line shape is required so consumers that pipe `chio replay
 /// --json | jq` see a stable byte stream regardless of pipeline
 /// buffering.
@@ -188,15 +186,6 @@ pub fn render_json<W: std::io::Write>(
     serde_json::to_writer(&mut *writer, report).map_err(std::io::Error::other)?;
     writer.write_all(b"\n")?;
     Ok(())
-}
-
-/// Render `report` to a single line of JSON (no trailing newline).
-///
-/// Convenience helper for tests and callers that want the bytes in
-/// memory before deciding where to write them. The byte sequence is
-/// identical to what [`render_json`] writes minus the trailing `\n`.
-pub fn render_json_string(report: &ReplayReport) -> Result<String, serde_json::Error> {
-    serde_json::to_string(report)
 }
 
 #[cfg(test)]
@@ -212,7 +201,7 @@ mod replay_report_tests {
     #[test]
     fn clean_report_serializes_with_null_divergence_and_exit_zero() {
         let report = ReplayReport::clean("./receipts/", 42, "abc123", Some("abc123".to_string()));
-        let json = render_json_string(&report).unwrap();
+        let json = serde_json::to_string(&report).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         assert_eq!(value["schema"], "chio.replay.report/v1");
@@ -228,7 +217,7 @@ mod replay_report_tests {
     fn clean_report_with_no_expected_root_serializes_null() {
         let report = ReplayReport::clean("./log.ndjson", 1, "deadbeef", None);
         let value: serde_json::Value =
-            serde_json::from_str(&render_json_string(&report).unwrap()).unwrap();
+            serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
         assert!(
             value["expected_root"].is_null(),
             "expected_root MUST serialize as JSON null when not asserted",
@@ -298,7 +287,7 @@ mod replay_report_tests {
             divergence,
             exit_code_for(DivergenceKind::VerdictDrift),
         );
-        let json = render_json_string(&report).unwrap();
+        let json = serde_json::to_string(&report).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         assert_eq!(value["exit_code"], 10);
@@ -334,7 +323,7 @@ mod replay_report_tests {
             exit_code_for(DivergenceKind::SignatureMismatch),
         );
         let value: serde_json::Value =
-            serde_json::from_str(&render_json_string(&report).unwrap()).unwrap();
+            serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
 
         assert_eq!(value["exit_code"], 20);
         let div = &value["first_divergence"];
@@ -372,7 +361,7 @@ mod replay_report_tests {
             exit_code_for(DivergenceKind::ParseError),
         );
         let value: serde_json::Value =
-            serde_json::from_str(&render_json_string(&report).unwrap()).unwrap();
+            serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
 
         assert_eq!(value["exit_code"], 30);
         assert_eq!(value["first_divergence"]["kind"], "parse_error");
@@ -401,7 +390,7 @@ mod replay_report_tests {
             exit_code_for(DivergenceKind::MerkleMismatch),
         );
         let value: serde_json::Value =
-            serde_json::from_str(&render_json_string(&report).unwrap()).unwrap();
+            serde_json::from_str(&serde_json::to_string(&report).unwrap()).unwrap();
 
         assert_eq!(value["exit_code"], 20);
         assert_eq!(value["computed_root"], "bbbb");
@@ -434,7 +423,7 @@ mod replay_report_tests {
             },
             10,
         );
-        let json = render_json_string(&original).unwrap();
+        let json = serde_json::to_string(&original).unwrap();
         let parsed: ReplayReport = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, original);
     }
@@ -456,16 +445,6 @@ mod replay_report_tests {
     }
 
     #[test]
-    fn render_json_string_matches_render_json_minus_newline() {
-        let report = ReplayReport::clean("./l", 1, "ab", None);
-        let mut buf: Vec<u8> = Vec::new();
-        render_json(&mut buf, &report).unwrap();
-        let from_writer = std::str::from_utf8(&buf).unwrap();
-        let from_string = render_json_string(&report).unwrap();
-        assert_eq!(from_writer.trim_end_matches('\n'), from_string);
-    }
-
-    #[test]
     fn schema_field_is_first_byte_string_in_serialized_output() {
         // serde_json honours field declaration order on serialize. The
         // schema field is declared first on `ReplayReport` so consumers
@@ -473,7 +452,7 @@ mod replay_report_tests {
         // without parsing the full document. This pin trips if a future
         // refactor reorders the struct.
         let report = ReplayReport::clean("./l", 0, String::new(), None);
-        let json = render_json_string(&report).unwrap();
+        let json = serde_json::to_string(&report).unwrap();
         assert!(
             json.starts_with("{\"schema\":\"chio.replay.report/v1\""),
             "schema must be the first serialized field: {json}",

@@ -17,13 +17,9 @@ pub const ROOT_LEN: usize = 32;
 /// [`MerkleAccumulator::finalize`] to obtain the 32-byte root. The
 /// finalization step consumes the accumulator so a single instance
 /// cannot accidentally produce two different roots.
-///
-/// The accumulator also tracks the receipt count so callers can sanity
-/// check that the corpus was non-empty without re-walking the input.
 #[derive(Debug, Clone)]
 pub struct MerkleAccumulator {
     hasher: Sha256,
-    count: usize,
 }
 
 impl MerkleAccumulator {
@@ -32,7 +28,6 @@ impl MerkleAccumulator {
     pub fn new() -> Self {
         Self {
             hasher: Sha256::new(),
-            count: 0,
         }
     }
 
@@ -44,13 +39,6 @@ impl MerkleAccumulator {
     /// corpus_smoke / reverify reference derivation.
     pub fn append(&mut self, receipt_canonical_bytes: &[u8]) {
         self.hasher.update(receipt_canonical_bytes);
-        self.count = self.count.saturating_add(1);
-    }
-
-    /// Number of receipts folded into the root so far.
-    #[must_use]
-    pub fn count(&self) -> usize {
-        self.count
     }
 
     /// Consume the accumulator and emit the 32-byte synthetic root.
@@ -107,7 +95,6 @@ mod replay_merkle_tests {
         let bytes = br#"{"id":"rcpt-1","ok":true}"#;
         let mut acc = MerkleAccumulator::new();
         acc.append(bytes);
-        assert_eq!(acc.count(), 1);
         let streamed = acc.finalize();
         let oneshot = one_shot(&[bytes]);
         assert_eq!(streamed, oneshot);
@@ -122,7 +109,6 @@ mod replay_merkle_tests {
         acc.append(r0);
         acc.append(r1);
         acc.append(r2);
-        assert_eq!(acc.count(), 3);
         let streamed = acc.finalize();
         let oneshot = one_shot(&[r0, r1, r2]);
         assert_eq!(streamed, oneshot);
@@ -142,7 +128,6 @@ mod replay_merkle_tests {
         for c in &chunks {
             acc.append(c);
         }
-        assert_eq!(acc.count(), 1000);
         let streamed = acc.finalize();
 
         let mut hasher = Sha256::new();
@@ -172,7 +157,6 @@ mod replay_merkle_tests {
         // `replay::reader::ReadError::Empty`) so this branch only
         // surfaces in unit tests.
         let acc = MerkleAccumulator::new();
-        assert_eq!(acc.count(), 0);
         let hex = acc.finalize_hex();
         // SHA-256 of "" pinned by RFC 6234 / NIST CAVP test vector.
         assert_eq!(
@@ -182,21 +166,9 @@ mod replay_merkle_tests {
     }
 
     #[test]
-    fn append_empty_slice_is_no_op_for_bytes_but_advances_count() {
-        // Folding an empty slice into SHA-256 leaves the running state
-        // unchanged. The accumulator still counts the call so a corrupt
-        // empty receipt is observable to the caller.
+    fn append_empty_slice_leaves_digest_unchanged() {
         let mut acc_empty = MerkleAccumulator::new();
         acc_empty.append(b"");
-        let acc_skipped = MerkleAccumulator::new();
-        // Same digest expected: appending b"" must not change the hash.
-        let with_empty = acc_empty.clone().finalize();
-        let baseline = acc_skipped.clone().finalize();
-        assert_eq!(with_empty, baseline);
-        // But the count must reflect the call.
-        acc_empty.append(b"");
-        assert_eq!(acc_empty.count(), 2);
-        // And acc_skipped which did not receive any append stays at 0.
-        let _ = acc_skipped.finalize();
+        assert_eq!(acc_empty.finalize(), MerkleAccumulator::new().finalize());
     }
 }

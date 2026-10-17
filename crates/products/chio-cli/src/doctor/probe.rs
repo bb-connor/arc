@@ -25,17 +25,6 @@ pub enum ProbeSeverity {
     Warning,
     /// Probe failed. Exit code becomes non-zero.
     Error,
-    /// Probe encountered a fatal condition. Exit code becomes non-zero
-    /// and subsequent probes may be skipped at the runner's discretion.
-    Fatal,
-}
-
-impl ProbeSeverity {
-    /// Severity is "failing" when it should drive a non-zero exit.
-    #[must_use]
-    pub const fn is_failing(self) -> bool {
-        matches!(self, Self::Error | Self::Fatal)
-    }
 }
 
 impl fmt::Display for ProbeSeverity {
@@ -45,7 +34,6 @@ impl fmt::Display for ProbeSeverity {
             Self::Info => "info",
             Self::Warning => "warning",
             Self::Error => "error",
-            Self::Fatal => "fatal",
         };
         f.write_str(label)
     }

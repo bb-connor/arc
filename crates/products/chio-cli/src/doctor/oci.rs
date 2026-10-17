@@ -20,19 +20,13 @@ const ALT_REGISTRY_ENV: &str = "CHIO_GUARD_REGISTRY_REFERENCE";
 #[derive(Debug, Default, Clone)]
 pub struct OciProbe {
     registry_override: Option<String>,
-    workdir_override: Option<PathBuf>,
 }
 
 impl OciProbe {
+    #[cfg(test)]
     #[must_use]
     pub fn with_registry(mut self, registry: impl Into<String>) -> Self {
         self.registry_override = Some(registry.into());
-        self
-    }
-
-    #[must_use]
-    pub fn with_workdir(mut self, dir: PathBuf) -> Self {
-        self.workdir_override = Some(dir);
         self
     }
 
@@ -51,10 +45,9 @@ impl OciProbe {
             }
         }
         // Fall back to a chio.yaml `registry:` line in the workspace.
-        let root = self
-            .workdir_override
+        let root = config
+            .workdir
             .clone()
-            .or_else(|| config.workdir.clone())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
         let body = std::fs::read_to_string(root.join("chio.yaml")).ok()?;
         for line in body.lines() {

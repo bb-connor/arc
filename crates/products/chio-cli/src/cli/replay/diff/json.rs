@@ -10,13 +10,6 @@ pub fn render_traffic_diff_json<W: std::io::Write>(
     Ok(())
 }
 
-/// Render the grouped traffic diff as a single-line JSON string.
-pub fn render_traffic_diff_json_string(
-    report: &TrafficReplayDiffReport,
-) -> Result<String, serde_json::Error> {
-    serde_json::to_string(report)
-}
-
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod replay_diff_json_tests {
@@ -54,7 +47,7 @@ mod replay_diff_json_tests {
             error_outcomes: vec![],
         };
 
-        let json = render_traffic_diff_json_string(&report).unwrap();
+        let json = serde_json::to_string(&report).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
 
         assert_eq!(value["schema"], TRAFFIC_DIFF_SCHEMA_ID);

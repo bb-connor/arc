@@ -99,7 +99,7 @@ impl PreflightArgs {
 /// Entry point invoked from the security dispatch.
 ///
 /// Like `chio doctor`, the process exit code is the worst severity: 0 for ok,
-/// info or warning, 1 for error, 2 for fatal, and the JSON envelope carries
+/// info or warning, 1 for error, and the JSON envelope carries
 /// the same number.
 pub fn cmd_security_preflight(
     args: &PreflightArgs,

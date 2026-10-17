@@ -72,13 +72,6 @@ pub struct TrafficReplayReport {
     pub outcomes: Vec<TrafficFrameOutcome>,
 }
 
-impl TrafficReplayReport {
-    /// `true` when no drift and no errors were observed.
-    pub fn ok(&self) -> bool {
-        self.drifts == 0 && self.errors == 0
-    }
-}
-
 /// Errors surfaced by [`run_traffic_replay`].
 #[derive(Debug, thiserror::Error)]
 pub enum ExecuteError {
@@ -131,7 +124,6 @@ pub fn run_traffic_replay(
     };
 
     // 2. Resolve the policy-ref.
-    let _resolved = against.resolve()?;
     let loaded_policy = against.load_workspace_policy()?;
     validate_pre_output_replay_policy(&loaded_policy)?;
     let against_label = against.label();
@@ -815,48 +807,6 @@ capabilities: {}
             v.get("replay_receipt_id").and_then(|s| s.as_str()),
             Some("replay:run-7:frame-x")
         );
-    }
-
-    #[test]
-    fn replay_report_ok_returns_true_when_no_drift_or_errors() {
-        let report = TrafficReplayReport {
-            run_id: "run-1".to_string(),
-            against_label: "/tmp/p.yaml".to_string(),
-            total: 3,
-            matches: 3,
-            drifts: 0,
-            errors: 0,
-            outcomes: vec![],
-        };
-        assert!(report.ok());
-    }
-
-    #[test]
-    fn replay_report_ok_returns_false_on_drift() {
-        let report = TrafficReplayReport {
-            run_id: "run-1".to_string(),
-            against_label: "/tmp/p.yaml".to_string(),
-            total: 3,
-            matches: 2,
-            drifts: 1,
-            errors: 0,
-            outcomes: vec![],
-        };
-        assert!(!report.ok());
-    }
-
-    #[test]
-    fn replay_report_ok_returns_false_on_error() {
-        let report = TrafficReplayReport {
-            run_id: "run-1".to_string(),
-            against_label: "/tmp/p.yaml".to_string(),
-            total: 3,
-            matches: 2,
-            drifts: 0,
-            errors: 1,
-            outcomes: vec![],
-        };
-        assert!(!report.ok());
     }
 
     #[test]

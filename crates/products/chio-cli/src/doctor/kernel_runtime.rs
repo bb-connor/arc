@@ -21,6 +21,7 @@ pub struct KernelRuntimeProbe {
 }
 
 impl KernelRuntimeProbe {
+    #[cfg(test)]
     #[must_use]
     pub fn with_metrics_url(mut self, url: impl Into<String>) -> Self {
         self.metrics_url_override = Some(url.into());
