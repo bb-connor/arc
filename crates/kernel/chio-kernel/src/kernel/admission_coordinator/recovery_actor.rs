@@ -126,7 +126,8 @@ impl ChioKernel {
         if !recovery_grant_permits(capability, permission) {
             return Err(KernelError::RecoveryAuthorityDenied);
         }
-        let digest = recovery_digest(RecoveryDigestDomain::Deployment, &deployment)?;
+        let digest = recovery_digest(RecoveryDigestDomain::Deployment, &deployment)
+            .map_err(KernelError::RecoveryEncoding)?;
         Ok(AuthenticatedRecoveryActor {
             scope: scope.clone(),
             principal: assignment.principal.clone(),

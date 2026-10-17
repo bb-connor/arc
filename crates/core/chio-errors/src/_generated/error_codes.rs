@@ -3006,6 +3006,19 @@ pub const KERNEL_RECEIPT_READ_PROJECTION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec
     consumed_by: &["chio-kernel", "chio-store-sqlite"],
 };
 
+pub const KERNEL_RECOVERY_ENCODING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:recovery-encoding",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Recovery digest refused: the preimage did not encode as canonical JSON.",
+    help: "Repair the recovery deployment record so every field encodes as canonical JSON.",
+    string_code: "CHIO-KERNEL-RECOVERY-ENCODING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
 pub const KERNEL_EXECUTION_NONCE_MISSING: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:execution-nonce-missing",
     domain: Domain::Kernel,
@@ -3902,6 +3915,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_RECEIPT_READ_SCOPE_MISMATCH,
     KERNEL_RECEIPT_READ_QUERY_INVALID,
     KERNEL_RECEIPT_READ_PROJECTION_MISMATCH,
+    KERNEL_RECOVERY_ENCODING,
     KERNEL_EXECUTION_NONCE_MISSING,
     KERNEL_EXECUTION_NONCE_SCHEMA,
     KERNEL_EXECUTION_NONCE_EXPIRED,

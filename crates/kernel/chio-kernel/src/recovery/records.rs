@@ -416,7 +416,7 @@ redacted!(RecoveryEffectContractV1);
 
 pub fn recovery_authority_scope_digest(
     profile: &RecoveryDeploymentV1,
-) -> Result<AuthorityScopeDigest, crate::KernelError> {
+) -> Result<AuthorityScopeDigest, chio_core_types::Error> {
     // Zero only this self-referential digest. Every operator-selected field,
     // including keys, coverage and the pinned sink, remains in the preimage.
     let mut unsigned = profile.clone();

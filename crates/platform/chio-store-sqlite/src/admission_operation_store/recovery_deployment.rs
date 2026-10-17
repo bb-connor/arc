@@ -88,7 +88,8 @@ fn digest<T: Serialize>(
     domain: RecoveryDigestDomain,
     value: &T,
 ) -> Result<[u8; 32], AdmissionOperationStoreError> {
-    recovery_digest(domain, value).map_err(|_| invariant("recovery digest refused"))
+    recovery_digest(domain, value)
+        .map_err(|error| invariant(format!("recovery digest refused: {error}")))
 }
 
 fn deployment_digest(
@@ -140,7 +141,7 @@ pub(super) fn validate_deployment(
             )?)
         || profile.authority_scope
             != recovery_authority_scope_digest(profile)
-                .map_err(|_| invariant("recovery scope digest refused"))?
+                .map_err(|error| invariant(format!("recovery scope digest refused: {error}")))?
     {
         return Err(invariant("recovery deployment refused"));
     }

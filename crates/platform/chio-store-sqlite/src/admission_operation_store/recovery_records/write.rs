@@ -57,7 +57,8 @@ pub(in crate::admission_operation_store) struct ProtectedWrite<'a> {
 pub(in crate::admission_operation_store) fn encode_protected<T: Serialize>(
     value: &T,
 ) -> Result<Vec<u8>, AdmissionOperationStoreError> {
-    let bytes = canonical_json_bytes(value).map_err(|_| invariant("recovery encoding refused"))?;
+    let bytes = canonical_json_bytes(value)
+        .map_err(|error| invariant(format!("recovery encoding refused: {error}")))?;
     if bytes.is_empty() || bytes.len() > MAX_RECORD_PAYLOAD_BYTES {
         return Err(invariant("recovery resource exhausted"));
     }

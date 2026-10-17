@@ -167,6 +167,10 @@ pub enum KernelError {
     #[error("recovery authority refused")]
     RecoveryAuthorityDenied,
 
+    /// Canonical encoding refused a recovery digest preimage.
+    #[error("recovery encoding refused: {0}")]
+    RecoveryEncoding(#[source] chio_core::Error),
+
     #[error("capability issuance failed: {0}")]
     CapabilityIssuanceFailed(String),
 
@@ -531,6 +535,11 @@ impl KernelError {
                 "CHIO-KERNEL-RECOVERY-AUTHORITY-DENIED",
                 serde_json::json!({}),
                 "Present a current recovery control capability for the selected scope and permission.",
+            ),
+            Self::RecoveryEncoding(_) => self.report_with_context(
+                "CHIO-KERNEL-RECOVERY-ENCODING",
+                serde_json::json!({}),
+                "Repair the recovery deployment record so every field encodes as canonical JSON.",
             ),
             Self::CapabilityIssuanceFailed(reason) => self.report_with_context(
                 "CHIO-KERNEL-CAPABILITY-ISSUANCE-FAILED",
@@ -1055,6 +1064,23 @@ mod hot_path_error_taxonomy_tests {
         let report = err.report();
         assert_eq!(report.code, "CHIO-KERNEL-RECOVERY-AUTHORITY-DENIED");
         assert_eq!(report.context, serde_json::json!({}));
+    }
+
+    #[test]
+    fn recovery_encoding_retains_the_encoder_cause() {
+        let err = KernelError::RecoveryEncoding(chio_core::Error::CanonicalJson(
+            "unsupported JSON number".to_string(),
+        ));
+        assert_eq!(
+            err.to_string(),
+            "recovery encoding refused: canonical JSON error: unsupported JSON number"
+        );
+        assert!(matches!(
+            std::error::Error::source(&err)
+                .and_then(|source| source.downcast_ref::<chio_core::Error>()),
+            Some(chio_core::Error::CanonicalJson(reason)) if reason == "unsupported JSON number"
+        ));
+        assert_eq!(err.report().code, "CHIO-KERNEL-RECOVERY-ENCODING");
     }
 
     #[test]
