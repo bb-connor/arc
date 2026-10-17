@@ -280,8 +280,8 @@ mod reqwest_like {
         }
 
         pub(super) async fn send(self) -> Result<HttpResponse, LifecycleError> {
-            let parsed = parse_url(&self.url)
-                .map_err(|err| LifecycleError::Transport(err.to_string()))?;
+            let parsed =
+                parse_url(&self.url).map_err(|err| LifecycleError::Transport(err.to_string()))?;
             trace!(host = %parsed.host_port, path = %parsed.path, "runtime api request");
 
             let stream = TcpStream::connect(&parsed.host_port)

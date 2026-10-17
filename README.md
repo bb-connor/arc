@@ -603,7 +603,7 @@ Each adapter follows a lift to kernel-verdict to lower pipeline over a real HTTP
 | Streaming (Kafka, NATS, Pulsar, EventBridge, Pub/Sub, Redis) | `chio-streaming` | Shipping |
 | Infrastructure-as-Code (Terraform, Pulumi) | `chio-iac` | Shipping |
 | Kubernetes (controller, CRDs, webhooks) | `sdks/k8s` | Shipping |
-| AWS Lambda (Rust + Python) | `chio-lambda-extension`, `chio-lambda-python` | Shipping |
+| AWS Lambda (Rust + Python) | `chio-lambda-extension`, `chio-lambda-python` | Detect-only (unsigned observations, no authorization) |
 | AWS Bedrock Marketplace | `chio-bedrock-control-plane` (`us-east-1`) | Listing package; entitlement and metering helpers, no AWS calls |
 | Editors | `vscode-chio`, `zed-chio` (LSP-backed) | Shipping |
 

@@ -52,9 +52,9 @@ def chio_tool(
     scope:
         Capability scope name passed to the extension (e.g. ``"db:read"``).
     tool_server:
-        Tool server identifier recorded on the receipt.
+        Tool server identifier recorded on the observation.
     tool_name:
-        Tool name recorded on the receipt.
+        Tool name recorded on the observation.
     client:
         Optional custom :class:`ChioLambdaClient`. The default is lazily
         constructed on first use and reused for the lifetime of the

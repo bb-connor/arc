@@ -1393,6 +1393,7 @@
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_existing::native-adapter",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_observer::native-adapter",
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_with_topology::native-adapter",
-    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::report_clock::native-adapter"
+    "crates/platform/chio-control-plane/src/trust_control/underwriting_and_support/policy_support.rs::report_clock::native-adapter",
+    "sdks/lambda/chio-lambda-extension/src/main.rs::native_clock::native-adapter"
   ]
 }

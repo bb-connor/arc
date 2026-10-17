@@ -19,10 +19,9 @@ def _allow_response(_request: httpx.Request) -> httpx.Response:
         200,
         json={
             "decision": "allow",
-            "receipt_id": "r-allow",
+            "observation_id": "r-allow",
             "authorized": True,
             "authoritative": True,
-            "receipt_kind": "mediated_decision",
             "boundary_class": "prevent",
             "reason": None,
             "capability_id": "cap-1",
@@ -38,7 +37,7 @@ def _deny_response(_request: httpx.Request) -> httpx.Response:
         200,
         json={
             "decision": "deny",
-            "receipt_id": "r-deny",
+            "observation_id": "r-deny",
             "reason": "not authorized",
             "capability_id": "cap-1",
             "tool_server": "srv",
@@ -87,7 +86,7 @@ def test_decorator_injects_verdict_when_requested() -> None:
 
     handler({"chio_capability_id": "cap-1"}, None)
     assert captured["verdict"].allowed is True
-    assert captured["verdict"].receipt_id == "r-allow"
+    assert captured["verdict"].observation_id == "r-allow"
 
 
 def test_decorator_denies_raises_and_skips_handler() -> None:

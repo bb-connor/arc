@@ -1,33 +1,33 @@
-//! Receipt flush to DynamoDB.
+//! Observation flush to DynamoDB.
 //!
-//! Receipts are buffered in-memory during the invocation and drained to
-//! DynamoDB when the extension receives a `SHUTDOWN` event (or when the
-//! buffer fills up, whichever happens first).
+//! Detect-only observations are buffered in memory and drained to DynamoDB
+//! when the extension receives a `SHUTDOWN` event. Items are unsigned
+//! observation records, not Chio receipts.
 //!
 //! Table schema (required; the extension does not create the table):
 //!
 //! ```text
 //! AttributeDefinitions:
-//!   - AttributeName: receipt_id   (HASH / partition key, S)
-//!   - AttributeName: timestamp    (RANGE / sort key, N)
+//!   - AttributeName: observation_id (HASH / partition key, S)
+//!   - AttributeName: timestamp      (RANGE / sort key, N)
 //! ```
 //!
 //! Every item also carries:
 //!
 //! | attribute      | type | meaning                                         |
 //! |----------------|------|-------------------------------------------------|
-//! | receipt_id     | S    | UUIDv7 unique identifier                        |
+//! | observation_id | S    | UUIDv7 unique identifier                        |
 //! | timestamp      | N    | unix seconds; sort key so latest is easy to scan|
 //! | capability_id  | S    | capability token the call was evaluated against |
 //! | tool_server    | S    | tool server identifier                          |
 //! | tool_name      | S    | tool name                                       |
 //! | decision       | S    | `allow` or `deny`                               |
 //! | reason         | S    | optional deny reason                            |
-//! | payload        | S    | canonical-JSON of the full receipt body         |
+//! | payload        | S    | JSON of the full observation response           |
 //!
 //! DynamoDB's `BatchWriteItem` API caps each request at 25 items; throttled
 //! items come back in `UnprocessedItems` and we retry them with exponential
-//! backoff. All errors are fail-closed: the buffered receipts stay in memory
+//! backoff. All errors are fail-closed: the buffered observations stay in memory
 //! and are surfaced to the caller.
 
 use std::collections::HashMap;
@@ -45,12 +45,12 @@ const BATCH_MAX: usize = 25;
 /// Maximum retry attempts for unprocessed / throttled items.
 const MAX_RETRIES: u32 = 5;
 
-/// In-memory representation of a receipt that we plan to persist. Kept
+/// In-memory representation of an observation that we plan to persist. Kept
 /// deliberately small and free of kernel types so the extension can be
 /// exercised without spinning up a full kernel.
 #[derive(Debug, Clone)]
-pub struct ReceiptRecord {
-    pub receipt_id: String,
+pub struct ObservationRecord {
+    pub observation_id: String,
     pub timestamp: u64,
     pub capability_id: String,
     pub tool_server: String,
@@ -74,7 +74,7 @@ impl From<aws_sdk_dynamodb::error::SdkError<BatchWriteItemError>> for FlushError
     }
 }
 
-/// Client wrapper that knows how to push a batch of receipts to a single
+/// Client wrapper that knows how to push a batch of observations to a single
 /// DynamoDB table. Cloning is cheap: the underlying SDK client is
 /// reference-counted.
 #[derive(Debug, Clone)]
@@ -101,24 +101,24 @@ impl DynamoFlusher {
         &self.table
     }
 
-    /// Flush every buffered receipt. Returns the total number of items
+    /// Flush every buffered observation. Returns the total number of items
     /// written. On partial failure the error carries the underlying SDK
     /// message; unflushed items are NOT silently dropped -- the caller is
     /// expected to keep them buffered and retry on the next SHUTDOWN.
-    pub async fn flush(&self, records: Vec<ReceiptRecord>) -> Result<usize, FlushError> {
+    pub async fn flush(&self, records: Vec<ObservationRecord>) -> Result<usize, FlushError> {
         if records.is_empty() {
             return Ok(0);
         }
 
         let total = records.len();
-        info!(count = total, table = %self.table, "flushing receipts to DynamoDB");
+        info!(count = total, table = %self.table, "flushing observations to DynamoDB");
         for chunk in records.chunks(BATCH_MAX) {
             self.flush_chunk(chunk).await?;
         }
         Ok(total)
     }
 
-    async fn flush_chunk(&self, chunk: &[ReceiptRecord]) -> Result<(), FlushError> {
+    async fn flush_chunk(&self, chunk: &[ObservationRecord]) -> Result<(), FlushError> {
         let mut pending: Vec<WriteRequest> = chunk.iter().map(build_write_request).collect();
 
         for attempt in 0..MAX_RETRIES {
@@ -154,11 +154,11 @@ impl DynamoFlusher {
     }
 }
 
-fn build_write_request(record: &ReceiptRecord) -> WriteRequest {
+fn build_write_request(record: &ObservationRecord) -> WriteRequest {
     let mut item: HashMap<String, AttributeValue> = HashMap::new();
     item.insert(
-        "receipt_id".into(),
-        AttributeValue::S(record.receipt_id.clone()),
+        "observation_id".into(),
+        AttributeValue::S(record.observation_id.clone()),
     );
     item.insert(
         "timestamp".into(),
@@ -218,9 +218,9 @@ async fn backoff(attempt: u32) {
 mod tests {
     use super::*;
 
-    fn sample_record() -> ReceiptRecord {
-        ReceiptRecord {
-            receipt_id: "01908f4a-0000-7000-8000-000000000001".into(),
+    fn sample_record() -> ObservationRecord {
+        ObservationRecord {
+            observation_id: "01908f4a-0000-7000-8000-000000000001".into(),
             timestamp: 1_700_000_000,
             capability_id: "cap-1".into(),
             tool_server: "tools.example".into(),
@@ -237,7 +237,7 @@ mod tests {
         let request = build_write_request(&record);
         let put = request.put_request().expect("put request");
         let item = put.item();
-        assert!(item.contains_key("receipt_id"));
+        assert!(item.contains_key("observation_id"));
         assert!(item.contains_key("timestamp"));
         assert!(item.contains_key("capability_id"));
         assert!(item.contains_key("tool_server"));

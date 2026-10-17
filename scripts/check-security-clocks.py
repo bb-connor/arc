@@ -45,6 +45,7 @@ FIXED_ROOTS = (
     "crates/protocol/chio-a2a-edge/",
     "crates/protocol/chio-acp-edge/",
     "crates/protocol/chio-acp-proxy/",
+    "sdks/lambda/chio-lambda-extension/",
 )
 ADAPTER = "crates/security/chio-security-types/src/clock/system.rs"
 PORT = "crates/security/chio-security-types/src/clock.rs"
@@ -212,6 +213,7 @@ def inventory(root):
             "--exclude-standard",
             "crates/*.rs",
             "crates/*.inc",
+            "sdks/lambda/chio-lambda-extension/*.rs",
         ],
         text=True,
     )
