@@ -8,6 +8,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 
 use super::error::{WorkContractError, WorkRejectionCodeV1};
+use super::ids::WorkProgramId;
 use super::wire::*;
 
 /// Request body bytes, excluding the frame's terminating newline.
@@ -53,7 +54,9 @@ fn decode<T: DeserializeOwned>(input: &[u8], bytes: usize) -> Result<T, WorkCont
     let value: Value = chio_core_types::canonical::UntrustedJsonText::from_wire(input, bytes)
         .and_then(|text| text.decode_document())
         .map_err(|error| match error {
-            chio_core_types::canonical::UntrustedJsonError::SignedInput(_) => {
+            chio_core_types::canonical::UntrustedJsonError::SignedInput(
+                chio_core_types::Error::Json(error),
+            ) if error.classify() == serde_json::error::Category::Data => {
                 reject(WorkRejectionCodeV1::DuplicateKey)
             }
             chio_core_types::canonical::UntrustedJsonError::TooLarge { .. } => {
@@ -79,32 +82,42 @@ const fn reject(code: WorkRejectionCodeV1) -> WorkContractError {
     WorkContractError::new(code)
 }
 
-/// A wrong `schema` or `version` on any Work-owned record is a schema
-/// rejection, distinct from an unknown field or variant.
+/// A wrong `schema` or `version` on a Work-owned record is a schema
+/// rejection, distinct from an unknown field or variant. Only the frame and
+/// its embedded preparation or command are Work records; caller payloads
+/// such as tool arguments are opaque.
 fn check_schema_fields(value: &Value) -> Result<(), WorkContractError> {
-    match value {
-        Value::Object(map) => {
-            if let Some(Value::String(schema)) = map.get("schema") {
-                if schema.starts_with("chio.work.") {
-                    let known = [
-                        "chio.work.request.v1",
-                        "chio.work.response.v1",
-                        "chio.work.preparation.v1",
-                        "chio.work.command.v1",
-                        "chio.work.join-inputs.v1",
-                    ];
-                    if !known.contains(&schema.as_str())
-                        || map.get("version") != Some(&Value::from(1))
-                    {
-                        return Err(reject(WorkRejectionCodeV1::Schema));
-                    }
-                }
-            }
-            map.values().try_for_each(check_schema_fields)
-        }
-        Value::Array(items) => items.iter().try_for_each(check_schema_fields),
-        _ => Ok(()),
+    check_record_schema(value)?;
+    let body = value.get("body");
+    let embedded = match body
+        .and_then(|body| body.get("kind"))
+        .and_then(Value::as_str)
+    {
+        Some("prepare") => body.and_then(|body| body.get("preparation")),
+        Some("submit") => body.and_then(|body| body.get("command")),
+        _ => None,
+    };
+    embedded.map_or(Ok(()), check_record_schema)
+}
+
+fn check_record_schema(record: &Value) -> Result<(), WorkContractError> {
+    let Some(Value::String(schema)) = record.get("schema") else {
+        return Ok(());
+    };
+    if !schema.starts_with("chio.work.") {
+        return Ok(());
     }
+    let known = [
+        "chio.work.request.v1",
+        "chio.work.response.v1",
+        "chio.work.preparation.v1",
+        "chio.work.command.v1",
+        "chio.work.join-inputs.v1",
+    ];
+    if !known.contains(&schema.as_str()) || record.get("version") != Some(&Value::from(1)) {
+        return Err(reject(WorkRejectionCodeV1::Schema));
+    }
+    Ok(())
 }
 
 /// Allocation-free resource accounting before the parser builds a value.
@@ -224,11 +237,33 @@ impl WorkRequestV1 {
     /// Structural checks every transport applies before an owner sees it.
     pub fn validate(&self) -> Result<(), WorkContractError> {
         match &self.body {
-            WorkRequestBodyV1::Prepare { preparation } => preparation.proposal.validate(),
-            WorkRequestBodyV1::Submit { command } => command.action.validate(),
+            WorkRequestBodyV1::Prepare { preparation } => {
+                if let WorkProposalV1::Agreement { commitment, .. } = &preparation.proposal {
+                    same_program(&preparation.program_id, commitment)?;
+                }
+                preparation.proposal.validate()
+            }
+            WorkRequestBodyV1::Submit { command } => {
+                if let WorkActionV1::Submit { commitment } = &command.action {
+                    same_program(&command.program_id, commitment)?;
+                }
+                command.action.validate()
+            }
             WorkRequestBodyV1::Query { .. } => Ok(()),
         }
     }
+}
+
+fn same_program(
+    program_id: &WorkProgramId,
+    commitment: &WorkCommitmentV1,
+) -> Result<(), WorkContractError> {
+    if program_id != &commitment.handle.program_id {
+        return Err(WorkContractError::binding(
+            super::error::WorkBindingFieldV1::ProgramId,
+        ));
+    }
+    Ok(())
 }
 
 impl WorkProposalV1 {
@@ -297,7 +332,8 @@ impl WorkActionV1 {
 impl WorkResponseV1 {
     pub fn validate(&self) -> Result<(), WorkContractError> {
         match &self.body {
-            WorkResponseBodyV1::Prepared { .. } | WorkResponseBodyV1::Command { .. } => Ok(()),
+            WorkResponseBodyV1::Prepared { .. } => Ok(()),
+            WorkResponseBodyV1::Command { result } => result.validate(),
             WorkResponseBodyV1::Query { result } => result.validate(),
         }
     }
@@ -320,7 +356,21 @@ impl WorkQueryResultV1 {
                 unique(profile.recovery_operations.iter())
             }
             Self::Work { view } => view.validate(),
-            Self::Command { .. } | Self::Preparation { .. } | Self::Unavailable { .. } => Ok(()),
+            Self::Command { result } => result.validate(),
+            Self::Preparation { .. } | Self::Unavailable { .. } => Ok(()),
+        }
+    }
+}
+
+impl WorkCommandResultV1 {
+    /// A reconciled view carries the same bounds on every path.
+    pub fn validate(&self) -> Result<(), WorkContractError> {
+        match &self.outcome {
+            WorkCommandOutcomeV1::Applied { result, .. } => match result.as_ref() {
+                WorkAppliedV1::Reconciled { view } => view.validate(),
+                _ => Ok(()),
+            },
+            WorkCommandOutcomeV1::Pending { .. } | WorkCommandOutcomeV1::Refused { .. } => Ok(()),
         }
     }
 }
