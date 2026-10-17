@@ -174,10 +174,14 @@ fn outcome_frame(outcome: Value) -> Value {
 
 /// Every embedded position at the limit refuses as `work.malformed` on the
 /// pad; one over refuses as `work.bounds` before the typed decoder runs.
+/// A unit variant that would silently drop an unknown field is malformed.
 pub fn vectors() -> TestResult<Vec<(String, &'static str, Value, &'static str)>> {
     let view = "/body/result/view";
     let pending = outcome_frame(json!({"kind": "pending",
         "owner_operation_ref": {"operation": operation(), "scope": scope()}}));
+    let mut withheld = view_frame();
+    withheld["body"]["result"]["view"]["result_reference"]["value"]["release"] =
+        json!({"kind": "withheld", "evidence": "evidence-a"});
     let cancel = outcome_frame(json!({"kind": "applied", "revision": 1,
         "result": {"kind": "cancel_observed", "control": "cancel_requested"}}));
     let positions: [(&str, &'static str, Value, String, &[Dimension]); 9] = [
@@ -205,7 +209,7 @@ pub fn vectors() -> TestResult<Vec<(String, &'static str, Value, &'static str)>>
         (
             "release",
             "response",
-            view_frame(),
+            withheld,
             format!("{view}/result_reference/value/release"),
             &[Dimension::Depth],
         ),
@@ -246,6 +250,15 @@ pub fn vectors() -> TestResult<Vec<(String, &'static str, Value, &'static str)>>
         ),
     ];
     let mut vectors = Vec::new();
+    let mut dropped = view_frame();
+    dropped["body"]["result"]["view"]["result_reference"]["value"]["release"] =
+        json!({"kind": "not_available", "pad": 0});
+    vectors.push((
+        "rec0a-release-unit-variant-unknown-field".to_owned(),
+        "response",
+        dropped,
+        "work.malformed",
+    ));
     for (position, contract, frame, path, dimensions) in positions {
         let embedded = frame.pointer(&path).ok_or("embedded contract path")?;
         for &dimension in dimensions {

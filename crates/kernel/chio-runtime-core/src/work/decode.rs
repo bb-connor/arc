@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use chio_security_types::recovery::{ContractError, SafeInteger};
 use serde::de::{DeserializeOwned, Error as _};
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use super::error::{WorkContractError, WorkRejectionCodeV1};
@@ -80,11 +80,12 @@ fn decode<T: DeserializeOwned>(input: &[u8], bytes: usize) -> Result<T, WorkCont
 }
 
 /// An embedded REC-0a contract keeps the inner limits `decode_contract`
-/// charges, measured before its typed decoder runs.
+/// charges, measured before its typed decoder runs, and like it refuses a
+/// typed decode that discards a field.
 pub(super) fn recovery_contract<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
-    T: DeserializeOwned,
+    T: DeserializeOwned + Serialize,
 {
     let value = Value::deserialize(deserializer)?;
     chio_core_types::recovery::check_contract_limits(&value).map_err(|error| {
@@ -93,7 +94,11 @@ where
             _ => WorkRejectionCodeV1::Malformed,
         }))
     })?;
-    serde_json::from_value(value).map_err(D::Error::custom)
+    let typed: T = serde_json::from_value(value.clone()).map_err(D::Error::custom)?;
+    if serde_json::to_value(&typed).ok().as_ref() != Some(&value) {
+        return Err(D::Error::custom(reject(WorkRejectionCodeV1::Malformed)));
+    }
+    Ok(typed)
 }
 
 /// An observation whose value is an embedded REC-0a contract.
@@ -102,7 +107,7 @@ pub(super) fn recovery_observation<'de, D, T>(
 ) -> Result<WorkObservationV1<T>, D::Error>
 where
     D: Deserializer<'de>,
-    T: DeserializeOwned,
+    T: DeserializeOwned + Serialize,
 {
     Ok(
         match WorkObservationV1::<Value>::deserialize(deserializer)? {
