@@ -1,6 +1,6 @@
 # TTFRH Bench
 
-This crate measures the time-to-first-receipt happy-path across the three
+This crate measures the time-to-first-receipt happy-path across the
 `create-chio-app` template starters. Runners are dependency-free so
 `Cargo.lock` stays quiet during ordinary development.
 

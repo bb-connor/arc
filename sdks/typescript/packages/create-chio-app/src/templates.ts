@@ -28,14 +28,6 @@ export const TEMPLATES: readonly TemplateEntry[] = [
     bench: "bench/ttfrh/runners/fastapi_langchain.rs",
     nextCommand: "uv sync && uv run uvicorn app.main:app --reload",
   },
-  {
-    slug: "cloudflare-worker",
-    description:
-      "Cloudflare Worker consuming @chio-protocol/workers and KV-backed receipts.",
-    directory: "templates/cloudflare-worker",
-    bench: "bench/ttfrh/runners/cloudflare_worker.rs",
-    nextCommand: "bun install && bun run dev",
-  },
 ];
 
 export function findTemplate(slug: string): TemplateEntry | undefined {

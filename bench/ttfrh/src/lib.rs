@@ -21,21 +21,15 @@ pub const TARGET_SECONDS: u64 = 60;
 pub enum TemplateRunner {
     NextAiSdkReceipts,
     FastapiLangchain,
-    CloudflareWorker,
 }
 
 impl TemplateRunner {
-    pub const ALL: [Self; 3] = [
-        Self::NextAiSdkReceipts,
-        Self::FastapiLangchain,
-        Self::CloudflareWorker,
-    ];
+    pub const ALL: [Self; 2] = [Self::NextAiSdkReceipts, Self::FastapiLangchain];
 
     pub const fn slug(self) -> &'static str {
         match self {
             Self::NextAiSdkReceipts => "next-ai-sdk-receipts",
             Self::FastapiLangchain => "fastapi-langchain",
-            Self::CloudflareWorker => "cloudflare-worker",
         }
     }
 }
@@ -58,11 +52,10 @@ pub struct RunnerPlan {
     pub synthetic_samples_ms: &'static [u64],
 }
 
-pub fn runner_plans() -> [RunnerPlan; 3] {
+pub fn runner_plans() -> [RunnerPlan; 2] {
     [
         runners::next_ai_sdk_receipts::plan(),
         runners::fastapi_langchain::plan(),
-        runners::cloudflare_worker::plan(),
     ]
 }
 

@@ -16,9 +16,10 @@ any outbound calls during the TTFRH first-run bench.
 |--------------------------|----------------------------------------------------------|
 | `next-ai-sdk-receipts`   | Next.js + Vercel AI SDK middleware + receipts viewer    |
 | `fastapi-langchain`      | Python FastAPI + LangChain + static receipts viewer     |
-| `cloudflare-worker`      | Cloudflare Worker + KV-backed receipts                  |
 
 List them at runtime with `create-chio-app --list`.
+
+There is no Cloudflare Workers template: a Workers integration requires the caller-delivery executor protocol, which is not available yet.
 
 ## Behavior
 

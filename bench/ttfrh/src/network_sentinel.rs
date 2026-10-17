@@ -56,10 +56,6 @@ impl Allowlist {
                     template: TemplateRunner::FastapiLangchain,
                     hosts: BTreeSet::new(),
                 },
-                TemplateAllowlist {
-                    template: TemplateRunner::CloudflareWorker,
-                    hosts: BTreeSet::new(),
-                },
             ],
         }
     }
@@ -364,7 +360,7 @@ mod tests {
         let allowlist = Allowlist::embedded();
         assert!(allowlist.allows(TemplateRunner::NextAiSdkReceipts, "127.0.0.1"));
         assert!(allowlist.allows(TemplateRunner::FastapiLangchain, "localhost"));
-        assert!(allowlist.allows(TemplateRunner::CloudflareWorker, "::1"));
+        assert!(allowlist.allows(TemplateRunner::NextAiSdkReceipts, "::1"));
     }
 
     #[test]
@@ -419,7 +415,7 @@ mod tests {
         let allowlist = Allowlist::embedded();
         let lines = ["[::1]:8787", "[2001:db8::1]:443", "fe80::1"];
         let report = SentinelReport::parse_capture_lines(
-            TemplateRunner::CloudflareWorker,
+            TemplateRunner::FastapiLangchain,
             &allowlist,
             lines.iter().copied(),
         );
@@ -461,9 +457,6 @@ hosts = []
 
 [templates.fastapi-langchain]
 hosts = []
-
-[templates.cloudflare-worker]
-hosts = []
 "#;
         let allowlist = Allowlist::embedded();
         assert!(!allowlist.matches_manifest(manifest));
@@ -478,9 +471,6 @@ global_hosts = ["127.0.0.1", "localhost", "::1", "server#1.example.com"] # comme
 hosts = []
 
 [templates.fastapi-langchain]
-hosts = []
-
-[templates.cloudflare-worker]
 hosts = []
 "#;
         let mut allowlist = Allowlist::embedded();
