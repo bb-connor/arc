@@ -2669,9 +2669,9 @@ fn add_public_settlement_deployment_provenance_to_bundle(bundle: &Path) -> Resul
     )?;
 
     settlement_proof["settlement_receipt"]["schema"] =
-        serde_json::Value::String("chio.web3-settlement-execution-receipt.v2".to_string());
+        serde_json::Value::String("chio.web3-settlement-execution-receipt.v1".to_string());
     settlement_proof["settlement_receipt"]["dispatch"]["schema"] =
-        serde_json::Value::String("chio.web3-settlement-dispatch.v2".to_string());
+        serde_json::Value::String("chio.web3-settlement-dispatch.v1".to_string());
     settlement_proof["settlement_receipt"]["dispatch"]["settlement_token_address"] =
         serde_json::Value::String(settlement_token_address.clone());
     settlement_proof["settlement_receipt"]["dispatch"]["operator_key_hash"] =

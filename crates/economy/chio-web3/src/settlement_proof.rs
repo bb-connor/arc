@@ -12,7 +12,7 @@ use crate::identity::{
 };
 use crate::settlement::{
     settlement_state_id, validate_web3_settlement_execution_receipt, Web3SettlementLifecycleState,
-    CHIO_WEB3_SETTLEMENT_DISPATCH_V2_SCHEMA, CHIO_WEB3_SETTLEMENT_RECEIPT_V2_SCHEMA,
+    CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA, CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA,
 };
 use crate::validation::{ensure_evm_address, ensure_money, ensure_non_empty, evm_addresses_match};
 
@@ -252,11 +252,11 @@ fn public_settlement_bundle_signature_body(
 fn validate_public_settlement_receipt_schema(
     bundle: &PublicSettlementProofBundle,
 ) -> Result<(), Web3ContractError> {
-    if bundle.settlement_receipt.schema != CHIO_WEB3_SETTLEMENT_RECEIPT_V2_SCHEMA
-        || bundle.settlement_receipt.dispatch.schema != CHIO_WEB3_SETTLEMENT_DISPATCH_V2_SCHEMA
+    if bundle.settlement_receipt.schema != CHIO_WEB3_SETTLEMENT_RECEIPT_SCHEMA
+        || bundle.settlement_receipt.dispatch.schema != CHIO_WEB3_SETTLEMENT_DISPATCH_SCHEMA
     {
         return Err(Web3ContractError::InvalidSettlement(
-            "public settlement proof requires v2 receipt and dispatch schemas".to_string(),
+            "public settlement proof requires v1 receipt and dispatch schemas".to_string(),
         ));
     }
     ensure_evm_address(

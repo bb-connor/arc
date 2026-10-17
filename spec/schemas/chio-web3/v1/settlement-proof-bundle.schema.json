@@ -635,7 +635,7 @@
         "settled_amount"
       ],
       "properties": {
-        "schema": { "const": "chio.web3-settlement-execution-receipt.v2" },
+        "schema": { "const": "chio.web3-settlement-execution-receipt.v1" },
         "execution_receipt_id": { "type": "string", "minLength": 1 },
         "dispatch": { "$ref": "#/$defs/settlementDispatch" },
         "lifecycle_state": {
@@ -667,7 +667,7 @@
         "operator_key_hash"
       ],
       "properties": {
-        "schema": { "const": "chio.web3-settlement-dispatch.v2" },
+        "schema": { "const": "chio.web3-settlement-dispatch.v1" },
         "dispatch_id": { "type": "string", "minLength": 1 },
         "chain_id": { "$ref": "#/$defs/chainId" },
         "settlement_amount": { "$ref": "#/$defs/money" },

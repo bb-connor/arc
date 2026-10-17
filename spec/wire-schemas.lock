@@ -5785,24 +5785,14 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/c
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.web3-settlement-dispatch.v2"
-files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/chio-web3/src/settlement.rs"]
-first_seen = "d0446d9648"
-
-[[schema]]
 value = "chio.web3-settlement-dispute.v1"
 files = ["crates/economy/chio-web3/src/settlement_proof.rs"]
 first_seen = "1b9620751d"
 
 [[schema]]
 value = "chio.web3-settlement-execution-receipt.v1"
-files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/chio-web3/src/settlement.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
-value = "chio.web3-settlement-execution-receipt.v2"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/economy/chio-web3/src/settlement.rs", "crates/platform/chio-enterprise-export/src/artifacts.rs", "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs", "crates/products/chio-proof-room/src/lib.rs"]
-first_seen = "d0446d9648"
+first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.web3-settlement-proof-bundle.v1"

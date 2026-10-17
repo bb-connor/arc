@@ -1,5 +1,5 @@
 {
-  "schema": "chio.web3-settlement-dispatch.v2",
+  "schema": "chio.web3-settlement-dispatch.v1",
   "dispatch_id": "dispatch-web3-1",
   "issued_at": 1743292800,
   "trust_profile_id": "chio.official-web3-stack",
