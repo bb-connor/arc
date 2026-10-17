@@ -591,7 +591,7 @@ fn cumulative_approval_backend_root_round_trip() -> TestResult {
     let root = CapabilityToken::sign_cumulative_approval_family_root_with_backend(
         token_body(
             "cap-backend-root",
-            &backend.public_key().unwrap(),
+            &backend.public_key()?,
             &subject.public_key(),
             tool_scope(true, Some(100)),
         ),

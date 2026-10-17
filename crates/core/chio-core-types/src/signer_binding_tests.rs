@@ -25,7 +25,7 @@ impl RotatedBackend {
     }
 
     fn active_key(&self) -> PublicKey {
-        self.active.public_key().unwrap()
+        self.active.keypair().public_key()
     }
 }
 
