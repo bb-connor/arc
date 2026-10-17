@@ -357,8 +357,7 @@ separate requirements; this table alone does not qualify a deployment.
 | D010-D015 | `crates/kernel/chio-kernel/src/kernel/evaluation/caller_execution.rs` | Caller reservation/start/report kernel owner | P01, M1-M3 and flow gates |
 | D016-D022 | `crates/kernel/chio-kernel/src/kernel/evaluation/evaluation_entry.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
 | D023-D024 | `crates/kernel/chio-kernel/src/kernel/evaluation/nested_flow_evaluation.rs` | Nested/session kernel owner | P01, M1-M3 and flow gates |
-| D025-D035 | `crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
-| D036-D037 | `crates/kernel/chio-kernel/src/kernel/evaluator.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
+| D025-D031, D033-D035 | `crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs` | Ordinary kernel entry/facade | P01, M1-M3 and flow gates |
 | D038 | `crates/kernel/chio-kernel/src/kernel/session_ops.rs` | Nested/session kernel owner | P01, M1-M3 and flow gates |
 | D039-D042 | `crates/kernel/chio-kernel/src/kernel/session_ops/nested_tool_call.rs` | Nested/session kernel owner | P01, M1-M3 and flow gates |
 | D043-D044 | `crates/kernel/chio-kernel/src/provider_verdict.rs` | Provider mediated verdict boundary | P01, M1-M3 and flow gates |
@@ -389,6 +388,7 @@ separate requirements; this table alone does not qualify a deployment.
 | D088 | `crates/platform/chio-control-plane/src/security/adapters/tests/native_flow/support/process_recovery/restart.rs::caller_lookup_waits_for_original_coordinator` | Included reconciliation fixture | P01/P07, native process restart and exact M3 dependency gate |
 | D090-D091 | `examples/rust-runtime-consumer/src/main.rs::{initial,recover}` | Two initial kernel calls (allow/deny) and original-outcome recovery | C31, offline Rust package consumer with independently counted effect |
 
+D032, D036 and D037 are retired with the removed `ToolEvaluator` trait.
 D063, D067 and D070 are retired with the removed transport-only methods.
 The surviving transport-channel methods retain mediated dispatch; stable IDs
 are not renumbered.

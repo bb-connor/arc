@@ -687,8 +687,7 @@ impl ChioKernel {
     /// spawned lazily on the first call.
     ///
     /// Not exposed publicly: callers should go through
-    /// [`Self::sign_receipt_via_channel`] or the `ToolEvaluator` trait so the
-    /// channel boundary stays an implementation detail of the kernel crate.
+    /// [`Self::sign_receipt_via_channel`] so the channel boundary stays an implementation detail of the kernel crate.
     /// Crash-recovery tests reach this directly.
     #[allow(dead_code)]
     pub(crate) fn signing_task_handle(&self) -> &signing_task::SigningTaskHandle {
@@ -708,9 +707,8 @@ impl ChioKernel {
     ///
     /// This method is async because it `.await`s on the channel send
     /// (backpressure) and on the oneshot reply. The caller must run
-    /// inside a tokio runtime; every kernel-internal call site already
-    /// does (the `ToolEvaluator` trait methods are async, and so is
-    /// the public `evaluate_tool_call` entrypoint).
+    /// inside a tokio runtime, as the public `evaluate_tool_call` entrypoint
+    /// does.
     ///
     /// `canonical_content` is the exact byte preimage `body.content_hash` was
     /// derived from. The signing task recomputes `sha256_hex(canonical_content)`
@@ -1123,9 +1121,8 @@ impl ChioKernel {
     /// attaching an incompatible store fails without replacing the active one.
     ///
     /// The returned error must not be discarded: swallowing it leaves the kernel
-    /// dispatching charges with settlement uninstalled. Embedders porting from
-    /// `set_settlement_observer` should read
-    /// `docs/migrations/kernel-embedder-surface.md`, which lists the receipt-store
+    /// dispatching charges with settlement uninstalled.
+    /// `docs/reference/KERNEL_EMBEDDING_GUIDE.md` lists the receipt-store
     /// capabilities this requires and the configuration failure modes.
     pub fn set_settlement_observer_runtime(
         &mut self,

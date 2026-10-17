@@ -703,8 +703,6 @@ pub use kernel::{
 };
 
 #[cfg(not(loom))]
-pub use kernel::evaluator::ToolEvaluator;
-#[cfg(not(loom))]
 pub use kernel::DurableFinalizationCutpoint;
 #[cfg(all(not(loom), feature = "admission-test-support"))]
 pub use kernel::DurableFinalizationCutpointHook;

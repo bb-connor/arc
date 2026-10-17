@@ -8,7 +8,7 @@
     "authoritative_files": [
       "crates/guards/chio-guards/src/pipeline.rs",
       "crates/guards/chio-guards/src/lib.rs",
-      "crates/kernel/chio-kernel/src/kernel/evaluator.rs",
+      "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
       "crates/guards/chio-policy/src/validate.rs",
       "crates/guards/chio-policy/src/evaluate/engine.rs"
     ],

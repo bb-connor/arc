@@ -21,7 +21,7 @@
 //! - Tool dispatch to wrapped servers (async transport).
 //! - Receipt persistence / Merkle checkpointing (SQL / IO).
 //!
-//! Callers (`chio-kernel::ChioKernel::evaluate_tool_call_sync`, the browser
+//! Callers (`chio-kernel::ChioKernel::evaluate_tool_call`, the browser
 //! and mobile adapters) wrap this pure core in the I/O checks they need.
 //!
 //! Verified-core boundary note:

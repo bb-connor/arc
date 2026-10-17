@@ -23,21 +23,6 @@ impl ChioKernel {
         )
     }
 
-    /// Crate-private sync entrypoint invoked by the
-    /// [`crate::kernel::evaluator::ToolEvaluator`] default
-    /// implementation. Wraps the long-form
-    /// `evaluate_tool_call_sync_inner` so the trait body does
-    /// not need to plumb the `session_filesystem_roots` /
-    /// `extra_metadata` parameters; both default to `None` on this path,
-    /// matching the previous direct delegation from
-    /// `evaluate_tool_call`.
-    pub(crate) fn evaluate_tool_call_sync(
-        &self,
-        request: &ToolCallRequest,
-    ) -> Result<ToolCallResponse, KernelError> {
-        self.evaluate_tool_call_sync_inner(request, None, None)
-    }
-
     pub fn evaluate_tool_call_blocking_with_metadata(
         &self,
         request: &ToolCallRequest,

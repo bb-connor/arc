@@ -58,7 +58,7 @@ fixtures:
     limit: 12
     expected_top_paths:
       - crates/guards/chio-guards/src
-      - crates/kernel/chio-kernel/src/kernel/evaluator.rs
+      - crates/kernel/chio-kernel/src/kernel/dispatch.rs
     expected_any_paths:
       - crates/guards/chio-guards/src/mcp_tool.rs
       - crates/guards/chio-guards/src/lib.rs
@@ -273,7 +273,7 @@ fixtures:
     limit: 6
     expected_top_paths:
       - crates/guards/chio-guards/src/pipeline.rs
-      - crates/kernel/chio-kernel/src/kernel/evaluator.rs
+      - crates/kernel/chio-kernel/src/kernel/dispatch.rs
     expected_any_paths:
       - crates/guards/chio-guards/tests/output_sanitization.rs
       - crates/guards/chio-policy/tests/compile_policy.rs

@@ -451,13 +451,6 @@ target = ".evaluate_tool_call_sync_with_session_and_security_context"
 references = 1
 
 [[dispatch_sites]]
-id = "D032"
-path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
-symbol = "ChioKernel::evaluate_tool_call_sync"
-target = ".evaluate_tool_call_sync_inner"
-references = 1
-
-[[dispatch_sites]]
 id = "D033"
 path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.rs"
 symbol = "ChioKernel::evaluate_tool_call_sync_inner"
@@ -477,20 +470,6 @@ path = "crates/kernel/chio-kernel/src/kernel/evaluation/sync_evaluation_wrapper.
 symbol = "ChioKernel::evaluate_tool_call_sync_with_session_context"
 target = ".evaluate_tool_call_sync_with_session_and_security_context"
 references = 1
-
-[[dispatch_sites]]
-id = "D036"
-path = "crates/kernel/chio-kernel/src/kernel/evaluator.rs"
-symbol = "<BlockingToolEvaluator as ToolEvaluator>::evaluate"
-target = ".evaluate_tool_call_sync"
-references = 2
-
-[[dispatch_sites]]
-id = "D037"
-path = "crates/kernel/chio-kernel/src/kernel/evaluator.rs"
-symbol = "<BlockingToolEvaluator as ToolEvaluator>::evaluate_with_metadata"
-target = ".evaluate_tool_call_blocking_with_metadata"
-references = 2
 
 [[dispatch_sites]]
 id = "D038"
