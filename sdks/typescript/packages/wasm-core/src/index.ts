@@ -5,14 +5,13 @@
 // the browser) without pulling in any runtime-specific machinery.
 
 /**
- * Normalizes and validates a receipt envelope hex string, returning the decoded
- * bytes.
+ * Decodes a hex-encoded receipt envelope to its canonical JSON text.
  *
- * Accepts an optional `0x` prefix. Rejects odd-length input and any non
- * hexadecimal characters so that malformed receipts fail fast before they reach
- * the wasm `verify_receipt` boundary.
+ * Accepts an optional `0x` prefix. Rejects odd-length input, any non
+ * hexadecimal characters and bytes that are not valid UTF-8, so malformed
+ * receipts fail fast before they reach the wasm `verify_receipt` boundary.
  */
-export function receiptHexToBytes(hex: string): Uint8Array {
+export function receiptHexToJson(hex: string): string {
   const normalized = hex.startsWith('0x') ? hex.slice(2) : hex;
   if (normalized.length % 2 !== 0) {
     throw new Error('receipt hex must have an even number of characters');
@@ -22,5 +21,6 @@ export function receiptHexToBytes(hex: string): Uint8Array {
   }
 
   const pairs = normalized.match(/.{2}/g) ?? [];
-  return Uint8Array.from(pairs.map(byte => Number.parseInt(byte, 16)));
+  const bytes = Uint8Array.from(pairs.map(byte => Number.parseInt(byte, 16)));
+  return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
 }

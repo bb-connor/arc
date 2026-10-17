@@ -22,8 +22,17 @@ use crate::wire::{
 };
 use crate::{BrowserClock, WebCryptoRng};
 
+/// Build a plain JS value by parsing serde_json text with `JSON.parse`, so
+/// free-form objects are own-property objects (never `Map`, never a prototype
+/// write for a `__proto__` key). Integers above 2^53 lose precision in this
+/// view; signed artifacts are authoritative only through their JSON text.
+fn to_plain_js<T: Serialize + ?Sized>(value: &T) -> Result<JsValue, String> {
+    let text = serde_json::to_string(value).map_err(|error| format!("{error}"))?;
+    js_sys::JSON::parse(&text).map_err(|_| String::from("JSON.parse rejected serialized result"))
+}
+
 fn to_js_error(error: &BindingError) -> JsValue {
-    serde_wasm_bindgen::to_value(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
+    to_plain_js(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
 }
 
 fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T, JsValue> {
@@ -34,13 +43,40 @@ fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T,
 }
 
 fn encode_result<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    serde_wasm_bindgen::to_value(value).map_err(|error| {
+    to_plain_js(value).map_err(|error| {
         let err = BindingError::new(
             "encode_result_failed",
             format!("could not serialize wasm result: {error}"),
         );
         to_js_error(&err)
     })
+}
+
+/// `{ receipt, receipt_json }`: `receipt_json` is the signer's canonical JSON
+/// text and the only form to store or pass to [`verify_receipt`]; `receipt` is
+/// a plain-object view of the same text.
+fn encode_signed_receipt(
+    receipt: &chio_core_types::receipt::body::ChioReceipt,
+) -> Result<JsValue, JsValue> {
+    let encode_error = |message: String| {
+        to_js_error(&BindingError::new(
+            "encode_result_failed",
+            format!("could not serialize signed receipt: {message}"),
+        ))
+    };
+    let receipt_json = chio_core_types::canonical::canonical_json_string(receipt)
+        .map_err(|e| encode_error(format!("{e}")))?;
+    let view = js_sys::JSON::parse(&receipt_json)
+        .map_err(|_| encode_error(String::from("JSON.parse rejected canonical text")))?;
+    let out = js_sys::Object::new();
+    for (key, value) in [
+        ("receipt", view),
+        ("receipt_json", JsValue::from_str(&receipt_json)),
+    ] {
+        js_sys::Reflect::set(&out, &JsValue::from_str(key), &value)
+            .map_err(|_| encode_error(String::from("could not build result object")))?;
+    }
+    Ok(out.into())
 }
 
 /// Evaluate a tool call request against a capability.
@@ -77,7 +113,7 @@ pub fn sign_receipt(body_json: &str, signing_seed_hex: &str) -> Result<JsValue, 
     let input: SignReceiptRequestJson = parse_json("sign_receipt body", body_json)?;
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt = sign_receipt_pure(input, &seed).map_err(|err| to_js_error(&err))?;
-    encode_result(&receipt)
+    encode_signed_receipt(&receipt)
 }
 
 /// Relay-sign an already-minted, upstream-trusted receipt body.
@@ -97,7 +133,7 @@ pub fn sign_receipt_relaying_trusted_body(
     let seed = decode_seed_hex(signing_seed_hex).map_err(|err| to_js_error(&err))?;
     let receipt =
         sign_receipt_relaying_trusted_body_pure(input, &seed).map_err(|err| to_js_error(&err))?;
-    encode_result(&receipt)
+    encode_signed_receipt(&receipt)
 }
 
 /// Verify a capability token against a trusted issuer set.
@@ -141,7 +177,8 @@ pub fn verify_capability_with_context(request_json: &str) -> Result<JsValue, JsV
 
 /// Verify a Chio receipt envelope.
 ///
-/// `envelope` is the canonical-JSON serialization of a `ChioReceipt`.
+/// `receipt_json` is the `receipt_json` text returned by [`sign_receipt`], the
+/// canonical-JSON serialization of a `ChioReceipt`.
 /// `trusted_issuers` is a JS value that the browser caller may pass as:
 ///
 /// - `undefined` / `null` -- run signature and parameter-hash checks
@@ -156,10 +193,11 @@ pub fn verify_capability_with_context(request_json: &str) -> Result<JsValue, JsV
 /// signature-bad path) and a [`BindingError`] (`Err(JsValue)`) when
 /// the envelope itself could not be parsed as a receipt.
 #[wasm_bindgen]
-pub fn verify_receipt(envelope: &[u8], trusted_issuers: &JsValue) -> Result<JsValue, JsValue> {
+pub fn verify_receipt(receipt_json: &str, trusted_issuers: &JsValue) -> Result<JsValue, JsValue> {
     let trusted_hex = parse_trusted_issuers_jsvalue(trusted_issuers)?;
     let trusted = decode_trusted_issuers(&trusted_hex).map_err(|err| to_js_error(&err))?;
-    let result = verify_receipt_pure(envelope, &trusted).map_err(|err| to_js_error(&err))?;
+    let result =
+        verify_receipt_pure(receipt_json.as_bytes(), &trusted).map_err(|err| to_js_error(&err))?;
     encode_result(&result)
 }
 

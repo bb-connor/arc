@@ -29,15 +29,15 @@ const RECEIPT_BINDING_VECTORS: &str =
     include_str!("../../../../tests/bindings/vectors/receipt/v1.json");
 
 /// Find the receipt vector with `id == case_id` and return the embedded
-/// receipt object as canonical-JSON bytes suitable for `verify_receipt`.
-fn fixture_envelope_for(case_id: &str) -> Vec<u8> {
+/// receipt object as canonical-JSON text suitable for `verify_receipt`.
+fn fixture_envelope_for(case_id: &str) -> String {
     let corpus: serde_json::Value = serde_json::from_str(RECEIPT_BINDING_VECTORS).unwrap();
     let cases = corpus["cases"].as_array().unwrap();
     let case = cases
         .iter()
         .find(|case| case["id"] == case_id)
         .unwrap_or_else(|| panic!("case {case_id} not in receipt corpus"));
-    serde_json::to_vec(&case["receipt"]).unwrap()
+    serde_json::to_string(&case["receipt"]).unwrap()
 }
 
 fn fixture_case(case_id: &str) -> serde_json::Value {
@@ -59,7 +59,7 @@ fn fixture_cases() -> Vec<serde_json::Value> {
 #[wasm_bindgen_test]
 fn verify_receipt_vector_corpus_matches_expected_without_pinning() {
     for case in fixture_cases() {
-        let envelope = serde_json::to_vec(&case["receipt"]).unwrap();
+        let envelope = serde_json::to_string(&case["receipt"]).unwrap();
         let result_js = verify_receipt(&envelope, &JsValue::UNDEFINED)
             .expect("verify_receipt should not error");
         let result: serde_json::Value = from_value(result_js).unwrap();
@@ -162,7 +162,7 @@ fn verify_receipt_tampered_signature_fixture_marks_invalid() {
 
 #[wasm_bindgen_test]
 fn verify_receipt_rejects_malformed_envelope() {
-    let result = verify_receipt(b"not a receipt", &JsValue::UNDEFINED);
+    let result = verify_receipt("not a receipt", &JsValue::UNDEFINED);
     assert!(result.is_err(), "malformed envelope must surface as Err");
     let error: serde_json::Value = from_value(result.unwrap_err()).unwrap();
     assert_eq!(error["code"], "invalid_receipt_envelope");

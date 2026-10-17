@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { receiptHexToBytes } from '../dist/index.js';
+import { receiptHexToJson } from '../dist/index.js';
 
-test('receiptHexToBytes decodes prefixed hexadecimal input', () => {
-  assert.deepEqual(receiptHexToBytes('0x00ff'), new Uint8Array([0, 255]));
+test('receiptHexToJson decodes prefixed hexadecimal input to text', () => {
+  assert.equal(receiptHexToJson('0x7b2261223a317d'), '{"a":1}');
 });
 
-test('receiptHexToBytes rejects malformed input', () => {
-  assert.throws(() => receiptHexToBytes('abc'), /even number/);
-  assert.throws(() => receiptHexToBytes('zz'), /hexadecimal/);
+test('receiptHexToJson rejects malformed input', () => {
+  assert.throws(() => receiptHexToJson('abc'), /even number/);
+  assert.throws(() => receiptHexToJson('zz'), /hexadecimal/);
+  assert.throws(() => receiptHexToJson('ff'), TypeError);
 });

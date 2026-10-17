@@ -2,47 +2,30 @@ import * as sdk from '../dist/index.js';
 
 const encoder = new TextEncoder();
 
-// serde-wasm-bindgen returns free-form JSON objects (action.parameters, metadata) as Map.
-function toPlain(value) {
-  if (value instanceof Map) {
-    return Object.fromEntries([...value].map(([k, v]) => [k, toPlain(v)]));
-  }
-  if (Array.isArray(value)) {
-    return value.map(toPlain);
-  }
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toPlain(v)]));
-  }
-  return value;
-}
-
 async function sha256Hex(bytes) {
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
-function receiptBody(contentHash) {
-  return {
-    id: 'rcpt-workers-1',
-    timestamp: 1710000200,
-    capability_id: 'cap-workers-1',
-    tool_server: 'srv-files',
-    tool_name: 'file_read',
-    action: {
-      parameters: { mode: 'read', path: '/workspace/docs/roadmap.md' },
-      parameter_hash: '035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929',
-    },
-    decision: { verdict: 'allow' },
-    receipt_kind: 'mediated_decision',
-    boundary_class: 'prevent',
-    tool_origin: 'caller_executed',
-    redaction_mode: 'none',
-    content_hash: contentHash,
-    policy_hash: '0'.repeat(64),
-    evidence: [],
-    trust_level: 'mediated',
-    kernel_key: '0'.repeat(64),
-  };
+// Hand-written JSON text: a JS object literal cannot carry an own `__proto__`
+// key or a u64::MAX integer.
+const PARAMETERS_CANONICAL =
+  '{"__proto__":{"x":null},"mode":"read","nest":{"a":null},"path":"/workspace/docs/roadmap.md"}';
+const METADATA = '{"__proto__":{"polluted":"yes"},"big":18446744073709551615,"k":{"n":null}}';
+
+async function signingInput(canonical) {
+  const contentHash = await sha256Hex(canonical);
+  const parameterHash = await sha256Hex(encoder.encode(PARAMETERS_CANONICAL));
+  return (
+    '{"body":{"id":"rcpt-workers-1","timestamp":1710000200,"capability_id":"cap-workers-1",' +
+    '"tool_server":"srv-files","tool_name":"file_read",' +
+    `"action":{"parameters":${PARAMETERS_CANONICAL},"parameter_hash":"${parameterHash}"},` +
+    '"decision":{"verdict":"allow"},"receipt_kind":"mediated_decision","boundary_class":"prevent",' +
+    '"tool_origin":"caller_executed","redaction_mode":"none",' +
+    `"content_hash":"${contentHash}","policy_hash":"${'0'.repeat(64)}","evidence":[],` +
+    `"metadata":${METADATA},"trust_level":"mediated","kernel_key":"${'0'.repeat(64)}"},` +
+    `"canonical_content":[${[...canonical].join(',')}]}`
+  );
 }
 
 export default {
@@ -58,14 +41,32 @@ export default {
     const seedA = await sdk.mint_signing_seed_hex();
     const seedB = await sdk.mint_signing_seed_hex();
     const canonical = encoder.encode('{"shown":"to-the-human"}');
-    const body = receiptBody(await sha256Hex(canonical));
-    const input = JSON.stringify({ body, canonical_content: [...canonical] });
+    const signed = await sdk.sign_receipt(await signingInput(canonical), seedA);
 
-    const receipt = toPlain(await sdk.sign_receipt(input, seedA));
-    const envelope = encoder.encode(JSON.stringify(receipt));
-    const trusted = await sdk.verify_receipt(envelope, receipt.kernel_key);
-    const untrusted = await sdk.verify_receipt(envelope);
+    // The stored form is the signer's canonical text, passed through storage as-is.
+    const stored = JSON.parse(JSON.stringify({ value: signed.receipt_json })).value;
+    const kernelKey = signed.receipt.kernel_key;
+    const trusted = await sdk.verify_receipt(stored, kernelKey);
+    const untrusted = await sdk.verify_receipt(stored);
+    const tampered = await sdk.verify_receipt(stored.replace('"read"', '"write"'), kernelKey);
 
-    return Response.json({ seedA, seedB, kernelKey: receipt.kernel_key, trusted, untrusted });
+    const view = signed.receipt;
+    return Response.json({
+      seedA,
+      seedB,
+      kernelKey,
+      stored,
+      trusted,
+      untrusted,
+      tampered,
+      view: {
+        metadataProtoIsObjectPrototype: Object.getPrototypeOf(view.metadata) === Object.prototype,
+        metadataOwnProto: Object.hasOwn(view.metadata, '__proto__'),
+        parametersOwnProto: Object.hasOwn(view.action.parameters, '__proto__'),
+        inheritedPollution: ({}).polluted ?? null,
+        nestedNull: view.metadata.k.n,
+        bigIsExact: BigInt(view.metadata.big) === 18446744073709551615n,
+      },
+    });
   },
 };

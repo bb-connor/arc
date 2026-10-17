@@ -10,7 +10,7 @@ type WorkersWasmImports = {
   mint_signing_seed_hex: () => string;
   sign_receipt: (bodyJson: string, signingSeedHex: string) => unknown;
   verify_capability: (tokenJson: string, authorityPubHex: string) => unknown;
-  verify_receipt: (envelope: Uint8Array, trustedIssuers?: unknown) => unknown;
+  verify_receipt: (receiptJson: string, trustedIssuers?: unknown) => unknown;
 };
 
 let wasmReady: Promise<WorkersWasmImports> | undefined;
@@ -43,8 +43,16 @@ export async function mint_signing_seed_hex(): Promise<string> {
   return (await loadWorkersWasm()).mint_signing_seed_hex();
 }
 
-export async function sign_receipt(bodyJson: string, signingSeedHex: string): Promise<unknown> {
-  return (await loadWorkersWasm()).sign_receipt(bodyJson, signingSeedHex);
+export type SignedReceipt = {
+  receipt: unknown;
+  receipt_json: string;
+};
+
+export async function sign_receipt(
+  bodyJson: string,
+  signingSeedHex: string,
+): Promise<SignedReceipt> {
+  return (await loadWorkersWasm()).sign_receipt(bodyJson, signingSeedHex) as SignedReceipt;
 }
 
 export async function verify_capability(tokenJson: string, authorityPubHex: string): Promise<unknown> {
@@ -52,10 +60,10 @@ export async function verify_capability(tokenJson: string, authorityPubHex: stri
 }
 
 export async function verify_receipt(
-  envelope: Uint8Array,
+  receiptJson: string,
   trustedIssuers?: string | string[],
 ): Promise<unknown> {
-  return (await loadWorkersWasm()).verify_receipt(envelope, trustedIssuers);
+  return (await loadWorkersWasm()).verify_receipt(receiptJson, trustedIssuers);
 }
 
 export async function verifyReceiptHex(
@@ -71,8 +79,8 @@ export async function verifyReceiptHex(
   }
 
   const pairs = normalized.match(/.{2}/g) ?? [];
-  const envelope = Uint8Array.from(pairs.map(byte => Number.parseInt(byte, 16)));
-  return verify_receipt(envelope, trustedIssuers);
+  const bytes = Uint8Array.from(pairs.map(byte => Number.parseInt(byte, 16)));
+  return verify_receipt(new TextDecoder('utf-8', { fatal: true }).decode(bytes), trustedIssuers);
 }
 
 const smokeHandler: ExportedHandler = {

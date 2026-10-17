@@ -1,4 +1,4 @@
-import { receiptHexToBytes } from '@chio-protocol/wasm-core';
+import { receiptHexToJson } from '@chio-protocol/wasm-core';
 
 type WasmExport = (...args: never[]) => unknown;
 
@@ -15,7 +15,7 @@ type DenoWasmGlueModule = {
   mint_signing_seed_hex: () => string;
   sign_receipt: (bodyJson: string, signingSeedHex: string) => unknown;
   verify_capability: (tokenJson: string, authorityPubHex: string) => unknown;
-  verify_receipt: (envelope: Uint8Array, trustedIssuers?: unknown) => unknown;
+  verify_receipt: (receiptJson: string, trustedIssuers?: unknown) => unknown;
 };
 
 type DenoWasmBindings = {
@@ -85,8 +85,16 @@ export async function mint_signing_seed_hex(): Promise<string> {
   return (await loadDenoWasm()).mint_signing_seed_hex();
 }
 
-export async function sign_receipt(bodyJson: string, signingSeedHex: string): Promise<unknown> {
-  return (await loadDenoWasm()).sign_receipt(bodyJson, signingSeedHex);
+export type SignedReceipt = {
+  receipt: unknown;
+  receipt_json: string;
+};
+
+export async function sign_receipt(
+  bodyJson: string,
+  signingSeedHex: string,
+): Promise<SignedReceipt> {
+  return (await loadDenoWasm()).sign_receipt(bodyJson, signingSeedHex) as SignedReceipt;
 }
 
 export async function verify_capability(tokenJson: string, authorityPubHex: string): Promise<unknown> {
@@ -94,17 +102,17 @@ export async function verify_capability(tokenJson: string, authorityPubHex: stri
 }
 
 export async function verify_receipt(
-  envelope: Uint8Array,
+  receiptJson: string,
   trustedIssuers?: string | string[],
 ): Promise<unknown> {
-  return (await loadDenoWasm()).verify_receipt(envelope, trustedIssuers);
+  return (await loadDenoWasm()).verify_receipt(receiptJson, trustedIssuers);
 }
 
 export async function verifyReceiptHex(
   envelopeHex: string,
   trustedIssuers?: string | string[],
 ): Promise<unknown> {
-  return verify_receipt(receiptHexToBytes(envelopeHex), trustedIssuers);
+  return verify_receipt(receiptHexToJson(envelopeHex), trustedIssuers);
 }
 
 export default async function handler(request: Request): Promise<Response> {

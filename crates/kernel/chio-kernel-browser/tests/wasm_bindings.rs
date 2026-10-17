@@ -144,8 +144,13 @@ fn sign_receipt_uses_webcrypto_seed() {
     let body = signable_body(content_hash);
     let input = serde_json::json!({ "body": body, "canonical_content": canonical_content });
 
-    let receipt_js = sign_receipt(&input.to_string(), &seed_hex).expect("sign_receipt");
-    let receipt: chio_core_types::receipt::body::ChioReceipt = from_value(receipt_js).unwrap();
+    let signed = sign_receipt(&input.to_string(), &seed_hex).expect("sign_receipt");
+    let receipt_json = js_sys::Reflect::get(&signed, &"receipt_json".into())
+        .unwrap()
+        .as_string()
+        .expect("receipt_json is a string");
+    let receipt: chio_core_types::receipt::body::ChioReceipt =
+        serde_json::from_str(&receipt_json).unwrap();
     assert!(receipt.verify_signature().unwrap());
 }
 
