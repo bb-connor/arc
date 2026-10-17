@@ -9,12 +9,14 @@
  * preliminary results; anything else is awaited as the final output. The
  * wrapper preserves that distinction:
  *
- *   - If the underlying `execute` is an async generator function, the wrapper
- *     is an async generator that authorizes on its first `next()` and then
- *     delegates with `yield*`. Nothing is buffered.
+ *   - Streaming (`streaming: true`, or by default a native async generator
+ *     function): the wrapper is an async generator that authorizes on its
+ *     first `next()`, calls `execute`, and delegates with `yield*` when the
+ *     result is an async iterable. Nothing is buffered.
  *   - Otherwise the wrapper is an async function that authorizes, calls the
- *     original `execute`, and returns its result untouched. A plain function
- *     that synchronously returns an async iterable is rejected, because the
+ *     original `execute`, and returns its result untouched. If `execute`
+ *     returns an async iterable here, the call is refused after
+ *     authorization with the receipt id on the error, because the
  *     asynchronous authorization step would turn the stream into a final
  *     output.
  *
@@ -118,6 +120,13 @@ export interface ChioToolSettings {
    * receipt to invoke the wrapped tool.
    */
   verifyReceipt?: ChioReceiptVerifier | undefined;
+  /**
+   * Whether `execute` streams preliminary results by returning an async
+   * iterable synchronously. Defaults to whether `execute` is a native async
+   * generator function. Set it to `true` for generators that are wrapped,
+   * bound or transpiled, which the default cannot recognize.
+   */
+  streaming?: boolean | undefined;
 }
 
 /** An AI SDK 7 `tool()` definition extended with Chio binding fields. */
@@ -174,6 +183,7 @@ export function chioTool<
     debug: _debug,
     resolveCapabilityToken,
     verifyReceipt,
+    streaming,
     ...definition
   } = options;
   const originalExecute = (definition as { execute?: unknown }).execute;
@@ -187,7 +197,7 @@ export function chioTool<
   const execute = originalExecute as ToolExecute;
   const client = resolveClient(options);
 
-  const authorize = async (params: unknown): Promise<void> => {
+  const authorize = async (params: unknown): Promise<string> => {
     let receipt;
     try {
       const clientArgs: { capabilityToken?: string | undefined } = {};
@@ -269,21 +279,28 @@ export function chioTool<
         receiptId: receipt.id,
       });
     }
+    return receipt.id;
   };
 
-  const wrappedExecute: ToolExecute = isAsyncGeneratorFunction(execute)
+  const wrappedExecute: ToolExecute = (streaming ?? isAsyncGeneratorFunction(execute))
     ? async function* (params, executeOptions) {
       await authorize(params);
-      yield* execute(params, executeOptions) as AsyncIterable<unknown>;
+      const result = await execute(params, executeOptions);
+      if (isAsyncIterable(result)) {
+        yield* result;
+      } else {
+        yield result;
+      }
     }
     : async (params, executeOptions) => {
-      await authorize(params);
+      const receiptId = await authorize(params);
       const result = execute(params, executeOptions);
       if (isAsyncIterable(result)) {
         throw new ChioToolError({
           verdict: "incomplete",
           guard: "",
-          reason: `chioTool(${scope.toolName}) execute() returned an async iterable from a non-generator function; declare it as an async generator function so results stream`,
+          reason: `chioTool(${scope.toolName}) execute() returned an async iterable but streaming is not enabled; set streaming: true so results stream`,
+          receiptId,
         });
       }
       return result;

@@ -1034,6 +1034,90 @@ describe("chioTool: streaming", () => {
     expect(started).toBe(false);
   });
 
+  it("refuses an arrow-wrapped generator that is not declared streaming, reporting the receipt id", async () => {
+    async function* inner(): AsyncGenerator<number> {
+      yield 1;
+    }
+    const gen = () => inner();
+    const { fetch } = fakeFetch([allowReceipt("r-bound")]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({}),
+      execute: gen,
+      scope: { toolServer: "s", toolName: "gen" },
+      clientOptions: { fetch },
+    });
+
+    await expect(run(wrapped, {})).rejects.toMatchObject({
+      name: "ChioToolError",
+      verdict: "incomplete",
+      receiptId: "r-bound",
+    });
+  });
+
+  it("recognizes a bound native generator without the streaming option", async () => {
+    const { fetch } = fakeFetch([allowReceipt()]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({}),
+      execute: (async function* (): AsyncGenerator<number> { yield 1; }).bind(null),
+      scope: { toolServer: "s", toolName: "gen" },
+      clientOptions: { fetch },
+    });
+
+    const returned = (wrapped.execute as (i: unknown, o: unknown) => AsyncIterable<number>)({}, EXECUTE_OPTIONS);
+    const collected: number[] = [];
+    for await (const n of returned) {
+      collected.push(n);
+    }
+    expect(collected).toEqual([1]);
+  });
+
+  it.each([
+    ["vi.fn-wrapped", () => vi.fn(async function* (): AsyncGenerator<number> { yield 1; yield 2; })],
+    ["bound", () => (async function* (): AsyncGenerator<number> { yield 1; yield 2; }).bind(null)],
+  ])("streams a %s generator when streaming: true", async (_label, make) => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({}),
+      execute: make(),
+      streaming: true,
+      scope: { toolServer: "s", toolName: "gen" },
+      clientOptions: { fetch },
+    });
+
+    const returned = (wrapped.execute as (i: unknown, o: unknown) => AsyncIterable<number>)({}, EXECUTE_OPTIONS);
+    expect(calls).toHaveLength(0);
+    const collected: number[] = [];
+    for await (const n of returned) {
+      collected.push(n);
+    }
+    expect(collected).toEqual([1, 2]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("does not run a streaming-declared tool when Chio denies", async () => {
+    const execute = vi.fn(async function* (): AsyncGenerator<number> { yield 1; });
+    const { fetch } = fakeFetch([denyReceipt()]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({}),
+      execute,
+      streaming: true,
+      scope: { toolServer: "s", toolName: "gen" },
+      clientOptions: { fetch },
+    });
+
+    const returned = (wrapped.execute as (i: unknown, o: unknown) => AsyncIterable<number>)({}, EXECUTE_OPTIONS);
+    await expect((async () => {
+      for await (const _ of returned) {
+        // drain
+      }
+    })()).rejects.toBeInstanceOf(ChioToolError);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it("passes a ReadableStream resolved by an async function through by reference", async () => {
     const stream = new ReadableStream<string>();
     const { fetch } = fakeFetch([allowReceipt()]);
@@ -1048,7 +1132,7 @@ describe("chioTool: streaming", () => {
     expect(await run(wrapped, {})).toBe(stream);
   });
 
-  it("rejects a non-generator function that synchronously returns an async iterable", async () => {
+  it("rejects a non-streaming function that synchronously returns an async iterable", async () => {
     const { fetch } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,

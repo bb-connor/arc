@@ -1,5 +1,5 @@
 import { describe, expect, it, mock } from "bun:test";
-import { generateText, jsonSchema, simulateReadableStream, streamText, tool } from "ai";
+import { generateText, jsonSchema, simulateReadableStream, streamText, tool, wrapLanguageModel } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
 import {
   ChioMiddlewareDeniedError,
@@ -241,6 +241,92 @@ describe("wrapWithChio", () => {
     await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
+    expect(invoked).toBe(false);
+  });
+});
+
+describe("tool declaration validation", () => {
+  const allow = { evaluate: () => authorizedAllow() };
+
+  it.each([
+    ["an unknown type", { type: "other", name: "x", inputSchema: {} }],
+    ["a missing type", { name: "x", inputSchema: {} }],
+    ["an empty name", { type: "function", name: "", inputSchema: {} }],
+    ["a non-string name", { type: "function", name: 7, inputSchema: {} }],
+    ["a provider tool without an id", { type: "provider", name: "bash", args: {} }],
+    ["a non-object entry", "search"],
+  ])("denies %s before invoking the model", async (_label, entry) => {
+    let invoked = false;
+    const wrapped = wrapWithChio(mockModel(() => { invoked = true; }), allow);
+
+    await expect(wrapped.doGenerate({ ...callOptions(), tools: [entry] } as never))
+      .rejects
+      .toThrow(ChioMiddlewareDeniedError);
+    expect(invoked).toBe(false);
+  });
+
+  it("reports the tool type and provider id so policy can tell a provider tool from a function", async () => {
+    const seen: Array<{ name: string; type: string; id?: string | undefined }> = [];
+    const wrapped = wrapWithChio(mockModel(), {
+      evaluate: ({ toolUse }) => {
+        seen.push({ name: toolUse!.name, type: toolUse!.type, id: toolUse!.id });
+        return authorizedAllow();
+      },
+    });
+
+    await wrapped.doGenerate({
+      ...callOptions("bash"),
+      tools: [
+        ...callOptions("bash").tools,
+        { type: "provider", id: "anthropic.bash_20250124", name: "bash", args: {} },
+      ],
+    });
+
+    expect(seen).toEqual([
+      { name: "bash", type: "function", id: undefined },
+      { name: "bash", type: "provider", id: "anthropic.bash_20250124" },
+    ]);
+  });
+});
+
+describe("middleware ordering", () => {
+  const injectTool = {
+    specificationVersion: "v4" as const,
+    transformParams: async ({ params }: { params: ReturnType<typeof callOptions> }) => ({
+      ...params,
+      tools: [
+        ...(params.tools ?? []),
+        { type: "function" as const, name: "injected", inputSchema: { type: "object" as const, properties: {} } },
+      ],
+    }),
+  };
+
+  it("denies a tool added by middleware placed before Chio in the array", async () => {
+    let invoked = false;
+    const model = wrapLanguageModel({
+      model: mockModel(() => { invoked = true; }),
+      middleware: [
+        injectTool as never,
+        createChioMiddleware({
+          evaluate: ({ toolUse }) =>
+            toolUse?.name === "injected" ? { verdict: "deny", reason: "injected" } : authorizedAllow(),
+        }),
+      ],
+    });
+
+    await expect(model.doGenerate(callOptions("search"))).rejects.toThrow(ChioMiddlewareDeniedError);
+    expect(invoked).toBe(false);
+  });
+
+  it("denies a tool added by middleware that wraps a Chio-wrapped model", async () => {
+    let invoked = false;
+    const inner = wrapWithChio(mockModel(() => { invoked = true; }), {
+      evaluate: ({ toolUse }) =>
+        toolUse?.name === "injected" ? { verdict: "deny", reason: "injected" } : authorizedAllow(),
+    });
+    const model = wrapLanguageModel({ model: inner, middleware: injectTool as never });
+
+    await expect(model.doGenerate(callOptions("search"))).rejects.toThrow(ChioMiddlewareDeniedError);
     expect(invoked).toBe(false);
   });
 });

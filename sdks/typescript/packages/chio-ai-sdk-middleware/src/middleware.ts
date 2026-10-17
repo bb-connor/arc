@@ -9,7 +9,12 @@ export type LanguageModelInvocation =
 export type ChioWrappableModel = Parameters<typeof wrapLanguageModel>[0]["model"];
 
 export interface ToolUseCandidate {
+  /** Tool name as declared on the call. */
   name: string;
+  /** Whether the tool is a caller-defined function or a provider-defined tool. */
+  type: "function" | "provider";
+  /** Provider tool id (`<provider>.<tool>`); present only for provider tools. */
+  id?: string | undefined;
 }
 
 export interface ChioEvaluation {
@@ -228,8 +233,40 @@ function nonAuthorizingEvaluation(evaluation: ChioEvaluation): ChioEvaluation {
 }
 
 function collectToolUses(request: LanguageModelInvocation): ToolUseCandidate[] {
-  return (request.tools ?? [])
-    .map(tool => tool.name)
-    .sort()
-    .map(name => ({ name }));
+  const candidates: ToolUseCandidate[] = [];
+  for (const tool of (request.tools ?? []) as unknown[]) {
+    candidates.push(toolUseCandidate(tool));
+  }
+  return candidates.sort(compareCandidates);
+}
+
+function toolUseCandidate(tool: unknown): ToolUseCandidate {
+  const record = tool != null && typeof tool === "object"
+    ? tool as Record<string, unknown>
+    : {};
+  const { type, name, id } = record;
+  if (typeof name !== "string" || name.length === 0) {
+    throw malformedTool("tool has no name");
+  }
+  if (type === "function") {
+    return { name, type };
+  }
+  if (type === "provider") {
+    if (typeof id !== "string" || id.length === 0) {
+      throw malformedTool(`provider tool ${name} has no id`);
+    }
+    return { name, type, id };
+  }
+  throw malformedTool(`tool ${name} has unsupported type ${String(type)}`);
+}
+
+function malformedTool(reason: string): ChioMiddlewareDeniedError {
+  return new ChioMiddlewareDeniedError({
+    verdict: "deny",
+    reason: `Chio refused a malformed tool declaration: ${reason}`,
+  });
+}
+
+function compareCandidates(a: ToolUseCandidate, b: ToolUseCandidate): number {
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : a.type < b.type ? -1 : a.type > b.type ? 1 : 0;
 }

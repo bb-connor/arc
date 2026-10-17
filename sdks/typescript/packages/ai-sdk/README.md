@@ -64,10 +64,10 @@ Vercel AI SDK surfaces the error through its standard `onError` /
 ## Streaming
 
 AI SDK 7 calls `execute` synchronously and streams the result as
-preliminary outputs when it is an async iterable. `chioTool` keeps that
-behavior for async generator functions: the wrapper is itself an async
-generator that authorizes with Chio on its first `next()` and then
-delegates with `yield*`, without buffering.
+preliminary outputs when it is an async iterable. For a native async
+generator function, `chioTool` returns an async generator that authorizes with
+Chio on its first `next()`, calls `execute`, and delegates with `yield*`,
+without buffering.
 
 ```ts
 const progressiveTool = chioTool({
@@ -82,12 +82,14 @@ const progressiveTool = chioTool({
 });
 ```
 
-Any other `execute` is awaited and its result returned untouched, so a
-`ReadableStream` resolved from an async function reaches the AI SDK by
-reference as the final output. A plain function that synchronously returns an
-async iterable (for example a `ReadableStream`) is rejected with
-`ChioToolError`, because the asynchronous Chio check would turn the stream
-into a final output; declare such tools as async generator functions.
+A generator that is wrapped, bound or transpiled is not recognized as a
+generator; declare it with `streaming: true`. With `streaming` unset, any other
+`execute` is awaited and its result returned untouched, so a `ReadableStream`
+resolved from an async function reaches the AI SDK by reference as the final
+output. If such an `execute` synchronously returns an async iterable, the call
+is refused after Chio has authorized it, with `ChioToolError` carrying the
+receipt id, because the asynchronous Chio check would turn the stream into a
+final output. Declare those tools with `streaming: true`.
 
 ## Approvals
 
@@ -116,6 +118,7 @@ because Chio cannot mediate execution that happens outside this process.
 | `clientOptions`   | `ChioClientOptions`                    | Inline client options (`sidecarUrl`, `timeoutMs`, `fetch`, `debug`).    |
 | `debug`           | `(message, data?) => void`            | Optional debug hook; the wrapper never writes to stdout.                |
 | `resolveCapabilityToken` | `(capabilityId) => token`       | Optional resolver when `scope.capabilityId` is only an indirection key. |
+| `streaming`       | `boolean`                             | Treat `execute` as a streaming generator. Defaults to native async generator detection. |
 | `verifyReceipt`   | `(receipt) => ChioReceiptAuthority`   | Optional receipt verifier; defaults to the sidecar `/chio/verify` route. |
 
 Every other `tool()` field (`contextSchema`, `needsApproval`, `toModelOutput`,
@@ -138,9 +141,9 @@ fail-closed mode. Fields: `verdict`, `guard`, `reason`, `receiptId`.
 Minimal HTTP client for `POST /chio/evaluate`. Can be shared across many
 `chioTool()` instances to amortize construction cost. The client builds an
 `ChioHttpRequest`-compatible payload for tool calls, accepts the sidecar's
-canonical `EvaluateResponse { verdict, receipt, evidence }` shape, and
-still normalizes the Lambda evaluator's `{ receipt_id, decision }` wire
-contract into the same `ChioReceipt` API.
+canonical `EvaluateResponse { verdict, receipt, evidence }` shape and
+normalizes it into the `ChioReceipt` API. Other response shapes, including the
+Lambda evaluator's `{ receipt_id, decision }`, are rejected.
 
 ## License
 

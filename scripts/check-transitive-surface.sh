@@ -247,6 +247,7 @@ for dir in \
   sdks/typescript/packages/fastify \
   sdks/typescript/packages/elysia \
   sdks/typescript/packages/ai-sdk \
+  sdks/typescript/packages/chio-ai-sdk-middleware \
   sdks/guard/chio-guard-ts
 do
   npm_suite "${dir}"

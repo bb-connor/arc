@@ -27,12 +27,28 @@ const model = wrapLanguageModel({
 });
 ```
 
+## Ordering
+
+Chio must be the innermost middleware, so that it sees the tools after every
+other middleware has run `transformParams`. `wrapLanguageModel` applies an
+array so that the first entry runs first and the last entry sits directly
+around the model; put `createChioMiddleware` last. A middleware placed after Chio in the array, or `wrapWithChio` applied to a
+model that other middleware already wraps, puts Chio outside that middleware,
+so tools it adds after the check are not evaluated. `wrapWithChio(baseModel)` on
+the raw provider model, with any other middleware wrapped around the result, is
+also correct. Tests cover both correct placements denying a tool added by a
+middleware outside Chio.
+
 ## What is evaluated
 
 The middleware runs in `wrapGenerate` (used by `generateText`) and
 `wrapStream` (used by `streamText`). Before delegating to the model it
 evaluates every tool declared in the call's `tools` option, function and
-provider tools alike, in name order. This gates whether the model may be
+provider tools alike, in name order. Each evaluation carries the tool `name`,
+its `type` (`"function"` or `"provider"`) and, for provider tools, the provider
+`id`, so policy can tell a provider `bash` tool from a function named `bash`.
+A declaration with an unknown type, an empty name, or a provider tool without
+an id is denied. This gates whether the model may be
 called with those tools offered. It does not inspect the arguments of the
 tool calls the model later emits, and it does not wrap tool execution. Use
 `@chio-protocol/ai-sdk` (`chioTool`) to evaluate each tool invocation with
