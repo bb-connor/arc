@@ -371,7 +371,6 @@ impl SqliteReceiptStore {
                     "issuerKeySource".to_string(),
                     "matchedGrantIndex".to_string(),
                     "proofRequired".to_string(),
-                    "proofType".to_string(),
                     "proofSchema".to_string(),
                     "runtimeAssuranceBound".to_string(),
                     "delegatedCallChainBound".to_string(),

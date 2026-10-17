@@ -299,8 +299,6 @@ pub struct AuthorizationContextSenderConstraint {
     pub matched_grant_index: u32,
     pub proof_required: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proof_type: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proof_schema: Option<String>,
     pub runtime_assurance_bound: bool,
     pub delegated_call_chain_bound: bool,
