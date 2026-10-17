@@ -16,6 +16,10 @@ mod payload_maintenance;
 #[path = "init/authority_provision_tests.rs"]
 mod authority_provision_tests;
 
+#[cfg(test)]
+#[path = "init/verifier_policy_freshness_tests.rs"]
+mod verifier_policy_freshness_tests;
+
 pub(crate) async fn serve_async(
     config: TrustServiceConfig,
     injected_joint_authority_store: Option<Arc<SqliteAuthorityStore>>,
@@ -130,12 +134,11 @@ async fn serve_async_inner(
         finding_rail.is_some(),
         finding_authority_status_resolver.is_some(),
     )?;
-    let enterprise_provider_registry = load_enterprise_provider_registry(
+    validate_enterprise_provider_registry(
         config.enterprise_providers_file.as_deref(),
         "trust_control",
     )?;
-    let verifier_policy_registry =
-        load_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
+    validate_verifier_policy_registry(config.verifier_policies_file.as_deref(), "trust_control")?;
     let joint_authority_store = match injected_joint_authority_store {
         Some(store) => {
             validate_injected_joint_authority_store(&config, &store)?;
@@ -249,8 +252,6 @@ async fn serve_async_inner(
         receipt_query_snapshots,
         receipt_query_lane: Arc::new(tokio::sync::Semaphore::new(4)),
         evidence_export_lane: Arc::new(tokio::sync::Semaphore::new(1)),
-        enterprise_provider_registry,
-        verifier_policy_registry,
         federation_admission_rate_limiter,
         cluster,
         cluster_progress,

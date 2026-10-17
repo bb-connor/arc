@@ -1,3 +1,6 @@
+#[path = "provider_registry_freshness.rs"]
+mod provider_registry_freshness;
+
 pub(super) fn enterprise_provider_record(
     provider_id: &str,
     enabled: bool,

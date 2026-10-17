@@ -272,15 +272,13 @@ impl CertificationDiscoveryOperator {
 
 impl EnterpriseProviderRegistry {
     pub fn load(path: &Path) -> Result<Self, CliError> {
-        let bytes = fs::read(path).map_err(|error| {
+        let bytes = crate::signed_input::read_bounded(path).map_err(|error| {
             CliError::cli_io_error(format!(
                 "failed to read enterprise provider registry {}: {error}",
                 path.display()
             ))
         })?;
-        let registry = chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed::<Self>())
-            .map_err(CliError::from)?;
+        let registry: Self = crate::signed_input::decode(&bytes)?;
         registry.with_revalidated_records()
     }
 
@@ -302,12 +300,7 @@ impl EnterpriseProviderRegistry {
                 path.display()
             ))
         })?;
-        fs::write(path, serialized).map_err(|error| {
-            CliError::cli_io_error(format!(
-                "failed to write enterprise provider registry {}: {error}",
-                path.display()
-            ))
-        })
+        crate::signed_input::replace_file(path, &serialized)
     }
 
     pub fn validated_provider(&self, provider_id: &str) -> Option<&EnterpriseProviderRecord> {
