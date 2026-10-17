@@ -28,7 +28,9 @@
       ],
       "properties": {
         "schema": {
-          "const": "chio.dpop_proof.v1"
+          "enum": [
+            "chio.dpop_proof.v1"
+          ]
         },
         "replay_authority": {
           "type": "object",
