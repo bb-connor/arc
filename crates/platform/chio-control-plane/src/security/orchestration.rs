@@ -695,7 +695,6 @@ impl ProductionDeclassificationReceiptLifecycle {
         self.outbox.clone()
     }
 
-    #[must_use]
     pub(super) fn signer_public_key(&self) -> Result<chio_core::PublicKey, chio_core::Error> {
         self.signer.public_key()
     }

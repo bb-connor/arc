@@ -39,12 +39,12 @@ fn kg2_rotated_issuer_does_not_remain_trusted_indefinitely() -> TestResult {
         root.path().join("authority.db"),
         clock.clone(),
     )?;
-    let old = authority.authority_public_key().unwrap();
+    let old = authority.authority_public_key()?;
     clock.0.store(101, Ordering::SeqCst);
     let current = authority.rotate()?.public_key;
     clock.0.store(100_000, Ordering::SeqCst);
     assert_eq!(authority.trusted_public_keys(), vec![current]);
-    assert_ne!(authority.authority_public_key().unwrap(), old);
+    assert_ne!(authority.authority_public_key()?, old);
     Ok(())
 }
 
@@ -73,7 +73,7 @@ fn kg2_lifecycle_deadlines_retirement_and_replay_survive_restart() -> TestResult
     let anchor = source.initialize_replication("lifecycle-tests")?;
     assert_eq!(anchor.schema, "chio.authority-replication-anchor.v1");
     follower.pin_replication_anchor(&anchor)?;
-    let old = source.authority_public_key().unwrap();
+    let old = source.authority_public_key()?;
     clock.0.store(101, Ordering::SeqCst);
     let new = source.rotate_with_verification_deadline(110)?.public_key;
     let rotation = source.signed_snapshot()?;
@@ -142,7 +142,7 @@ fn kg2_independent_recovery_revokes_all_prior_issuers_without_seed_replication()
         source.initialize_replication_with_recovery("recoverable", Some(&recovery.public_key()))?;
     follower.pin_replication_anchor(&anchor)?;
     let follower_seed = follower.local_keypair()?.seed_hex();
-    let old = source.authority_public_key().unwrap();
+    let old = source.authority_public_key()?;
     let before = source.snapshot()?;
     assert!(
         matches!(source.recover_authority(&Keypair::generate()), Err(chio_kernel::AuthorityStoreError::Fence(message)) if message == "lifecycle signer does not own the required authority")
@@ -167,7 +167,7 @@ fn kg2_retirement_rolls_back_history_commitment_and_clock_on_sql_failure() -> Te
     let clock = Arc::new(AuthorityClock(AtomicU64::new(100)));
     let source = SqliteCapabilityAuthority::open_with_clock(&path, clock.clone())?;
     source.initialize_replication("rollback")?;
-    let old = source.authority_public_key().unwrap();
+    let old = source.authority_public_key()?;
     clock.0.store(101, Ordering::SeqCst);
     source.rotate()?;
     let before = source.signed_snapshot()?;
@@ -201,7 +201,7 @@ fn kg2_competing_lifecycle_imports_commit_one_complete_history() -> TestResult {
     )?);
     let anchor = source.initialize_replication("competing-lifecycle")?;
     follower.pin_replication_anchor(&anchor)?;
-    let old = source.authority_public_key().unwrap();
+    let old = source.authority_public_key()?;
     clock.0.store(101, Ordering::SeqCst);
     source.rotate()?;
     let base = source.signed_snapshot()?;
@@ -329,7 +329,7 @@ fn kg2_invalid_deadlines_and_head_removal_preserve_all_authority_state() -> Test
     let clock = Arc::new(AuthorityClock(AtomicU64::new(100)));
     let source = SqliteCapabilityAuthority::open_with_clock(root.path().join("source.db"), clock)?;
     source.initialize_replication("refused-operations")?;
-    let current = source.authority_public_key().unwrap();
+    let current = source.authority_public_key()?;
     let before = source.signed_snapshot()?;
     let seed = source.local_keypair()?.seed_hex();
     for deadline in [99, 3701, u64::MAX] {

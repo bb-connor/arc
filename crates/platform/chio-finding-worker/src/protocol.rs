@@ -988,11 +988,21 @@ mod tests {
         assert!(prepared.is_some());
         if let Some((mut request, authority)) = prepared {
             assert!(request
-                .validate_authorized(&authority.public_key().unwrap(), 10)
+                .validate_authorized(
+                    &authority
+                        .public_key()
+                        .unwrap_or_else(|error| panic!("signing identity: {error}")),
+                    10
+                )
                 .is_ok());
             request.job.command.push("--release".to_owned());
             assert_eq!(
-                request.validate_authorized(&authority.public_key().unwrap(), 10),
+                request.validate_authorized(
+                    &authority
+                        .public_key()
+                        .unwrap_or_else(|error| panic!("signing identity: {error}")),
+                    10
+                ),
                 Err("payload_digest_mismatch")
             );
         }
@@ -1017,13 +1027,25 @@ mod tests {
         let (request, authority) = request().unwrap_or_else(|| panic!("valid request fixture"));
         let mut job = hosted_job(&request).unwrap_or_else(|| panic!("valid hosted job fixture"));
         assert_eq!(
-            authorized_attempt_limit(&job, &authority.public_key().unwrap(), 10),
+            authorized_attempt_limit(
+                &job,
+                &authority
+                    .public_key()
+                    .unwrap_or_else(|error| panic!("signing identity: {error}")),
+                10
+            ),
             Ok(3)
         );
         job.payload_json.insert(0, b' ');
-        let error = authorized_attempt_limit(&job, &authority.public_key().unwrap(), 10)
-            .err()
-            .unwrap_or_else(|| panic!("noncanonical original must reject"));
+        let error = authorized_attempt_limit(
+            &job,
+            &authority
+                .public_key()
+                .unwrap_or_else(|error| panic!("signing identity: {error}")),
+            10,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("noncanonical original must reject"));
         assert!(matches!(error, WorkerProtocolError::Input(_)));
         assert!(std::error::Error::source(&error).is_some());
     }
@@ -1064,26 +1086,42 @@ mod tests {
             assert!(job.is_some());
             if let Some(mut job) = job {
                 assert_eq!(
-                    authorized_attempt_limit(&job, &authority.public_key().unwrap(), 10),
+                    authorized_attempt_limit(
+                        &job,
+                        &authority
+                            .public_key()
+                            .unwrap_or_else(|error| panic!("signing identity: {error}")),
+                        10
+                    ),
                     Ok(3)
                 );
                 let bounded = FindingWorkerRequest::from_job(
                     &job,
                     3_600,
-                    &authority.public_key().unwrap(),
+                    &authority
+                        .public_key()
+                        .unwrap_or_else(|error| panic!("signing identity: {error}")),
                     10,
                 );
                 assert_eq!(bounded.map(|request| request.deadline_unix_secs), Ok(20));
 
                 job.attempt_count = 4;
                 assert_eq!(
-                    authorized_attempt_limit(&job, &authority.public_key().unwrap(), 10),
+                    authorized_attempt_limit(
+                        &job,
+                        &authority
+                            .public_key()
+                            .unwrap_or_else(|error| panic!("signing identity: {error}")),
+                        10
+                    ),
                     Ok(3)
                 );
                 assert!(FindingWorkerRequest::from_job(
                     &job,
                     3_600,
-                    &authority.public_key().unwrap(),
+                    &authority
+                        .public_key()
+                        .unwrap_or_else(|error| panic!("signing identity: {error}")),
                     10,
                 )
                 .is_err());
@@ -1160,12 +1198,20 @@ mod tests {
                     assert!(verify_attested_result(
                         &envelope,
                         &request,
-                        &signer.public_key().unwrap()
+                        &signer
+                            .public_key()
+                            .unwrap_or_else(|error| panic!("signing identity: {error}"))
                     )
                     .is_ok());
                     envelope.body.kernel_sha256 = "9".repeat(64);
                     assert_eq!(
-                        verify_attested_result(&envelope, &request, &signer.public_key().unwrap()),
+                        verify_attested_result(
+                            &envelope,
+                            &request,
+                            &signer
+                                .public_key()
+                                .unwrap_or_else(|error| panic!("signing identity: {error}"))
+                        ),
                         Err("worker_signature_invalid")
                     );
                 }

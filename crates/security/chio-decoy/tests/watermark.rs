@@ -258,7 +258,9 @@ impl Fixture {
         keys.values.lock().test_expect("keys lock").insert(
             (tenant_id.clone(), key_id.clone()),
             TrustedWatermarkKey {
-                public_key: signer.public_key().unwrap(),
+                public_key: signer
+                    .public_key()
+                    .unwrap_or_else(|error| panic!("signing identity: {error}")),
                 status: WatermarkKeyStatus::Active,
                 not_before_unix_ms: 900,
                 signing_cutoff_unix_ms: 2_000,

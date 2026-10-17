@@ -557,7 +557,7 @@ mod tests {
         let signature = backend.sign_bytes(message).test_unwrap();
         assert!(backend
             .public_key()
-            .unwrap()
+            .test_unwrap()
             .verify_strict(message, &signature));
         let request = request_rx.recv().test_unwrap();
         assert!(request.starts_with("POST /v1/signing-keys/finding-listing/sign HTTP/1.1"));
@@ -671,7 +671,7 @@ mod tests {
         let signature = backend.sign_bytes(message).test_unwrap();
         assert!(backend
             .public_key()
-            .unwrap()
+            .test_unwrap()
             .verify_strict(message, &signature));
         let request = request_rx.recv().test_unwrap();
         assert!(request.starts_with("POST /v1/transit/sign/finding-status HTTP/1.1"));
