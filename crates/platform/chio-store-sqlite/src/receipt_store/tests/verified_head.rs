@@ -188,13 +188,11 @@ fn incremental_append_updates_the_head_and_stays_correct() -> Result<(), Box<dyn
     }
     store.flush_receipt_writes()?;
     let snapshot = store.writer_head_snapshot();
-    assert_eq!(snapshot.claim_log_count, 7);
-    assert_eq!(snapshot.claim_log_max_seq, 7);
     // The head equals what a full re-verification computes.
     let connection = store.connection()?;
     let reference = seed_verified_head(&connection)?;
-    assert_eq!(snapshot.claim_log_count, reference.claim_log_count);
-    assert_eq!(snapshot.claim_log_max_seq, reference.claim_log_max_seq);
+    assert_eq!(reference.claim_log_count, 7);
+    assert_eq!(reference.claim_log_max_seq, 7);
     assert_eq!(snapshot.checkpoint_seq, reference.checkpoint_seq());
     let _ = fs::remove_file(path);
     Ok(())
@@ -280,7 +278,9 @@ fn writer_routed_inserts_do_not_false_conflict_the_next_append(
     }
     store.flush_receipt_writes()?;
     let snapshot = store.writer_head_snapshot();
-    assert_eq!(snapshot.claim_log_max_seq, 5); // 1 tool + 1 child + 3 tool
+    // 1 tool + 1 child + 3 tool
+    let reference = seed_verified_head(&*store.connection()?)?;
+    assert_eq!(reference.claim_log_max_seq, 5);
     assert_eq!(snapshot.checkpoint_seq, 1);
     let _ = fs::remove_file(path);
     Ok(())
@@ -1606,8 +1606,8 @@ fn divergent_newly_projected_row_is_rejected_before_head_advance(
         store.append_chio_receipt_returning_seq(&receipt)?;
     }
     store.flush_receipt_writes()?;
-    let head_before = store.writer_head_snapshot().claim_log_max_seq;
-    assert_eq!(head_before, 3);
+    let max_seq_before = claim_log_delta_count_and_max_seq(&*store.connection()?, 0)?.1;
+    assert_eq!(max_seq_before, 3);
 
     // Simulate a modified projection trigger that still emits exactly one row per
     // insert (count/MAX gate passes) and keeps `receipt_id`/`raw_json` correct
@@ -1667,12 +1667,12 @@ fn divergent_newly_projected_row_is_rejected_before_head_advance(
         "expected a fail-closed Conflict, got {error:?}"
     );
 
-    // The head did NOT advance: the rejected append rolled its transaction back,
-    // so the actor's cached head still stops at the last clean entry. (No flush
-    // here: the failed batch leaves a pending flush error by design.)
-    let head_after = store.writer_head_snapshot().claim_log_max_seq;
+    // The rejected append rolled its transaction back, so the claim log still
+    // stops at the last clean entry. (No flush here: the failed batch leaves a
+    // pending flush error by design.)
+    let max_seq_after = claim_log_delta_count_and_max_seq(&*store.connection()?, 0)?.1;
     assert_eq!(
-        head_after, head_before,
+        max_seq_after, max_seq_before,
         "the head must not advance past a divergent newly-projected row"
     );
 

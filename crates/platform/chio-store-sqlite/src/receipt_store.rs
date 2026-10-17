@@ -276,8 +276,6 @@ struct ReceiptCommitWriterHealth {
     // flush_report / receipt_store_health / kernel counters.
     head_checkpoint_seq: AtomicU64,
     head_checkpointed_entry_seq: AtomicU64,
-    head_claim_log_count: AtomicU64,
-    head_claim_log_max_seq: AtomicU64,
     // Mirror of the actor thread's `WriterHeadState` poison bit. The head lives
     // only on the actor thread, so a poisoned head (every append rejected with a
     // Conflict) is invisible to the supervised thread flag: the writer thread is
@@ -359,10 +357,6 @@ impl ReceiptCommitWriterHealth {
             .store(head.checkpoint_seq(), Ordering::SeqCst);
         self.head_checkpointed_entry_seq
             .store(head.checkpointed_entry_seq(), Ordering::SeqCst);
-        self.head_claim_log_count
-            .store(head.claim_log_count, Ordering::SeqCst);
-        self.head_claim_log_max_seq
-            .store(head.claim_log_max_seq, Ordering::SeqCst);
     }
 }
 
@@ -1848,9 +1842,9 @@ fn handle_non_append_command(
             // After a successful bottom-of-log delete the cached head's
             // latest_checkpoint and claim_log_max_seq are unchanged (rotation
             // never deletes checkpoints and never touches the max entry_seq),
-            // but claim_log_count shrank. Refresh it so diagnostics stay
-            // accurate; correctness does not depend on this (no hot path
-            // asserts count equality).
+            // but claim_log_count shrank. Refresh it so the cached count
+            // matches the table; correctness does not depend on this (no hot
+            // path asserts count equality).
             if outcome.is_ok() {
                 if let WriterHeadState::Verified(head) = head_state {
                     if let Ok((count, max_seq)) = claim_log_delta_count_and_max_seq(&connection, 0)
@@ -2565,14 +2559,6 @@ impl VerifiedHead {
 pub(crate) struct WriterHeadSnapshot {
     pub(crate) checkpoint_seq: u64,
     pub(crate) checkpointed_entry_seq: u64,
-    // Read only by tests (`incremental_append_updates_the_head_and_stays_correct`,
-    // `writer_routed_inserts_do_not_false_conflict_the_next_append`): they
-    // cross-check the actor-maintained head against a full re-verification.
-    // `flush_report` does not need the claim-log counters today.
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) claim_log_count: u64,
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) claim_log_max_seq: u64,
 }
 
 /// Seed the verified head by running the existing FULL verification exactly
@@ -3349,8 +3335,6 @@ impl SqliteReceiptStore {
         WriterHeadSnapshot {
             checkpoint_seq: health.head_checkpoint_seq.load(Ordering::SeqCst),
             checkpointed_entry_seq: health.head_checkpointed_entry_seq.load(Ordering::SeqCst),
-            claim_log_count: health.head_claim_log_count.load(Ordering::SeqCst),
-            claim_log_max_seq: health.head_claim_log_max_seq.load(Ordering::SeqCst),
         }
     }
 

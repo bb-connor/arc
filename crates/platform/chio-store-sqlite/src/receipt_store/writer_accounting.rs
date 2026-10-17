@@ -19,8 +19,6 @@ impl ReceiptCommitWriterHealth {
             retention_error: Mutex::new(None),
             head_checkpoint_seq: AtomicU64::new(0),
             head_checkpointed_entry_seq: AtomicU64::new(0),
-            head_claim_log_count: AtomicU64::new(0),
-            head_claim_log_max_seq: AtomicU64::new(0),
             // Fail closed until the actor thread seeds a verified head. The head
             // is seeded asynchronously after construction, so starting open would
             // let a corrupt or still-attaching store pass the pre-dispatch gate
