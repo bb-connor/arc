@@ -7141,6 +7141,9 @@
     "crates/security/chio-security-types/src/recovery/profile.rs": [
       "attachment_profile::custom_deserialize"
     ],
+    "crates/security/chio-security-types/src/strict_serde.rs": [
+      "serialize::custom_deserialize"
+    ],
     "crates/security/chio-semantic-contracts/src/effect.rs": [
       "recovery_profile::custom_deserialize"
     ],
@@ -12260,6 +12263,22 @@
     "crates/security/chio-security-types/src/recovery/profile.rs": {
       "kind": "typed-field-deserializer",
       "contract": "Profile requirements validate ordering and baseline features through their constructor after an outer original-byte reader.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/security/chio-security-types/src/strict_serde.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom Deserialize for enums derived with remote = Self: decodes through a Value, runs the derived decoder and refuses any value that does not reserialize to its input, so unit variants of internally tagged enums cannot discard fields. It runs inside an outer reader and constructs no authority token.",
       "readers": [
         {
           "reader": "deserialize",
