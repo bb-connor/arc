@@ -71,8 +71,8 @@ When present, `decision` is one of:
 - `incomplete`
 
 Implementations must preserve those distinct terminal states. Only
-`mediated_decision` plus `prevent` plus `allow` may be displayed or exported as
-authorization.
+`mediated_decision` plus `prevent` plus `trust_level = mediated` plus `allow`,
+with no `observation_outcome`, may be displayed or exported as authorization.
 
 ## Security Properties
 
