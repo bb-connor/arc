@@ -1,0 +1,1716 @@
+{
+  "cases": [
+    {
+      "description": "Allow receipt over a value output; both commitments open with the fixture salts.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "value_output",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "Empty output: the content preimage is the zero-length byte string. The opening carries the salt only; the verifier derives the preimage from its own copy of the output.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": null,
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "6bf060d8e27d078dbca439b7cfb17300a5b6df5f82241eaaab9c06d0df7d4818",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "empty_output",
+      "preimages": {
+        "content_preimage_hex": "",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:df8c55381eb7bb742a1e4ad5c64b32be01166e9e6127d1a3cdca9b3902cac185"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "6bf060d8e27d078dbca439b7cfb17300a5b6df5f82241eaaab9c06d0df7d4818",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "a5fcf81d915c8eafb1c5dd14044e1cd628389658828a59bd1b370a05c7204d8f",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "5aef0deabf035d96a9fd4385ec6436dbcf76402b16a9c7b8c5794fc15ef48605f3a1576cc99367031fe1d8718ba8f1cdefef52c96fc063e7e186b75534c9b801",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "Stream output: the content preimage is the concatenation of the lowercase hex SHA-256 of each canonical chunk. No per-chunk digest appears in the receipt.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": null,
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "2c8e4542d88b89e5b8c5eb884c46ecef8e47762f401aa80b900215956f5df87e",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "stream_output",
+      "preimages": {
+        "content_preimage_hex": "6338633739663131636666613839336561663466313337336364333133363462623963383264363162646363306639646366653638613662373430333261666637396232666433366139373365623665623630376130653930303237343133363863313035633530373838353734383938623234333464613235626364363531",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:1380c1ef5da1353d51b9f7c88672ade73113bb366c7b34ffc8b4238f5bce03fa"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "2c8e4542d88b89e5b8c5eb884c46ecef8e47762f401aa80b900215956f5df87e",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "9545b973220a667d7e57be9fa9e6cb93269a3c1417c00f49ab084438fe71752c",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "91ea372d4dd243cf4563eafa1b81407c1f3243360386674359715fe6a70efb855f2fa3fe73357eb069a297fc27e02eb03a71ac784a8856827ab66cab6730f601",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "Stream output with no chunks: the content preimage is the zero-length byte string, the same as an empty output.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": null,
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "6bf060d8e27d078dbca439b7cfb17300a5b6df5f82241eaaab9c06d0df7d4818",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "stream_output_no_chunks",
+      "preimages": {
+        "content_preimage_hex": "",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:df8c55381eb7bb742a1e4ad5c64b32be01166e9e6127d1a3cdca9b3902cac185"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "6bf060d8e27d078dbca439b7cfb17300a5b6df5f82241eaaab9c06d0df7d4818",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "a5fcf81d915c8eafb1c5dd14044e1cd628389658828a59bd1b370a05c7204d8f",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "5aef0deabf035d96a9fd4385ec6436dbcf76402b16a9c7b8c5794fc15ef48605f3a1576cc99367031fe1d8718ba8f1cdefef52c96fc063e7e186b75534c9b801",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "Deny receipt: parameters are committed, the content commitment covers the empty output (zero-length preimage).",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/etc/shadow"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": null,
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "52d3a7c7edd060aa915458ed9bc24baa6aeeb0cde771ce955f2bb4694ee1ac46",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "deny_receipt",
+      "preimages": {
+        "content_preimage_hex": "",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/etc/shadow\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:5f23e870afe6d721bc25789f9d0b515eb461b3a6b206cb04c246f19ebd86d134"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:df8c55381eb7bb742a1e4ad5c64b32be01166e9e6127d1a3cdca9b3902cac185"
+        },
+        "decision": {
+          "guard": "ForbiddenPathGuard",
+          "reason": "path is forbidden",
+          "verdict": "deny"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "52d3a7c7edd060aa915458ed9bc24baa6aeeb0cde771ce955f2bb4694ee1ac46",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "4fbc3901b6ab3d13e979acd61ffa3b32183fbfca026c0e8a91a353d6f6c76ae8",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "e7916d90ed936644f5e3bdc041f346c14e9d5190fd474a75d24b42182d35eedee28431535cb42e4b1f20eb9a7b1c6ad21ff6205ea0285c2488526d9aac81b905",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "delegation_context": {
+        "anchor": {
+          "alg": "RS256",
+          "artifact_digest": "sha256:147886696da74773269ae11291ac9b3d78d30fc48c5759e7a9129128d184974b",
+          "artifact_retained": false,
+          "claims": {
+            "client_id": "mcp-client-fixture",
+            "scope": [
+              "files.read"
+            ]
+          },
+          "issuer": "https://idp.fixture.example",
+          "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
+          "kid": "k-fixture-1",
+          "kind": "oauth_id_jag",
+          "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
+          "subject": {
+            "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
+            "salt_ref": "anchor.sub"
+          },
+          "tenant": {
+            "commit": "sha256:16eaee516aa605a40bacde5aaf4e78711f1a8d17512b77bc1df1de7022f8cba3",
+            "salt_ref": "anchor.tenant"
+          },
+          "token_exp": 1792235090,
+          "token_iat": 1792234790
+        },
+        "effective_root_scope_hash": "sha256:e8b7cd2edc64ac9727684b2b4874928142c8050cd98816b8f4ed8188ad9efda0",
+        "exchange": {
+          "exchange_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "exchanged_at": 1792234795,
+          "holder": "edge_session",
+          "request_digest": "sha256:1998b9810e55d5eae127e890ea1c2018b6cf28a703af8be9aaf0c6342d81fe3c"
+        },
+        "root_policy_rule_id": "fixture-rule",
+        "schema": "chio.delegation-context.v1"
+      },
+      "description": "Receipt with an authority block at chain_depth 0 and no tenant_id; the delegation context recomputes context_digest and its subject and tenant commitments open. chain_digest and root_policy_digest are computed over fixture placeholders and are not checked here.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          },
+          {
+            "payload": "00u1fixturesubject",
+            "salt": "b64u:EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI",
+            "salt_ref": "anchor.sub"
+          },
+          {
+            "payload": "tenant-fixture",
+            "salt": "b64u:ExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExM",
+            "salt_ref": "anchor.tenant"
+          }
+        ],
+        "receipt_id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "anchor_subject": "verified",
+        "anchor_tenant": "verified",
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "authority_chain_depth_0",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "authority": {
+          "chain_depth": 0,
+          "chain_digest": "sha256:3fd0c850d923f9b475e938e773eb88bd8740ed708bbc95b7db4dd7b5b0322694",
+          "holder": "edge_session",
+          "root_anchor": {
+            "anchored_at": 1792234795,
+            "assertion_exp": 1792235090,
+            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "kind": "oauth_id_jag",
+            "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-root",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "6599409b2752b71d06bd34938c1e869da102be1061ce9f9666461294cf2537e4",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "57a5b60ccc6818bce5688230de2f80727c80814a31b1a59d9e8fe7932c075b400527f9ba096b4593497657cdaa38440581e621cee5baccf639578cc6fad1db0f",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "delegation_context": {
+        "anchor": {
+          "alg": "RS256",
+          "artifact_digest": "sha256:147886696da74773269ae11291ac9b3d78d30fc48c5759e7a9129128d184974b",
+          "artifact_retained": false,
+          "claims": {
+            "client_id": "mcp-client-fixture",
+            "scope": [
+              "files.read"
+            ]
+          },
+          "issuer": "https://idp.fixture.example",
+          "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
+          "kid": "k-fixture-1",
+          "kind": "oauth_id_jag",
+          "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
+          "subject": {
+            "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
+            "salt_ref": "anchor.sub"
+          },
+          "tenant": {
+            "commit": "sha256:16eaee516aa605a40bacde5aaf4e78711f1a8d17512b77bc1df1de7022f8cba3",
+            "salt_ref": "anchor.tenant"
+          },
+          "token_exp": 1792235090,
+          "token_iat": 1792234790
+        },
+        "effective_root_scope_hash": "sha256:e8b7cd2edc64ac9727684b2b4874928142c8050cd98816b8f4ed8188ad9efda0",
+        "exchange": {
+          "exchange_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "exchanged_at": 1792234795,
+          "holder": "edge_session",
+          "request_digest": "sha256:1998b9810e55d5eae127e890ea1c2018b6cf28a703af8be9aaf0c6342d81fe3c"
+        },
+        "root_policy_rule_id": "fixture-rule",
+        "schema": "chio.delegation-context.v1"
+      },
+      "description": "Receipt carrying both tenant_id and an authority block. Signing must refuse it; this fixture is signed anyway so a verifier shows the rule independently of the signature.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          },
+          {
+            "payload": "00u1fixturesubject",
+            "salt": "b64u:EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI",
+            "salt_ref": "anchor.sub"
+          },
+          {
+            "payload": "tenant-fixture",
+            "salt": "b64u:ExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExM",
+            "salt_ref": "anchor.tenant"
+          }
+        ],
+        "receipt_id": "a52779b2257333b4f16719eec56826e3d8825111f9ce941bbdea0272cc8cbcf6",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "anchor_subject": "verified",
+        "anchor_tenant": "verified",
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": false,
+        "signature_valid": true
+      },
+      "id": "tenant_id_with_authority",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "authority": {
+          "chain_depth": 0,
+          "chain_digest": "sha256:3fd0c850d923f9b475e938e773eb88bd8740ed708bbc95b7db4dd7b5b0322694",
+          "holder": "edge_session",
+          "root_anchor": {
+            "anchored_at": 1792234795,
+            "assertion_exp": 1792235090,
+            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "kind": "oauth_id_jag",
+            "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-root",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "a52779b2257333b4f16719eec56826e3d8825111f9ce941bbdea0272cc8cbcf6",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "f39228ce5ba14685b4a5a6bc11415f044647289bbb2fad4f547c1fdf551df489",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "76e58adae2cc607ef624c31ce0a01fb3a5288d3d36c8aba929fac47a8c83361b883e54012c047db5443c6cf7e8763f6a8b32a53be3ebd714c8cb8aee9497320a",
+        "tenant_id": "tenant-fixture",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The parameters opening carries the fixture salt with one bit flipped.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:ERAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "rejected",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "salt_one_bit_change",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The content opening's payload differs from the committed output in one bit.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 43,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "payload_one_bit_change",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34332c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The parameters opening (salt and payload) is presented under salt_ref content and checked against the content commitment.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": true,
+        "parameters": "unverifiable",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "parameters_opening_for_content",
+      "preimages": {
+        "content_preimage_hex": "7b226d6f6465223a2272656164222c2270617468223a222f776f726b73706163652f646f63732f726f61646d61702e6d64227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The content commitment was computed with the parameters domain. The opening is correct, and the verifier rejects it because the domain comes from the commitment position, never from the opening.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d6b5db66501fc799e45dae15814f3f176e3ddaf5207da8bfd92c9d5e5b89f48f",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "content_commitment_under_parameters_domain",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:8d398ef87e512993d7bd00f67294c6be5ab2c2fca327e22aec1249523552f3de"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d6b5db66501fc799e45dae15814f3f176e3ddaf5207da8bfd92c9d5e5b89f48f",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "767944c13cffbfa96b428eda85513376f3edc2407b843293d4ae8c3f5f1ff7b6",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "d0bc3a5dc5123545b7c965e500ce7c5cbddc6ff84a1879c07dfe4c7da582695a0374fdd2bb371a80f5727de75705d673ce37ec97779404dec69e15942b7b670d",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The parameters opening carries a 31-byte salt; salts are exactly 32 bytes.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": false,
+        "parameters": "rejected",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "salt_31_bytes",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The parameters opening carries the right salt with base64url padding; the encoding is unpadded.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA=",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": false,
+        "parameters": "rejected",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "salt_padded_b64u",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The producer used one salt for both the parameters and the content commitment. A verifier rejects an opening document that repeats a salt across salt_refs, so every opened field is rejected and the receipt is marked as tampered disclosure.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "5e9d73524c4aab5881c9e5febff07e3d3130a08532be3e8a6d7e20656cdf001a",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "rejected",
+        "disclosure_valid": false,
+        "parameters": "rejected",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "salt_reused_across_fields",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:fa85953c36514eccaaf148c15ef2be3188f71cee22acbac80b6e2ad4abb33067"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "5e9d73524c4aab5881c9e5febff07e3d3130a08532be3e8a6d7e20656cdf001a",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "1f1d489b29779943c632b473bf5abf497a7cf658e23aa750845d02aac5d5107d",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "520ad783c6929317ac4f575c5f136b68465e23a7ae92fe35404f9182c235d472c3f332b32df316b36169bc3f7eb789f1d20bab891dc2a0ae920ca515d9f72409",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "delegation_context": {
+        "anchor": {
+          "alg": "RS256",
+          "artifact_digest": "sha256:147886696da74773269ae11291ac9b3d78d30fc48c5759e7a9129128d184974b",
+          "artifact_retained": false,
+          "claims": {
+            "client_id": "mcp-client-fixture",
+            "scope": [
+              "files.read"
+            ]
+          },
+          "issuer": "https://idp.fixture.example",
+          "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
+          "kid": "k-fixture-1",
+          "kind": "oauth_id_jag",
+          "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
+          "subject": {
+            "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
+            "salt_ref": "anchor.sub"
+          },
+          "tenant": {
+            "commit": "sha256:16eaee516aa605a40bacde5aaf4e78711f1a8d17512b77bc1df1de7022f8cba3",
+            "salt_ref": "anchor.tenant"
+          },
+          "token_exp": 1792235090,
+          "token_iat": 1792234790
+        },
+        "effective_root_scope_hash": "sha256:e8b7cd2edc64ac9727684b2b4874928142c8050cd98816b8f4ed8188ad9efda0",
+        "exchange": {
+          "exchange_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "exchanged_at": 1792234795,
+          "holder": "edge_session",
+          "request_digest": "sha256:1998b9810e55d5eae127e890ea1c2018b6cf28a703af8be9aaf0c6342d81fe3c"
+        },
+        "root_policy_rule_id": "fixture-rule",
+        "schema": "chio.delegation-context.v1"
+      },
+      "description": "The subject opening (salt and value) is presented as the tenant opening; the tenant commitment uses its own domain and salt.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          },
+          {
+            "payload": "00u1fixturesubject",
+            "salt": "b64u:EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI",
+            "salt_ref": "anchor.tenant"
+          }
+        ],
+        "receipt_id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "anchor_subject": "unverifiable",
+        "anchor_tenant": "rejected",
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "subject_opening_as_tenant",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "authority": {
+          "chain_depth": 0,
+          "chain_digest": "sha256:3fd0c850d923f9b475e938e773eb88bd8740ed708bbc95b7db4dd7b5b0322694",
+          "holder": "edge_session",
+          "root_anchor": {
+            "anchored_at": 1792234795,
+            "assertion_exp": 1792235090,
+            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "kind": "oauth_id_jag",
+            "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-root",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "6599409b2752b71d06bd34938c1e869da102be1061ce9f9666461294cf2537e4",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "57a5b60ccc6818bce5688230de2f80727c80814a31b1a59d9e8fe7932c075b400527f9ba096b4593497657cdaa38440581e621cee5baccf639578cc6fad1db0f",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "delegation_context": {
+        "anchor": {
+          "alg": "RS256",
+          "artifact_digest": "sha256:147886696da74773269ae11291ac9b3d78d30fc48c5759e7a9129128d184974b",
+          "artifact_retained": false,
+          "claims": {
+            "client_id": "mcp-client-fixture",
+            "scope": [
+              "files.read"
+            ]
+          },
+          "issuer": "https://idp.fixture.example",
+          "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
+          "kid": "k-fixture-1",
+          "kind": "oauth_id_jag",
+          "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
+          "subject": {
+            "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
+            "salt_ref": "anchor.sub"
+          },
+          "tenant": {
+            "commit": "sha256:16eaee516aa605a40bacde5aaf4e78711f1a8d17512b77bc1df1de7022f8cba3",
+            "salt_ref": "anchor.tenant"
+          },
+          "token_exp": 1792235090,
+          "token_iat": 1792234790
+        },
+        "effective_root_scope_hash": "sha256:e8b7cd2edc64ac9727684b2b4874928142c8050cd98816b8f4ed8188ad9efda0",
+        "exchange": {
+          "exchange_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+          "exchanged_at": 1792234795,
+          "holder": "edge_session",
+          "request_digest": "sha256:1998b9810e55d5eae127e890ea1c2018b6cf28a703af8be9aaf0c6342d81fe3c"
+        },
+        "root_policy_rule_id": "fixture-rule",
+        "schema": "chio.delegation-context.v1"
+      },
+      "description": "The tenant opening carries the tenant salt with the subject value.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          },
+          {
+            "payload": "00u1fixturesubject",
+            "salt": "b64u:EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI",
+            "salt_ref": "anchor.sub"
+          },
+          {
+            "payload": "00u1fixturesubject",
+            "salt": "b64u:ExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExM",
+            "salt_ref": "anchor.tenant"
+          }
+        ],
+        "receipt_id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "anchor_subject": "verified",
+        "anchor_tenant": "rejected",
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "subject_value_as_tenant",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "authority": {
+          "chain_depth": 0,
+          "chain_digest": "sha256:3fd0c850d923f9b475e938e773eb88bd8740ed708bbc95b7db4dd7b5b0322694",
+          "holder": "edge_session",
+          "root_anchor": {
+            "anchored_at": 1792234795,
+            "assertion_exp": 1792235090,
+            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "kind": "oauth_id_jag",
+            "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-root",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "6599409b2752b71d06bd34938c1e869da102be1061ce9f9666461294cf2537e4",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "57a5b60ccc6818bce5688230de2f80727c80814a31b1a59d9e8fe7932c075b400527f9ba096b4593497657cdaa38440581e621cee5baccf639578cc6fad1db0f",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "Only the parameters opening is disclosed; the content commitment stays hiding.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "unverifiable",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": true,
+        "signature_valid": true
+      },
+      "id": "content_opening_absent",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "1dd53f95b19f19be22b42b2ef9493356076f2e4ccd78ecbfec56bb2ef4e45f51c5b588e4007b9584da850aa23813f7b0c217b6bf630a127d0b0f9503d9628604",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    },
+    {
+      "description": "The kernel signed the canonical ChioReceiptSigningBody directly instead of its wrapper.",
+      "disclosure": {
+        "openings": [
+          {
+            "payload": {
+              "mode": "read",
+              "path": "/workspace/docs/roadmap.md"
+            },
+            "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA",
+            "salt_ref": "params"
+          },
+          {
+            "payload": {
+              "lines": 42,
+              "text": "Roadmap"
+            },
+            "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+            "salt_ref": "content"
+          }
+        ],
+        "receipt_id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "schema": "chio.receipt-disclosure.v1"
+      },
+      "expected": {
+        "content": "verified",
+        "disclosure_valid": true,
+        "parameters": "verified",
+        "receipt_valid": false,
+        "signature_valid": false
+      },
+      "id": "body_signature_without_wrapper",
+      "preimages": {
+        "content_preimage_hex": "7b226c696e6573223a34322c2274657874223a22526f61646d6170227d",
+        "parameters_canonical": "{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}"
+      },
+      "receipt": {
+        "action": {
+          "parameter_commitment": {
+            "alg": "sha256-salted",
+            "salt_ref": "params",
+            "value": "sha256:c46779d6b765628cccc5ad0256e8f6f36699f3573b1f19e14eb6add1fe953a21"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-fixture-001",
+        "content_commitment": {
+          "alg": "sha256-salted",
+          "salt_ref": "content",
+          "value": "sha256:75fc4449b79d9810dea9b6f2e57256e90a07f1cffdd6d7707e8d538bc9f793db"
+        },
+        "decision": {
+          "verdict": "allow"
+        },
+        "disclosure": {
+          "parameter_inline_fields": [],
+          "result_inline_fields": []
+        },
+        "evidence": [
+          {
+            "details": "path checked",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          }
+        ],
+        "id": "d9f4cc34e357aaf0c22e38974c82c093a31948087cc955f769a87fd454711c33",
+        "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "173996116531eee947378d4b5a428f442daae28b8e2bfa6d7e01beaf00f5e784",
+          "surface": "committed-receipt-vectors"
+        },
+        "policy_hash": "policy-fixture-v1",
+        "receipt_kind": "mediated_decision",
+        "signature": "374fe8f43e3b47276a15bbf5df1bc0d81eee3e15e1a4c487dc7eb10142ae9cba47a96ff07de7d427d524c38df7530c458b8586d5584d45d1f0aacc372adb740a",
+        "timestamp": 1792234800,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "mediated"
+      }
+    }
+  ],
+  "commitment_domains": {
+    "anchor.sub": "chio.delegation-context.subject.v1\\0",
+    "anchor.tenant": "chio.delegation-context.tenant.v1\\0",
+    "content": "chio.receipt.content.v1\\0",
+    "params": "chio.receipt.parameters.v1\\0"
+  },
+  "fixture_material": "Every key, salt and body in this file is a fixed test fixture. Production salts are 32 fresh bytes per receipt per field.",
+  "fixture_salts": {
+    "anchor.sub": "1212121212121212121212121212121212121212121212121212121212121212",
+    "anchor.tenant": "1313131313131313131313131313131313131313131313131313131313131313",
+    "content": "1111111111111111111111111111111111111111111111111111111111111111",
+    "params": "1010101010101010101010101010101010101010101010101010101010101010"
+  },
+  "generated_by": "scripts/gen-signing-wrapper-vectors.py",
+  "generator": {
+    "command": "uv run --with-requirements scripts/gen-signing-wrapper-vectors.requirements.txt python3 -I scripts/gen-signing-wrapper-vectors.py write",
+    "dependencies": [
+      "cryptography==44.0.3"
+    ],
+    "python_verified": [
+      "3.11",
+      "3.12"
+    ],
+    "script": "scripts/gen-signing-wrapper-vectors.py"
+  },
+  "input_seeds": {
+    "ecdsa_nonces": "RFC 6979 deterministic, derived from the key and message",
+    "ed25519_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+    "p256_scalar_hex": "0202020202020202020202020202020202020202020202020202020202020202",
+    "p384_scalar_hex": "030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303",
+    "receipt_salts_hex": {
+      "anchor.sub": "1212121212121212121212121212121212121212121212121212121212121212",
+      "anchor.tenant": "1313131313131313131313131313131313131313131313131313131313131313",
+      "content": "1111111111111111111111111111111111111111111111111111111111111111",
+      "params": "1010101010101010101010101010101010101010101010101010101010101010"
+    }
+  },
+  "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "kernel_key_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "version": 1
+}

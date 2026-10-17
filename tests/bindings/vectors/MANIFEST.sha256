@@ -5,6 +5,7 @@
 27331e1d7d7f94f0e6292d78a4dbf8e1ff0320d5e82cb0b782cc55357bfb1a97  tests/bindings/vectors/eval/v1.json
 c22fa7f39f71a11060ecd710bdd17297eadd249612964a95d519e98c60e95cc6  tests/bindings/vectors/hashing/v1.json
 a86c906bb01e4789c7ffa038d02a9185848e1dae7f42531f4f83d36249dfd643  tests/bindings/vectors/manifest/v1.json
+5f967fe53f0f6b4555c4d3c75a580b66d1441112f0d3f48927f43a35d0637d69  tests/bindings/vectors/receipt/committed/v1.json
 4ccf40bff7e7196646ea04c9ea1f7a98eb37e5ae331d9ddc10a283d908a309e8  tests/bindings/vectors/receipt/v1.json
 1028dfbdbec262c733b489a4e773a4688f9b0b5792148ebdf9f753d177800f71  tests/bindings/vectors/security/active-defense/index.json
 9848b771a2f1cb8f54e044a58ad01b5fc3d109866cfb2dde03bf827a65af4486  tests/bindings/vectors/security/active-defense/mutations-v1.json
@@ -104,3 +105,4 @@ e7e7f657d92a33ecb9b6e0a54d8c910701f82b3c1791e7299d566e2d6cb57d1b  tests/bindings
 8fa5a85c679ccc9db7338dab3f0303c10e0e4b2567a5e1d3214433f54eb1157f  tests/bindings/vectors/security/signed-wire/positive/signed-security-event-envelope-v1.json
 03a3185f0018018b853e8650eeda92c53b1f92810808529e6005f68855027122  tests/bindings/vectors/security/v1.json
 d8afddad6b16db986f2d1408d06529fa0cf2273081eff5984c6de3476f95dd17  tests/bindings/vectors/signing/v1.json
+445253bbd7fa2a6ff77caa4ece99c682d4df7737b3a5895db45133a05ede59d4  tests/bindings/vectors/signing/wrapper/v1.json
