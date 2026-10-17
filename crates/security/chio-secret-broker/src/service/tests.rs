@@ -525,12 +525,8 @@ struct FailFirstSigningBackend {
 }
 
 impl SigningBackend for FailFirstSigningBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.keypair.public_key().algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.keypair.public_key()
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+        Ok(self.keypair.public_key())
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {

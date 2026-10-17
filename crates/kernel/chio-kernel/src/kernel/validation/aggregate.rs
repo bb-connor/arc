@@ -41,7 +41,7 @@ impl ChioKernel {
             subject,
             &scope,
             ttl_seconds,
-            &self.capability_authority.authority_public_key(),
+            &self.capability_authority.authority_public_key()?,
             max_invocations,
             self.read_authority_time()?,
         )?;

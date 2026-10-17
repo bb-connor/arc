@@ -1,4 +1,4 @@
-use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard, Weak};
 
 use chio_core_types::{
     canonical_json_bytes, sha256, Hash, PublicKey, Signature, SigningAlgorithm, SigningBackend,
@@ -176,7 +176,7 @@ impl KeyringSigningRouter {
         anchor_id: AnchorId,
         artifact_time_signer: Arc<dyn SigningBackend>,
     ) -> Result<Self> {
-        store.validate_artifact_time_signer(&anchor_id, &artifact_time_signer.public_key())?;
+        store.validate_artifact_time_signer(&anchor_id, &artifact_time_signer.public_key()?)?;
         for signature in store.load_artifact_signatures()? {
             if store
                 .artifact_time_anchor(&signature.artifact_hash)?
@@ -206,11 +206,11 @@ impl KeyringSigningRouter {
             .load_state()?
             .ok_or(KeyringError::StateInvariant("key log is not initialized"))?;
         let active = durable.active_signing_key()?;
-        let active_key_id =
-            derive_key_id(active_backend.algorithm(), &active_backend.public_key())?;
+        let active_public_key = active_backend.public_key()?;
+        let active_key_id = derive_key_id(active_public_key.algorithm(), &active_public_key)?;
         if active_key_id != active.key_id
-            || active_backend.public_key() != active.public_key
-            || active_backend.algorithm() != active.algorithm
+            || active_public_key != active.public_key
+            || active_public_key.algorithm() != active.algorithm
         {
             return Err(KeyringError::StateInvariant(
                 "active backend does not match durable key selector",
@@ -256,10 +256,11 @@ impl KeyringSigningRouter {
             .ok_or(KeyringError::StateInvariant(
                 "durable pending key is absent",
             ))?;
-        let key_id = derive_key_id(backend.algorithm(), &backend.public_key())?;
+        let backend_public_key = backend.public_key()?;
+        let key_id = derive_key_id(backend_public_key.algorithm(), &backend_public_key)?;
         if key_id != pending.key_id
-            || backend.public_key() != pending.public_key
-            || backend.algorithm() != pending.algorithm
+            || backend_public_key != pending.public_key
+            || backend_public_key.algorithm() != pending.algorithm
         {
             return Err(KeyringError::StateInvariant(
                 "pending backend does not match durable pending key",
@@ -371,8 +372,8 @@ impl KeyringSigningRouter {
         if expected_epoch.is_some_and(|expected| router.signing_epoch != expected) {
             return Err(KeyringError::StateInvariant("stale signing epoch"));
         }
-        let algorithm = router.active.algorithm();
-        let public_key = router.active.public_key();
+        let public_key = router.active.public_key()?;
+        let algorithm = public_key.algorithm();
         if expected_public_key.is_some_and(|expected| expected != &public_key) {
             return Err(KeyringError::StateInvariant(
                 "active signing identity does not match the requested key",
@@ -482,17 +483,7 @@ impl KeyringSigningRouter {
     }
 
     pub fn active_public_key(&self) -> Result<PublicKey> {
-        Ok(self.read_state()?.active.public_key())
-    }
-
-    /// Key held by the selector, read even after a panic poisoned the lock.
-    /// Signing and [`Self::active_public_key`] still refuse a poisoned selector.
-    fn selected_public_key(&self) -> PublicKey {
-        self.state
-            .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .active
-            .public_key()
+        Ok(self.read_state()?.active.public_key()?)
     }
 
     pub fn activate_rotation(
@@ -572,7 +563,8 @@ impl KeyringSigningRouter {
         let backend = staged.backend.as_ref().ok_or(KeyringError::StateInvariant(
             "staged signing backend is absent",
         ))?;
-        if derive_key_id(backend.algorithm(), &backend.public_key())? != staged.lease.key_id {
+        let backend_public_key = backend.public_key()?;
+        if derive_key_id(backend_public_key.algorithm(), &backend_public_key)? != staged.lease.key_id {
             return Err(KeyringError::StateInvariant(
                 "staged signing backend changed identity",
             ));
@@ -632,15 +624,7 @@ impl KeyringAuthoritySigningBackend {
 }
 
 impl SigningBackend for KeyringAuthoritySigningBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.router.selected_public_key().algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.router.selected_public_key()
-    }
-
-    fn current_public_key(&self) -> chio_core_types::Result<PublicKey> {
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
         self.router
             .active_public_key()
             .map_err(|error| chio_core_types::Error::InvalidPublicKey(error.to_string()))

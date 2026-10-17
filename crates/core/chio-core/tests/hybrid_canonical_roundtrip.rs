@@ -31,7 +31,7 @@ struct HybridGolden {
 fn hybrid_signature_round_trips_through_wire_encoding() -> Result<(), Box<dyn Error>> {
     let golden = golden()?;
     let backend = backend(&golden)?;
-    let public_key = backend.public_key();
+    let public_key = backend.public_key()?;
     let signature = backend.sign_bytes(golden.message.as_bytes())?;
 
     let restored_public_key = PublicKey::from_hex(&public_key.to_hex())?;
@@ -49,7 +49,7 @@ fn hybrid_signature_round_trips_through_wire_encoding() -> Result<(), Box<dyn Er
 fn hybrid_canonical_json_matches_golden_prefix_and_shape() -> Result<(), Box<dyn Error>> {
     let golden = golden()?;
     let backend = backend(&golden)?;
-    let public_key = backend.public_key();
+    let public_key = backend.public_key()?;
     let public_key_hex = public_key.to_hex();
     let canonical = canonical_json_string(&public_key)?;
 

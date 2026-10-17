@@ -210,11 +210,7 @@ impl CountingSigner {
 }
 
 impl SigningBackend for CountingSigner {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.backend.algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
         self.backend.public_key()
     }
 
@@ -264,7 +260,7 @@ impl Fixture {
         keys.values.lock().test_expect("keys lock").insert(
             (tenant_id.clone(), key_id.clone()),
             TrustedWatermarkKey {
-                public_key: signer.public_key(),
+                public_key: signer.public_key().unwrap(),
                 status: WatermarkKeyStatus::Active,
                 not_before_unix_ms: 900,
                 signing_cutoff_unix_ms: 2_000,

@@ -273,7 +273,7 @@ fn receipt_floor_accepts_hybrid_under_pq_required() {
     let pq = MlDsa65Backend::from_seed(&seed);
     let backend = HybridBackend::new(Box::new(Ed25519Backend::new(kp.clone())), pq).unwrap();
     let mut body = make_receipt_body(&kp);
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
 
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Hybrid);
@@ -292,7 +292,7 @@ fn receipt_floor_rejects_hybrid_under_allow_classical() {
     let pq = MlDsa65Backend::from_seed(&seed);
     let backend = HybridBackend::new(Box::new(Ed25519Backend::new(kp.clone())), pq).unwrap();
     let mut body = make_receipt_body(&kp);
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
 
     let err = receipt
@@ -1394,7 +1394,7 @@ fn receipt_signs_and_verifies_under_p256_backend() {
     use crate::crypto::{P256Backend, SigningAlgorithm, SigningBackend};
     let backend = P256Backend::generate().expect("p256 backend");
     let mut body = make_receipt_body(&Keypair::generate());
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
     assert!(receipt.verify_signature().unwrap());

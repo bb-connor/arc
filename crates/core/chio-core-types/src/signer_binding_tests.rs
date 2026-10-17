@@ -11,37 +11,27 @@ use crate::error::Result;
 use crate::receipt::lineage::{ChildRequestReceipt, ChildRequestReceiptBody, SignedExportEnvelope};
 use crate::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 
-/// Infallible accessors still report the retired P-256 identity; the
-/// selector signs with `active`.
+/// Overrides every bound signing method, so artifacts take their identity
+/// from the signing outcome.
 struct RotatedBackend {
-    retired: Ed25519Backend,
     active: Ed25519Backend,
 }
 
 impl RotatedBackend {
     fn new() -> Self {
         Self {
-            retired: Ed25519Backend::new(Keypair::from_seed(&[81; 32])),
             active: Ed25519Backend::new(Keypair::from_seed(&[82; 32])),
         }
     }
 
     fn active_key(&self) -> PublicKey {
-        self.active.public_key()
+        self.active.public_key().unwrap()
     }
 }
 
 impl SigningBackend for RotatedBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::P256
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.retired.public_key()
-    }
-
-    fn current_public_key(&self) -> Result<PublicKey> {
-        Ok(self.active.public_key())
+    fn public_key(&self) -> crate::Result<PublicKey> {
+        self.active.public_key()
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {

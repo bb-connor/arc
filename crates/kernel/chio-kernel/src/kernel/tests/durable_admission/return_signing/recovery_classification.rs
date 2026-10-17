@@ -125,13 +125,13 @@ fn replaced_signer_defers_until_the_original_authority_returns() -> TestResult {
         .receipt
         .clone()
         .ok_or("original signer receipt")?;
-    assert_eq!(receipt.kernel_key, original_key);
+    assert_eq!(receipt.kernel_key, original_key?);
     Ok(())
 }
 
 #[derive(Clone, Copy)]
 enum BackendFault {
-    MisreportedAlgorithm,
+    ReplacedSigner,
     PanickingKey,
 }
 
@@ -142,16 +142,9 @@ struct FaultyBackend {
 }
 
 impl SigningBackend for FaultyBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         match self.fault {
-            BackendFault::MisreportedAlgorithm => SigningAlgorithm::Hybrid,
-            BackendFault::PanickingKey => self.inner.algorithm(),
-        }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        match self.fault {
-            BackendFault::MisreportedAlgorithm => self.inner.public_key(),
+            BackendFault::ReplacedSigner => self.inner.public_key(),
             BackendFault::PanickingKey => panic!("signing backend key selection fault"),
         }
     }
@@ -181,9 +174,9 @@ fn backend_fault_stays_global(fault: BackendFault, expected: &str) -> TestResult
 }
 
 #[test]
-fn misreported_backend_algorithm_stays_global_with_a_replaced_signer() -> TestResult {
+fn replaced_backend_signer_stays_global() -> TestResult {
     backend_fault_stays_global(
-        BackendFault::MisreportedAlgorithm,
+        BackendFault::ReplacedSigner,
         "receipt signing identity changed during selection",
     )
 }
@@ -204,7 +197,7 @@ fn malformed_retained_identity_stays_global_before_signer_comparison() -> TestRe
         crate::tool_outcome::ToolOutcomeError::Binding("raw.receipt_signing_floor").to_string();
     for key in [
         kernel.receipt_signing_public_key(),
-        Keypair::generate().public_key(),
+        Keypair::generate().public_key().unwrap(),
     ] {
         let mut value = serde_json::to_value(&current)?;
         value["public_key"] = serde_json::to_value(&key)?;

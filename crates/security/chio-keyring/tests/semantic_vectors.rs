@@ -104,21 +104,21 @@ impl DeterministicKeys {
         let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
             log_id: LogId::new("log.enterprise.receipt").test_unwrap(),
             authority_id: AuthorityId::new("authority.enterprise.receipt").test_unwrap(),
-            bootstrap_key: bootstrap.public_key(),
-            operator_key: operator.public_key(),
+            bootstrap_key: bootstrap.public_key().test_unwrap(),
+            operator_key: operator.public_key().test_unwrap(),
             witness_roster_id: WitnessRosterId::new("roster.enterprise.receipt.v1").test_unwrap(),
             witness_keys: BTreeMap::from([
                 (
                     WitnessId::new("witness.a").test_unwrap(),
-                    witnesses[0].public_key(),
+                    witnesses[0].public_key().test_unwrap(),
                 ),
                 (
                     WitnessId::new("witness.b").test_unwrap(),
-                    witnesses[1].public_key(),
+                    witnesses[1].public_key().test_unwrap(),
                 ),
                 (
                     WitnessId::new("witness.c").test_unwrap(),
-                    witnesses[2].public_key(),
+                    witnesses[2].public_key().test_unwrap(),
                 ),
             ]),
             recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.receipt.v1")
@@ -130,7 +130,7 @@ impl DeterministicKeys {
         .test_unwrap()
         .with_artifact_time_roots(BTreeMap::from([(
             AnchorId::new("timestamp.enterprise.receipt.v1").test_unwrap(),
-            artifact_time.public_key(),
+            artifact_time.public_key().test_unwrap(),
         )]))
         .test_unwrap();
         Self {
@@ -164,8 +164,8 @@ impl PositiveContext {
         let active_receipt =
             load_receipt("positive/key-log-enterprise-receipt-envelope-active-v1.json");
 
-        assert_eq!(genesis.body.public_key, keys.old_artifact.public_key());
-        assert_eq!(rotation.body.public_key, keys.new_artifact.public_key());
+        assert_eq!(genesis.body.public_key, keys.old_artifact.public_key().test_unwrap());
+        assert_eq!(rotation.body.public_key, keys.new_artifact.public_key().test_unwrap());
         genesis
             .validate_common(
                 0,
@@ -176,7 +176,7 @@ impl PositiveContext {
             )
             .test_unwrap();
         genesis
-            .verify_genesis(&keys.bootstrap.public_key())
+            .verify_genesis(&keys.bootstrap.public_key().test_unwrap())
             .test_unwrap();
         let genesis_hash = genesis.envelope_hash().test_unwrap();
         rotation
@@ -189,14 +189,14 @@ impl PositiveContext {
             )
             .test_unwrap();
         rotation
-            .verify_rotation(&keys.old_artifact.public_key())
+            .verify_rotation(&keys.old_artifact.public_key().test_unwrap())
             .test_unwrap();
 
         genesis_checkpoint
-            .verify_operator(&keys.operator.public_key())
+            .verify_operator(&keys.operator.public_key().test_unwrap())
             .test_unwrap();
         witnessed_checkpoint
-            .verify_operator(&keys.operator.public_key())
+            .verify_operator(&keys.operator.public_key().test_unwrap())
             .test_unwrap();
         witnessed_checkpoint
             .verify_witnesses(keys.policy.witness_public_keys())
@@ -312,7 +312,7 @@ fn schema_valid_key_log_mutations_are_rejected_by_native_semantics() {
                 let candidate =
                     SignedKeyLogEvent::from_canonical_envelope_bytes(&mutated).test_unwrap();
                 assert!(matches!(
-                    candidate.verify_rotation(&keys.old_artifact.public_key()),
+                    candidate.verify_rotation(&keys.old_artifact.public_key().test_unwrap()),
                     Err(KeyringError::InvalidSignature)
                 ));
             }
@@ -325,7 +325,7 @@ fn schema_valid_key_log_mutations_are_rejected_by_native_semantics() {
                 let candidate =
                     SignedKeyLogCheckpoint::from_canonical_bytes(&mutated).test_unwrap();
                 assert!(matches!(
-                    candidate.verify_operator(&keys.operator.public_key()),
+                    candidate.verify_operator(&keys.operator.public_key().test_unwrap()),
                     Err(KeyringError::InvalidSignature)
                 ));
             }

@@ -175,7 +175,7 @@ impl FindingStatusEpochPublisher {
             key_domain_nonce: FINDING_STATUS_KEY_DOMAIN_NONCE,
             map_epoch,
             operator_id: self.operator.authority.authority_id.clone(),
-            operator_key: self.operator_signer.public_key(),
+            operator_key: self.operator_signer.public_key()?,
             operator_key_epoch: self.operator.authority.key_epoch,
             root_hash: hex::encode(map.root().root_hash),
             tree_depth: u16::try_from(FINDING_STATUS_SPARSE_DEPTH)

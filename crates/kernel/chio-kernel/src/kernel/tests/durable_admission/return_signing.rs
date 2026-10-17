@@ -71,7 +71,7 @@ fn unfinished_return_cannot_be_signed_by_a_replacement_authority() -> TestResult
         None,
     )?;
     assert_eq!(recovered.verdict, Verdict::Allow);
-    assert_eq!(recovered.receipt.kernel_key, original_key);
+    assert_eq!(recovered.receipt.kernel_key, original_key?);
     assert!(recovered.receipt.verify_signature()?);
     assert_eq!(
         store.operation().state(),

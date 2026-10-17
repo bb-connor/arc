@@ -410,10 +410,7 @@ struct RecoveringSigner {
 }
 
 impl chio_core::crypto::SigningBackend for RecoveringSigner {
-    fn algorithm(&self) -> chio_core::crypto::SigningAlgorithm {
-        self.backend.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.backend.public_key()
     }
     fn sign_bytes(&self, bytes: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
@@ -518,10 +515,7 @@ struct LockInspectingSigner {
 }
 
 impl chio_core::crypto::SigningBackend for LockInspectingSigner {
-    fn algorithm(&self) -> chio_core::crypto::SigningAlgorithm {
-        self.backend.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         if let Some(kernel) = self.kernel.lock().unwrap().upgrade() {
             self.lock_held.store(
                 kernel.post_effect_evidence.try_lock().is_err(),

@@ -929,8 +929,8 @@ fn v2_verifier_rejects_source_receipt_key_reused_by_valid_iou_signature() -> Tes
     let mut value = serde_json::to_value(signed)?;
     let backend = Ed25519Backend::new(fixture.kernel_signer.clone());
     let (signature, _) = sign_canonical_with_backend(&backend, &value["body"])?;
-    value["signerKey"] = serde_json::to_value(backend.public_key())?;
-    value["algorithm"] = serde_json::to_value(backend.algorithm())?;
+    value["signerKey"] = serde_json::to_value(backend.public_key()?)?;
+    value["algorithm"] = serde_json::to_value(backend.public_key()?.algorithm())?;
     value["signature"] = serde_json::to_value(signature)?;
     let canonical = canonical_json_bytes(&value)?;
     let issuer_trust = ReceivableIouIssuerTrust::new(
@@ -989,14 +989,14 @@ fn v2_rejects_creditor_key_reused_under_an_issuer_alias() -> TestResult {
     let backend = Ed25519Backend::new(fixture.creditor_signer.clone());
     value["body"]["issuerId"] = serde_json::json!("economy.credit.issuer");
     let (signature, _) = sign_canonical_with_backend(&backend, &value["body"])?;
-    value["signerKey"] = serde_json::to_value(backend.public_key())?;
-    value["algorithm"] = serde_json::to_value(backend.algorithm())?;
+    value["signerKey"] = serde_json::to_value(backend.public_key()?)?;
+    value["algorithm"] = serde_json::to_value(backend.public_key()?.algorithm())?;
     value["signature"] = serde_json::to_value(signature)?;
     let canonical = canonical_json_bytes(&value)?;
     let issuer_trust = ReceivableIouIssuerTrust::new(
         "economy.credit.issuer".to_owned(),
         7,
-        backend.public_key(),
+        backend.public_key()?,
         ReceivableIouCryptoFloor::AllowClassical,
     )?;
     assert_eq!(

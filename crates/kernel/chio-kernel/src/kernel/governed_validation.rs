@@ -314,9 +314,10 @@ impl ChioKernel {
 
     pub(super) fn trusted_threshold_proposal_authorities(&self) -> Vec<chio_core::PublicKey> {
         let mut trusted = self.trusted_governance_authorities();
-        let signing_key = self.threshold_proposal_signing_key();
-        if !trusted.contains(&signing_key) {
-            trusted.push(signing_key);
+        if let Ok(signing_key) = self.threshold_proposal_signing_key() {
+            if !trusted.contains(&signing_key) {
+                trusted.push(signing_key);
+            }
         }
         trusted
     }

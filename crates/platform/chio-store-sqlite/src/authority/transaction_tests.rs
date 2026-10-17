@@ -80,7 +80,7 @@ fn rotation_rolls_back_seed_head_and_history_when_trust_insert_fails() -> TestRe
     assert_eq!(authority.snapshot()?, before);
     assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
     assert_eq!(
-        authority.authority_public_key().to_hex(),
+        authority.authority_public_key()?.to_hex(),
         before.public_key_hex
     );
     connection.execute_batch("DROP TRIGGER fail_trust")?;

@@ -177,7 +177,7 @@ pub fn sign_register_attempt_authorization(
         tenant_scope,
         registration_digest: attempt_registration_digest(registration)?,
         issued_at_unix_seconds,
-        authority: expected_authority.clone(),
+        authority: expected_authority?.clone(),
     };
     let signing = RegisterAttemptSigningInput {
         domain: REGISTER_ATTEMPT_AUTHORIZATION_DOMAIN,
@@ -195,8 +195,8 @@ pub fn sign_register_attempt_authorization(
                 "register-attempt authorization signing failed: {error}"
             ))
         })?;
-    if signed.public_key != expected_authority
-        || signed.algorithm != expected_authority.algorithm()
+    if signed.public_key != expected_authority?
+        || signed.algorithm != expected_authority?.algorithm()
         || signed.signature.algorithm() != signed.algorithm
         || !signed.public_key.verify(&canonical, &signed.signature)
     {

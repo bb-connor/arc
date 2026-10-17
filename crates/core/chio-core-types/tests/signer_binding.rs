@@ -236,7 +236,7 @@ fn capability_backend_sign_rejects_embedded_issuer_mismatch() -> chio_core_types
     let backend = Ed25519Backend::generate();
     let subject = Keypair::generate();
 
-    assert_ne!(embedded_issuer.public_key(), backend.public_key());
+    assert_ne!(embedded_issuer.public_key(), backend.keypair().public_key());
     assert_signer_mismatch(
         CapabilityToken::sign_with_backend(
             capability_body(embedded_issuer.public_key(), subject.public_key()),
@@ -246,7 +246,7 @@ fn capability_backend_sign_rejects_embedded_issuer_mismatch() -> chio_core_types
         "issuer",
     );
     CapabilityToken::sign_with_backend(
-        capability_body(backend.public_key(), subject.public_key()),
+        capability_body(backend.keypair().public_key(), subject.public_key()),
         &backend,
     )?;
     Ok(())
@@ -306,7 +306,7 @@ fn approval_signers_reject_embedded_approver_mismatches() -> chio_core_types::Re
         &embedded_approver,
     )?;
 
-    assert_ne!(embedded_approver.public_key(), backend.public_key());
+    assert_ne!(embedded_approver.public_key(), backend.keypair().public_key());
     assert_signer_mismatch(
         GovernedApprovalToken::sign_with_backend(
             approval_token_body(embedded_approver.public_key(), subject.public_key()),
@@ -316,7 +316,7 @@ fn approval_signers_reject_embedded_approver_mismatches() -> chio_core_types::Re
         "approver",
     );
     GovernedApprovalToken::sign_with_backend(
-        approval_token_body(backend.public_key(), subject.public_key()),
+        approval_token_body(backend.keypair().public_key(), subject.public_key()),
         &backend,
     )?;
     Ok(())
@@ -384,7 +384,7 @@ fn child_receipt_signers_reject_embedded_kernel_key_mismatches() -> chio_core_ty
         &embedded_kernel,
     )?;
 
-    assert_ne!(embedded_kernel.public_key(), backend.public_key());
+    assert_ne!(embedded_kernel.public_key(), backend.keypair().public_key());
     assert_signer_mismatch(
         ChildRequestReceipt::sign_with_backend(
             child_request_receipt_body(embedded_kernel.public_key()),
@@ -394,7 +394,7 @@ fn child_receipt_signers_reject_embedded_kernel_key_mismatches() -> chio_core_ty
         "kernel_key",
     );
     ChildRequestReceipt::sign_with_backend(
-        child_request_receipt_body(backend.public_key()),
+        child_request_receipt_body(backend.keypair().public_key()),
         &backend,
     )?;
     Ok(())

@@ -32,23 +32,23 @@ fn policy_file_loader_is_strict_and_binds_all_configured_roots() {
         "schema": KEY_LOG_POLICY_DOCUMENT_SCHEMA,
         "log_id": "log.service.test",
         "authority_id": "authority.service.test",
-        "bootstrap_public_key": bootstrap.public_key().to_hex(),
-        "operator_public_key": operator.public_key().to_hex(),
+        "bootstrap_public_key": bootstrap.public_key().test_unwrap().to_hex(),
+        "operator_public_key": operator.public_key().test_unwrap().to_hex(),
         "witness_roster_id": "roster.service.v1",
         "witness_public_keys": {
-            "witness.a": witness_a.public_key().to_hex(),
-            "witness.b": witness_b.public_key().to_hex(),
-            "witness.c": witness_c.public_key().to_hex()
+            "witness.a": witness_a.public_key().test_unwrap().to_hex(),
+            "witness.b": witness_b.public_key().test_unwrap().to_hex(),
+            "witness.c": witness_c.public_key().test_unwrap().to_hex()
         },
         "recovery_policy_id": "recovery.service.v1",
         "recovery_public_keys": {},
         "recovery_threshold": 0,
         "artifact_time_public_keys": {
-            "timestamp.service.v1": artifact_time.public_key().to_hex()
+            "timestamp.service.v1": artifact_time.public_key().test_unwrap().to_hex()
         },
         "auditor_public_keys": {
-            "audit.a": auditor_a.public_key().to_hex(),
-            "audit.b": auditor_b.public_key().to_hex()
+            "audit.a": auditor_a.public_key().test_unwrap().to_hex(),
+            "audit.b": auditor_b.public_key().test_unwrap().to_hex()
         },
         "max_checkpoint_future_skew_millis": 100
     });
@@ -124,7 +124,7 @@ fn witness_seed_loader_rejects_links_and_permissive_modes() {
     write_private_file(&seed_path, [9_u8; 32]).test_unwrap();
     std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o600)).test_unwrap();
     let loaded = load_witness_seed_backend(&seed_path).test_unwrap();
-    assert_eq!(loaded.public_key(), backend(9).public_key());
+    assert_eq!(loaded.public_key().test_unwrap(), backend(9).public_key().test_unwrap());
 
     std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o640)).test_unwrap();
     assert!(load_witness_seed_backend(&seed_path).is_err());

@@ -501,7 +501,7 @@ impl<'a> PostEffectObligation<'a> {
                             .signing_authority
                             .floor
                             .allowed_signing_algorithms()
-                            .contains(&self.kernel.signing_authority.backend.algorithm())
+                            .contains(&self.kernel.receipt_signing_public_key()?.algorithm())
                         {
                             return Err(KernelError::ReceiptSigningFailed(
                                 "fault signer does not satisfy the boot floor".into(),

@@ -655,7 +655,7 @@ fn sign_authority_request(
         schema: AUTHORITY_RPC_SCHEMA.to_string(),
         request_id: hex::encode(random),
         issued_at_unix_seconds,
-        broker: expected_broker.clone(),
+        broker: expected_broker?.clone(),
         operation,
     };
     let input = AuthoritySigningInput {
@@ -672,8 +672,8 @@ fn sign_authority_request(
         .map_err(|error| {
             BrokerError::Invariant(format!("authority request signing failed: {error}"))
         })?;
-    if signed.public_key != expected_broker
-        || signed.algorithm != expected_broker.algorithm()
+    if signed.public_key != expected_broker?
+        || signed.algorithm != expected_broker?.algorithm()
         || signed.signature.algorithm() != signed.algorithm
         || !signed.public_key.verify(&canonical, &signed.signature)
     {
@@ -740,7 +740,7 @@ fn sign_authority_response(
         request_id: request_id.to_string(),
         request_digest: request_digest.to_string(),
         issued_at_unix_seconds,
-        authority: expected_authority.clone(),
+        authority: expected_authority?.clone(),
         result,
     };
     let input = AuthoritySigningInput {
@@ -757,8 +757,8 @@ fn sign_authority_response(
         .map_err(|error| {
             BrokerError::Invariant(format!("authority response signing failed: {error}"))
         })?;
-    if signed.public_key != expected_authority
-        || signed.algorithm != expected_authority.algorithm()
+    if signed.public_key != expected_authority?
+        || signed.algorithm != expected_authority?.algorithm()
         || signed.signature.algorithm() != signed.algorithm
         || !signed.public_key.verify(&canonical, &signed.signature)
     {

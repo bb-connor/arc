@@ -117,8 +117,8 @@ fn allow_classical_constructs_ed25519_backend() {
     let kp = Keypair::generate();
     let backend =
         kernel_signing_backend(KernelCryptoFloor::AllowClassical, kp.clone(), None).unwrap();
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Ed25519);
-    assert_eq!(backend.public_key(), kp.public_key());
+    assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::Ed25519);
+    assert_eq!(backend.public_key().unwrap(), kp.public_key());
 }
 
 #[test]
@@ -161,9 +161,9 @@ fn allow_hybrid_with_seed_constructs_hybrid_backend() {
     let seed = fixture_pq_seed();
     let backend =
         kernel_signing_backend(KernelCryptoFloor::AllowHybrid, kp.clone(), Some(&seed)).unwrap();
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::Hybrid);
     let pk = backend.public_key();
-    assert_eq!(pk.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(pk.public_key().unwrap().algorithm(), SigningAlgorithm::Hybrid);
     assert_ne!(pk, kp.public_key());
 }
 
@@ -172,7 +172,7 @@ fn pq_required_with_seed_constructs_hybrid_backend() {
     let kp = Keypair::generate();
     let seed = fixture_pq_seed();
     let backend = kernel_signing_backend(KernelCryptoFloor::PqRequired, kp, Some(&seed)).unwrap();
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::Hybrid);
 }
 
 #[test]
@@ -223,7 +223,7 @@ fn hybrid_receipt_round_trip_signs_and_verifies() {
     // Under hybrid signing, the kernel_key field must carry the hybrid
     // public key so the verifier reaches both halves.
     let hybrid_pk = backend.public_key();
-    assert_eq!(hybrid_pk.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(hybrid_pk.public_key().unwrap().algorithm(), SigningAlgorithm::Hybrid);
     let body = build_body(hybrid_pk.clone());
 
     let receipt =
@@ -305,7 +305,7 @@ fn classical_and_hybrid_canonical_bytes_diverge_only_on_signature() {
         Some(&seed),
     )
     .unwrap();
-    let body_hybrid = build_body(backend_hybrid.public_key());
+    let body_hybrid = build_body(backend_hybrid.public_key().unwrap());
     let receipt_hybrid = sign_receipt_body_with_backend(
         body_hybrid,
         backend_hybrid.as_ref(),

@@ -326,8 +326,8 @@ impl FindingPurchaseCoordinator {
         status_feed_service_bond
             .validate(status_feed_operator)
             .map_err(|_| PurchaseCoordinatorError::AuthorityStatusPin)?;
-        if authority_status_key == purchase_authority.public_key()
-            || authority_status_key == failed_delivery_authority.public_key()
+        if authority_status_key == purchase_authority.public_key()?
+            || authority_status_key == failed_delivery_authority.public_key()?
             || authority_status_key == status_operator_key
         {
             return Err(PurchaseCoordinatorError::AuthorityStatusPin);
@@ -340,8 +340,8 @@ impl FindingPurchaseCoordinator {
         let listing_key = listing_pin
             .validate("listing")
             .map_err(|_| PurchaseCoordinatorError::ListingPin)?;
-        if listing_key == purchase_authority.public_key()
-            || listing_key == failed_delivery_authority.public_key()
+        if listing_key == purchase_authority.public_key()?
+            || listing_key == failed_delivery_authority.public_key()?
             || listing_key == authority_status_key
             || listing_key == status_operator_key
         {
@@ -351,8 +351,8 @@ impl FindingPurchaseCoordinator {
             .validate("venue")
             .map_err(|_| PurchaseCoordinatorError::VenuePin)?;
         if venue_id.is_empty()
-            || venue_key == purchase_authority.public_key()
-            || venue_key == failed_delivery_authority.public_key()
+            || venue_key == purchase_authority.public_key()?
+            || venue_key == failed_delivery_authority.public_key()?
             || venue_key == authority_status_key
             || venue_key == status_operator_key
             || venue_key == listing_key
@@ -829,7 +829,7 @@ impl FindingPurchaseCoordinator {
                 self.failed_delivery_authority.public_key(),
             ),
         ] {
-            if policy.key != signing_key {
+            if policy.key != signing_key? {
                 return Err(PurchaseCoordinatorError::DeclaredAuthorityMismatch(role));
             }
             if !authority_policy_covers(policy, now) {
@@ -1186,7 +1186,7 @@ impl FindingPurchaseCoordinator {
                 self.failed_delivery_authority.public_key(),
             ),
         ] {
-            if policy.key != signing_key {
+            if policy.key != signing_key? {
                 return Err(PurchaseCoordinatorError::DeclaredAuthorityMismatch(role));
             }
             if !authority_policy_covers(policy, reservation.created_at) {

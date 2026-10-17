@@ -248,12 +248,8 @@ struct FailingSigner {
 }
 
 impl SigningBackend for FailingSigner {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Ed25519
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.key.public_key()
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Ok(self.key.public_key())
     }
 
     fn sign_bytes(&self, _: &[u8]) -> Result<Signature, chio_core::Error> {

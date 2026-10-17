@@ -71,7 +71,7 @@ impl TripwireEventPublisher {
         producer_key_id: RecordId,
         policy_version: RecordId,
     ) -> PortResult<Self> {
-        if signer.public_key().algorithm() != signer.algorithm() {
+        if signer.public_key().is_err() {
             return Err(PortError::integrity_failure());
         }
         Ok(Self {

@@ -591,7 +591,7 @@ fn cumulative_approval_backend_root_round_trip() -> TestResult {
     let root = CapabilityToken::sign_cumulative_approval_family_root_with_backend(
         token_body(
             "cap-backend-root",
-            &backend.public_key(),
+            &backend.public_key().unwrap(),
             &subject.public_key(),
             tool_scope(true, Some(100)),
         ),
@@ -606,7 +606,7 @@ fn cumulative_approval_backend_root_round_trip() -> TestResult {
         canonical_json_bytes(binding(&decoded)?)?
     );
     assert_eq!(
-        verify_cumulative_approval_constraints(&decoded, &[backend.public_key()], None)?.len(),
+        verify_cumulative_approval_constraints(&decoded, &[backend.public_key()?], None)?.len(),
         1
     );
     Ok(())

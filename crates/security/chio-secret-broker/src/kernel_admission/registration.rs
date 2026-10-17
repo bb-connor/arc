@@ -85,7 +85,7 @@ impl BrokerAdmissionParticipant {
             config,
             Arc::new(RegistrationSigner {
                 inner: authority_signer,
-                key: authority_key,
+                key: authority_key?,
             }),
             verifier.clock.clone(),
         )?;
@@ -242,11 +242,8 @@ struct RegistrationSigner {
 }
 
 impl SigningBackend for RegistrationSigner {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.key.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
-        self.key.clone()
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+        Ok(self.key.clone())
     }
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
         self.sign_bytes_with_identity(message)

@@ -113,21 +113,21 @@ impl Fixture {
             schema: KEY_LOG_POLICY_DOCUMENT_SCHEMA.to_string(),
             log_id: "log.independent.processes".to_string(),
             authority_id: "authority.independent.processes".to_string(),
-            bootstrap_public_key: bootstrap.public_key().to_hex(),
-            operator_public_key: operator.public_key().to_hex(),
+            bootstrap_public_key: bootstrap.public_key().test_unwrap().to_hex(),
+            operator_public_key: operator.public_key().test_unwrap().to_hex(),
             witness_roster_id: "roster.independent.v1".to_string(),
             witness_public_keys: BTreeMap::from([
                 (
                     witness_ids[0].to_string(),
-                    witness_backends[0].public_key().to_hex(),
+                    witness_backends[0].public_key().test_unwrap().to_hex(),
                 ),
                 (
                     witness_ids[1].to_string(),
-                    witness_backends[1].public_key().to_hex(),
+                    witness_backends[1].public_key().test_unwrap().to_hex(),
                 ),
                 (
                     witness_ids[2].to_string(),
-                    witness_backends[2].public_key().to_hex(),
+                    witness_backends[2].public_key().test_unwrap().to_hex(),
                 ),
             ]),
             recovery_policy_id: "recovery.independent.v1".to_string(),
@@ -135,16 +135,16 @@ impl Fixture {
             recovery_threshold: 0,
             artifact_time_public_keys: BTreeMap::from([(
                 "clock.independent.v1".to_string(),
-                artifact_time.public_key().to_hex(),
+                artifact_time.public_key().test_unwrap().to_hex(),
             )]),
             auditor_public_keys: BTreeMap::from([
                 (
                     "audit.a".to_string(),
-                    audit_backends[0].public_key().to_hex(),
+                    audit_backends[0].public_key().test_unwrap().to_hex(),
                 ),
                 (
                     "audit.b".to_string(),
-                    audit_backends[1].public_key().to_hex(),
+                    audit_backends[1].public_key().test_unwrap().to_hex(),
                 ),
             ]),
             max_checkpoint_future_skew_millis: 60_000,
@@ -196,7 +196,7 @@ impl Fixture {
         UnixKeyLogWitnessClient::new(
             self.path(format!("witness-{index}.sock")),
             chio_keyring::WitnessId::new(self.witness_ids[index]).test_unwrap(),
-            self.witness_backends[index].public_key(),
+            self.witness_backends[index].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
         )
         .test_unwrap()
@@ -322,7 +322,7 @@ fn three_witness_processes_prove_distinct_durable_identity_and_restart_recovery(
     assert!(proofs[0]
         .verify(
             &chio_keyring::WitnessId::new(fixture.witness_ids[0]).test_unwrap(),
-            &fixture.witness_backends[0].public_key(),
+            &fixture.witness_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "different-challenge",
         )
@@ -330,7 +330,7 @@ fn three_witness_processes_prove_distinct_durable_identity_and_restart_recovery(
     let rebound_client = UnixKeyLogWitnessClient::new(
         fixture.path("witness-0.sock"),
         chio_keyring::WitnessId::new(fixture.witness_ids[1]).test_unwrap(),
-        fixture.witness_backends[1].public_key(),
+        fixture.witness_backends[1].public_key().test_unwrap(),
         policy.configuration_binding().test_unwrap(),
     )
     .test_unwrap();
@@ -392,10 +392,10 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         event_id: EventId::new("event.independent.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: AuthorityId::new("authority.independent.processes").test_unwrap(),
-        key_id: derive_key_id(fixture.active.algorithm(), &fixture.active.public_key())
+        key_id: derive_key_id(fixture.active.public_key().test_unwrap().algorithm(), &fixture.active.public_key().test_unwrap())
             .test_unwrap(),
-        algorithm: fixture.active.algorithm(),
-        public_key: fixture.active.public_key(),
+        algorithm: fixture.active.public_key().test_unwrap().algorithm(),
+        public_key: fixture.active.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
         effective_at: issued_at,
         verify_until: None,
@@ -471,7 +471,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
             UnixKeyLogAuditClient::new(
                 socket_path,
                 monitor_id,
-                fixture.audit_backends[index].public_key(),
+                fixture.audit_backends[index].public_key().test_unwrap(),
                 policy.configuration_binding().test_unwrap(),
             )
             .test_unwrap(),
@@ -576,7 +576,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
     audit_proofs[0]
         .verify(
             "audit.a",
-            &fixture.audit_backends[0].public_key(),
+            &fixture.audit_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "audit-ready-0",
         )
@@ -584,7 +584,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
     assert!(audit_proofs[0]
         .verify(
             "audit.a",
-            &fixture.audit_backends[0].public_key(),
+            &fixture.audit_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "replayed-challenge",
         )
@@ -592,7 +592,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
     assert!(audit_proofs[0]
         .verify(
             "audit.a",
-            &fixture.audit_backends[1].public_key(),
+            &fixture.audit_backends[1].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "audit-ready-0",
         )
@@ -602,7 +602,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
     assert!(forged
         .verify(
             "audit.a",
-            &fixture.audit_backends[0].public_key(),
+            &fixture.audit_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "audit-ready-0",
         )
@@ -697,9 +697,9 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         event_id: EventId::new("event.independent.rotation").test_unwrap(),
         previous_event_hash: Some(event.envelope_hash().test_unwrap()),
         authority_id: event.body.authority_id.clone(),
-        key_id: derive_key_id(rotated.algorithm(), &rotated.public_key()).test_unwrap(),
-        algorithm: rotated.algorithm(),
-        public_key: rotated.public_key(),
+        key_id: derive_key_id(rotated.public_key().test_unwrap().algorithm(), &rotated.public_key().test_unwrap()).test_unwrap(),
+        algorithm: rotated.public_key().test_unwrap().algorithm(),
+        public_key: rotated.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
             previous_key_id: event.body.key_id,
             witness_roster_id: WitnessRosterId::new("roster.independent.v1").test_unwrap(),
@@ -730,7 +730,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         .is_err());
     assert_eq!(
         router.active_public_key().test_unwrap(),
-        fixture.active.public_key()
+        fixture.active.public_key().test_unwrap()
     );
 
     drop(runtime);
@@ -783,7 +783,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
     assert_eq!(activation_guard.calls.load(Ordering::SeqCst), 1);
     assert_eq!(
         router.active_public_key().test_unwrap(),
-        fixture.active.public_key()
+        fixture.active.public_key().test_unwrap()
     );
     activation_guard.allowed.store(true, Ordering::SeqCst);
     assert!(runtime
@@ -822,7 +822,7 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
     assert_eq!(outcome.audit_pin.signing_epoch, 1);
     assert_eq!(
         router.active_public_key().test_unwrap(),
-        rotated.public_key()
+        rotated.public_key().test_unwrap()
     );
 }
 
@@ -1004,7 +1004,7 @@ impl Fixture {
                 "audit.{}",
                 char::from(b'a' + u8::try_from(index).test_unwrap())
             ),
-            self.audit_backends[index].public_key(),
+            self.audit_backends[index].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
         )
         .test_unwrap()
@@ -1028,9 +1028,9 @@ impl Fixture {
             event_id: EventId::new("event.independent.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.independent.processes").test_unwrap(),
-            key_id: derive_key_id(self.active.algorithm(), &self.active.public_key()).test_unwrap(),
-            algorithm: self.active.algorithm(),
-            public_key: self.active.public_key(),
+            key_id: derive_key_id(self.active.public_key().test_unwrap().algorithm(), &self.active.public_key().test_unwrap()).test_unwrap(),
+            algorithm: self.active.public_key().test_unwrap().algorithm(),
+            public_key: self.active.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
             effective_at: issued_at,
             verify_until: None,
@@ -1270,7 +1270,6 @@ fn authority_current_selector_refuses_after_router_poison() {
         }
     };
 
-    let original = fixture.active.public_key();
     let router = Arc::new(
         KeyringSigningRouter::open_enterprise(
             Arc::clone(&store),
@@ -1310,9 +1309,9 @@ fn authority_current_selector_refuses_after_router_poison() {
         event_id: EventId::new("event.independent.poison-rotation").test_unwrap(),
         previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
         authority_id: genesis.body.authority_id.clone(),
-        key_id: derive_key_id(rotated.algorithm(), &rotated.public_key()).test_unwrap(),
-        algorithm: rotated.algorithm(),
-        public_key: rotated.public_key(),
+        key_id: derive_key_id(rotated.public_key().test_unwrap().algorithm(), &rotated.public_key().test_unwrap()).test_unwrap(),
+        algorithm: rotated.public_key().test_unwrap().algorithm(),
+        public_key: rotated.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
             previous_key_id: genesis.body.key_id,
             witness_roster_id: WitnessRosterId::new("roster.independent.v1").test_unwrap(),
@@ -1338,7 +1337,7 @@ fn authority_current_selector_refuses_after_router_poison() {
         .test_unwrap();
     assert_eq!(
         router.active_public_key().test_unwrap(),
-        rotated.public_key()
+        rotated.public_key().test_unwrap()
     );
 
     // Re-activation reaches the guard while the selector write lock is held.
@@ -1355,11 +1354,8 @@ fn authority_current_selector_refuses_after_router_poison() {
         Err(chio_keyring::KeyringError::Synchronization)
     ));
 
-    assert_eq!(authority.public_key(), rotated.public_key());
-    assert_ne!(authority.public_key(), original);
-    assert_eq!(authority.algorithm(), rotated.algorithm());
     assert!(matches!(
-        authority.current_public_key(),
+        authority.public_key(),
         Err(chio_core_types::Error::InvalidPublicKey(message))
             if message == chio_keyring::KeyringError::Synchronization.to_string()
     ));
@@ -1377,7 +1373,7 @@ fn authority_current_selector_refuses_after_router_poison() {
     ));
     assert!(refused(
         authority
-            .sign_bytes_for_identity(&rotated.public_key(), message)
+            .sign_bytes_for_identity(&rotated.public_key().test_unwrap(), message)
             .map(drop)
     ));
     let canonical = chio_core_types::CanonicalBytes::from_serializable(&"poisoned").test_unwrap();

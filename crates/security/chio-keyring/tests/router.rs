@@ -90,21 +90,21 @@ fn ready_log(path: &Path) -> ReadyLog {
     let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
         log_id: log_id.clone(),
         authority_id: authority_id.clone(),
-        bootstrap_key: bootstrap.public_key(),
-        operator_key: operator.public_key(),
+        bootstrap_key: bootstrap.public_key().test_unwrap(),
+        operator_key: operator.public_key().test_unwrap(),
         witness_roster_id: roster_id.clone(),
         witness_keys: BTreeMap::from([
             (
                 WitnessId::new("witness.a").test_unwrap(),
-                witness_a.public_key(),
+                witness_a.public_key().test_unwrap(),
             ),
             (
                 WitnessId::new("witness.b").test_unwrap(),
-                witness_b.public_key(),
+                witness_b.public_key().test_unwrap(),
             ),
             (
                 WitnessId::new("witness.c").test_unwrap(),
-                witness_c.public_key(),
+                witness_c.public_key().test_unwrap(),
             ),
         ]),
         recovery_policy_id: RecoveryPolicyId::new("recovery.router.v1").test_unwrap(),
@@ -115,7 +115,7 @@ fn ready_log(path: &Path) -> ReadyLog {
     .test_unwrap()
     .with_artifact_time_roots(BTreeMap::from([(
         artifact_time_anchor_id.clone(),
-        artifact_time_signer.public_key(),
+        artifact_time_signer.public_key().test_unwrap(),
     )]))
     .test_unwrap();
     let genesis_body = KeyLogEventBody {
@@ -125,9 +125,9 @@ fn ready_log(path: &Path) -> ReadyLog {
         event_id: EventId::new("event.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: authority_id.clone(),
-        key_id: derive_key_id(old.algorithm(), &old.public_key()).test_unwrap(),
-        algorithm: old.algorithm(),
-        public_key: old.public_key(),
+        key_id: derive_key_id(old.public_key().test_unwrap().algorithm(), &old.public_key().test_unwrap()).test_unwrap(),
+        algorithm: old.public_key().test_unwrap().algorithm(),
+        public_key: old.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
         effective_at: 1_000,
         verify_until: None,
@@ -147,9 +147,9 @@ fn ready_log(path: &Path) -> ReadyLog {
         event_id: EventId::new("event.rotation.1").test_unwrap(),
         previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
         authority_id,
-        key_id: derive_key_id(new.algorithm(), &new.public_key()).test_unwrap(),
-        algorithm: new.algorithm(),
-        public_key: new.public_key(),
+        key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+        algorithm: new.public_key().test_unwrap().algorithm(),
+        public_key: new.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
             previous_key_id: genesis.body.key_id,
             witness_roster_id: roster_id,
@@ -246,12 +246,12 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     assert_eq!(first.signing_epoch, 0);
     assert_eq!(
         first.key_id,
-        derive_key_id(ready.old.algorithm(), &ready.old.public_key()).test_unwrap()
+        derive_key_id(ready.old.public_key().test_unwrap().algorithm(), &ready.old.public_key().test_unwrap()).test_unwrap()
     );
     let mut corrupted_evidence = first.clone();
     corrupted_evidence.artifact_signature =
         ready.old.sign_bytes(b"corrupted evidence").test_unwrap();
-    assert!(corrupted_evidence.verify(&ready.old.public_key()).is_err());
+    assert!(corrupted_evidence.verify(&ready.old.public_key().test_unwrap()).is_err());
     assert!(router
         .sign_canonical(1, &serde_json::json!({"artifact": 2}))
         .is_err());
@@ -271,7 +271,7 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     assert_eq!(second.signing_epoch, 1);
     assert_eq!(
         second.key_id,
-        derive_key_id(ready.new.algorithm(), &ready.new.public_key()).test_unwrap()
+        derive_key_id(ready.new.public_key().test_unwrap().algorithm(), &ready.new.public_key().test_unwrap()).test_unwrap()
     );
     assert_eq!(
         ready.store.load_artifact_signatures().test_unwrap().len(),
@@ -288,11 +288,7 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
 struct PanicOnDropBackend(Ed25519Backend);
 
 impl SigningBackend for PanicOnDropBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.0.algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
         self.0.public_key()
     }
 
@@ -332,7 +328,7 @@ fn retired_backend_drop_panic_leaves_the_selector_usable() {
 
     assert_eq!(
         router.active_public_key().test_unwrap(),
-        ready.new.public_key()
+        ready.new.public_key().test_unwrap()
     );
     let signed = router
         .sign_canonical(1, &serde_json::json!({"artifact": "after-retired-drop"}))
@@ -340,7 +336,7 @@ fn retired_backend_drop_panic_leaves_the_selector_usable() {
     assert_eq!(signed.signing_epoch, 1);
     assert_eq!(
         signed.key_id,
-        derive_key_id(ready.new.algorithm(), &ready.new.public_key()).test_unwrap()
+        derive_key_id(ready.new.public_key().test_unwrap().algorithm(), &ready.new.public_key().test_unwrap()).test_unwrap()
     );
 }
 
@@ -382,11 +378,7 @@ struct BlockingBackend {
 }
 
 impl SigningBackend for BlockingBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.inner.algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
         self.inner.public_key()
     }
 
@@ -493,7 +485,7 @@ fn failed_durable_anchor_never_returns_signature_evidence() {
 fn enterprise_router_returns_one_identity_epoch_signature_and_anchor_result() {
     let directory = private_tempdir().test_unwrap();
     let ready = ready_log(&trusted_temp_path(&directory, "atomic-result.sqlite"));
-    let expected_public_key = ready.old.public_key();
+    let expected_public_key = ready.old.public_key().test_unwrap();
     let router = KeyringSigningRouter::open_enterprise(
         Arc::clone(&ready.store),
         Box::new(ready.old.clone()),
@@ -513,7 +505,7 @@ fn enterprise_router_returns_one_identity_epoch_signature_and_anchor_result() {
     assert!(result.public_key.verify(artifact, &result.signature));
     assert!(result.time_anchor.is_some());
     assert!(router
-        .sign_bytes_for_identity(&ready.new.public_key(), artifact)
+        .sign_bytes_for_identity(&ready.new.public_key().test_unwrap(), artifact)
         .is_err());
 }
 
@@ -522,7 +514,7 @@ fn enterprise_time_anchor_keeps_pre_rotation_artifact_verifiable_after_reopen() 
     let directory = private_tempdir().test_unwrap();
     let path = trusted_temp_path(&directory, "historical-verification.sqlite");
     let ready = ready_log(&path);
-    let old_public_key = ready.old.public_key();
+    let old_public_key = ready.old.public_key().test_unwrap();
     let policy = ready.policy.clone();
     let router = KeyringSigningRouter::open_enterprise(
         Arc::clone(&ready.store),
@@ -572,7 +564,7 @@ fn remote_verifier_accepts_pre_activation_anchor_and_rejects_post_activation_or_
         &directory,
         "remote-artifact-source.sqlite",
     ));
-    let old_key_id = derive_key_id(ready.old.algorithm(), &ready.old.public_key()).test_unwrap();
+    let old_key_id = derive_key_id(ready.old.public_key().test_unwrap().algorithm(), &ready.old.public_key().test_unwrap()).test_unwrap();
     let router = KeyringSigningRouter::open_enterprise(
         Arc::clone(&ready.store),
         Box::new(ready.old.clone()),
@@ -610,7 +602,7 @@ fn remote_verifier_accepts_pre_activation_anchor_and_rejects_post_activation_or_
     let record = verifier
         .verify_artifact_signing_evidence(artifact, &signed.evidence, &pre_activation_anchor)
         .test_unwrap();
-    assert_eq!(record.public_key, ready.old.public_key());
+    assert_eq!(record.public_key, ready.old.public_key().test_unwrap());
 
     let mut post_activation_body = pre_activation_anchor.body.clone();
     post_activation_body.anchored_at = deactivated_at;
@@ -670,7 +662,7 @@ fn enterprise_router_rejects_unguarded_activation_and_standard_runtime() {
     assert_eq!(router.signing_epoch().test_unwrap(), 0);
     assert_eq!(
         router.active_public_key().test_unwrap(),
-        ready.old.public_key()
+        ready.old.public_key().test_unwrap()
     );
 
     let standard_ready = ready_log(&trusted_temp_path(
