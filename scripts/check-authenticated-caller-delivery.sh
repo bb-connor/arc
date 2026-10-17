@@ -30,9 +30,14 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   delegated_share::boundaries::an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share \
   delegated_share::boundaries::concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak \
   delegated_share::caller_share_snapshot_is_complete_scoped_and_fenced \
+  delegated_share::indexed::indexed_caller_shares_match_verified_operations_for_each_parent \
   delegated_share::outcome_unknown::an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry \
   delegated_share::pending::a_later_funded_sibling_cannot_displace_an_existing_caller_owner \
   delegated_share::pending::an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_owner \
+  delegated_share::projection_tamper::external_foreign_projection_insert_is_refused \
+  delegated_share::projection_tamper::external_trigger_drop_alone_is_refused \
+  delegated_share::projection_tamper::external_trigger_drop_and_reparent_is_refused \
+  delegated_share::projection_tamper::external_trigger_drop_and_row_delete_is_refused \
   delegated_share::restart_preserves_the_delegated_share_of_a_live_caller_reservation \
   delegated_share::settling_a_durable_caller_reservation_releases_its_delegated_share \
   delegated_share::two_caller_operations_share_one_child_edge_until_both_settle \

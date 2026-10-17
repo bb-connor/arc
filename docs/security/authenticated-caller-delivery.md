@@ -96,7 +96,7 @@ of creating another join after budget reservation.
 
 Run `bash scripts/check-authenticated-caller-delivery.sh` on a Linux host with
 the repository's Rust toolchain and SQLite test prerequisites. The gate requires
-61 exact tests: 33 caller lifecycle tests, nine executor-ledger tests and 19 native
+66 exact tests: 38 caller lifecycle tests, nine executor-ledger tests and 19 native
 caller tests. Missing, ignored or renamed cases fail the inventory check. The
 native cases also remain in the composed flow gate; its restart subset retains
 the ordinary M2 cases alongside the new caller process-loss cases.
