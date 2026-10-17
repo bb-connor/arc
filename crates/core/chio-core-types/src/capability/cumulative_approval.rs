@@ -143,7 +143,8 @@ impl CumulativeApprovalRootBinding {
             &body.root_issuer,
             backend,
             &domain_message(ROOT_SIGNATURE_DOMAIN, &body)?,
-        )?;
+        )?
+        .signature;
         let algorithm = body.root_issuer.algorithm();
         Ok(Self {
             body,

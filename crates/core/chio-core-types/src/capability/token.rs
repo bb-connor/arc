@@ -747,7 +747,8 @@ impl CapabilityToken {
             &body.issuer,
             backend,
             &canonical_json_bytes(&signing_body)?,
-        )?;
+        )?
+        .signature;
         let algorithm = body.issuer.algorithm();
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
@@ -800,7 +801,8 @@ impl CapabilityToken {
             &expected_issuer,
             backend,
             &canonical_json_bytes(&signing_body)?,
-        )?;
+        )?
+        .signature;
         let token = Self {
             schema: CHIO_CAPABILITY_SCHEMA.to_string(),
             id: body.id,

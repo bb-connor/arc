@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::canonical::canonical_json_bytes;
 use crate::crypto::{
-    is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend, Keypair, PublicKey,
-    Signature, SigningAlgorithm, SigningBackend,
+    is_default_optional_algorithm, sha256_hex, Keypair, PublicKey, Signature, SigningAlgorithm,
+    SigningBackend,
 };
 use crate::error::{Error, Result};
 use crate::hashing::Hash;
@@ -15,6 +15,7 @@ use crate::schema_binding::ensure_schema_matches;
 use crate::session::SessionAnchorReference;
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
+    sign_bytes_for_embedded_key,
 };
 
 use super::runtime_attestation::{RuntimeAssuranceTier, RuntimeAttestationEvidence};
@@ -1378,7 +1379,7 @@ impl GovernedApprovalToken {
 
     /// Sign a governed approval token body with an arbitrary [`SigningBackend`].
     ///
-    /// `body.approver` must equal `backend.public_key()`.
+    /// `body.approver` must equal the backend's current signing identity.
     pub fn sign_with_backend(
         body: GovernedApprovalTokenBody,
         backend: &dyn SigningBackend,
@@ -1389,7 +1390,8 @@ impl GovernedApprovalToken {
             "governed approval token",
             "approver",
         )?;
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        let outcome =
+            sign_bytes_for_embedded_key(&body.approver, backend, &canonical_json_bytes(&body)?)?;
         Ok(Self {
             id: body.id,
             approver: body.approver,
@@ -1400,8 +1402,8 @@ impl GovernedApprovalToken {
             issued_at: body.issued_at,
             expires_at: body.expires_at,
             decision: body.decision,
-            algorithm: Some(backend.algorithm()),
-            signature,
+            algorithm: Some(outcome.algorithm),
+            signature: outcome.signature,
         })
     }
 
@@ -1681,11 +1683,15 @@ impl ThresholdApprovalProposal {
             "threshold approval proposal",
             "policy_authority",
         )?;
-        let (signature, _) = sign_canonical_with_backend(backend, &body)?;
+        let outcome = sign_bytes_for_embedded_key(
+            &body.policy_authority,
+            backend,
+            &canonical_json_bytes(&body)?,
+        )?;
         Ok(Self {
             body,
-            algorithm: Some(backend.algorithm()),
-            signature,
+            algorithm: Some(outcome.algorithm),
+            signature: outcome.signature,
         })
     }
 
