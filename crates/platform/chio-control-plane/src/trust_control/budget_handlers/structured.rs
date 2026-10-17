@@ -63,7 +63,7 @@ fn structured_lifecycle_budget_store(
     if state.cluster.is_some() && state.joint_authority_store.is_none() {
         return Err(plain_http_error(
             StatusCode::SERVICE_UNAVAILABLE,
-            "versioned rich budget lifecycle is unavailable with the legacy cluster coordinator",
+            "versioned rich budget lifecycle is unavailable with peer cluster replication",
         ));
     }
     let store = state.budget_store()?;

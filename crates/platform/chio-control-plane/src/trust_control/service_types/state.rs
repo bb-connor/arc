@@ -237,7 +237,7 @@ impl TrustServiceState {
         if let Some(authority_store) = self.joint_authority_store.as_ref() {
             if self.cluster.is_some() {
                 return Err(
-                    "joint budget and revocation authority cannot run with the legacy cluster coordinator",
+                    "joint budget and revocation authority cannot run with peer cluster replication",
                 );
             }
             return Ok(Some(authority_store.budget_store()));
@@ -271,7 +271,7 @@ impl TrustServiceState {
         if let Some(authority_store) = self.joint_authority_store.as_ref() {
             if self.cluster.is_some() {
                 return Err(
-                    "joint budget and revocation authority cannot run with the legacy cluster coordinator",
+                    "joint budget and revocation authority cannot run with peer cluster replication",
                 );
             }
             return Ok(Some(authority_store.revocation_store()));

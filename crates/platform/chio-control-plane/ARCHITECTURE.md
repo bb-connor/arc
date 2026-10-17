@@ -97,7 +97,7 @@ and flushes the receipt writer off async workers.
 `TrustServiceConfig::validate` rejects malformed or overlapping privileged
 secrets, aliased database paths, simultaneous seed and SQLite capability custody,
 and invalid replication issue skew. Joint authority replaces separate budget
-and revocation databases and rejects the legacy cluster coordinator.
+and revocation databases and rejects peer cluster replication.
 Keyring custody requires receipts, separate receipt anchors, and a workload
 token; clustered keyring issuance is rejected. A configured fiscal runtime
 requires joint authority and validated anchor/admission parameters.
