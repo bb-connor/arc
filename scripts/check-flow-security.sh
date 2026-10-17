@@ -73,6 +73,10 @@ run_exact_target --label "security types library" --expected \
   flow::tests::unknown_and_variant_payload_fields_are_rejected \
   flow::tests::utf8_identifier_limit_is_normative_in_bytes \
   ports::bounded::reader_boundary_tests::collection_limit_does_not_construct_overflow_elements \
+  recovery::authorization::tests::grant_binding_requires_a_positive_epoch_and_actions_keep_epoch_zero \
+  recovery::identifiers::tests::effect_route_wrappers_use_the_record_identity_codec \
+  recovery::product::setup_report_tests::setup_report_still_requires_ordered_time_and_a_different_writer \
+  recovery::product::setup_report_tests::setup_writer_reattestation_may_outlive_the_initial_probe \
   -- cargo test -p chio-security-types --lib
 
 run_exact_target --label "security capability-set suspension types" --expected \
@@ -134,6 +138,7 @@ run_exact_target --label "security response types" --expected \
   response_transition_matrix_contains_only_the_specified_edges \
   prepared_dispatch_binding_requires_exact_artifact_schema_pairing \
   response_plan_holds_at_most_one_leading_issuance_fence \
+  response_plan_refuses_padded_automatic_approval \
   -- cargo test -p chio-security-types --test response
 run_exact_target --label "security session-throttle types" --expected \
   limits_are_nonzero_and_bounded \
@@ -508,8 +513,8 @@ run_exact_target --label "original security authority selection" --allow-filtere
   kernel::tests::durable_admission::security_binding::ordinary_security_replay_checks_every_identity_field_and_preserves_flow_observations \
   kernel::tests::durable_admission::security_binding::retention::retained_security_decoder_rejects_schema_downgrade_unknown_fields_and_invalid_generations \
   kernel::tests::durable_admission::security_binding::retention::retained_current_profile_binds_security_but_not_mutable_flow_generation \
-  kernel::tests::durable_admission::security_binding::retention::current_profile_without_security_context_keeps_its_exact_inner_hash \
-  kernel::tests::durable_admission::security_binding::security_binding_preserves_large_ordinary_requests \
+  kernel::tests::durable_admission::security_binding::retention::current_profile_without_security_context_has_exact_authority_bound_hash \
+  kernel::tests::durable_admission::security_binding::security_bound_oversized_request_is_refused_before_admission \
   kernel::tests::durable_admission::security_binding::security_bound_raw_return_recovers_without_a_live_request_or_redispatch \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::security_binding::
 
@@ -805,9 +810,7 @@ run_exact_target --label "native runtime validity contract" --allow-filtered --e
   -- cargo test -p chio-kernel --lib admission_operation::runtime_participant::validity_tests::
 
 run_exact_target --label "native runtime signed freshness" --allow-filtered --expected \
-  operation_owned::combined::native_validity::native_runtime_deadline_includes_every_selected_signed_time_bound \
-  operation_owned::combined::native_validity::native_runtime_deadline_includes_the_verified_bilateral_capability_lease \
-  operation_owned::combined::native_validity::native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_plan \
+  operation_owned::combined::native_validity::native_swarm_evolution_preserves_treaty_and_original_physical_claim \
   -- cargo test -p chio-runtime-core --test runtime_admission operation_owned::combined::native_validity::
 
 run_exact_target --label "native policy clock bounds" --allow-filtered --expected \
@@ -869,8 +872,6 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::tests::durable_admission::return_context::frozen_return_context_keeps_limits_and_metadata_when_kernel_configuration_changes \
   kernel::tests::durable_admission::return_context::frozen_return_context_rejects_substituted_return_request_before_persistence \
   kernel::tests::durable_admission::return_context::invalid_return_context_cannot_commit_dispatch_or_capture_budget \
-  kernel::tests::durable_admission::return_context::nested_return_context_preserves_large_request_behavior \
-  kernel::tests::durable_admission::return_context::ordinary_return_context_preserves_large_request_behavior \
   kernel::tests::durable_admission::return_context::return_context_rejects_request_or_grant_substitution_before_commit \
   kernel::tests::durable_admission::return_context::signing::callbacks::signer_callback_cannot_extend_the_original_finalization_lease \
   kernel::tests::durable_admission::return_context::signing::callbacks::signer_can_reenter_without_holding_the_mutation_sequencer \
@@ -885,6 +886,15 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
+  kernel::tests::durable_admission::return_context::nested_oversized_request_is_refused_before_admission \
+  kernel::tests::durable_admission::return_context::ordinary_oversized_request_is_refused_before_admission \
+  kernel::tests::durable_admission::return_context::signing::replay::compensated_cancellation_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::replay::compensated_denial_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_another_operation_from_lookup \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_changed_arguments_after_signer_rotation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_failed_lookup_after_signer_rotation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_stale_fence_after_signer_rotation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_requires_retained_request_after_signer_rotation \
   -- cargo test -p chio-kernel --lib return_context::
 
 run_exact_target --label "durable caller participant persistence" --allow-filtered --expected \
@@ -907,6 +917,11 @@ run_exact_target --label "frozen federation context" --allow-filtered --expected
   kernel::tests::durable_admission::federation_context::retained_federation_context_rejects_wrong_treaty_pin_before_dispatch \
   kernel::tests::durable_admission::federation_context::retained_federation_context_tampering_fails_the_committed_outcome_binding \
   kernel::tests::durable_admission::federation_context::security_release_requirement_and_federation_survive_either_codec_order \
+  kernel::tests::durable_admission::federation_context::refusal::federated_refusal_replay_rejects_a_conflicting_dsse_envelope \
+  kernel::tests::durable_admission::federation_context::refusal::federated_refusal_replay_rejects_a_poisoned_artifact_cache \
+  kernel::tests::durable_admission::federation_context::refusal::federated_unknown_refusal_replays_existing_bilateral_artifacts \
+  kernel::tests::durable_admission::federation_context::refusal::restarted_unknown_refusal_requires_its_original_federation_treaty \
+  kernel::tests::durable_admission::federation_context::refusal::startup_recovery_terminalizes_a_federated_admission_without_its_original_treaty \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::federation_context::
 
 run_exact_target --label "frozen durable receipt signing" --allow-filtered --expected \
@@ -923,6 +938,13 @@ run_exact_target --label "frozen durable receipt signing" --allow-filtered --exp
   kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
+  kernel::tests::durable_admission::return_context::signing::replay::compensated_cancellation_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::replay::compensated_denial_replay_uses_original_signer_without_reinvocation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_another_operation_from_lookup \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_changed_arguments_after_signer_rotation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_failed_lookup_after_signer_rotation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_rejects_stale_fence_after_signer_rotation \
+  kernel::tests::durable_admission::return_context::signing::replay::completed_replay_requires_retained_request_after_signer_rotation \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::return_context::signing::
 
 run_exact_target --label "durable security release recovery" --expected \
