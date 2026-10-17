@@ -14,6 +14,8 @@ use fixture_paths::{unique_path, workspace_root};
 #[cfg(target_os = "linux")]
 #[path = "passport/authority_startup.rs"]
 mod authority_startup;
+#[path = "passport/issuance_revocation.rs"]
+mod issuance_revocation;
 #[path = "passport/public_discovery.rs"]
 mod public_discovery;
 #[path = "passport/replay.rs"]

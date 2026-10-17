@@ -323,7 +323,11 @@ pub(crate) async fn handle_redeem_passport_issuance_credential(
                         &payload,
                         clock_now,
                         signer,
-                        portable_status_registry.as_ref(),
+                        state
+                            .config
+                            .passport_statuses_file
+                            .as_deref()
+                            .zip(portable_status_registry.as_ref()),
                     )
                     .map_err(RegistryOperationError::bad_request)?;
                 registry.prune_dead(clock_now);

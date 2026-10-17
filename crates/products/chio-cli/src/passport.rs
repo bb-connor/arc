@@ -397,9 +397,10 @@ fn portable_passport_status_reference(
         return Ok(None);
     };
     let registry = load_passport_status_registry_for_admin(path)?;
-    registry
-        .portable_status_reference_for_passport(passport, at)
-        .map(Some)
+    chio_control_plane::passport_revocation::portable_passport_status_reference(
+        path, &registry, passport, at,
+    )
+    .map(Some)
 }
 
 fn require_passport_lifecycle_source(
@@ -1190,7 +1191,7 @@ pub(crate) fn cmd_passport_issuance_credential_redeem(
                 &request,
                 unix_now()?,
                 portable_signing_keypair.as_ref(),
-                portable_status_registry.as_ref(),
+                passport_statuses_file.zip(portable_status_registry.as_ref()),
             )
         })?
     };
