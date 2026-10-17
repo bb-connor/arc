@@ -10,6 +10,8 @@
 
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
+use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core_types::capability::{
     governance::ProvenanceEvidenceClass,
     scope::{
@@ -17,6 +19,8 @@ use chio_core_types::capability::{
         FindingSettlementSelector, ModelMetadata, ModelSafetyTier, SqlOperationClass,
     },
 };
+use chio_core_types::Keypair;
+use chio_security_types::strict_serde::DROPPED_INPUT;
 use serde_json::{json, Value};
 
 fn to_value(constraint: &Constraint) -> Value {
@@ -316,6 +320,59 @@ fn require_finding_purchase_rejects_unknown_marker_fields() {
         },
     });
     assert!(serde_json::from_value::<Constraint>(value).is_err());
+}
+
+#[test]
+fn require_finding_purchase_refuses_a_padded_local_selector() {
+    let value = json!({
+        "type": "require_finding_purchase",
+        "value": {
+            "finding_id": "finding-1",
+            "listing_id": "listing-1",
+            "settlement": {"mode": "local_reversible_hold", "payout_override": "attacker"},
+        },
+    });
+    let refused = serde_json::from_value::<Constraint>(value).map_err(|error| error.to_string());
+    assert_eq!(refused.err().as_deref(), Some(DROPPED_INPUT));
+}
+
+#[test]
+fn signed_capability_refuses_a_padded_local_selector() {
+    let issuer = Keypair::from_seed(&[3; 32]);
+    let body = CapabilityTokenBody {
+        id: "cap-purchase".to_string(),
+        issuer: issuer.public_key(),
+        subject: Keypair::from_seed(&[4; 32]).public_key(),
+        scope: ChioScope {
+            grants: vec![ToolGrant {
+                server_id: "srv".to_string(),
+                tool_name: "read_finding".to_string(),
+                operations: vec![Operation::Invoke],
+                constraints: vec![purchase_marker(
+                    "finding-1",
+                    "listing-1",
+                    FindingSettlementSelector::LocalReversibleHold,
+                )],
+                max_invocations: Some(1),
+                max_cost_per_invocation: None,
+                max_total_cost: None,
+                dpop_required: Some(true),
+            }],
+            ..ChioScope::default()
+        },
+        issued_at: 1_710_000_000,
+        expires_at: 1_710_003_600,
+        delegation_chain: Vec::new(),
+        aggregate_invocation_budget: None,
+    };
+    let token = CapabilityToken::sign(body, &issuer).expect("token signs");
+    let mut value = serde_json::to_value(&token).expect("token serializes");
+    let decoded: CapabilityToken = serde_json::from_value(value.clone()).expect("token decodes");
+    assert!(decoded.verify_signature().expect("signature checks"));
+    value["scope"]["grants"][0]["constraints"][0]["value"]["settlement"]["pad"] = json!(0);
+    let refused =
+        serde_json::from_value::<CapabilityToken>(value).map_err(|error| error.to_string());
+    assert_eq!(refused.err().as_deref(), Some(DROPPED_INPUT));
 }
 
 #[test]

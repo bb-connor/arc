@@ -411,7 +411,7 @@ fn real_adapter_capability(
 ) -> CapabilityToken {
     let scope = ChioScope {
         grants: vec![ToolGrant {
-            server_id: CHIO_ACTIVE_RESPONSE_SERVER_ID.to_string(),
+            server_id: ACTIVE_RESPONSE_SERVER_ID.to_string(),
             tool_name: GovernedResponseEffect::ThrottleSession
                 .tool_name()
                 .to_string(),
@@ -842,7 +842,7 @@ fn real_adapter_fixture_with_options(
     );
     let governed_intent = GovernedTransactionIntent::active_response_plan(
         GovernedResponsePlanIntentBody::new(
-            CHIO_RESPONSE_PLAN_SCHEMA,
+            GOVERNED_RESPONSE_PLAN_SCHEMA,
             response_plan.action_id.as_str(),
             capability.id.clone(),
             capability_hash.clone(),
