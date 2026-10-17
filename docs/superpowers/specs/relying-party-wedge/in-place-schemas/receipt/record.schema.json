@@ -1,0 +1,827 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/record/v1",
+  "title": "Chio Receipt Record",
+  "description": "A signed Chio receipt: proof that a tool call was evaluated by the Kernel. The receipt id is the authoritative content-addressed SHA-256 hash over the canonical ChioReceiptIdInput. Arguments and results appear only as salted commitments, plus the inline fields a signed root policy authorizes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "timestamp",
+    "capability_id",
+    "tool_server",
+    "tool_name",
+    "action",
+    "receipt_kind",
+    "boundary_class",
+    "tool_origin",
+    "disclosure",
+    "policy_hash",
+    "trust_level",
+    "kernel_key",
+    "signature"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Authoritative content-addressed receipt id.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix timestamp (seconds) when the receipt was created."
+    },
+    "capability_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "ID of the capability token that was exercised (or presented)."
+    },
+    "tool_server": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tool server that handled the invocation."
+    },
+    "tool_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tool that was invoked (or attempted)."
+    },
+    "action": {
+      "$ref": "#/$defs/toolCallAction"
+    },
+    "decision": {
+      "$ref": "#/$defs/decision"
+    },
+    "receipt_kind": {
+      "type": "string",
+      "enum": [
+        "mediated_decision",
+        "trace_observation",
+        "advisory_evaluation",
+        "pdp_decision"
+      ],
+      "description": "Signed semantic class for this v1 receipt. `pdp_decision`: Introduced with `pdp_decision` receipts (PROTOCOL 6.1)."
+    },
+    "boundary_class": {
+      "type": "string",
+      "enum": [
+        "prevent",
+        "detect_only",
+        "advisory_only",
+        "prevent_external"
+      ],
+      "description": "Signed runtime boundary class. `cannot_see` is planning metadata only and is not valid on signed runtime receipts. `prevent_external`: Introduced with `pdp_decision` receipts (PROTOCOL 6.1)."
+    },
+    "observation_outcome": {
+      "type": "string",
+      "enum": [
+        "observed",
+        "evaluated",
+        "dropped"
+      ],
+      "description": "Signed outcome for trace and advisory records. Omitted for mediated decisions."
+    },
+    "tool_origin": {
+      "type": "string",
+      "enum": [
+        "caller_executed",
+        "host_executed_provider_reported",
+        "host_executed_unmediated",
+        "chio_internal"
+      ],
+      "description": "Signed classification of where the tool effect executed relative to Chio."
+    },
+    "disclosure": {
+      "$ref": "#/$defs/receiptDisclosure"
+    },
+    "actor_chain": {
+      "type": "array",
+      "description": "Signed actor attribution chain. Omitted from the wire when empty.",
+      "items": {
+        "$ref": "#/$defs/actorRef"
+      }
+    },
+    "content_commitment": {
+      "$ref": "#/$defs/contentCommitment",
+      "description": "Salted commitment to the evaluated content. Absent only on `pdp_decision` receipts. Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\")."
+    },
+    "result_inline": {
+      "type": "object",
+      "description": "Sparse object holding only the result fields listed in `disclosure.result_inline_fields`. Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\")."
+    },
+    "policy_hash": {
+      "type": "string",
+      "minLength": 1,
+      "description": "SHA-256 hash (or symbolic identifier) of the policy that was applied. Mirrors the `String` shape on `ChioReceipt::policy_hash` rather than enforcing a hex pattern, since some deployments embed a symbolic version id (e.g. `policy-bindings-v1`) rather than a raw digest."
+    },
+    "evidence": {
+      "type": "array",
+      "description": "Per-guard evidence collected during evaluation. Omitted from the wire when empty (matches `#[serde(skip_serializing_if = \"Vec::is_empty\")]`).",
+      "items": {
+        "$ref": "#/$defs/guardEvidence"
+      }
+    },
+    "metadata": {
+      "description": "Optional receipt metadata for stream/accounting/financial details. Schema-less by design (mirrors `Option<serde_json::Value>`)."
+    },
+    "trust_level": {
+      "type": "string",
+      "enum": [
+        "mediated",
+        "verified",
+        "advisory",
+        "delegated"
+      ],
+      "description": "Strength of kernel mediation that produced this receipt. Must cohere with receipt_kind: mediated_decision uses mediated, trace_observation uses verified, advisory_evaluation uses advisory, and pdp_decision uses delegated. `delegated`: Introduced with `pdp_decision` receipts (PROTOCOL 6.1)."
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tenant identifier for multi-tenant deployments. Absent in single-tenant mode; derived from the authenticated session's enterprise identity context, never from caller-provided request fields. Omitted when `authority` is present."
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "enforcement": {
+      "$ref": "#/$defs/enforcement"
+    },
+    "settlement": {
+      "$ref": "#/$defs/settlement"
+    },
+    "bbs_projection_version": {
+      "type": "string",
+      "const": "chio.bbs-projection.receipt.v1",
+      "description": "Receipt-body BBS projection version bound into the receipt id when bbs_signature is present."
+    },
+    "kernel_key": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:04[0-9a-f]{128}|p384:04[0-9a-f]{192}|hybrid:[0-9a-f]{64}:[0-9a-f]{3904}:ed25519\\+mldsa65|hybrid:p256:04[0-9a-f]{128}:[0-9a-f]{3904}:p256\\+mldsa65|hybrid:p384:04[0-9a-f]{192}:[0-9a-f]{3904}:p384\\+mldsa65)$",
+      "description": "Kernel public key (for verification without out-of-band lookup). Supports Ed25519, uncompressed SEC1 P-256/P-384, and algorithm-coupled classical plus ML-DSA-65 hybrid envelopes accepted by `PublicKey::from_hex`."
+    },
+    "bbs_signature": {
+      "$ref": "#/$defs/bbsReceiptSignature",
+      "description": "Optional BBS signature material for selective disclosure. When present, the Ed25519 receipt signature covers this material through ChioReceiptSigningBody."
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": [
+        "ed25519",
+        "p256",
+        "p384",
+        "hybrid"
+      ],
+      "description": "Signing algorithm envelope hint. Verification dispatches off the signature hex prefix, not this field."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2})+|p384:([0-9a-f]{2})+|hybrid:[0-9a-f]{128}:[0-9a-f]{6618}:ed25519\\+mldsa65|hybrid:p256:([0-9a-f]{2})+:[0-9a-f]{6618}:p256\\+mldsa65|hybrid:p384:([0-9a-f]{2})+:[0-9a-f]{6618}:p384\\+mldsa65)$",
+      "description": "Hex-encoded signature over the signing wrapper (PROTOCOL 4.5) for `chio.receipt.v1` and the canonical JSON of ChioReceiptSigningBody { id, body: ChioReceiptIdInput, bbs_signature? }. Supports Ed25519, byte-aligned DER P-256/P-384, and algorithm-coupled classical plus ML-DSA-65 hybrid envelopes; cryptographic DER validity is checked by the verifier."
+    }
+  },
+  "dependentRequired": {
+    "bbs_projection_version": [
+      "bbs_signature"
+    ],
+    "bbs_signature": [
+      "bbs_projection_version"
+    ]
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "receipt_kind": {
+            "const": "mediated_decision"
+          }
+        },
+        "required": [
+          "receipt_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "boundary_class": {
+            "const": "prevent"
+          },
+          "trust_level": {
+            "const": "mediated"
+          }
+        },
+        "not": {
+          "required": [
+            "observation_outcome"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "receipt_kind": {
+            "enum": [
+              "trace_observation",
+              "advisory_evaluation"
+            ]
+          }
+        },
+        "required": [
+          "receipt_kind"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "decision"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "receipt_kind": {
+            "const": "trace_observation"
+          }
+        },
+        "required": [
+          "receipt_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "observation_outcome"
+        ],
+        "properties": {
+          "boundary_class": {
+            "const": "detect_only"
+          },
+          "trust_level": {
+            "const": "verified"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "receipt_kind": {
+            "const": "advisory_evaluation"
+          }
+        },
+        "required": [
+          "receipt_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "observation_outcome"
+        ],
+        "properties": {
+          "boundary_class": {
+            "const": "advisory_only"
+          },
+          "trust_level": {
+            "const": "advisory"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "receipt_kind": {
+            "const": "pdp_decision"
+          }
+        },
+        "required": [
+          "receipt_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "decision",
+          "enforcement"
+        ],
+        "properties": {
+          "boundary_class": {
+            "const": "prevent_external"
+          },
+          "trust_level": {
+            "const": "delegated"
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "content_commitment"
+              ]
+            },
+            {
+              "required": [
+                "result_inline"
+              ]
+            },
+            {
+              "required": [
+                "observation_outcome"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "required": [
+          "content_commitment"
+        ],
+        "not": {
+          "required": [
+            "enforcement"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "authority"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "tenant_id"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disclosure": {
+            "properties": {
+              "parameter_inline_fields": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "disclosure"
+        ]
+      },
+      "then": {
+        "properties": {
+          "action": {
+            "required": [
+              "parameters_inline"
+            ]
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "action": {
+            "not": {
+              "required": [
+                "parameters_inline"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "disclosure": {
+            "properties": {
+              "result_inline_fields": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "disclosure"
+        ]
+      },
+      "then": {
+        "required": [
+          "result_inline"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "result_inline"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "bbsReceiptSignature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema",
+        "projection_version",
+        "algorithm",
+        "ciphersuite",
+        "issuer_fingerprint",
+        "issuer_public_key_hex",
+        "message_count",
+        "signature_hex"
+      ],
+      "properties": {
+        "schema": {
+          "const": "chio.receipt.bbs_signature.v1"
+        },
+        "projection_version": {
+          "type": "string",
+          "const": "chio.bbs-projection.receipt.v1"
+        },
+        "algorithm": {
+          "type": "string",
+          "const": "bbs"
+        },
+        "ciphersuite": {
+          "type": "string",
+          "const": "BBS_BLS12381G1_XMD:SHA-256_SSWU_RO_"
+        },
+        "issuer_fingerprint": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+        },
+        "issuer_public_key_hex": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{192}$"
+        },
+        "message_count": {
+          "type": "integer",
+          "const": 14
+        },
+        "signature_hex": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{2})+$"
+        }
+      }
+    },
+    "toolCallAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter_commitment"
+      ],
+      "description": "Describes the tool call that was evaluated. Mirrors `ToolCallAction`. Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
+      "properties": {
+        "parameter_commitment": {
+          "$ref": "#/$defs/parameterCommitment"
+        },
+        "parameters_inline": {
+          "type": "object",
+          "description": "Sparse object holding only the argument fields listed in `disclosure.parameter_inline_fields`."
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "verdict"
+      ],
+      "description": "The Kernel's verdict on the tool call. Internally tagged enum mirroring `Decision` in `chio-core-types` (`#[serde(tag = \"verdict\", rename_all = \"snake_case\")]`).",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "verdict": {
+              "const": "allow"
+            }
+          },
+          "required": [
+            "verdict"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "verdict": {
+              "const": "deny"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Human-readable reason for the denial."
+            },
+            "guard": {
+              "type": "string",
+              "description": "The guard or validation step that triggered the denial."
+            }
+          },
+          "required": [
+            "verdict",
+            "reason",
+            "guard"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "verdict": {
+              "const": "cancelled"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Human-readable reason for the cancellation."
+            }
+          },
+          "required": [
+            "verdict",
+            "reason"
+          ]
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "verdict": {
+              "const": "incomplete"
+            },
+            "reason": {
+              "type": "string",
+              "description": "Human-readable reason for the incomplete terminal state."
+            }
+          },
+          "required": [
+            "verdict",
+            "reason"
+          ]
+        }
+      ]
+    },
+    "guardEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "guard_name",
+        "verdict"
+      ],
+      "description": "Evidence from a single guard's evaluation. Mirrors `GuardEvidence`.",
+      "properties": {
+        "guard_name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the guard (e.g. `ForbiddenPathGuard`)."
+        },
+        "verdict": {
+          "type": "boolean",
+          "description": "Whether the guard passed (true) or denied (false)."
+        },
+        "details": {
+          "type": "string",
+          "description": "Optional details about the guard's decision."
+        }
+      }
+    },
+    "actorRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_id"
+      ],
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "parameterCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alg",
+        "value",
+        "salt_ref"
+      ],
+      "description": "`value = SHA-256(\"chio.receipt.parameters.v1\\0\" || salt || preimage)` over the RFC 8785 canonical arguments, with a 32-byte salt per receipt per field. The salt is never in the signed body. Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
+      "properties": {
+        "alg": {
+          "type": "string",
+          "const": "sha256-salted"
+        },
+        "value": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/Digest"
+        },
+        "salt_ref": {
+          "type": "string",
+          "const": "params"
+        }
+      }
+    },
+    "contentCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alg",
+        "value",
+        "salt_ref"
+      ],
+      "description": "`value = SHA-256(\"chio.receipt.content.v1\\0\" || salt || preimage)` over the WYSIWYS content preimage (for streams, the concatenated per-chunk digest preimage), with a 32-byte salt per receipt per field. The salt is never in the signed body. Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
+      "properties": {
+        "alg": {
+          "type": "string",
+          "const": "sha256-salted"
+        },
+        "value": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/Digest"
+        },
+        "salt_ref": {
+          "type": "string",
+          "const": "content"
+        }
+      }
+    },
+    "receiptDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter_inline_fields",
+        "result_inline_fields"
+      ],
+      "description": "Which fields appear in plaintext. Both lists equal the loaded root policy's lists for this tool; a receipt with no inline fields has empty lists and no `policy_digest`. Replaces `redaction_mode`. Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
+      "properties": {
+        "policy_digest": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/Digest",
+          "description": "`root_policy_digest` of the root policy that authorized the inline fields."
+        },
+        "parameter_inline_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(/([^~/]|~[01])*)+$"
+          }
+        },
+        "result_inline_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(/([^~/]|~[01])*)+$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "parameter_inline_fields": {
+                "maxItems": 0
+              },
+              "result_inline_fields": {
+                "maxItems": 0
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "policy_digest"
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "policy_digest"
+            ]
+          }
+        }
+      ]
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root_anchor",
+        "chain_digest",
+        "chain_depth",
+        "holder"
+      ],
+      "description": "Present whenever the exercised capability carries `root_anchor`. Introduced with anchored roots (PROTOCOL 5.6).",
+      "properties": {
+        "root_anchor": {
+          "$ref": "../root_authority/root-anchor.schema.json"
+        },
+        "chain_digest": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/Digest",
+          "description": "`SHA-256(\"chio.receipt.chain-digest.v1\\0\" || canonical_json([root, ..., parent, leaf]))` over the full signed tokens."
+        },
+        "chain_depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "holder": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/HolderClass"
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pep_id",
+        "pep_key",
+        "pep_profile",
+        "request_id",
+        "decision_expires_at"
+      ],
+      "description": "The external policy enforcement point that enforces a `pdp_decision`. Introduced with `pdp_decision` receipts (PROTOCOL 6.1).",
+      "properties": {
+        "pep_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pep_key": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/PublicKeyHex"
+        },
+        "pep_profile": {
+          "type": "string",
+          "enum": [
+            "authzen_1_0_fail_closed"
+          ]
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_expires_at": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "settlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rail",
+        "scheme",
+        "state",
+        "asset",
+        "amount",
+        "pay_to",
+        "hold_id",
+        "rail_refs"
+      ],
+      "description": "Inline settlement of a paid call. An `authorized_pending` receipt is joined by exactly one `chio.settlement-closure.v1`. Introduced with settlement (PROTOCOL 6.7).",
+      "properties": {
+        "rail": {
+          "type": "string",
+          "enum": [
+            "x402"
+          ]
+        },
+        "scheme": {
+          "type": "string",
+          "enum": [
+            "exact"
+          ]
+        },
+        "state": {
+          "$ref": "settlement-closure.schema.json#/$defs/SettlementState"
+        },
+        "asset": {
+          "$ref": "settlement-closure.schema.json#/$defs/Asset"
+        },
+        "amount": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)$"
+        },
+        "pay_to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hold_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rail_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "settlement-closure.schema.json#/$defs/RailRef"
+          }
+        }
+      }
+    }
+  }
+}

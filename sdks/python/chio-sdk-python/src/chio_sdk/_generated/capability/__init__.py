@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
+# Schema sha256: 474bdbf3f47de4760cd26c431403a6dfec83325e15db307cb5fcbf132a6f05dd
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -16,6 +16,7 @@ from .capabilities_schema import ChioCapabilityNegotiationV1
 from .cumulative_approval_root_schema import Body, ChioCumulativeApprovalRootBinding, CumulativeRootMonetaryAmount, CumulativeRootPublicKey, CumulativeRootSignature, CumulativeRootSigningAlgorithm
 from .governed_approval_token_schema import Algorithm, ChioGovernedApprovalToken, Decision, GovernedApprovalPublicKey, GovernedApprovalSignature
 from .grant_schema import ChioCapabilityGrant, Constraint, MonetaryAmount, Operation, PromptGrant, ResourceGrant, ToolGrant
+from .presentation_schema import ChioCapabilityPresentation
 from .revocation_schema import ChioCapabilityRevocationEntry
 from .security_binding_schema import ChioCapabilitySecurityBinding, SecurityBindingText
 from .supplemental_authorization_schema import ChioOpaqueSupplementalAuthorization
@@ -39,6 +40,7 @@ __all__ = [
     "ChioAggregateInvocationBudget2",
     "ChioCapabilityGrant",
     "ChioCapabilityNegotiationV1",
+    "ChioCapabilityPresentation",
     "ChioCapabilityRevocationEntry",
     "ChioCapabilitySecurityBinding",
     "ChioCapabilitytoken",

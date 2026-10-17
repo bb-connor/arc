@@ -74,9 +74,8 @@ WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 WRAPPER_LEN = 88
 MAX_SAFE_INTEGER = 2**53 - 1
 
-# Registry rows that never carry a wrapper: a payload schema named as another
-# row's payloadSchemaFile, and a DPoP profile id that collapses to v1.
-EXCLUDED_WRAPPER_IDS = frozenset({"chio.security-event-body.v1", "chio.dpop_proof.v2"})
+# Registry rows that never carry a wrapper: a DPoP profile id that collapses to v1.
+EXCLUDED_WRAPPER_IDS = frozenset({"chio.dpop_proof.v2"})
 
 # Wrapper ids that PROTOCOL section 4.5 names but `spec/schemas/registry.json`
 # does not list yet. Each id is registered with its type before any
@@ -111,7 +110,6 @@ SECTION_4_5_UNREGISTERED_IDS = (
     "chio.frost.dkg-package.v1",
     "chio.governed-approval-token.v1",
     "chio.governed-upstream-call-chain-proof.v1",
-    "chio.idp-key-snapshot.v1",
     "chio.key-log.witness-statement.v1",
     "chio.mcp.operator-approval.v1",
     "chio.mcp.session-credential-call.v1",
@@ -126,12 +124,9 @@ SECTION_4_5_UNREGISTERED_IDS = (
     "chio.public-issuer-discovery.v1",
     "chio.public-verifier-discovery.v1",
     "chio.reputation-credential.v1",
-    "chio.revocation-request.v1",
-    "chio.root-policy.v1",
     "chio.runtime.tool-server-ack-signature.v1",
     "chio.session-compliance-certificate.v1",
     "chio.session_anchor.v1",
-    "chio.settlement-closure.v1",
     "chio.signed-admission-terminal-projection.v1",
     "chio.signed-watermark-envelope.v1",
     "chio.signer-readiness-probe.v1",
@@ -186,6 +181,7 @@ TENANT_DOMAIN = b"chio.delegation-context.tenant.v1\x00"
 CONTEXT_DIGEST_DOMAIN = b"chio.delegation-context.v1\x00"
 ROOT_POLICY_DIGEST_DOMAIN = b"chio.root-policy.v1\x00"
 CHAIN_DIGEST_DOMAIN = b"chio.receipt.chain-digest.v1\x00"
+PROVIDER_IDENTITY_DIGEST_DOMAIN = b"chio.enterprise-provider-identity.v1\x00"
 
 COMMITMENT_DOMAINS = {
     "params": PARAMETERS_DOMAIN,
@@ -654,6 +650,10 @@ def delegation_context(subject: str, tenant: str, exchange_key: str) -> dict:
             "key_snapshot_digest": digest_str(b"fixture:idp-key-snapshot"),
             "kid": "k-fixture-1",
             "kind": "oauth_id_jag",
+            "provider_identity_digest": digest_str(
+                PROVIDER_IDENTITY_DIGEST_DOMAIN + canonical_json(FIXTURE_PROVIDER_IDENTITY)
+            ),
+            "provider_record_id": FIXTURE_PROVIDER_IDENTITY["provider_id"],
             "replay_key_digest": digest_str(b"fixture:replay-key"),
             "subject": {
                 "commit": commitment(SUBJECT_DOMAIN, FIXTURE_SALTS["anchor.sub"], subject.encode("utf-8")),
@@ -685,6 +685,18 @@ STREAM_CHUNKS = [{"delta": "Road"}, {"delta": "map"}]
 SUBJECT_VALUE = "00u1fixturesubject"
 TENANT_VALUE = "tenant-fixture"
 FIXTURE_ROOT_POLICY_BODY = {"policy_id": "fixture-policy", "schema": "chio.root-policy.v1"}
+# Synthetic enterprise provider record identity projection; the delegation
+# context pins its digest the way a root policy rule does.
+FIXTURE_PROVIDER_IDENTITY = {
+    "audiences": [],
+    "issuer": "https://idp.fixture.example",
+    "jwks_url": "https://idp.fixture.example/oauth2/v1/keys",
+    "kind": "oidc_jwks",
+    "provider_id": "fixture-provider",
+    "schema": "chio.enterprise-provider-identity.v1",
+    "subject_mapping": {"principal_source": "sub", "tenant_id_field": "iss"},
+    "trust_material_ref": "fixture-trust-material",
+}
 FIXTURE_ROOT_TOKEN = {"fixture": "root-capability-placeholder", "id": "cap-fixture-root"}
 
 
@@ -1081,6 +1093,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         "cases": cases,
         "commitment_domains": {ref: domain.decode("ascii").replace("\x00", "\\0") for ref, domain in COMMITMENT_DOMAINS.items()},
         "fixture_material": "Every key, salt and body in this file is a fixed test fixture. Production salts are 32 fresh bytes per receipt per field.",
+        "fixture_provider_identity": FIXTURE_PROVIDER_IDENTITY,
         "fixture_salts": {ref: salt.hex() for ref, salt in FIXTURE_SALTS.items()},
         "generated_by": GENERATED_BY,
         "generator": GENERATOR,

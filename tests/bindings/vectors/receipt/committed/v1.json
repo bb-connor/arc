@@ -411,6 +411,8 @@
           "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
           "kid": "k-fixture-1",
           "kind": "oauth_id_jag",
+          "provider_identity_digest": "sha256:3a0340bc47a91f4378a243c7c82d5d0d06bb74a1346ebcd1df8c43009e9bdd58",
+          "provider_record_id": "fixture-provider",
           "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
           "subject": {
             "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
@@ -463,7 +465,7 @@
             "salt_ref": "anchor.tenant"
           }
         ],
-        "receipt_id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "receipt_id": "c506bf59868ebdf8844c9814f41b276ea2a9236b14cec53db2c1a89ab4bc14c8",
         "schema": "chio.receipt-disclosure.v1"
       },
       "expected": {
@@ -495,7 +497,7 @@
           "root_anchor": {
             "anchored_at": 1792234795,
             "assertion_exp": 1792235090,
-            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "context_digest": "sha256:d6d6711bcd2de2b0151349febfe6f76db546f63a3c83106b1ae13aa80022974b",
             "kind": "oauth_id_jag",
             "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
           }
@@ -521,15 +523,15 @@
             "verdict": true
           }
         ],
-        "id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "id": "c506bf59868ebdf8844c9814f41b276ea2a9236b14cec53db2c1a89ab4bc14c8",
         "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
         "metadata": {
-          "chio_receipt_signing_nonce": "6599409b2752b71d06bd34938c1e869da102be1061ce9f9666461294cf2537e4",
+          "chio_receipt_signing_nonce": "9674807fb293127a3a4de1678e7e77941e7c35496060d98c7420b3921f09c268",
           "surface": "committed-receipt-vectors"
         },
         "policy_hash": "policy-fixture-v1",
         "receipt_kind": "mediated_decision",
-        "signature": "57a5b60ccc6818bce5688230de2f80727c80814a31b1a59d9e8fe7932c075b400527f9ba096b4593497657cdaa38440581e621cee5baccf639578cc6fad1db0f",
+        "signature": "0374c3341c9462991e83f7c615e5c92d8d83bbfb101b18ec18abd0fcbdfc615373d04e39d7aab6269d64730b0dcbdf9a66ce1116b2edb974b81a0f70736b6806",
         "timestamp": 1792234800,
         "tool_name": "file_read",
         "tool_origin": "caller_executed",
@@ -553,6 +555,8 @@
           "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
           "kid": "k-fixture-1",
           "kind": "oauth_id_jag",
+          "provider_identity_digest": "sha256:3a0340bc47a91f4378a243c7c82d5d0d06bb74a1346ebcd1df8c43009e9bdd58",
+          "provider_record_id": "fixture-provider",
           "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
           "subject": {
             "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
@@ -605,7 +609,7 @@
             "salt_ref": "anchor.tenant"
           }
         ],
-        "receipt_id": "a52779b2257333b4f16719eec56826e3d8825111f9ce941bbdea0272cc8cbcf6",
+        "receipt_id": "3ed1fbf560d082dfdf2df53daccb746f6e550fa9c6ab106bf34538e7240b49a2",
         "schema": "chio.receipt-disclosure.v1"
       },
       "expected": {
@@ -637,7 +641,7 @@
           "root_anchor": {
             "anchored_at": 1792234795,
             "assertion_exp": 1792235090,
-            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "context_digest": "sha256:d6d6711bcd2de2b0151349febfe6f76db546f63a3c83106b1ae13aa80022974b",
             "kind": "oauth_id_jag",
             "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
           }
@@ -663,15 +667,15 @@
             "verdict": true
           }
         ],
-        "id": "a52779b2257333b4f16719eec56826e3d8825111f9ce941bbdea0272cc8cbcf6",
+        "id": "3ed1fbf560d082dfdf2df53daccb746f6e550fa9c6ab106bf34538e7240b49a2",
         "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
         "metadata": {
-          "chio_receipt_signing_nonce": "f39228ce5ba14685b4a5a6bc11415f044647289bbb2fad4f547c1fdf551df489",
+          "chio_receipt_signing_nonce": "2030bdd4d664726a51a6f50676bfbc8828259cfaa0128f8d05532eae6ecdb9f3",
           "surface": "committed-receipt-vectors"
         },
         "policy_hash": "policy-fixture-v1",
         "receipt_kind": "mediated_decision",
-        "signature": "76e58adae2cc607ef624c31ce0a01fb3a5288d3d36c8aba929fac47a8c83361b883e54012c047db5443c6cf7e8763f6a8b32a53be3ebd714c8cb8aee9497320a",
+        "signature": "1b01d5e86318d039ed55ff0dad07b28863c5ee0836c3849510a86e3fe7a1a2c7c373b9ac6b65a727bce3edc22a5deb2c12e4d767376944e344b4599d1ee1650a",
         "tenant_id": "tenant-fixture",
         "timestamp": 1792234800,
         "tool_name": "file_read",
@@ -1255,6 +1259,8 @@
           "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
           "kid": "k-fixture-1",
           "kind": "oauth_id_jag",
+          "provider_identity_digest": "sha256:3a0340bc47a91f4378a243c7c82d5d0d06bb74a1346ebcd1df8c43009e9bdd58",
+          "provider_record_id": "fixture-provider",
           "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
           "subject": {
             "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
@@ -1302,7 +1308,7 @@
             "salt_ref": "anchor.tenant"
           }
         ],
-        "receipt_id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "receipt_id": "c506bf59868ebdf8844c9814f41b276ea2a9236b14cec53db2c1a89ab4bc14c8",
         "schema": "chio.receipt-disclosure.v1"
       },
       "expected": {
@@ -1334,7 +1340,7 @@
           "root_anchor": {
             "anchored_at": 1792234795,
             "assertion_exp": 1792235090,
-            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "context_digest": "sha256:d6d6711bcd2de2b0151349febfe6f76db546f63a3c83106b1ae13aa80022974b",
             "kind": "oauth_id_jag",
             "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
           }
@@ -1360,15 +1366,15 @@
             "verdict": true
           }
         ],
-        "id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "id": "c506bf59868ebdf8844c9814f41b276ea2a9236b14cec53db2c1a89ab4bc14c8",
         "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
         "metadata": {
-          "chio_receipt_signing_nonce": "6599409b2752b71d06bd34938c1e869da102be1061ce9f9666461294cf2537e4",
+          "chio_receipt_signing_nonce": "9674807fb293127a3a4de1678e7e77941e7c35496060d98c7420b3921f09c268",
           "surface": "committed-receipt-vectors"
         },
         "policy_hash": "policy-fixture-v1",
         "receipt_kind": "mediated_decision",
-        "signature": "57a5b60ccc6818bce5688230de2f80727c80814a31b1a59d9e8fe7932c075b400527f9ba096b4593497657cdaa38440581e621cee5baccf639578cc6fad1db0f",
+        "signature": "0374c3341c9462991e83f7c615e5c92d8d83bbfb101b18ec18abd0fcbdfc615373d04e39d7aab6269d64730b0dcbdf9a66ce1116b2edb974b81a0f70736b6806",
         "timestamp": 1792234800,
         "tool_name": "file_read",
         "tool_origin": "caller_executed",
@@ -1392,6 +1398,8 @@
           "key_snapshot_digest": "sha256:a87c23781b47de6628480dd0ed2b5f9a66df671e5a5271fc6f77dc279ade9b85",
           "kid": "k-fixture-1",
           "kind": "oauth_id_jag",
+          "provider_identity_digest": "sha256:3a0340bc47a91f4378a243c7c82d5d0d06bb74a1346ebcd1df8c43009e9bdd58",
+          "provider_record_id": "fixture-provider",
           "replay_key_digest": "sha256:0c6da7eaf72d0a8815564bd6bebc3a33335a22d14c71086954d64aba557bd654",
           "subject": {
             "commit": "sha256:9b9133d62bf1cdc1aa9f3ff5069d582b0c661db2f7e3a3c70bb4eb5a64a984c9",
@@ -1444,7 +1452,7 @@
             "salt_ref": "anchor.tenant"
           }
         ],
-        "receipt_id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "receipt_id": "c506bf59868ebdf8844c9814f41b276ea2a9236b14cec53db2c1a89ab4bc14c8",
         "schema": "chio.receipt-disclosure.v1"
       },
       "expected": {
@@ -1476,7 +1484,7 @@
           "root_anchor": {
             "anchored_at": 1792234795,
             "assertion_exp": 1792235090,
-            "context_digest": "sha256:2bdfcbca90af75514f50dd8a0fc0df8a20b18bdd917cacc17b89d04c59bbea8c",
+            "context_digest": "sha256:d6d6711bcd2de2b0151349febfe6f76db546f63a3c83106b1ae13aa80022974b",
             "kind": "oauth_id_jag",
             "root_policy_digest": "sha256:2e6c1790b344f450400483fac885910f6a86736cee90d0ed772e9cdf86c3b846"
           }
@@ -1502,15 +1510,15 @@
             "verdict": true
           }
         ],
-        "id": "b5717a39ce54055c663bfdca15e9d76d7af967d48061b38babe624357747f81d",
+        "id": "c506bf59868ebdf8844c9814f41b276ea2a9236b14cec53db2c1a89ab4bc14c8",
         "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
         "metadata": {
-          "chio_receipt_signing_nonce": "6599409b2752b71d06bd34938c1e869da102be1061ce9f9666461294cf2537e4",
+          "chio_receipt_signing_nonce": "9674807fb293127a3a4de1678e7e77941e7c35496060d98c7420b3921f09c268",
           "surface": "committed-receipt-vectors"
         },
         "policy_hash": "policy-fixture-v1",
         "receipt_kind": "mediated_decision",
-        "signature": "57a5b60ccc6818bce5688230de2f80727c80814a31b1a59d9e8fe7932c075b400527f9ba096b4593497657cdaa38440581e621cee5baccf639578cc6fad1db0f",
+        "signature": "0374c3341c9462991e83f7c615e5c92d8d83bbfb101b18ec18abd0fcbdfc615373d04e39d7aab6269d64730b0dcbdf9a66ce1116b2edb974b81a0f70736b6806",
         "timestamp": 1792234800,
         "tool_name": "file_read",
         "tool_origin": "caller_executed",
@@ -1680,6 +1688,19 @@
     "params": "chio.receipt.parameters.v1\\0"
   },
   "fixture_material": "Every key, salt and body in this file is a fixed test fixture. Production salts are 32 fresh bytes per receipt per field.",
+  "fixture_provider_identity": {
+    "audiences": [],
+    "issuer": "https://idp.fixture.example",
+    "jwks_url": "https://idp.fixture.example/oauth2/v1/keys",
+    "kind": "oidc_jwks",
+    "provider_id": "fixture-provider",
+    "schema": "chio.enterprise-provider-identity.v1",
+    "subject_mapping": {
+      "principal_source": "sub",
+      "tenant_id_field": "iss"
+    },
+    "trust_material_ref": "fixture-trust-material"
+  },
   "fixture_salts": {
     "anchor.sub": "1212121212121212121212121212121212121212121212121212121212121212",
     "anchor.tenant": "1313131313131313131313131313131313131313131313131313131313131313",

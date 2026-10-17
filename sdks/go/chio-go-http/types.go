@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: edd4db223f71003535d91fc1664ea95781f5b12ebc6119553c9dccf3029db407
+// Schema content SHA-256: ba6e49ffc89dd306628c55ce72fbc3e299b32d51b7899938f29c65477fcaaaf8
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -160,6 +160,11 @@ const (
 	CapabilityGrantOperationRead       CapabilityGrantOperation = "read"
 	CapabilityGrantOperationReadResult CapabilityGrantOperation = "read_result"
 	CapabilityGrantOperationSubscribe  CapabilityGrantOperation = "subscribe"
+)
+
+// Defines values for CapabilityPresentationSchema.
+const (
+	CapabilityPresentationSchemaChioCapabilityPresentationV1 CapabilityPresentationSchema = "chio.capability-presentation.v1"
 )
 
 // Defines values for CapabilitySecurityBindingSchema.
@@ -575,6 +580,11 @@ const (
 	ReceiptDeliveryContractSchemaChioDeliveryContractV1 ReceiptDeliveryContractSchema = "chio.delivery-contract.v1"
 )
 
+// Defines values for ReceiptDisclosureSchema.
+const (
+	ReceiptDisclosureSchemaChioReceiptDisclosureV1 ReceiptDisclosureSchema = "chio.receipt-disclosure.v1"
+)
+
 // Defines values for ReceiptFindingDeliveryDigestCheck.
 const (
 	ReceiptFindingDeliveryDigestCheckMatched    ReceiptFindingDeliveryDigestCheck = "matched"
@@ -726,6 +736,30 @@ const (
 // Defines values for ReceiptRecordDecision3Verdict.
 const (
 	ReceiptRecordDecision3VerdictIncomplete ReceiptRecordDecision3Verdict = "incomplete"
+)
+
+// Defines values for ReceiptSettlementClosureRail.
+const (
+	ReceiptSettlementClosureRailX402 ReceiptSettlementClosureRail = "x402"
+)
+
+// Defines values for ReceiptSettlementClosureSchema.
+const (
+	ReceiptSettlementClosureSchemaChioSettlementClosureV1 ReceiptSettlementClosureSchema = "chio.settlement-closure.v1"
+)
+
+// Defines values for ReceiptSettlementClosureRailRefKind.
+const (
+	ReceiptSettlementClosureRailRefKindX402PaymentPayload      ReceiptSettlementClosureRailRefKind = "x402.payment_payload"
+	ReceiptSettlementClosureRailRefKindX402PaymentRequirements ReceiptSettlementClosureRailRefKind = "x402.payment_requirements"
+	ReceiptSettlementClosureRailRefKindX402SettlementResponse  ReceiptSettlementClosureRailRefKind = "x402.settlement_response"
+)
+
+// Defines values for ReceiptSettlementClosureSettlementState.
+const (
+	ReceiptSettlementClosureSettlementStateAuthorizedPending ReceiptSettlementClosureSettlementState = "authorized_pending"
+	ReceiptSettlementClosureSettlementStateFailed            ReceiptSettlementClosureSettlementState = "failed"
+	ReceiptSettlementClosureSettlementStateSettled           ReceiptSettlementClosureSettlementState = "settled"
 )
 
 // Defines values for RecoveryActionIntentSchema.
@@ -3101,6 +3135,124 @@ const (
 // Defines values for ResultStreamCompleteStatus.
 const (
 	ResultStreamCompleteStatusStreamComplete ResultStreamCompleteStatus = "stream_complete"
+)
+
+// Defines values for RootAuthorityDelegationContextSchema.
+const (
+	RootAuthorityDelegationContextSchemaChioDelegationContextV1 RootAuthorityDelegationContextSchema = "chio.delegation-context.v1"
+)
+
+// Defines values for RootAuthorityDelegationContextSubjectCommitmentSaltRef.
+const (
+	RootAuthorityDelegationContextSubjectCommitmentSaltRefAnchorSub RootAuthorityDelegationContextSubjectCommitmentSaltRef = "anchor.sub"
+)
+
+// Defines values for RootAuthorityDelegationContextTenantCommitmentSaltRef.
+const (
+	RootAuthorityDelegationContextTenantCommitmentSaltRefAnchorTenant RootAuthorityDelegationContextTenantCommitmentSaltRef = "anchor.tenant"
+)
+
+// Defines values for RootAuthorityEnterpriseProviderIdentityKind.
+const (
+	RootAuthorityEnterpriseProviderIdentityKindOauthIntrospection RootAuthorityEnterpriseProviderIdentityKind = "oauth_introspection"
+	RootAuthorityEnterpriseProviderIdentityKindOidcJwks           RootAuthorityEnterpriseProviderIdentityKind = "oidc_jwks"
+)
+
+// Defines values for RootAuthorityEnterpriseProviderIdentitySchema.
+const (
+	RootAuthorityEnterpriseProviderIdentitySchemaChioEnterpriseProviderIdentityV1 RootAuthorityEnterpriseProviderIdentitySchema = "chio.enterprise-provider-identity.v1"
+)
+
+// Defines values for RootAuthorityIdpKeySnapshotSchema.
+const (
+	RootAuthorityIdpKeySnapshotSchemaChioIdpKeySnapshotV1 RootAuthorityIdpKeySnapshotSchema = "chio.idp-key-snapshot.v1"
+)
+
+// Defines values for RootAuthorityRevocationRequestSchema.
+const (
+	RootAuthorityRevocationRequestSchemaChioRevocationRequestV1 RootAuthorityRevocationRequestSchema = "chio.revocation-request.v1"
+)
+
+// Defines values for RootAuthorityRootAnchorAnchorKind.
+const (
+	RootAuthorityRootAnchorAnchorKindChioLocalAs          RootAuthorityRootAnchorAnchorKind = "chio_local_as"
+	RootAuthorityRootAnchorAnchorKindChioOperatorKey      RootAuthorityRootAnchorAnchorKind = "chio_operator_key"
+	RootAuthorityRootAnchorAnchorKindEntraAgentId         RootAuthorityRootAnchorAnchorKind = "entra_agent_id"
+	RootAuthorityRootAnchorAnchorKindEntraJwt             RootAuthorityRootAnchorAnchorKind = "entra_jwt"
+	RootAuthorityRootAnchorAnchorKindOauthIdJag           RootAuthorityRootAnchorAnchorKind = "oauth_id_jag"
+	RootAuthorityRootAnchorAnchorKindOauthIntrospection   RootAuthorityRootAnchorAnchorKind = "oauth_introspection"
+	RootAuthorityRootAnchorAnchorKindOidcJwt              RootAuthorityRootAnchorAnchorKind = "oidc_jwt"
+	RootAuthorityRootAnchorAnchorKindOperatorStaticBearer RootAuthorityRootAnchorAnchorKind = "operator_static_bearer"
+)
+
+// Defines values for RootAuthorityRootAnchorHolderClass.
+const (
+	RootAuthorityRootAnchorHolderClassCaller      RootAuthorityRootAnchorHolderClass = "caller"
+	RootAuthorityRootAnchorHolderClassEdgeSession RootAuthorityRootAnchorHolderClass = "edge_session"
+)
+
+// Defines values for RootAuthorityRootAnchorJwkCrv.
+const (
+	RootAuthorityRootAnchorJwkCrvEd25519 RootAuthorityRootAnchorJwkCrv = "Ed25519"
+	RootAuthorityRootAnchorJwkCrvP256    RootAuthorityRootAnchorJwkCrv = "P-256"
+	RootAuthorityRootAnchorJwkCrvP384    RootAuthorityRootAnchorJwkCrv = "P-384"
+	RootAuthorityRootAnchorJwkCrvP521    RootAuthorityRootAnchorJwkCrv = "P-521"
+)
+
+// Defines values for RootAuthorityRootAnchorJwkKty.
+const (
+	RootAuthorityRootAnchorJwkKtyEC  RootAuthorityRootAnchorJwkKty = "EC"
+	RootAuthorityRootAnchorJwkKtyOKP RootAuthorityRootAnchorJwkKty = "OKP"
+	RootAuthorityRootAnchorJwkKtyRSA RootAuthorityRootAnchorJwkKty = "RSA"
+)
+
+// Defines values for RootAuthorityRootAnchorJwkUse.
+const (
+	RootAuthorityRootAnchorJwkUseSig RootAuthorityRootAnchorJwkUse = "sig"
+)
+
+// Defines values for RootAuthorityRootAnchorJwsAlgorithm.
+const (
+	RootAuthorityRootAnchorJwsAlgorithmES256 RootAuthorityRootAnchorJwsAlgorithm = "ES256"
+	RootAuthorityRootAnchorJwsAlgorithmES384 RootAuthorityRootAnchorJwsAlgorithm = "ES384"
+	RootAuthorityRootAnchorJwsAlgorithmES512 RootAuthorityRootAnchorJwsAlgorithm = "ES512"
+	RootAuthorityRootAnchorJwsAlgorithmEdDSA RootAuthorityRootAnchorJwsAlgorithm = "EdDSA"
+	RootAuthorityRootAnchorJwsAlgorithmPS256 RootAuthorityRootAnchorJwsAlgorithm = "PS256"
+	RootAuthorityRootAnchorJwsAlgorithmPS384 RootAuthorityRootAnchorJwsAlgorithm = "PS384"
+	RootAuthorityRootAnchorJwsAlgorithmPS512 RootAuthorityRootAnchorJwsAlgorithm = "PS512"
+	RootAuthorityRootAnchorJwsAlgorithmRS256 RootAuthorityRootAnchorJwsAlgorithm = "RS256"
+	RootAuthorityRootAnchorJwsAlgorithmRS384 RootAuthorityRootAnchorJwsAlgorithm = "RS384"
+	RootAuthorityRootAnchorJwsAlgorithmRS512 RootAuthorityRootAnchorJwsAlgorithm = "RS512"
+)
+
+// Defines values for RootAuthorityRootPolicySchema.
+const (
+	RootAuthorityRootPolicySchemaChioRootPolicyV1 RootAuthorityRootPolicySchema = "chio.root-policy.v1"
+)
+
+// Defines values for RootAuthorityRootPolicyClaimMode.
+const (
+	RootAuthorityRootPolicyClaimModeCommitted RootAuthorityRootPolicyClaimMode = "committed"
+	RootAuthorityRootPolicyClaimModePlain     RootAuthorityRootPolicyClaimMode = "plain"
+)
+
+// Defines values for RootAuthorityRootPolicyRootPolicyDisclosureDefault.
+const (
+	RootAuthorityRootPolicyRootPolicyDisclosureDefaultCommitted RootAuthorityRootPolicyRootPolicyDisclosureDefault = "committed"
+)
+
+// Defines values for RootAuthorityVerifierTrustRequiredColumns.
+const (
+	RootAuthorityVerifierTrustRequiredColumnsContent         RootAuthorityVerifierTrustRequiredColumns = "content"
+	RootAuthorityVerifierTrustRequiredColumnsDecision        RootAuthorityVerifierTrustRequiredColumns = "decision"
+	RootAuthorityVerifierTrustRequiredColumnsDelegationChain RootAuthorityVerifierTrustRequiredColumns = "delegation_chain"
+	RootAuthorityVerifierTrustRequiredColumnsIdentityRoot    RootAuthorityVerifierTrustRequiredColumns = "identity_root"
+	RootAuthorityVerifierTrustRequiredColumnsSettlement      RootAuthorityVerifierTrustRequiredColumns = "settlement"
+)
+
+// Defines values for RootAuthorityVerifierTrustSchema.
+const (
+	RootAuthorityVerifierTrustSchemaChioVerifierTrustV1 RootAuthorityVerifierTrustSchema = "chio.verifier-trust.v1"
 )
 
 // Defines values for SecurityBrokerAdminControlReceiptBodyV1Operation.
@@ -5587,6 +5739,22 @@ type CapabilityGrantToolGrant struct {
 	ToolName string `json:"tool_name"`
 }
 
+// CapabilityPresentation `chio.capability-presentation.v1`, carried in MCP `_meta.chioCapability`: a leaf capability, its signed ancestors and, when the presenter is not the session holder, the delegation context. The envelope is unsigned; every member inside is verified independently. Decoding is strict.
+type CapabilityPresentation struct {
+	// Ancestors Signed ancestors ordered root to parent, at most 16. A root presented alone has an empty list.
+	Ancestors []CapabilityToken `json:"ancestors"`
+
+	// DelegationContext `chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.
+	DelegationContext *RootAuthorityDelegationContext `json:"delegation_context,omitempty"`
+
+	// Leaf A Chio capability token with typed caveats, attenuation fields, attenuation proof, budget share, and hybrid signing support folded into the unreleased v1 wire shape.
+	Leaf   CapabilityToken              `json:"leaf"`
+	Schema CapabilityPresentationSchema `json:"schema"`
+}
+
+// CapabilityPresentationSchema defines model for CapabilityPresentation.Schema.
+type CapabilityPresentationSchema string
+
 // CapabilityRevocation A single revocation entry recording that a previously issued capability token (identified by its `id`) is no longer valid as of `revoked_at`. Mirrors `RevocationRecord` in `crates/kernel/chio-kernel/src/revocation_store.rs` (the kernel's persisted revocation row), and is the wire-level companion to the `capability_revoked` kernel notification under `chio-wire/v1/kernel/capability_revoked.schema.json`. Operators read these entries from `/admin/revocations` (hosted edge) and from the trust-control revocation list.
 type CapabilityRevocation struct {
 	// CapabilityId The `id` field of the revoked CapabilityToken. Used to match revocations against presented tokens.
@@ -6815,6 +6983,28 @@ type ReceiptDeliveryContractSchema string
 // ReceiptDeliveryContractDigest defines model for ReceiptDeliveryContractDigest.
 type ReceiptDeliveryContractDigest = string
 
+// ReceiptDisclosure `chio.receipt-disclosure.v1`: an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening. The same salt under two `salt_ref` values marks the receipt as tampered disclosure.
+type ReceiptDisclosure struct {
+	Openings []ReceiptDisclosureOpening `json:"openings"`
+
+	// ReceiptId `id` of the receipt whose commitments these openings open.
+	ReceiptId string                  `json:"receipt_id"`
+	Schema    ReceiptDisclosureSchema `json:"schema"`
+}
+
+// ReceiptDisclosureSchema defines model for ReceiptDisclosure.Schema.
+type ReceiptDisclosureSchema string
+
+// ReceiptDisclosureOpening defines model for ReceiptDisclosureOpening.
+type ReceiptDisclosureOpening struct {
+	// Payload The committed value. `null` is a salt-only opening, valid only where the holder already has the payload (the caller copy, `caller` bundles and the PDP response to the enforcement point that sent the arguments).
+	Payload interface{} `json:"payload"`
+
+	// Salt A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+	Salt    RootAuthorityRootAnchorSalt    `json:"salt"`
+	SaltRef RootAuthorityRootAnchorSaltRef `json:"salt_ref"`
+}
+
 // ReceiptFindingDelivery defines model for ReceiptFindingDelivery.
 type ReceiptFindingDelivery struct {
 	AcceptedBidEnvelopeSha256       ReceiptFindingDeliveryDigest           `json:"accepted_bid_envelope_sha256"`
@@ -7114,6 +7304,53 @@ type ReceiptRecordToolCallAction struct {
 	// Parameters The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`).
 	Parameters interface{} `json:"parameters"`
 }
+
+// ReceiptSettlementClosure `chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
+type ReceiptSettlementClosure struct {
+	// Amount Integer minor units as a decimal string.
+	Amount string `json:"amount"`
+
+	// Asset Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`.
+	Asset ReceiptSettlementClosureAsset `json:"asset"`
+
+	// HoldId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	HoldId RootAuthorityRootAnchorIdentifier `json:"hold_id"`
+
+	// KernelKey Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+	KernelKey  RootAuthorityRootAnchorPublicKeyHex `json:"kernel_key"`
+	ObservedAt int64                               `json:"observed_at"`
+	Rail       ReceiptSettlementClosureRail        `json:"rail"`
+	RailRefs   []ReceiptSettlementClosureRailRef   `json:"rail_refs"`
+	Schema     ReceiptSettlementClosureSchema      `json:"schema"`
+
+	// Signature Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+	Signature         RootAuthorityRootAnchorSignatureHex     `json:"signature"`
+	State             ReceiptSettlementClosureSettlementState `json:"state"`
+	TerminalReceiptId string                                  `json:"terminal_receipt_id"`
+}
+
+// ReceiptSettlementClosureRail defines model for ReceiptSettlementClosure.Rail.
+type ReceiptSettlementClosureRail string
+
+// ReceiptSettlementClosureSchema defines model for ReceiptSettlementClosure.Schema.
+type ReceiptSettlementClosureSchema string
+
+// ReceiptSettlementClosureAsset Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`.
+type ReceiptSettlementClosureAsset = string
+
+// ReceiptSettlementClosureRailRef defines model for ReceiptSettlementClosureRailRef.
+type ReceiptSettlementClosureRailRef struct {
+	// Digest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Digest RootAuthorityRootAnchorDigest       `json:"digest"`
+	Id     *string                             `json:"id,omitempty"`
+	Kind   ReceiptSettlementClosureRailRefKind `json:"kind"`
+}
+
+// ReceiptSettlementClosureRailRefKind defines model for ReceiptSettlementClosureRailRef.Kind.
+type ReceiptSettlementClosureRailRefKind string
+
+// ReceiptSettlementClosureSettlementState defines model for ReceiptSettlementClosureSettlementState.
+type ReceiptSettlementClosureSettlementState string
 
 // RecoveryActionIntent defines model for RecoveryActionIntent.
 type RecoveryActionIntent struct {
@@ -13133,6 +13370,476 @@ type ResultStreamComplete struct {
 
 // ResultStreamCompleteStatus defines model for ResultStreamComplete.Status.
 type ResultStreamCompleteStatus string
+
+// RootAuthorityDelegationContext `chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.
+type RootAuthorityDelegationContext struct {
+	Anchor RootAuthorityDelegationContextDelegationAnchor `json:"anchor"`
+
+	// EffectiveRootScopeHash SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	EffectiveRootScopeHash RootAuthorityRootAnchorDigest                    `json:"effective_root_scope_hash"`
+	Exchange               RootAuthorityDelegationContextDelegationExchange `json:"exchange"`
+
+	// RootPolicyRuleId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	RootPolicyRuleId RootAuthorityRootAnchorIdentifier    `json:"root_policy_rule_id"`
+	Schema           RootAuthorityDelegationContextSchema `json:"schema"`
+}
+
+// RootAuthorityDelegationContextSchema defines model for RootAuthorityDelegationContext.Schema.
+type RootAuthorityDelegationContextSchema string
+
+// RootAuthorityDelegationContextDelegationAnchor defines model for RootAuthorityDelegationContextDelegationAnchor.
+type RootAuthorityDelegationContextDelegationAnchor struct {
+	// Alg Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+	Alg *RootAuthorityRootAnchorJwsAlgorithm `json:"alg,omitempty"`
+
+	// ArtifactDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ArtifactDigest *RootAuthorityRootAnchorDigest `json:"artifact_digest,omitempty"`
+
+	// ArtifactRetained True only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`.
+	ArtifactRetained bool `json:"artifact_retained"`
+
+	// Claims The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+	Claims RootAuthorityRootAnchorRecordedClaims `json:"claims"`
+
+	// Issuer A bounded URI or URN, such as an issuer.
+	Issuer RootAuthorityRootAnchorUri `json:"issuer"`
+
+	// KeySnapshotDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	KeySnapshotDigest *RootAuthorityRootAnchorDigest `json:"key_snapshot_digest,omitempty"`
+
+	// Kid A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	Kid *RootAuthorityRootAnchorIdentifier `json:"kid,omitempty"`
+
+	// Kind Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+	Kind RootAuthorityRootAnchorAnchorKind `json:"kind"`
+
+	// ProviderIdentityDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ProviderIdentityDigest *RootAuthorityRootAnchorDigest `json:"provider_identity_digest,omitempty"`
+
+	// ProviderRecordId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	ProviderRecordId *RootAuthorityRootAnchorIdentifier `json:"provider_record_id,omitempty"`
+
+	// ReplayKeyDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ReplayKeyDigest RootAuthorityRootAnchorDigest `json:"replay_key_digest"`
+
+	// Subject `SHA-256("chio.delegation-context.subject.v1\0" || salt || utf8(subject))`.
+	Subject RootAuthorityDelegationContextSubjectCommitment `json:"subject"`
+
+	// Tenant `SHA-256("chio.delegation-context.tenant.v1\0" || salt || utf8(tenant))`.
+	Tenant   RootAuthorityDelegationContextTenantCommitment `json:"tenant"`
+	TokenExp int64                                          `json:"token_exp"`
+	TokenIat int64                                          `json:"token_iat"`
+}
+
+// RootAuthorityDelegationContextDelegationExchange defines model for RootAuthorityDelegationContextDelegationExchange.
+type RootAuthorityDelegationContextDelegationExchange struct {
+	// ExchangeKey Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+	ExchangeKey RootAuthorityRootAnchorPublicKeyHex `json:"exchange_key"`
+	ExchangedAt int64                               `json:"exchanged_at"`
+
+	// Holder Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+	Holder RootAuthorityRootAnchorHolderClass `json:"holder"`
+
+	// RequestDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	RequestDigest RootAuthorityRootAnchorDigest `json:"request_digest"`
+}
+
+// RootAuthorityDelegationContextSubjectCommitment `SHA-256("chio.delegation-context.subject.v1\0" || salt || utf8(subject))`.
+type RootAuthorityDelegationContextSubjectCommitment struct {
+	// Commit SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Commit  RootAuthorityRootAnchorDigest                          `json:"commit"`
+	SaltRef RootAuthorityDelegationContextSubjectCommitmentSaltRef `json:"salt_ref"`
+}
+
+// RootAuthorityDelegationContextSubjectCommitmentSaltRef defines model for RootAuthorityDelegationContextSubjectCommitment.SaltRef.
+type RootAuthorityDelegationContextSubjectCommitmentSaltRef string
+
+// RootAuthorityDelegationContextTenantCommitment `SHA-256("chio.delegation-context.tenant.v1\0" || salt || utf8(tenant))`.
+type RootAuthorityDelegationContextTenantCommitment struct {
+	// Commit SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Commit  RootAuthorityRootAnchorDigest                         `json:"commit"`
+	SaltRef RootAuthorityDelegationContextTenantCommitmentSaltRef `json:"salt_ref"`
+}
+
+// RootAuthorityDelegationContextTenantCommitmentSaltRef defines model for RootAuthorityDelegationContextTenantCommitment.SaltRef.
+type RootAuthorityDelegationContextTenantCommitmentSaltRef string
+
+// RootAuthorityEnterpriseProviderIdentity `chio.enterprise-provider-identity.v1`: the unsigned, content-addressed identity projection of one enterprise provider record. A root policy rule pins `SHA-256("chio.enterprise-provider-identity.v1\0" || canonical_json(projection))` as `provider_identity_digest`. The projection excludes `enabled`, other provenance labels and validation errors. Decoding is strict.
+type RootAuthorityEnterpriseProviderIdentity struct {
+	// Audiences The record's `trust_boundary.allowed_audiences`.
+	Audiences        []RootAuthorityRootAnchorUri     `json:"audiences"`
+	IntrospectionUrl *RootAuthorityRootAnchorHttpsUrl `json:"introspection_url,omitempty"`
+
+	// Issuer A bounded URI or URN, such as an issuer.
+	Issuer  RootAuthorityRootAnchorUri                         `json:"issuer"`
+	Jwks    *RootAuthorityEnterpriseProviderIdentityInlineJwks `json:"jwks,omitempty"`
+	JwksUrl *RootAuthorityRootAnchorHttpsUrl                   `json:"jwks_url,omitempty"`
+
+	// Kind Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.
+	Kind RootAuthorityEnterpriseProviderIdentityKind `json:"kind"`
+
+	// ProviderId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	ProviderId     RootAuthorityRootAnchorIdentifier                     `json:"provider_id"`
+	Schema         RootAuthorityEnterpriseProviderIdentitySchema         `json:"schema"`
+	SubjectMapping RootAuthorityEnterpriseProviderIdentitySubjectMapping `json:"subject_mapping"`
+
+	// TrustMaterialRef A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	TrustMaterialRef RootAuthorityRootAnchorIdentifier `json:"trust_material_ref"`
+}
+
+// RootAuthorityEnterpriseProviderIdentityKind Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.
+type RootAuthorityEnterpriseProviderIdentityKind string
+
+// RootAuthorityEnterpriseProviderIdentitySchema defines model for RootAuthorityEnterpriseProviderIdentity.Schema.
+type RootAuthorityEnterpriseProviderIdentitySchema string
+
+// RootAuthorityEnterpriseProviderIdentityInlineJwks defines model for RootAuthorityEnterpriseProviderIdentityInlineJwks.
+type RootAuthorityEnterpriseProviderIdentityInlineJwks struct {
+	Keys []RootAuthorityRootAnchorJwk `json:"keys"`
+}
+
+// RootAuthorityEnterpriseProviderIdentitySubjectMapping defines model for RootAuthorityEnterpriseProviderIdentitySubjectMapping.
+type RootAuthorityEnterpriseProviderIdentitySubjectMapping struct {
+	// PrincipalSource A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	PrincipalSource RootAuthorityRootAnchorIdentifier `json:"principal_source"`
+
+	// TenantIdField A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	TenantIdField RootAuthorityRootAnchorIdentifier `json:"tenant_id_field"`
+}
+
+// RootAuthorityIdpKeySnapshot `chio.idp-key-snapshot.v1`, signed by the exchange key. It records the key set the exchange fetched for an enterprise provider record, or took from the record's inline `jwks`, and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement of what the identity provider published, not identity-provider evidence.
+type RootAuthorityIdpKeySnapshot struct {
+	// ExchangeKey Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+	ExchangeKey RootAuthorityRootAnchorPublicKeyHex `json:"exchange_key"`
+
+	// Issuer A bounded URI or URN, such as an issuer.
+	Issuer     RootAuthorityRootAnchorUri        `json:"issuer"`
+	Keys       []RootAuthorityRootAnchorJwk      `json:"keys"`
+	ObservedAt int64                             `json:"observed_at"`
+	Schema     RootAuthorityIdpKeySnapshotSchema `json:"schema"`
+
+	// Signature Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+	Signature RootAuthorityRootAnchorSignatureHex `json:"signature"`
+
+	// Source The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.
+	Source RootAuthorityIdpKeySnapshot_Source `json:"source"`
+}
+
+// RootAuthorityIdpKeySnapshotSchema defines model for RootAuthorityIdpKeySnapshot.Schema.
+type RootAuthorityIdpKeySnapshotSchema string
+
+// RootAuthorityIdpKeySnapshotSource1 defines model for .
+type RootAuthorityIdpKeySnapshotSource1 = string
+
+// RootAuthorityIdpKeySnapshot_Source The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.
+type RootAuthorityIdpKeySnapshot_Source struct {
+	union json.RawMessage
+}
+
+// RootAuthorityRevocationRequest `chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
+type RootAuthorityRevocationRequest struct {
+	IssuedAt int64 `json:"issued_at"`
+
+	// PresentationDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	PresentationDigest RootAuthorityRootAnchorDigest `json:"presentation_digest"`
+	Reason             string                        `json:"reason"`
+
+	// RevokerKey Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+	RevokerKey RootAuthorityRootAnchorPublicKeyHex  `json:"revoker_key"`
+	Schema     RootAuthorityRevocationRequestSchema `json:"schema"`
+
+	// Signature Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+	Signature RootAuthorityRootAnchorSignatureHex `json:"signature"`
+
+	// TargetCapabilityId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	TargetCapabilityId RootAuthorityRootAnchorIdentifier `json:"target_capability_id"`
+}
+
+// RootAuthorityRevocationRequestSchema defines model for RootAuthorityRevocationRequest.Schema.
+type RootAuthorityRevocationRequestSchema string
+
+// RootAuthorityRootAnchor The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
+type RootAuthorityRootAnchor struct {
+	// AnchoredAt Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+	AnchoredAt int64 `json:"anchored_at"`
+
+	// AssertionExp Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+	AssertionExp int64 `json:"assertion_exp"`
+
+	// ContextDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ContextDigest RootAuthorityRootAnchorDigest `json:"context_digest"`
+
+	// Kind Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+	Kind RootAuthorityRootAnchorAnchorKind `json:"kind"`
+
+	// RootPolicyDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	RootPolicyDigest RootAuthorityRootAnchorDigest `json:"root_policy_digest"`
+}
+
+// RootAuthorityRootAnchorAnchorKind Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+type RootAuthorityRootAnchorAnchorKind string
+
+// RootAuthorityRootAnchorClaimValue A recorded claim: a plain string, a plain list of strings, or a committed value.
+type RootAuthorityRootAnchorClaimValue struct {
+	union json.RawMessage
+}
+
+// RootAuthorityRootAnchorClaimValue1 defines model for .
+type RootAuthorityRootAnchorClaimValue1 = []RootAuthorityRootAnchorText
+
+// RootAuthorityRootAnchorCommitment A salted commitment whose salt is held in the disclosure store under `salt_ref`.
+type RootAuthorityRootAnchorCommitment struct {
+	// Commit SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Commit  RootAuthorityRootAnchorDigest  `json:"commit"`
+	SaltRef RootAuthorityRootAnchorSaltRef `json:"salt_ref"`
+}
+
+// RootAuthorityRootAnchorDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+type RootAuthorityRootAnchorDigest = string
+
+// RootAuthorityRootAnchorHolderClass Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+type RootAuthorityRootAnchorHolderClass string
+
+// RootAuthorityRootAnchorHttpsUrl defines model for RootAuthorityRootAnchorHttpsUrl.
+type RootAuthorityRootAnchorHttpsUrl = string
+
+// RootAuthorityRootAnchorIdentifier A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+type RootAuthorityRootAnchorIdentifier = string
+
+// RootAuthorityRootAnchorJwk A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+type RootAuthorityRootAnchorJwk struct {
+	// Alg Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+	Alg *RootAuthorityRootAnchorJwsAlgorithm `json:"alg,omitempty"`
+
+	// CloudInstanceName A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	CloudInstanceName *RootAuthorityRootAnchorIdentifier `json:"cloud_instance_name,omitempty"`
+	Crv               *RootAuthorityRootAnchorJwkCrv     `json:"crv,omitempty"`
+	E                 *string                            `json:"e,omitempty"`
+
+	// Issuer A bounded URI or URN, such as an issuer.
+	Issuer *RootAuthorityRootAnchorUri `json:"issuer,omitempty"`
+
+	// Kid A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	Kid     RootAuthorityRootAnchorIdentifier `json:"kid"`
+	Kty     RootAuthorityRootAnchorJwkKty     `json:"kty"`
+	N       *string                           `json:"n,omitempty"`
+	Use     *RootAuthorityRootAnchorJwkUse    `json:"use,omitempty"`
+	X       *string                           `json:"x,omitempty"`
+	X5c     *[]string                         `json:"x5c,omitempty"`
+	X5t     *string                           `json:"x5t,omitempty"`
+	X5tS256 *string                           `json:"x5t#S256,omitempty"`
+	Y       *string                           `json:"y,omitempty"`
+}
+
+// RootAuthorityRootAnchorJwkCrv defines model for RootAuthorityRootAnchorJwk.Crv.
+type RootAuthorityRootAnchorJwkCrv string
+
+// RootAuthorityRootAnchorJwkKty defines model for RootAuthorityRootAnchorJwk.Kty.
+type RootAuthorityRootAnchorJwkKty string
+
+// RootAuthorityRootAnchorJwkUse defines model for RootAuthorityRootAnchorJwk.Use.
+type RootAuthorityRootAnchorJwkUse string
+
+// RootAuthorityRootAnchorJwsAlgorithm Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+type RootAuthorityRootAnchorJwsAlgorithm string
+
+// RootAuthorityRootAnchorPublicKeyHex Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+type RootAuthorityRootAnchorPublicKeyHex = string
+
+// RootAuthorityRootAnchorRecordedClaims The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+type RootAuthorityRootAnchorRecordedClaims struct {
+	// Appid A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Appid *RootAuthorityRootAnchorClaimValue `json:"appid,omitempty"`
+
+	// Aud A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Aud *RootAuthorityRootAnchorClaimValue `json:"aud,omitempty"`
+
+	// Azp A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Azp *RootAuthorityRootAnchorClaimValue `json:"azp,omitempty"`
+
+	// ClientId A recorded claim: a plain string, a plain list of strings, or a committed value.
+	ClientId *RootAuthorityRootAnchorClaimValue `json:"client_id,omitempty"`
+
+	// Oid A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Oid *RootAuthorityRootAnchorClaimValue `json:"oid,omitempty"`
+
+	// Resource A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Resource *RootAuthorityRootAnchorClaimValue `json:"resource,omitempty"`
+
+	// Scope A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Scope *RootAuthorityRootAnchorClaimValue `json:"scope,omitempty"`
+
+	// Sub A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Sub *RootAuthorityRootAnchorClaimValue `json:"sub,omitempty"`
+
+	// Tid A recorded claim: a plain string, a plain list of strings, or a committed value.
+	Tid *RootAuthorityRootAnchorClaimValue `json:"tid,omitempty"`
+}
+
+// RootAuthorityRootAnchorSalt A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+type RootAuthorityRootAnchorSalt = string
+
+// RootAuthorityRootAnchorSaltRef defines model for RootAuthorityRootAnchorSaltRef.
+type RootAuthorityRootAnchorSaltRef = string
+
+// RootAuthorityRootAnchorSignatureHex Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+type RootAuthorityRootAnchorSignatureHex = string
+
+// RootAuthorityRootAnchorText A bounded NUL-free string.
+type RootAuthorityRootAnchorText = string
+
+// RootAuthorityRootAnchorUri A bounded URI or URN, such as an issuer.
+type RootAuthorityRootAnchorUri = string
+
+// RootAuthorityRootPolicy `chio.root-policy.v1`, signed by the provider's policy key. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts. Provider identity (issuer, keys, endpoints, audiences, principal and tenant claims) is never held here: a provider-backed rule names an enterprise provider record and pins the digest of its identity projection. Decoding is strict: an unknown member at any level rejects at load.
+type RootAuthorityRootPolicy struct {
+	Disclosure   RootAuthorityRootPolicyRootPolicyDisclosure `json:"disclosure"`
+	ExchangeKeys []RootAuthorityRootAnchorPublicKeyHex       `json:"exchange_keys"`
+
+	// PolicyId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	PolicyId RootAuthorityRootAnchorIdentifier `json:"policy_id"`
+
+	// PolicyKey Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+	PolicyKey RootAuthorityRootAnchorPublicKeyHex     `json:"policy_key"`
+	Rules     []RootAuthorityRootPolicyRootPolicyRule `json:"rules"`
+	Schema    RootAuthorityRootPolicySchema           `json:"schema"`
+
+	// Signature Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+	Signature  RootAuthorityRootAnchorSignatureHex `json:"signature"`
+	ValidFrom  int64                               `json:"valid_from"`
+	ValidUntil int64                               `json:"valid_until"`
+}
+
+// RootAuthorityRootPolicySchema defines model for RootAuthorityRootPolicy.Schema.
+type RootAuthorityRootPolicySchema string
+
+// RootAuthorityRootPolicyClaimMode defines model for RootAuthorityRootPolicyClaimMode.
+type RootAuthorityRootPolicyClaimMode string
+
+// RootAuthorityRootPolicyInlineFields defines model for RootAuthorityRootPolicyInlineFields.
+type RootAuthorityRootPolicyInlineFields struct {
+	InlineFields []string `json:"inline_fields"`
+}
+
+// RootAuthorityRootPolicyMatchClaims Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
+type RootAuthorityRootPolicyMatchClaims struct {
+	Appid    *[]RootAuthorityRootAnchorText `json:"appid,omitempty"`
+	Azp      *[]RootAuthorityRootAnchorText `json:"azp,omitempty"`
+	ClientId *[]RootAuthorityRootAnchorText `json:"client_id,omitempty"`
+	Oid      *[]RootAuthorityRootAnchorText `json:"oid,omitempty"`
+	Resource *[]RootAuthorityRootAnchorText `json:"resource,omitempty"`
+	Scope    *[]RootAuthorityRootAnchorText `json:"scope,omitempty"`
+	Sub      *[]RootAuthorityRootAnchorText `json:"sub,omitempty"`
+	Tid      *[]RootAuthorityRootAnchorText `json:"tid,omitempty"`
+}
+
+// RootAuthorityRootPolicyRecordedClaimModes Claims copied into the delegation context, each plain or committed. The claim set is closed.
+type RootAuthorityRootPolicyRecordedClaimModes struct {
+	Appid    *RootAuthorityRootPolicyClaimMode `json:"appid,omitempty"`
+	Aud      *RootAuthorityRootPolicyClaimMode `json:"aud,omitempty"`
+	Azp      *RootAuthorityRootPolicyClaimMode `json:"azp,omitempty"`
+	ClientId *RootAuthorityRootPolicyClaimMode `json:"client_id,omitempty"`
+	Oid      *RootAuthorityRootPolicyClaimMode `json:"oid,omitempty"`
+	Resource *RootAuthorityRootPolicyClaimMode `json:"resource,omitempty"`
+	Scope    *RootAuthorityRootPolicyClaimMode `json:"scope,omitempty"`
+	Sub      *RootAuthorityRootPolicyClaimMode `json:"sub,omitempty"`
+	Tid      *RootAuthorityRootPolicyClaimMode `json:"tid,omitempty"`
+}
+
+// RootAuthorityRootPolicyRootPolicyDisclosure defines model for RootAuthorityRootPolicyRootPolicyDisclosure.
+type RootAuthorityRootPolicyRootPolicyDisclosure struct {
+	// Default The only allowed value.
+	Default RootAuthorityRootPolicyRootPolicyDisclosureDefault `json:"default"`
+
+	// Tools `server/tool` to the RFC 6901 pointers that may appear in plaintext in that tool's receipts. A tool not listed is fully committed.
+	Tools *map[string]RootAuthorityRootPolicyToolDisclosure `json:"tools,omitempty"`
+}
+
+// RootAuthorityRootPolicyRootPolicyDisclosureDefault The only allowed value.
+type RootAuthorityRootPolicyRootPolicyDisclosureDefault string
+
+// RootAuthorityRootPolicyRootPolicyMatch What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.
+type RootAuthorityRootPolicyRootPolicyMatch struct {
+	AllowedAlgs *[]RootAuthorityRootAnchorJwsAlgorithm `json:"allowed_algs,omitempty"`
+
+	// AnchorKind Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+	AnchorKind RootAuthorityRootAnchorAnchorKind `json:"anchor_kind"`
+
+	// Claims Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
+	Claims *RootAuthorityRootPolicyMatchClaims `json:"claims,omitempty"`
+
+	// ProviderIdentityDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ProviderIdentityDigest *RootAuthorityRootAnchorDigest `json:"provider_identity_digest,omitempty"`
+
+	// ProviderRecordId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	ProviderRecordId *RootAuthorityRootAnchorIdentifier `json:"provider_record_id,omitempty"`
+}
+
+// RootAuthorityRootPolicyRootPolicyRule defines model for RootAuthorityRootPolicyRootPolicyRule.
+type RootAuthorityRootPolicyRootPolicyRule struct {
+	// CapabilityTtlSecs Defaults to 300.
+	CapabilityTtlSecs *int64 `json:"capability_ttl_secs,omitempty"`
+
+	// CeilingScope What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
+	CeilingScope CapabilityTokenChioScope `json:"ceiling_scope"`
+
+	// CeilingScopeHash SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	CeilingScopeHash RootAuthorityRootAnchorDigest        `json:"ceiling_scope_hash"`
+	HolderClasses    []RootAuthorityRootAnchorHolderClass `json:"holder_classes"`
+
+	// IdpScopeProjection Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.
+	IdpScopeProjection *map[string][]RootAuthorityRootAnchorIdentifier `json:"idp_scope_projection,omitempty"`
+
+	// Match What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.
+	Match RootAuthorityRootPolicyRootPolicyMatch `json:"match"`
+
+	// MaxAssertionLifetimeSecs Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.
+	MaxAssertionLifetimeSecs *int64 `json:"max_assertion_lifetime_secs,omitempty"`
+	MaxClockSkewSecs         *int64 `json:"max_clock_skew_secs,omitempty"`
+
+	// Principal A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	Principal *RootAuthorityRootAnchorIdentifier `json:"principal,omitempty"`
+
+	// RecordedClaims Claims copied into the delegation context, each plain or committed. The claim set is closed.
+	RecordedClaims RootAuthorityRootPolicyRecordedClaimModes `json:"recorded_claims"`
+
+	// RetainIdpArtifact Allowed only on `oauth_id_jag` rules.
+	RetainIdpArtifact *bool `json:"retain_idp_artifact,omitempty"`
+
+	// RuleId A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	RuleId RootAuthorityRootAnchorIdentifier `json:"rule_id"`
+
+	// TenantValue A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+	TenantValue *RootAuthorityRootAnchorIdentifier `json:"tenant_value,omitempty"`
+}
+
+// RootAuthorityRootPolicyToolDisclosure defines model for RootAuthorityRootPolicyToolDisclosure.
+type RootAuthorityRootPolicyToolDisclosure struct {
+	Parameters RootAuthorityRootPolicyInlineFields `json:"parameters"`
+	Result     RootAuthorityRootPolicyInlineFields `json:"result"`
+}
+
+// RootAuthorityVerifierTrust `chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
+type RootAuthorityVerifierTrust struct {
+	CheckpointKeys *[]RootAuthorityRootAnchorPublicKeyHex `json:"checkpoint_keys,omitempty"`
+	ExchangeKeys   []RootAuthorityRootAnchorPublicKeyHex  `json:"exchange_keys"`
+
+	// IdpKeys Issuer to the identity-provider keys the verifier pins itself.
+	IdpKeys    *map[string][]RootAuthorityRootAnchorJwk `json:"idp_keys,omitempty"`
+	KernelKeys []RootAuthorityRootAnchorPublicKeyHex    `json:"kernel_keys"`
+
+	// PepKeys Policy enforcement point id to its pinned key.
+	PepKeys         *map[string]RootAuthorityRootAnchorPublicKeyHex `json:"pep_keys,omitempty"`
+	RequiredColumns *[]RootAuthorityVerifierTrustRequiredColumns    `json:"required_columns,omitempty"`
+	RootPolicyKeys  []RootAuthorityRootAnchorPublicKeyHex           `json:"root_policy_keys"`
+	Schema          RootAuthorityVerifierTrustSchema                `json:"schema"`
+}
+
+// RootAuthorityVerifierTrustRequiredColumns defines model for RootAuthorityVerifierTrust.RequiredColumns.
+type RootAuthorityVerifierTrustRequiredColumns string
+
+// RootAuthorityVerifierTrustSchema defines model for RootAuthorityVerifierTrust.Schema.
+type RootAuthorityVerifierTrustSchema string
 
 // SecurityBrokerAdminControlReceiptBodyV1 defines model for SecurityBrokerAdminControlReceiptBodyV1.
 type SecurityBrokerAdminControlReceiptBodyV1 struct {
@@ -24687,6 +25394,156 @@ func (t ResultErr_Error) MarshalJSON() ([]byte, error) {
 }
 
 func (t *ResultErr_Error) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRootAuthorityRootAnchorHttpsUrl returns the union data inside the RootAuthorityIdpKeySnapshot_Source as a RootAuthorityRootAnchorHttpsUrl
+func (t RootAuthorityIdpKeySnapshot_Source) AsRootAuthorityRootAnchorHttpsUrl() (RootAuthorityRootAnchorHttpsUrl, error) {
+	var body RootAuthorityRootAnchorHttpsUrl
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityRootAnchorHttpsUrl overwrites any union data inside the RootAuthorityIdpKeySnapshot_Source as the provided RootAuthorityRootAnchorHttpsUrl
+func (t *RootAuthorityIdpKeySnapshot_Source) FromRootAuthorityRootAnchorHttpsUrl(v RootAuthorityRootAnchorHttpsUrl) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityRootAnchorHttpsUrl performs a merge with any union data inside the RootAuthorityIdpKeySnapshot_Source, using the provided RootAuthorityRootAnchorHttpsUrl
+func (t *RootAuthorityIdpKeySnapshot_Source) MergeRootAuthorityRootAnchorHttpsUrl(v RootAuthorityRootAnchorHttpsUrl) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRootAuthorityIdpKeySnapshotSource1 returns the union data inside the RootAuthorityIdpKeySnapshot_Source as a RootAuthorityIdpKeySnapshotSource1
+func (t RootAuthorityIdpKeySnapshot_Source) AsRootAuthorityIdpKeySnapshotSource1() (RootAuthorityIdpKeySnapshotSource1, error) {
+	var body RootAuthorityIdpKeySnapshotSource1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityIdpKeySnapshotSource1 overwrites any union data inside the RootAuthorityIdpKeySnapshot_Source as the provided RootAuthorityIdpKeySnapshotSource1
+func (t *RootAuthorityIdpKeySnapshot_Source) FromRootAuthorityIdpKeySnapshotSource1(v RootAuthorityIdpKeySnapshotSource1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityIdpKeySnapshotSource1 performs a merge with any union data inside the RootAuthorityIdpKeySnapshot_Source, using the provided RootAuthorityIdpKeySnapshotSource1
+func (t *RootAuthorityIdpKeySnapshot_Source) MergeRootAuthorityIdpKeySnapshotSource1(v RootAuthorityIdpKeySnapshotSource1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RootAuthorityIdpKeySnapshot_Source) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RootAuthorityIdpKeySnapshot_Source) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsRootAuthorityRootAnchorText returns the union data inside the RootAuthorityRootAnchorClaimValue as a RootAuthorityRootAnchorText
+func (t RootAuthorityRootAnchorClaimValue) AsRootAuthorityRootAnchorText() (RootAuthorityRootAnchorText, error) {
+	var body RootAuthorityRootAnchorText
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityRootAnchorText overwrites any union data inside the RootAuthorityRootAnchorClaimValue as the provided RootAuthorityRootAnchorText
+func (t *RootAuthorityRootAnchorClaimValue) FromRootAuthorityRootAnchorText(v RootAuthorityRootAnchorText) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityRootAnchorText performs a merge with any union data inside the RootAuthorityRootAnchorClaimValue, using the provided RootAuthorityRootAnchorText
+func (t *RootAuthorityRootAnchorClaimValue) MergeRootAuthorityRootAnchorText(v RootAuthorityRootAnchorText) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRootAuthorityRootAnchorClaimValue1 returns the union data inside the RootAuthorityRootAnchorClaimValue as a RootAuthorityRootAnchorClaimValue1
+func (t RootAuthorityRootAnchorClaimValue) AsRootAuthorityRootAnchorClaimValue1() (RootAuthorityRootAnchorClaimValue1, error) {
+	var body RootAuthorityRootAnchorClaimValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityRootAnchorClaimValue1 overwrites any union data inside the RootAuthorityRootAnchorClaimValue as the provided RootAuthorityRootAnchorClaimValue1
+func (t *RootAuthorityRootAnchorClaimValue) FromRootAuthorityRootAnchorClaimValue1(v RootAuthorityRootAnchorClaimValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityRootAnchorClaimValue1 performs a merge with any union data inside the RootAuthorityRootAnchorClaimValue, using the provided RootAuthorityRootAnchorClaimValue1
+func (t *RootAuthorityRootAnchorClaimValue) MergeRootAuthorityRootAnchorClaimValue1(v RootAuthorityRootAnchorClaimValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRootAuthorityRootAnchorCommitment returns the union data inside the RootAuthorityRootAnchorClaimValue as a RootAuthorityRootAnchorCommitment
+func (t RootAuthorityRootAnchorClaimValue) AsRootAuthorityRootAnchorCommitment() (RootAuthorityRootAnchorCommitment, error) {
+	var body RootAuthorityRootAnchorCommitment
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRootAuthorityRootAnchorCommitment overwrites any union data inside the RootAuthorityRootAnchorClaimValue as the provided RootAuthorityRootAnchorCommitment
+func (t *RootAuthorityRootAnchorClaimValue) FromRootAuthorityRootAnchorCommitment(v RootAuthorityRootAnchorCommitment) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRootAuthorityRootAnchorCommitment performs a merge with any union data inside the RootAuthorityRootAnchorClaimValue, using the provided RootAuthorityRootAnchorCommitment
+func (t *RootAuthorityRootAnchorClaimValue) MergeRootAuthorityRootAnchorCommitment(v RootAuthorityRootAnchorCommitment) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t RootAuthorityRootAnchorClaimValue) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *RootAuthorityRootAnchorClaimValue) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }

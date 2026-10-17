@@ -1,0 +1,7 @@
+{
+  "kind": "oauth_id_jag",
+  "context_digest": "sha256:98CE71691EB7F5FA848C099FC43A61EE896B83F995ACCF9C63B91993A1D4E54F",
+  "root_policy_digest": "sha256:9b4f99320898437fa3e016f9995894f863b4197dcacf6a964d7b12967c077664",
+  "anchored_at": 1792234795,
+  "assertion_exp": 1792235090
+}

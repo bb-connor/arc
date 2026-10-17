@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/revocation/v1",
+  "title": "Chio Capability Revocation Entry",
+  "description": "A single revocation entry. Its target is one of the closed target kinds of PROTOCOL 5.6.7; `capability_id` revokes that capability and every descendant, the other kinds revoke every anchored root they match. Subject and tenant targets are stored as tags, never as plaintext. Operators write entries through `/admin/revocations`; a denied call's receipt names the matching `entry_id` in its guard evidence. Mirrors the kernel revocation store row. Introduced with anchored roots (PROTOCOL 5.6).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entry_id",
+    "target_kind",
+    "target",
+    "revoked_at"
+  ],
+  "properties": {
+    "entry_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable revocation entry id returned to the admin and named in deny receipts."
+    },
+    "target_kind": {
+      "type": "string",
+      "enum": [
+        "capability_id",
+        "root_policy_rule",
+        "anchor_subject",
+        "tenant_tag",
+        "replay_key"
+      ]
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A capability `id`, a root policy `rule_id`, a subject tag, a tenant tag, or the `replay_key_digest` of one assertion, per `target_kind`."
+    },
+    "revoked_at": {
+      "type": "integer",
+      "description": "Unix timestamp (seconds) at which the revocation took effect. Stored as a signed integer in the kernel store; negative values are not produced by the issuer but are not rejected here in order to match the Rust `i64` shape."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "target_kind": {
+            "enum": [
+              "anchor_subject",
+              "tenant_tag"
+            ]
+          }
+        },
+        "required": [
+          "target_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "HMAC-SHA256 tag as 64 lowercase hex characters."
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "target_kind": {
+            "const": "replay_key"
+          }
+        },
+        "required": [
+          "target_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  ]
+}

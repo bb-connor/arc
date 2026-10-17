@@ -1,0 +1,13 @@
+{
+  "schema": "chio.enterprise-provider-identity.v1",
+  "provider_id": "acme-okta",
+  "kind": "oidc_jwks",
+  "issuer": "https://acme.okta.com",
+  "jwks_url": "https://acme.okta.com/oauth2/v1/keys",
+  "audiences": [],
+  "subject_mapping": {
+    "principal_source": "sub",
+    "tenant_id_field": "iss"
+  },
+  "trust_material_ref": "okta-org-acme"
+}

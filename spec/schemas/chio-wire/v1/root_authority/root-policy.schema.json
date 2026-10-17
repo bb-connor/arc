@@ -1,0 +1,654 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/root-policy.schema.json",
+  "title": "Chio Root Policy",
+  "description": "`chio.root-policy.v1`, signed by the provider's policy key. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts. Provider identity (issuer, keys, endpoints, audiences, principal and tenant claims) is never held here: a provider-backed rule names an enterprise provider record and pins the digest of its identity projection. Decoding is strict: an unknown member at any level rejects at load.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "policy_id",
+    "policy_key",
+    "exchange_keys",
+    "rules",
+    "disclosure",
+    "valid_from",
+    "valid_until",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.root-policy.v1"
+    },
+    "policy_id": {
+      "$ref": "root-anchor.schema.json#/$defs/Identifier"
+    },
+    "policy_key": {
+      "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex",
+      "description": "Must equal the policy key pinned in the edge configuration."
+    },
+    "exchange_keys": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
+      },
+      "maxItems": 16
+    },
+    "rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/RootPolicyRule"
+      },
+      "maxItems": 64
+    },
+    "disclosure": {
+      "$ref": "#/$defs/RootPolicyDisclosure"
+    },
+    "valid_from": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "valid_until": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "signature": {
+      "$ref": "root-anchor.schema.json#/$defs/SignatureHex"
+    }
+  },
+  "$defs": {
+    "RootPolicyRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "match",
+        "ceiling_scope",
+        "ceiling_scope_hash",
+        "recorded_claims",
+        "holder_classes"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "root-anchor.schema.json#/$defs/Identifier"
+        },
+        "match": {
+          "$ref": "#/$defs/RootPolicyMatch"
+        },
+        "idp_scope_projection": {
+          "type": "object",
+          "maxProperties": 256,
+          "propertyNames": {
+            "maxLength": 128,
+            "pattern": "^[^\\u0000]+$"
+          },
+          "description": "Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.",
+          "additionalProperties": {
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "$ref": "root-anchor.schema.json#/$defs/Identifier"
+            }
+          }
+        },
+        "ceiling_scope": {
+          "$ref": "../capability/token.schema.json#/$defs/chioScope"
+        },
+        "ceiling_scope_hash": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest"
+        },
+        "recorded_claims": {
+          "$ref": "#/$defs/RecordedClaimModes"
+        },
+        "holder_classes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/HolderClass"
+          },
+          "maxItems": 2
+        },
+        "capability_ttl_secs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Defaults to 300.",
+          "maximum": 86400
+        },
+        "max_assertion_lifetime_secs": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.",
+          "maximum": 86400
+        },
+        "max_clock_skew_secs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 60
+        },
+        "retain_idp_artifact": {
+          "type": "boolean",
+          "description": "Allowed only on `oauth_id_jag` rules."
+        },
+        "principal": {
+          "$ref": "root-anchor.schema.json#/$defs/Identifier",
+          "description": "Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind."
+        },
+        "tenant_value": {
+          "$ref": "root-anchor.schema.json#/$defs/Identifier",
+          "description": "Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "enum": [
+                      "oauth_id_jag",
+                      "entra_jwt",
+                      "entra_agent_id",
+                      "oidc_jwt",
+                      "oauth_introspection"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "properties": {
+              "match": {
+                "required": [
+                  "provider_record_id",
+                  "provider_identity_digest"
+                ]
+              }
+            }
+          },
+          "else": {
+            "allOf": [
+              {
+                "properties": {
+                  "match": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "provider_record_id"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "provider_identity_digest"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "allowed_algs"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "idp_scope_projection"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "enum": [
+                      "oauth_id_jag",
+                      "entra_jwt",
+                      "entra_agent_id",
+                      "oidc_jwt"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "properties": {
+              "match": {
+                "required": [
+                  "allowed_algs"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "const": "operator_static_bearer"
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "required": [
+              "principal",
+              "tenant_value"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "principal"
+                  ]
+                },
+                {
+                  "required": [
+                    "tenant_value"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "enum": [
+                      "entra_jwt",
+                      "entra_agent_id"
+                    ]
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "max_assertion_lifetime_secs"
+              ]
+            }
+          },
+          "else": {
+            "allOf": [
+              {
+                "properties": {
+                  "recorded_claims": {
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "azp"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "appid"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "oid"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "tid"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "match": {
+                    "properties": {
+                      "claims": {
+                        "not": {
+                          "anyOf": [
+                            {
+                              "required": [
+                                "azp"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "appid"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "oid"
+                              ]
+                            },
+                            {
+                              "required": [
+                                "tid"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "const": "oauth_id_jag"
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "retain_idp_artifact"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "const": "oauth_introspection"
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "properties": {
+              "match": {
+                "not": {
+                  "required": [
+                    "allowed_algs"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "RootPolicyMatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_kind"
+      ],
+      "properties": {
+        "anchor_kind": {
+          "$ref": "root-anchor.schema.json#/$defs/AnchorKind"
+        },
+        "provider_record_id": {
+          "$ref": "root-anchor.schema.json#/$defs/Identifier",
+          "description": "`provider_id` of the enterprise provider record this rule verifies against. Required for provider-backed kinds and absent otherwise."
+        },
+        "provider_identity_digest": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest",
+          "description": "`SHA-256(\"chio.enterprise-provider-identity.v1\\0\" || canonical_json(projection))` over the record's identity projection. A record whose projection differs denies."
+        },
+        "allowed_algs": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/JwsAlgorithm"
+          }
+        },
+        "claims": {
+          "$ref": "#/$defs/MatchClaims"
+        }
+      },
+      "description": "What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record."
+    },
+    "RootPolicyDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "default"
+      ],
+      "properties": {
+        "default": {
+          "type": "string",
+          "const": "committed",
+          "description": "The only allowed value."
+        },
+        "tools": {
+          "type": "object",
+          "description": "`server/tool` to the RFC 6901 pointers that may appear in plaintext in that tool's receipts. A tool not listed is fully committed.",
+          "additionalProperties": {
+            "$ref": "#/$defs/ToolDisclosure"
+          },
+          "maxProperties": 1024,
+          "propertyNames": {
+            "maxLength": 256,
+            "pattern": "^[^\\u0000/]+/[^\\u0000]+$"
+          }
+        }
+      }
+    },
+    "ToolDisclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameters",
+        "result"
+      ],
+      "properties": {
+        "parameters": {
+          "$ref": "#/$defs/InlineFields"
+        },
+        "result": {
+          "$ref": "#/$defs/InlineFields"
+        }
+      }
+    },
+    "InlineFields": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inline_fields"
+      ],
+      "properties": {
+        "inline_fields": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(/([^~/]|~[01])*)+$",
+            "maxLength": 256
+          },
+          "maxItems": 64
+        }
+      }
+    },
+    "MatchClaims": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.",
+      "properties": {
+        "client_id": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "scope": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "sub": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "resource": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "azp": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "appid": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "oid": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        },
+        "tid": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "$ref": "root-anchor.schema.json#/$defs/Text"
+          }
+        }
+      }
+    },
+    "RecordedClaimModes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Claims copied into the delegation context, each plain or committed. The claim set is closed.",
+      "properties": {
+        "client_id": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "scope": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "sub": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "aud": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "resource": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "azp": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "appid": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "oid": {
+          "$ref": "#/$defs/ClaimMode"
+        },
+        "tid": {
+          "$ref": "#/$defs/ClaimMode"
+        }
+      }
+    },
+    "ClaimMode": {
+      "type": "string",
+      "enum": [
+        "plain",
+        "committed"
+      ]
+    }
+  }
+}

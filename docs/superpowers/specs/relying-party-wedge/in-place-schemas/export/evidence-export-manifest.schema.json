@@ -1,0 +1,359 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json",
+  "title": "Chio Evidence Export Manifest",
+  "description": "`chio.evidence_export_manifest.v1`, signed by the kernel key through `chio.evidence_export_commitment.v1`. Mirrors `EvidenceExportManifest` (camelCase members). `disclosureProfile`, `tenantTag` and `artifacts`: Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "exportedAt",
+    "query",
+    "counts",
+    "proofCoverage",
+    "childReceiptScope",
+    "files",
+    "disclosureProfile"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.evidence_export_manifest.v1"
+    },
+    "exportedAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Mirrors `EvidenceExportQuery`.",
+      "properties": {
+        "capabilityId": {
+          "type": "string"
+        },
+        "agentSubject": {
+          "type": "string"
+        },
+        "since": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "until": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "tenant": {
+          "type": "string"
+        },
+        "readBoundary": {
+          "description": "Mirrors `ReceiptReadBoundary`; unchanged."
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "toolReceipts",
+        "childReceipts",
+        "checkpoints",
+        "capabilityLineage",
+        "inclusionProofs",
+        "uncheckpointedReceipts"
+      ],
+      "properties": {
+        "toolReceipts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "childReceipts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checkpoints": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "capabilityLineage": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "inclusionProofs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncheckpointedReceipts": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "proofCoverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpointedReceipts",
+        "uncheckpointedReceipts"
+      ],
+      "properties": {
+        "checkpointedReceipts": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncheckpointedReceipts": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "receiptSemantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mediatedDecisions",
+        "traceObservations",
+        "advisoryEvaluations",
+        "prevent",
+        "detectOnly",
+        "advisoryOnly",
+        "cannotSee",
+        "authorized"
+      ],
+      "properties": {
+        "mediatedDecisions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "traceObservations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "advisoryEvaluations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prevent": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "detectOnly": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "advisoryOnly": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cannotSee": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "authorized": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "childReceiptScope": {
+      "type": "string",
+      "enum": [
+        "full_query_window",
+        "time_window_context_only",
+        "omitted_no_join_path"
+      ]
+    },
+    "claimBoundary": {
+      "type": "object",
+      "description": "Mirrors `EvidenceTransparencyClaims`; unchanged."
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fileHash"
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "sourceHash",
+        "runtimeHash",
+        "sourcePath",
+        "sourceBytes"
+      ],
+      "properties": {
+        "format": {
+          "type": "string"
+        },
+        "sourceHash": {
+          "type": "string"
+        },
+        "runtimeHash": {
+          "type": "string"
+        },
+        "sourcePath": {
+          "type": "string"
+        },
+        "sourceBytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "federationPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issuer",
+        "partner",
+        "signerPublicKey",
+        "createdAt",
+        "expiresAt",
+        "requireProofs"
+      ],
+      "properties": {
+        "issuer": {
+          "type": "string"
+        },
+        "partner": {
+          "type": "string"
+        },
+        "signerPublicKey": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/PublicKeyHex"
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expiresAt": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "requireProofs": {
+          "type": "boolean"
+        }
+      }
+    },
+    "disclosureNotice": {
+      "type": "object",
+      "description": "Mirrors `EvidenceDisclosureNotice`; unchanged."
+    },
+    "disclosureProfile": {
+      "type": "string",
+      "enum": [
+        "caller",
+        "auditor_full",
+        "auditor_hash_only"
+      ],
+      "description": "`caller`: receipts for one tenant, salts for their parameters and content and for the tenant's own subject and tenant commitments, no payloads. `auditor_full`: salts and payloads. `auditor_hash_only`: no salts and no payloads."
+    },
+    "tenantTag": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "HMAC-SHA256 tenant tag as 64 lowercase hex characters. Required for `caller`; the bundle holds only receipts whose stored tag matches."
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "Root-authority and disclosure artifacts in the bundle. Each entry's file is also listed in `files`.",
+      "items": {
+        "$ref": "#/$defs/artifactEntry"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "disclosureProfile": {
+            "const": "caller"
+          }
+        },
+        "required": [
+          "disclosureProfile"
+        ]
+      },
+      "then": {
+        "required": [
+          "tenantTag"
+        ],
+        "properties": {
+          "artifacts": {
+            "items": {
+              "properties": {
+                "role": {
+                  "not": {
+                    "const": "idp_artifact"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "tenantTag"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "fileHash": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "artifactEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "path"
+      ],
+      "properties": {
+        "role": {
+          "type": "string",
+          "enum": [
+            "capability_presentation",
+            "delegation_context",
+            "root_policy",
+            "idp_key_snapshot",
+            "idp_artifact",
+            "receipt_disclosure",
+            "revocation_entry",
+            "revocation_request",
+            "settlement_closure",
+            "pdp_decision_receipt"
+          ],
+          "description": "`idp_artifact` (a retained ID-JAG) appears only in auditor profiles."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

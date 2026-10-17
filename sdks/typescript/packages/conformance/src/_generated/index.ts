@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 9dd07ed6b8a6798299f7f0bd6dc9f8a178dc0ab7cf90435ce8edab69fd9fe430
+// Schema SHA: 1a8bf6e0398117241555d9888529fea9ee0bf71f3544c9805be3ca41e9f1150d
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -863,6 +863,561 @@ export namespace Capability_Grant {
      * @minItems 1
      */
     operations: [Operation, ...Operation[]];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/capability/presentation.schema.json
+export namespace Capability_Presentation {
+  /**
+   * A Chio capability token with typed caveats, attenuation fields, attenuation proof, budget share, and hybrid signing support folded into the unreleased v1 wire shape.
+   */
+  export type ChioCapabilityToken = {
+    [k: string]: unknown;
+  } & {
+    schema: "chio.capability.v1";
+    id: string;
+    issuer: string;
+    subject: string;
+    scope: ChioScope;
+    issued_at: number;
+    expires_at: number;
+    delegation_chain?: DelegationLink[];
+    aggregate_invocation_budget?: ChioAggregateInvocationBudget;
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    /**
+     * At most one caveat, which must be bind_security_context.
+     *
+     * @maxItems 1
+     */
+    caveats?: [] | [Caveat];
+    scope_attenuations?: {
+      type: string;
+      [k: string]: unknown;
+    }[];
+    attenuation_proof?: AttenuationProof;
+    /**
+     * Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed.
+     */
+    budget_share_bps?: number;
+    signature: string;
+  };
+  export type ChioAggregateInvocationBudget =
+    | {
+        scope: "capability";
+        max_invocations: number;
+        root_binding?: never;
+      }
+    | {
+        scope: "delegation_family";
+        max_invocations: number;
+        root_binding: ChioAggregateBudgetRootBinding;
+      };
+  export type Caveat = {
+    [k: string]: unknown;
+  } & {
+    kind:
+      | "restrict_tool"
+      | "bind_session"
+      | "restrict_audience"
+      | "restrict_geo"
+      | "restrict_time_window"
+      | "bind_security_context";
+    /**
+     * For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.
+     */
+    predicate: string;
+    sig?: string;
+  };
+  export type DelegationAnchor = {
+    [k: string]: unknown;
+  } & {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * The provider record's issuer for provider-backed kinds; `urn:chio:operator` for `operator_static_bearer`.
+     */
+    issuer: string;
+    /**
+     * The enterprise provider record the exchange verified against. Present exactly for provider-backed kinds.
+     */
+    provider_record_id?: string;
+    /**
+     * Digest of the record's `chio.enterprise-provider-identity.v1` projection; equals the matched rule's. Present exactly for provider-backed kinds.
+     */
+    provider_identity_digest?: string;
+    /**
+     * Digest of the `chio.idp-key-snapshot.v1` in force when the assertion was verified.
+     */
+    key_snapshot_digest?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    kid?: string;
+    /**
+     * Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+     */
+    alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
+    /**
+     * SHA-256 of the exact compact JWS bytes received.
+     */
+    artifact_digest?: string;
+    /**
+     * True only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`.
+     */
+    artifact_retained: boolean;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    replay_key_digest: string;
+    token_iat: number;
+    token_exp: number;
+    subject: SubjectCommitment;
+    tenant: TenantCommitment;
+    claims: RecordedClaims;
+  };
+
+  /**
+   * `chio.capability-presentation.v1`, carried in MCP `_meta.chioCapability`: a leaf capability, its signed ancestors and, when the presenter is not the session holder, the delegation context. The envelope is unsigned; every member inside is verified independently. Decoding is strict.
+   */
+  export interface ChioCapabilityPresentation {
+    schema: "chio.capability-presentation.v1";
+    leaf: ChioCapabilityToken;
+    /**
+     * Signed ancestors ordered root to parent, at most 16. A root presented alone has an empty list.
+     *
+     * @maxItems 16
+     */
+    ancestors:
+      | []
+      | [ChioCapabilityToken]
+      | [ChioCapabilityToken, ChioCapabilityToken]
+      | [ChioCapabilityToken, ChioCapabilityToken, ChioCapabilityToken]
+      | [ChioCapabilityToken, ChioCapabilityToken, ChioCapabilityToken, ChioCapabilityToken]
+      | [ChioCapabilityToken, ChioCapabilityToken, ChioCapabilityToken, ChioCapabilityToken, ChioCapabilityToken]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ]
+      | [
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken,
+          ChioCapabilityToken
+        ];
+    delegation_context?: ChioDelegationContext;
+  }
+  /**
+   * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
+   */
+  export interface ChioScope {
+    grants?: ToolGrant[];
+    resource_grants?: ResourceGrant[];
+    prompt_grants?: PromptGrant[];
+  }
+  /**
+   * Authorization to invoke a single tool. Mirrors `ToolGrant`.
+   */
+  export interface ToolGrant {
+    server_id: string;
+    tool_name: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+    constraints?: (
+      | GenericConstraint
+      | RequireApprovalAboveConstraint
+      | CumulativeApprovalDirectConstraint
+      | CumulativeApprovalDelegableConstraint
+    )[];
+    max_invocations?: number;
+    max_cost_per_invocation?: MonetaryAmount;
+    max_total_cost?: MonetaryAmount;
+    dpop_required?: boolean;
+  }
+  /**
+   * Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
+   */
+  export interface GenericConstraint {
+    type: string;
+    value?: unknown;
+  }
+  export interface RequireApprovalAboveConstraint {
+    type: "require_approval_above";
+    value: {
+      threshold_units: number;
+    };
+  }
+  export interface CumulativeApprovalDirectConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      threshold: MonetaryAmount;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      cumulative_approval_root_binding?: never;
+    };
+  }
+  /**
+   * A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
+   */
+  export interface MonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  export interface CumulativeApprovalDelegableConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      threshold: MonetaryAmount;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      cumulative_approval_root_binding: ChioCumulativeApprovalRootBinding;
+    };
+  }
+  export interface ChioCumulativeApprovalRootBinding {
+    body: {
+      schema: "chio.cumulative-approval-root.v1";
+      signer_key_epoch: number;
+      root_capability_id: string;
+      root_capability_hash: string;
+      root_issuer: string;
+      root_subject: string;
+      root_scope_hash: string;
+      root_grant_hash: string;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      threshold: CumulativeRootMonetaryAmount;
+      root_expires_at: number;
+    };
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface CumulativeRootMonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  /**
+   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+   */
+  export interface ResourceGrant {
+    uri_pattern: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+  }
+  /**
+   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+   */
+  export interface PromptGrant {
+    prompt_name: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+  }
+  /**
+   * A single delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.
+   */
+  export interface DelegationLink {
+    capability_id: string;
+    delegator: string;
+    delegatee: string;
+    attenuations?: {
+      type: string;
+      [k: string]: unknown;
+    }[];
+    timestamp: number;
+    signature: string;
+    /**
+     * RFC 8785 canonical scope hash for this delegation hop. Runtime verification rejects links that omit it.
+     */
+    scope_hash: string;
+  }
+  export interface ChioAggregateBudgetRootBinding {
+    body: {
+      schema: "chio.aggregate-budget-root.v1";
+      root_capability_id: string;
+      root_capability_hash: string;
+      root_issuer: string;
+      root_subject: string;
+      max_invocations: number;
+      root_expires_at: number;
+      root_scope_hash: string;
+    };
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface AttenuationProof {
+    parentScopeHash: string;
+    childScopeHash: string;
+    normalizedSubsetProof: AttenuationWitness;
+  }
+  export interface AttenuationWitness {
+    normalizedParentScope: string;
+    normalizedChildScope: string;
+    subsetRelations?: GrantSubsetRelation[];
+    restrictedPredicates?: string[];
+  }
+  export interface GrantSubsetRelation {
+    grantKind: "tool" | "resource" | "prompt";
+    childIndex: number;
+    parentIndex: number;
+    subset: true;
+  }
+  /**
+   * Required when the presenter is not the session holder, so the verifier can recompute `context_digest`.
+   */
+  export interface ChioDelegationContext {
+    schema: "chio.delegation-context.v1";
+    anchor: DelegationAnchor;
+    exchange: DelegationExchange;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    root_policy_rule_id: string;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    effective_root_scope_hash: string;
+  }
+  /**
+   * `SHA-256("chio.delegation-context.subject.v1\0" || salt || utf8(subject))`.
+   */
+  export interface SubjectCommitment {
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    commit: string;
+    salt_ref: "anchor.sub";
+  }
+  /**
+   * `SHA-256("chio.delegation-context.tenant.v1\0" || salt || utf8(tenant))`.
+   */
+  export interface TenantCommitment {
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    commit: string;
+    salt_ref: "anchor.tenant";
+  }
+  /**
+   * Exactly the claims the matched rule names in `recorded_claims`, each plain or committed per the rule.
+   */
+  export interface RecordedClaims {
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    client_id?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    scope?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    sub?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    aud?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    resource?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    azp?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    appid?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    oid?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    tid?: string | string[] | Commitment;
+  }
+  /**
+   * A salted commitment whose salt is held in the disclosure store under `salt_ref`.
+   */
+  export interface Commitment {
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    commit: string;
+    salt_ref: string;
+  }
+  export interface DelegationExchange {
+    /**
+     * Equals the issuer key of the minted root.
+     */
+    exchange_key: string;
+    exchanged_at: number;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    request_digest: string;
+    /**
+     * Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+     */
+    holder: "edge_session" | "caller";
   }
 }
 
@@ -2730,6 +3285,42 @@ export namespace Receipt_DeliveryContract {
 }
 
 // -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/disclosure.schema.json
+export namespace Receipt_Disclosure {
+  /**
+   * `chio.receipt-disclosure.v1`: an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening. The same salt under two `salt_ref` values marks the receipt as tampered disclosure.
+   */
+  export interface ChioReceiptDisclosure {
+    schema: "chio.receipt-disclosure.v1";
+    /**
+     * `id` of the receipt whose commitments these openings open.
+     */
+    receipt_id: string;
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    openings: [Opening, ...Opening[]];
+  }
+  export interface Opening {
+    /**
+     * Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant` or a committed claim).
+     */
+    salt_ref: string;
+    /**
+     * A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+     */
+    salt: string;
+    /**
+     * The committed value. `null` is a salt-only opening, valid only where the holder already has the payload (the caller copy, `caller` bundles and the PDP response to the enforcement point that sent the arguments).
+     */
+    payload: {
+      [k: string]: unknown;
+    };
+  }
+}
+
+// -----------------------------------------------------------------------------
 // Source: spec/schemas/chio-wire/v1/receipt/finding-delivery.schema.json
 export namespace Receipt_FindingDelivery {
   export type Identifier = string;
@@ -2993,6 +3584,65 @@ export namespace Receipt_Record {
     issuer_public_key_hex: string;
     message_count: 14;
     signature_hex: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/receipt/settlement-closure.schema.json
+export namespace Receipt_SettlementClosure {
+  export type SettlementState = "settled" | "authorized_pending" | "failed";
+  /**
+   * Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`.
+   */
+  export type Asset = string;
+
+  /**
+   * `chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
+   */
+  export interface ChioSettlementClosure {
+    schema: "chio.settlement-closure.v1";
+    terminal_receipt_id: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    hold_id: string;
+    rail: "x402";
+    state: SettlementState;
+    asset: Asset;
+    /**
+     * Integer minor units as a decimal string.
+     */
+    amount: string;
+    /**
+     * @minItems 1
+     * @maxItems 8
+     */
+    rail_refs:
+      | [RailRef]
+      | [RailRef, RailRef]
+      | [RailRef, RailRef, RailRef]
+      | [RailRef, RailRef, RailRef, RailRef]
+      | [RailRef, RailRef, RailRef, RailRef, RailRef]
+      | [RailRef, RailRef, RailRef, RailRef, RailRef, RailRef]
+      | [RailRef, RailRef, RailRef, RailRef, RailRef, RailRef, RailRef]
+      | [RailRef, RailRef, RailRef, RailRef, RailRef, RailRef, RailRef, RailRef];
+    observed_at: number;
+    /**
+     * Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+     */
+    kernel_key: string;
+    /**
+     * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+     */
+    signature: string;
+  }
+  export interface RailRef {
+    kind: "x402.payment_requirements" | "x402.payment_payload" | "x402.settlement_response";
+    id?: string;
+    /**
+     * Digest over the canonical JSON of the decoded base64 payload.
+     */
+    digest: string;
   }
 }
 
@@ -46754,6 +47404,1082 @@ export namespace Result_StreamComplete {
   export interface ChioToolCallResultStreamComplete {
     status: "stream_complete";
     total_chunks: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/delegation-context.schema.json
+export namespace RootAuthority_DelegationContext {
+  export type DelegationAnchor = {
+    [k: string]: unknown;
+  } & {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * The provider record's issuer for provider-backed kinds; `urn:chio:operator` for `operator_static_bearer`.
+     */
+    issuer: string;
+    /**
+     * The enterprise provider record the exchange verified against. Present exactly for provider-backed kinds.
+     */
+    provider_record_id?: string;
+    /**
+     * Digest of the record's `chio.enterprise-provider-identity.v1` projection; equals the matched rule's. Present exactly for provider-backed kinds.
+     */
+    provider_identity_digest?: string;
+    /**
+     * Digest of the `chio.idp-key-snapshot.v1` in force when the assertion was verified.
+     */
+    key_snapshot_digest?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    kid?: string;
+    /**
+     * Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+     */
+    alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
+    /**
+     * SHA-256 of the exact compact JWS bytes received.
+     */
+    artifact_digest?: string;
+    /**
+     * True only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`.
+     */
+    artifact_retained: boolean;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    replay_key_digest: string;
+    token_iat: number;
+    token_exp: number;
+    subject: SubjectCommitment;
+    tenant: TenantCommitment;
+    claims: RecordedClaims;
+  };
+
+  /**
+   * `chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.
+   */
+  export interface ChioDelegationContext {
+    schema: "chio.delegation-context.v1";
+    anchor: DelegationAnchor;
+    exchange: DelegationExchange;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    root_policy_rule_id: string;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    effective_root_scope_hash: string;
+  }
+  /**
+   * `SHA-256("chio.delegation-context.subject.v1\0" || salt || utf8(subject))`.
+   */
+  export interface SubjectCommitment {
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    commit: string;
+    salt_ref: "anchor.sub";
+  }
+  /**
+   * `SHA-256("chio.delegation-context.tenant.v1\0" || salt || utf8(tenant))`.
+   */
+  export interface TenantCommitment {
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    commit: string;
+    salt_ref: "anchor.tenant";
+  }
+  /**
+   * Exactly the claims the matched rule names in `recorded_claims`, each plain or committed per the rule.
+   */
+  export interface RecordedClaims {
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    client_id?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    scope?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    sub?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    aud?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    resource?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    azp?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    appid?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    oid?: string | string[] | Commitment;
+    /**
+     * A recorded claim: a plain string, a plain list of strings, or a committed value.
+     */
+    tid?: string | string[] | Commitment;
+  }
+  /**
+   * A salted commitment whose salt is held in the disclosure store under `salt_ref`.
+   */
+  export interface Commitment {
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    commit: string;
+    salt_ref: string;
+  }
+  export interface DelegationExchange {
+    /**
+     * Equals the issuer key of the minted root.
+     */
+    exchange_key: string;
+    exchanged_at: number;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    request_digest: string;
+    /**
+     * Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+     */
+    holder: "edge_session" | "caller";
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/enterprise-provider-identity.schema.json
+export namespace RootAuthority_EnterpriseProviderIdentity {
+  /**
+   * `chio.enterprise-provider-identity.v1`: the unsigned, content-addressed identity projection of one enterprise provider record. A root policy rule pins `SHA-256("chio.enterprise-provider-identity.v1\0" || canonical_json(projection))` as `provider_identity_digest`. The projection excludes `enabled`, other provenance labels and validation errors. Decoding is strict.
+   */
+  export type ChioEnterpriseProviderIdentity = {
+    [k: string]: unknown;
+  } & {
+    schema: "chio.enterprise-provider-identity.v1";
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    provider_id: string;
+    /**
+     * Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.
+     */
+    kind: "oidc_jwks" | "oauth_introspection";
+    /**
+     * A bounded URI or URN, such as an issuer.
+     */
+    issuer: string;
+    jwks_url?: string;
+    jwks?: InlineJwks;
+    introspection_url?: string;
+    /**
+     * The record's `trust_boundary.allowed_audiences`.
+     *
+     * @maxItems 32
+     */
+    audiences: string[];
+    subject_mapping: SubjectMapping;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    trust_material_ref: string;
+  };
+  /**
+   * A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+   */
+  export type Jwk = {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    kid: string;
+    kty: "RSA" | "EC" | "OKP";
+    /**
+     * Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+     */
+    alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
+    use?: "sig";
+    n?: string;
+    e?: string;
+    crv?: "P-256" | "P-384" | "P-521" | "Ed25519";
+    x?: string;
+    y?: string;
+    /**
+     * @maxItems 8
+     */
+    x5c?:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string];
+    x5t?: string;
+    "x5t#S256"?: string;
+    /**
+     * A bounded URI or URN, such as an issuer.
+     */
+    issuer?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    cloud_instance_name?: string;
+  } & {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    kid: string;
+    kty: "RSA" | "EC" | "OKP";
+    /**
+     * Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+     */
+    alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
+    use?: "sig";
+    n?: string;
+    e?: string;
+    crv?: "P-256" | "P-384" | "P-521" | "Ed25519";
+    x?: string;
+    y?: string;
+    /**
+     * @maxItems 8
+     */
+    x5c?:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string];
+    x5t?: string;
+    "x5t#S256"?: string;
+    /**
+     * A bounded URI or URN, such as an issuer.
+     */
+    issuer?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    cloud_instance_name?: string;
+  };
+
+  export interface InlineJwks {
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    keys: [Jwk, ...Jwk[]];
+  }
+  export interface SubjectMapping {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    principal_source: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    tenant_id_field: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json
+export namespace RootAuthority_IdpKeySnapshot {
+  /**
+   * A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+   */
+  export type Jwk = {
+    [k: string]: unknown;
+  } & {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    kid: string;
+    kty: "RSA" | "EC" | "OKP";
+    /**
+     * Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+     */
+    alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
+    use?: "sig";
+    n?: string;
+    e?: string;
+    crv?: "P-256" | "P-384" | "P-521" | "Ed25519";
+    x?: string;
+    y?: string;
+    /**
+     * @maxItems 8
+     */
+    x5c?:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string];
+    x5t?: string;
+    "x5t#S256"?: string;
+    /**
+     * A bounded URI or URN, such as an issuer.
+     */
+    issuer?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    cloud_instance_name?: string;
+  };
+
+  /**
+   * `chio.idp-key-snapshot.v1`, signed by the exchange key. It records the key set the exchange fetched for an enterprise provider record, or took from the record's inline `jwks`, and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement of what the identity provider published, not identity-provider evidence.
+   */
+  export interface ChioIdPKeySnapshot {
+    schema: "chio.idp-key-snapshot.v1";
+    /**
+     * A bounded URI or URN, such as an issuer.
+     */
+    issuer: string;
+    /**
+     * The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.
+     */
+    source: string;
+    /**
+     * @maxItems 64
+     */
+    keys: Jwk[];
+    observed_at: number;
+    /**
+     * Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+     */
+    exchange_key: string;
+    /**
+     * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+     */
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/revocation-request.schema.json
+export namespace RootAuthority_RevocationRequest {
+  /**
+   * `chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
+   */
+  export interface ChioRevocationRequest {
+    schema: "chio.revocation-request.v1";
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    target_capability_id: string;
+    /**
+     * Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+     */
+    revoker_key: string;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    presentation_digest: string;
+    reason: string;
+    issued_at: number;
+    /**
+     * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+     */
+    signature: string;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/root-anchor.schema.json
+export namespace RootAuthority_RootAnchor {
+  /**
+   * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+   */
+  export type AnchorKind =
+    | "oauth_id_jag"
+    | "entra_jwt"
+    | "entra_agent_id"
+    | "oidc_jwt"
+    | "oauth_introspection"
+    | "chio_local_as"
+    | "chio_operator_key"
+    | "operator_static_bearer";
+
+  /**
+   * The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
+   */
+  export interface ChioRootAnchor {
+    kind: AnchorKind;
+    /**
+     * SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
+     */
+    context_digest: string;
+    /**
+     * SHA-256 over `chio.root-policy.v1\0 || canonical_json(policy signing body)`.
+     */
+    root_policy_digest: string;
+    /**
+     * Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+     */
+    anchored_at: number;
+    /**
+     * Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+     */
+    assertion_exp: number;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/root-policy.schema.json
+export namespace RootAuthority_RootPolicy {
+  export type RootPolicyRule = {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    [k: string]: unknown;
+  } & {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    rule_id: string;
+    match: RootPolicyMatch;
+    /**
+     * Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.
+     */
+    idp_scope_projection?: {
+      /**
+       * @maxItems 256
+       */
+      [k: string]: string[];
+    };
+    ceiling_scope: ChioScope;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    ceiling_scope_hash: string;
+    recorded_claims: RecordedClaimModes;
+    /**
+     * @minItems 1
+     * @maxItems 2
+     */
+    holder_classes: ["edge_session" | "caller"] | ["edge_session" | "caller", "edge_session" | "caller"];
+    /**
+     * Defaults to 300.
+     */
+    capability_ttl_secs?: number;
+    /**
+     * Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.
+     */
+    max_assertion_lifetime_secs?: number;
+    max_clock_skew_secs?: number;
+    /**
+     * Allowed only on `oauth_id_jag` rules.
+     */
+    retain_idp_artifact?: boolean;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    principal?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    tenant_value?: string;
+  } & {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    rule_id: string;
+    match: RootPolicyMatch;
+    /**
+     * Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.
+     */
+    idp_scope_projection?: {
+      /**
+       * @maxItems 256
+       */
+      [k: string]: string[];
+    };
+    ceiling_scope: ChioScope;
+    /**
+     * SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+     */
+    ceiling_scope_hash: string;
+    recorded_claims: RecordedClaimModes;
+    /**
+     * @minItems 1
+     * @maxItems 2
+     */
+    holder_classes: ["edge_session" | "caller"] | ["edge_session" | "caller", "edge_session" | "caller"];
+    /**
+     * Defaults to 300.
+     */
+    capability_ttl_secs?: number;
+    /**
+     * Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.
+     */
+    max_assertion_lifetime_secs?: number;
+    max_clock_skew_secs?: number;
+    /**
+     * Allowed only on `oauth_id_jag` rules.
+     */
+    retain_idp_artifact?: boolean;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    principal?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    tenant_value?: string;
+  };
+  export type ClaimMode = "plain" | "committed";
+
+  /**
+   * `chio.root-policy.v1`, signed by the provider's policy key. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts. Provider identity (issuer, keys, endpoints, audiences, principal and tenant claims) is never held here: a provider-backed rule names an enterprise provider record and pins the digest of its identity projection. Decoding is strict: an unknown member at any level rejects at load.
+   */
+  export interface ChioRootPolicy {
+    schema: "chio.root-policy.v1";
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    policy_id: string;
+    /**
+     * Must equal the policy key pinned in the edge configuration.
+     */
+    policy_key: string;
+    /**
+     * @minItems 1
+     * @maxItems 16
+     */
+    exchange_keys:
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+      | [
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string
+        ]
+      | [
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string,
+          string
+        ];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    rules: [RootPolicyRule, ...RootPolicyRule[]];
+    disclosure: RootPolicyDisclosure;
+    valid_from: number;
+    valid_until: number;
+    /**
+     * Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+     */
+    signature: string;
+  }
+  /**
+   * What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.
+   */
+  export interface RootPolicyMatch {
+    /**
+     * Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+     */
+    anchor_kind:
+      | "oauth_id_jag"
+      | "entra_jwt"
+      | "entra_agent_id"
+      | "oidc_jwt"
+      | "oauth_introspection"
+      | "chio_local_as"
+      | "chio_operator_key"
+      | "operator_static_bearer";
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    provider_record_id?: string;
+    /**
+     * `SHA-256("chio.enterprise-provider-identity.v1\0" || canonical_json(projection))` over the record's identity projection. A record whose projection differs denies.
+     */
+    provider_identity_digest?: string;
+    /**
+     * @minItems 1
+     * @maxItems 10
+     */
+    allowed_algs?:
+      | ["RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ]
+      | [
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA",
+          "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA"
+        ];
+    claims?: MatchClaims;
+  }
+  /**
+   * Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
+   */
+  export interface MatchClaims {
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    client_id?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    scope?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    sub?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    resource?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    azp?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    appid?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    oid?: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    tid?: [string, ...string[]];
+  }
+  /**
+   * What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
+   */
+  export interface ChioScope {
+    grants?: ToolGrant[];
+    resource_grants?: ResourceGrant[];
+    prompt_grants?: PromptGrant[];
+  }
+  /**
+   * Authorization to invoke a single tool. Mirrors `ToolGrant`.
+   */
+  export interface ToolGrant {
+    server_id: string;
+    tool_name: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+    constraints?: (
+      | GenericConstraint
+      | RequireApprovalAboveConstraint
+      | CumulativeApprovalDirectConstraint
+      | CumulativeApprovalDelegableConstraint
+    )[];
+    max_invocations?: number;
+    max_cost_per_invocation?: MonetaryAmount;
+    max_total_cost?: MonetaryAmount;
+    dpop_required?: boolean;
+  }
+  /**
+   * Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.
+   */
+  export interface GenericConstraint {
+    type: string;
+    value?: unknown;
+  }
+  export interface RequireApprovalAboveConstraint {
+    type: "require_approval_above";
+    value: {
+      threshold_units: number;
+    };
+  }
+  export interface CumulativeApprovalDirectConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      threshold: MonetaryAmount;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      cumulative_approval_root_binding?: never;
+    };
+  }
+  /**
+   * A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
+   */
+  export interface MonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  export interface CumulativeApprovalDelegableConstraint {
+    type: "require_cumulative_approval_above";
+    value: {
+      threshold: MonetaryAmount;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      cumulative_approval_root_binding: ChioCumulativeApprovalRootBinding;
+    };
+  }
+  export interface ChioCumulativeApprovalRootBinding {
+    body: {
+      schema: "chio.cumulative-approval-root.v1";
+      signer_key_epoch: number;
+      root_capability_id: string;
+      root_capability_hash: string;
+      root_issuer: string;
+      root_subject: string;
+      root_scope_hash: string;
+      root_grant_hash: string;
+      approval_budget_id: string;
+      approval_budget_epoch: number;
+      threshold: CumulativeRootMonetaryAmount;
+      root_expires_at: number;
+    };
+    algorithm?: "ed25519" | "p256" | "p384" | "hybrid";
+    signature: string;
+  }
+  export interface CumulativeRootMonetaryAmount {
+    units: number;
+    currency: string;
+  }
+  /**
+   * Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.
+   */
+  export interface ResourceGrant {
+    uri_pattern: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+  }
+  /**
+   * Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.
+   */
+  export interface PromptGrant {
+    prompt_name: string;
+    /**
+     * @minItems 1
+     */
+    operations: [
+      "invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate",
+      ...("invoke" | "read_result" | "read" | "subscribe" | "get" | "delegate")[]
+    ];
+  }
+  /**
+   * Claims copied into the delegation context, each plain or committed. The claim set is closed.
+   */
+  export interface RecordedClaimModes {
+    client_id?: ClaimMode;
+    scope?: ClaimMode;
+    sub?: ClaimMode;
+    aud?: ClaimMode;
+    resource?: ClaimMode;
+    azp?: ClaimMode;
+    appid?: ClaimMode;
+    oid?: ClaimMode;
+    tid?: ClaimMode;
+  }
+  export interface RootPolicyDisclosure {
+    /**
+     * The only allowed value.
+     */
+    default: "committed";
+    /**
+     * `server/tool` to the RFC 6901 pointers that may appear in plaintext in that tool's receipts. A tool not listed is fully committed.
+     */
+    tools?: {
+      [k: string]: ToolDisclosure;
+    };
+  }
+  export interface ToolDisclosure {
+    parameters: InlineFields;
+    result: InlineFields;
+  }
+  export interface InlineFields {
+    /**
+     * @maxItems 64
+     */
+    inline_fields: string[];
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Source: spec/schemas/chio-wire/v1/root_authority/verifier-trust.schema.json
+export namespace RootAuthority_VerifierTrust {
+  /**
+   * A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+   */
+  export type Jwk = {
+    [k: string]: unknown;
+  } & {
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    kid: string;
+    kty: "RSA" | "EC" | "OKP";
+    /**
+     * Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+     */
+    alg?: "RS256" | "RS384" | "RS512" | "PS256" | "PS384" | "PS512" | "ES256" | "ES384" | "ES512" | "EdDSA";
+    use?: "sig";
+    n?: string;
+    e?: string;
+    crv?: "P-256" | "P-384" | "P-521" | "Ed25519";
+    x?: string;
+    y?: string;
+    /**
+     * @maxItems 8
+     */
+    x5c?:
+      | []
+      | [string]
+      | [string, string]
+      | [string, string, string]
+      | [string, string, string, string]
+      | [string, string, string, string, string]
+      | [string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string]
+      | [string, string, string, string, string, string, string, string];
+    x5t?: string;
+    "x5t#S256"?: string;
+    /**
+     * A bounded URI or URN, such as an issuer.
+     */
+    issuer?: string;
+    /**
+     * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+     */
+    cloud_instance_name?: string;
+  };
+
+  /**
+   * `chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
+   */
+  export interface ChioVerifierTrust {
+    schema: "chio.verifier-trust.v1";
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    kernel_keys: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    exchange_keys: [string, ...string[]];
+    /**
+     * @minItems 1
+     * @maxItems 64
+     */
+    root_policy_keys: [string, ...string[]];
+    /**
+     * Issuer to the identity-provider keys the verifier pins itself.
+     */
+    idp_keys?: {
+      /**
+       * @maxItems 64
+       */
+      [k: string]: Jwk[];
+    };
+    /**
+     * Policy enforcement point id to its pinned key.
+     */
+    pep_keys?: {
+      /**
+       * Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+       */
+      [k: string]: string;
+    };
+    /**
+     * @maxItems 64
+     */
+    checkpoint_keys?: string[];
+    /**
+     * @maxItems 5
+     */
+    required_columns?:
+      | []
+      | ["identity_root" | "delegation_chain" | "decision" | "content" | "settlement"]
+      | [
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement"
+        ]
+      | [
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement"
+        ]
+      | [
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement"
+        ]
+      | [
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement",
+          "identity_root" | "delegation_chain" | "decision" | "content" | "settlement"
+        ];
   }
 }
 

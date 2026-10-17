@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/root-anchor.schema.json",
+  "title": "Chio Root Anchor",
+  "description": "The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "context_digest",
+    "root_policy_digest",
+    "anchored_at",
+    "assertion_exp"
+  ],
+  "properties": {
+    "kind": {
+      "$ref": "#/$defs/AnchorKind"
+    },
+    "context_digest": {
+      "$ref": "#/$defs/Digest",
+      "description": "SHA-256 over `chio.delegation-context.v1\\0 || canonical_json(context)`."
+    },
+    "root_policy_digest": {
+      "$ref": "#/$defs/Digest",
+      "description": "SHA-256 over `chio.root-policy.v1\\0 || canonical_json(policy signing body)`."
+    },
+    "anchored_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix seconds. Equals `exchange.exchanged_at` of the delegation context."
+    },
+    "assertion_exp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it."
+    }
+  },
+  "$defs": {
+    "AnchorKind": {
+      "type": "string",
+      "enum": [
+        "oauth_id_jag",
+        "entra_jwt",
+        "entra_agent_id",
+        "oidc_jwt",
+        "oauth_introspection",
+        "chio_local_as",
+        "chio_operator_key",
+        "operator_static_bearer"
+      ],
+      "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode."
+    },
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[^\\u0000]+$",
+      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs."
+    },
+    "Text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^[^\\u0000]+$",
+      "description": "A bounded NUL-free string."
+    },
+    "Uri": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^[^\\u0000\\s]+$",
+      "description": "A bounded URI or URN, such as an issuer."
+    },
+    "HttpsUrl": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^https://[^\\u0000\\s]+$"
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters."
+    },
+    "Salt": {
+      "type": "string",
+      "pattern": "^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+      "description": "A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters)."
+    },
+    "SaltRef": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    },
+    "PublicKeyHex": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+      "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`."
+    },
+    "SignatureHex": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+      "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form."
+    },
+    "Commitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "salt_ref"
+      ],
+      "description": "A salted commitment whose salt is held in the disclosure store under `salt_ref`.",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/Digest"
+        },
+        "salt_ref": {
+          "$ref": "#/$defs/SaltRef"
+        }
+      }
+    },
+    "HolderClass": {
+      "type": "string",
+      "enum": [
+        "edge_session",
+        "caller"
+      ],
+      "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller."
+    },
+    "ClaimValue": {
+      "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Text"
+        },
+        {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/Text"
+          }
+        },
+        {
+          "$ref": "#/$defs/Commitment"
+        }
+      ]
+    },
+    "RecordedClaims": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+      "properties": {
+        "client_id": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "scope": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "sub": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "aud": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "resource": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "azp": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "appid": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "oid": {
+          "$ref": "#/$defs/ClaimValue"
+        },
+        "tid": {
+          "$ref": "#/$defs/ClaimValue"
+        }
+      }
+    },
+    "Jwk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kid",
+        "kty"
+      ],
+      "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
+      "properties": {
+        "kid": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kty": {
+          "type": "string",
+          "enum": [
+            "RSA",
+            "EC",
+            "OKP"
+          ]
+        },
+        "alg": {
+          "$ref": "#/$defs/JwsAlgorithm"
+        },
+        "use": {
+          "type": "string",
+          "enum": [
+            "sig"
+          ]
+        },
+        "n": {
+          "type": "string",
+          "maxLength": 1400,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "e": {
+          "type": "string",
+          "maxLength": 16,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "crv": {
+          "type": "string",
+          "enum": [
+            "P-256",
+            "P-384",
+            "P-521",
+            "Ed25519"
+          ]
+        },
+        "x": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "y": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "x5c": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "maxLength": 16384,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+          }
+        },
+        "x5t": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "x5t#S256": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "issuer": {
+          "$ref": "#/$defs/Uri"
+        },
+        "cloud_instance_name": {
+          "$ref": "#/$defs/Identifier"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kty": {
+                "const": "RSA"
+              }
+            },
+            "required": [
+              "kty"
+            ]
+          },
+          "then": {
+            "required": [
+              "n",
+              "e"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "crv"
+                  ]
+                },
+                {
+                  "required": [
+                    "x"
+                  ]
+                },
+                {
+                  "required": [
+                    "y"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kty": {
+                "const": "EC"
+              }
+            },
+            "required": [
+              "kty"
+            ]
+          },
+          "then": {
+            "required": [
+              "crv",
+              "x",
+              "y"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "n"
+                  ]
+                },
+                {
+                  "required": [
+                    "e"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "crv": {
+                "enum": [
+                  "P-256",
+                  "P-384",
+                  "P-521"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kty": {
+                "const": "OKP"
+              }
+            },
+            "required": [
+              "kty"
+            ]
+          },
+          "then": {
+            "required": [
+              "crv",
+              "x"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "n"
+                  ]
+                },
+                {
+                  "required": [
+                    "e"
+                  ]
+                },
+                {
+                  "required": [
+                    "y"
+                  ]
+                }
+              ]
+            },
+            "properties": {
+              "crv": {
+                "const": "Ed25519"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "JwsAlgorithm": {
+      "type": "string",
+      "enum": [
+        "RS256",
+        "RS384",
+        "RS512",
+        "PS256",
+        "PS384",
+        "PS512",
+        "ES256",
+        "ES384",
+        "ES512",
+        "EdDSA"
+      ],
+      "description": "Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted."
+    }
+  }
+}

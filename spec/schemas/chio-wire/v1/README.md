@@ -35,13 +35,21 @@ Directory layout:
   - `policy_denied.schema.json`
   - `tool_server_error.schema.json`
   - `internal_error.schema.json`
-- `capability/` - capability tokens, grants, and revocation envelopes.
+- `capability/` - capability tokens, grants, revocation envelopes, and the
+  `chio.capability-presentation.v1` envelope (`presentation.schema.json`).
 - `jsonrpc/` - JSON-RPC framing used by the hosted MCP HTTP edge.
 - `provenance/` - provenance and attestation records emitted by the kernel.
-- `receipt/` - signed receipts produced after tool calls complete.
-- `security/` - active-defense labels and enterprise key-log artifacts,
-  including separate signed bodies and envelopes.
-- `trust-control/` - trust-control plane messages (policy, allowlist, audit).
+- `receipt/` - signed receipts produced after tool calls complete, the
+  `chio.receipt-disclosure.v1` opening (`disclosure.schema.json`), and the
+  signed `chio.settlement-closure.v1` (`settlement-closure.schema.json`).
+- `root_authority/` - anchored-root artifacts: `root_anchor` and the shared
+  definitions (`root-anchor.schema.json`), the delegation context, the signed
+  root policy, the enterprise provider identity projection, the signed
+  identity-provider key snapshot, the verifier trust file, and the signed
+  caller revocation request. Valid and invalid instances live under
+  `root_authority/examples/`; `scripts/check-root-authority-schema-examples.py`
+  checks them, each invalid instance against the error path and keyword in
+  `examples/invalid-expectations.json`.
 
 Source-of-truth pointers:
 

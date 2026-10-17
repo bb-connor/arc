@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
+# Schema sha256: 474bdbf3f47de4760cd26c431403a6dfec83325e15db307cb5fcbf132a6f05dd
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -64,7 +64,7 @@ from .semantic_annotation_schema import OpaqueId, RecoveryDigest32, RecoveryDige
 from .semantic_audience_schema import Completeness, Cursor, OpaqueId, Pagination, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticAudienceV1
 from .semantic_deployment_schema import OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticAnnotator, SemanticDeploymentV1, SemanticDestination, SemanticOverride, SemanticRoute, SemanticSelector, SemanticSelector1, SemanticSelector2, SemanticSelector3, SemanticValue, SemanticValue1, SemanticValue2, SemanticValue3
 from .semantic_invocation_schema import SemanticInvocationV1
-from .semantic_package_schema import Channel, Kind, Kind13, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, SemanticChannel, SemanticOperation, SemanticPackageV1, SemanticPrerequisiteRequirement, SemanticSelector, SemanticSelector4, SemanticSelector5, SemanticSelector6, SemanticValue, SemanticValue4, SemanticValue5, SemanticValue6, SemanticWithheldStatus
+from .semantic_package_schema import Channel, Kind, Kind14, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, SemanticChannel, SemanticOperation, SemanticPackageV1, SemanticPrerequisiteRequirement, SemanticSelector, SemanticSelector4, SemanticSelector5, SemanticSelector6, SemanticValue, SemanticValue4, SemanticValue5, SemanticValue6, SemanticWithheldStatus
 from .semantic_payload_schema import OpaqueId, SafeInteger, SemanticField, SemanticPayloadV1, SemanticValue, SemanticValue7, SemanticValue8, SemanticValue9
 from .semantic_plan_schema import OpaqueId, Output, RecoveryDigest32, RecoveryDigest32Item, Scope, SemanticPlanInput, SemanticPlanInput1, SemanticPlanInput2, SemanticPlanStep, SemanticPlanV1
 from .semantic_prerequisite_schema import Kind, OpaqueId, RecoveryDigest32, RecoveryDigest32Item, SafeInteger, Scope, SemanticPrerequisiteV1
@@ -190,7 +190,7 @@ __all__ = [
     "Integrity",
     "IsolationBoundaryV1",
     "Kind",
-    "Kind13",
+    "Kind14",
     "Kind2",
     "LabeledCheckpointV1",
     "Latency",

@@ -187,6 +187,9 @@ in the signed root.
   `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`
   with its own 32-byte salt.
 - `holder` is `edge_session` or `caller` (section 5.6.6).
+- `key_snapshot_digest`, `kid`, `alg` and `artifact_digest` are present for
+  the JWS-verified kinds (`oauth_id_jag`, `entra_jwt`, `entra_agent_id` and
+  `oidc_jwt`).
 
 #### 5.6.4 `chio.root-policy.v1`, provider records and `chio.idp-key-snapshot.v1`
 
@@ -261,6 +264,8 @@ Rule constraints:
   `entra_jwt` and `entra_agent_id` rules.
 - `max_clock_skew_secs` is at most 60.
 - `retain_idp_artifact` is allowed only on `oauth_id_jag` rules.
+- `allowed_algs` is required on the JWS-verified kinds and absent on
+  `oauth_introspection` rules, which verify no JWS.
 - `principal` and `tenant_value` are required on `operator_static_bearer`
   rules and rejected on every other kind. `provider_record_id`,
   `provider_identity_digest`, `allowed_algs` and `idp_scope_projection` are

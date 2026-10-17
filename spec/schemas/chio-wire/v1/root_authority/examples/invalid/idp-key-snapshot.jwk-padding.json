@@ -1,0 +1,32 @@
+{
+  "schema": "chio.idp-key-snapshot.v1",
+  "issuer": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0",
+  "source": "registry:acme-entra",
+  "keys": [
+    {
+      "kty": "RSA",
+      "use": "sig",
+      "kid": "JYhAcTPMZ_LX6DBlOWQ7Hn0NeXE",
+      "x5t": "JYhAcTPMZ_LX6DBlOWQ7Hn0NeXE",
+      "n": "u1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0_IzW7yWR7QkrmBL7jTKEn5u-qKhbwKfBstIs-bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyehkd3qqGElvW_VDL5AaWTg0nLVkjRo9z-40RQzuVaE8AkAFmxZzow3x-VJYKdjykkJ0iT9wCS0DRTXu269V264Vf_3jvredZiKRkgwlL9xNAwxXFg0x_XFw005UWVRIkdgcKWTjpBP2dPwVZ4WWC-9aGVd-Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbcmw",
+      "e": "AQAB",
+      "x5c": [
+        "MIIC/jCCAeagAwIBAgIJAOCJOVRxNKcNMA0GCSqGSIb3DQEBCwUAMC0xKzApBgNVBAMTImFjY291bnRzLmFjY2Vzc2NvbnRyb2wud2luZG93cy5uZXQ="
+      ],
+      "cloud_instance_name": "microsoftonline.com",
+      "issuer": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0",
+      "pad": 0
+    },
+    {
+      "kid": "ec-1",
+      "kty": "EC",
+      "use": "sig",
+      "crv": "P-256",
+      "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+      "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+    }
+  ],
+  "observed_at": 1792230000,
+  "exchange_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+  "signature": "30adf7d9941aea0c4f1a3a48725db75cadc840a8af9e91a92e4a82fa18f36af38cee01640a11f62cb693ca9d0248c1836c723930bd80cb6bb81327ab0f2ba4b5"
+}

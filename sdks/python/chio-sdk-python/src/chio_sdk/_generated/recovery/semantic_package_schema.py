@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
+# Schema sha256: 474bdbf3f47de4760cd26c431403a6dfec83325e15db307cb5fcbf132a6f05dd
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -75,7 +75,7 @@ class Kind(Enum):
     field_projection = "field_projection"
 
 
-class Kind13(Enum):
+class Kind14(Enum):
     historical_fact = "historical_fact"
     current_predicate = "current_predicate"
     held_reservation = "held_reservation"
@@ -86,7 +86,7 @@ class SemanticPrerequisiteRequirement(BaseModel):
         extra="forbid",
     )
     fact: OpaqueId
-    kind: Kind13
+    kind: Kind14
     resource: OpaqueId
 
 
