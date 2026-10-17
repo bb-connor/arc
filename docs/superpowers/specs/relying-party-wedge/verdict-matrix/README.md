@@ -1,0 +1,132 @@
+# Staged verdict-matrix scenarios: anchored_root, receipt_disclosure, revocation_local
+
+Planning material for the relying-party wedge (spec section 11.3, section 12 M0 exit "scenario files written (expected to fail)"). These 36 files are staged, not executed. The live corpus under `crates/tooling/chio-conformance/verdict_matrix/scenarios/` cannot hold them yet: `ScenarioCategory` (`crates/tooling/chio-conformance/verdict_matrix/src/lib.rs:49`) is a closed enum, `manifest.toml` pins the scenario count, per-category counts and the index hash, and no driver implements `rust-mcp-serve-http`. "Expected to fail" therefore means: staged here, and failing until the M1 code that implements each behavior lands.
+
+## File shape
+
+Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, in the field order of the live corpus:
+
+```json
+{"schema":"chio.verdict-matrix.scenario.v1","id":"<category-kebab>-NNN-<suffix>","title":"...","category":"<directory name>","description":"...","tags":["<category>","<verdict>"],"requires":["rust-kernel","rust-mcp-serve-http"],"script":{"operation":"...","setup":["..."],"mutation":"..." | null},"expected":{"verdict":"allow" | "deny","reason_code":"urn:chio:error:...","scope_set":["..."]}}
+```
+
+- `id` equals the file name without `.json`.
+- `category` equals the directory name: `anchored_root`, `receipt_disclosure` or `revocation_local`.
+- `requires` names the existing required driver `rust-kernel` and the new `rust-mcp-serve-http` driver (spec 11.3), which runs a real `serve-http` process against the local IdP stub.
+- `expected.scope_set` is `["tool:read"]` for `tool.call` scenarios and `[]` for `exchange`, `export` and `policy.load` scenarios, which admit no tool call.
+- All fixture timestamps are fixed: `issued_at = 1792234800`. Assertion fixtures use `iat = 1792234790` and `exp = 1792235090`, and the root policy window is `valid_from = 1792000000`, `valid_until = 1799999999` (spec 7.3 and 7.4 examples).
+
+## Operations
+
+| `operation` | What the driver does | Where the verdict is read |
+|---|---|---|
+| `tool.call` | Starts `serve-http` with the setup fixtures, obtains a root through the intake the fixtures name (bearer at the edge, local AS login, exchange or admin route), applies the mutation, then sends one `tools/call` for `files.read` with required scope `tool:read`. | The admission decision and its signed receipt. |
+| `exchange` | Sends one token request to the local AS token endpoint (`jwt-bearer` or RFC 8693 `token-exchange`, or bearer intake at the edge for Entra), after applying the mutation. | Whether a root is minted. `allow` means minted, `deny` means refused with the reason code. |
+| `export` | Records receipts through `tool.call` first (fixture `recorded_receipts`), then runs one evidence export with the profile the mutation names. | Whether the export is written, and the contents checks in the scenario description. |
+| `policy.load` | Starts `serve-http` with the root policy fixture named in `setup`. | Whether startup succeeds. `deny` means startup refuses with the reason code. |
+
+## Setup fixtures
+
+| Name | Definition |
+|---|---|
+| `serve_http_edge` | One `serve-http` process with a fresh state directory, durable admission on, and the local AS enabled. |
+| `root_policy` | A signed `chio.root-policy.v1` with one rule per M1 anchor kind (`oauth_id_jag`, `oidc_jwt`, `oauth_introspection`, `chio_local_as`, `chio_operator_key`, `operator_static_bearer`, `entra_jwt`), `disclosure.default = "committed"`, no `tools` map, `ceiling_scope` granting `tool:read`, `capability_ttl_secs = 300`, `max_clock_skew_secs = 30`. Its `policy_key` equals the configured `--root-policy-key`. |
+| `root_policy_inline_tools` | `root_policy` plus `disclosure.tools` naming `files/read` with empty `inline_fields` lists. |
+| `root_policy_inline_pointer` | `root_policy` plus `disclosure.tools.files/read.parameters.inline_fields = ["/path"]`. |
+| `tenant_index_key` | A 32-byte tenant index key file (`0x14 * 32`), fixture material only. |
+| `kernel_seed` | A kernel signing seed file with mode 0600, distinct from the exchange, policy and local AS keys. |
+| `exchange_key` | The exchange signing key listed in the root policy's `exchange_keys`, available to the mutation that mints a forged root. |
+| `idp_stub_jwks` | Local IdP stub serving a JWKS over `https` with one RS256 key, `kid = "k-stub-1"`, `use = "sig"`, 2048-bit modulus. It also mints Entra-shaped tokens with a tenant-specific issuer. |
+| `id_jag_minter` | Mints ID-JAG assertions from `idp_stub_jwks`: `typ` from the pinned draft, `aud` equal to the local AS issuer, `client_id = "mcp-client-fixture"`, a fresh `jti` per assertion, `iat` and `exp` as above, `scope = ["tool.read"]` projected to `tool:read` by the rule. |
+| `confidential_client_key` | The registered client key for `mcp-client-fixture` (`token_endpoint_auth_method = private_key_jwt`); requests carry a client assertion with `aud` equal to the token endpoint URL and a 60 s lifetime. |
+| `public_client` | A client registration for `mcp-client-fixture` with `token_endpoint_auth_method = none`. |
+| `oidc_jwt_minter` | Mints bearer JWTs for the `oidc_jwt` rule from a non-Entra issuer on `idp_stub_jwks`, with `sub`, a tenant claim and a `jti`. |
+| `introspection_stub` | RFC 7662 endpoint that reports `active: true` for `opaque_bearer_token` and `active: false` for anything else. |
+| `opaque_bearer_token` | One opaque bearer token string known to `introspection_stub`. |
+| `local_as_login` | Completes the local AS `authorization_code` flow and yields a local AS access token. |
+| `operator_admin_key` | The pinned operator key used to call the admin route that issues a `chio_operator_key` root. |
+| `static_bearer_token` | The `--auth-token` value given to `serve-http`. Only its SHA-256 is held after startup. |
+| `static_bearer_principal` | The single `operator_static_bearer` rule with `principal = "dev:alice"` and `tenant_value = "dev-tenant"`. |
+| `entra_token_with_uti` | An Entra application token from `idp_stub_jwks` with a tenant-specific `iss`, `tid`, `oid`, `aud` equal to the provider app ID URI, and a `uti` claim, matched by the `entra_jwt` rule (`tenant_claim = "tid"`). |
+| `guard_with_undeclared_evidence_field` | A guard that allows the call and emits one evidence field it has not declared safe under committed disclosure. |
+| `argument_marker` | Call arguments carrying the marker string `chio-fixture-marker-7f3a`. |
+| `streaming_tool` | A tool whose result is a stream of three chunks. |
+| `delegated_child` | A token delegated from the live root under the same `root_anchor` (depth 1 is used only to exercise the existing revocation cascade, not portable chains). |
+| `two_tenants` | Two `oidc_jwt` principals from tenants A and B, each with recorded receipts. |
+| `recorded_receipts` | Receipts produced by earlier `tool.call` steps in the same scenario, stored with their openings in the disclosure store. |
+
+## Mutations
+
+| Name | Effect |
+|---|---|
+| `null` | None. |
+| `repeat_same_bearer_token` | Presents the same Entra token twice; both calls resolve to the one root keyed by `(issuer, uti)`. |
+| `omit_client_assertion` | Sends the `jwt-bearer` request from `public_client` with no client assertion. |
+| `replay_id_jag_jti` | Exchanges one ID-JAG successfully, then presents a second ID-JAG with the same `(issuer, jti)`. |
+| `second_token_same_uti` | After one Entra token is exchanged, presents a different Entra token whose `uti` equals the first token's. |
+| `strip_root_anchor` | Mints a root with `exchange_key` that carries no `root_anchor` and presents it at the edge. |
+| `root_expires_after_assertion_exp` | Mints a root with `exchange_key` whose `expires_at` is one second past `root_anchor.assertion_exp`. |
+| `request_scope_outside_root` | Calls a tool needing `tool:write` under a root that grants only `tool:read`. |
+| `body_tenant_id_with_authority` | Test hook that sets `tenant_id` on a receipt body that also carries `authority`, before signing. |
+| `export_auditor_hash_only` | Runs an `auditor_hash_only` export. |
+| `export_auditor_with_salt_only_opening` | Runs an auditor-profile export with a salt-only opening (`payload: null`) supplied for inclusion. |
+| `export_caller_without_tenant_tag` | Runs a `caller` export with no `tenant_tag`. |
+| `export_caller_tenant_a` | Runs a `caller` export with tenant A's tag. |
+| `revoke_capability_id` | Revokes the live root by `capability_id` through `/admin/revocations`, then calls. |
+| `revoke_parent_capability` | Revokes the root by `capability_id`, then calls under `delegated_child`. |
+| `revoke_root_policy_rule` | Revokes the matching rule by `root_policy_rule`, then calls. |
+| `revoke_anchor_subject` | Revokes the principal by issuer and plaintext subject (`anchor_subject`), then calls. |
+| `revoke_tenant_tag` | Revokes by issuer and tenant value (`tenant_tag`), then calls. |
+| `revoke_replay_key` | Revokes by `(kind, issuer, jti)` (`replay_key`), then calls. |
+| `revoke_before_exchange` | Writes a revocation entry that matches the would-be root (rule, subject tag, tenant tag or replay key), then exchanges. |
+| `revocation_store_read_error` | Fault injection that makes the revocation read inside the admission transaction fail. |
+| `revoke_and_acknowledge_then_call` | Waits for the admin route's acknowledgement of a revocation, then calls. |
+| `revoke_during_inflight_call` | Starts a streaming call, lets its admission commit, then revokes and waits for acknowledgement before the stream finishes. |
+| `revoke_anchor_subject_inspect_store` | As `revoke_anchor_subject`, then reads the stored revocation row and checks it holds the subject tag and no plaintext subject or tenant. |
+| `revoke_other_subject` | Revokes a different principal by `anchor_subject`, then calls under the fixture principal. |
+
+## Reason codes
+
+Codes taken from the live corpus:
+
+| Code | Used for | Source |
+|---|---|---|
+| `urn:chio:error:none` | every allow | `verdict_matrix/scenarios/capability_subset/` |
+| `urn:chio:error:capability:scope-exceeded` | `receipt-disclosure-002` | `verdict_matrix/scenarios/capability_subset/` |
+| `urn:chio:error:capability:revoked` | revocation denies | `verdict_matrix/scenarios/revocation_propagation/` |
+
+Proposed codes, registered in `spec/errors/registry.yaml` by the M1 PR that implements each behavior:
+
+| Proposed code | Scenarios |
+|---|---|
+| `urn:chio:error:root-exchange:client-unauthenticated` | anchored-root-008 |
+| `urn:chio:error:root-exchange:replay` | anchored-root-009, anchored-root-012 |
+| `urn:chio:error:root-exchange:revoked` | revocation-local-007 |
+| `urn:chio:error:root-anchor:missing` | anchored-root-010 |
+| `urn:chio:error:root-anchor:lifetime` | anchored-root-011 |
+| `urn:chio:error:receipt:tenant-id-with-authority` | receipt-disclosure-005 |
+| `urn:chio:error:export:salt-only-opening` | receipt-disclosure-008 |
+| `urn:chio:error:export:tenant-tag-required` | receipt-disclosure-009 |
+| `urn:chio:error:root-policy:inline-disclosure-unavailable` | receipt-disclosure-011, receipt-disclosure-012 |
+| `urn:chio:error:kernel:revocation-store` | revocation-local-008 |
+
+The domains `root-exchange`, `root-anchor`, `root-policy`, `receipt` and `export` are not among the 20 domains in `spec/errors/registry.yaml`. M1 either adds them or renames these codes into existing domains (`transport`, `capability`, `policy`, `attest`). Revocation-store failures report the non-URN code `CHIO-KERNEL-REVOCATION-STORE` today (`crates/kernel/chio-kernel/src/kernel/error.rs:788`). The plan expects an existing revocation-store URN, but none exists, so `urn:chio:error:kernel:revocation-store` is a proposal too.
+
+## Inline disclosure flip
+
+`receipt-disclosure-011` and `receipt-disclosure-012` expect `deny` at policy load because M1 rejects a non-empty `disclosure.tools` map (spec 7.4, 13.1). When inline disclosure lands (M2), both flip to `allow` and their reason code becomes `urn:chio:error:none`. The PR that lands inline disclosure updates both files and re-pins the manifest.
+
+## Counts against spec 11.3
+
+Spec 11.3 lists `anchored_root` at 16 scenarios for M1 (each M1 kind allow, each section 8.1 and 8.2 deny, client authentication denials, `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry). The plan stages 12, matching `receipt_disclosure` (12) and `revocation_local` (12). M1 adds at least the multi-tenant `entra_jwt` issuer deny and `uti` reuse after root expiry, plus further section 8.1 and 8.2 denies, to reach 16.
+
+## Move-in checklist for M1
+
+1. `git mv` each category directory into `crates/tooling/chio-conformance/verdict_matrix/scenarios/` in the PR that implements its behavior.
+2. Add `AnchoredRoot`, `ReceiptDisclosure` and `RevocationLocal` to `ScenarioCategory` (`verdict_matrix/src/lib.rs:49`) with serde names `anchored_root`, `receipt_disclosure` and `revocation_local`, and to `as_str` and `FromStr`.
+3. Add the three values to the `category` row of `verdict_matrix/SCENARIOS.md` (line 19).
+4. Update `manifest.toml`: `scenario_count`, the `[corpus.categories]` counts, `scenario_index_hash` and `corpus_sha256`.
+5. Add the `rust-mcp-serve-http` driver entry to `manifest.toml` and its runner under `verdict_matrix/drivers/`, with the IdP stub, introspection stub and fixture definitions above.
+6. Register every proposed reason code (and any new domain) in `spec/errors/registry.yaml` and run `scripts/check-error-urn-registry.py`.
+7. Recheck `requires`: drivers that do not implement `rust-mcp-serve-http` must skip these scenarios, not fail them.
+8. Remove this staging directory once all three categories have moved.
