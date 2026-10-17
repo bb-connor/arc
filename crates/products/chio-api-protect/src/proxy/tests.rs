@@ -192,12 +192,11 @@ fn test_state_with_receipt_db(
             let store = SqliteReceiptStore::open(path).test_unwrap();
             let receipts = store.load_receipts().test_unwrap();
             let tool_receipts = store.load_tool_receipts().test_unwrap();
-            let revoked_capability_ids = store.load_revoked_capability_ids().test_unwrap();
             (
                 Some(Mutex::new(store)),
                 receipts,
                 tool_receipts,
-                revoked_capability_ids,
+                HashSet::new(),
             )
         } else {
             (None, Vec::new(), Vec::new(), HashSet::new())

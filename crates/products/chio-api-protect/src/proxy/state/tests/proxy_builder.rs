@@ -114,18 +114,14 @@ fn evidence_custody_is_existing_private_and_stable() {
 
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn evidence_startup_ignores_oversized_legacy_receipts_and_preserves_revocations(
+async fn evidence_startup_ignores_oversized_legacy_receipts(
 ) -> Result<(), Box<dyn std::error::Error>> {
     use std::os::unix::fs::PermissionsExt;
     let directory = tempfile::tempdir()?;
     let database = directory.path().join("receipts.db");
     let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
     let raw = rusqlite::Connection::open(&database)?;
-    raw.execute_batch("CREATE TABLE http_receipts (raw_json TEXT); INSERT INTO http_receipts VALUES (zeroblob(2000000)); CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY); INSERT INTO revoked_capabilities VALUES ('legacy-revoked');")?;
-    assert_eq!(
-        canonical.legacy_revoked_capability_ids()?,
-        vec!["legacy-revoked"]
-    );
+    raw.execute_batch("CREATE TABLE http_receipts (raw_json TEXT); INSERT INTO http_receipts VALUES (zeroblob(2000000));")?;
     drop(raw);
     drop(canonical);
     let key = Keypair::generate();
@@ -155,14 +151,46 @@ async fn evidence_startup_ignores_oversized_legacy_receipts_and_preserves_revoca
         reopened.query_receipts(&chio_kernel::ReceiptQuery::default().local_operator_admin())?;
     assert_eq!(receipts.total_count, 1);
     assert_eq!(receipts.receipts[0].receipt.kernel_key, key.public_key());
-    assert_eq!(
-        reopened.legacy_revoked_capability_ids()?,
-        vec!["legacy-revoked"]
-    );
     let error = reopened
         .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())
         .test_unwrap_err();
     assert!(error.to_string().contains("legacy mutable receipt history"));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn evidence_startup_refuses_a_receipt_database_holding_revocations(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = tempfile::tempdir()?;
+    let database = directory.path().join("receipts.db");
+    drop(chio_store_sqlite::SqliteReceiptStore::open(&database)?);
+    rusqlite::Connection::open(&database)?.execute_batch(
+        "CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY); INSERT INTO revoked_capabilities VALUES ('revoked-in-receipt-db');",
+    )?;
+    let key = Keypair::generate();
+    let seed = directory.path().join("signer.seed");
+    std::fs::write(&seed, key.seed_hex())?;
+    std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600))?;
+    let mut config = minimal_config();
+    config.receipt_db = Some(database.to_string_lossy().into_owned());
+    config.signer_seed_file = Some(seed);
+    config.sidecar_control_token = Some("evidence-test-control".into());
+    config.spec_content =
+        Some("openapi: 3.0.3\ninfo:\n  title: Evidence\n  version: 1.0.0\npaths: {}\n".into());
+    let outcome = tokio::time::timeout(
+        Duration::from_secs(10),
+        ProtectProxy::new(config).run_with_observer(|_| {}),
+    )
+    .await;
+    assert!(
+        matches!(outcome, Ok(Err(ProtectError::RevocationsInReceiptStore))),
+        "{outcome:?}"
+    );
+    let mut revocations = database.into_os_string();
+    revocations.push(".revocations");
+    assert!(!std::path::Path::new(&revocations).exists());
     Ok(())
 }
 

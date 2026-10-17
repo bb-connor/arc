@@ -50,6 +50,11 @@ pub enum ProtectError {
     #[error("receipt persistence failed: {0}")]
     ReceiptStore(String),
 
+    #[error(
+        "the receipt database holds a revoked_capabilities table; revocations live only in the sibling revocation store, so preserve the original database and use a new evidence database"
+    )]
+    RevocationsInReceiptStore,
+
     #[error("receipt evidence persistence failed: {0}")]
     EvidenceStore(#[from] chio_kernel::ReceiptStoreError),
 
