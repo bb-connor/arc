@@ -192,8 +192,6 @@ pub(crate) enum ReceiptCheckpointCommands {
         #[arg(long, default_value_t = 1024, value_parser = clap::value_parser!(u64).range(1..))]
         max_batch: u64,
     },
-    /// Verify the integrity of the receipt-checkpoint chain.
-    Verify,
 }
 
 #[derive(Subcommand)]

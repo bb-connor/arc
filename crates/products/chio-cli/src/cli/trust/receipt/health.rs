@@ -133,17 +133,8 @@ pub(crate) fn cmd_receipt_checkpoint_create(
     Ok(())
 }
 
-/// Retained as a documented compatibility alias for `chio receipt audit`
-/// (read-only: never passes `--repair`). Keeps emitting the legacy
-/// `CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA` envelope so existing
-/// automation parsing that schema does not break.
-pub(crate) fn cmd_receipt_checkpoint_verify(backend: QueryBackend<'_>) -> Result<(), CliError> {
-    receipt_audit_with_schema(false, CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, backend)
-}
-
-/// `chio receipt audit [--repair]`: the promoted full-verification surface
-/// (rollout step 3). Runs validate_claim_receipt_log_entries plus a
-/// complete checkpoint-chain verification via receipt_checkpoint_status.
+/// `chio receipt audit [--repair]`: runs validate_claim_receipt_log_entries
+/// plus a complete checkpoint-chain verification via receipt_checkpoint_status.
 ///
 /// `--repair` is an OFFLINE operation. It opens a
 /// LOCAL throwaway store and revalidates/reseeds the ON-DISK state on that
@@ -152,7 +143,33 @@ pub(crate) fn cmd_receipt_checkpoint_verify(backend: QueryBackend<'_>) -> Result
 /// live poisoned writer. Run it with the kernel stopped and restart the kernel
 /// to seed a clean verified head from the validated on-disk state.
 pub(crate) fn cmd_receipt_audit(repair: bool, backend: QueryBackend<'_>) -> Result<(), CliError> {
-    receipt_audit_with_schema(repair, CHIO_CLI_RECEIPT_AUDIT_SCHEMA, backend)
+    let store = local_receipt_store(&backend, "receipt audit")?;
+    if repair {
+        // Revalidate + reseed the ON-DISK state on this throwaway local store.
+        // This validates the persisted chain (fail-closed) but cannot reach a
+        // live kernel's in-memory writer head; see `offline_repair_notice`.
+        store.reseed_verified_head()?;
+    } else {
+        store.audit_receipt_cost_projection()?;
+    }
+    let report = store.receipt_checkpoint_status(Some(1))?;
+    if backend.json_output {
+        print_receipt_operator_json(CHIO_CLI_RECEIPT_AUDIT_SCHEMA, &report)?;
+        // Keep stdout pure JSON; surface the honest offline-repair note on stderr.
+        if repair {
+            eprintln!("{}", offline_repair_notice());
+        }
+    } else {
+        print!("{}", render_receipt_checkpoint_status_human(&report));
+        if repair {
+            println!("{}", offline_repair_notice());
+        }
+    }
+    if report.healthy {
+        Ok(())
+    } else {
+        Err(receipt_checkpoint_report_error(&report))
+    }
 }
 
 /// Honest, cross-process description of what `chio receipt audit --repair`
@@ -227,40 +244,6 @@ pub(crate) fn cmd_receipt_retention_repair(
         }
     }
     Ok(())
-}
-
-fn receipt_audit_with_schema(
-    repair: bool,
-    schema: &'static str,
-    backend: QueryBackend<'_>,
-) -> Result<(), CliError> {
-    let store = local_receipt_store(&backend, "receipt audit")?;
-    if repair {
-        // Revalidate + reseed the ON-DISK state on this throwaway local store.
-        // This validates the persisted chain (fail-closed) but cannot reach a
-        // live kernel's in-memory writer head; see `offline_repair_notice`.
-        store.reseed_verified_head()?;
-    } else {
-        store.audit_receipt_cost_projection()?;
-    }
-    let report = store.receipt_checkpoint_status(Some(1))?;
-    if backend.json_output {
-        print_receipt_operator_json(schema, &report)?;
-        // Keep stdout pure JSON; surface the honest offline-repair note on stderr.
-        if repair {
-            eprintln!("{}", offline_repair_notice());
-        }
-    } else {
-        print!("{}", render_receipt_checkpoint_status_human(&report));
-        if repair {
-            println!("{}", offline_repair_notice());
-        }
-    }
-    if report.healthy {
-        Ok(())
-    } else {
-        Err(receipt_checkpoint_report_error(&report))
-    }
 }
 
 #[cfg(test)]
@@ -368,8 +351,8 @@ mod receipt_operator_tests {
                 receipt_operator_json_value(CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, &create)?,
             ),
             (
-                CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA,
-                receipt_operator_json_value(CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, &status)?,
+                CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
+                receipt_operator_json_value(CHIO_CLI_RECEIPT_AUDIT_SCHEMA, &status)?,
             ),
         ] {
             assert_eq!(report["schema"].as_str(), Some(schema));
@@ -666,7 +649,7 @@ mod receipt_operator_tests {
             1000,
             backend(None, control_url),
         ));
-        assert_remote_unsupported(cmd_receipt_checkpoint_verify(backend(None, control_url)));
+        assert_remote_unsupported(cmd_receipt_audit(false, backend(None, control_url)));
     }
 
     #[test]
@@ -684,7 +667,7 @@ mod receipt_operator_tests {
         cmd_receipt_flush(5000, backend(Some(&db_path), None))?;
         cmd_receipt_checkpoint_status(10, backend(Some(&db_path), None))?;
         cmd_receipt_checkpoint_create(&seed_path, 10, backend(Some(&db_path), None))?;
-        cmd_receipt_checkpoint_verify(backend(Some(&db_path), None))?;
+        cmd_receipt_audit(false, backend(Some(&db_path), None))?;
 
         let _ = std::fs::remove_file(db_path);
         let _ = std::fs::remove_file(seed_path);

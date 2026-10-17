@@ -205,7 +205,7 @@ pub(crate) use trust_commands_cli::select_receipt_for_explain;
 #[allow(unused_imports)]
 pub(crate) use trust_commands_cli::{
     build_underwriting_policy_input_query, cmd_receipt_audit,
-    cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status, cmd_receipt_checkpoint_verify,
+    cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
     cmd_receipt_explain, cmd_receipt_flush, cmd_receipt_health, cmd_receipt_list,
     cmd_receipt_retention_repair, cmd_trust_credit_backtest_export,
     cmd_trust_credit_loss_lifecycle_evaluate, cmd_trust_credit_loss_lifecycle_issue,
@@ -259,7 +259,7 @@ pub(crate) use trust_commands_cli::{
     UnderwritingAppealResolveArgs, UnderwritingDecisionIssueArgs, UnderwritingDecisionListArgs,
     UnderwritingDecisionSimulateArgs, UnderwritingPolicyInputArgs, CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
     CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
+    CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
     CHIO_CLI_RECEIPT_HEALTH_SCHEMA,
 };
 #[path = "cli/session/mod.rs"]

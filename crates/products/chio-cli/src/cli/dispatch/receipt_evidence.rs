@@ -121,12 +121,6 @@ pub(crate) fn dispatch_receipt(
                         control_token: control_token.as_deref(),
                     },
                 ),
-                ReceiptCheckpointCommands::Verify => cmd_receipt_checkpoint_verify(QueryBackend {
-                    json_output,
-                    receipt_db_path: receipt_db.as_deref(),
-                    control_url: control_url.as_deref(),
-                    control_token: control_token.as_deref(),
-                }),
             },
             ReceiptCommands::Explain {
                 receipt_id,

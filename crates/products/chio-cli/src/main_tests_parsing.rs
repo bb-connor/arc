@@ -276,6 +276,23 @@ fn receipt_checkpoint_rejects_zero_max_batch() {
 }
 
 #[test]
+fn receipt_checkpoint_verify_subcommand_is_rejected() {
+    let error = match parse_cli([
+        "chio",
+        "--receipt-db",
+        "receipts.sqlite3",
+        "receipt",
+        "checkpoint",
+        "verify",
+    ]) {
+        Ok(_) => panic!("chio receipt checkpoint verify must be rejected"),
+        Err(error) => error,
+    };
+
+    assert_eq!(error.kind(), clap::error::ErrorKind::InvalidSubcommand);
+}
+
+#[test]
 fn write_cli_error_emits_structured_json() {
     let error = CliError::Kernel(chio_kernel::KernelError::OutOfScope {
         tool: "read_file".to_string(),

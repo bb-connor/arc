@@ -6,8 +6,6 @@ pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA: &str =
     "chio.cli.receipt.checkpoint_status.v1";
 pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA: &str =
     "chio.cli.receipt.checkpoint_create.v1";
-pub(crate) const CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA: &str =
-    "chio.cli.receipt.checkpoint_verify.v1";
 pub(crate) const CHIO_CLI_RECEIPT_AUDIT_SCHEMA: &str = "chio.cli.receipt.audit.v1";
 pub(crate) const CHIO_CLI_RECEIPT_RETENTION_REPAIR_SCHEMA: &str =
     "chio.cli.receipt.retention.repair.v1";
