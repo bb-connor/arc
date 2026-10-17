@@ -1,12 +1,65 @@
 use super::*;
 use chio_guards::SanitizerHook;
 use chio_kernel::PipelineOutcome;
-use std::sync::{mpsc, Barrier};
+use std::sync::atomic::AtomicBool;
+use std::sync::{mpsc, Barrier, Condvar};
 use std::time::Duration;
 
 const THREADS: usize = 8;
 const CALLS_PER_THREAD: usize = 24;
 const CANARY: &str = "tripwire-canary";
+const OVERLAP_WAIT: Duration = Duration::from_secs(5);
+
+/// Holds each inspection until a second one is in flight and records the peak
+/// number of concurrent calls. After one wait exceeds `OVERLAP_WAIT` no later
+/// call waits, so a serialized pipeline finishes and fails the peak assertion.
+#[derive(Default)]
+struct OverlapProbe {
+    in_flight: AtomicUsize,
+    peak: AtomicUsize,
+    gave_up: AtomicBool,
+    gate: Mutex<()>,
+    overlapped: Condvar,
+}
+
+impl OverlapProbe {
+    fn observe(&self) {
+        let now = self.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+        self.peak.fetch_max(now, Ordering::SeqCst);
+        let gate = self
+            .gate
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.overlapped.notify_all();
+        let (_gate, wait) = self
+            .overlapped
+            .wait_timeout_while(gate, OVERLAP_WAIT, |_| {
+                self.peak.load(Ordering::SeqCst) < 2 && !self.gave_up.load(Ordering::SeqCst)
+            })
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if wait.timed_out() {
+            self.gave_up.store(true, Ordering::SeqCst);
+        }
+        self.in_flight.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+struct OverlapProbeHook(Arc<OverlapProbe>);
+
+impl PostInvocationHook for OverlapProbeHook {
+    fn name(&self) -> &str {
+        "overlap-probe"
+    }
+
+    fn inspect(
+        &self,
+        _context: &PostInvocationContext<'_>,
+        _response: &serde_json::Value,
+    ) -> PostInvocationVerdict {
+        self.0.observe();
+        PostInvocationVerdict::Allow
+    }
+}
 
 struct CanaryDetector;
 
@@ -46,10 +99,13 @@ struct Harness {
     events: Arc<FakeEvents>,
 }
 
-fn harness() -> Harness {
+fn harness(probe: Option<Arc<OverlapProbe>>) -> Harness {
     let flow = Arc::new(RecordingPostFlow::default());
     let events = Arc::new(FakeEvents::new(false));
     let mut pipeline = PostInvocationPipeline::new();
+    if let Some(probe) = probe {
+        pipeline.add(Box::new(OverlapProbeHook(probe)));
+    }
     pipeline.add(Box::new(SanitizerHook::new()));
     pipeline.add(Box::new(FlowPostInvocationHook::new(
         flow.clone(),
@@ -166,13 +222,14 @@ fn concurrent_pipeline_calls_keep_their_own_results_and_evidence() {
     let security = security_context(&base);
     let calls = calls(&base);
 
-    let oracle = harness();
+    let oracle = harness(None);
     let expected = calls
         .iter()
         .map(|call| evaluate(&oracle.pipeline, call, &security))
         .collect::<Vec<_>>();
 
-    let shared = Arc::new(harness());
+    let probe = Arc::new(OverlapProbe::default());
+    let shared = Arc::new(harness(Some(Arc::clone(&probe))));
     let calls = Arc::new(calls);
     let security = Arc::new(security);
     let start = Arc::new(Barrier::new(THREADS));
@@ -223,6 +280,12 @@ fn concurrent_pipeline_calls_keep_their_own_results_and_evidence() {
             panic!("post-invocation worker panicked");
         }
     }
+
+    assert!(
+        probe.peak.load(Ordering::SeqCst) > 1,
+        "pipeline inspections never overlapped"
+    );
+    assert_eq!(probe.in_flight.load(Ordering::SeqCst), 0);
 
     let observed = shared
         .flow
