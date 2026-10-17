@@ -12351,7 +12351,7 @@
     },
     "crates/kernel/chio-runtime-core/src/work/decode.rs": {
       "kind": "strict-preflight-reparse",
-      "contract": "Allocation-free preflight bounds bytes, depth, nodes, container entries and safe integers before the duplicate-aware original-JSON reader builds a Value; each embedded REC-0a contract is charged at the REC-0a inner limits over its canonical bytes and refused when its typed decode discards a field; typed conversion then refuses unknown fields and variants, and validate() enforces work bounds and commitment bindings. Decoding proves no signature, authority or audience.",
+      "contract": "Allocation-free preflight bounds bytes, depth, nodes, container entries and safe integers before the duplicate-aware original-JSON reader builds a Value; each embedded REC-0a contract is charged at the REC-0a inner limits over its canonical bytes; typed conversion then refuses unknown fields and variants, a frame whose typed decode does not reserialize to the input Value is refused, and validate() enforces work bounds and commitment bindings. Decoding proves no signature, authority or audience.",
       "readers": [
         {
           "reader": "decode",
