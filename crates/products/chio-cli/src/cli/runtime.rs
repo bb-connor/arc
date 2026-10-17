@@ -521,7 +521,6 @@ pub(crate) fn cmd_api_protect(
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
             revocation_db: revocation_db.map(|path| path.display().to_string()),
-            require_nonce: false,
             allow_advisory: false,
             upstream_request_timeout: upstream_timeout_secs
                 .map(Duration::from_secs)
@@ -631,7 +630,6 @@ pub(crate) fn cmd_start(
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
             revocation_db: revocation_db.map(|path| path.display().to_string()),
-            require_nonce: false,
             allow_advisory: false,
             // The chio-start shape never proxies upstream, so the hop ceiling is
             // moot; keep the default so the serve site's drain window is unchanged.

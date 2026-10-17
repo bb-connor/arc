@@ -219,7 +219,6 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_link_local() {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -287,7 +286,6 @@ async fn api_protect_upstream_proxy_rejects_redirect_to_loopback_authority() {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -359,7 +357,6 @@ async fn api_protect_upstream_proxy_rejects_oversized_response() {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };

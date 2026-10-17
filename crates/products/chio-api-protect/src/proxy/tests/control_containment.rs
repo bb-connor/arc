@@ -308,7 +308,6 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
             control_token: None,
             budget_db: None,
             revocation_db: None,
-            require_nonce: false,
             allow_advisory: false,
             upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         })
@@ -461,7 +460,6 @@ async fn serving_proxy_rejects_control_headers_without_waiting_for_request_body(
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     });

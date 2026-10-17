@@ -179,7 +179,6 @@ fn service_clock_is_shared_by_durable_admission_and_configured_budget_owners(
                 .into_owned(),
         ),
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };

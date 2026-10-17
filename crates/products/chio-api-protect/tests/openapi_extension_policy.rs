@@ -68,7 +68,6 @@ async fn f069_invalid_extension_never_activates_issuance_or_proxy_listener() -> 
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: true,
         allow_advisory: false,
         upstream_request_timeout: Duration::from_millis(100),
     };

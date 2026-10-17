@@ -68,11 +68,6 @@ pub struct ProtectConfig {
     /// the sidecar refuses to start rather than run without the revocations it
     /// was told to enforce.
     pub revocation_db: Option<String>,
-    /// Retained for API compatibility. The kernel-mediated `/v1/evaluate`
-    /// route is a pre-execution authorization gate and always runs the
-    /// mediation kernel in execution-nonce strict mode, so this flag no
-    /// longer changes mediation behavior.
-    pub require_nonce: bool,
     /// When true, the `/v1/evaluate/advisory` route is active.
     /// Defaults to false; production deployments should leave this off to
     /// prevent agents from receiving advisory receipts and bypassing the
@@ -117,7 +112,6 @@ impl std::fmt::Debug for ProtectConfig {
             .field("control_url", &self.control_url)
             .field("budget_db", &self.budget_db)
             .field("revocation_db", &self.revocation_db)
-            .field("require_nonce", &self.require_nonce)
             .field("allow_advisory", &self.allow_advisory)
             .field("upstream_request_timeout", &self.upstream_request_timeout)
             .finish()
