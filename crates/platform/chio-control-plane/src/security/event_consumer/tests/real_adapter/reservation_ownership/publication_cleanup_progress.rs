@@ -11,7 +11,7 @@ use chio_kernel::security_admission_operation::{
 const CLEANUP_LEASE_MS: u64 = 30_000;
 const FOREIGN_CLAIM_TOKEN: &str = "other";
 const ACTIVE_RESPONSE_APPROVAL_CLEANUP_SCHEMA: &str =
-    "chio.admission-cleanup.active-response-approval.v2";
+    "chio.admission-cleanup.active-response-approval.v1";
 
 fn cold_kernel(fixture: &RealAdapterFixture) -> ChioKernel {
     let mut kernel = ChioKernel::new_with_clock(
