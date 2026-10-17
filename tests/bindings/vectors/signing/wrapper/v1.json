@@ -3922,21 +3922,9 @@
     },
     {
       "canonical_body": "{\"a\":1}",
-      "id": "chio.web3-settlement-dispatch.v2",
-      "schema_id": "chio.web3-settlement-dispatch.v2",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100c14ca32f9f1019075d2c1a85f352fa59e40c40149aa7a758734d110d3a3cd0bc015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
       "id": "chio.web3-settlement-execution-receipt.v1",
       "schema_id": "chio.web3-settlement-execution-receipt.v1",
       "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100b9b146f1aef39e82e2fb54e0ed1beb9a026156f86531bf47dcb0c3b8da03aa7f015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
-    },
-    {
-      "canonical_body": "{\"a\":1}",
-      "id": "chio.web3-settlement-execution-receipt.v2",
-      "schema_id": "chio.web3-settlement-execution-receipt.v2",
-      "wrapper_hex": "6368696f2e7369676e696e672d777261707065722e763100e7a8ccb6086cd24474f828eb988cdd69b6c49c21acef7305fe9e323be2fc494b015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
     },
     {
       "canonical_body": "{\"a\":1}",
