@@ -344,7 +344,13 @@ impl BrokerService {
         let Some(receipt) = self.receipt_sink.load_failure(&receipt_id)? else {
             return Ok(None);
         };
-        verify_failure_receipt(&receipt, &self.receipt_signer.public_key())?;
+        verify_failure_receipt(
+            &receipt,
+            &self
+                .receipt_signer
+                .public_key()
+                .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?,
+        )?;
         let request_digest = failure_bound_request_digest(request)?;
         let capability_digest = capability_digest(&request.capability).ok();
         if receipt.body.receipt_id != receipt_id

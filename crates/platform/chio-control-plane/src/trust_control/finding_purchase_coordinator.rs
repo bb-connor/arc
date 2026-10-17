@@ -308,9 +308,15 @@ impl FindingPurchaseCoordinator {
         venue_pin: &FindingAuthorityPin,
         venue_id: &str,
     ) -> Result<Self, PurchaseCoordinatorError> {
-        if purchase_authority.public_key() != *purchase_pin
-            || failed_delivery_authority.public_key() != *failed_delivery_pin
-            || purchase_authority.public_key() == failed_delivery_authority.public_key()
+        let purchase_key = purchase_authority
+            .public_key()
+            .map_err(|_| PurchaseCoordinatorError::Signing)?;
+        let failed_delivery_key = failed_delivery_authority
+            .public_key()
+            .map_err(|_| PurchaseCoordinatorError::Signing)?;
+        if purchase_key != *purchase_pin
+            || failed_delivery_key != *failed_delivery_pin
+            || purchase_key == failed_delivery_key
         {
             return Err(PurchaseCoordinatorError::AuthorityPinMismatch);
         }
@@ -326,8 +332,8 @@ impl FindingPurchaseCoordinator {
         status_feed_service_bond
             .validate(status_feed_operator)
             .map_err(|_| PurchaseCoordinatorError::AuthorityStatusPin)?;
-        if authority_status_key == purchase_authority.public_key()?
-            || authority_status_key == failed_delivery_authority.public_key()?
+        if authority_status_key == purchase_key
+            || authority_status_key == failed_delivery_key
             || authority_status_key == status_operator_key
         {
             return Err(PurchaseCoordinatorError::AuthorityStatusPin);
@@ -340,8 +346,8 @@ impl FindingPurchaseCoordinator {
         let listing_key = listing_pin
             .validate("listing")
             .map_err(|_| PurchaseCoordinatorError::ListingPin)?;
-        if listing_key == purchase_authority.public_key()?
-            || listing_key == failed_delivery_authority.public_key()?
+        if listing_key == purchase_key
+            || listing_key == failed_delivery_key
             || listing_key == authority_status_key
             || listing_key == status_operator_key
         {
@@ -351,8 +357,8 @@ impl FindingPurchaseCoordinator {
             .validate("venue")
             .map_err(|_| PurchaseCoordinatorError::VenuePin)?;
         if venue_id.is_empty()
-            || venue_key == purchase_authority.public_key()?
-            || venue_key == failed_delivery_authority.public_key()?
+            || venue_key == purchase_key
+            || venue_key == failed_delivery_key
             || venue_key == authority_status_key
             || venue_key == status_operator_key
             || venue_key == listing_key
@@ -435,6 +441,18 @@ impl FindingPurchaseCoordinator {
             return Err(reject("authority is revoked at reservation"));
         }
         Ok(configured_key)
+    }
+
+    fn purchase_key(&self) -> Result<PublicKey, PurchaseCoordinatorError> {
+        self.purchase_authority
+            .public_key()
+            .map_err(|_| PurchaseCoordinatorError::Signing)
+    }
+
+    fn failed_delivery_key(&self) -> Result<PublicKey, PurchaseCoordinatorError> {
+        self.failed_delivery_authority
+            .public_key()
+            .map_err(|_| PurchaseCoordinatorError::Signing)
     }
 
     fn require_live_listing_authority(
@@ -821,15 +839,15 @@ impl FindingPurchaseCoordinator {
             (
                 "purchase",
                 &admission.body.purchase_authority,
-                self.purchase_authority.public_key(),
+                self.purchase_key()?,
             ),
             (
                 "failed-delivery",
                 &admission.body.failed_delivery_authority,
-                self.failed_delivery_authority.public_key(),
+                self.failed_delivery_key()?,
             ),
         ] {
-            if policy.key != signing_key? {
+            if policy.key != signing_key {
                 return Err(PurchaseCoordinatorError::DeclaredAuthorityMismatch(role));
             }
             if !authority_policy_covers(policy, now) {
@@ -1076,12 +1094,12 @@ impl FindingPurchaseCoordinator {
                 (
                     "purchase",
                     &admission.body.purchase_authority,
-                    self.purchase_authority.public_key(),
+                    self.purchase_key()?,
                 ),
                 (
                     "failed-delivery",
                     &admission.body.failed_delivery_authority,
-                    self.failed_delivery_authority.public_key(),
+                    self.failed_delivery_key()?,
                 ),
             ] {
                 self.require_live_terminal_authority(
@@ -1178,15 +1196,15 @@ impl FindingPurchaseCoordinator {
             (
                 "purchase",
                 &admission.body.purchase_authority,
-                self.purchase_authority.public_key(),
+                self.purchase_key()?,
             ),
             (
                 "failed-delivery",
                 &admission.body.failed_delivery_authority,
-                self.failed_delivery_authority.public_key(),
+                self.failed_delivery_key()?,
             ),
         ] {
-            if policy.key != signing_key? {
+            if policy.key != signing_key {
                 return Err(PurchaseCoordinatorError::DeclaredAuthorityMismatch(role));
             }
             if !authority_policy_covers(policy, reservation.created_at) {
@@ -1558,7 +1576,7 @@ impl FindingPurchaseCoordinator {
         }
         self.require_live_terminal_authority(
             &admission.body.purchase_authority,
-            &self.purchase_authority.public_key(),
+            &self.purchase_key()?,
             AuthorityStatusReading::PostTerminal {
                 terminal_at: receipt.timestamp,
             },
@@ -1750,7 +1768,7 @@ impl FindingPurchaseCoordinator {
         }
         self.require_live_terminal_authority(
             &admission.body.failed_delivery_authority,
-            &self.failed_delivery_authority.public_key(),
+            &self.failed_delivery_key()?,
             AuthorityStatusReading::PostTerminal {
                 terminal_at: receipt.timestamp,
             },

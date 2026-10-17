@@ -124,7 +124,10 @@ fn witness_seed_loader_rejects_links_and_permissive_modes() {
     write_private_file(&seed_path, [9_u8; 32]).test_unwrap();
     std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o600)).test_unwrap();
     let loaded = load_witness_seed_backend(&seed_path).test_unwrap();
-    assert_eq!(loaded.public_key().test_unwrap(), backend(9).public_key().test_unwrap());
+    assert_eq!(
+        loaded.public_key().test_unwrap(),
+        backend(9).public_key().test_unwrap()
+    );
 
     std::fs::set_permissions(&seed_path, std::fs::Permissions::from_mode(0o640)).test_unwrap();
     assert!(load_witness_seed_backend(&seed_path).is_err());

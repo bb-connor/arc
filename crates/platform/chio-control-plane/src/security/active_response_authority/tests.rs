@@ -2,8 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use chio_core::{
-    canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature,
-    SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend,
 };
 use chio_secure_ipc::PeerIdentity as BrokerPeerIdentity;
 #[cfg(target_os = "linux")]

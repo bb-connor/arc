@@ -34,7 +34,7 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
     let signature = signer.sign_bytes(&active_response_authority_request_signing_bytes(&body)?)?;
     let signed = SignedActiveResponseAuthorityRequest {
         body,
-        algorithm: signer.algorithm(),
+        algorithm: signer.public_key()?.algorithm(),
         signature,
     };
     let valid = canonical_json_bytes(&signed)?;

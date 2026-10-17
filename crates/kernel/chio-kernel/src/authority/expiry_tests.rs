@@ -1,5 +1,5 @@
 use super::*;
-use chio_core::crypto::{Signature, SigningAlgorithm};
+use chio_core::crypto::Signature;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct Clock;

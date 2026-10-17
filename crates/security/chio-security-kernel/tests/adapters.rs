@@ -9,8 +9,7 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::receipt::security::ActiveDefenseReceiptBody;
 use chio_core::{
-    canonical_json_bytes, sha256, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm,
-    SigningBackend,
+    canonical_json_bytes, sha256, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend,
 };
 use chio_core_types::{SignedDeclassificationGrant, SignedSecurityEvent};
 use chio_flow::{
@@ -667,8 +666,8 @@ struct PinnedWorkloadAuthority {
 }
 
 impl CapabilityAuthority for PinnedWorkloadAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.issuer.public_key()
+    fn authority_public_key(&self) -> Result<PublicKey, chio_kernel::KernelError> {
+        Ok(self.issuer.public_key())
     }
 
     fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {

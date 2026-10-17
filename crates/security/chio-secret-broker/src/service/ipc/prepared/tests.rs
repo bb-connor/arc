@@ -63,7 +63,7 @@ impl BrokerIpcHandler for PreparedHandler {
             &authenticated.registration,
             RegisterAttemptAction::Prepare,
             &request.tenant_scope,
-            &authority().public_key(),
+            &authority().public_key().unwrap(),
             now,
             0,
         )?;

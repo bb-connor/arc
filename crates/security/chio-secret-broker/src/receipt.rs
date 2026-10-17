@@ -1146,8 +1146,7 @@ fn terminal_constraint_or_storage(error: rusqlite::Error) -> BrokerError {
 #[cfg(test)]
 mod tests {
     use chio_core_types::{
-        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-        SigningOutcome,
+        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningBackend, SigningOutcome,
     };
     use chio_test_support::prelude::*;
 

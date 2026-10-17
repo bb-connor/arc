@@ -97,7 +97,11 @@ impl Fixture {
             event_id: EventId::new("event.receipt.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.enterprise.receipt").test_unwrap(),
-            key_id: derive_key_id(self.old.public_key().test_unwrap().algorithm(), &self.old.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                self.old.public_key().test_unwrap().algorithm(),
+                &self.old.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: self.old.public_key().test_unwrap().algorithm(),
             public_key: self.old.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
@@ -122,7 +126,11 @@ impl Fixture {
             event_id: EventId::new("event.receipt.rotation").test_unwrap(),
             previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
             authority_id: genesis.body.authority_id.clone(),
-            key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                new.public_key().test_unwrap().algorithm(),
+                &new.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: new.public_key().test_unwrap().algorithm(),
             public_key: new.public_key().test_unwrap(),
             operation: KeyLogOperation::Rotate {

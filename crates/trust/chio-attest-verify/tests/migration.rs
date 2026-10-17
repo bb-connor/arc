@@ -366,7 +366,8 @@ fn end_to_end_migration_walks_three_stages() {
     // Stage 2: roll in the initial PQ key.
     let stage2 = build_hybrid_backend(&stage2_pq_seed());
     let stage2_bundle =
-        ChioReceipt::sign_with_backend(migration_body(stage2.public_key().unwrap()), &stage2).unwrap();
+        ChioReceipt::sign_with_backend(migration_body(stage2.public_key().unwrap()), &stage2)
+            .unwrap();
     assert!(
         verify_under_floor(&stage2_bundle, CryptoFloor::AllowHybrid),
         "stage = 2 (allow_hybrid) MUST accept new hybrid bundle"
@@ -386,7 +387,8 @@ fn end_to_end_migration_walks_three_stages() {
 
     // Stage 3: tighten the floor and verify the rolled bundle.
     let stage3_bundle =
-        ChioReceipt::sign_with_backend(migration_body(stage3.public_key().unwrap()), &stage3).unwrap();
+        ChioReceipt::sign_with_backend(migration_body(stage3.public_key().unwrap()), &stage3)
+            .unwrap();
     assert!(
         verify_under_floor(&stage3_bundle, CryptoFloor::PqRequired),
         "stage = 3 (pq_required) MUST accept rolled hybrid bundle"

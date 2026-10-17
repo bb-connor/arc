@@ -77,7 +77,7 @@ fn dispatch_after_refresh(
     )?;
     assert!(capability.verify_signature()?);
     assert_eq!((capability.issued_at, capability.expires_at), (100, 110));
-    assert_eq!(source.authority_public_key(), capability.issuer);
+    assert_eq!(source.authority_public_key().unwrap(), capability.issuer);
     let status = crate::trust_control::report_validation::authority_status_response(
         "sqlite".into(),
         source.status()?,

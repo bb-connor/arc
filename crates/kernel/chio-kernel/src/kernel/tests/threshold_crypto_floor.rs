@@ -90,9 +90,10 @@ impl Fixture {
         let policy_hash = sha256_hex(b"threshold-crypto-floor-policy");
         let mut config = make_config();
         config.policy_hash = policy_hash.clone();
-        config
-            .ca_public_keys
-            .extend([authority.public_key().unwrap(), issuer.public_key().unwrap()]);
+        config.ca_public_keys.extend([
+            authority.public_key().unwrap(),
+            issuer.public_key().unwrap(),
+        ]);
         let mut kernel = make_kernel(config);
         let requirement = ThresholdApprovalRequirement::new(
             policy_hash.clone(),

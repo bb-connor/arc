@@ -409,7 +409,9 @@ impl KeyringRuntimeComposition {
             let sequence = previous.body.sequence.checked_add(1).ok_or_else(|| {
                 CliError::cli_other_error("key-log sequence overflow".to_string())
             })?;
-            let new_public_key = new_backend.public_key();
+            let new_public_key = new_backend
+                .public_key()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
             let body = chio_keyring::KeyLogEventBody {
                 schema: chio_keyring::KEY_LOG_EVENT_SCHEMA.to_string(),
                 log_id: policy.log_id().clone(),
@@ -424,10 +426,10 @@ impl KeyringRuntimeComposition {
                         .map_err(|error| CliError::cli_other_error(error.to_string()))?,
                 ),
                 authority_id: policy.authority_id().clone(),
-                key_id: chio_keyring::derive_key_id(new_backend.algorithm(), &new_public_key)
+                key_id: chio_keyring::derive_key_id(new_public_key.algorithm(), &new_public_key)
                     .map_err(|error| CliError::cli_other_error(error.to_string()))?,
-                algorithm: new_backend.algorithm(),
-                public_key: new_public_key?,
+                algorithm: new_public_key.algorithm(),
+                public_key: new_public_key,
                 operation: chio_keyring::KeyLogOperation::Rotate {
                     previous_key_id: state
                         .active_signing_key()
@@ -870,10 +872,13 @@ pub fn load_keyring_runtime_composition_with_clock(
     let artifact_time_inner: Arc<dyn SigningBackend> = Arc::new(load_private_seed_backend(
         &config.artifact_time_seed_file_path,
     )?);
+    let artifact_time_key = artifact_time_inner
+        .public_key()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let artifact_time_anchor_id = artifact_time
         .iter()
         .find_map(|(anchor_id, public_key)| {
-            (public_key == &artifact_time_inner.public_key()).then(|| anchor_id.clone())
+            (public_key == &artifact_time_key).then(|| anchor_id.clone())
         })
         .ok_or_else(|| {
             CliError::cli_other_error(
@@ -1094,8 +1099,11 @@ fn key_enterprise_receipt_to_chio_receipt(
     };
     use chio_core::receipt::metadata::ActorRef;
 
+    let operator_key = operator_backend
+        .public_key()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     enterprise_receipt
-        .verify_operator(&operator_backend.public_key())
+        .verify_operator(&operator_key)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let canonical = enterprise_receipt
         .canonical_bytes()
@@ -1131,7 +1139,7 @@ fn key_enterprise_receipt_to_chio_receipt(
         })),
         trust_level: TrustLevel::Verified,
         tenant_id: None,
-        kernel_key: operator_backend.public_key()?,
+        kernel_key: operator_key,
         bbs_projection_version: None,
     };
     ChioReceipt::sign_with_backend(body, operator_backend)

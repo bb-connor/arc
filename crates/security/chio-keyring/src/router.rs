@@ -564,7 +564,9 @@ impl KeyringSigningRouter {
             "staged signing backend is absent",
         ))?;
         let backend_public_key = backend.public_key()?;
-        if derive_key_id(backend_public_key.algorithm(), &backend_public_key)? != staged.lease.key_id {
+        if derive_key_id(backend_public_key.algorithm(), &backend_public_key)?
+            != staged.lease.key_id
+        {
             return Err(KeyringError::StateInvariant(
                 "staged signing backend changed identity",
             ));

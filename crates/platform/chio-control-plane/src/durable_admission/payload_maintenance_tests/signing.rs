@@ -42,7 +42,7 @@ fn compacted_payload_holds_actual_boot_selected_hybrid_receipt_and_cold_replay()
     )?;
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Allow, "{:?}", response.reason);
-    assert_eq!(response.receipt.kernel_key, backend.public_key());
+    assert_eq!(response.receipt.kernel_key, backend.public_key()?);
     assert_ne!(response.receipt.kernel_key, kernel.public_key());
     assert_eq!(response.receipt.algorithm, Some(SigningAlgorithm::Hybrid));
     assert!(response.receipt.verify_signature_with_floor(

@@ -1067,8 +1067,12 @@ mod tests {
                     authorized_attempt_limit(&job, &authority.public_key().unwrap(), 10),
                     Ok(3)
                 );
-                let bounded =
-                    FindingWorkerRequest::from_job(&job, 3_600, &authority.public_key().unwrap(), 10);
+                let bounded = FindingWorkerRequest::from_job(
+                    &job,
+                    3_600,
+                    &authority.public_key().unwrap(),
+                    10,
+                );
                 assert_eq!(bounded.map(|request| request.deadline_unix_secs), Ok(20));
 
                 job.attempt_count = 4;
@@ -1076,10 +1080,13 @@ mod tests {
                     authorized_attempt_limit(&job, &authority.public_key().unwrap(), 10),
                     Ok(3)
                 );
-                assert!(
-                    FindingWorkerRequest::from_job(&job, 3_600, &authority.public_key().unwrap(), 10,)
-                        .is_err()
-                );
+                assert!(FindingWorkerRequest::from_job(
+                    &job,
+                    3_600,
+                    &authority.public_key().unwrap(),
+                    10,
+                )
+                .is_err());
             }
         }
     }
@@ -1150,9 +1157,12 @@ mod tests {
                 let envelope = sign_attested_result(body, &signer);
                 assert!(envelope.is_ok());
                 if let Ok(mut envelope) = envelope {
-                    assert!(
-                        verify_attested_result(&envelope, &request, &signer.public_key().unwrap()).is_ok()
-                    );
+                    assert!(verify_attested_result(
+                        &envelope,
+                        &request,
+                        &signer.public_key().unwrap()
+                    )
+                    .is_ok());
                     envelope.body.kernel_sha256 = "9".repeat(64);
                     assert_eq!(
                         verify_attested_result(&envelope, &request, &signer.public_key().unwrap()),

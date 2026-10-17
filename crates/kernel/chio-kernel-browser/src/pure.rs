@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNegotiation};
-use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
+use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
 use chio_kernel_core::{
     evaluate_with_full_floor_and_root as core_evaluate_with_full_floor,

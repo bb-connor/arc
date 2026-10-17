@@ -120,10 +120,8 @@ impl ChioKernel {
             ));
         }
         let canonical_content = std::mem::take(&mut params.canonical_content);
-        let body = self.prepare_receipt_body(
-            params,
-            expected_key.cloned().unwrap_or(authority_key),
-        )?;
+        let body =
+            self.prepare_receipt_body(params, expected_key.cloned().unwrap_or(authority_key))?;
 
         // The signing handle binds the canonical content to body.content_hash.
         // Body assembly and persistence are outside the portable signing boundary.

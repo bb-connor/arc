@@ -157,7 +157,10 @@ impl Fixture {
 fn classical_boot_preserves_canonical_proposal() -> TestResult {
     let mut fixture = Fixture::new()?;
     let backend = fixture.configure(KernelCryptoFloor::AllowClassical)?;
-    assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::Ed25519);
+    assert_eq!(
+        backend.public_key().unwrap().algorithm(),
+        SigningAlgorithm::Ed25519
+    );
     let proposal = fixture.pending()?;
     assert_eq!(proposal.body.policy_authority, backend.public_key()?);
     let legacy =

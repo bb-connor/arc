@@ -60,7 +60,7 @@ fn native_raw_store_rejects_substituted_original_dispatch_bindings() -> TestResu
                 request: &fixture.request,
                 security_context: &context,
                 ledger: &ledger,
-                receipt_signing_public_key: fixture.kernel.receipt_signing_public_key(),
+                receipt_signing_public_key: fixture.kernel.receipt_signing_public_key().unwrap(),
                 receipt_crypto_floor:
                     chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
             },

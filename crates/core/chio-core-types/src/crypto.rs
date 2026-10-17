@@ -1068,7 +1068,7 @@ impl SigningBackend for Ed25519Backend {
 #[cfg(feature = "fips")]
 mod fips_backends {
     use super::{PublicKey, PublicKeyMaterial, Result, Signature, SignatureMaterial};
-    use crate::crypto::{Error, SigningAlgorithm, SigningBackend};
+    use crate::crypto::{Error, SigningBackend};
     use aws_lc_rs::rand::SystemRandom;
     use aws_lc_rs::signature::{
         EcdsaKeyPair, KeyPair, ECDSA_P256_SHA256_ASN1_SIGNING, ECDSA_P384_SHA384_ASN1_SIGNING,
@@ -1547,7 +1547,10 @@ mod tests {
     #[test]
     fn ed25519_backend_round_trip() {
         let backend = Ed25519Backend::generate();
-        assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::Ed25519);
+        assert_eq!(
+            backend.public_key().unwrap().algorithm(),
+            SigningAlgorithm::Ed25519
+        );
         let msg = b"hello chio";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
@@ -1646,7 +1649,10 @@ mod tests {
     #[test]
     fn p256_backend_round_trip() {
         let backend = P256Backend::generate().unwrap();
-        assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::P256);
+        assert_eq!(
+            backend.public_key().unwrap().algorithm(),
+            SigningAlgorithm::P256
+        );
         let msg = b"hello fips";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::P256);
@@ -1666,7 +1672,10 @@ mod tests {
     #[test]
     fn p384_backend_round_trip() {
         let backend = P384Backend::generate().unwrap();
-        assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::P384);
+        assert_eq!(
+            backend.public_key().unwrap().algorithm(),
+            SigningAlgorithm::P384
+        );
         let msg = b"hello fips 384";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::P384);

@@ -325,13 +325,13 @@ impl FindingChallengeCoordinator {
             destinations,
             effect_intents: bindings,
             penalty_authority_id: self.penalty_pin.authority_id.clone(),
-            penalty_key: self.penalty_authority.public_key()?,
+            penalty_key: self.penalty_authority.public_key().map_err(|_| ChallengeCoordinatorError::Signing)?,
             penalty_key_epoch: self.penalty_pin.key_epoch,
             penalty_valid_from: self.penalty_pin.valid_from,
             penalty_valid_until: self.penalty_pin.valid_until,
             penalty_revocation_status_ref: self.penalty_pin.revocation_status_ref.clone(),
             finalization_authority_id: self.finalization_pin.authority_id.clone(),
-            finalization_key: self.finalization_authority.public_key()?,
+            finalization_key: self.finalization_authority.public_key().map_err(|_| ChallengeCoordinatorError::Signing)?,
             finalization_key_epoch: self.finalization_pin.key_epoch,
             finalization_valid_from: self.finalization_pin.valid_from,
             finalization_valid_until: self.finalization_pin.valid_until,
@@ -466,7 +466,7 @@ impl FindingChallengeCoordinator {
         now: u64,
     ) -> Result<FindingPenaltyOutcome, ChallengeCoordinatorError> {
         self.require_current_role(&self.penalty_pin, issued_at, now, "penalty")?;
-        let penalty_key = self.penalty_authority.public_key();
+        let penalty_key = self.penalty_authority.public_key().map_err(|_| ChallengeCoordinatorError::Signing)?;
         let mut trusted = self.require_pinned_governance(governance, case, prior_penalty, now)?;
         let outcome_envelope_sha256 = self.envelope_digest(outcome)?;
         let (action, state, supersedes) = match branch {
@@ -511,7 +511,7 @@ impl FindingChallengeCoordinator {
             expires_at: governance.penalty_expires_at,
             note: None,
         };
-        for key in [governance.fee_schedule.signer_key.clone(), penalty_key?] {
+        for key in [governance.fee_schedule.signer_key.clone(), penalty_key] {
             if !trusted.contains(&key) {
                 trusted.push(key);
             }

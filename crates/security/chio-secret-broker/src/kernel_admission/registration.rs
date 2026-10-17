@@ -7,7 +7,7 @@ use crate::registration::broker_execute_request_registration_digest;
 use crate::service::broker_request_digest;
 use crate::store::{derive_attempt_ids_for_operation, AttemptRegistration};
 use crate::{validate_identifier, Result};
-use chio_core_types::{PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningOutcome};
+use chio_core_types::{PublicKey, Signature, SigningBackend, SigningOutcome};
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingV1,
 };
@@ -47,7 +47,9 @@ impl BrokerAdmissionParticipant {
             "revocation authority domain",
             512,
         )?;
-        let authority_key = authority_signer.public_key();
+        let authority_key = authority_signer
+            .public_key()
+            .map_err(|error| crate::BrokerError::AuthorityUnavailable(error.to_string()))?;
         let configuration = canonical(&serde_json::json!({
             "schema": PARTICIPANT_ID,
             "socket_path": config.socket_path.to_str().ok_or_else(rejected)?,
@@ -85,7 +87,7 @@ impl BrokerAdmissionParticipant {
             config,
             Arc::new(RegistrationSigner {
                 inner: authority_signer,
-                key: authority_key?,
+                key: authority_key,
             }),
             verifier.clock.clone(),
         )?;
