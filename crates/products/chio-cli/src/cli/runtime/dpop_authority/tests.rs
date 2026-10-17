@@ -154,7 +154,7 @@ fn descriptor_file_rejects_duplicate_keys_before_typed_projection() -> TestResul
     };
     assert_eq!(
         message,
-        "duplicate object key: \"proof_ttl_secs\" at line 1 column 42"
+        "duplicate object key: \"proof_ttl_secs\" at line 1 column 43"
     );
     assert_eq!(fs::read(&path)?, bytes);
     Ok(())
