@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-199 of 607 identifier constants in the security crates are unpinned.
+198 of 607 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (66)
 
@@ -172,7 +172,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:72` `VERIFIED_FIX_PAYLOAD_SCHEMA` = `chio.finding.verified-fix-payload.v1`
 - `crates/platform/chio-control-plane/src/trust_control/service_types/structured_budget.rs:4` `STRUCTURED_BUDGET_RESPONSE_SCHEMA` = `chio.structured-budget-response.v1`
 
-## crates/platform/chio-store-sqlite (17)
+## crates/platform/chio-store-sqlite (16)
 
 - `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs:5` `FORMAT` = `chio.native-security-egress.v1`
 - `crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/egress/record.rs:6` `DECLASSIFIED_FORMAT` = `chio.native-security-egress.v2`
@@ -186,7 +186,6 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:133` `EFFECT_FEE_DOMAIN` = `chio.finding.effect.fee.v1`
 - `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:134` `DISPUTE_FEE_OPERATION_DOMAIN` = `chio.finding.dispute-fee-operation.v1`
 - `crates/platform/chio-store-sqlite/src/finding_challenge_store.rs:135` `DISPUTE_FEE_RETURN_OPERATION_DOMAIN` = `chio.finding.dispute-fee-return-operation.v1`
-- `crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs:29` `CUSTODY_AAD_FORMAT` = `chio.frost.ceremony-custody-aad.v2`
 - `crates/platform/chio-store-sqlite/src/frost_store/signer.rs:34` `SIGNER_AAD_FORMAT` = `chio.frost.signer-nonce-aad.v1`
 - `crates/platform/chio-store-sqlite/src/security_state/participant_source/evidence.rs:10` `SCHEMA` = `chio.security-participant-source-fingerprint.v1`
 - `crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs:21` `FORMAT` = `chio.sqlite-local-path-identity.v1`

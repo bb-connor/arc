@@ -2735,9 +2735,9 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/trust/chi
 first_seen = "51e46336b1"
 
 [[schema]]
-value = "chio.frost.ceremony-custody-aad.v2"
+value = "chio.frost.ceremony-custody-aad.v1"
 files = ["crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs"]
-first_seen = "21c831d396"
+first_seen = "51e46336b1"
 
 [[schema]]
 value = "chio.frost.dkg-package.v1"
