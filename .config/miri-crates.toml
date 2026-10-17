@@ -77,6 +77,9 @@ reason = "syscall: getdents64 is not supported by Miri"
 [[crate.skip]]
 test = "linux::scan_bounds_tests::forbidden_directory_budget_counts_skipped_entries_across_roots"
 reason = "syscall: getdents64 is not supported by Miri"
+[[crate.skip]]
+test = "tests::admission_consumes_nonforgeable_registry_authorization"
+reason = "syscall: open with O_PATH (flags 0x200000) is not supported by Miri"
 
 [[crate]]
 name = "chio-keyring"
@@ -133,6 +136,9 @@ reason = "syscall: open with O_DIRECTORY is not supported by Miri"
 [[crate.skip]]
 test = "sqlite::synchronization_tests::synchronization_page_and_head_share_a_snapshot_during_concurrent_append"
 reason = "syscall: open with O_DIRECTORY is not supported by Miri"
+[[crate.skip]]
+test = "sqlite::canonical_bounds_tests::canonical_blob_columns_refuse_nul_padded_text"
+reason = "calls into C: sqlite3_threadsafe through rusqlite"
 
 # FFI buffers transfer Box ownership into the exported pointer and reconstruct
 # the same allocation when freed. The read/write/free regressions reproduced
