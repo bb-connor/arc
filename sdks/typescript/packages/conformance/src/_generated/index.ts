@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: c8b5ee6df9b15a899f4675e77896711da05598977975f1e8660b3590e711e548
+// Schema SHA: 1a8bf6e0398117241555d9888529fea9ee0bf71f3544c9805be3ca41e9f1150d
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -47878,6 +47878,8 @@ export namespace RootAuthority_RootPolicy {
   } & {
     [k: string]: unknown;
   } & {
+    [k: string]: unknown;
+  } & {
     /**
      * A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
      */
@@ -48159,7 +48161,7 @@ export namespace RootAuthority_RootPolicy {
     claims?: MatchClaims;
   }
   /**
-   * Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+   * Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
    */
   export interface MatchClaims {
     /**
@@ -48177,11 +48179,6 @@ export namespace RootAuthority_RootPolicy {
      * @maxItems 64
      */
     sub?: [string, ...string[]];
-    /**
-     * @minItems 1
-     * @maxItems 64
-     */
-    aud?: [string, ...string[]];
     /**
      * @minItems 1
      * @maxItems 64

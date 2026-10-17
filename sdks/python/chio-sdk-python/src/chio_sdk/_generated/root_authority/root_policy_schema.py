@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
+# Schema sha256: 474bdbf3f47de4760cd26c431403a6dfec83325e15db307cb5fcbf132a6f05dd
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -33,7 +33,7 @@ class InlineFields(BaseModel):
 
 class MatchClaims(BaseModel):
     """
-    Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+    Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
     """
 
     model_config = ConfigDict(
@@ -46,7 +46,6 @@ class MatchClaims(BaseModel):
         None, max_length=64, min_length=1
     )
     sub: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
-    aud: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
     resource: list[root_anchor_schema.Text] | None = Field(
         None, max_length=64, min_length=1
     )

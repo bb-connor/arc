@@ -145473,28 +145473,16 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    ///Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+    ///Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.",
+    ///  "description": "Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.",
     ///  "type": "object",
     ///  "properties": {
     ///    "appid": {
-    ///      "type": "array",
-    ///      "items": {
-    ///        "description": "A bounded NUL-free string.",
-    ///        "type": "string",
-    ///        "maxLength": 1024,
-    ///        "minLength": 1,
-    ///        "pattern": "^[^\\u0000]+$"
-    ///      },
-    ///      "maxItems": 64,
-    ///      "minItems": 1
-    ///    },
-    ///    "aud": {
     ///      "type": "array",
     ///      "items": {
     ///        "description": "A bounded NUL-free string.",
@@ -145601,8 +145589,6 @@ pub mod root_authority_root_policy {
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub appid: ::std::vec::Vec<MatchClaimsAppidItem>,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
-        pub aud: ::std::vec::Vec<MatchClaimsAudItem>,
-        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub azp: ::std::vec::Vec<MatchClaimsAzpItem>,
         #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
         pub client_id: ::std::vec::Vec<MatchClaimsClientIdItem>,
@@ -145626,7 +145612,6 @@ pub mod root_authority_root_policy {
         fn default() -> Self {
             Self {
                 appid: Default::default(),
-                aud: Default::default(),
                 azp: Default::default(),
                 client_id: Default::default(),
                 oid: Default::default(),
@@ -145710,90 +145695,6 @@ pub mod root_authority_root_policy {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for MatchClaimsAppidItem {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///A bounded NUL-free string.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "A bounded NUL-free string.",
-    ///  "type": "string",
-    ///  "maxLength": 1024,
-    ///  "minLength": 1,
-    ///  "pattern": "^[^\\u0000]+$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct MatchClaimsAudItem(::std::string::String);
-    impl ::std::ops::Deref for MatchClaimsAudItem {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<MatchClaimsAudItem> for ::std::string::String {
-        fn from(value: MatchClaimsAudItem) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&MatchClaimsAudItem> for MatchClaimsAudItem {
-        fn from(value: &MatchClaimsAudItem) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for MatchClaimsAudItem {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() > 1024usize {
-                return Err("longer than 1024 characters".into());
-            }
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for MatchClaimsAudItem {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsAudItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsAudItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for MatchClaimsAudItem {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,

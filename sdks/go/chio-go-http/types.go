@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: d90061dc16bbd14e7334af62899c06da7b5e5906b24fd400a28c0ce65a10c07e
+// Schema content SHA-256: ba6e49ffc89dd306628c55ce72fbc3e299b32d51b7899938f29c65477fcaaaf8
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -13721,10 +13721,9 @@ type RootAuthorityRootPolicyInlineFields struct {
 	InlineFields []string `json:"inline_fields"`
 }
 
-// RootAuthorityRootPolicyMatchClaims Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+// RootAuthorityRootPolicyMatchClaims Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
 type RootAuthorityRootPolicyMatchClaims struct {
 	Appid    *[]RootAuthorityRootAnchorText `json:"appid,omitempty"`
-	Aud      *[]RootAuthorityRootAnchorText `json:"aud,omitempty"`
 	Azp      *[]RootAuthorityRootAnchorText `json:"azp,omitempty"`
 	ClientId *[]RootAuthorityRootAnchorText `json:"client_id,omitempty"`
 	Oid      *[]RootAuthorityRootAnchorText `json:"oid,omitempty"`
@@ -13766,7 +13765,7 @@ type RootAuthorityRootPolicyRootPolicyMatch struct {
 	// AnchorKind Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
 	AnchorKind RootAuthorityRootAnchorAnchorKind `json:"anchor_kind"`
 
-	// Claims Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+	// Claims Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.
 	Claims *RootAuthorityRootPolicyMatchClaims `json:"claims,omitempty"`
 
 	// ProviderIdentityDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
