@@ -102,7 +102,7 @@ requests when authority admission, runtime availability, or evidence fails.
 Cluster replication uses authenticated pulls, deterministic leader selection,
 and quorum gates. Deployments with a clustered SQLite capability authority must
 provision its replication anchor out of band. Keyring authority and local joint
-admission authority each reject the legacy cluster configuration.
+admission authority each reject peer cluster replication.
 
 Tests exercise local stores, HTTP adapters, and composed finding flows. Fixture
 trust and injected test rails have a bounded scope; deployment acceptance also

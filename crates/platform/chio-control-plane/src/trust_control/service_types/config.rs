@@ -247,7 +247,7 @@ impl TrustServiceConfig {
         }
         if self.joint_authority_db_path.is_some() && !self.peer_urls.is_empty() {
             return Err(CliError::cli_other_error(
-                "a local joint authority database cannot run with the legacy cluster coordinator"
+                "a local joint authority database cannot run with peer cluster replication"
                     .to_string(),
             ));
         }
@@ -531,18 +531,22 @@ mod service_config_tests {
     }
 
     #[test]
-    fn trust_service_config_rejects_joint_authority_with_legacy_cluster() {
+    fn trust_service_config_rejects_joint_authority_with_peer_cluster() {
         let mut config = base_config();
         config.joint_authority_db_path = Some(PathBuf::from("joint.sqlite3"));
         config.peer_urls = vec!["https://peer.example".to_string()];
 
         let error = config
             .validate()
-            .test_expect_err("joint authority must not use the legacy cluster coordinator");
+            .test_expect_err("joint authority must not use peer cluster replication");
 
-        assert!(error
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(
+                "a local joint authority database cannot run with peer cluster replication"
+            )
             .to_string()
-            .contains("joint authority database cannot run with the legacy cluster"));
+        );
     }
 
     #[test]

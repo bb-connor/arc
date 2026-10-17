@@ -473,7 +473,7 @@ async fn standalone_legacy_holds_use_exact_versioned_rich_lifecycle(
 }
 
 #[tokio::test]
-async fn versioned_rich_lifecycle_does_not_mutate_legacy_cluster_follower(
+async fn versioned_rich_lifecycle_does_not_mutate_peer_cluster_follower(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let temp = crate::durable_admission::private_tempdir()?;
     let sqlite = Arc::new(SqliteBudgetStore::open(
@@ -523,9 +523,75 @@ async fn versioned_rich_lifecycle_does_not_mutate_legacy_cluster_follower(
     )
     .await;
     assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&body)?,
+        serde_json::json!({
+            "error": "cluster quorum is unavailable for trust-control writes"
+        })
+    );
     assert!(sqlite
         .mutation_event_for_event_id("cluster-hold:capture-invocation")?
         .is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn joint_authority_refuses_peer_cluster_replication() -> Result<(), Box<dyn std::error::Error>>
+{
+    use super::super::admission_authority::handle_admission_authority;
+
+    let temp = crate::durable_admission::private_tempdir()?;
+    let database = temp.path().join("authority.sqlite3");
+    let locks = temp.path().join("locks");
+    crate::create_private_directory(&locks)?;
+    SqliteAuthorityStore::provision(&database, &locks)?;
+    let authority = Arc::new(SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?);
+    let fence = authority.mutation_fence();
+    let mut state = metrics_state("service-secret");
+    state.joint_authority_store = Some(authority);
+    state.config.advertise_url = Some("http://127.0.0.1:3200".to_string());
+    state.config.peer_urls = vec!["http://127.0.0.1:3300".to_string()];
+    state.cluster = crate::trust_control::cluster::build_cluster_state(
+        &state.config,
+        state.config.listen,
+        state.finding_challenge_clock.clone(),
+    )?;
+    let refusal = "joint budget and revocation authority cannot run with peer cluster replication";
+    assert_eq!(state.optional_budget_store().err(), Some(refusal));
+    assert_eq!(state.optional_revocation_store().err(), Some(refusal));
+
+    let request = AdmissionAuthorityRequest::new(
+        Some(fence),
+        AdmissionAuthorityAction::LoadBudgetHold,
+        &RetainedBudgetHoldRequest {
+            hold_id: "cluster-hold".to_owned(),
+        },
+    )?;
+    let response = handle_admission_authority(
+        State(state),
+        axum::http::Request::builder()
+            .header(AUTHORIZATION, "Bearer service-secret")
+            .header("content-type", "application/json")
+            .body(axum::body::Body::from(serde_json::to_vec(&request)?))?,
+    )
+    .await;
+    let body = axum::body::to_bytes(response.into_body(), 64 * 1024).await?;
+    let response: AdmissionAuthorityResponse = serde_json::from_slice(&body)?;
+    assert!(response.result.is_none());
+    assert_eq!(
+        response.error,
+        Some(AdmissionAuthorityWireError {
+            code: AdmissionAuthorityErrorCode::Unavailable,
+            message: "joint admission authority cannot run with peer cluster replication"
+                .to_owned(),
+            compacted_raw: None,
+        })
+    );
     Ok(())
 }
 

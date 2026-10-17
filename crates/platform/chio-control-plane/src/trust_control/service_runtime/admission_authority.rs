@@ -63,7 +63,7 @@ fn handle_request(
     if state.cluster.is_some() {
         return AdmissionAuthorityResponse::failure(
             AdmissionAuthorityErrorCode::Unavailable,
-            "joint admission authority cannot run with the legacy cluster coordinator",
+            "joint admission authority cannot run with peer cluster replication",
         );
     }
     if request.action == AdmissionAuthorityAction::Begin
