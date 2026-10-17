@@ -4712,6 +4712,11 @@ partners:
   accepted epoch is refused, and a refused root leaves the mirror unchanged
 - a mirror whose accepted root is older than the TTL, or that holds no
   verified root, is stale and denies fail closed
+- the verifier binds a presented passport to a partner by its verified issuer:
+  the signed `iss` of an OID4VP credential, or a native credential issuer DID
+  equal to the `did:chio` of the partner's authority key; it reads the partner
+  registry on every check, syncs a stale mirror on demand, and refuses the
+  passport when the mirror stays stale, cannot be verified, or holds it
 
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:

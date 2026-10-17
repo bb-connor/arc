@@ -1251,6 +1251,26 @@ pub(crate) async fn handle_public_submit_oid4vp_response(
             return plain_http_error(StatusCode::FORBIDDEN, &passport_lifecycle_reason(lifecycle));
         }
     }
+    let partner_check = {
+        let config = state.config.clone();
+        let clock = Arc::clone(&state.finding_challenge_clock);
+        let issuer = verified.issuer.clone();
+        let passport_id = verified.passport_id.clone();
+        run_portable_issuer_fetch(move || {
+            check_partner_passport_revocation(
+                &config,
+                VerifiedPassportIssuer::Url(&issuer),
+                &passport_id,
+                &clock,
+            )
+        })
+        .await
+    };
+    match partner_check {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+        Err(refusal) => return refusal.into_response(plain_http_error),
+    }
     // Refresh trusted time after the lifecycle wait and revalidate the signed
     // response at that final acceptance time, so a credential or holder proof
     // that expired during either remote wait is refused even while the verifier
@@ -1422,6 +1442,32 @@ pub(crate) async fn handle_federated_issue(
             }
         }
         Err(error) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+    }
+    let partner_check = {
+        let config = state.config.clone();
+        let clock = Arc::clone(&state.finding_challenge_clock);
+        let issuers = payload
+            .presentation
+            .passport
+            .credentials
+            .iter()
+            .map(|credential| credential.unsigned.issuer.clone())
+            .collect::<Vec<_>>();
+        let passport_id = verification.passport_id.clone();
+        run_portable_issuer_fetch(move || {
+            check_partner_passport_revocation(
+                &config,
+                VerifiedPassportIssuer::Dids(&issuers),
+                &passport_id,
+                &clock,
+            )
+        })
+        .await
+    };
+    match partner_check {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => return plain_http_error(StatusCode::FORBIDDEN, &error.to_string()),
+        Err(refusal) => return refusal.into_response(plain_http_error),
     }
     match consume_challenge_if_configured(&state.config, &payload.expected_challenge, now) {
         Ok(replay_state) => verification.replay_state = replay_state,

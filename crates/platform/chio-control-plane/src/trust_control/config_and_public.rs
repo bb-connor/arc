@@ -1319,9 +1319,14 @@ mod portable_issuer_fetch;
 pub(crate) use portable_issuer_fetch::*;
 #[path = "config_and_public/partner_revocation_sync.rs"]
 mod partner_revocation_sync;
+#[cfg(test)]
+pub(crate) use partner_revocation_sync::check_partner_passport_revocation_with;
 pub use partner_revocation_sync::sync_partner_revocation_mirror;
 #[cfg(test)]
 pub(crate) use partner_revocation_sync::PartnerRevocationFeed;
+pub(crate) use partner_revocation_sync::{
+    check_partner_passport_revocation, VerifiedPassportIssuer,
+};
 pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,
     subject_public_key: &str,
@@ -1619,6 +1624,7 @@ mod config_and_public_tests {
             verifier_policies_file: None,
             verifier_challenge_db_path: None,
             passport_statuses_file: None,
+            revocation_partners_file: None,
             passport_issuance_offers_file: None,
             certification_registry_file: None,
             certification_discovery_file: None,

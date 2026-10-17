@@ -13,9 +13,10 @@ use crate::passport_revocation_feed::{
     MAX_PASSPORT_REVOCATION_PAGE_BYTES,
 };
 use crate::passport_revocation_mirror::{
-    PartnerRevocationError, PartnerRevocationMirror, PartnerRevocationSource,
+    partner_revocation_mirror_path, PartnerRevocationError, PartnerRevocationMirror,
+    PartnerRevocationSource,
 };
-use crate::revocation_partner::RevocationPartner;
+use crate::revocation_partner::{RevocationPartner, RevocationPartnerRegistry};
 
 use super::portable_issuer_fetch::{
     build_portable_fetch_agent, pin_checked_https_addrs, portable_fetch_transport_error,
@@ -141,4 +142,79 @@ fn sync_over_strict_transport(
     let mirror = PartnerRevocationMirror::open(mirror_path, &partner.partner_id)?;
     let mut feed = PartnerRevocationFeed::new(&partner.partner_id, &partner.issuer, agent);
     mirror.sync(partner, &mut feed, clock)
+}
+
+/// The verified issuer identity a presented passport carries.
+#[derive(Clone, Copy)]
+pub(crate) enum VerifiedPassportIssuer<'a> {
+    /// The signed `iss` URL of an OID4VP credential.
+    Url(&'a str),
+    /// The issuer DIDs of a native passport's verified credentials.
+    Dids(&'a [String]),
+}
+
+/// Refuses `passport_id` when its verified issuer is a registered revocation
+/// partner whose mirror, synced on demand when stale, is not fresh or holds
+/// the passport. The registry is read on every call under its size bound, and
+/// an unreadable or invalid registry refuses. A service without a registry,
+/// or a passport whose issuer names no partner, is not checked here.
+pub(crate) fn check_partner_passport_revocation(
+    config: &TrustServiceConfig,
+    issuer: VerifiedPassportIssuer<'_>,
+    passport_id: &str,
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<(), CliError> {
+    check_partner_passport_revocation_with(config, issuer, passport_id, clock, &|partner, path| {
+        sync_partner_revocation_mirror(partner.clone(), path.to_path_buf(), Arc::clone(clock))
+            .map(|_| ())
+    })
+}
+
+/// [`check_partner_passport_revocation`] with the mirror sync supplied.
+pub(crate) fn check_partner_passport_revocation_with(
+    config: &TrustServiceConfig,
+    issuer: VerifiedPassportIssuer<'_>,
+    passport_id: &str,
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
+    sync: &dyn Fn(&RevocationPartner, &Path) -> Result<(), PartnerRevocationError>,
+) -> Result<(), CliError> {
+    let Some(registry_path) = config.revocation_partners_file.as_deref() else {
+        return Ok(());
+    };
+    let refused = |error: String| CliError::policy_error(error);
+    let registry = RevocationPartnerRegistry::load(registry_path)
+        .map_err(|error| refused(error.to_string()))?;
+    let partners = match issuer {
+        VerifiedPassportIssuer::Url(url) => registry.by_issuer(url).into_iter().collect(),
+        VerifiedPassportIssuer::Dids(dids) => registry.by_issuer_dids(dids),
+    };
+    for partner in partners {
+        check_partner(registry_path, partner, passport_id, clock, sync)
+            .map_err(|error| refused(error.to_string()))?;
+    }
+    Ok(())
+}
+
+fn check_partner(
+    registry_path: &Path,
+    partner: &RevocationPartner,
+    passport_id: &str,
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
+    sync: &dyn Fn(&RevocationPartner, &Path) -> Result<(), PartnerRevocationError>,
+) -> Result<(), PartnerRevocationError> {
+    let mirror_path = partner_revocation_mirror_path(registry_path, &partner.partner_id)?;
+    let mirror = PartnerRevocationMirror::open(&mirror_path, &partner.partner_id)?;
+    if mirror.require_fresh(partner, clock_millis(clock)?).is_err() {
+        sync(partner, &mirror_path)?;
+    }
+    mirror.check_passport(partner, passport_id, clock_millis(clock)?)
+}
+
+fn clock_millis(
+    clock: &Arc<dyn chio_security_types::clock::Clock>,
+) -> Result<u64, PartnerRevocationError> {
+    clock
+        .unix_millis()
+        .map(|now| now.get())
+        .map_err(|error| PartnerRevocationError::Clock(error.to_string()))
 }
