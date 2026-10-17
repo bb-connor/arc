@@ -1,0 +1,632 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/token.schema.json",
+  "title": "Chio CapabilityToken",
+  "description": "A Chio capability token with typed caveats, attenuation fields, attenuation proof, budget share, and hybrid signing support folded into the unreleased v1 wire shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "issuer",
+    "subject",
+    "scope",
+    "issued_at",
+    "expires_at",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.capability.v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "issuer": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    },
+    "scope": {
+      "$ref": "#/$defs/chioScope"
+    },
+    "issued_at": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expires_at": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "delegation_chain": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/delegationLink"
+      }
+    },
+    "aggregate_invocation_budget": {
+      "$ref": "aggregate-invocation-budget.schema.json"
+    },
+    "algorithm": {
+      "type": "string",
+      "enum": [
+        "ed25519",
+        "p256",
+        "p384",
+        "hybrid"
+      ]
+    },
+    "caveats": {
+      "description": "At most one caveat, which must be bind_security_context.",
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "$ref": "#/$defs/caveat"
+      }
+    },
+    "scope_attenuations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "attenuation_proof": {
+      "$ref": "#/$defs/attenuationProof"
+    },
+    "budget_share_bps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000,
+      "description": "Fixed-point child share in basis points. Values above 10000 re-amplify budget and fail closed."
+    },
+    "root_anchor": {
+      "$ref": "../root_authority/root-anchor.schema.json",
+      "description": "Signed anchor of a root capability, copied byte for byte into every delegated token. Required on every capability the relying-party edge admits. Introduced with anchored roots (PROTOCOL 5.6)."
+    },
+    "signature": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    }
+  },
+  "$defs": {
+    "chioScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.",
+      "properties": {
+        "grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/toolGrant"
+          }
+        },
+        "resource_grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/resourceGrant"
+          }
+        },
+        "prompt_grants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/promptGrant"
+          }
+        }
+      }
+    },
+    "toolGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server_id",
+        "tool_name",
+        "operations"
+      ],
+      "description": "Authorization to invoke a single tool. Mirrors `ToolGrant`.",
+      "properties": {
+        "server_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/constraint"
+          }
+        },
+        "max_invocations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_cost_per_invocation": {
+          "$ref": "#/$defs/monetaryAmount"
+        },
+        "max_total_cost": {
+          "$ref": "#/$defs/monetaryAmount"
+        },
+        "dpop_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "resourceGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uri_pattern",
+        "operations"
+      ],
+      "description": "Authorization for reading or subscribing to a resource. Mirrors `ResourceGrant`.",
+      "properties": {
+        "uri_pattern": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        }
+      }
+    },
+    "promptGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt_name",
+        "operations"
+      ],
+      "description": "Authorization for retrieving a prompt by name. Mirrors `PromptGrant`.",
+      "properties": {
+        "prompt_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/operation"
+          }
+        }
+      }
+    },
+    "operation": {
+      "enum": [
+        "invoke",
+        "read_result",
+        "read",
+        "subscribe",
+        "get",
+        "delegate"
+      ]
+    },
+    "monetaryAmount": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "units",
+        "asset"
+      ],
+      "description": "A monetary amount in the asset's smallest minor unit. Mirrors `MonetaryAmount`. A child's asset must equal its parent's.",
+      "properties": {
+        "units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "asset": {
+          "type": "string",
+          "pattern": "^(iso4217:[A-Z]{3}|caip19:[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}/[-a-z0-9]{3,8}:[-.%a-zA-Z0-9]{1,128})$",
+          "description": "Typed asset `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`. Introduced with settlement (PROTOCOL 6.7)."
+        }
+      }
+    },
+    "constraint": {
+      "oneOf": [
+        { "$ref": "#/$defs/genericConstraint" },
+        { "$ref": "#/$defs/requireApprovalAboveConstraint" },
+        { "$ref": "#/$defs/cumulativeApprovalDirectConstraint" },
+        { "$ref": "#/$defs/cumulativeApprovalDelegableConstraint" }
+      ]
+    },
+    "genericConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type"
+      ],
+      "description": "Tagged enum mirroring `Constraint`. Encoded as `{ type, value }`.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "require_approval_above",
+              "require_cumulative_approval_above"
+            ]
+          }
+        },
+        "value": true
+      }
+    },
+    "requireApprovalAboveConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "const": "require_approval_above" },
+        "value": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["threshold_units"],
+          "properties": {
+            "threshold_units": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "cumulativeApprovalDirectConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "const": "require_cumulative_approval_above" },
+        "value": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["threshold", "approval_budget_id", "approval_budget_epoch"],
+          "properties": {
+            "threshold": { "$ref": "#/$defs/monetaryAmount" },
+            "approval_budget_id": { "type": "string", "minLength": 1 },
+            "approval_budget_epoch": { "type": "integer", "minimum": 0 },
+            "cumulative_approval_root_binding": false
+          }
+        }
+      }
+    },
+    "cumulativeApprovalDelegableConstraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "const": "require_cumulative_approval_above" },
+        "value": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "threshold",
+            "approval_budget_id",
+            "approval_budget_epoch",
+            "cumulative_approval_root_binding"
+          ],
+          "properties": {
+            "threshold": { "$ref": "#/$defs/monetaryAmount" },
+            "approval_budget_id": { "type": "string", "minLength": 1 },
+            "approval_budget_epoch": { "type": "integer", "minimum": 0 },
+            "cumulative_approval_root_binding": {
+              "$ref": "cumulative-approval-root.schema.json"
+            }
+          }
+        }
+      }
+    },
+    "caveat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "predicate"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "restrict_tool",
+            "bind_session",
+            "restrict_audience",
+            "restrict_geo",
+            "restrict_time_window",
+            "bind_security_context"
+          ]
+        },
+        "predicate": {
+          "description": "For bind_security_context, the RFC 8785 canonical JSON text of a capability/security-binding.schema.json object.",
+          "type": "string",
+          "minLength": 1
+        },
+        "sig": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "bind_security_context"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "required": [
+                "sig"
+              ]
+            }
+          },
+          "else": false
+        }
+      ]
+    },
+    "attenuationProof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parentScopeHash",
+        "childScopeHash",
+        "normalizedSubsetProof"
+      ],
+      "properties": {
+        "parentScopeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "childScopeHash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "normalizedSubsetProof": {
+          "$ref": "#/$defs/attenuationWitness"
+        }
+      }
+    },
+    "delegationLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_id",
+        "delegator",
+        "delegatee",
+        "timestamp",
+        "signature",
+        "scope_hash"
+      ],
+      "description": "A single delegation link. The required scope_hash binds the authorized parent scope used by the next hop's attenuation_proof.parent_scope_hash.",
+      "properties": {
+        "capability_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "delegator": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
+        },
+        "delegatee": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+)$"
+        },
+        "attenuations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "timestamp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:[a-z0-9_-]+:[a-z0-9_-]+:[a-z0-9_+.-]+:[0-9a-f]+:[0-9a-f]+)$"
+        },
+        "scope_hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$",
+          "description": "RFC 8785 canonical scope hash for this delegation hop. Runtime verification rejects links that omit it."
+        }
+      }
+    },
+    "attenuationWitness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalizedParentScope",
+        "normalizedChildScope"
+      ],
+      "properties": {
+        "normalizedParentScope": {
+          "type": "string",
+          "minLength": 2
+        },
+        "normalizedChildScope": {
+          "type": "string",
+          "minLength": 2
+        },
+        "subsetRelations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/grantSubsetRelation"
+          }
+        },
+        "restrictedPredicates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "grantSubsetRelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grantKind",
+        "childIndex",
+        "parentIndex",
+        "subset"
+      ],
+      "properties": {
+        "grantKind": {
+          "type": "string",
+          "enum": [
+            "tool",
+            "resource",
+            "prompt"
+          ]
+        },
+        "childIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "parentIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subset": {
+          "type": "boolean",
+          "enum": [
+            true
+          ]
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "anyOf": [
+          {
+            "required": ["delegation_chain"],
+            "properties": { "delegation_chain": { "minItems": 1 } }
+          },
+          {
+            "properties": {
+              "scope": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "grants": {
+                        "contains": {
+                          "properties": {
+                            "operations": { "contains": { "const": "delegate" } }
+                          },
+                          "required": ["operations"]
+                        }
+                      }
+                    },
+                    "required": ["grants"]
+                  },
+                  {
+                    "properties": {
+                      "resource_grants": {
+                        "contains": {
+                          "properties": {
+                            "operations": { "contains": { "const": "delegate" } }
+                          },
+                          "required": ["operations"]
+                        }
+                      }
+                    },
+                    "required": ["resource_grants"]
+                  },
+                  {
+                    "properties": {
+                      "prompt_grants": {
+                        "contains": {
+                          "properties": {
+                            "operations": { "contains": { "const": "delegate" } }
+                          },
+                          "required": ["operations"]
+                        }
+                      }
+                    },
+                    "required": ["prompt_grants"]
+                  }
+                ]
+              }
+            },
+            "required": ["scope"]
+          }
+        ]
+      },
+      "then": {
+        "properties": {
+          "scope": {
+            "properties": {
+              "grants": {
+                "items": {
+                  "properties": {
+                    "constraints": {
+                      "items": {
+                        "not": { "$ref": "#/$defs/cumulativeApprovalDirectConstraint" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "scope": {
+            "properties": {
+              "grants": {
+                "items": {
+                  "properties": {
+                    "constraints": {
+                      "items": {
+                        "not": { "$ref": "#/$defs/cumulativeApprovalDelegableConstraint" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
