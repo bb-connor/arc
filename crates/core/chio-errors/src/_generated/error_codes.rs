@@ -3006,6 +3006,20 @@ pub const KERNEL_RECEIPT_READ_PROJECTION_MISMATCH: ErrorCodeSpec = ErrorCodeSpec
     consumed_by: &["chio-kernel", "chio-store-sqlite"],
 };
 
+pub const KERNEL_EXECUTION_NONCE_MISSING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:execution-nonce-missing",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "Execution nonce refused: missing.",
+    help:
+        "Preserve replay custody and present a fresh nonce bound to the exact authorized request.",
+    string_code: "CHIO-KERNEL-EXECUTION-NONCE-MISSING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
 pub const KERNEL_EXECUTION_NONCE_SCHEMA: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:execution-nonce-schema",
     domain: Domain::Kernel,
@@ -3888,6 +3902,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_RECEIPT_READ_SCOPE_MISMATCH,
     KERNEL_RECEIPT_READ_QUERY_INVALID,
     KERNEL_RECEIPT_READ_PROJECTION_MISMATCH,
+    KERNEL_EXECUTION_NONCE_MISSING,
     KERNEL_EXECUTION_NONCE_SCHEMA,
     KERNEL_EXECUTION_NONCE_EXPIRED,
     KERNEL_EXECUTION_NONCE_BINDING,
