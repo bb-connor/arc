@@ -51,13 +51,9 @@ pub struct AnchorBatchBody {
     pub witness: AnchorBatchWitness,
     pub issued_at: u64,
     pub signer_key: PublicKey,
-    /// Always serialized. A non-Rust signer that emits explicit
-    /// `witnessState: {"kind":"pending"}` produces canonical bytes
-    /// that Rust verification must match. Stripping the field on
-    /// the Rust side via `skip_serializing_if` would canonicalize
-    /// to a different byte sequence and reject otherwise-valid
-    /// cross-SDK batches.
-    #[serde(default)]
+    /// Required on the wire and always serialized. The body signature
+    /// covers the canonical bytes including `witnessState`, so every
+    /// signer emits it explicitly and a body without it is refused.
     pub witness_state: WitnessState,
 }
 
@@ -334,5 +330,33 @@ mod tests {
         let mut impersonated = batch;
         impersonated.body.witness.root = Hash::zero();
         assert!(verify_anchor_batch(&impersonated).is_err());
+    }
+
+    #[test]
+    fn anchor_batch_body_without_witness_state_is_refused() {
+        let kp = Keypair::generate();
+        let witness = AnchorBatchWitness {
+            kind: AnchorBatchWitnessKind::Rekor,
+            witness_id: "rekor:uuid".to_string(),
+            root: Hash::zero(),
+            observed_at: Some(1710000000),
+        };
+        let body = build_anchor_batch_body(
+            vec!["checkpoint-a".to_string()],
+            witness,
+            1710000000,
+            kp.public_key(),
+        )
+        .unwrap();
+        let batch = AnchorBatch::sign(body, &kp).unwrap();
+        let mut value = serde_json::to_value(&batch).unwrap();
+        let removed = value
+            .get_mut("body")
+            .and_then(serde_json::Value::as_object_mut)
+            .and_then(|body| body.remove("witnessState"));
+        assert_eq!(removed, Some(serde_json::json!({"kind": "pending"})));
+
+        let error = serde_json::from_value::<AnchorBatch>(value).unwrap_err();
+        assert_eq!(error.to_string(), "missing field `witnessState`");
     }
 }

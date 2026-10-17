@@ -271,10 +271,9 @@ pub fn batch_body_hash_from_body(body: &AnchorBatchBody) -> Result<Hash, AnchorW
 /// `last_verified` as untrusted telemetry and admits stale batches
 /// only when the verifier-owned [`VerifiedWitnessCache`] has a fresh
 /// `verified_at` timestamp for the recomputed batch body hash.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "kind")]
 pub enum WitnessState {
-    #[default]
     Pending,
     Witnessed {
         receipt: WitnessReceipt,
