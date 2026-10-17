@@ -117,14 +117,17 @@ fn competing_prepared_credentials_cannot_release_the_winning_reservation() -> Te
     fixture.assert_no_writes()?;
     let mut owner = first.reserve()?;
     let refused = second.reserve();
-    assert!(refused
-        .as_ref()
-        .is_err_and(|error| error.to_string().contains("nonce replayed")));
+    assert!(matches!(
+        refused,
+        Err(KernelError::ExecutionNonce(
+            crate::execution_nonce::ExecutionNonceError::Replayed
+        ))
+    ));
     assert!(fixture.nonce_consumed()?);
     assert_eq!(fixture.dpop_occupancy()?, 0);
-    assert_eq!(fixture.writes(), (1, 0, 1, 0, 0));
+    assert_eq!(fixture.writes(), (2, 0, 1, 0, 0));
     owner.commit()?;
-    assert_eq!(fixture.writes(), (1, 0, 1, 1, 0));
+    assert_eq!(fixture.writes(), (2, 0, 1, 1, 0));
     drop(owner);
     assert!(fixture.prepare()?.reserve().is_err());
     assert!(fixture.nonce_consumed()?);

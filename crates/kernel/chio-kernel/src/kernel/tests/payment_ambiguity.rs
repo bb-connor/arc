@@ -710,6 +710,13 @@ impl PaymentAdapter for DurableDeclinedPaymentAdapter {
     fn refund(&self, _: &str, _: u64, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
         panic!("declined authorization cannot be refunded")
     }
+    fn settlement_state(
+        &self,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        Ok(crate::payment::RailSettlementState::NoAuthorization)
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

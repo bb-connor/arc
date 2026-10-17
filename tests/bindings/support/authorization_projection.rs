@@ -81,7 +81,7 @@ pub fn complete_wire_request() -> chio_kernel::ToolCallRequest {
                 "proof_ttl_secs": 300,
                 "max_clock_skew_secs": 30
             }))
-            .unwrap(),
+            .unwrap_or_else(|error| panic!("projection authority: {error}")),
             capability_id: capability.id.clone(),
             tool_server: "server-1".to_string(),
             tool_name: "tool-1".to_string(),
