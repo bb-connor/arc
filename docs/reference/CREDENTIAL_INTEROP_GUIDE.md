@@ -224,8 +224,7 @@ artifacts. mTLS binds the runtime sender to the issued token, while the
 attestation digest is only accepted when it matches the carried
 `runtimeAssuranceEvidenceSha256` and is paired with mTLS. Missing or
 contradictory sender proof fails closed. Chio DPoP sender binding is
-unavailable until the edge holds durable authentication replay custody:
-`chio_sender_dpop_public_key` is refused as `invalid_request`.
+refused: `chio_sender_dpop_public_key` is refused as `invalid_request`.
 
 ## Cross-Issuer Portfolios
 

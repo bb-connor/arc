@@ -85,8 +85,7 @@ target-chain factory, and rollout environment explicitly.
   same-device and cross-device launch artifacts, public challenge fetch and
   response submit routes, and one bounded hosted sender-constrained
   continuation contract over mTLS thumbprint binding and one
-  attestation-confirmation profile; Chio DPoP sender binding is
-  unavailable until durable authentication replay custody exists
+  attestation-confirmation profile; Chio DPoP sender binding is refused
 - one bounded public identity profile, one verifier-bound wallet-directory
   entry, one replay-safe wallet-routing manifest, and one identity-interop
   qualification matrix over `did:chio` plus explicit `did:web`, `did:key`, and
