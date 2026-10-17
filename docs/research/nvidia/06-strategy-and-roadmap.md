@@ -242,7 +242,7 @@ Sources for the facts in the paragraph, kept out of the approved text:
 Additions for specific audiences:
 
 - Healthcare design partner: "Today Chio receipts include the request's arguments, so no PHI goes through Chio until the receipt privacy mode ships and your BAA review is complete. The pilot stays in zero-PHI shadow mode until then."
-- AWS: "Chio does not replace Bedrock AgentCore Gateway or Policy. It can run as an MCP server behind AgentCore Gateway, so far tested only against a recorded consumer fixture. It adds capability chains and receipts that can be checked outside your AWS account." The fixture is [`integrations/mcp-adapter/tests/mcp_gateway_consumer_scenario.rs`](../../../integrations/mcp-adapter/tests/mcp_gateway_consumer_scenario.rs) (test only).
+- AWS: "Chio does not replace Bedrock AgentCore Gateway or Policy. It can run as an MCP server behind AgentCore Gateway, not yet tested against AgentCore; the only related test is a hand-written in-memory MCP scenario. It adds capability chains and receipts that can be checked outside your AWS account." The scenario is [`integrations/mcp-adapter/tests/mcp_gateway_consumer_scenario.rs`](../../../integrations/mcp-adapter/tests/mcp_gateway_consumer_scenario.rs) (test only).
 
 ### Stack diagram
 

@@ -14,7 +14,7 @@
     ],
     "tests": [
       "integrations/mcp-adapter/tests/transport_round_trip.rs",
-      "integrations/mcp-adapter/tests/conformance_suite.rs",
+      "integrations/mcp-adapter/tests/streamable_http_contract.rs",
       "crates/protocol/chio-mcp-adapter/tests/integration_smoke.rs",
       "crates/tooling/chio-conformance/verdict_matrix/tests/verdict_matrix_cross_language.rs"
     ],

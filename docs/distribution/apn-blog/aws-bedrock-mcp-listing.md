@@ -50,9 +50,7 @@ to agents without creating one-off integration contracts for every application.
 The Chio MCP server entry is submitted under the `dev.chio` namespace at
 `https://registry.modelcontextprotocol.io/servers/dev.chio/chio-governed-tools`.
 It declares Streamable HTTP transport, OAuth 2.1 with PKCE, and protected
-resource metadata. Chio pins the conformance record to
-draft suite hash `17f1f93cc070754cdd290ac13476dcfa13f39855`, with 28 scenario
-modules in the local contract test and 0 skipped. The registry record is
+resource metadata. The registry record is
 not a badge by itself; it is a reproducible pointer that tells customers which
 MCP contract Chio passed when the Bedrock listing was submitted.
 

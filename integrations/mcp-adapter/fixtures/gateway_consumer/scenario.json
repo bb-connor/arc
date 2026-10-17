@@ -11,6 +11,6 @@
     ]
   },
   "tool_call": {
-    "name": "chio.bedrock.invoke"
+    "name": "chio.example.invoke"
   }
 }

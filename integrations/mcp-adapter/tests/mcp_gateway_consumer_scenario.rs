@@ -2,8 +2,9 @@ use chio_mcp_adapter_integration::{ProtectedResourceMetadata, StreamableHttpTran
 use chio_mcp_edge::{McpToolInfo, McpToolResult, McpTransport};
 use serde_json::json;
 
-/// Replays a recorded gateway-consumer scenario over the in-memory
-/// Streamable HTTP transport. No AWS service, signing, or receipt is involved.
+/// Runs a hand-written gateway-consumer scenario over the in-memory
+/// Streamable HTTP transport. No AWS service, AgentCore client, signing, or
+/// receipt is involved.
 #[test]
 fn gateway_consumer_scenario_round_trips_over_in_memory_transport(
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -25,7 +26,7 @@ fn gateway_consumer_scenario_round_trips_over_in_memory_transport(
         .bearer_token("gateway-consumer-token")
         .tool(
             McpToolInfo {
-                name: "chio.bedrock.invoke".to_string(),
+                name: "chio.example.invoke".to_string(),
                 title: Some("Invoke governed Bedrock".to_string()),
                 description: Some("Gateway consumer scenario tool".to_string()),
                 input_schema: json!({ "type": "object" }),
@@ -34,14 +35,14 @@ fn gateway_consumer_scenario_round_trips_over_in_memory_transport(
                 execution: None,
             },
             McpToolResult {
-                content: vec![json!({ "type": "text", "text": "bedrock ok" })],
+                content: vec![json!({ "type": "text", "text": "example ok" })],
                 structured_content: None,
                 is_error: Some(false),
             },
         )
         .build()?;
 
-    let result = transport.call_tool("chio.bedrock.invoke", json!({ "model": "bedrock" }))?;
+    let result = transport.call_tool("chio.example.invoke", json!({ "input": "example" }))?;
     assert_eq!(result.is_error, Some(false));
     assert_eq!(transport.exchange_log()?.len(), 1);
     Ok(())
