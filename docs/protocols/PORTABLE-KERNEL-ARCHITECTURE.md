@@ -259,7 +259,7 @@ Bindings via `wasm-bindgen`, built with `wasm-pack build --target web`.
 
 | Concern | Implementation |
 |---|---|
-| Entropy | `WebCryptoRng` wraps `window.crypto.getRandomValues()` directly via `web_sys` |
+| Entropy | `WebCryptoRng` wraps `globalThis.crypto.getRandomValues()` (browsers, Workers, Deno, Node 20+), filling in chunks of at most 65 536 bytes |
 | Clock | `BrowserClock` wraps `js_sys::Date::now()` |
 | Receipt persistence | Not implemented in the crate -- entry points are stateless JSON-in / JSON-out; the caller queues and persists signed receipts application-side |
 | Transport | Not applicable -- browser host calls the exported functions directly |

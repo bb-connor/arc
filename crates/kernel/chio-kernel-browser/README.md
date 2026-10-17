@@ -26,7 +26,7 @@ wasm-pack build crates/kernel/chio-kernel-browser --target web
 
 The `wasm` module exports JSON-oriented evaluation, signing, capability
 verification, receipt verification, and seed minting functions. Browser time
-needs `Date.now()` and `performance.now()`; seed minting needs `window.crypto`.
+needs `Date.now()` and `performance.now()`; seed minting needs `globalThis.crypto`.
 The HTML and JavaScript examples live in [examples](examples/demo.html).
 
 ## Guarantees
@@ -46,8 +46,9 @@ Implemented browser facade with native helper tests and wasm browser tests.
 Evaluation supplies an empty guard pipeline and an in-memory registry per call;
 applications own durable accounting, revocation, tool execution, and receipts.
 Native `BrowserClock` returns `ClockError::Unavailable`, and native
-`WebCryptoRng::try_new` returns an unavailable error. Web Crypto requires a
-Window global, so worker and non-browser wasm hosts need separate adapters.
+`WebCryptoRng::try_new` returns an unavailable error. Web Crypto is read from
+`globalThis.crypto`, so browsers, Workers, Durable Objects, Deno and Node 20+
+work; a host without it gets an unavailable error.
 A failed RNG fill zeroes its output; seed minting rejects an all-zero seed.
 Native tests do not exercise JavaScript bindings or browser APIs.
 

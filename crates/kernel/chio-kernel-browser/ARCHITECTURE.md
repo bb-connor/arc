@@ -47,12 +47,13 @@ An empty issuer set permits inspection but never a trusted `ok` result.
 `BrowserClock` reads wall time from `Date.now()` and monotonic time from
 `performance.now()`. It rejects nonfinite, negative, overflowing, or regressing
 readings. The native adapter returns `ClockError::Unavailable`.
-`WebCryptoRng::try_new` requires `window.crypto`; native construction fails.
-A getRandomValues failure zeroes the destination because `Rng` has no error
+`WebCryptoRng::try_new` requires `globalThis.crypto.getRandomValues`; native
+construction fails. Fills are chunked to the 65 536-byte Web Crypto quota. A
+getRandomValues failure zeroes the destination because `Rng` has no error
 return; `mint_signing_seed_hex` rejects an all-zero seed.
 
-These requirements cover a Window-backed browser environment. A wasm worker,
-WASI host, or other wasm runtime cannot acquire that Window through this API.
+A wasm host that provides no `globalThis.crypto` (for example WASI) cannot
+mint seeds through this API.
 The pure evaluation path inherits core denial of security bindings and
 unsupported stateful enforcement. Caller snapshots are per-call inputs and
 provide no durable cross-call counter updates. No registered guards run here.

@@ -45,6 +45,10 @@ impl core::fmt::Display for WebCryptoRngError {
     }
 }
 
+/// Web Crypto `getRandomValues` quota per call, in bytes.
+#[cfg(target_arch = "wasm32")]
+const MAX_GET_RANDOM_VALUES_BYTES: usize = 65_536;
+
 /// CSPRNG adapter backed by `globalThis.crypto.getRandomValues(...)`.
 ///
 /// Constructing the adapter caches a handle to the browser `Crypto`
@@ -85,17 +89,14 @@ impl WebCryptoRng {
 #[cfg(target_arch = "wasm32")]
 impl Rng for WebCryptoRng {
     fn fill_bytes(&self, dest: &mut [u8]) {
-        // `get_random_values_with_u8_array` populates the slice in place
-        // using the browser CSPRNG. If it throws (e.g. the slice is
-        // oversized past the 65 536-byte quota in older browsers), fall
-        // back to zeros and trust the upstream caller to refuse a
-        // zero-seed signing attempt. We explicitly ignore the Result:
-        // the Rng trait has no error channel, and signing-path callers
-        // in `lib.rs` detect the all-zero seed fallback before they
-        // would sign anything with it.
-        if self.crypto.get_random_values_with_u8_array(dest).is_err() {
-            for byte in dest.iter_mut() {
-                *byte = 0;
+        // Web Crypto rejects a request larger than 65 536 bytes, so the
+        // buffer is filled in chunks of at most that size. On any failure the
+        // whole buffer is zeroed; the Rng trait has no error channel and
+        // signing-path callers refuse an all-zero seed.
+        for chunk in dest.chunks_mut(MAX_GET_RANDOM_VALUES_BYTES) {
+            if self.crypto.get_random_values_with_u8_array(chunk).is_err() {
+                dest.fill(0);
+                return;
             }
         }
     }

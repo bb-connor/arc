@@ -186,3 +186,14 @@ fn evaluate_rejects_malformed_json() {
     let error: serde_json::Value = from_value(result.unwrap_err()).unwrap();
     assert_eq!(error["code"], "invalid_json_input");
 }
+
+#[wasm_bindgen_test]
+fn web_crypto_rng_fills_buffers_larger_than_one_quota() {
+    use chio_kernel_core::Rng as _;
+    let rng = chio_kernel_browser::WebCryptoRng::try_new().expect("web crypto");
+    let mut buffer = vec![0u8; 200_000];
+    rng.fill_bytes(&mut buffer);
+    for tail in [&buffer[65_536..131_072], &buffer[131_072..]] {
+        assert!(tail.iter().any(|byte| *byte != 0), "chunk left zero-filled");
+    }
+}
