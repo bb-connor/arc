@@ -355,3 +355,53 @@ mod custody {
         Ok(())
     }
 }
+
+/// A registry document padded with trailing whitespace to exactly `len` bytes.
+fn padded_document(document: &str, len: usize) -> Vec<u8> {
+    let mut bytes = document.as_bytes().to_vec();
+    bytes.resize(len, b' ');
+    bytes
+}
+
+#[test]
+fn verifier_policy_registry_over_the_read_cap_is_refused_at_load() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("verifier-policies.json");
+    let document = r#"{"version":"chio.passport-verifier-policies.v1","policies":{}}"#;
+    fs::write(&path, padded_document(document, MAX_SIGNED_FILE_BYTES))?;
+    assert!(VerifierPolicyRegistry::load(&path)?.policies.is_empty());
+
+    let oversized = padded_document(document, MAX_SIGNED_FILE_BYTES + 1);
+    fs::write(&path, &oversized)?;
+    let expected = crate::signed_input::decode::<serde_json::Value>(&oversized)
+        .err()
+        .ok_or("an oversized document decoded")?;
+    let error = VerifierPolicyRegistry::load(&path)
+        .err()
+        .ok_or("an oversized verifier policy registry loaded")?;
+    assert_eq!(error.to_string(), expected.to_string());
+    Ok(())
+}
+
+#[test]
+fn enterprise_provider_registry_over_the_read_cap_is_refused_at_load() -> TestResult {
+    use crate::enterprise_federation::EnterpriseProviderRegistry;
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("enterprise-providers.json");
+    let document = r#"{"version":"chio.enterprise-providers.v1","providers":{}}"#;
+    fs::write(&path, padded_document(document, MAX_SIGNED_FILE_BYTES))?;
+    assert!(EnterpriseProviderRegistry::load(&path)?
+        .providers
+        .is_empty());
+
+    let oversized = padded_document(document, MAX_SIGNED_FILE_BYTES + 1);
+    fs::write(&path, &oversized)?;
+    let expected = crate::signed_input::decode::<serde_json::Value>(&oversized)
+        .err()
+        .ok_or("an oversized document decoded")?;
+    let error = EnterpriseProviderRegistry::load(&path)
+        .err()
+        .ok_or("an oversized enterprise provider registry loaded")?;
+    assert_eq!(error.to_string(), expected.to_string());
+    Ok(())
+}
