@@ -42,7 +42,7 @@ const EVIDENCE_ID_DOMAIN: &[u8] = b"chio-decoy-evidence-id-v1";
 const ENVELOPE_AAD_DOMAIN: &[u8] = b"chio-decoy-envelope-aad-v1";
 const ARM_OPERATION_DOMAIN: &[u8] = b"chio-decoy-arm-operation-v1";
 const MAX_EXPORT_CREDENTIAL_BYTES: usize = 4_096;
-pub const MAX_REGISTRY_LEGACY_KEYS: usize = 4;
+pub const MAX_REGISTRY_RETIRED_KEYS: usize = 4;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -129,13 +129,13 @@ impl fmt::Debug for VersionedRegistryKey {
     }
 }
 
-pub struct LegacyRegistryKey {
+pub struct RetiredRegistryKey {
     key: VersionedRegistryKey,
     overlap_started_at_unix_ms: u64,
     overlap_ends_at_unix_ms: u64,
 }
 
-impl LegacyRegistryKey {
+impl RetiredRegistryKey {
     pub fn new(
         key: VersionedRegistryKey,
         overlap_started_at_unix_ms: u64,
@@ -172,10 +172,10 @@ impl LegacyRegistryKey {
     }
 }
 
-impl fmt::Debug for LegacyRegistryKey {
+impl fmt::Debug for RetiredRegistryKey {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("LegacyRegistryKey")
+            .debug_struct("RetiredRegistryKey")
             .field("version", &self.key.version)
             .field(
                 "overlap_started_at_unix_ms",
@@ -189,27 +189,27 @@ impl fmt::Debug for LegacyRegistryKey {
 
 pub struct RegistryKeyRing {
     active: VersionedRegistryKey,
-    legacy: Vec<LegacyRegistryKey>,
+    retired: Vec<RetiredRegistryKey>,
     evaluated_at_unix_ms: u64,
 }
 
 impl RegistryKeyRing {
     pub fn new(
         active: VersionedRegistryKey,
-        legacy: Vec<LegacyRegistryKey>,
+        retired: Vec<RetiredRegistryKey>,
         evaluated_at_unix_ms: u64,
     ) -> Result<Self, RegistryError> {
-        if evaluated_at_unix_ms == 0 || legacy.len() > MAX_REGISTRY_LEGACY_KEYS {
+        if evaluated_at_unix_ms == 0 || retired.len() > MAX_REGISTRY_RETIRED_KEYS {
             return Err(RegistryError::IntegrityFailure);
         }
-        for (index, candidate) in legacy.iter().enumerate() {
+        for (index, candidate) in retired.iter().enumerate() {
             if candidate.overlap_started_at_unix_ms > evaluated_at_unix_ms
                 || candidate.version() == active.version()
                 || same_registry_key(candidate.key.key(), active.key())
             {
                 return Err(RegistryError::IntegrityFailure);
             }
-            if legacy.iter().take(index).any(|existing| {
+            if retired.iter().take(index).any(|existing| {
                 existing.version() == candidate.version()
                     || same_registry_key(existing.key.key(), candidate.key.key())
             }) {
@@ -218,7 +218,7 @@ impl RegistryKeyRing {
         }
         Ok(Self {
             active,
-            legacy,
+            retired,
             evaluated_at_unix_ms,
         })
     }
@@ -229,8 +229,8 @@ impl RegistryKeyRing {
     }
 
     #[must_use]
-    pub fn legacy(&self) -> &[LegacyRegistryKey] {
-        self.legacy.as_slice()
+    pub fn retired(&self) -> &[RetiredRegistryKey] {
+        self.retired.as_slice()
     }
 
     #[must_use]
@@ -238,8 +238,8 @@ impl RegistryKeyRing {
         self.evaluated_at_unix_ms
     }
 
-    fn has_expired_legacy(&self) -> bool {
-        self.legacy
+    fn has_expired_retired_key(&self) -> bool {
+        self.retired
             .iter()
             .any(|key| self.evaluated_at_unix_ms >= key.overlap_ends_at_unix_ms)
     }
@@ -1147,15 +1147,15 @@ impl PrivateDecoyRegistry {
                 Err(error) => return Err(error),
             }
         }
-        for legacy in &keys.legacy {
-            if !legacy.is_readable_at(keys.evaluated_at_unix_ms) {
+        for retired in &keys.retired {
+            if !retired.is_readable_at(keys.evaluated_at_unix_ms) {
                 continue;
             }
-            if let Some(sealed) = lookup(legacy.key.key())? {
-                match open_envelope(&legacy.key, &sealed) {
+            if let Some(sealed) = lookup(retired.key.key())? {
+                match open_envelope(&retired.key, &sealed) {
                     Ok(envelope) => {
                         return Ok(Some(OpenedEnvelope {
-                            key: &legacy.key,
+                            key: &retired.key,
                             sealed,
                             envelope,
                         }));
@@ -1165,7 +1165,7 @@ impl PrivateDecoyRegistry {
                 }
             }
         }
-        if keys.has_expired_legacy() {
+        if keys.has_expired_retired_key() {
             return Err(RegistryError::KeyUnavailable);
         }
         if authentication_failed {
@@ -1510,17 +1510,17 @@ fn open_scanned_envelope(
         Err(RegistryError::AuthenticationFailed) => {}
         Err(error) => return Err(error),
     }
-    for legacy in &keys.legacy {
-        if !legacy.is_readable_at(keys.evaluated_at_unix_ms) {
+    for retired in &keys.retired {
+        if !retired.is_readable_at(keys.evaluated_at_unix_ms) {
             continue;
         }
-        match open_envelope(&legacy.key, sealed) {
+        match open_envelope(&retired.key, sealed) {
             Ok(envelope) => return Ok(envelope),
             Err(RegistryError::AuthenticationFailed) => {}
             Err(error) => return Err(error),
         }
     }
-    if keys.has_expired_legacy() {
+    if keys.has_expired_retired_key() {
         Err(RegistryError::KeyUnavailable)
     } else {
         Err(RegistryError::AuthenticationFailed)

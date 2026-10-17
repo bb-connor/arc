@@ -59,7 +59,7 @@ Observation-store failure remains explicit even when a verified active hit exist
 Registry keys and secret material use zeroizing containers and redact debug
 output. ChaCha20-Poly1305 authenticates the private envelope; domain-separated
 HMAC indexes bind tenant and lookup purpose. Key versions select the active key
-or a bounded legacy set whose overlap windows permit reads.
+or a bounded set of retired keys whose overlap windows permit reads.
 
 `transition` checks generation, version, operation shape, and legal state edges.
 `DecoyDetector::detect` rejects empty or zero-time observations and distinguishes
