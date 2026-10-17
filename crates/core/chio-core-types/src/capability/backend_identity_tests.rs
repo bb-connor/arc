@@ -49,7 +49,7 @@ impl SigningBackend for IdentityBackend {
 
     fn sign_bytes_for_identity(&self, key: &PublicKey, message: &[u8]) -> Result<SigningOutcome> {
         self.bound_calls.fetch_add(1, Ordering::SeqCst);
-        assert_eq!(key, &self.original.public_key().unwrap());
+        assert_eq!(key, &self.original.public_key()?);
         let mut outcome = self.original.sign_bytes_for_identity(key, message)?;
         match self.fault {
             0 => {}

@@ -808,7 +808,7 @@ fn aggregate_invocation_backend_binding_survives_root_round_trip() -> TestResult
     let root = CapabilityToken::sign_aggregate_family_root_with_backend(
         token_body(
             "cap-backend-root",
-            &backend.public_key().unwrap(),
+            &backend.public_key()?,
             &root_subject.public_key(),
             tool_scope(true),
         ),
@@ -833,7 +833,7 @@ fn aggregate_invocation_backend_binding_survives_root_round_trip() -> TestResult
     )?;
     let mut child_body = token_body(
         "cap-backend-child",
-        &backend.public_key().unwrap(),
+        &backend.public_key()?,
         &delegatee.public_key(),
         tool_scope(false),
     );

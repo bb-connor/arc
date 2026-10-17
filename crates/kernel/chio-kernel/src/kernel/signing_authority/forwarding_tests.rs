@@ -1,4 +1,5 @@
 use super::*;
+use chio_core::crypto::SigningAlgorithm;
 use chio_core::{CanonicalBytes, CanonicalJsonWitness, Ed25519Backend, PublicKey, Signature};
 use std::sync::atomic::{AtomicU64, Ordering};
 
