@@ -485,7 +485,7 @@ fn step_record_proof_validates_against_attest_schema() {
 }
 
 #[test]
-fn projection_manifest_uses_v2_slot_class_and_sensitivity() {
+fn projection_manifest_uses_typed_slot_class_and_sensitivity() {
     let ed25519 = Keypair::generate();
     let receipt = receipt_fixture(&ed25519);
     let projection = project_receipt_body(&receipt).expect("receipt projection succeeds");
@@ -494,7 +494,7 @@ fn projection_manifest_uses_v2_slot_class_and_sensitivity() {
 
     assert_eq!(
         manifest_json["schema"], "chio.bbs-projection.manifest.v1",
-        "launch BBS projection manifests must be v2"
+        "BBS projection manifests carry the v1 schema id"
     );
     for slot in manifest_json["message_slots"]
         .as_array()
