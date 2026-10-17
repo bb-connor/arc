@@ -22,8 +22,14 @@ use crate::wire::{
 };
 use crate::{BrowserClock, WebCryptoRng};
 
+/// Serialize to plain JS objects so `JSON.stringify` round-trips every
+/// result; the default serializer emits free-form JSON objects as `Map`.
+fn to_plain_js<T: Serialize + ?Sized>(value: &T) -> Result<JsValue, serde_wasm_bindgen::Error> {
+    value.serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+}
+
 fn to_js_error(error: &BindingError) -> JsValue {
-    serde_wasm_bindgen::to_value(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
+    to_plain_js(error).unwrap_or_else(|_| JsValue::from_str(&error.message))
 }
 
 fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T, JsValue> {
@@ -34,7 +40,7 @@ fn parse_json<T: for<'de> Deserialize<'de>>(label: &str, raw: &str) -> Result<T,
 }
 
 fn encode_result<T: Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    serde_wasm_bindgen::to_value(value).map_err(|error| {
+    to_plain_js(value).map_err(|error| {
         let err = BindingError::new(
             "encode_result_failed",
             format!("could not serialize wasm result: {error}"),

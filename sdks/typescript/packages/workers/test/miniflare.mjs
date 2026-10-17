@@ -26,6 +26,7 @@ try {
   assert.notEqual(out.seedA, '0'.repeat(64));
   assert.notEqual(out.seedA, out.seedB);
   assert.match(out.kernelKey, /^[0-9a-f]{64}$/);
+  assert.deepEqual(out.parameters, { mode: 'read', path: '/workspace/docs/roadmap.md' });
   assert.equal(out.trusted.signature_valid, true);
   assert.equal(out.trusted.signer_trusted, true);
   assert.equal(out.trusted.ok, true);

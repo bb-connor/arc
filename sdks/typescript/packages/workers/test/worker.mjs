@@ -2,20 +2,6 @@ import * as sdk from '../dist/index.js';
 
 const encoder = new TextEncoder();
 
-// serde-wasm-bindgen returns free-form JSON objects (action.parameters, metadata) as Map.
-function toPlain(value) {
-  if (value instanceof Map) {
-    return Object.fromEntries([...value].map(([k, v]) => [k, toPlain(v)]));
-  }
-  if (Array.isArray(value)) {
-    return value.map(toPlain);
-  }
-  if (value !== null && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toPlain(v)]));
-  }
-  return value;
-}
-
 async function sha256Hex(bytes) {
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -61,11 +47,12 @@ export default {
     const body = receiptBody(await sha256Hex(canonical));
     const input = JSON.stringify({ body, canonical_content: [...canonical] });
 
-    const receipt = toPlain(await sdk.sign_receipt(input, seedA));
+    const receipt = await sdk.sign_receipt(input, seedA);
     const envelope = encoder.encode(JSON.stringify(receipt));
+    const stored = JSON.parse(JSON.stringify(receipt));
     const trusted = await sdk.verify_receipt(envelope, receipt.kernel_key);
     const untrusted = await sdk.verify_receipt(envelope);
 
-    return Response.json({ seedA, seedB, kernelKey: receipt.kernel_key, trusted, untrusted });
+    return Response.json({ seedA, seedB, kernelKey: receipt.kernel_key, parameters: stored.action.parameters, metadata: stored.metadata, trusted, untrusted });
   },
 };
