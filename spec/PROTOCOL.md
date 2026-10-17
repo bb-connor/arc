@@ -1745,11 +1745,13 @@ continuations are reserved before dispatch and cannot be replayed through the
 memory or durable runtime stores. `Resumable` continuations are revalidated on
 resume without being treated as single-use replay.
 
-Route metadata is mandatory for swarm-bound dispatch. Runtime admission accepts
-the current edge metadata spellings `route`, `route_selection`, and
-`routeSelection`, then compares the selected route, bridge, and protocol target
-against the verified route-plan receipt. Omitting route metadata is a denial,
-not a way to bypass route-plan enforcement.
+Route metadata is mandatory for swarm-bound dispatch. Runtime admission reads
+it from the `route` member of the request metadata, an object with exactly the
+string fields `bridge`, `protocolTarget`, and `selectedRoute`, and compares each
+with the verified route-plan receipt. Route-selection evidence
+(`route_selection`) is not a swarm route. Omitting `route`, a non-object
+`route`, or any other field in it is a denial, not a way to bypass route-plan
+enforcement.
 
 Budget fan-out and fan-in use explicit reservation and release transitions.
 Allocations carry dimension id, state, reserved units, active units, consumed

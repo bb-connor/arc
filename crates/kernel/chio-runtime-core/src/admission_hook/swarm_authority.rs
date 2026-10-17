@@ -150,98 +150,88 @@ fn verify_swarm_reference_hashes(
     Ok(())
 }
 
+const SWARM_ROUTE_FIELDS: [&str; 3] = ["bridge", "protocolTarget", "selectedRoute"];
+
+fn route_rejected(detail: String) -> ChioRuntimeError {
+    ChioRuntimeError::Rejected {
+        code: "chio_swarm_authority_rejected",
+        detail,
+    }
+}
+
 fn verify_route_metadata_matches(
     route_metadata: Option<&serde_json::Value>,
     route_plan: &SwarmRoutePlanReceipt,
 ) -> Result<serde_json::Value, ChioRuntimeError> {
     let Some(metadata) = route_metadata else {
-        return Err(ChioRuntimeError::Rejected {
-            code: "chio_swarm_authority_rejected",
-            detail: format!(
-                "swarm route metadata missing for route plan {}",
-                route_plan.route_plan_id
-            ),
-        });
+        return Err(route_rejected(format!(
+            "swarm route metadata missing for route plan {}",
+            route_plan.route_plan_id
+        )));
     };
-    let Some(route) = metadata
-        .get("route")
-        .or_else(|| metadata.get("route_selection"))
-        .or_else(|| metadata.get("routeSelection"))
-    else {
-        return Err(ChioRuntimeError::Rejected {
-            code: "chio_swarm_authority_rejected",
-            detail: format!(
-                "swarm route metadata missing routed entry for route plan {}",
-                route_plan.route_plan_id
-            ),
-        });
+    let Some(route) = metadata.get("route") else {
+        if let Some(key) = ["route_selection", "routeSelection"]
+            .into_iter()
+            .find(|key| metadata.get(*key).is_some())
+        {
+            return Err(route_rejected(format!(
+                "swarm route metadata {key} is not a swarm route; send route"
+            )));
+        }
+        return Err(route_rejected(format!(
+            "swarm route metadata missing routed entry for route plan {}",
+            route_plan.route_plan_id
+        )));
     };
-    let bridge = route_metadata_string(
-        route,
-        &[
-            "bridge",
-            "bridgeId",
-            "targetProtocol",
-            "selectedTargetProtocol",
-        ],
-    )
-    .ok_or_else(|| ChioRuntimeError::Rejected {
-        code: "chio_swarm_authority_rejected",
-        detail: format!(
+    let Some(route) = route.as_object() else {
+        return Err(route_rejected(
+            "swarm route metadata route must be an object".to_string(),
+        ));
+    };
+    if let Some(field) = route
+        .keys()
+        .find(|field| !SWARM_ROUTE_FIELDS.contains(&field.as_str()))
+    {
+        return Err(route_rejected(format!(
+            "swarm route metadata field route.{field} is not accepted"
+        )));
+    }
+    let field = |name: &str| route.get(name).and_then(serde_json::Value::as_str);
+    let bridge = field("bridge").ok_or_else(|| {
+        route_rejected(format!(
             "swarm route metadata missing bridge for route plan {}",
             route_plan.route_plan_id
-        ),
+        ))
     })?;
     if bridge != route_plan.bridge_id {
-        return Err(ChioRuntimeError::Rejected {
-            code: "chio_swarm_authority_rejected",
-            detail: format!(
-                "swarm route metadata bridge mismatch: expected {}, got {}",
-                route_plan.bridge_id, bridge
-            ),
-        });
+        return Err(route_rejected(format!(
+            "swarm route metadata bridge mismatch: expected {}, got {}",
+            route_plan.bridge_id, bridge
+        )));
     }
-    let protocol_target = route_metadata_string(route, &["protocolTarget", "protocol_target"])
-        .ok_or_else(|| ChioRuntimeError::Rejected {
-            code: "chio_swarm_authority_rejected",
-            detail: format!(
-                "swarm route metadata missing protocol target for route plan {}",
-                route_plan.route_plan_id
-            ),
-        })?;
+    let protocol_target = field("protocolTarget").ok_or_else(|| {
+        route_rejected(format!(
+            "swarm route metadata missing protocol target for route plan {}",
+            route_plan.route_plan_id
+        ))
+    })?;
     if protocol_target != route_plan.protocol_target {
-        return Err(ChioRuntimeError::Rejected {
-            code: "chio_swarm_authority_rejected",
-            detail: format!(
-                "swarm route metadata target mismatch: expected {}, got {}",
-                route_plan.protocol_target, protocol_target
-            ),
-        });
+        return Err(route_rejected(format!(
+            "swarm route metadata target mismatch: expected {}, got {}",
+            route_plan.protocol_target, protocol_target
+        )));
     }
-    let selected_route = route_metadata_string(
-        route,
-        &[
-            "selectedRoute",
-            "selected_route",
-            "selectedRouteId",
-            "selected_route_id",
-        ],
-    )
-    .ok_or_else(|| ChioRuntimeError::Rejected {
-        code: "chio_swarm_authority_rejected",
-        detail: format!(
+    let selected_route = field("selectedRoute").ok_or_else(|| {
+        route_rejected(format!(
             "swarm route metadata missing selected route for route plan {}",
             route_plan.route_plan_id
-        ),
+        ))
     })?;
     if selected_route != route_plan.selected_route {
-        return Err(ChioRuntimeError::Rejected {
-            code: "chio_swarm_authority_rejected",
-            detail: format!(
-                "swarm route metadata selected route mismatch: expected {}, got {}",
-                route_plan.selected_route, selected_route
-            ),
-        });
+        return Err(route_rejected(format!(
+            "swarm route metadata selected route mismatch: expected {}, got {}",
+            route_plan.selected_route, selected_route
+        )));
     }
     Ok(serde_json::json!({
         "route": {
@@ -250,12 +240,6 @@ fn verify_route_metadata_matches(
             "selectedRoute": selected_route
         }
     }))
-}
-
-fn route_metadata_string<'a>(route: &'a serde_json::Value, fields: &[&str]) -> Option<&'a str> {
-    fields
-        .iter()
-        .find_map(|field| route.get(*field).and_then(serde_json::Value::as_str))
 }
 
 fn verify_ref_matches<T>(
@@ -322,4 +306,99 @@ fn find_by_id<'a, T>(
             detail: "swarm-bound request referenced authority evidence that is absent from the stored bundle"
                 .to_string(),
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn route_plan() -> SwarmRoutePlanReceipt {
+        SwarmRoutePlanReceipt {
+            schema: "chio.swarm.route-plan-receipt.v1".to_string(),
+            route_plan_id: "route-plan-1".to_string(),
+            graph_id: "graph-1".to_string(),
+            task_id: "task-1".to_string(),
+            selected_route: "mcp:task-child-a".to_string(),
+            candidate_set_digest: "a".repeat(64),
+            registry_snapshot_hash: "b".repeat(64),
+            bridge_id: "mcp".to_string(),
+            protocol_target: "mcp://provider-runtime".to_string(),
+            egress_contract_id: "egress-1".to_string(),
+            egress_constraints: Vec::new(),
+            attenuation_decision: "attenuated".to_string(),
+            policy_digest: "c".repeat(64),
+            expires_at_unix_ms: 1,
+            issuer: "issuer".to_string(),
+            signature: "signature".to_string(),
+        }
+    }
+
+    fn refusal(metadata: serde_json::Value) -> String {
+        match verify_route_metadata_matches(Some(&metadata), &route_plan()) {
+            Err(ChioRuntimeError::Rejected { code, detail }) => {
+                assert_eq!(code, "chio_swarm_authority_rejected");
+                detail
+            }
+            other => panic!("route metadata must be refused: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn swarm_route_metadata_admits_the_route_object() {
+        let metadata = serde_json::json!({"route": {
+            "bridge": "mcp",
+            "protocolTarget": "mcp://provider-runtime",
+            "selectedRoute": "mcp:task-child-a"
+        }});
+        let verified = verify_route_metadata_matches(Some(&metadata), &route_plan())
+            .unwrap_or_else(|error| panic!("route metadata must verify: {error}"));
+        assert_eq!(verified, metadata);
+    }
+
+    #[test]
+    fn swarm_route_metadata_refuses_route_selection_spellings() {
+        for key in ["route_selection", "routeSelection"] {
+            let metadata = serde_json::json!({key: {
+                "bridge": "mcp",
+                "protocolTarget": "mcp://provider-runtime",
+                "selectedRoute": "mcp:task-child-a"
+            }});
+            assert_eq!(
+                refusal(metadata),
+                format!("swarm route metadata {key} is not a swarm route; send route")
+            );
+        }
+    }
+
+    #[test]
+    fn swarm_route_metadata_refuses_alternate_field_names() {
+        for (field, value) in [
+            ("bridgeId", "mcp"),
+            ("targetProtocol", "mcp"),
+            ("selectedTargetProtocol", "mcp"),
+            ("protocol_target", "mcp://provider-runtime"),
+            ("selected_route", "mcp:task-child-a"),
+            ("selectedRouteId", "mcp:task-child-a"),
+            ("selected_route_id", "mcp:task-child-a"),
+        ] {
+            let mut route = serde_json::json!({
+                "bridge": "mcp",
+                "protocolTarget": "mcp://provider-runtime",
+                "selectedRoute": "mcp:task-child-a"
+            });
+            route[field] = serde_json::json!(value);
+            assert_eq!(
+                refusal(serde_json::json!({"route": route})),
+                format!("swarm route metadata field route.{field} is not accepted")
+            );
+        }
+    }
+
+    #[test]
+    fn swarm_route_metadata_refuses_a_non_object_route() {
+        assert_eq!(
+            refusal(serde_json::json!({"route": "mcp:task-child-a"})),
+            "swarm route metadata route must be an object"
+        );
+    }
 }

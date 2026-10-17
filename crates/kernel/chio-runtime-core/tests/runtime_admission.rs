@@ -1398,7 +1398,7 @@ fn chio_runtime_hook_denies_swarm_route_metadata_mismatch_before_dispatch(
 }
 
 #[test]
-fn chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch(
+fn chio_runtime_hook_denies_route_selection_as_swarm_route_before_dispatch(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let store = InMemoryRuntimeAdmissionStore::new();
     let mut admission_bundle = bundle();
@@ -1419,8 +1419,9 @@ fn chio_runtime_hook_denies_swarm_route_selection_id_mismatch_before_dispatch(
         chio_swarm_runtime_request(args, bundle_hash, swarm_runtime_context(&swarm_bundle)?)?;
     let route_metadata = serde_json::json!({
         "route_selection": {
-            "selectedRouteId": "a2a:task-child-b",
-            "selectedTargetProtocol": "mcp"
+            "bridge": "mcp",
+            "protocolTarget": "mcp://provider-runtime",
+            "selectedRoute": "mcp:task-child-a"
         }
     });
     let hook =
