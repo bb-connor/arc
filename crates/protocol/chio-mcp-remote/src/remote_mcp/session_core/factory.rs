@@ -580,8 +580,7 @@ impl RemoteSessionFactory {
                 .grants
                 .iter()
                 .any(|grant| grant.dpop_required == Some(true))
-        }) && authenticated_sender_key(&record.auth_context).is_none()
-        {
+        }) {
             return Ok(None);
         }
         match record.auth_mode_fingerprint.as_deref() {

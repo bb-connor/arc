@@ -430,9 +430,6 @@ fn derive_session_agent_public_key(
     auth_context: &SessionAuthContext,
     proof_required: bool,
 ) -> Result<PublicKey, CliError> {
-    if let Some(key) = authenticated_sender_key(auth_context) {
-        return Ok(key.clone());
-    }
     if proof_required {
         return Err(CliError::cli_other_error(
             "proof-required sessions require an authenticated Chio sender key".to_owned(),
@@ -447,15 +444,6 @@ fn derive_session_agent_public_key(
             ..
         } => Ok(derive_federated_agent_keypair(seed_path, principal)?.public_key()),
         _ => Ok(Keypair::generate().public_key()),
-    }
-}
-
-fn authenticated_sender_key(auth_context: &SessionAuthContext) -> Option<&PublicKey> {
-    match &auth_context.method {
-        SessionAuthMethod::OAuthBearer {
-            federated_claims, ..
-        } => federated_claims.sender_public_key.as_ref(),
-        _ => None,
     }
 }
 
@@ -777,9 +765,6 @@ fn expected_resume_agent_id(
     config: &RemoteServeHttpConfig,
     auth_context: &SessionAuthContext,
 ) -> Result<Option<String>, CliError> {
-    if let Some(key) = authenticated_sender_key(auth_context) {
-        return Ok(Some(key.to_hex()));
-    }
     let Some(seed_path) = config.identity_federation_seed_path.as_deref() else {
         return Ok(None);
     };
