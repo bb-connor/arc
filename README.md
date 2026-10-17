@@ -19,7 +19,7 @@
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/subhead-mobile.svg" />
-    <img src="docs/assets/subhead.svg" alt="A signed receipt for every call &middot; Authority that can only narrow &middot; Agents that pay each other" width="880" />
+    <img src="docs/assets/subhead.svg" alt="A signed receipt for every mediated call &middot; Authority that can only narrow &middot; Spend metered against a signed budget" width="880" />
   </picture>
 </p>
 
