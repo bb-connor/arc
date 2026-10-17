@@ -100,16 +100,15 @@ pub trait PostInvocationHook: Send + Sync {
 
     fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict;
 
-    /// Return a verdict and its evidence atomically. Existing hooks retain the
-    /// serialized legacy evidence path through this default implementation.
+    /// Return a verdict and the evidence produced by this one call. Hooks that
+    /// emit receipt evidence override this and return it by value; the default
+    /// carries no evidence.
     fn inspect_with_evidence(
         &self,
         ctx: &PostInvocationContext<'_>,
         response: &Value,
     ) -> PostInvocationInspection {
-        let verdict = self.inspect(ctx, response);
-        let evidence = self.take_evidence().into_iter().collect();
-        PostInvocationInspection::new(verdict, evidence)
+        PostInvocationInspection::without_evidence(self.inspect(ctx, response))
     }
 
     /// Stable identity for deterministic, non-blocking durable evaluation.
@@ -120,10 +119,6 @@ pub trait PostInvocationHook: Send + Sync {
     /// non-durable paths and are rejected before a durable dispatch starts.
     fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
         Ok(None)
-    }
-
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        None
     }
 }
 
@@ -466,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn pipeline_serializes_hook_evaluation_and_evidence_side_channels() {
+    fn pipeline_serializes_hook_evaluation() {
         let active = Arc::new(AtomicUsize::new(0));
         let overlapped = Arc::new(AtomicBool::new(false));
         let mut pipeline = PostInvocationPipeline::new();

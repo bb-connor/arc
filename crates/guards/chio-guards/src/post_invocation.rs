@@ -20,7 +20,7 @@
 use chio_core::receipt::metadata::GuardEvidence;
 pub use chio_kernel::{
     PipelineOutcome, PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
-    PostInvocationPipeline, PostInvocationVerdict,
+    PostInvocationInspection, PostInvocationPipeline, PostInvocationVerdict,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -46,7 +46,6 @@ use crate::response_sanitization::{
 pub struct SanitizerHook {
     sanitizer: OutputSanitizer,
     hook_name: String,
-    evidence: std::sync::Mutex<Option<GuardEvidence>>,
 }
 
 impl SanitizerHook {
@@ -55,7 +54,6 @@ impl SanitizerHook {
         Self {
             sanitizer: OutputSanitizer::new(),
             hook_name: "output-sanitizer".to_string(),
-            evidence: std::sync::Mutex::new(None),
         }
     }
 
@@ -64,7 +62,6 @@ impl SanitizerHook {
         Ok(Self {
             sanitizer: OutputSanitizer::with_config(config)?,
             hook_name: "output-sanitizer".to_string(),
-            evidence: std::sync::Mutex::new(None),
         })
     }
 
@@ -73,7 +70,6 @@ impl SanitizerHook {
         Self {
             sanitizer,
             hook_name: "output-sanitizer".to_string(),
-            evidence: std::sync::Mutex::new(None),
         }
     }
 
@@ -88,12 +84,20 @@ impl SanitizerHook {
         &self.sanitizer
     }
 
-    fn store_evidence(&self, ev: GuardEvidence) {
-        let mut guard = match self.evidence.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        *guard = Some(ev);
+    fn inspect_once(&self, response: &Value) -> PostInvocationInspection {
+        let sanitized = self.sanitizer.sanitize_value(response);
+        if !sanitized.was_redacted {
+            return PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow);
+        }
+        let details = summarize_findings(&sanitized.findings, &sanitized.redactions);
+        PostInvocationInspection::new(
+            PostInvocationVerdict::Redact(sanitized.value),
+            vec![GuardEvidence {
+                guard_name: self.hook_name.clone(),
+                verdict: true,
+                details: Some(details),
+            }],
+        )
     }
 }
 
@@ -109,21 +113,15 @@ impl PostInvocationHook for SanitizerHook {
     }
 
     fn inspect(&self, _ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
-        let sanitized = self.sanitizer.sanitize_value(response);
-        if !sanitized.was_redacted {
-            // Clear any stale evidence from a previous run.
-            if let Ok(mut g) = self.evidence.lock() {
-                *g = None;
-            }
-            return PostInvocationVerdict::Allow;
-        }
-        let details = summarize_findings(&sanitized.findings, &sanitized.redactions);
-        self.store_evidence(GuardEvidence {
-            guard_name: self.hook_name.clone(),
-            verdict: true, // sanitized: still allowed but redacted
-            details: Some(details),
-        });
-        PostInvocationVerdict::Redact(sanitized.value)
+        self.inspect_once(response).verdict
+    }
+
+    fn inspect_with_evidence(
+        &self,
+        _ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
+        self.inspect_once(response)
     }
 
     fn durable_identity(&self) -> Result<Option<PostInvocationHookIdentity>, String> {
@@ -148,14 +146,6 @@ impl PostInvocationHook for SanitizerHook {
             },
         )
         .map(Some)
-    }
-
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        let mut guard = match self.evidence.lock() {
-            Ok(g) => g,
-            Err(poisoned) => poisoned.into_inner(),
-        };
-        guard.take()
     }
 }
 
@@ -396,5 +386,64 @@ mod tests {
             .durable_identity()
             .expect_err("counter-backed tokenization must not be durable");
         assert!(error.contains("tokenize redaction strategy is not deterministic"));
+    }
+
+    #[test]
+    fn concurrent_inspections_keep_their_own_evidence() {
+        use std::sync::{Arc, Barrier};
+
+        const ROUNDS: usize = 2_000;
+        let hook = Arc::new(SanitizerHook::new());
+        let redaction = |details: &str| {
+            vec![GuardEvidence {
+                guard_name: "output-sanitizer".to_string(),
+                verdict: true,
+                details: Some(details.to_string()),
+            }]
+        };
+        let calls = [
+            (
+                serde_json::json!({"token": format!("ghp_{}", "a".repeat(36))}),
+                redaction("sanitizer detected 1 findings (secret_github_token:1)"),
+            ),
+            (
+                serde_json::json!({"contact": "alice@example.com"}),
+                redaction("sanitizer detected 1 findings (pii_email:1)"),
+            ),
+            (serde_json::json!({"message": "nothing to see"}), Vec::new()),
+        ];
+        let barrier = Arc::new(Barrier::new(calls.len()));
+
+        let workers: Vec<_> = calls
+            .into_iter()
+            .map(|(response, expected_evidence)| {
+                let hook = Arc::clone(&hook);
+                let barrier = Arc::clone(&barrier);
+                std::thread::spawn(move || {
+                    let ctx = PostInvocationContext::synthetic("tool");
+                    let mut foreign = 0usize;
+                    for _ in 0..ROUNDS {
+                        barrier.wait();
+                        let inspection = hook.inspect_with_evidence(&ctx, &response);
+                        if inspection.evidence != expected_evidence {
+                            foreign += 1;
+                        }
+                    }
+                    foreign
+                })
+            })
+            .collect();
+
+        let foreign: usize = workers
+            .into_iter()
+            .map(|worker| match worker.join() {
+                Ok(foreign) => foreign,
+                Err(_) => panic!("inspection worker panicked"),
+            })
+            .sum();
+        assert_eq!(
+            foreign, 0,
+            "every inspection must carry exactly its own call's evidence"
+        );
     }
 }
