@@ -367,12 +367,18 @@ const CALL_CONTRACTS: &[CallContract] = &[
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation.rs",
         function: "ChioKernel::verify_capability_full_pre_admit",
-        target: "self.verify_capability_full_pre_admit_with_clock",
+        target: "self.verify_capability_full_pre_admit_typed",
         minimum: 1,
     },
     CallContract {
         path: "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs",
-        function: "ChioKernel::verify_capability_full_pre_admit_with_clock",
+        function: "ChioKernel::verify_capability_full_pre_admit_typed",
+        target: "self.verify_capability_full_typed_with_clock",
+        minimum: 1,
+    },
+    CallContract {
+        path: "crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs",
+        function: "ChioKernel::verify_capability_full_typed_with_clock",
         target: "chio_kernel_core::verify_capability_full_with_evidence",
         minimum: 1,
     },
@@ -468,7 +474,7 @@ fn require_pre_admit_budget_registry(parsed: &BTreeMap<String, SourceFacts>) -> 
         parsed
             .get("crates/kernel/chio-kernel/src/kernel/validation/capability_evidence.rs")
             .ok_or_else(|| "kernel capability evidence source was not parsed".to_string())?,
-        "ChioKernel::verify_capability_full_pre_admit_with_clock",
+        "ChioKernel::verify_capability_full_typed_with_clock",
         "chio_kernel_core::NoopBudgetRegistry",
     )
 }
@@ -1184,7 +1190,7 @@ mod tests {
             &facts,
             &CallContract {
                 path: owner,
-                function: "ChioKernel::verify_capability_full_pre_admit_with_clock",
+                function: "ChioKernel::verify_capability_full_typed_with_clock",
                 target: "chio_kernel_core::verify_capability_full_with_evidence",
                 minimum: 1,
             },
@@ -1196,7 +1202,7 @@ mod tests {
         };
         assert_eq!(
             error,
-            "mediation contract path missing: ChioKernel::verify_capability_full_pre_admit_with_clock requires chio_kernel_core::NoopBudgetRegistry",
+            "mediation contract path missing: ChioKernel::verify_capability_full_typed_with_clock requires chio_kernel_core::NoopBudgetRegistry",
         );
         Ok(())
     }
