@@ -35,10 +35,11 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
+    "ai": "^7.0.93",
     "typescript": "~5.7.0"
   },
   "peerDependencies": {
-    "ai": ">=4.0 <6",
+    "ai": ">=7 <8",
     "@chio-protocol/edge": ">=0.1.0 <1"
   },
   "peerDependenciesMeta": {

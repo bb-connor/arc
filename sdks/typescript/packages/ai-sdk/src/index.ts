@@ -1,20 +1,19 @@
 /**
  * @chio-protocol/ai-sdk
  *
- * Vercel AI SDK wrapper for the Chio protocol. Provides `chioTool()` which
+ * Vercel AI SDK 7 wrapper for the Chio protocol. Provides `chioTool()` which
  * evaluates each tool invocation through the Chio sidecar before delegating
- * to the underlying `execute`. Streaming return values (`ReadableStream`,
- * async generators) pass through unchanged.
+ * to the underlying `execute`. Async generator tools keep streaming.
  *
  * @example
  * ```ts
- * import { streamText, tool } from "ai";
+ * import { streamText } from "ai";
  * import { z } from "zod";
  * import { chioTool } from "@chio-protocol/ai-sdk";
  *
  * const searchTool = chioTool({
  *   description: "Search the web",
- *   parameters: z.object({ query: z.string() }),
+ *   inputSchema: z.object({ query: z.string() }),
  *   execute: async ({ query }) => runSearch(query),
  *   scope: { toolServer: "web-tools", toolName: "search" },
  * });
@@ -31,9 +30,8 @@ export {
   chioTool,
   type ChioToolOptions,
   type ChioToolScope,
+  type ChioToolSettings,
   type CapabilityTokenResolver,
-  type ToolLike,
-  type ToolExecuteOptions,
 } from "./chio-tool.js";
 export {
   ChioClient,

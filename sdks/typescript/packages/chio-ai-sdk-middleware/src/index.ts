@@ -10,7 +10,7 @@ export {
   type ChioMiddlewareOptions,
   type ChioReceiptAuthority,
   type ChioReceiptVerifier,
-  type LanguageModelLike,
+  type ChioWrappableModel,
   type LanguageModelInvocation,
   type ToolUseCandidate,
 } from "./middleware.js";
