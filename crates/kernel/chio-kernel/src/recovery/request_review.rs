@@ -7,9 +7,10 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenSigningBody},
 };
 use chio_core_types::{
-    canonical::CanonicalBytes, recovery::RecoveryDigestDomain, SignedDeclassificationGrant,
+    canonical::CanonicalBytes, recovery::RecoveryDigestDomain, Error as EncodingError,
+    SignedDeclassificationGrant,
 };
-use chio_security_types::recovery::{ActionIntentV1, ContractError, ReviewDigest};
+use chio_security_types::recovery::{ActionIntentV1, ReviewDigest};
 use serde::Serialize;
 
 /// A borrowed view of the request's semantics and exact presented credentials.
@@ -53,8 +54,8 @@ impl core::fmt::Debug for RecoveryRequestProjection<'_> {
 
 impl RecoveryRequestProjection<'_> {
     /// Canonical semantic data for exact-action materialization.
-    pub fn canonical_semantics(&self) -> Result<CanonicalBytes, ContractError> {
-        CanonicalBytes::new(&self.semantics).map_err(|_| ContractError::Malformed)
+    pub fn canonical_semantics(&self) -> Result<CanonicalBytes, EncodingError> {
+        CanonicalBytes::new(&self.semantics)
     }
 
     /// Full action and semantic request bytes for the protected review document.
@@ -62,8 +63,8 @@ impl RecoveryRequestProjection<'_> {
     pub fn canonical_action_preview(
         &self,
         action: &ActionIntentV1,
-    ) -> Result<CanonicalBytes, ContractError> {
-        CanonicalBytes::new(&(action, &self.semantics)).map_err(|_| ContractError::Malformed)
+    ) -> Result<CanonicalBytes, EncodingError> {
+        CanonicalBytes::new(&(action, &self.semantics))
     }
 }
 
@@ -114,15 +115,15 @@ impl ToolCallRequest {
     }
 }
 
-/// Domain-separated digest of the complete action preview.
+/// Domain-separated digest of the complete action preview. A refusal is the
+/// canonical encoder's own error.
 pub fn recovery_review_digest(
     action: &ActionIntentV1,
     request: &ToolCallRequest,
-) -> Result<ReviewDigest, crate::KernelError> {
+) -> Result<ReviewDigest, EncodingError> {
     let bytes = request
         .recovery_review_projection()
-        .canonical_action_preview(action)
-        .map_err(|_| crate::KernelError::DurableAdmission("recovery preview refused".into()))?;
+        .canonical_action_preview(action)?;
     Ok(ReviewDigest::from_bytes(
         *RecoveryDigestDomain::Preview.digest(&bytes).as_bytes(),
     ))
