@@ -217,7 +217,6 @@ pub(crate) fn derive_authorization_sender_constraint(
         issuer_key_source,
         matched_grant_index,
         proof_required,
-        proof_type: proof_required.then(|| CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP.to_string()),
         proof_schema: proof_required.then(|| DPOP_SCHEMA.to_string()),
         runtime_assurance_bound: transaction_context.runtime_assurance_tier.is_some(),
         delegated_call_chain_bound: delegated_call_chain_is_sender_bound(
@@ -529,13 +528,6 @@ pub(crate) fn validate_chio_oauth_authorization_row(
         &row.sender_constraint.issuer_key_source,
     )?;
     if row.sender_constraint.proof_required {
-        let proof_type = row.sender_constraint.proof_type.as_deref().ok_or_else(|| {
-            invalid_chio_oauth_authorization_profile(
-                &row.receipt_id,
-                "proofRequired requires senderConstraint.proofType",
-            )
-        })?;
-        ensure_non_empty_profile_value(&row.receipt_id, "senderConstraint.proofType", proof_type)?;
         let proof_schema = row
             .sender_constraint
             .proof_schema

@@ -134,8 +134,7 @@ binding forward through `cnf`:
 - `cnf["x5t#S256"]`
 - `cnf.chioAttestationSha256`
 
-Chio DPoP sender binding is unavailable until the edge holds durable
-authentication replay custody. `chio_sender_dpop_public_key` is refused as
+Chio DPoP sender binding is refused. `chio_sender_dpop_public_key` is refused as
 `invalid_request`; a token whose `cnf` carries `chioSenderKey`, and any
 request presenting a `DPoP` header, is refused with
 `urn:chio:error:transport:dpop-sender-proof-unavailable`.
@@ -210,13 +209,9 @@ row in `senderConstraint`:
 - `matchedGrantIndex`
   - the scope grant resolved for the governed action
 - `proofRequired`
-  - `true` when runtime admission requires explicit sender proof continuity
-- `proofType`
-  - currently `chio_dpop_v1`, `chio_mtls_thumbprint_v1`, or
-    `chio_attestation_binding_v1` when proof is required
+  - `true` when the matched grant requires a Chio invocation proof
 - `proofSchema`
-  - currently `chio.dpop_proof.v1` for DPoP
-  - omitted for header-bound mTLS and attestation confirmation
+  - `chio.dpop_proof.v1` when proof is required
 - `runtimeAssuranceBound`
   - `true` when `transactionContext.runtimeAssurance*` fields are populated
 - `delegatedCallChainBound`

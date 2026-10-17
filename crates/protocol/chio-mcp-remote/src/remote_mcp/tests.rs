@@ -1215,7 +1215,7 @@ fn chio_oauth_discovery_profile_metadata_advertises_sender_constraints() {
         .sender_constraints
         .proof_types_supported
         .iter()
-        .any(|proof| proof == chio_kernel::operator_report::CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP));
+        .any(|proof| proof == "chio_dpop_v1"));
     assert!(profile
         .sender_constraints
         .proof_types_supported

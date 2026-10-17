@@ -212,10 +212,7 @@ fn test_authorization_context_report_and_cli() {
         auth_row["senderConstraint"]["proofRequired"].as_bool(),
         Some(true)
     );
-    assert_eq!(
-        auth_row["senderConstraint"]["proofType"].as_str(),
-        Some("chio_dpop_v1")
-    );
+    assert!(auth_row["senderConstraint"].get("proofType").is_none());
     assert_eq!(
         auth_row["senderConstraint"]["proofSchema"].as_str(),
         Some("chio.dpop_proof.v1")
@@ -318,8 +315,8 @@ fn test_authorization_context_report_and_cli() {
     );
     assert!(cli_row.sender_constraint.proof_required);
     assert_eq!(
-        cli_row.sender_constraint.proof_type.as_deref(),
-        Some("chio_dpop_v1")
+        cli_row.sender_constraint.proof_schema.as_deref(),
+        Some("chio.dpop_proof.v1")
     );
     assert_eq!(cli_row.sender_constraint.issuer_key, issuer_hex);
     assert_eq!(
