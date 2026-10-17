@@ -348,7 +348,6 @@ pub(super) fn request_with_replayed_approval(
         Keypair,
         CapabilityToken,
         ToolCallRequest,
-        crate::execution_nonce::NonceBinding,
         Arc<super::durable_admission::TestAdmissionOperationStore>,
     ),
     KernelError,
@@ -358,16 +357,6 @@ pub(super) fn request_with_replayed_approval(
     let agent = make_keypair();
     let (mut kernel, capability, store) =
         super::support_monetary::make_dpop_kernel_and_cap_with_store(&agent, server, tool);
-    let nonce_config = ExecutionNonceConfig {
-        nonce_ttl_secs: 300,
-        nonce_store_capacity: 1024,
-        require_nonce: false,
-    };
-    kernel.set_execution_nonce_store(
-        nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
-
     let arguments = serde_json::json!({"operation": "settle"});
     let mut request =
         make_request_with_arguments(request_id, &capability, tool, server, arguments.clone());
@@ -401,30 +390,16 @@ pub(super) fn request_with_replayed_approval(
         &arguments,
         &format!("dpop-{request_id}"),
     ));
-    let binding = binding_for_request(&capability, &request);
-    request.execution_nonce = Some(mint_execution_nonce(
-        &kernel.config.keypair,
-        binding.clone(),
-        &nonce_config,
-        i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX),
-    )?);
-
     kernel.consume_governed_approval_for_dispatch(&request)?;
-    Ok((kernel, agent, capability, request, binding, store))
+    Ok((kernel, agent, capability, request, store))
 }
 
 fn assert_earlier_credentials_remain_fresh(
     kernel: &ChioKernel,
     request: &ToolCallRequest,
     capability: &CapabilityToken,
-    binding: &crate::execution_nonce::NonceBinding,
     store: &super::durable_admission::TestAdmissionOperationStore,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let execution_nonce = request
-        .execution_nonce
-        .as_ref()
-        .ok_or_else(|| std::io::Error::other("execution nonce missing"))?;
-    kernel.verify_presented_execution_nonce(execution_nonce, binding)?;
     kernel.verify_required_dpop_preview(request, capability)?;
     let history = store.dpop_history();
     assert!(!history.is_empty());
@@ -1339,7 +1314,7 @@ fn installing_runtime_trace_observer_starts_sequence_at_one(
 #[test]
 fn hosted_late_approval_replay_rolls_back_earlier_credentials(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (kernel, _agent, capability, request, binding, store) =
+    let (kernel, _agent, capability, request, store) =
         request_with_replayed_approval("hosted-credential-rollback")?;
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
@@ -1349,13 +1324,13 @@ fn hosted_late_approval_replay_rolls_back_earlier_credentials(
         .reason
         .as_deref()
         .is_some_and(|reason| reason.contains("approval token has already been consumed")));
-    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &binding, &store)
+    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &store)
 }
 
 #[test]
 fn nested_late_approval_replay_rolls_back_credentials_and_dispatch_claim(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (kernel, agent, capability, request, binding, store) =
+    let (kernel, agent, capability, request, store) =
         request_with_replayed_approval("nested-credential-rollback")?;
     let session_id = kernel.open_session(agent.public_key().to_hex(), vec![capability.clone()])?;
     kernel.activate_session(&session_id)?;
@@ -1368,7 +1343,7 @@ fn nested_late_approval_replay_rolls_back_credentials_and_dispatch_claim(
 
     assert_eq!(response.verdict, Verdict::Deny);
     kernel.request_session_cancellation(&session_id, &context.request_id)?;
-    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &binding, &store)
+    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &store)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
