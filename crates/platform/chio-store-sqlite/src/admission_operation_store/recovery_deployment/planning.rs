@@ -209,8 +209,11 @@ fn data_tenant(
         || profile.native_authority.store_uuid().as_str() != domain.as_str()
         || profile.security_context.as_v1().tenant_id().as_str() != profile.scope.tenant_id.as_str()
         || profile.authority_scope
-            != recovery_authority_scope_digest(profile)
-                .map_err(|_| invariant("recovery planning profile binding refused"))?
+            != recovery_authority_scope_digest(profile).map_err(|error| {
+                invariant(format!(
+                    "recovery planning profile binding refused: {error}"
+                ))
+            })?
         || profile.contract_digest
             != ContractDigest::from_bytes(digest(
                 RecoveryDigestDomain::EffectContract,

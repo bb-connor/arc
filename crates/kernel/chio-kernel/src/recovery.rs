@@ -20,11 +20,11 @@ pub use server::RecoveryToolServerConnection;
 mod vector_test_fixture;
 
 /// Recovery digests use the established canonical encoder and SHA-256 primitive.
+/// A refusal is the canonical encoder's own error.
 pub fn recovery_digest<T: serde::Serialize>(
     domain: chio_core_types::recovery::RecoveryDigestDomain,
     value: &T,
-) -> Result<[u8; 32], crate::KernelError> {
-    let canonical = chio_core_types::canonical::CanonicalBytes::new(value)
-        .map_err(|_| crate::KernelError::DurableAdmission("recovery encoding refused".into()))?;
+) -> Result<[u8; 32], chio_core_types::Error> {
+    let canonical = chio_core_types::canonical::CanonicalBytes::new(value)?;
     Ok(*domain.digest(&canonical).as_bytes())
 }
