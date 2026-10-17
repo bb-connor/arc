@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: 1a8bf6e0398117241555d9888529fea9ee0bf71f3544c9805be3ca41e9f1150d
+// Schema SHA: f420a036c34171ed68c51d1524c76c310f13b7aaec2f9e1ea06f58513db6dafa
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -607,7 +607,7 @@ export namespace Agent_ToolCallRequest {
 // Source: spec/schemas/chio-wire/v1/anchor/batch.schema.json
 export namespace Anchor_Batch {
   /**
-   * W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+   * W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
    */
   export type WitnessState =
     | {
@@ -645,7 +645,7 @@ export namespace Anchor_Batch {
     witness: Witness;
     issuedAt: number;
     signerKey: string;
-    witnessState?: WitnessState;
+    witnessState: WitnessState;
   }
   export interface Inclusion {
     checkpointId: string;

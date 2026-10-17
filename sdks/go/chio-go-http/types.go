@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: ba6e49ffc89dd306628c55ce72fbc3e299b32d51b7899938f29c65477fcaaaf8
+// Schema content SHA-256: 771dc35cb6b4bf636c72067844d26b75ef55bffd010133d4651f56591b1f93a4
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -5484,8 +5484,8 @@ type AnchorBatchBody struct {
 	TreeRoot      string                 `json:"treeRoot"`
 	Witness       AnchorBatchWitness     `json:"witness"`
 
-	// WitnessState W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
-	WitnessState *AnchorBatchWitnessState `json:"witnessState,omitempty"`
+	// WitnessState W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
+	WitnessState AnchorBatchWitnessState `json:"witnessState"`
 }
 
 // AnchorBatchBodySchema defines model for AnchorBatchBody.Schema.
@@ -5522,7 +5522,7 @@ type AnchorBatchWitnessReceipt struct {
 // AnchorBatchWitnessReceiptKind defines model for AnchorBatchWitnessReceipt.Kind.
 type AnchorBatchWitnessReceiptKind string
 
-// AnchorBatchWitnessState W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+// AnchorBatchWitnessState W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
 type AnchorBatchWitnessState struct {
 	union json.RawMessage
 }
