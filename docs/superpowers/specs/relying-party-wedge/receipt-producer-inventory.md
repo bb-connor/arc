@@ -61,29 +61,31 @@ The regex also matches `build_and_sign_receipt(` and `self.sign_receipt(`, so ke
 | Keyring enterprise receipt projection | chio-control-plane:crates/platform/chio-control-plane/src/keyring_runtime.rs:1145 | `ChioReceipt::sign_with_backend` | yes | Security producers: host `Rng` | 4 |
 | Native active-defense evidence receipt | chio-control-plane:crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs:123 | `ChioReceipt::sign_with_backend` | yes (body in scope; `content_hash` is its body digest) | Security producers: host `Rng` | 4 |
 | Response simulation receipt | chio-control-plane:crates/platform/chio-control-plane/src/security/response_simulation.rs:312 | `ChioReceipt::sign_with_backend` | yes (report in scope; `content_hash` is its body hash) | Security producers: host `Rng` | 4 |
-| SCIM deprovision receipt | chio-control-plane:crates/platform/chio-control-plane/src/trust_control/config_and_public.rs:1536 | `ChioReceipt::sign` (Keypair) | yes | no 7.8 row (G3) | 4 |
-| Verified-fix evidence receipts | chio-control-plane:crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:1315 | `ChioReceipt::sign` (Keypair) | no | no 7.8 row (G3) | 4 |
-| HTTP decision receipt (`HttpReceipt`, not `chio.receipt.v1`) | chio-http-core:crates/platform/chio-http-core/src/authority.rs:879 | `self.sign_receipt` -> `HttpReceipt::sign` (authority.rs:1117) | no | no 7.8 row (G3) | 4 |
-| HTTP final receipt (`HttpReceipt`, not `chio.receipt.v1`) | chio-http-core:crates/platform/chio-http-core/src/authority.rs:895 | `self.sign_receipt` -> `HttpReceipt::sign` (authority.rs:1117) | no | no 7.8 row (G3) | 4 |
-| HTTP receipt projection to `ChioReceipt` | chio-http-core:crates/platform/chio-http-core/src/receipt.rs:350 | `ChioReceipt::sign` (Keypair) | yes (projection canonical bytes) | no 7.8 row (G3) | 4 |
+| SCIM deprovision receipt | chio-control-plane:crates/platform/chio-control-plane/src/trust_control/config_and_public.rs:1536 | `ChioReceipt::sign` (Keypair) | yes | Other std processes: OS RNG through the `Rng` seam (G3) | 4 |
+| Verified-fix evidence receipts | chio-control-plane:crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:1315 | `ChioReceipt::sign` (Keypair) | no | Other std processes: OS RNG through the `Rng` seam (G3) | 4 |
+| HTTP decision receipt (`HttpReceipt`, not `chio.receipt.v1`) | chio-http-core:crates/platform/chio-http-core/src/authority.rs:879 | `self.sign_receipt` -> `HttpReceipt::sign` (authority.rs:1117) | no | Other std processes: OS RNG through the `Rng` seam (G3) | 4 (signs `chio.receipt.v1` directly, G4) |
+| HTTP final receipt (`HttpReceipt`, not `chio.receipt.v1`) | chio-http-core:crates/platform/chio-http-core/src/authority.rs:895 | `self.sign_receipt` -> `HttpReceipt::sign` (authority.rs:1117) | no | Other std processes: OS RNG through the `Rng` seam (G3) | 4 (signs `chio.receipt.v1` directly, G4) |
+| HTTP receipt projection to `ChioReceipt` | chio-http-core:crates/platform/chio-http-core/src/receipt.rs:350 | `ChioReceipt::sign` (Keypair) | yes (projection canonical bytes) | Other std processes: OS RNG through the `Rng` seam (G3) | 4 (deleted, G4) |
 | `api protect` sidecar evaluation | chio-api-protect:crates/products/chio-api-protect/src/proxy/sidecar.rs:1133 | `ChioReceipt::sign` (Keypair) | yes | Hosted kernel (`api protect`) | 4 |
-| ACP session update (tool call) | chio-acp-proxy:crates/protocol/chio-acp-proxy/src/interceptor.rs:621 | `self.sign_receipt` -> `sign_acp_receipt` | no (relays the audit entry hash) | no 7.8 row (G3) | 4 |
-| ACP session update (tool call update) | chio-acp-proxy:crates/protocol/chio-acp-proxy/src/interceptor.rs:641 | `self.sign_receipt` -> `sign_acp_receipt` | no (relays the audit entry hash) | no 7.8 row (G3) | 4 |
-| ACP kernel signer | chio-acp-proxy:crates/protocol/chio-acp-proxy/src/kernel_signer.rs:554 | `ChioReceipt::sign` (Keypair) | no (relays `entry.content_hash`) | no 7.8 row (G3) | 4 |
-| OTel span receipt exporter | chio-otel-receipt-exporter:crates/observability/chio-otel-receipt-exporter/src/sink.rs:284 | `ChioReceipt::sign` (Keypair) | yes | no 7.8 row (G3) | 5 |
-| Runtime loopback treaty proof receipt | chio-runtime-harness:crates/kernel/chio-runtime-harness/src/treaty.rs:102 | `ChioReceipt::sign` (Keypair) | yes (synthetic outcome label) | no 7.8 row (G3) | 5 |
-| Proof fixture commerce event receipt | chio-cli:crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs:2071 | `ChioReceipt::sign` (Keypair) | no (copies `event_sha256`) | no 7.8 row (G3) | 5 |
-| Proof fixture settlement anchor reseal | chio-cli:crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs:2955 | `ChioReceipt::sign` (Keypair) | yes | no 7.8 row (G3) | 5 |
-| Proof fixture agent-web re-sign | chio-cli:crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs:151 | `ChioReceipt::sign` (Keypair) | no (copies a recorded hash) | no 7.8 row (G3) | 5 |
+| ACP session update (tool call) | chio-acp-proxy:crates/protocol/chio-acp-proxy/src/interceptor.rs:621 | `self.sign_receipt` -> `sign_acp_receipt` | no (relays the audit entry hash) | Other std processes: OS RNG through the `Rng` seam (G3) | 4 |
+| ACP session update (tool call update) | chio-acp-proxy:crates/protocol/chio-acp-proxy/src/interceptor.rs:641 | `self.sign_receipt` -> `sign_acp_receipt` | no (relays the audit entry hash) | Other std processes: OS RNG through the `Rng` seam (G3) | 4 |
+| ACP kernel signer | chio-acp-proxy:crates/protocol/chio-acp-proxy/src/kernel_signer.rs:554 | `ChioReceipt::sign` (Keypair) | no (relays `entry.content_hash`) | Other std processes: OS RNG through the `Rng` seam (G3) | 4 |
+| OTel span receipt exporter | chio-otel-receipt-exporter:crates/observability/chio-otel-receipt-exporter/src/sink.rs:284 | `ChioReceipt::sign` (Keypair) | yes | Other std processes: OS RNG through the `Rng` seam (G3) | 5 |
+| Runtime loopback treaty proof receipt | chio-runtime-harness:crates/kernel/chio-runtime-harness/src/treaty.rs:102 | `ChioReceipt::sign` (Keypair) | yes (synthetic outcome label) | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
+| Proof fixture commerce event receipt | chio-cli:crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs:2071 | `ChioReceipt::sign` (Keypair) | no (copies `event_sha256`) | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
+| Proof fixture settlement anchor reseal | chio-cli:crates/products/chio-cli/src/cli/dispatch/proof/fixture.rs:2955 | `ChioReceipt::sign` (Keypair) | yes | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
+| Proof fixture agent-web re-sign | chio-cli:crates/products/chio-cli/src/cli/dispatch/proof/fixture_agent_web.rs:151 | `ChioReceipt::sign` (Keypair) | no (copies a recorded hash) | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
 | `chio run` call evidence export | chio-cli:crates/products/chio-cli/src/cli/process_host/call_evidence/export.rs:212 | `ChioReceipt::sign` (Keypair) | yes | Hosted kernel (`chio run`) | 5 |
 | `chio run` call outcomes export | chio-cli:crates/products/chio-cli/src/cli/process_host/call_evidence/outcomes_export.rs:106 | `ChioReceipt::sign` (Keypair) | yes | Hosted kernel (`chio run`) | 5 |
 | `chio run` run evidence export | chio-cli:crates/products/chio-cli/src/cli/process_host/run_evidence/export.rs:197 | `ChioReceipt::sign` (Keypair) | yes | Hosted kernel (`chio run`) | 5 |
 | `chio run` swarm bootstrap | chio-cli:crates/products/chio-cli/src/cli/process_host/swarm/requests.rs:30 | `ChioReceipt::sign` (Keypair) | yes | Hosted kernel (`chio run`) | 5 |
-| Mercury step receipt | chio-mercury:crates/products/chio-mercury/src/commands/shared/builders.rs:102 | `ChioReceipt::sign` (Keypair) | yes | no 7.8 row (G3) | 5 |
-| Wall receipt | chio-wall:crates/products/chio-wall/src/commands.rs:420 | `ChioReceipt::sign` (Keypair) | yes | no 7.8 row (G3) | 5 |
-| Native conformance suite receipt | chio-conformance:crates/tooling/chio-conformance/src/native_suite.rs:1720 | `ChioReceipt::sign` (Keypair) | yes (fixed literal) | no 7.8 row (G3) | 5 |
-| Attest loopback issuance request | chio-attest-loopback:crates/trust/chio-attest-loopback/src/lib.rs:458 | `ChioReceipt::sign` (Keypair) | yes (vendor output label) | no 7.8 row (G3) | 5 |
-| Attest loopback proof package | chio-attest-loopback:crates/trust/chio-attest-loopback/src/package.rs:54 | `ChioReceipt::sign` (Keypair) | yes (vendor output label) | no 7.8 row (G3) | 5 |
+| Mercury step receipt | chio-mercury:crates/products/chio-mercury/src/commands/shared/builders.rs:102 | `ChioReceipt::sign` (Keypair) | yes | Other std processes: OS RNG through the `Rng` seam (G3) | 5 |
+| Wall receipt | chio-wall:crates/products/chio-wall/src/commands.rs:420 | `ChioReceipt::sign` (Keypair) | yes | Other std processes: OS RNG through the `Rng` seam (G3) | 5 |
+| Native conformance suite receipt | chio-conformance:crates/tooling/chio-conformance/src/native_suite.rs:1720 | `ChioReceipt::sign` (Keypair) | yes (fixed literal) | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
+| Attest loopback issuance request | chio-attest-loopback:crates/trust/chio-attest-loopback/src/lib.rs:458 | `ChioReceipt::sign` (Keypair) | yes (vendor output label) | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
+| Attest loopback proof package | chio-attest-loopback:crates/trust/chio-attest-loopback/src/package.rs:54 | `ChioReceipt::sign` (Keypair) | yes (vendor output label) | Harness and fixture: seeded `Rng`, fixture material (G3) | 5 |
+
+Producers marked "no" in the preimage column receive the preimage over their existing channel in M1 item 2; no signing path accepts a caller-supplied hash (spec 2.5 G3). Fixture producers that copy a recorded hash are regenerated from the recorded preimage.
 
 ## Receipt producers outside the first grep
 
@@ -136,7 +138,7 @@ One row per signed canonical-JSON artifact type reached through `Keypair::sign_c
 | `GovernedApprovalToken` | `Keypair::sign_canonical` at crates/core/chio-core-types/src/capability/governance.rs:1364 | `chio.governed-approval-token.v1` | assign (new) |
 | `ThresholdApprovalProposal` | `Keypair::sign_canonical` at crates/core/chio-core-types/src/capability/governance.rs:1667 | `chio.threshold-approval-proposal.v1` | yes |
 | `SignedDeclassificationGrant` | `sign_bytes_with_identity` over domain-prefixed canonical bytes at crates/core/chio-core-types/src/declassification.rs:47 | `chio.declassification-grant.v1` | yes |
-| `ToolManifest` (chio-core-types) | `Keypair::sign_canonical` at crates/core/chio-core-types/src/manifest.rs:75 | `chio.core-tool-manifest.v1` | assign (new; see G9) |
+| `ToolManifest` (chio-core-types) | `Keypair::sign_canonical` at crates/core/chio-core-types/src/manifest.rs:75 | none: type deleted in M1 item 1, `chio.manifest.v1` is the one signed manifest | deleted (G9) |
 | `ChioReceipt` | `Keypair::sign_canonical` at crates/core/chio-core-types/src/receipt/body.rs:296, body.rs:390, body.rs:417; `sign_canonical_with_backend_for_identity` at body.rs:310; `sign_shared_canonical_with_backend` at crates/kernel/chio-kernel/src/receipt_support/signing.rs:330 | `chio.receipt.v1` | yes |
 | `ChildRequestReceipt` | `Keypair::sign_canonical` at crates/core/chio-core-types/src/receipt/lineage.rs:129 | `chio.child-request-receipt.v1` | assign (new) |
 | `ReceiptLineageStatement` | `Keypair::sign_canonical` at crates/core/chio-core-types/src/receipt/lineage.rs:356 | `chio.receipt_lineage_statement.v1` | yes |
@@ -157,7 +159,7 @@ One row per signed canonical-JSON artifact type reached through `Keypair::sign_c
 | `SignedAuthorityTransition` | `Keypair::sign_canonical` at crates/kernel/chio-kernel/src/authority/replication.rs:225 | `chio.authority-lifecycle.v1` | assign (existing member) |
 | `SignedAuthoritySnapshot` | `Keypair::sign_canonical` at crates/kernel/chio-kernel/src/authority/replication.rs:317 | `chio.authority-snapshot.v1` | assign (existing member) |
 | `SessionComplianceCertificate` | `sign_canonical_with_backend` at crates/kernel/chio-kernel/src/compliance_certificate.rs:159 | `chio.session-compliance-certificate.v1` | assign (new) |
-| `DpopProof` (Chio DPoP) | `sign_canonical_with_backend` at crates/kernel/chio-kernel/src/dpop.rs:148; `Keypair::sign` over canonical bytes at dpop.rs:135 | `chio.dpop_proof.v1` | yes (the registry also lists `chio.dpop_proof.v2` until #1489 lands; see G10) |
+| `DpopProof` (Chio DPoP) | `sign_canonical_with_backend` at crates/kernel/chio-kernel/src/dpop.rs:148; `Keypair::sign` over canonical bytes at dpop.rs:135 | `chio.dpop_proof.v1` | yes (`chio.dpop_proof.v2` is removed after #1489 in the parallel lead's lane; see G10) |
 | `SignedExecutionNonce` | `Keypair::sign_canonical` at crates/kernel/chio-kernel/src/execution_nonce.rs:152; `Keypair::sign` over canonical bytes at crates/platform/chio-control-plane/src/trust_control/finding_verified_fix.rs:1377 | `chio.execution_nonce.v1` | assign (existing member) |
 | `ActiveResponseSubmissionProof` | `sign_bytes_for_identity` over domain-prefixed canonical bytes at crates/kernel/chio-kernel/src/kernel/active_response_admission.rs:100 | `chio.active-response-submission.v1` | assign (existing member) |
 | `ActiveResponseArtifactAuthorityAttestation` | `sign_bytes_for_identity` over domain-prefixed canonical bytes at crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs:144 | `chio.active-response-artifact-authority-attestation.v1` | assign (existing member) |
@@ -173,7 +175,7 @@ One row per signed canonical-JSON artifact type reached through `Keypair::sign_c
 | `FederationPolicyDocument` | `Keypair::sign_canonical` at crates/platform/chio-control-plane/src/evidence_export.rs:971 | `chio.federation-policy.v1` | assign (existing const) |
 | `SignedActiveResponseAuthorityRequest` | `sign_bytes_for_identity` over domain-prefixed canonical bytes at crates/platform/chio-control-plane/src/security/active_response_authority/client.rs:197 | `chio.active-response-policy-authority-request.v1` | assign (new; see G6) |
 | `SignedActiveResponseAuthorityResponse` | `sign_bytes_for_identity` over domain-prefixed canonical bytes at crates/platform/chio-control-plane/src/security/active_response_authority/protocol.rs:298 | `chio.active-response-policy-authority-response.v1` | assign (new; see G6) |
-| `HttpReceipt` | `Keypair::sign_canonical` at crates/platform/chio-http-core/src/receipt.rs:193 | `chio.http-receipt.v1` | assign (new; see G4) |
+| `HttpReceipt` | `Keypair::sign_canonical` at crates/platform/chio-http-core/src/receipt.rs:193 | none: type deleted in M1 item 2, HTTP calls sign `chio.receipt.v1` | deleted (G4) |
 | `SignedManifest` (chio-manifest `ToolManifest`) | `Keypair::sign_canonical` at crates/platform/chio-manifest/src/lib_parts/part_01.inc:575 | `chio.manifest.v1` | yes |
 | `SignedBudgetSnapshotAnchorCommitment` | `Keypair::sign_canonical` at crates/platform/chio-store-sqlite/src/authority.rs:293 | `chio.budget-snapshot-anchor-commitment.v1` | assign (existing literal) |
 | `EnterpriseMigrationTransition` | `Keypair::sign_canonical` at crates/platform/chio-store-sqlite/src/enterprise_migration_state.rs:265 | `chio.enterprise-migration-transition.v1` | assign (existing `signature_domain` value) |
@@ -189,7 +191,7 @@ One row per signed canonical-JSON artifact type reached through `Keypair::sign_c
 | Session credential row | `Keypair::sign_canonical` at crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs:329 | `chio.mcp.session-credential.v1` | assign (existing const) |
 | Session credential call row | `Keypair::sign_canonical` at crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials.rs:612 | `chio.mcp.session-credential-call.v1` | assign (existing literal) |
 | `SignedProvenance` | `sign_canonical_with_backend` at crates/protocol/chio-tool-call-fabric/src/provenance.rs:95 | `chio.provenance-stamp.v1` | assign (new) |
-| SDK JSON signer (`sign_json_str_ed25519`) | `Keypair::sign_canonical` at crates/sdk/chio-binding-helpers/src/signing.rs:59 | supplied by the caller | assign (API gains a schema id argument; see G7) |
+| SDK JSON signer (`sign_json_str_ed25519`) | `Keypair::sign_canonical` at crates/sdk/chio-binding-helpers/src/signing.rs:59 | supplied by the caller, must be registered | none of its own (API gains a schema id argument; see G7) |
 | `SignedWatermarkEnvelope` | `sign_bytes` over domain-prefixed canonical bytes at crates/security/chio-decoy/src/watermark.rs:331 | `chio.signed-watermark-envelope.v1` | assign (existing envelope const) |
 | `SignedKeyLogCheckpoint` | `sign_bytes_with_identity` over domain-prefixed canonical bytes at crates/security/chio-keyring/src/checkpoint.rs:203 | `chio.key-log.checkpoint.v1` | yes |
 | `SignedKeyActivationCommit` | `sign_bytes_with_identity` over domain-prefixed canonical bytes at crates/security/chio-keyring/src/checkpoint.rs:345 | `chio.key-log.activation-commit.v1` | yes |
@@ -247,55 +249,69 @@ Helpers and forwarders that carry no artifact type of their own (the wrapper is 
 
 Test-only sites under `src/` excluded from the table: crates/products/chio-cli/src/cli/chio/dispatch/pheromone/iroh_mount.rs:1665,1725,1783,2092,2510 (inside `mod tests` at line 1295) and crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_evidence_test_support.rs:176,348 (module gated `#[cfg(test)]`).
 
-Signing-bytes forms at the inventoried commit (input to G5): plain canonical JSON for most rows; a byte prefix ending in NUL before canonical JSON for chio-keyring, chio-decoy, `SignedDeclassificationGrant`, `SignedSecurityEvent`, the recovery macro, `SignedAdmissionTerminalProjectionV1`, the two kernel active-response artifacts, `SignedBrokerAuditRunnerAuthorization` and `DkgPackage`; canonical JSON of a `{domain, body}` object for the other chio-secret-broker rows and the control-plane active-response authority request and response; canonical JSON of a `(DOMAIN, signer, body)` tuple for chio-workflow `Signed<T>`.
+Signing-bytes forms at the inventoried commit (input to G5; spec 2.5 drops every prefix below and keeps the `signer` member of the workflow tuple inside the canonical body): plain canonical JSON for most rows; a byte prefix ending in NUL before canonical JSON for chio-keyring, chio-decoy, `SignedDeclassificationGrant`, `SignedSecurityEvent`, the recovery macro, `SignedAdmissionTerminalProjectionV1`, the two kernel active-response artifacts, `SignedBrokerAuditRunnerAuthorization` and `DkgPackage`; canonical JSON of a `{domain, body}` object for the other chio-secret-broker rows and the control-plane active-response authority request and response; canonical JSON of a `(DOMAIN, signer, body)` tuple for chio-workflow `Signed<T>`.
 
 ### Signing sites outside the named helpers
 
-Non-test `Keypair::sign` and `SigningBackend::sign_bytes` calls that are not reached through the helpers above. They are not resolved to artifact types here (see G2). Bytes are named as written at the call site.
+Non-test `Keypair::sign` and `SigningBackend::sign_bytes` calls that are not reached through the helpers above. Bytes are named as written at the call site. The resolution column applies spec 2.5 G2: every site signs the wrapper unless its bytes are an exempt external format. Where the column says "per naming rule", M1 item 1 takes the id from the signed type in this order: its existing schema member or constant; else its existing signature-domain string without the NUL when it already has the `chio.<area>.<payload>.v<N>` shape; else `chio.<kebab-case type name without a Signed prefix>.v1`. "unreg." marks an id M1 item 1 registers (G11).
 
-| file:line | signed bytes at the call site |
-|---|---|
-| crates/core/chio-core-types/src/capability/aggregate_invocation.rs:121 | `domain_message(ROOT_SIGNATURE_DOMAIN, &body)` |
-| crates/core/chio-core-types/src/capability/cumulative_approval.rs:124 | `domain_message(ROOT_SIGNATURE_DOMAIN, &body)` |
-| crates/core/chio-core-types/src/economic_continuity.rs:910 | `self.signing_bytes()` |
-| crates/core/chio-core-types/src/economic_continuity/anchor.rs:256, anchor.rs:1055 | `signing_bytes()` |
-| crates/economy/chio-anchor/src/witness/rekor.rs:941 | Rekor envelope (P-256, external format) |
-| crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs:78 | `bytes` |
-| crates/kernel/chio-kernel/src/caller_delivery.rs:143, caller_delivery.rs:243 | `bytes`; `bounded_canonical(&body, MAX_REPORT_BYTES)` |
-| crates/kernel/chio-kernel/src/checkpoint/builders.rs:213 | `body_bytes` (kernel checkpoint) |
-| crates/kernel/chio-kernel/src/stop/config.rs:155, config.rs:285 | `approval_message(config_digest)`; `message` |
-| crates/kernel/chio-kernel/src/tool_outcome/release/terminal.rs:255 | `body.signing_bytes()` |
-| crates/platform/chio-control-plane/src/fiscal_runtime_readiness.rs:133 | `.sign(policy, anchor_key)` |
-| crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs:134 | `RECEIPT_READINESS_DOMAIN` (fixed readiness probe) |
-| crates/platform/chio-control-plane/src/security/response_simulation.rs:234 | `b"chio.response-simulation.readiness.v1\0"` (fixed readiness probe) |
-| crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs:850 | `ask_digest.as_bytes()` |
-| crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs:535 | `challenge` |
-| crates/platform/chio-store-sqlite/src/fiscal_store.rs:432 | `.sign(proposal, current_charter, signer)` |
-| crates/products/chio-cli/src/cli/dispatch/proof/collect.rs:1267, crates/products/chio-cli/src/cli/dispatch/proof/export.rs:721 | `signed_payload` |
-| crates/products/chio-cli/src/guards/sign.rs:53 | `message` |
-| crates/protocol/chio-acp-proxy/src/compliance.rs:514 | `body_bytes` |
-| crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs:36 | JWS signing input (local AS; exempt per spec 7.0) |
-| crates/sdk/chio-binding-helpers/src/signing.rs:39 | UTF-8 message from the caller |
-| crates/security/chio-keyring/src/router.rs:292 | `canonical` |
-| crates/trust/chio-credentials/src/oid4vp.rs:1079, crates/trust/chio-credentials/src/portable_sd_jwt.rs:378 | JWS signing input (exempt per spec 7.0) |
-| crates/trust/chio-disclosure-lineage/src/verifier.rs:144 | `digest.as_bytes()` |
-| crates/trust/chio-federation-authority/src/frost_ceremony/sealing.rs:322 | `sealed.signing_bytes()` |
-| crates/trust/chio-federation/src/bilateral.rs:223, crates/trust/chio-federation/src/bilateral_dsse/sign.rs:69,72,136,139,227, crates/trust/chio-federation/src/bilateral_dsse/typestate_handlers.rs:94, crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs:757 | DSSE PAE bytes |
-| crates/trust/chio-federation/src/trust_establishment.rs:396 | `bytes` |
-| crates/trust/chio-revocation-oracle/src/signer.rs:166 | `message` |
-| crates/trust/chio-tee/src/capture.rs:182 | `payload` |
+| file:line | signed bytes at the call site | resolution (spec 2.5 G2) |
+|---|---|---|
+| crates/core/chio-core-types/src/capability/aggregate_invocation.rs:121 | `domain_message(ROOT_SIGNATURE_DOMAIN, &body)` | `chio.aggregate-budget-root.v1` |
+| crates/core/chio-core-types/src/capability/cumulative_approval.rs:124 | `domain_message(ROOT_SIGNATURE_DOMAIN, &body)` | `chio.cumulative-approval-root.v1` |
+| crates/core/chio-core-types/src/economic_continuity.rs:910 | `self.signing_bytes()` | `chio.economy.state-batch.v1` |
+| crates/core/chio-core-types/src/economic_continuity/anchor.rs:256, anchor.rs:1055 | `signing_bytes()` | `chio.economy.anchor-view.v1`; `chio.economy.effect-dispatch-commit.v1` |
+| crates/economy/chio-anchor/src/witness/rekor.rs:941 | Rekor envelope (P-256, external format) | exempt (Sigstore Rekor) |
+| crates/kernel/chio-kernel/src/admission_operation/execution_nonce/profile.rs:78 | `bytes` | `chio.operation_execution_nonce.v1` (unreg.) |
+| crates/kernel/chio-kernel/src/caller_delivery.rs:143, caller_delivery.rs:243 | `bytes`; `bounded_canonical(&body, MAX_REPORT_BYTES)` | `chio.caller-dispatch-authorization.v1`; `chio.caller-delivery-report.v1` |
+| crates/kernel/chio-kernel/src/checkpoint/builders.rs:213 | `body_bytes` (kernel checkpoint) | `chio.checkpoint_statement.v1` (unreg.) |
+| crates/kernel/chio-kernel/src/stop/config.rs:155, config.rs:285 | `approval_message(config_digest)`; `message` | `chio.stop-operator-config-approval.v1` over the approval object without its signature; `chio.stop-operator-config.v1` (both unreg.) |
+| crates/kernel/chio-kernel/src/tool_outcome/release/terminal.rs:255 | `body.signing_bytes()` | the existing `CHANNEL_TERMINAL_OUTCOME_COMMITMENT_SCHEMA` id |
+| crates/platform/chio-control-plane/src/fiscal_runtime_readiness.rs:133 | `.sign(policy, anchor_key)` | per naming rule (fiscal runtime readiness) |
+| crates/platform/chio-control-plane/src/security/adapters/native_evidence.rs:134 | `RECEIPT_READINESS_DOMAIN` (fixed readiness probe) | `chio.signer-readiness-probe.v1` (unreg.) over `{"probe": "native_security_receipt", "schema": ...}` |
+| crates/platform/chio-control-plane/src/security/response_simulation.rs:234 | `b"chio.response-simulation.readiness.v1\0"` (fixed readiness probe) | `chio.signer-readiness-probe.v1` over `{"probe": "response_simulation", "schema": ...}` |
+| crates/platform/chio-control-plane/src/trust_control/finding_operator_purchase.rs:850 | `ask_digest.as_bytes()` | wrapper over the ask body that `ask_digest` is computed from; per naming rule |
+| crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs:535 | `challenge` | `chio.finding-pool.store-identity-proof.v1` (unreg.) over a canonical challenge object |
+| crates/platform/chio-store-sqlite/src/fiscal_store.rs:432 | `.sign(proposal, current_charter, signer)` | per naming rule (fiscal proposal admission) |
+| crates/products/chio-cli/src/cli/dispatch/proof/collect.rs:1267, crates/products/chio-cli/src/cli/dispatch/proof/export.rs:721 | `signed_payload` | exempt (DSSE PAE, proof-room bundle) |
+| crates/products/chio-cli/src/guards/sign.rs:53 | `message` | per naming rule over a canonical module statement replacing the newline-joined `chio-wasm-guard-v1` message; the verifier in chio-wasm-guards changes with it |
+| crates/protocol/chio-acp-proxy/src/compliance.rs:514 | `body_bytes` | `chio.compliance.certificate.v1` (unreg.) |
+| crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/helpers.rs:36 | JWS signing input (local AS; exempt per spec 7.0) | exempt (JWS) |
+| crates/sdk/chio-binding-helpers/src/signing.rs:39 | UTF-8 message from the caller | deleted with `sign_utf8_message_ed25519` (G7) |
+| crates/security/chio-keyring/src/router.rs:292 | `canonical` | the schema id of the artifact passed in (the router takes it as an argument) |
+| crates/trust/chio-credentials/src/oid4vp.rs:1079, crates/trust/chio-credentials/src/portable_sd_jwt.rs:378 | JWS signing input (exempt per spec 7.0) | exempt (JWS) |
+| crates/trust/chio-disclosure-lineage/src/verifier.rs:144 | `digest.as_bytes()` | wrapper over the lineage subgraph body instead of its digest; per naming rule |
+| crates/trust/chio-federation-authority/src/frost_ceremony/sealing.rs:322 | `sealed.signing_bytes()` | per naming rule (sealed DKG share) |
+| crates/trust/chio-federation/src/bilateral.rs:223, crates/trust/chio-federation/src/bilateral_dsse/sign.rs:69,72,136,139,227, crates/trust/chio-federation/src/bilateral_dsse/typestate_handlers.rs:94, crates/trust/chio-federation-transport-iroh/src/lanes/bilateral.rs:757 | DSSE PAE bytes | exempt (DSSE PAE) |
+| crates/trust/chio-federation/src/trust_establishment.rs:396 | `bytes` | `chio.federation-kernel-handshake.v1` (unreg.) |
+| crates/trust/chio-revocation-oracle/src/signer.rs:166 | `message` | per naming rule (epoch root); the `chio-revocation-oracle:v1:epoch-root` prefix is dropped |
+| crates/trust/chio-tee/src/capture.rs:182 | `payload` | per naming rule (capture frame) |
 
 ## Spec gaps found
 
+Each gap below is decided in spec section 2.5 (Decided 2026-10-17, coordinator call; founder may override). The one-line decision follows each gap.
+
 - G1. Spec 13.3 step 2 says committed receipts land "producer by producer in the M0 inventory order, with the format change itself in one PR". `ChioReceiptBody` and `ToolCallAction` are single structs used by all 54 call sites, so changing the fields breaks every producer at compile time. Producer-by-producer PRs are possible only after the format PR, and only for behavior that does not change the struct. This inventory therefore reads "commit order" as commit groups inside the one item 2 PR.
+  Decided: one squash-merged PR, commit groups as above, each producer's salt-source wiring in its own commit.
 - G2. Spec 7.0 covers "every Chio signature over a canonical-JSON body", but the plan's Task 2 helper list (`sign_canonical_with_backend*`, `sign_shared_canonical_with_backend`, `sign_canonical_bytes`, `sign_bytes_with_identity`, `Keypair` canonical signing) misses raw `Keypair::sign` and `sign_bytes` over canonical or domain-prefixed bytes, including the kernel checkpoint (crates/kernel/chio-kernel/src/checkpoint/builders.rs:213), which spec 7.0 names. Those sites are listed under "Signing sites outside the named helpers". M1 item 1 has to resolve each to an artifact type and an id. The spec also does not say whether DSSE PAE signatures (chio-federation bilateral), detached digest or challenge signatures, and fixed readiness probes are exempt like JWS or must be wrapped.
+  Decided: wrap every signature over Chio-defined bytes; exempt only JWS, DSSE PAE, Sigstore Rekor and RFC 9421 HTTP message signatures; readiness probes use `chio.signer-readiness-probe.v1`; the raw-site table above carries each resolution.
 - G3. The spec 7.8 salt-source table has no row for these producers: chio-acp-proxy, chio-http-core, chio-otel-receipt-exporter, chio-mercury, chio-wall, chio-runtime-harness, chio-conformance native suite, chio-attest-loopback, the `chio proof fixture` generators, and the trust-control SCIM and verified-fix receipts. Each needs a salt source, or a decision that it is deleted or becomes a test fixture.
+  Decided: salts come from the signing process's `Rng` seam (OS RNG in std processes, seeded `Rng` in harness and fixture producers); hash-only producers receive the preimage.
 - G4. `HttpReceipt` (crates/platform/chio-http-core/src/receipt.rs:190) is a separate signed artifact. It carries `content_hash` and `redaction_mode` and has no schema id. Spec 7.6 changes `chio.receipt.v1` "protocol-wide" but does not say whether `HttpReceipt` changes the same way or is deleted in favor of its `ChioReceipt` projection (receipt.rs:350). The ACP proxy and SCIM paths have the same problem: they relay or compute hashes without the preimage the committed format needs.
+  Decided: `HttpReceipt` is a receipt and is deleted; HTTP calls sign `chio.receipt.v1` directly with the request as parameter preimage and the response as content preimage.
 - G5. Spec 7.0 says `canonical_body` is "exactly the bytes signed today". For the domain-prefixed rows (byte prefix, `{domain, body}` object or `(DOMAIN, signer, body)` tuple), the bytes signed today are not canonical JSON of the artifact body. The spec has to choose: keep each legacy prefix inside the wrapped body, or drop the prefixes and let the wrapper's schema id carry separation. "No legacy" points to dropping them, but the spec does not say so.
+  Decided: drop every signature prefix; the wrapper's schema id is the only signature domain; the workflow tuple's `signer` stays in the canonical body.
 - G6. Two request and response pairs share one `schema` member value and are separated today only by their domain strings: the control-plane active-response authority (`chio.active-response-policy-authority.v1`) and the secret-broker authority RPC (`chio.broker-authority-rpc.v1`, unregistered, while the registry already lists `chio.broker-authority-request.v1` and `chio.broker-authority-response.v1` at registry.json:2510,2517). If G5 drops the prefixes, the wrapper needs distinct ids for request and response. The table uses the registered broker ids and assigns `chio.active-response-policy-authority-request.v1` and `...-response.v1`. The four `SignedKeyLogEvent` authorization roles sign the same body under one id; that is safe only if the role is a member of the signed body.
+  Decided: request and response get distinct ids (registered broker ids; new active-response authority ids); `schema` members change to match; the four key-log roles keep `chio.key-log.event.v1`.
 - G7. `chio-binding-helpers` `sign_json_str_ed25519` (signing.rs:59) signs arbitrary caller JSON for the FFI and SDK bindings. Under the wrapper it needs a schema id argument, and verifiers on the other side must agree on it. The spec does not cover generic SDK signing.
+  Decided: the generic signer takes a registered schema id; the raw UTF-8 signer is deleted.
 - G8. The registry lists both `chio.security-event-body.v1` and `chio.signed-security-event.v1` for one signature. Spec 7.0 says "the artifact's registered schema id", which is ambiguous here. The table uses the signed-artifact id, following the `chio.receipt.v1` precedent.
+  Decided: `chio.signed-security-event.v1`; M0 PR 4 removes the `chio.security-event-body.v1` registry row.
 - G9. Two different `ToolManifest` types are signed: chio-core-types (no schema id, manifest.rs:75) and chio-manifest (`chio.manifest.v1`, part_01.inc:575). The table assigns the core type its own id. Collapsing the two types would follow the no-dual-API rule better than registering a second id.
+  Decided: delete the core-types `ToolManifest`; `chio.manifest.v1` is the one signed manifest.
 - G10. The registry still lists `chio.dpop_proof.v2` beside `chio.dpop_proof.v1` (registry.json:2712,2718). #1489 is open at the inventoried commit, so the DPoP row uses `chio.dpop_proof.v1` and must be rechecked when #1489 lands.
+  Decided: `chio.dpop_proof.v1`; the v2 removal follows #1489 in the parallel lead's lane.
 - G11. 37 rows of the wrapper table carry a schema id that is not in `registry.json` (35 outside the proof fixtures), and 13 rows get a new id: 11 artifact types that carry no id at all, plus the two active-response authority messages that share one (G6). Spec 7 says new signed ids are registered; it does not say that existing unregistered ids are registered before the wrapper lands. The wrapper cannot bind an unregistered id.
+  Decided: register every missing id with its Rust type and schema in M1 item 1, in the wrapper PR, not in M0.
 - G12. The verdict-matrix reason codes proposed in plan Task 3 use URN domains (`root-exchange`, `root-anchor`, `root-policy`, `receipt`, `export`) that are not among the 20 domains in `spec/errors/registry.yaml`. Revocation-store failures report the non-URN code `CHIO-KERNEL-REVOCATION-STORE` (crates/kernel/chio-kernel/src/kernel/error.rs:788), so no "existing revocation-store error code" URN exists. See `verdict-matrix/README.md`.
+  Decided: no new domain; codes move into `transport`, `capability`, `policy` and `attest`; `CHIO-KERNEL-REVOCATION-STORE` becomes `urn:chio:error:kernel:revocation-store` in M1 item 5.

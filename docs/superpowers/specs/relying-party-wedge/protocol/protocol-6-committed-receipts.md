@@ -140,10 +140,22 @@ An unsigned, self-verifying opening:
 | Mobile (`chio-kernel-mobile`) | OS RNG |
 | C ABI (`chio-cpp-kernel-ffi`) | OS RNG inside the library |
 | Security producers (cage, secret broker and other `chio.receipt.v1` emitters) | host `Rng` passed into their signing path |
+| Other std processes (control plane, HTTP authority, ACP proxy, OpenTelemetry receipt exporter, product CLIs) | OS RNG through the `Rng` seam |
+| Harness, conformance and fixture generators | a seeded deterministic `Rng` through the same seam; their output is fixture material only |
+
+A producer draws salts from the `Rng` seam of the process that signs.
 
 FFI and WASM adapters pass the unsigned body plus the parameter and content
 preimages, and the core computes commitments and salts. No adapter supplies a
-content hash or commitment for the core to sign.
+content hash or commitment for the core to sign. The same holds for every
+producer: no signing path accepts a caller-supplied hash or commitment, so a
+producer that relays a call passes its preimages to the signer.
+
+HTTP calls mediated by the HTTP authority sign `chio.receipt.v1` like every
+other producer: `tool_server` is `http`, `tool_name` is the method and route
+pattern, the canonical HTTP request is the parameter preimage, and the
+response status with the response body is the content preimage. There is no
+separate HTTP receipt artifact.
 
 #### Export profiles
 

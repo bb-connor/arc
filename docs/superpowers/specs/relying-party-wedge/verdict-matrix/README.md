@@ -1,6 +1,6 @@
 # Staged verdict-matrix scenarios: anchored_root, receipt_disclosure, revocation_local
 
-Planning material for the relying-party wedge (spec section 11.3, section 12 M0 exit "scenario files written (expected to fail)"). These 36 files are staged, not executed. The live corpus under `crates/tooling/chio-conformance/verdict_matrix/scenarios/` cannot hold them yet: `ScenarioCategory` (`crates/tooling/chio-conformance/verdict_matrix/src/lib.rs:49`) is a closed enum, `manifest.toml` pins the scenario count, per-category counts and the index hash, and no driver implements `rust-mcp-serve-http`. "Expected to fail" therefore means: staged here, and failing until the M1 code that implements each behavior lands.
+Planning material for the relying-party wedge (spec section 11.3, section 12 M0 exit "scenario files written (expected to fail)"). These 40 files (16 `anchored_root`, 12 `receipt_disclosure`, 12 `revocation_local`) are staged, not executed. The live corpus under `crates/tooling/chio-conformance/verdict_matrix/scenarios/` cannot hold them yet: `ScenarioCategory` (`crates/tooling/chio-conformance/verdict_matrix/src/lib.rs:49`) is a closed enum, `manifest.toml` pins the scenario count, per-category counts and the index hash, and no driver implements `rust-mcp-serve-http`. "Expected to fail" therefore means: staged here, and failing until the M1 code that implements each behavior lands.
 
 ## File shape
 
@@ -31,6 +31,7 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 |---|---|
 | `serve_http_edge` | One `serve-http` process with a fresh state directory, durable admission on, and the local AS enabled. |
 | `root_policy` | A signed `chio.root-policy.v1` with one rule per M1 anchor kind (`oauth_id_jag`, `oidc_jwt`, `oauth_introspection`, `chio_local_as`, `chio_operator_key`, `operator_static_bearer`, `entra_jwt`), `disclosure.default = "committed"`, no `tools` map, `ceiling_scope` granting `tool:read`, `capability_ttl_secs = 300`, `max_clock_skew_secs = 30`. Its `policy_key` equals the configured `--root-policy-key`. |
+| `root_policy_entra_issuer_on_oidc_jwt` | `root_policy` plus one `oidc_jwt` rule whose `issuer` is a tenant-specific Microsoft Entra issuer. |
 | `root_policy_inline_tools` | `root_policy` plus `disclosure.tools` naming `files/read` with empty `inline_fields` lists. |
 | `root_policy_inline_pointer` | `root_policy` plus `disclosure.tools.files/read.parameters.inline_fields = ["/path"]`. |
 | `tenant_index_key` | A 32-byte tenant index key file (`0x14 * 32`), fixture material only. |
@@ -64,6 +65,9 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 | `omit_client_assertion` | Sends the `jwt-bearer` request from `public_client` with no client assertion. |
 | `replay_id_jag_jti` | Exchanges one ID-JAG successfully, then presents a second ID-JAG with the same `(issuer, jti)`. |
 | `second_token_same_uti` | After one Entra token is exchanged, presents a different Entra token whose `uti` equals the first token's. |
+| `multi_tenant_issuer` | Presents an Entra token from `idp_stub_jwks` whose `iss` is the multi-tenant `organizations` issuer. |
+| `reuse_token_after_root_expiry` | Calls once with the Entra token, advances the injected clock past the root's `expires_at` (the token's `exp` is still in the future), then calls again with the same token. |
+| `root_signed_by_unlisted_key` | Mints a root with a well-formed `root_anchor`, signed by a key that is not in the root policy's `exchange_keys`, and presents it at the edge. |
 | `strip_root_anchor` | Mints a root with `exchange_key` that carries no `root_anchor` and presents it at the edge. |
 | `root_expires_after_assertion_exp` | Mints a root with `exchange_key` whose `expires_at` is one second past `root_anchor.assertion_exp`. |
 | `request_scope_outside_root` | Calls a tool needing `tool:write` under a root that grants only `tool:read`. |
@@ -95,22 +99,25 @@ Codes taken from the live corpus:
 | `urn:chio:error:capability:scope-exceeded` | `receipt-disclosure-002` | `verdict_matrix/scenarios/capability_subset/` |
 | `urn:chio:error:capability:revoked` | revocation denies | `verdict_matrix/scenarios/revocation_propagation/` |
 
-Proposed codes, registered in `spec/errors/registry.yaml` by the M1 PR that implements each behavior:
+Codes for the new behavior, in existing error domains (spec section 2.5, G12). Each is registered in `spec/errors/registry.yaml` by the M1 PR that first emits it:
 
-| Proposed code | Scenarios |
+| Code | Scenarios |
 |---|---|
-| `urn:chio:error:root-exchange:client-unauthenticated` | anchored-root-008 |
-| `urn:chio:error:root-exchange:replay` | anchored-root-009, anchored-root-012 |
-| `urn:chio:error:root-exchange:revoked` | revocation-local-007 |
-| `urn:chio:error:root-anchor:missing` | anchored-root-010 |
-| `urn:chio:error:root-anchor:lifetime` | anchored-root-011 |
-| `urn:chio:error:receipt:tenant-id-with-authority` | receipt-disclosure-005 |
-| `urn:chio:error:export:salt-only-opening` | receipt-disclosure-008 |
-| `urn:chio:error:export:tenant-tag-required` | receipt-disclosure-009 |
-| `urn:chio:error:root-policy:inline-disclosure-unavailable` | receipt-disclosure-011, receipt-disclosure-012 |
+| `urn:chio:error:transport:exchange-client-unauthenticated` | anchored-root-008 |
+| `urn:chio:error:transport:exchange-replay` | anchored-root-009, anchored-root-012, anchored-root-014 |
+| `urn:chio:error:transport:exchange-issuer-not-allowed` | anchored-root-013 |
+| `urn:chio:error:transport:exchange-revoked` | revocation-local-007 |
+| `urn:chio:error:capability:root-anchor-missing` | anchored-root-010 |
+| `urn:chio:error:capability:root-anchor-lifetime` | anchored-root-011 |
+| `urn:chio:error:capability:root-exchange-key-untrusted` | anchored-root-016 |
+| `urn:chio:error:policy:root-policy-entra-issuer-on-oidc-rule` | anchored-root-015 |
+| `urn:chio:error:policy:root-policy-inline-disclosure-unavailable` | receipt-disclosure-011, receipt-disclosure-012 |
+| `urn:chio:error:attest:receipt-tenant-id-with-authority` | receipt-disclosure-005 |
+| `urn:chio:error:attest:export-salt-only-opening` | receipt-disclosure-008 |
+| `urn:chio:error:attest:export-tenant-tag-required` | receipt-disclosure-009 |
 | `urn:chio:error:kernel:revocation-store` | revocation-local-008 |
 
-The domains `root-exchange`, `root-anchor`, `root-policy`, `receipt` and `export` are not among the 20 domains in `spec/errors/registry.yaml`. M1 either adds them or renames these codes into existing domains (`transport`, `capability`, `policy`, `attest`). Revocation-store failures report the non-URN code `CHIO-KERNEL-REVOCATION-STORE` today (`crates/kernel/chio-kernel/src/kernel/error.rs:788`). The plan expects an existing revocation-store URN, but none exists, so `urn:chio:error:kernel:revocation-store` is a proposal too.
+No error domain is added. Exchange failures are token endpoint authentication failures (`transport`), anchor and root failures are capability validation (`capability`), root-policy load failures are `policy`, and receipt signing and export failures are `attest`. Revocation-store failures report the non-URN code `CHIO-KERNEL-REVOCATION-STORE` today (`crates/kernel/chio-kernel/src/kernel/error.rs:788`); M1 item 5 converts it to `urn:chio:error:kernel:revocation-store`.
 
 ## Inline disclosure flip
 
@@ -118,7 +125,7 @@ The domains `root-exchange`, `root-anchor`, `root-policy`, `receipt` and `export
 
 ## Counts against spec 11.3
 
-Spec 11.3 lists `anchored_root` at 16 scenarios for M1 (each M1 kind allow, each section 8.1 and 8.2 deny, client authentication denials, `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry). The plan stages 12, matching `receipt_disclosure` (12) and `revocation_local` (12). M1 adds at least the multi-tenant `entra_jwt` issuer deny and `uti` reuse after root expiry, plus further section 8.1 and 8.2 denies, to reach 16.
+Spec 11.3 lists `anchored_root` at 16 scenarios for M1, `receipt_disclosure` at 12 and `revocation_local` at 12. All 40 are staged here (spec section 2.5, "Count"). M2 adds four `anchored_root` scenarios for Entra Agent ID.
 
 ## Move-in checklist for M1
 
@@ -127,6 +134,6 @@ Spec 11.3 lists `anchored_root` at 16 scenarios for M1 (each M1 kind allow, each
 3. Add the three values to the `category` row of `verdict_matrix/SCENARIOS.md` (line 19).
 4. Update `manifest.toml`: `scenario_count`, the `[corpus.categories]` counts, `scenario_index_hash` and `corpus_sha256`.
 5. Add the `rust-mcp-serve-http` driver entry to `manifest.toml` and its runner under `verdict_matrix/drivers/`, with the IdP stub, introspection stub and fixture definitions above.
-6. Register every proposed reason code (and any new domain) in `spec/errors/registry.yaml` and run `scripts/check-error-urn-registry.py`.
+6. Register each reason code in the table above in `spec/errors/registry.yaml` in the PR that first emits it, and run `scripts/check-error-urn-registry.py`.
 7. Recheck `requires`: drivers that do not implement `rust-mcp-serve-http` must skip these scenarios, not fail them.
 8. Remove this staging directory once all three categories have moved.
