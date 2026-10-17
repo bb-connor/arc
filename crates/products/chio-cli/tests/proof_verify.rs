@@ -4,6 +4,9 @@ mod support;
 #[path = "proof_verify/evidence_graph.rs"]
 mod evidence_graph;
 
+#[path = "proof_verify/projection_manifest.rs"]
+mod projection_manifest;
+
 use chio_test_support::prelude::*;
 use support::*;
 

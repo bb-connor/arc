@@ -445,7 +445,7 @@ files = ["crates/economy/chio-autonomy/src/model.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.bbs-projection.manifest.v2"
+value = "chio.bbs-projection.manifest.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/trust/chio-selective-disclosure/src/projection_manifest.rs"]
 first_seen = "2a36f21acf"
 

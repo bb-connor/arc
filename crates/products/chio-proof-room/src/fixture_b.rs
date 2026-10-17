@@ -548,7 +548,7 @@ pub(crate) fn embedded_disclosure_lineage_bundle(
             &graph.nodes,
             artifacts,
             "bbs-projection-manifest",
-            chio_selective_disclosure::BBS_PROJECTION_MANIFEST_SCHEMA_V2,
+            chio_selective_disclosure::BBS_PROJECTION_MANIFEST_SCHEMA_V1,
             "disclosure crypto context",
         )
         .map_err(|error| format!("missing BBS proof material: {error}"))?;
