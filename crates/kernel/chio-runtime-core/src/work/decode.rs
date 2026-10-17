@@ -50,7 +50,10 @@ pub fn decode_work_join_inputs(input: &[u8]) -> Result<WorkJoinInputsV1, WorkCon
     Ok(manifest)
 }
 
-fn decode<T: DeserializeOwned>(input: &[u8], bytes: usize) -> Result<T, WorkContractError> {
+fn decode<T: DeserializeOwned + Serialize>(
+    input: &[u8],
+    bytes: usize,
+) -> Result<T, WorkContractError> {
     preflight(input, bytes)?;
     let value: Value = chio_core_types::canonical::UntrustedJsonText::from_wire(input, bytes)
         .and_then(|text| text.decode_document())
@@ -66,7 +69,7 @@ fn decode<T: DeserializeOwned>(input: &[u8], bytes: usize) -> Result<T, WorkCont
             _ => reject(WorkRejectionCodeV1::Malformed),
         })?;
     check_schema_fields(&value)?;
-    serde_json::from_value(value).map_err(|error| {
+    let typed: T = serde_json::from_value(value.clone()).map_err(|error| {
         let message = error.to_string();
         [
             WorkRejectionCodeV1::Identifier,
@@ -76,16 +79,21 @@ fn decode<T: DeserializeOwned>(input: &[u8], bytes: usize) -> Result<T, WorkCont
         .into_iter()
         .find(|code| message.starts_with(code.as_str()))
         .map_or_else(|| reject(WorkRejectionCodeV1::Malformed), reject)
-    })
+    })?;
+    // Unit variants of internally tagged enums ignore unknown fields, so a
+    // typed decode that drops any input is refused.
+    if serde_json::to_value(&typed).ok().as_ref() != Some(&value) {
+        return Err(reject(WorkRejectionCodeV1::Malformed));
+    }
+    Ok(typed)
 }
 
 /// An embedded REC-0a contract keeps the inner limits `decode_contract`
-/// charges, measured before its typed decoder runs, and like it refuses a
-/// typed decode that discards a field.
+/// charges, measured before its typed decoder runs.
 pub(super) fn recovery_contract<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
-    T: DeserializeOwned + Serialize,
+    T: DeserializeOwned,
 {
     let value = Value::deserialize(deserializer)?;
     chio_core_types::recovery::check_contract_limits(&value).map_err(|error| {
@@ -94,11 +102,7 @@ where
             _ => WorkRejectionCodeV1::Malformed,
         }))
     })?;
-    let typed: T = serde_json::from_value(value.clone()).map_err(D::Error::custom)?;
-    if serde_json::to_value(&typed).ok().as_ref() != Some(&value) {
-        return Err(D::Error::custom(reject(WorkRejectionCodeV1::Malformed)));
-    }
-    Ok(typed)
+    serde_json::from_value(value).map_err(D::Error::custom)
 }
 
 /// An observation whose value is an embedded REC-0a contract.
@@ -107,7 +111,7 @@ pub(super) fn recovery_observation<'de, D, T>(
 ) -> Result<WorkObservationV1<T>, D::Error>
 where
     D: Deserializer<'de>,
-    T: DeserializeOwned + Serialize,
+    T: DeserializeOwned,
 {
     Ok(
         match WorkObservationV1::<Value>::deserialize(deserializer)? {
