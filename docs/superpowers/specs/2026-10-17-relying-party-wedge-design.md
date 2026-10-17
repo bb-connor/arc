@@ -2,7 +2,7 @@
 
 Status: APPROVED by the founder, revision 3. Design doc. No code in this document is implemented unless a row says otherwise.
 
-Repository state read for this spec: `origin/main` at `d0482967b8` (after #1513). No cargo commands were run. Every "today" statement below cites a file read at that commit.
+Repository state read for this spec: `origin/main` at `d0482967b8` (after #1513). No cargo commands were run. Every "today" statement below cites a file read at that commit. Section 2.5 G17 to G19 and facts T26, T29 and T30 were re-read at `d78dfef2dc` (after #1535 and #1540).
 
 Milestones are labeled M0 to M3. Calendar dates for them are kept outside this repository.
 
@@ -64,7 +64,7 @@ Each row below is recorded as: Decided 2026-10-17 (coordinator call; founder may
 
 | # | Decision | Where it lands |
 |---|---|---|
-| D1 | The relying-party behaviour replaces current `serve-http` issuance for every deployment. No dual paths: every surviving authentication path ends in an exchange-issued anchored root. Under F14 the useful paths are kept and mapped (static bearer, generic OIDC JWT, introspection, generic Entra, the local AS login and re-exchange, trust-control as an exchange signer), and the hacks and duplicates are deleted (seed-derived federation subject keys, session issuance that bypasses the exchange, the `serve-http` enterprise provider registry file and provider-profile flag, the per-store database path flags). Section 2.4 lists each. The qualified hosted-edge lane re-runs inside M1; the qualified label is suspended until it passes. Revised: Decided 2026-10-17 (founder): keep useful paths; no compat hacks. | Sections 2.4, 6, 7.2, 10.5, 12 (M1), 13 |
+| D1 | The relying-party behaviour replaces current `serve-http` issuance for every deployment. No dual paths: every surviving authentication path ends in an exchange-issued anchored root. Under F14 the useful paths are kept and mapped (static bearer, generic OIDC JWT, introspection, generic Entra, the local AS login and re-exchange, trust-control as an exchange signer, and the enterprise provider registry as the one source of provider identity, G17), and the hacks and duplicates are deleted (seed-derived federation subject keys, session issuance that bypasses the exchange, the provider-profile flag and the per-provider verification flags, the per-store database path flags). Section 2.4 lists each. The qualified hosted-edge lane re-runs inside M1; the qualified label is suspended until it passes. Revised: Decided 2026-10-17 (founder): keep useful paths; no compat hacks. | Sections 2.4, 6, 7.2, 10.5, 12 (M1), 13 |
 | D2 | Committed receipts are protocol-wide: one receipt format. Every producer gets a salt source from the host RNG through the existing `Rng` seam, including the FFI and WASM signers. Inline-versus-committed disclosure per tool and per field lives in the signed root policy, so a verifier can see that plaintext was authorized. Default is committed. | Sections 7.6, 7.7, 10.2, 10.3, 13 |
 | D3 | Revocation v1 extends the existing SQLite revocation store inside the provider process and is read in the admission transaction. Provider-side revocation and IdP-driven expiry land in M1. Caller-side revocation of its own delegated descendants, by a signed revocation request submitted to the provider, lands in M2. | Sections 7.11, 8.2, 10.7 |
 | D4 | v1 is single-instance per provider. This is a deployment limit. A shared replay, root and revocation store is roadmap. | Sections 6.1, 8.3, 9.5 |
@@ -77,7 +77,7 @@ Each row below is recorded as: Decided 2026-10-17 (coordinator call; founder may
 | D11 | Every MCP tool response carries the signed receipt and the caller's salts in `_meta.chioReceipt` by default, from M2 (F11). | Section 7.6 |
 | D12 | Accept a customer-hosted root exchange ADR in M0. Its outline is section 15. | Sections 10.10, 15 |
 | D13 | In v1, caps must be denominated in the same asset as the tool price. No conversion and no peg. | Sections 6.7, 8.6 |
-| D14 | Entra is admitted through two dedicated kinds. `entra_jwt` (M1) admits ordinary Entra application and workload tokens, with the principal taken from `oid`, else `sub`, else `azp`, `appid` or `client_id` (today's `JwtProviderProfile::AzureAd` mapping). `entra_agent_id` (M2) admits Entra Agent ID agent identities and is added beside `entra_jwt`, not in place of it. An `oidc_jwt` rule naming a Microsoft Entra issuer rejects at load, so every Entra token is held to the D5 rules. Revised: Decided 2026-10-17 (founder): keep useful paths; no compat hacks. | Sections 6.3, 7.2, 8.1 |
+| D14 | Entra is admitted through two dedicated kinds. `entra_jwt` (M1) admits ordinary Entra application and workload tokens, with the principal taken from the one claim the provider record's subject mapping names (`oid` for Entra records; G17 replaces the earlier `oid`, `sub`, `azp`, `appid`, `client_id` fallback). `entra_agent_id` (M2) admits Entra Agent ID agent identities and is added beside `entra_jwt`, not in place of it. An `oidc_jwt` rule naming a Microsoft Entra issuer rejects at load, so every Entra token is held to the D5 rules. Revised: Decided 2026-10-17 (founder): keep useful paths; no compat hacks. | Sections 6.3, 7.2, 8.1 |
 | D15 | This spec stays in `docs/superpowers/specs/`, with milestone labels instead of calendar dates. | Header |
 | D16 | The `SigningBackend` collapse (`public_key() -> Result<PublicKey>`, `algorithm()` and `current_public_key()` deleted, per the parallel lead's plan) folds into M0 as its only Rust code item. It is byte-neutral and lands as one PR before M1 item 1. The signing wrapper, the `sign_canonical_bytes` replacement, the committed receipt fields and `root_anchor` stay in M1; `ClassicalSigner` and KMS stay in M2. | Sections 10.1, 12 (M0), 13 |
 | D17 | M0 code starts after #1496 and #1489 land. Any change to `chio.receipt.v1` bytes or the capability signing bytes is coordinated with the parallel lead before its PR opens, because #1489 (DPoP) and coop2c (revocation roots) produce signed artifacts whose fixtures regenerate with it. | Sections 12 (M0), 13.3 |
@@ -95,21 +95,22 @@ D16 rationale: the wrapper and committed receipts both replace the trait's canon
 
 ### 2.4 Keep-or-delete decisions for existing `serve-http` paths (F14)
 
-Usage counts are from `git grep` on `origin/main` at `6c76fafe95`, outside `docs/superpowers/`.
+Usage counts are from `git grep` on `origin/main` at `6c76fafe95`, outside `docs/superpowers/`. The enterprise provider registry and verification-flag rows were re-audited at `d78dfef2dc`, after #1535 (G17).
 
 | Path today | Used by | Decision | Reason |
 |---|---|---|---|
 | `--auth-token` static bearer (`RemoteAuthMode::StaticBearer`) | progressive tutorial, cpp, js, go and python conformance peers, TypeScript, Go, C++ and Python SDK tests, five example networks, `examples/docker`, `scripts/check-sdk-publication-examples.sh`, `scripts/check-sdk-release.sh` | keep and map: `operator_static_bearer` (M1) | dev, test and conformance on-ramp; the token resolves to an operator-issued root naming an operator-configured principal |
-| Generic Entra intake (`JwtProviderProfile::AzureAd`) | `chio-mcp-remote` bearer path and tests | keep and map: `entra_jwt` (M1) | dominant enterprise IdP; most agents present ordinary Entra application tokens |
-| Generic OIDC JWT bearer (`--auth-jwt-public-key`, discovery) | operator runbook onboarding, operations and security docs, `chio-mcp-remote` tests | keep and map: `oidc_jwt` (M1) | standard bearer intake for non-Entra issuers |
-| Introspection bearer (`--auth-introspection-url`) | operations and reference docs, `chio-mcp-remote` tests | keep and map: `oauth_introspection` (M1) | opaque-token issuers have no other path |
+| Generic Entra intake (`JwtProviderProfile::AzureAd`) | `chio-mcp-remote` bearer path and tests | keep and map: `entra_jwt` (M1) | dominant enterprise IdP; most agents present ordinary Entra application tokens. The provider's issuer, keys, audience and principal claim live in its provider record (G17) |
+| Generic OIDC JWT bearer (`--auth-jwt-public-key`, discovery) | operator runbook onboarding, operations and security docs, `chio-mcp-remote` tests | keep and map: `oidc_jwt` (M1) | standard bearer intake for non-Entra issuers. Its issuer and keys (`jwks_url`, or an inline `jwks` that replaces `--auth-jwt-public-key`) live in its provider record (G17) |
+| Introspection bearer (`--auth-introspection-url`) | operations and reference docs, `chio-mcp-remote` tests | keep and map: `oauth_introspection` (M1) | opaque-token issuers have no other path. The endpoint lives in its provider record (G17); the client credentials the edge presents stay `serve-http` secrets |
 | Local AS `authorization_code` login | cpp, js, go and python conformance peers, Go, Python and C++ SDK auth clients, `integrations/mcp-adapter` | keep and map: `chio_local_as` (M1) | local users and the conformance auth scenarios |
 | Local AS token re-exchange (RFC 8693, `subject_token_type` access token) | `auth-token-exchange-initialize` in the cpp, js and go peers, Go and Python SDK `exchange_token`, the QUALIFICATION hosted-edge row | keep and map: `chio_local_as` re-exchange (M1) | resource and scope narrowing of a local AS token; the exchanged token gets a narrower root (section 7.2) |
 | Pinned remote trust-control authority (`--control-url`, `--control-authority-public-key`) | `deploy/reference-runtime` systemd unit, `scripts/check-sdk-publication-examples.sh`, example networks, operator runbook | keep and map: `--exchange-signer trust-control` (M1) | operators already run `serve-http` against trust-control; it becomes a signer for exchange roots |
 | Session capability issuance that bypasses the exchange (`configure_capability_authority` path in `factory.rs`) | `serve-http` internals only | delete | a second issuance path beside the exchange, excluded by D1 |
 | Seed-derived federation subject keys (`derive_federated_agent_keypair`, `derive_enterprise_subject_key` in `chio-mcp-remote`) | `serve-http` session identity and resume only | delete | anyone holding the authority seed can derive every principal's key; session-held roots (section 6.5) replace it. The separate copy in `chio-control-plane` SCIM lifecycle is outside this spec |
-| `serve-http` `--enterprise-providers-file` | `chio-mcp-remote` tests | delete for `serve-http` | duplicates root policy rules. Trust-control's provider registry and admin are unchanged |
-| `serve-http` `--auth-jwt-provider-profile` | `chio-mcp-remote` and `chio-cli` tests | delete | duplicates the rule's `anchor_kind`; the AzureAd claim mapping moves into `entra_jwt` |
+| `serve-http` `--enterprise-providers-file` (`chio.enterprise-providers.v1`) | since #1535, every JWT and introspection bearer request in `chio-mcp-remote` reads it once (provider enable and disable, subject mapping, trust material reference, HTTP 503 when unreadable); admin health; trust-control provider admin writes the same format; `chio-mcp-remote` and `chio-cli` tests | keep: the one source of provider identity (M1, G17) | maintained and used. Root policy rules reference a record by `provider_record_id` and pin its identity digest; issuer, keys, endpoint, audience and subject mapping are configured only in the record |
+| `serve-http` `--auth-jwt-provider-profile` and the record member `provider_profile` | `chio-mcp-remote` and `chio-cli` tests; the record member is written as `None` | delete | duplicates the rule's `anchor_kind`; the principal claim comes from the record's subject mapping (G17) |
+| `serve-http` provider verification flags (`--auth-jwt-public-key`, `--auth-jwt-discovery-url`, `--auth-jwt-issuer`, `--auth-jwt-audience`, `--auth-introspection-url`) | operator runbook, operations and reference docs, `chio-mcp-remote` and `chio-cli` tests | delete; callers move to provider records | a second place to configure issuer, keys, audience and endpoint beside the registry (G17). `--auth-introspection-client-id` and `CHIO_MCP_AUTH_INTROSPECTION_CLIENT_SECRET` stay: they are the edge's own credentials, not provider identity |
 | `serve-http` per-store path flags (`--session-db`, `--receipt-db`, `--revocation-db`, `--authority-db`, `--budget-db` and the others) | `deploy/reference-runtime`, the SDK publication script, example networks | delete for `serve-http`; callers move to `--state-dir` | a second way to place stores; the single-instance lock needs one directory. `chio trust serve` flags are unchanged |
 
 ### 2.5 M0 inventory gap decisions
@@ -133,9 +134,12 @@ The M0 producer inventory (`docs/superpowers/specs/relying-party-wedge/receipt-p
 | G14 | Decided 2026-10-17 (coordinator call; founder may override). The `receipt_id` in `chio.receipt-disclosure.v1` and the `terminal_receipt_id` in `chio.settlement-closure.v1` are bare lowercase hex, as the PROTOCOL receipt id rule produces. The `rcpt_sha256:` prefix in the earlier examples was wrong. | Sections 7.7, 7.10; PROTOCOL sections 6, 6.7 |
 | G15 | Decided 2026-10-17 (coordinator call; founder may override). A verifier rejects an opening document in which the same salt appears for more than one `salt_ref`. The receipt is marked as tampered disclosure. | Section 7.7; PROTOCOL section 6 |
 | G16 | Decided 2026-10-17 (coordinator call; founder may override). G11 counts 63 unregistered ids, the number of ids in the staged PROTOCOL 4.5 table that `spec/schemas/registry.json` does not list (wrapper-table, root-authority and raw-site ids), not 51. | Section 2.5 G11; PROTOCOL section 4.5 |
-| Count | `anchored_root` is 16 in M1, as section 11.3 says. The staged corpus gains four scenarios (013 Entra multi-tenant issuer deny, 014 Entra `uti` reuse after root expiry deny, 015 Entra issuer on an `oidc_jwt` rule rejected at load, 016 root signed by a key outside `exchange_keys` deny), for 16, 12 and 12 (40 files). | Section 11.3; plan Task 3 |
+| G17 | Decided 2026-10-17 (coordinator call; founder may override). The enterprise provider registry (`chio.enterprise-providers.v1`, `--enterprise-providers-file`) is kept in `serve-http` and is the one source of provider identity: `provider_id`, kind, issuer, keys (`jwks_url`, or an inline `jwks`), introspection endpoint, audience (`trust_boundary.allowed_audiences`), subject mapping (`principal_source` names one claim; `tenant_id_field` names the tenant claim), trust material reference and enabled state. A root policy rule of a provider-backed kind (`oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt`, `oauth_introspection`) names `provider_record_id` and pins `provider_identity_digest` over the record's identity projection (`chio.enterprise-provider-identity.v1`, which excludes `enabled`). The rule owns no provider identity member: it holds the anchor kind, scope ceiling and projection, claim match, allowed algorithms, lifetimes and holder classes. Issuer, keys and subject mapping are therefore configured once, and the offline policy key still governs which provider identity a rule trusts. Every exchange, and every admission under a provider-anchored root, loads the registry once per request (bounded, as #1535) and matches against that one version. A missing, disabled or invalid record, a record of the wrong kind, or an identity digest that differs from the rule's denies; an unreadable or invalid registry answers HTTP 503 on the token endpoint and bearer intake and denies admission. There is no cached copy and no fallback. The `serve-http` verification flags and `--auth-jwt-provider-profile` are deleted, as is the record member `provider_profile` (trust-control callers change in the same PR). `entra_jwt` takes its principal from the record's one claim, which keeps one principal namespace per provider; the `oid`, `sub`, `azp`, `appid`, `client_id` fallback is dropped. The tenant claim moves from the rule's `tenant_claim` to the record's `tenant_id_field`. | Sections 2.4, 6.1, 7.2, 7.3, 7.4, 7.12, 8, 9.8, 10, 11, 12 (M1), 13.2 |
+| G18 | Decided 2026-10-17 (coordinator call; founder may override). Strict decoding for every signed v1 type this spec adds or changes in place: `root_anchor` and the capability body that carries it, `chio.delegation-context.v1`, `chio.root-policy.v1`, `chio.idp-key-snapshot.v1`, `chio.enterprise-provider-identity.v1`, `chio.capability-presentation.v1`, `chio.receipt-disclosure.v1`, the receipt's commitment, `disclosure`, `authority`, `enforcement` (`pdp_decision`) and `settlement` blocks, the metering and runtime-attestation blocks carried beside them, `chio.settlement-closure.v1` and `chio.revocation-request.v1`. Each rejects an unknown member at every nesting level, even when the signature over the padded body is valid. A tagged union never uses serde internally tagged unit variants, which accept padding such as `{"kind":"x","pad":0}` (fixed for Work frames in #1540); a closed discriminator is a plain string enum member of a closed struct, and a union whose variants carry different members uses closed struct variants or the #1540 lossless round trip (the typed value re-encodes to exactly the input value). `#[serde(flatten)]` is not used in these types, because it disables unknown-member rejection. The capability tree's strict decoding lands in the parallel lead's lane; these types follow the same rule. | Section 7.0; PROTOCOL 4.5; sections 11.1, 11.2, 11.3 |
+| G19 | Decided 2026-10-17 (coordinator call; founder may override). A verifier derives the signature algorithm only from the pinned, typed key it verifies against, never from any member of the artifact. The unsigned top-level `algorithm` member (`CapabilityToken.algorithm` and `ChioReceipt.algorithm`, plus the same optional member on the other `chio-core-types` and `chio-credit` envelopes) is deleted in M1 item 1, the wrapper PR, with every caller. After it, an `algorithm` member, added or altered, fails strict decoding (G18) before any verifier is chosen, and no member can change which verifier runs. | Section 7.0; PROTOCOL 4.5; sections 11.1, 11.2, 11.3 |
+| Count | `anchored_root` is 24 in M1, as section 11.3 says. The staged corpus gained four scenarios in the gap PR (013 Entra multi-tenant issuer deny, 014 Entra `uti` reuse after root expiry deny, 015 Entra issuer on an `oidc_jwt` rule rejected at load, 016 root signed by a key outside `exchange_keys` deny) and gains eight here (017 provider disabled after the root was issued, 018 provider removed before exchange, 019 registry unreadable at exchange, 020 provider identity changed without a re-signed policy, 021 registry unreadable at admission, 022 padded `root_anchor`, 023 added `algorithm` member, 024 padded root policy rejected at load), for 24, 12 and 12 (48 files). | Section 11.3; plan Task 3 |
 
-Size effect: M1 item 1 grows by the raw-site resolution, the id registration with schemas, the binding signer change and the core manifest deletion; M1 item 2 grows by the `HttpReceipt` deletion with its SDK middleware and by the preimage plumbing for hash-relaying producers. M0 is unchanged. Section 13.2 carries the new sizes.
+Size effect: M1 item 1 grows by the raw-site resolution, the id registration with schemas, the binding signer change and the core manifest deletion; M1 item 2 grows by the `HttpReceipt` deletion with its SDK middleware and by the preimage plumbing for hash-relaying producers. G17 to G19 grow item 1 by the `algorithm` member deletion and its negatives (+1 to +2), item 3 by strict decoding of the new types with padding negatives (+1), item 4 by the provider identity projection, per-request registry reads at exchange and admission, the record and flag changes and the registry scenarios (+2 to +3), and item 6 by the provider identity export role (+0 to +1). M0 is unchanged. Section 13.2 carries the new sizes.
 
 ## 3. Goals, non-goals, anti-goals
 
@@ -237,9 +241,11 @@ Line numbers are at `d0482967b8`.
 | T23 | MCP confirmation profiles are closed. RFC 9449 `jkt` is rejected. Remote sessions use `cnf.chioSenderKey` as the capability subject. | shipped | PROTOCOL "Inbound sender authority profile" |
 | T24 | Verdict-matrix corpus has 72 scenarios with a pinned index hash. `rust-kernel` is the required driver. | shipped | `crates/tooling/chio-conformance/verdict_matrix/manifest.toml` |
 | T25 | The clock gate covers `chio-mcp-remote`, `chio-mcp-edge`, `crates/kernel/`, `crates/guards/`, `crates/security/`, the control plane and `chio-store-sqlite` among fixed roots. It does not cover `crates/trust/` or `crates/core/`. | shipped | `scripts/check-security-clocks.py:28-48` |
-| T26 | `serve-http` auth modes are `StaticBearer` (a shared `--auth-token` secret with no principal), `JwtBearer` and `IntrospectionBearer`, plus the local AS. The local AS client registry holds only `client_id` and one redirect URI and advertises `token_endpoint_auth_methods_supported: ["none"]`: every client is public. An enterprise provider registry file labels federated claims. | shipped | `session_core.rs:151-154,179,808-818`; `http_service_auth.rs:342,676-740`; `session_identity.rs:568-584` |
+| T26 | `serve-http` auth modes are `StaticBearer` (a shared `--auth-token` secret with no principal), `JwtBearer` and `IntrospectionBearer`, plus the local AS. The local AS client registry holds only `client_id` and one redirect URI and advertises `token_endpoint_auth_methods_supported: ["none"]`: every client is public. Since #1535 the enterprise provider registry file is loaded once per JWT and introspection bearer request: a disabled or removed provider no longer matches, the matched record supplies `provider_record_id`, subject mapping and trust material reference, and an unreadable or invalid registry answers HTTP 503. Token verification itself is still configured by the `--auth-jwt-*` and `--auth-introspection-url` flags. | shipped | `session_core.rs:151-154,179,808-818`; `http_service_auth.rs:342,676-740`; `oauth/bearer_auth.rs:556-566,840-850`; `session_identity.rs:456-566` (at `d78dfef2dc`) |
 | T27 | `ChioReceiptBody` carries an optional plaintext `tenant_id`. | shipped | `receipt/body.rs:93` |
 | T28 | The MCP edge reads Chio `_meta` members from a closed list of `chio`-prefixed names (#1503). `chioCapability` and `chioReceipt` are not on it. | shipped | `crates/protocol/chio-mcp-edge/src/runtime/protocol/parsing.rs` |
+| T29 | `CapabilityToken.algorithm` and `ChioReceipt.algorithm` are optional members outside the signing body, documented as informational; verification dispatches off the self-describing key and signature encodings. Twelve such optional `algorithm` members exist across `chio-core-types` and `chio-credit`. | shipped | `crates/core/chio-core-types/src/capability/token.rs:138-140`; `receipt/body.rs:104-107` (at `d78dfef2dc`) |
+| T30 | serde's `deny_unknown_fields` does not apply to unit variants of internally tagged enums, so `{"kind":"x","pad":0}` decodes. #1540 closed this for Work frames with a lossless round trip; the capability tree's strict decoding is in the parallel lead's lane. | shipped | #1540; `crates/core/chio-core-types` |
 
 ## 6. Architecture and data flow
 
@@ -257,12 +263,15 @@ Line numbers are at `d0482967b8`.
  |                                  |                                          |
  |  [bearer intake]  static bearer, OIDC JWT, introspection, Entra (M1)        |
  |                                  v                                          |
+ |  [provider registry]  read once per request: issuer, keys, subject map,     |
+ |     enabled; unreadable -> 503                                              |
  |  [root exchange]  verify assertion -> one root policy rule -> mint root     |
  |     signs with EXCHANGE key (seed file or trust-control; KMS from M2)       |
  |                                  |                                          |
  |                                  v                                          |
- |  [MCP edge + kernel]  verify chain (anchored trust root), revocation read   |
- |     in the admission transaction, guards, x402 challenge (M3), dispatch     |
+ |  [MCP edge + kernel]  verify chain (anchored trust root), provider record   |
+ |     check, revocation read in the admission transaction, guards,           |
+ |     x402 challenge (M3), dispatch                                           |
  |     signs committed receipts with KERNEL key (seed file in M1; KMS from M2) |
  |                                  |                                          |
  |  [state dir, SQLite, exclusive lock] receipts, disclosure openings          |
@@ -299,13 +308,15 @@ Three provider keys and one local AS key are distinct and pinned separately:
 
 No two of them may be the same key (startup refusal, section 8.3).
 
+Provider identity lives in one place, the enterprise provider registry file (`--enterprise-providers-file`, `chio.enterprise-providers.v1`), which the existing provider-admin writer updates under its lock with durable bounded persistence (G17). Root policy rules reference records by id and pin their identity digest (section 7.4). `serve-http` reads the file once per exchange and once per admission under a provider-anchored root, so enabling, disabling or removing a provider takes effect at the next request. A change to a record's identity projection takes effect only together with a root policy re-signed by the offline policy key.
+
 ### 6.2 Flow A: ID-JAG (Okta Cross App Access, MCP Enterprise-Managed Authorization), M1
 
 Pin at build start: MCP ext-auth `specification/stable/enterprise-managed-authorization`, the IETF Identity Assertion JWT Authorization Grant draft revision it references, and the token endpoint client authentication method the stable profile requires.
 
 1. The MCP client obtains an ID-JAG from the enterprise IdP through RFC 8693 token exchange at the IdP. The ID-JAG `aud` is the provider's AS issuer (the Chio local AS).
 2. The client calls the Chio local AS token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` and `assertion=<ID-JAG>`, and authenticates as a confidential client with `private_key_jwt` (RFC 7523 section 2.2). The client registry (#1380) gains a per-client public JWK and `token_endpoint_auth_method`. Public clients (`none`) cannot use the `jwt-bearer` or `token-exchange` grants. The client assertion has `aud` equal to the token endpoint URL, a lifetime of at most 60 s, and a `jti` recorded in the replay store. If the stable profile mandates a method other than `private_key_jwt`, the builder adds exactly that method and records it in the ADR.
-3. The exchange verifies the ID-JAG (section 8.1), records its replay key, matches exactly one root policy rule, computes the effective root scope, mints a root `chio.capability.v1` with `root_anchor`, writes the `chio.delegation-context.v1`, writes the tenant and subject tags (section 7.12), and signs the root with the exchange key.
+3. The exchange loads the provider registry once for the request, verifies the ID-JAG against the matched rule's provider record (section 8.1), records its replay key, matches exactly one root policy rule, computes the effective root scope, mints a root `chio.capability.v1` with `root_anchor`, writes the `chio.delegation-context.v1`, writes the tenant and subject tags (section 7.12), and signs the root with the exchange key.
 4. Root lifetime: `expires_at = min(now + capability_ttl_secs, assertion exp)`. If the result is not after `now`, the exchange denies. The rule's `max_assertion_lifetime_secs` (default 300) bounds `exp - iat` of accepted ID-JAGs. A longer-lived ID-JAG denies.
 5. The AS returns an access token (local AS EdDSA JWT, `exp` equal to the root's `expires_at`, claim `chio_root` = root capability id). The existing local AS DPoP and mTLS sender constraints apply to it unchanged. No refresh token is issued (consistent with the existing refusal of `offline_access`, #1358).
 6. The client calls `tools/call` with the access token. The edge resolves `chio_root` to the stored root and evaluates the call. For clients without a Chio sender key, the root is session-held (section 6.5).
@@ -333,7 +344,7 @@ Rules (D5):
 
 Kill latency: Chio does not observe Entra revocation in v1. A caller that already holds several unexchanged Entra tokens can exchange each once until it expires. The claim is therefore that IdP revocation of an Entra principal takes effect at the expiry of tokens issued before it, about one hour for typical Entra access tokens. Provider-side revocation of the principal (section 7.11) takes effect for every call admitted after it commits.
 
-An `oidc_jwt` rule whose issuer is a Microsoft Entra issuer rejects at policy load (D14), so every Entra token is held to these rules.
+An `oidc_jwt` rule whose provider record has a Microsoft Entra issuer rejects at policy load (D14), so every Entra token is held to these rules. The principal is the claim the record's `subject_mapping.principal_source` names (`oid` for Entra records, G17); a token without it denies.
 
 ### 6.4 Flow C: multi-hop delegation (G5, M2)
 
@@ -390,6 +401,8 @@ What is signed and why:
 - `canonical_body` is the RFC 8785 canonical JSON of the artifact's signing body. For receipts that is the canonical `ChioReceiptSigningBody { id, body, bbs_signature? }`, so BBS signature material stays covered by the authoritative signature through this hash. Existing signature domain prefixes are dropped, because the schema id replaces them (G5): after a NUL-terminated byte prefix the body is the canonical JSON that followed it; for a `{domain, body}` object it is `body`; for a `(DOMAIN, signer, body)` tuple it is `{"body": body, "signer": signer}`. A signature over a digest of a Chio object signs the wrapper over the object's canonical body instead. Hash and commitment domains that are not signature prefixes are unchanged.
 - Domain separation: no Chio key signs any message other than wrapper bytes, except the local AS key, which signs JWS signing inputs, and keys used only for the exempt formats below. A JWS signing input is base64url text plus `.` and never contains `0x00`, while byte 23 of every wrapper is `0x00`, so the two message spaces are disjoint. The local AS key is still required to differ from every wrapper-signing key (section 6.1).
 - Algorithm binding: every pinned key admits exactly one signature algorithm, derived from its self-describing encoding. A signature whose prefix does not match the pinned key's algorithm rejects before any cryptographic check. A verifier holding a pinned hybrid key rejects a bare classical signature, so stripping the post-quantum half yields nothing.
+- Algorithm selection (G19): a verifier takes the algorithm only from the pinned, typed key it verifies against, never from any member of the artifact being verified, signed or unsigned. The unsigned top-level `algorithm` member is deleted from `CapabilityToken`, `ChioReceipt` and every other envelope that carries one, in M1 item 1, with every caller. An artifact with an `algorithm` member, added or altered, fails strict decoding before a verifier is chosen.
+- Strict decoding (G18): every signed v1 type this spec adds or changes in place rejects an unknown member at every nesting level, even when the signature over the padded body verifies. Tagged unions never use serde internally tagged unit variants; a closed discriminator is a string enum member of a closed struct, and a union whose variants carry different members uses closed struct variants or a lossless round trip (the typed value re-encodes to exactly the input value, as #1540 does for Work frames). `#[serde(flatten)]` is not used in these types. Duplicate member names reject, as today. Members whose value is caller data by definition (an opening's `payload`, `parameters_inline`, `result_inline`, `metadata`) are opaque values; the rule covers every Chio-defined object around them. The SDK verifiers apply the same rule.
 - Algorithms: Ed25519 signs the wrapper bytes. ML-DSA-65 signs the wrapper bytes with an empty FIPS 204 context string. P-256 and P-384 sign the wrapper with ECDSA over SHA-256 or SHA-384 of the wrapper, so a KMS can be sent the digest (`MessageType=DIGEST`). Hybrid signatures sign the same 88 bytes with both halves.
 - Hash choice: both inner hashes are SHA-256, which caps every signature's collision resistance at 128 bits, including P-384 and ML-DSA-65. This is accepted for v1. Changing the hash or the layout requires a new prefix string and a PROTOCOL change.
 - Signature encodings are unchanged (bare 128-hex Ed25519, `p256:<DER hex>`, `p384:<DER hex>`, hybrid form).
@@ -417,7 +430,7 @@ New signed member in `CapabilityTokenBody` (`crates/core/chio-core-types/src/cap
 Rules:
 
 - `root_anchor` is required on every capability admitted by `serve-http` (from M1) and by `api protect` (from M3). A root without it is rejected (F3, D1).
-- `kind` is a closed enum (section 7.2). Unknown kinds reject at decode.
+- `kind` is a closed enum (section 7.2). Unknown kinds reject at decode. An unknown member in `root_anchor`, or anywhere in the capability body, rejects at decode (G18).
 - A delegated token copies `root_anchor` byte for byte from its root. Any difference denies.
 - A root's `expires_at` must not exceed `assertion_exp`. Verifiers check this offline.
 - `context_digest` = SHA-256 over `chio.delegation-context.v1\0 || canonical_json(context)`.
@@ -427,15 +440,15 @@ Rules:
 
 ### 7.2 Anchor kinds (closed, v1)
 
-All v1 kinds are exchange kinds (F3). There is no `class` member. Every `serve-http` authentication method kept under D1 and F14 maps to exactly one kind (section 2.4). The `serve-http` enterprise provider registry file and `--auth-jwt-provider-profile` are deleted in M1; root policy rules and the rule's `anchor_kind` replace them.
+All v1 kinds are exchange kinds (F3). There is no `class` member. Every `serve-http` authentication method kept under D1 and F14 maps to exactly one kind (section 2.4). The provider-backed kinds (`oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt`, `oauth_introspection`) verify against the provider record their rule references (G17, section 7.4). `--auth-jwt-provider-profile` and the provider verification flags are deleted in M1; the rule's `anchor_kind` and the provider record replace them.
 
 | `kind` | Milestone | Accepted input | Verified against | Replay key | Notes |
 |---|---|---|---|---|---|
-| `oauth_id_jag` | M1 | `jwt-bearer` assertion, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:id-jag`, from an authenticated confidential client | the rule's pinned `jwks_uri`; `typ` equals the ID-JAG media type from the pinned draft; `aud` equals the local AS issuer; `client_id` equals the authenticated client; `resource`, when present, equals the advertised protected resource | `(issuer, jti)`, single use | `exp - iat <= max_assertion_lifetime_secs` |
-| `entra_jwt` | M1 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | tenant-specific Entra JWKS; `iss` is a tenant-specific issuer listed in the root policy (multi-tenant `common` or `organizations` issuers reject); `aud` is the provider app ID URI; principal is `oid`, else `sub`, else `azp`, `appid` or `client_id`, and a token with none of them denies | `(issuer, uti)`, one root per token | ordinary Entra application and workload tokens; D5 lifetime and kill latency |
-| `entra_agent_id` | M2 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | tenant-specific Entra JWKS; `iss` is a tenant-specific issuer listed in the root policy (multi-tenant `common` or `organizations` issuers reject); `aud` is the provider app ID URI; the agent-identity discriminator claim is present (D14) | `(issuer, uti)`, one root per token | added beside `entra_jwt`; discriminator claim name pinned at build start; rules of this kind reject at load before M2 |
-| `oidc_jwt` | M1 | bearer at the edge (today's generic OIDC JWT path) | the rule's pinned issuer and `jwks_uri` or static key | `(issuer, jti)` when present, else the token-bytes digest | Microsoft Entra issuers reject at load (D14) |
-| `oauth_introspection` | M1 | bearer at the edge (today's introspection path) | RFC 7662 response from the configured endpoint, `active: true` | token-bytes digest | evidence is the introspection response digest |
+| `oauth_id_jag` | M1 | `jwt-bearer` assertion, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:id-jag`, from an authenticated confidential client | the provider record's issuer and `jwks_url`; `typ` equals the ID-JAG media type from the pinned draft; `aud` equals the local AS issuer; `client_id` equals the authenticated client; `resource`, when present, equals the advertised protected resource | `(issuer, jti)`, single use | `exp - iat <= max_assertion_lifetime_secs` |
+| `entra_jwt` | M1 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | the provider record's tenant-specific Entra `jwks_url`; `iss` equals the record's issuer, which must be tenant-specific (multi-tenant `common` or `organizations` issuers reject); `aud` is in the record's `trust_boundary.allowed_audiences` (the provider app ID URI); principal is the claim the record's `subject_mapping.principal_source` names (`oid` for Entra records), and a token without it denies | `(issuer, uti)`, one root per token | ordinary Entra application and workload tokens; D5 lifetime and kill latency |
+| `entra_agent_id` | M2 | bearer at the edge, or RFC 8693 `subject_token_type=urn:ietf:params:oauth:token-type:jwt` | as `entra_jwt`, against the rule's provider record; the agent-identity discriminator claim is present (D14) | `(issuer, uti)`, one root per token | added beside `entra_jwt`; discriminator claim name pinned at build start; rules of this kind reject at load before M2 |
+| `oidc_jwt` | M1 | bearer at the edge (today's generic OIDC JWT path) | the provider record's issuer, `trust_boundary.allowed_audiences`, and its `jwks_url` or inline `jwks` | `(issuer, jti)` when present, else the token-bytes digest | Microsoft Entra issuers reject at load (D14) |
+| `oauth_introspection` | M1 | bearer at the edge (today's introspection path) | RFC 7662 response from the provider record's `introspection_url`, `active: true` | token-bytes digest | evidence is the introspection response digest |
 | `chio_local_as` | M1 | access token from the local AS `authorization_code` flow, or RFC 8693 re-exchange of such a token (`subject_token_type=urn:ietf:params:oauth:token-type:access_token`) | local AS key | local token `jti`; a re-exchange consumes the subject token's `jti` once | today's local OAuth path. A re-exchanged root's scope is the subject root's scope narrowed by the requested `scope` and `resource`, and its `assertion_exp` equals the subject root's. Re-exchange is open to the client the subject token was issued to, including public clients, because it can only narrow |
 | `chio_operator_key` | M1 | operator-issued root through the admin route | pinned operator key | admin request id | replaces direct unanchored issuance |
 | `operator_static_bearer` | M1 | `--auth-token` static bearer at the edge | constant-time comparison against the SHA-256 of the configured token | token-bytes digest plus root expiry, one live root per token | operator-issued root naming the rule's operator-configured `principal`; a fresh root is minted when the previous one expires. Identity is operator-attested and carries no IdP evidence. Scope: development, tests and conformance |
@@ -458,6 +471,8 @@ Bearer intake (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `ent
   "anchor": {
     "kind": "oauth_id_jag",
     "issuer": "https://acme.okta.com",
+    "provider_record_id": "acme-okta",
+    "provider_identity_digest": "sha256:5c0e...",
     "key_snapshot_digest": "sha256:31bb...",
     "kid": "k-okta-1",
     "alg": "RS256",
@@ -487,12 +502,14 @@ Bearer intake (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `ent
 Rules:
 
 - `artifact_digest` is SHA-256 of the exact compact JWS bytes received.
+- `provider_record_id` and `provider_identity_digest` name the provider record the exchange verified against and the digest of its identity projection (section 7.4), which equals the matched rule's. `issuer` equals the record's issuer. Both members are present for provider-backed kinds and absent for `chio_local_as`, `chio_operator_key` and `operator_static_bearer`.
+- Decoding is strict (G18): an unknown member in the context, `anchor`, `exchange`, a commitment object or `claims` rejects. `claims` keys are exactly the rule's `recorded_claims` names.
 - `artifact_retained` (D7, M2) is `true` only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`. The retained token is stored in the evidence store keyed by `artifact_digest` and never in the context, receipts or logs. Every other kind is always `false`.
 - `subject` and `tenant` are always salted commitments with field-specific domains: `commit = SHA-256(domain || salt || utf8(value))`, where `domain` is `chio.delegation-context.subject.v1\0` or `chio.delegation-context.tenant.v1\0` and the salt is 32 bytes from the injected `Rng`, fresh per context. A subject opening therefore cannot be presented as a tenant opening. Salts live in the disclosure store under `salt_ref`.
 - `claims` holds only the claims the matched rule names in `recorded_claims`, each as plain or committed per the rule. A committed claim uses `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))` with its own 32-byte salt.
 - `holder` is `edge_session` or `caller` (section 6.5).
 
-### 7.4 `chio.root-policy.v1` (signed by the provider's policy key) and `chio.idp-key-snapshot.v1` (signed by the exchange key)
+### 7.4 `chio.root-policy.v1` (signed by the provider's policy key), provider records and `chio.idp-key-snapshot.v1` (signed by the exchange key)
 
 ```json
 {
@@ -505,12 +522,11 @@ Rules:
       "rule_id": "okta-crm-agents",
       "match": {
         "anchor_kind": "oauth_id_jag",
-        "issuer": "https://acme.okta.com",
-        "jwks_uri": "https://acme.okta.com/oauth2/v1/keys",
+        "provider_record_id": "acme-okta",
+        "provider_identity_digest": "sha256:5c0e...",
         "allowed_algs": ["RS256"],
         "claims": { "client_id": ["mcp-client-claude"] }
       },
-      "tenant_claim": "iss",
       "idp_scope_projection": { "crm.read": ["crm/search", "crm/get"], "crm.write": ["crm/update"] },
       "ceiling_scope": { "grants": ["..."] },
       "ceiling_scope_hash": "sha256:...",
@@ -542,15 +558,15 @@ Policy key and validity:
 
 Anchor rules:
 
-- `jwks_uri` is required for every JWKS-verified kind and must be `https`. Keys are fetched only from it. Token header members that name key material (`jku`, `x5u`, `jwk`, `x5c`) and any `crit` member reject.
+- Provider-backed kinds (`oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt`, `oauth_introspection`) require `provider_record_id` and `provider_identity_digest` in `match`. The rule holds no issuer, key location, endpoint, audience, tenant claim or principal claim; those come only from the provider record (G17). A token matches a rule only when its `iss` equals the issuer of the rule's provider record and the rule's other `match` members hold. Keys are fetched only from the record's `jwks_url` or taken from its inline `jwks`. Token header members that name key material (`jku`, `x5u`, `jwk`, `x5c`) and any `crit` member reject.
 - The effective root scope is `ceiling_scope ∩ projection(idp scope values)`. A scope value absent from `idp_scope_projection` denies the exchange. An IdP that sends no scope gets the empty projection, which denies.
 - Exactly one rule must match. Zero or more than one denies.
 - `capability_ttl_secs` defaults to 300. `max_assertion_lifetime_secs` defaults to 300 and applies to `oauth_id_jag`; for `entra_jwt` and `entra_agent_id` it must be absent (Entra lifetimes are set by Entra, and D5 governs).
 - `max_clock_skew_secs` is bounded to at most 60 at load time.
-- `tenant_claim` names the claim that identifies the caller's tenant (`iss` for per-org Okta issuers, `tid` for Entra). It feeds the tenant tag (section 7.12).
 - `retain_idp_artifact` is allowed only on `oauth_id_jag` rules (D7) and rejects at load before M2.
-- `entra_agent_id` rules reject at load before M2. `oidc_jwt` rules naming a Microsoft Entra issuer always reject (D14).
-- `principal` and `tenant_value` are required on `operator_static_bearer` rules and rejected on every other kind. `jwks_uri`, `allowed_algs` and `idp_scope_projection` are absent on that kind; its effective root scope is `ceiling_scope`.
+- `entra_agent_id` rules reject at load before M2. An `oidc_jwt` rule whose provider record has a Microsoft Entra issuer always rejects (D14).
+- `principal` and `tenant_value` are required on `operator_static_bearer` rules and rejected on every other kind. `provider_record_id`, `provider_identity_digest`, `allowed_algs` and `idp_scope_projection` are absent on that kind; its effective root scope is `ceiling_scope`. `chio_local_as` and `chio_operator_key` rules carry no provider members either.
+- Decoding is strict (G18): an unknown member in the policy, a rule, `match`, `disclosure` or a `tools` entry rejects at load, even under a valid policy signature.
 
 Disclosure rules (D2):
 
@@ -559,7 +575,33 @@ Disclosure rules (D2):
 - Inline fields are copied into `action.parameters_inline` or `result_inline` as a sparse object containing only those pointers. The commitments still cover the full arguments and the full result.
 - In M1 a non-empty `tools` map rejects at load (section 13.1).
 
-Load rules: the policy is loaded at startup. A policy that fails signature, pinned-key match, validity window, schema, ceiling-hash recomputation, pointer syntax or bound checks refuses startup.
+Load rules: the policy is loaded at startup. A policy that fails signature, pinned-key match, validity window, schema, ceiling-hash recomputation, pointer syntax or bound checks refuses startup. A provider-backed rule whose record is missing from the registry, of the wrong record kind, invalid, lacking a member its kind needs, or whose identity digest differs from `provider_identity_digest` also refuses startup. A disabled record does not refuse startup; it denies at runtime.
+
+Provider records (G17). The enterprise provider registry (`chio.enterprise-providers.v1`) is the one source of provider identity. A record referenced by a rule must be valid and carry:
+
+- record kind `oidc_jwks` for `oauth_id_jag`, `entra_jwt`, `entra_agent_id` and `oidc_jwt` rules, with `issuer` and exactly one of `jwks_url` (`https`) or an inline `jwks` (for issuers without a published key endpoint; it replaces `--auth-jwt-public-key`). The exchange never follows `discovery_url`. `entra_jwt`, `entra_agent_id` and `oidc_jwt` records also carry a non-empty `trust_boundary.allowed_audiences`; an `oauth_id_jag` token's `aud` is always the local AS issuer;
+- record kind `oauth_introspection` for `oauth_introspection` rules, with `issuer` and an `https` `introspection_url`. The client credentials the edge presents to that endpoint are `serve-http` secrets and never appear in the registry;
+- `subject_mapping.principal_source` naming the one claim that is the principal, and `subject_mapping.tenant_id_field` naming the tenant claim (`iss` for per-org Okta issuers, `tid` for Entra). The tenant claim feeds the tenant tag (section 7.12);
+- `provenance.trust_material_ref`, as the registry already requires.
+
+Scim and saml records are never referenced by a rule. The record member `provider_profile` is deleted (it duplicated the rule's `anchor_kind`).
+
+```json
+{
+  "schema": "chio.enterprise-provider-identity.v1",
+  "provider_id": "acme-okta",
+  "kind": "oidc_jwks",
+  "issuer": "https://acme.okta.com",
+  "jwks_url": "https://acme.okta.com/oauth2/v1/keys",
+  "audiences": [],
+  "subject_mapping": { "principal_source": "sub", "tenant_id_field": "iss" },
+  "trust_material_ref": "okta-org-acme"
+}
+```
+
+The identity projection holds the record's id, kind, issuer, key source (`jwks_url`, `jwks` or `introspection_url`), audiences, subject mapping and trust material reference. It excludes `enabled`, provenance labels other than `trust_material_ref`, and `validation_errors`. `provider_identity_digest = SHA-256("chio.enterprise-provider-identity.v1\0" || canonical_json(projection))`. The projection is unsigned and content-addressed, decodes strictly (G18), and is exported in bundles so a verifier can recompute the digest.
+
+Runtime rules: every exchange, and every admission under a root whose anchor names a provider record, loads the registry once (bounded, 16 MiB cap) and checks the record against that one version. A missing, disabled or invalid record, a record of the wrong kind, or a recomputed identity digest that differs from the rule's denies. An unreadable or invalid registry answers HTTP 503 with the load error on the token endpoint and bearer intake, and denies admission. There is no cached registry and no fallback copy.
 
 Producers without a root policy (`chio mcp serve`, `chio run`, the local kernel, `api protect` before M3, cage and broker receipts) emit fully committed receipts. Plaintext in a receipt always requires a signed root policy referenced by digest.
 
@@ -575,7 +617,7 @@ Producers without a root policy (`chio mcp serve`, `chio run`, the local kernel,
 }
 ```
 
-The exchange writes a snapshot each time its fetched key set changes. A snapshot is in force from `observed_at` until the next snapshot's `observed_at` for the same issuer. Each delegation context names the snapshot and `kid` it used. A snapshot is the provider's statement of what the IdP published. It is not IdP evidence, so an auditor who wants the identity root `verified` pins the IdP's keys in its own trust file (section 7.12).
+The exchange writes a snapshot each time its fetched key set changes. For a record with an inline `jwks`, `source` is `registry:<provider_id>` and a snapshot is written when the inline set changes. A snapshot is in force from `observed_at` until the next snapshot's `observed_at` for the same issuer. Each delegation context names the snapshot and `kid` it used. A snapshot is the provider's statement of what the IdP published. It is not IdP evidence, so an auditor who wants the identity root `verified` pins the IdP's keys in its own trust file (section 7.12).
 
 JWKS documents are accepted only when they parse within a size cap, every used key has `use` absent or `sig`, the key's `alg` (when present) matches the token `alg`, and RSA moduli are at least 2048 bits. Keys failing these checks are dropped from the set.
 
@@ -594,7 +636,7 @@ JWKS documents are accepted only when they parse within a size cap, every used k
 
 - `ancestors` is ordered root to parent, matching PROTOCOL W1.1. A root presented alone has `ancestors: []`. In M1 only `ancestors: []` is accepted (section 6.4).
 - `delegation_context` is required when the presenter is not the session holder, so the verifier can recompute `context_digest`.
-- Unsigned envelope. Every member inside is verified independently.
+- Unsigned envelope. Every member inside is verified independently. Decoding is strict (G18): an unknown member in the envelope or in any member it carries rejects the presentation.
 
 ### 7.6 `chio.receipt.v1` (in place, protocol-wide): commitments, `disclosure`, `authority`
 
@@ -637,6 +679,7 @@ Commitment rules:
 - A receipt with no inline fields omits `policy_digest` and both lists are empty.
 - `chain_digest = SHA-256("chio.receipt.chain-digest.v1\0" || canonical_json([root, ..., parent, leaf]))` over the full signed tokens.
 - Guard `evidence` entries and `metadata` must not contain argument or result values outside the inline fields. Enforcement is in section 8.4.
+- Decoding is strict (G18): an unknown member in a commitment, `disclosure`, `authority` or its `root_anchor`, or in any later block (`enforcement`, `settlement`), rejects the receipt at decode.
 
 Caller copy (D11, M2): every MCP `tools/call` response from `serve-http` carries `_meta.chioReceipt` with the signed receipt and a `chio.receipt-disclosure.v1` opening that contains the salts for that receipt's parameters, content and anchor subject and tenant, without payloads (the caller holds its own arguments, result and identity). `chioReceipt` joins the closed `_meta` name list in M2.
 
@@ -657,6 +700,7 @@ Caller copy (D11, M2): every MCP `tools/call` response from `serve-http` carries
 - An opening with a `salt` and `payload: null` is valid only in the caller copy, in `caller` bundles (section 7.12) and in the AuthZEN response to the PEP that sent the arguments (section 7.9). Export refuses to write salt-only openings in auditor profiles.
 - A verifier opens a commitment by recomputing it. A mismatch marks that field `rejected` and the receipt as tampered disclosure.
 - A verifier rejects an opening document in which the same `salt` value appears for more than one `salt_ref`, and marks the receipt as tampered disclosure. A producer draws a fresh salt for every field.
+- Decoding is strict (G18): an unknown member in the document or in any opening rejects it.
 - Deleting a receipt's openings from the disclosure store makes its commitments permanently hiding and leaves the signed receipt valid (erasure path).
 
 ### 7.8 Producer salt sources (D2)
@@ -804,7 +848,7 @@ Caller-side revocation (M2):
 
 Tags (D8):
 
-- `tenant_tag = HMAC-SHA256(index_key, "chio.tenant-tag.v1\0" || issuer || "\0" || tenant_value)` where `tenant_value` is the claim named by the rule's `tenant_claim`.
+- `tenant_tag = HMAC-SHA256(index_key, "chio.tenant-tag.v1\0" || issuer || "\0" || tenant_value)` where `issuer` is the provider record's issuer and `tenant_value` is the claim named by the record's `subject_mapping.tenant_id_field` (G17).
 - `subject_tag = HMAC-SHA256(index_key, "chio.subject-tag.v1\0" || issuer || "\0" || subject)`.
 - `index_key` is a provider secret loaded from a file at startup (32 bytes). It never leaves the process and is not a signing key.
 - Tags are stored in SQLite columns beside each root and receipt. They are not part of any signed artifact. No plaintext tenant id or subject is stored outside the salted commitments in the delegation context.
@@ -813,7 +857,7 @@ New manifest members:
 
 - `disclosure_profile`: closed, one of `caller` (receipts for one tenant; salts for those receipts' parameters, content, and the tenant's own principals and tenant commitment; no payloads), `auditor_full` (salts and payloads, M2), `auditor_hash_only` (no salts, no payloads).
 - `tenant_tag`: required for `caller`; the bundle contains only receipts whose stored tag matches.
-- New artifact roles: `capability_presentation`, `delegation_context`, `root_policy`, `idp_key_snapshot`, `idp_artifact` (retained ID-JAG, auditor profiles only, D7, M2), `receipt_disclosure`, `revocation_entry`, `revocation_request` (M2), `settlement_closure` (M3), `pdp_decision_receipt` (M2).
+- New artifact roles: `capability_presentation`, `delegation_context`, `root_policy`, `enterprise_provider_identity` (the identity projection of every provider record a bundle's roots name), `idp_key_snapshot`, `idp_artifact` (retained ID-JAG, auditor profiles only, D7, M2), `receipt_disclosure`, `revocation_entry`, `revocation_request` (M2), `settlement_closure` (M3), `pdp_decision_receipt` (M2).
 - The manifest is signed by the kernel key (existing commitment artifact pattern, `chio.evidence_export_commitment.v1`).
 
 The tenant confirms the bundle is its own by opening the subject and tenant commitments with the included salts.
@@ -854,11 +898,12 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 - Client authentication: a `jwt-bearer` or `token-exchange` request from a public client, without a client assertion, with an assertion whose signature fails against the registered client key, whose `aud` is not the token endpoint URL, whose lifetime exceeds 60 s, or whose `jti` was already used.
 - JWT header: `alg` not in the rule's `allowed_algs` (`none` and HMAC algorithms are never allowed); `typ` mismatch for `oauth_id_jag`; `kid` absent; any of `jku`, `x5u`, `jwk`, `x5c` or `crit` present.
 - `kid` not in the current key set after at most one rate-limited refresh (section 9.2).
-- Signature invalid. `iss` not exactly the rule's issuer. `aud` not exactly the local AS issuer (ID-JAG) or app ID URI (Entra). ID-JAG `resource` present and not equal to the advertised protected resource.
+- Provider registry (G17): unreadable or invalid (HTTP 503, no exchange); the rule's record missing, disabled, invalid or of the wrong kind; the record's recomputed identity digest different from the rule's `provider_identity_digest`.
+- Signature invalid. `iss` not exactly the provider record's issuer. `aud` not exactly the local AS issuer (ID-JAG) or not in the record's `trust_boundary.allowed_audiences` (Entra, OIDC JWT). ID-JAG `resource` present and not equal to the advertised protected resource.
 - Time: `exp` or `iat` missing; `now >= exp + skew`; `iat > now + skew`; `nbf > now + skew`; for ID-JAG, `exp - iat > max_assertion_lifetime_secs`; computed root `expires_at <= now`. All time reads go through the injected authority clock.
 - Replay key (section 7.2) missing where required, or already bound. The replay store is durable and retained until `exp + skew`.
 - ID-JAG `client_id` not equal to the authenticated client.
-- Entra token with none of `oid`, `sub`, `azp`, `appid` or `client_id`. From M2, a token with the agent-identity discriminator claim matched against an `entra_jwt` rule, or one without it matched against an `entra_agent_id` rule. Any Entra issuer on an `oidc_jwt` rule.
+- Token without the claim the provider record's `subject_mapping.principal_source` names, or, where the record names a `tenant_id_field`, without that claim. From M2, a token with the agent-identity discriminator claim matched against an `entra_jwt` rule, or one without it matched against an `entra_agent_id` rule. Any Entra issuer on an `oidc_jwt` rule's provider record.
 - Static bearer token not equal to the configured token. Local AS re-exchange whose subject token is expired, revoked or already re-exchanged, or whose requested scope or `resource` is not a subset of the subject root's.
 - Any string feeding a tag or commitment that contains a NUL character.
 - Root policy: outside `valid_from`/`valid_until`; zero or more than one matching rule; a scope value missing from the projection; effective scope empty; requested holder class not in `holder_classes`; DPoP-required grants for a session-held root.
@@ -869,6 +914,8 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 ### 8.2 Edge admission
 
 - Root without `root_anchor`, signed by a key outside the root policy's `exchange_keys`, or naming a `root_policy_digest` that is not the loaded policy. Loaded policy outside its validity window.
+- Strict decoding (G18, G19): an unknown member at any level of a presented capability, presentation or delegation context, including an added or altered `algorithm` member. The rejection happens at decode, before any verifier is chosen.
+- Provider record (G17), for a root whose anchor names one: the registry, loaded once for this request, is unreadable or invalid, or the record is missing, disabled, invalid, or its identity digest differs from the one the delegation context names.
 - Root `expires_at > root_anchor.assertion_exp`.
 - `context_digest` mismatch against the presented or stored delegation context, or any binding in section 7.1 failing (`assertion_exp` against `token_exp`, issuer key against `exchange_key`, scope hash against `effective_root_scope_hash`, subject against `holder`).
 - Delegated token whose `root_anchor` differs from its root's. Ancestor evidence missing, reordered, unsigned or not covering every hop (existing W1.1 rule). Any non-empty `ancestors` before M2.
@@ -877,7 +924,7 @@ Every rule below denies, rejects at load, or refuses startup. None degrades to a
 
 ### 8.3 Startup refusals
 
-`serve-http` refuses to start when: no root policy is configured, or it fails any load rule in section 7.4; the root policy's `policy_key` differs from `--root-policy-key`; the state-directory lock is held by another process or the state directory is on a network filesystem (D4); the kernel signer is ephemeral (T7) or missing; any two of the exchange, kernel, policy and local AS keys are equal; a seed file is readable by group or other or not owned by the process user; the tenant index key is missing or not 32 bytes; a manifest price uses a chain id outside the testnet allowlist; durable admission is off; `--auth-token` is set without exactly one `operator_static_bearer` rule naming a `principal`, or such a rule exists without `--auth-token`; `--exchange-signer trust-control` is set and the trust-control authority key differs from `--control-authority-public-key`. From M2: a KMS key's `GetPublicKey` result differs from the pinned public key in config. `api protect` gains the same refusals in M3.
+`serve-http` refuses to start when: no root policy is configured, or it fails any load rule in section 7.4; a provider-backed rule exists and `--enterprise-providers-file` is not set, or the registry is unreadable or invalid; the root policy's `policy_key` differs from `--root-policy-key`; the state-directory lock is held by another process or the state directory is on a network filesystem (D4); the kernel signer is ephemeral (T7) or missing; any two of the exchange, kernel, policy and local AS keys are equal; a seed file is readable by group or other or not owned by the process user; the tenant index key is missing or not 32 bytes; a manifest price uses a chain id outside the testnet allowlist; durable admission is off; `--auth-token` is set without exactly one `operator_static_bearer` rule naming a `principal`, or such a rule exists without `--auth-token`; `--exchange-signer trust-control` is set and the trust-control authority key differs from `--control-authority-public-key`. From M2: a KMS key's `GetPublicKey` result differs from the pinned public key in config. `api protect` gains the same refusals in M3.
 
 ### 8.4 Privacy
 
@@ -922,7 +969,7 @@ Adversaries: an external agent with a stolen or replayed token; a malicious call
 ### 9.2 IdP key rotation
 
 - Today the JWKS is fetched once (T4), so a rotation breaks the edge until restart, and a withdrawn key stays trusted until restart.
-- New behavior: keys come only from the rule's pinned `jwks_uri`. Unknown `kid` triggers one refresh, rate-limited per issuer (at most one fetch per 60 s). A scheduled refresh (default every 15 min) removes keys the IdP has withdrawn. Every key-set change writes a new `chio.idp-key-snapshot.v1`.
+- New behavior: keys come only from the `jwks_url` or inline `jwks` of the rule's provider record, whose identity digest the signed rule pins. Unknown `kid` triggers one refresh, rate-limited per issuer (at most one fetch per 60 s). A scheduled refresh (default every 15 min) removes keys the IdP has withdrawn. Every key-set change writes a new `chio.idp-key-snapshot.v1`.
 - An attacker cannot force a refresh storm: the rate limit holds, and unknown-`kid` tokens deny while it is active. Header-supplied key locations (`jku`, `x5u`, `jwk`, `x5c`) reject, so a token cannot choose its own key.
 - A compromised IdP key is the IdP's incident. Chio's exposure after the IdP withdraws the key is bounded by the next scheduled refresh plus the root lifetime.
 
@@ -970,6 +1017,18 @@ Adversaries: an external agent with a stolen or replayed token; a malicious call
 - Rehearsal-only enforcement (F2): the CAIP-2 testnet allowlist is compiled in for v1 (Base Sepolia `eip155:84532`, plus any others the builder pins). Mainnet ids reject at manifest and policy load.
 - Facilitator compromise is out of Chio's control. Chio records what the facilitator returned and its digest; the verifier's settlement column is `asserted` unless the optional online on-chain check (`chio-verify --online`) confirms the transaction.
 
+### 9.8 Provider registry
+
+- **Unsigned, mutable source.** The registry file is not signed. A party who can write it can disable or remove providers, which denies their exchanges and calls (availability only). It cannot repoint a provider's issuer, keys, endpoint, audience or subject mapping: each rule pins the record's identity digest under the offline policy key, so any identity change denies until a re-signed policy is loaded.
+- **Stale state.** Each exchange and each admission under a provider-anchored root reads the registry once and matches against that version, as #1535 does for bearer requests. A provider disabled after a root was issued denies the next call under that root, and no cached copy outlives an edit.
+- **Unreadable registry.** Startup refuses. At runtime the token endpoint and bearer intake answer HTTP 503 and admission denies. Nothing falls back to a previous copy or to flags.
+- **Offline evidence.** The enabled state is admission-time state and is not in any bundle. A verifier recomputes the provider identity digest from the exported projection and checks it against the rule; it does not learn whether the provider was enabled.
+
+### 9.9 Decoding malleability and algorithm confusion
+
+- **Padding.** A member a decoder silently drops is still covered by the signature, so two parties can disagree about a signed artifact's content, and a signer can be induced to sign bytes whose typed reading differs from what it checked. Strict decoding (G18) rejects unknown members at every level, including the serde internally tagged unit-variant gap (T30).
+- **Algorithm confusion.** No member of an artifact selects the verifier (G19). The algorithm comes from the pinned, typed key, and the signature encoding prefix must match it. Deleting the unsigned `algorithm` member removes the field an attacker could tamper with, and a document that carries one fails decoding.
+
 ## 10. Crate-by-crate changes
 
 Paths are relative to the repository root. "Delete" means in the same PR as the replacement. Milestone in brackets.
@@ -977,12 +1036,12 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 ### 10.1 `crates/core/chio-core-types`
 
 - `src/crypto.rs` [M0, D16]: `SigningBackend` collapse per the parallel lead's plan: `public_key() -> Result<PublicKey>`; `algorithm()` and `current_public_key()` deleted; the 36 trait impls and the infallible wrappers that call them (kernel `receipt_signing_public_key`, `authority_public_key`, federation `local_public_key` and the others in the plan) become fallible. Byte-neutral, one PR.
-- `src/crypto.rs` [M1]: signing-wrapper construction, `sign_wrapped` on the trait and the single verification helper (section 7.0); `sign_canonical_bytes` deleted; algorithm-binding check.
+- `src/crypto.rs` [M1]: signing-wrapper construction, `sign_wrapped` on the trait and the single verification helper (section 7.0); `sign_canonical_bytes` deleted; algorithm-binding check; verifier selection from the pinned typed key only (G19).
 - `src/crypto.rs` [M2]: P-256 and P-384 verification in default builds through the RustCrypto `p256` and `p384` crates (already in the dependency graph as direct dependencies of `chio-mcp-remote`), `no_std` compatible. Under `fips`, the same functions use aws-lc-rs. One public API, one backend per build, and a differential test over shared vectors. `ClassicalSigner` (local `Keypair` or `Arc<dyn SigningBackend>`).
 - `src/capability/anchor.rs` (new) [M1]: `RootAnchor`, `AnchorKind`.
-- `src/capability/token.rs` [M1]: `root_anchor` on `CapabilityTokenBody` and the signing body. Regenerate `_generated/chio_wire_v1.rs`.
+- `src/capability/token.rs` [M1]: delete the unsigned `algorithm` member in item 1 (G19), with the receipt's and the other optional `algorithm` members in `chio-core-types` and `chio-credit`; `root_anchor` on `CapabilityTokenBody` and the signing body in item 3. Regenerate `_generated/chio_wire_v1.rs`.
 - `src/capability/scope.rs` [M3]: `MonetaryAmount.currency` becomes `asset: Asset`. Every caller changes in the same PR.
-- `src/root_authority/` (new) [M1]: `DelegationContext`, `RootPolicy` (anchor and disclosure rules), `IdpKeySnapshot`, `CapabilityPresentation`, `VerifierTrust`, `RevocationRequest` [M2], the pure root-policy matcher, scope projection, the section 7.1 binding checks and disclosure-policy check, `no_std + alloc` compatible so `chio-verify` and wasm verifiers reuse them. Every function takes time as a parameter; none reads a clock.
+- `src/root_authority/` (new) [M1]: `DelegationContext`, `RootPolicy` (anchor and disclosure rules), `EnterpriseProviderIdentity` (the projection and its digest, G17), `IdpKeySnapshot`, `CapabilityPresentation`, `VerifierTrust`, `RevocationRequest` [M2], the pure root-policy matcher, scope projection, the section 7.1 binding checks and disclosure-policy check, `no_std + alloc` compatible so `chio-verify` and wasm verifiers reuse them. Every function takes time as a parameter; none reads a clock. Every type decodes strictly (G18), with a padding negative test per struct and per union variant.
 - `src/receipt/decision.rs`, `src/receipt/body.rs` [M1]: commitments, inline fields, `disclosure`, `authority`, the `tenant_id` exclusion; `enforcement` [M2]; `settlement` [M3].
 - `src/receipt/kinds.rs` [M1, M2]: delete `RedactionMode` [M1]; add `PdpDecision`, `PreventExternal`, `Delegated` [M2].
 - `src/receipt/disclosure.rs` (new) [M1]: `Commitment`, `ReceiptDisclosure`, open and verify.
@@ -1019,9 +1078,10 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 - `src/remote_mcp/oauth/local_server.rs`: add the `jwt-bearer` grant; replace `exchange_subject_token` and `validate_subject_token` with the anchored exchange for the subject token types in section 7.2, keeping local AS re-exchange as a `chio_local_as` narrowing (T1); add `requested_token_type` handling; confidential client authentication (`private_key_jwt`) for `jwt-bearer` and `token-exchange`. The `authorization_code` flow now yields `chio_local_as` anchored roots.
 - `src/remote_mcp/session_core.rs`: `OAuthClientRegistration` gains the client public JWK and `token_endpoint_auth_method`; `JwtHeader` gains `typ` and rejects key-location members and `crit`; claims gain `iat`, `uti` and `resource`; `RemoteAuthMode::StaticBearer` keeps `auth_token` and resolves through the exchange to an `operator_static_bearer` root; per-store path fields replaced by `state_dir`.
 - `src/remote_mcp/oauth/root_exchange.rs` (new): verification per anchor kind, replay keys, root policy matching, root minting through the exchange `SigningBackend`, delegation-context, snapshot and tag writes, optional ID-JAG retention [M2], `entra_jwt` [M1], `entra_agent_id` [M2].
-- `src/remote_mcp/oauth/bearer_auth.rs` and introspection paths: every bearer intake (static bearer, generic OIDC JWT, introspection, Entra) ends in the exchange and binds an anchored root through the token-digest mapping; no session authority is created any other way.
-- `src/remote_mcp/session_identity.rs`: JWKS from the rule's pinned `jwks_uri`, refresh on unknown `kid` with rate limit, scheduled refresh, JWKS document checks, snapshot emission; delete `derive_federated_agent_keypair`, `derive_enterprise_subject_key` (T8), the enterprise provider registry and `JwtProviderProfile`; the `AzureAd` principal mapping (`oid`, `sub`, then `azp`, `appid` or `client_id`) moves into `entra_jwt` verification.
+- `src/remote_mcp/oauth/bearer_auth.rs` and introspection paths: every bearer intake (static bearer, generic OIDC JWT, introspection, Entra) ends in the exchange and binds an anchored root through the token-digest mapping; no session authority is created any other way. The per-request registry load from #1535 stays and feeds the exchange and the admission provider check (G17).
+- `src/remote_mcp/session_identity.rs`: JWKS from the provider record's `jwks_url` or inline `jwks`, refresh on unknown `kid` with rate limit, scheduled refresh, JWKS document checks, snapshot emission; principal and tenant from the record's subject mapping; delete `derive_federated_agent_keypair`, `derive_enterprise_subject_key` (T8), `JwtProviderProfile` and its `AzureAd` fallback chain (G17). The enterprise provider registry stays as the provider identity source.
 - `src/remote_mcp/http_service_auth.rs`: AS metadata advertises `urn:ietf:params:oauth:grant-type:jwt-bearer`, the supported token types and `private_key_jwt`.
+- `src/remote_mcp/session_core.rs` and `http_service_auth.rs`: delete the configuration fields behind the provider verification flags (`auth_jwt_public_key`, `auth_jwt_discovery_url`, `auth_jwt_issuer`, `auth_jwt_audience`, `auth_introspection_url`, `auth_jwt_provider_profile`); the bearer verifiers are built from provider records per request.
 - `src/remote_mcp/session_core/factory.rs`: delete the direct `configure_capability_authority` session issuance path; the pinned remote trust-control authority becomes the `trust-control` exchange signer; sessions receive roots only from the exchange; ephemeral kernel keys refuse startup.
 - `src/remote_mcp/admin.rs`: revocation targets from section 7.11 on `/admin/revocations` [M1]; `POST /v1/revocations` for caller requests [M2].
 - State-directory lock at startup (D4).
@@ -1035,13 +1095,14 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 ### 10.7 `crates/platform`
 
 - `chio-store-sqlite` [M1]: tables `disclosure_openings` (erasable), `exchange_replay` (half-open expiry ranges), `anchored_roots` (with rule id, subject tag and tenant tag columns), `bearer_token_roots` (token digest to root), `idp_key_snapshots`, `capability_presentations`, `tenant_index`; the existing revocation tables gain the section 7.11 target kinds; `idp_artifacts` [M2], `revocation_requests` [M2]. All writes through the existing serving writer, in the database under the state directory.
+- `chio-control-plane/src/enterprise_federation.rs` [M1]: delete the record member `provider_profile`; add the optional inline `jwks` to `oidc_jwks` records (exactly one of `jwks_url` or `jwks` when referenced by a rule); project a record into `EnterpriseProviderIdentity`. Trust-control's provider admin and its tests change in the same PR (G17).
 - `chio-control-plane/src/evidence_export/` [M1]: export writes the new roles, `disclosure_profile` and `tenant_tag`; delete `verification.rs` and the verify half of `evidence_export.rs` once `chio-bundle-verify` replaces them. `build_kernel_with_clock` takes a `ClassicalSigner` [M2].
 - `chio-http-core/src/authzen.rs` (new) [M2]: framework-neutral AuthZEN types, mapping to Chio evaluation, PEP allowlist type.
 - `chio-manifest` [M3]: tool `pricing` block.
 
 ### 10.8 `crates/products`
 
-- `chio-cli` [M1]: `serve-http --root-policy`, `--root-policy-key`, `--exchange-signer`, `--kernel-signer` (value `seed-file:<path>` in M1, `--exchange-signer` also `trust-control` with the existing `--control-url` and `--control-authority-public-key`; `aws-kms:<arn>` added in M2), `--tenant-index-key`, `--state-dir`; `--auth-token` kept (section 7.2); the per-store database path flags, `--enterprise-providers-file` and `--auth-jwt-provider-profile` deleted. The progressive tutorial, conformance peers, examples, deploy units and SDK publication scripts gain a root policy file and move to `--state-dir` in the same PR. `chio evidence verify` delegates to `chio-bundle-verify`. `chio evidence export --disclosure-profile --tenant`. `chio revoke` admin subcommands.
+- `chio-cli` [M1]: `serve-http --root-policy`, `--root-policy-key`, `--exchange-signer`, `--kernel-signer` (value `seed-file:<path>` in M1, `--exchange-signer` also `trust-control` with the existing `--control-url` and `--control-authority-public-key`; `aws-kms:<arn>` added in M2), `--tenant-index-key`, `--state-dir`; `--auth-token` and `--enterprise-providers-file` kept (sections 7.2, 7.4); the per-store database path flags, `--auth-jwt-provider-profile`, `--auth-jwt-public-key`, `--auth-jwt-discovery-url`, `--auth-jwt-issuer`, `--auth-jwt-audience` and `--auth-introspection-url` deleted (G17). The operator runbook and examples move their provider settings into registry records. The progressive tutorial, conformance peers, examples, deploy units and SDK publication scripts gain a root policy file and move to `--state-dir` in the same PR. `chio evidence verify` delegates to `chio-bundle-verify`. `chio evidence export --disclosure-profile --tenant`. `chio revoke` admin subcommands.
 - `chio-api-protect` [M1]: committed receipts through the shared kernel signer (no root policy, no inline fields). [M3]: anchored roots, root policy and disclosure, tenant index and export, x402 HTTP 402 challenge, the section 8.3 startup refusals.
 
 ### 10.9 New crates
@@ -1051,9 +1112,9 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 
 ### 10.10 SDK verifiers, spec and docs
 
-- `sdks/typescript`, `sdks/python`, `sdks/go` verifiers [M1]: signing wrapper, commitments, openings, new vectors. These change in the same PRs as the Rust format change. Default-build P-256 verification in the SDKs [M2].
-- `spec/PROTOCOL.md` [M0]: section 4 (signing wrapper, algorithm binding); new subsection 5.6 "Anchored roots and the relying-party exchange"; section 6 table and WYSIWYS text for commitments, the `tenant_id` exclusion and producer salt sources; 6.1 for `pdp_decision`; new 6.7 "Settlement block and closure"; 8.2 updated once the ADR is accepted; 10.3 rewritten for root policy rules (the enterprise provider registry is deleted); the section 14 gap line on enterprise identity propagation narrowed to "outside exchange-issued roots"; a deployment-limits note for single-instance edges. `spec/WIRE_PROTOCOL.md` [M0]: `_meta.chioCapability` and `_meta.chioReceipt`.
-- `spec/schemas/chio-wire/v1/` [M0]: schemas for every artifact in section 7, including the optional ID-JAG retention slot (D7) and the M2 and M3 artifacts; `registry.json` entries.
+- `sdks/typescript`, `sdks/python`, `sdks/go` verifiers [M1]: signing wrapper, commitments, openings, strict decoding of every section 7 type (G18), algorithm from the pinned key only (G19), new vectors. These change in the same PRs as the Rust format change. Default-build P-256 verification in the SDKs [M2].
+- `spec/PROTOCOL.md` [M0]: section 4 (signing wrapper, algorithm binding); new subsection 5.6 "Anchored roots and the relying-party exchange"; section 6 table and WYSIWYS text for commitments, the `tenant_id` exclusion and producer salt sources; 6.1 for `pdp_decision`; new 6.7 "Settlement block and closure"; 8.2 updated once the ADR is accepted; 10.3 rewritten so the enterprise provider registry is the one source of provider identity and root policy rules reference records by id and identity digest (G17); the section 14 gap line on enterprise identity propagation narrowed to "outside exchange-issued roots"; a deployment-limits note for single-instance edges. `spec/WIRE_PROTOCOL.md` [M0]: `_meta.chioCapability` and `_meta.chioReceipt`.
+- `spec/schemas/chio-wire/v1/` [M0]: schemas for every artifact in section 7, including the optional ID-JAG retention slot (D7), the M2 and M3 artifacts and `chio.enterprise-provider-identity.v1`; every object `additionalProperties: false` and every tagged union a `oneOf` of closed objects (G18); `registry.json` entries.
 - `docs/adr/` [M0]: the customer-hosted root exchange ADR outlined in section 15 (`docs/adr/ADR-0039-customer-hosted-root-exchange.md`, #1533), accepted before M1 code merges (T22, D12).
 - `docs/reference/CLAIM_REGISTRY.md`: one row per acceptance statement in section 12, added only when its evidence exists.
 - `docs/release/QUALIFICATION.md` [M1]: the hosted authorization edge rows (including the row whose command runs `mcp_serve_http_local_auth_server_supports_auth_code_and_token_exchange`, which exercises local AS re-exchange) are marked suspended at the M1 migration merge and rewritten against the anchored flow when the lane re-passes (D1).
@@ -1063,10 +1124,12 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 
 ### 11.1 Unit and property tests
 
-- Signing wrapper: every registered signed artifact type signs and verifies through the one helper; a signature over one schema id fails as another; the verifier ignores any schema member inside the artifact and uses its call-site schema id; a signature prefix that does not match the pinned key's algorithm rejects; a stripped hybrid signature fails against a pinned hybrid key; ML-DSA-65 with a non-empty context fails; Ed25519, P-256 (both backends, M2 for default builds), P-384 and hybrid vectors.
+- Signing wrapper: every registered signed artifact type signs and verifies through the one helper; an artifact with an added or altered `algorithm` member fails strict decoding, and the verifier chosen for a pinned key is the same with and without such a member (G19); a signature over one schema id fails as another; the verifier ignores any schema member inside the artifact and uses its call-site schema id; a signature prefix that does not match the pinned key's algorithm rejects; a stripped hybrid signature fails against a pinned hybrid key; ML-DSA-65 with a non-empty context fails; Ed25519, P-256 (both backends, M2 for default builds), P-384 and hybrid vectors.
 - Trait collapse [M0]: every changed crate suite green with no byte change in any fixture (fixture digests compared before and after).
 - Client authentication: public client on `jwt-bearer` denies; missing, expired, wrong-`aud`, wrong-key and replayed client assertions deny.
-- Anchor verification per kind: valid, expired, future `iat`, wrong `aud`, wrong `typ`, wrong `resource`, unknown `kid`, rotated key, `alg` outside `allowed_algs`, HMAC `alg`, `jku`/`x5u`/`jwk`/`x5c`/`crit` headers, JWKS key with `use: enc`, RSA modulus below 2048 bits, oversized JWKS, ID-JAG lifetime above the cap, computed `expires_at <= now`, replayed `jti` (including after restart against SQLite), the same `jti` under two issuers (both accepted), NUL in issuer or subject, Entra issuer on an `oidc_jwt` rule rejects at load; `entra_jwt`: multi-tenant issuer, principal from `oid` then `sub` then `azp`/`appid`/`client_id`, no principal claim denies, reused `uti`, a second token with a bound `uti`, root lifetime `min(ttl, token exp)`. M2: agent-identity token routed to `entra_agent_id` and denied by an `entra_jwt`-only policy, token without the discriminator denied by an `entra_agent_id`-only policy.
+- Anchor verification per kind: valid, expired, future `iat`, wrong `aud`, wrong `typ`, wrong `resource`, unknown `kid`, rotated key, `alg` outside `allowed_algs`, HMAC `alg`, `jku`/`x5u`/`jwk`/`x5c`/`crit` headers, JWKS key with `use: enc`, RSA modulus below 2048 bits, oversized JWKS, ID-JAG lifetime above the cap, computed `expires_at <= now`, replayed `jti` (including after restart against SQLite), the same `jti` under two issuers (both accepted), NUL in issuer or subject, Entra issuer on an `oidc_jwt` rule's provider record rejects at load; `entra_jwt`: multi-tenant issuer, principal from the record's `principal_source` (`oid`), a token without that claim denies, reused `uti`, a second token with a bound `uti`, root lifetime `min(ttl, token exp)`. M2: agent-identity token routed to `entra_agent_id` and denied by an `entra_jwt`-only policy, token without the discriminator denied by an `entra_agent_id`-only policy.
+- Provider registry (G17): a rule naming a missing record, a record of the wrong kind, an invalid record or a record whose identity digest differs refuses startup; a provider-backed rule without `--enterprise-providers-file` refuses startup; a provider disabled or removed after a root was issued denies the next exchange and the next call under the live root; re-enabling it admits again; an unreadable or corrupted registry answers HTTP 503 at the token endpoint and bearer intake and denies admission; a record whose `jwks_url` changes without a re-signed policy denies; one request reads the registry once; the exchange never follows `discovery_url`; an inline `jwks` record verifies tokens and writes a `registry:<provider_id>` snapshot.
+- Strict decoding (G18): for every section 7 type, one added member at each nesting level fails decoding even when the signature over the padded body is valid; for every tagged union, `{"kind":<variant>,"pad":0}` fails; a type using `#[serde(flatten)]` fails a repository check.
 - Bearer intake: the same token in two sessions maps to one root; a different token with the same `(iss, sub, iat, exp)` and no `jti` gets its own root.
 - Static bearer: `--auth-token` without an `operator_static_bearer` rule refuses startup; a rule without `principal` refuses startup; a wrong token denies; the root names the configured principal and the receipt's identity column verifies as `asserted`; the token never appears in the state directory or logs; a new root is minted after expiry.
 - Local AS re-exchange: narrowed scope and `resource` succeed; widening, an expired or revoked subject token, and a second re-exchange of the same token deny.
@@ -1086,9 +1149,9 @@ Paths are relative to the repository root. "Delete" means in the same PR as the 
 
 ### 11.2 Conformance vectors
 
-- `tests/bindings/vectors/signing/` [M0]: signing-wrapper vectors for each registered schema id and algorithm, including negative vectors for schema-id substitution and algorithm-prefix mismatch, generated in M0 by a small reference script (Python standard library plus a pinned Ed25519 and ECDSA library) and cross-checked by the Rust implementation in M1.
-- `tests/bindings/vectors/receipt/` [M0, M1]: committed receipts with openings, inline fields with a referenced policy [M2], `pdp_decision` receipts [M2], settlement blocks and closures [M3]. TS, Python and Go verifiers run them.
-- `tests/bindings/vectors/capability/` [M1, M2]: anchored roots per M1 kind (including `operator_static_bearer` and `entra_jwt`), negative vectors for each section 8.2 rule; Entra Agent ID roots [M2]; chains of depth 1, 2 and 4 [M2].
+- `tests/bindings/vectors/signing/` [M0]: signing-wrapper vectors for each registered schema id and algorithm, including negative vectors for schema-id substitution and algorithm-prefix mismatch, generated in M0 by a small reference script (Python standard library plus a pinned Ed25519 and ECDSA library) and cross-checked by the Rust implementation in M1. M1 item 1 adds algorithm negatives (G19): a capability and a receipt with an added top-level `algorithm` member, and with `algorithm` altered to name another algorithm, each fail strict decoding; and a P-256 pinned key with an `algorithm: "ed25519"` member and an Ed25519 signature still rejects on the encoding prefix.
+- `tests/bindings/vectors/receipt/` [M0, M1]: committed receipts with openings, inline fields with a referenced policy [M2], `pdp_decision` receipts [M2], settlement blocks and closures [M3]. TS, Python and Go verifiers run them. Padding negatives (G18), each with a valid signature over the padded body: an added member in a commitment, `disclosure`, `authority`, `authority.root_anchor`, the opening document and one opening [M1]; in `enforcement` [M2]; in `settlement`, one `rail_refs` entry and the closure [M3].
+- `tests/bindings/vectors/capability/` [M1, M2]: anchored roots per M1 kind (including `operator_static_bearer` and `entra_jwt`), negative vectors for each section 8.2 rule; padding negatives (G18) for `root_anchor`, the delegation context (`anchor`, `exchange`, a commitment, `claims`), the presentation envelope, the root policy (rule, `match`, `disclosure.tools` entry), an IdP key snapshot key and the provider identity projection; Entra Agent ID roots [M2]; chains of depth 1, 2 and 4 [M2]; a padded revocation request [M2].
 
 ### 11.3 Verdict-matrix additions
 
@@ -1096,7 +1159,7 @@ New categories under `crates/tooling/chio-conformance/verdict_matrix/scenarios/`
 
 | Category | Milestone | Covers |
 |---|---|---|
-| `anchored_root` | M1 (16), M2 (+4) | each M1 anchor kind allow, including static bearer and `entra_jwt`; section 8.1 and 8.2 denies (client authentication, replay, missing anchor, lifetime, unlisted exchange key, Entra issuer on an `oidc_jwt` rule); `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry. All 16 are staged in M0 (section 2.5). M2 adds Entra Agent ID allow, discriminator routing in both directions, and agent `uti` reuse |
+| `anchored_root` | M1 (24), M2 (+4) | each M1 anchor kind allow, including static bearer and `entra_jwt`; section 8.1 and 8.2 denies (client authentication, replay, missing anchor, lifetime, unlisted exchange key, Entra issuer on an `oidc_jwt` rule); `entra_jwt` multi-tenant issuer and `uti` reuse after root expiry; provider registry (provider disabled after the root was issued, provider removed, registry unreadable at exchange and at admission, provider identity changed without a re-signed policy); strict decoding (padded `root_anchor`, added `algorithm` member, padded root policy at load). All 24 are staged in M0 (section 2.5). M2 adds Entra Agent ID allow, discriminator routing in both directions, and agent `uti` reuse |
 | `receipt_disclosure` | M1 (12) | committed default; evidence allowlist drop; `tenant_id` exclusion; salt-only opening rejected in auditor profile; inline-field scenarios written in M1 as expected-deny at policy load and flipped in M2 |
 | `revocation_local` | M1 (12) | each provider revocation target denies the next call; cascade; concurrent revocation and admission |
 | `delegation_chain` | M2 (12) | depth 1-4 allow; reorder, gap, widened hop, mismatched anchor deny; offline verify equals online verdict; caller revocation of a descendant |
@@ -1157,6 +1220,7 @@ May say (shipped; `serve-http` qualified again only after the lane re-passes):
 - "`chio mcp serve-http` accepts Microsoft Entra access tokens from tenant-specific issuers and roots each one in an exchange recorded under the provider's root policy. Disabling an Entra principal takes effect at the provider when its already-issued tokens expire, typically about one hour."
 - "For Okta ID-JAG principals, disabling the principal at the IdP takes effect at the provider within 300 seconds plus the configured clock skew (at most 60 seconds), by default."
 - "The provider can revoke a capability, a principal, a policy rule or a tenant. Every call admitted after the revocation is recorded denies."
+- "Disabling or removing an identity provider in the provider registry denies the next exchange and the next call under capabilities rooted in it."
 - "Every Chio receipt contains salted commitments to tool arguments and results instead of plaintext."
 - "A provider can export a bundle for one customer tenant that the tenant verifies offline with the Apache-2.0 `chio-verify` tool."
 
@@ -1218,14 +1282,14 @@ Not available as cuts: the `operator_static_bearer`, `oidc_jwt`, `oauth_introspe
 | M0 | Signing-wrapper and committed-receipt reference script and vectors | S, 4-5 |
 | M0 | `SigningBackend` collapse (D16): trait, 36 impls, fallible wrappers, about 1.5k-2.5k changed lines, byte-neutral | M, 5-7 |
 | M0 total | | 17-22 |
-| M1 | 1. Signing wrapper in `chio-core-types` (`sign_wrapped`, algorithm binding), all signing call sites including the raw-site table, registration of every unregistered wrapper id with its schema, the schema-id binding signer, deletion of the core-types `ToolManifest`, Rust and SDK verifiers, fixture regeneration | L, 22-30 |
+| M1 | 1. Signing wrapper in `chio-core-types` (`sign_wrapped`, algorithm binding), all signing call sites including the raw-site table, registration of every unregistered wrapper id with its schema, the schema-id binding signer, deletion of the core-types `ToolManifest`, deletion of the unsigned `algorithm` members with algorithm negatives (G19), Rust and SDK verifiers, fixture regeneration | L, 23-32 |
 | M1 | 2. Committed receipts in every producer (kernel-core signer, hosted kernel, `api protect`, FFI, WASM, mobile, security producers, Lambda extension), `HttpReceipt` deletion with the HTTP middleware SDKs, preimage plumbing for hash-relaying producers, `tenant_id` exclusion, guard evidence allowlist, disclosure store, SDK verifiers, scenario and fixture rewrites | L, 26-37 |
-| M1 | 3. Anchored-root types, section 7.1 bindings and `AnchoredTrustRoot` (depth 0) | M, 6-8 |
-| M1 | 4. Exchange: ID-JAG with confidential client authentication; the kept kinds (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `entra_jwt`, `chio_local_as` with re-exchange, `chio_operator_key`); trust-control exchange signer; deletions (seed-derived keys, bypass issuance, `serve-http` enterprise provider registry and provider profile, per-store path flags) with tutorial, peer, example and deploy updates; pinned JWKS with refresh and snapshots; replay keys; tenant and subject tags; state-directory lock | L, 25-35 |
+| M1 | 3. Anchored-root types with strict decoding and padding negatives (G18), section 7.1 bindings and `AnchoredTrustRoot` (depth 0) | M, 7-9 |
+| M1 | 4. Exchange: ID-JAG with confidential client authentication; the kept kinds (`operator_static_bearer`, `oidc_jwt`, `oauth_introspection`, `entra_jwt`, `chio_local_as` with re-exchange, `chio_operator_key`); trust-control exchange signer; the provider registry as the provider identity source (identity projection and digest, per-request reads at exchange and admission, record changes in trust-control, registry scenarios, G17); deletions (seed-derived keys, bypass issuance, provider profile and provider verification flags, per-store path flags) with tutorial, peer, example, runbook and deploy updates; pinned JWKS with refresh and snapshots; replay keys; tenant and subject tags; state-directory lock | L, 27-38 |
 | M1 | 5. Revocation target kinds on the existing store, linearized with admission, provider revocation admin | M, 4-6 |
-| M1 | 6. `chio-bundle-verify`, `caller` and `auditor_hash_only` export | M, 7-10 |
+| M1 | 6. `chio-bundle-verify` (including the provider identity role), `caller` and `auditor_hash_only` export | M, 7-11 |
 | M1 | 7. Tests, vectors, `rust-mcp-serve-http` driver, live Okta and Entra runs, conformance peers on the migrated edge, hosted-edge qualification lane re-run, QUALIFICATION and README updates | M, 10-15 |
-| M1 total | | 100-141 |
+| M1 total | | 104-148 |
 | M2 | Entra Agent ID intake beside `entra_jwt` (D5, D14), discriminator routing and live run | S, 3-5 |
 | M2 | `ClassicalSigner` plumbing, default-build P-256 verification (Rust and SDKs), AWS KMS P-256 backend, live KMS run | M, 10-13 |
 | M2 | KMS Ed25519 | S, 3-4 |
@@ -1241,7 +1305,7 @@ Not available as cuts: the `operator_static_bearer`, `oidc_jwt`, `oauth_introspe
 | M3 | Typed `Asset` (in place, all callers), manifest pricing, facilitator adapter, x402 challenge on MCP and HTTP, settlement block and closure | L, 18-25 |
 | M3 total | | 28-39 |
 
-M1 is 100-141 engineer-days after the day-one and second-line cuts and the section 2.5 decisions (previously 87-122). At about 21 working days a month that is roughly five to seven months for one engineer, before any wait for the D17 byte-change coordination. The M1 window in the private schedule is set against this number.
+M1 is 104-148 engineer-days after the day-one and second-line cuts and the section 2.5 decisions (100-141 before G17 to G19, 87-122 before G1 to G16). At about 21 working days a month that is roughly five to seven months for one engineer, before any wait for the D17 byte-change coordination. The M1 window in the private schedule is set against this number.
 
 ### 13.3 M1 order for one engineer
 
@@ -1288,7 +1352,7 @@ Written as `docs/adr/ADR-0039-customer-hosted-root-exchange.md` in M0 (#1533). A
 1. **Context.** PROTOCOL 8.2 blocks hosted OAuth authorization-server product work pending an ADR. The relying-party wedge needs the local AS in `serve-http` to accept external IdP assertions and issue anchored Chio roots. Today the local AS exchanges only its own tokens (T1) and every registered client is public (T26).
 2. **Decision.** The provider runs the root exchange inside its own `serve-http` process, on the existing local AS, using provider-controlled exchange and policy keys. Backbay operates no exchange in v1. Every `serve-http` root is exchange-issued and anchored, including roots for the static bearer, generic OIDC, introspection, Entra and local AS paths; session issuance that bypasses the exchange is removed. The exchange signer is a local seed file or the pinned remote trust-control authority.
 3. **Scope.** Grants: `authorization_code` (local users, `chio_local_as`), `jwt-bearer` (ID-JAG), `token-exchange` (ID-JAG and Entra, capability out; local AS re-exchange, narrowing only). `jwt-bearer` and `token-exchange` with an external subject token require confidential client authentication (`private_key_jwt`, or the method the stable MCP profile requires). Bearer intake for the static bearer, generic OIDC JWT, introspection and Entra ends in the same exchange. No refresh tokens. No dynamic client registration beyond the existing startup registry.
-4. **Security properties.** Fail-closed rules from section 8.1; single-use replay keys namespaced by issuer; keys only from pinned `jwks_uri`; IdP never consulted after the root; root lifetime capped by assertion `exp`; exchange, kernel, policy and local AS keys distinct; policy key pinned in configuration; single instance per state directory.
+4. **Security properties.** Fail-closed rules from section 8.1; single-use replay keys namespaced by issuer; keys only from the provider record a rule references and pins by identity digest; IdP never consulted after the root; root lifetime capped by assertion `exp`; exchange, kernel, policy and local AS keys distinct; policy key pinned in configuration; single instance per state directory.
 5. **Standards pinned.** RFC 6749, RFC 7523 (grant and client authentication), RFC 8693, RFC 8707, RFC 9728 metadata, MCP Enterprise-Managed Authorization (stable profile) and the ID-JAG draft revision recorded at build start.
-6. **Consequences.** PROTOCOL 8.2 unblocked for this scope only; the hosted-edge qualification lane re-runs in M1 and the label is suspended, publicly, until it passes; seed-derived federation keys, bypass issuance and the `serve-http` enterprise provider registry are deleted; the static bearer is documented as a development, test and conformance mode with operator-attested identity; a Backbay-hosted exchange requires a new ADR.
+6. **Consequences.** PROTOCOL 8.2 unblocked for this scope only; the hosted-edge qualification lane re-runs in M1 and the label is suspended, publicly, until it passes; seed-derived federation keys, bypass issuance, the provider-profile flag and the provider verification flags are deleted, and the enterprise provider registry is the one source of provider identity that root policy rules reference by id and identity digest; the static bearer is documented as a development, test and conformance mode with operator-attested identity; a Backbay-hosted exchange requires a new ADR.
 7. **Alternatives rejected.** Trust-control as the exchange (a second deployable for every provider); self-anchored roots at the edge (excluded by F3); keeping direct issuance beside the exchange (excluded by D1 and the no-compat rule); public clients on the assertion grants (a stolen assertion would be redeemable by anyone knowing the `client_id`).
