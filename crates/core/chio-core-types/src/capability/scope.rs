@@ -460,7 +460,12 @@ pub enum Constraint {
 /// admitted for one rail cannot be replayed against another by omitting
 /// its companion evidence.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
+#[serde(
+    tag = "mode",
+    rename_all = "snake_case",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum FindingSettlementSelector {
     /// Single-operator settlement over a local reversible hold: authorize
     /// before dispatch, capture only after the delivered output passes the
@@ -476,6 +481,7 @@ pub enum FindingSettlementSelector {
         settlement_profile_sha256: String,
     },
 }
+chio_security_types::lossless_serde!(FindingSettlementSelector);
 
 /// Provider-signed purchase binding carried by
 /// [`Constraint::RequireFindingPurchase`].
