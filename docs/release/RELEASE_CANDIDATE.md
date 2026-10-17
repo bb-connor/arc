@@ -182,8 +182,7 @@ kernel/browser/mobile qualification lanes.
 - Chio now also ships one bounded hosted sender-constrained continuation
   contract over that verifier/auth surface, with mTLS thumbprint binding and
   one attestation-confirmation profile that never widens runtime authority
-  from attestation alone; Chio DPoP sender binding is unavailable until
-  durable authentication replay custody exists
+  from attestation alone; Chio DPoP sender binding is refused
 - Chio now also ships one bounded cross-issuer portfolio contract over those
   passport artifacts, with explicit native/imported/migrated entry kinds, one
   signed trust-pack activation surface, one signed migration artifact for
