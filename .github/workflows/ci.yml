@@ -242,6 +242,9 @@ jobs:
           run_gate python3 ./scripts/check-enterprise-provenance.py
           run_gate python3 ./scripts/check-linux-enforcement-stack.py
           run_gate cargo test --locked --all-features --manifest-path third_party/seccompiler-chio/Cargo.toml --target-dir target/seccompiler-chio
+          run_gate cargo fmt --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml --all -- --check
+          run_gate cargo clippy --locked --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml --all-targets --target-dir target/lambda-extension -- -D warnings
+          run_gate cargo test --locked --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml --target-dir target/lambda-extension
           run_gate bash ./scripts/check-security-dependencies.sh
           run_gate bash ./scripts/tests/check-security-provenance.test.sh
           run_gate bash ./scripts/tests/check-enterprise-provenance.test.sh
