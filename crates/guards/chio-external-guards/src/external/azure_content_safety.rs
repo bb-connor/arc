@@ -18,9 +18,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chio_core_types::receipt::metadata::GuardEvidence;
+use chio_egress_contract::ContractClient;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
-use reqwest::Client;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -160,12 +160,12 @@ struct CategoryResult {
 /// Guard wrapping Azure Content Safety's `text:analyze` endpoint.
 pub struct AzureContentSafetyGuard {
     cfg: AzureContentSafetyConfig,
-    http: Client,
+    http: ContractClient,
     egress_contract: chio_egress_contract::HttpEgressContract,
 }
 
 impl AzureContentSafetyGuard {
-    /// Build a guard with an internally-owned [`reqwest::Client`].
+    /// Build a guard with an internally-owned [`ContractClient`].
     pub fn new(cfg: AzureContentSafetyConfig) -> Result<Self, ExternalGuardError> {
         let egress_contract = http_egress::contract_for_url(GUARD_NAME, &cfg.analyze_url())?;
         let http = http_egress::client_for_contract(&egress_contract, cfg.timeout)?;
@@ -174,18 +174,6 @@ impl AzureContentSafetyGuard {
             http,
             egress_contract,
         })
-    }
-
-    /// Build a guard from a caller-supplied client handle.
-    ///
-    /// The supplied client is not reused. The guard rebuilds an internal client
-    /// from its egress contract so automatic redirect following cannot bypass
-    /// per-hop contract validation.
-    pub fn with_client(
-        cfg: AzureContentSafetyConfig,
-        _http: Client,
-    ) -> Result<Self, ExternalGuardError> {
-        Self::new(cfg)
     }
 
     /// Build a [`GuardEvidence`] record for a prior decision.

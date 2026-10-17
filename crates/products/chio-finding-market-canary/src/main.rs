@@ -167,7 +167,7 @@ struct NetworkCanaryReport {
 }
 
 struct NetworkHttpClient {
-    client: reqwest::Client,
+    client: chio_egress_contract::ContractClient,
     egress_contract: HttpEgressContract,
 }
 

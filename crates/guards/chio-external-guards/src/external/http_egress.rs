@@ -3,9 +3,9 @@ use std::net::Ipv4Addr;
 use std::time::Duration;
 
 use chio_egress_contract::{
-    client_builder_with_contract, send_with_contract, ContractResponse, HttpEgressContract,
+    client_builder_with_contract, send_with_contract, ContractClient, ContractRequestBuilder,
+    ContractResponse, HttpEgressContract,
 };
-use reqwest::{Client, RequestBuilder};
 use url::{Host, Url};
 
 use super::ExternalGuardError;
@@ -51,7 +51,7 @@ pub(crate) fn contract_for_url(
 pub(crate) fn client_for_contract(
     contract: &HttpEgressContract,
     timeout: Duration,
-) -> Result<Client, ExternalGuardError> {
+) -> Result<ContractClient, ExternalGuardError> {
     client_builder_with_contract(contract)
         .timeout(timeout)
         .build()
@@ -60,8 +60,8 @@ pub(crate) fn client_for_contract(
 
 pub(crate) async fn send_request_with_contract(
     contract: &HttpEgressContract,
-    client: &Client,
-    request: RequestBuilder,
+    client: &ContractClient,
+    request: ContractRequestBuilder,
 ) -> Result<ContractResponse, ExternalGuardError> {
     let request = request.build().map_err(|error| {
         ExternalGuardError::Permanent(format!("reqwest build request: {error}"))

@@ -16,9 +16,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chio_core_types::receipt::metadata::GuardEvidence;
+use chio_egress_contract::ContractClient;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use reqwest::Client;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -171,12 +171,12 @@ pub struct SnykVulnSummary {
 pub struct SnykGuard {
     cfg: SnykConfig,
     base_url: String,
-    http: Client,
+    http: ContractClient,
     egress_contract: chio_egress_contract::HttpEgressContract,
 }
 
 impl SnykGuard {
-    /// Build a guard with an internally-owned [`reqwest::Client`].
+    /// Build a guard with an internally-owned [`ContractClient`].
     pub fn new(cfg: SnykConfig) -> Result<Self, ExternalGuardError> {
         let base_url = cfg.resolved_base_url();
         let egress_contract = http_egress::contract_for_url(GUARD_NAME, &base_url)?;
@@ -187,15 +187,6 @@ impl SnykGuard {
             http,
             egress_contract,
         })
-    }
-
-    /// Build from a caller-supplied client handle.
-    ///
-    /// The supplied client is not reused. The guard rebuilds an internal client
-    /// from its egress contract so automatic redirect following cannot bypass
-    /// per-hop contract validation.
-    pub fn with_client(cfg: SnykConfig, _http: Client) -> Result<Self, ExternalGuardError> {
-        Self::new(cfg)
     }
 
     /// Build a [`GuardEvidence`] record for a prior decision.

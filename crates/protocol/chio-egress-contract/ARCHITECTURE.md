@@ -31,9 +31,13 @@ URL enforcement parses the target, rejects userinfo, checks the redirect
 count, and matches normalized authority and address classes. DNS enforcement
 resolves domain names and checks every returned address.
 
-With `reqwest-egress`, build the client using `client_builder_with_contract`
-and dispatch through `send_with_contract`. The helper drives redirects
-explicitly and collects response chunks under the declared byte ceiling.
+With `reqwest-egress`, build a `ContractClient` using
+`client_builder_with_contract` and dispatch through `send_with_contract`.
+`ContractClient` keeps its reqwest client private and exposes request
+construction but no dispatch, and `send_with_contract` accepts no other
+client type. The client never retries and never follows redirects. The helper
+drives redirects explicitly and collects response chunks under the declared
+byte ceiling.
 
 ## Trust and invariants
 

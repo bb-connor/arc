@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use chio_egress_contract::{
-    client_builder_with_contract, send_with_contract, ContractResponse, HttpEgressContract,
+    client_builder_with_contract, send_with_contract, ContractClient, ContractRequestBuilder,
+    ContractResponse, HttpEgressContract,
 };
 use oci_distribution::client::{ClientConfig, ClientProtocol, Config, ImageData, ImageLayer};
 use oci_distribution::errors::OciDistributionError;
@@ -791,7 +792,7 @@ impl GuardRegistryClient {
         &self,
         url: &str,
         contract: &HttpEgressContract,
-    ) -> Result<reqwest::Client> {
+    ) -> Result<ContractClient> {
         client_builder_with_contract(contract)
             .timeout(std::time::Duration::from_secs(30))
             .build()
@@ -805,8 +806,8 @@ impl GuardRegistryClient {
         &self,
         url: &str,
         contract: &HttpEgressContract,
-        client: &reqwest::Client,
-        request: reqwest::RequestBuilder,
+        client: &ContractClient,
+        request: ContractRequestBuilder,
     ) -> Result<ContractResponse> {
         let request = request
             .build()

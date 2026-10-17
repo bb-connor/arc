@@ -97,7 +97,11 @@ fn test_introspection_verifier(
     let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     IntrospectionBearerVerifier {
         clock: RemoteClock::default(),
-        client: HttpClient::builder().build().expect("build http client"),
+        client: client_builder_with_contract(&HttpEgressContract::permissive_for_tests(
+            "127.0.0.1:9",
+        ))
+        .build()
+        .expect("build http client"),
         introspection_url: Url::parse("http://127.0.0.1:9/introspect")
             .expect("parse introspection url"),
         client_id: None,

@@ -25,7 +25,9 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::ocsf::siem_event_to_ocsf;
 use crate::redaction::redact_for_operator_log;
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 
 const DEFAULT_OCSF_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -81,7 +83,7 @@ impl Default for OcsfExporterConfig {
 /// before forwarding them to an HTTPS sink.
 pub struct OcsfExporter {
     config: OcsfExporterConfig,
-    client: reqwest::Client,
+    client: Option<ContractClient>,
 }
 
 impl OcsfExporter {
@@ -110,13 +112,14 @@ impl OcsfExporter {
             })?;
         }
 
-        let client = match contract {
-            Some(contract) => client_builder_with_contract(contract)
-                .timeout(config.timeout)
-                .build(),
-            None => reqwest::Client::builder().timeout(config.timeout).build(),
-        }
-        .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
+        let client = contract
+            .map(|contract| {
+                client_builder_with_contract(contract)
+                    .timeout(config.timeout)
+                    .build()
+            })
+            .transpose()
+            .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
         Ok(Self { config, client })
     }
 
@@ -144,7 +147,10 @@ impl OcsfExporter {
             .timeout(config.timeout)
             .build()
             .map_err(|e| ExportError::HttpError(format!("failed to build HTTP client: {e}")))?;
-        Ok(Self { config, client })
+        Ok(Self {
+            config,
+            client: Some(client),
+        })
     }
 
     fn validate_endpoint_security(config: &OcsfExporterConfig) -> Result<(), ExportError> {
@@ -228,8 +234,16 @@ impl Exporter for OcsfExporter {
                 .unwrap_or_else(|| self.default_content_type())
                 .to_string();
 
-            let mut request = self
-                .client
+            // HttpEgressContract: every dispatch routes through send_with_contract.
+            let (Some(contract), Some(client)) =
+                (self.config.egress_contract.as_ref(), self.client.as_ref())
+            else {
+                return Err(ExportError::HttpError(
+                    "OCSF exporter is missing HttpEgressContract; substrate fails closed"
+                        .to_string(),
+                ));
+            };
+            let mut request = client
                 .post(&self.config.endpoint)
                 .header("Content-Type", content_type)
                 .body(body);
@@ -238,17 +252,10 @@ impl Exporter for OcsfExporter {
                 request = request.header("Authorization", format!("Bearer {token}"));
             }
 
-            // HttpEgressContract: every dispatch routes through send_with_contract.
-            let contract = self.config.egress_contract.as_ref().ok_or_else(|| {
-                ExportError::HttpError(
-                    "OCSF exporter is missing HttpEgressContract; substrate fails closed"
-                        .to_string(),
-                )
-            })?;
             let raw_request = request.build().map_err(|e| {
                 ExportError::HttpError(format!("failed to build OCSF request: {e}"))
             })?;
-            let response = send_with_contract(contract, &self.client, raw_request)
+            let response = send_with_contract(contract, client, raw_request)
                 .await
                 .map_err(|err| {
                     ExportError::HttpError(format!("OCSF sink request failed: {err}"))

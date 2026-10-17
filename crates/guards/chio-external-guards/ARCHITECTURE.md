@@ -66,8 +66,8 @@ Endpoint validation requires HTTPS except explicit loopback HTTP endpoints.
 DNS validation rejects disallowed resolved addresses. The shared transport
 pins DNS and enforces a contract with one allowed authority, a redirect-chain
 ceiling of four, and a response ceiling of 1 MiB. The contract allows loopback
-only for a loopback-configured endpoint. `with_client` constructors rebuild a
-contract-bound client rather than using the supplied client's transport policy.
+only for a loopback-configured endpoint. Each guard owns a `ContractClient`
+built from that contract; no constructor accepts a caller-supplied client.
 
 HTTP 429 and server-error statuses are classified Transient; other unsuccessful
 statuses are Permanent, subject to VirusTotal's unseen exception. Contract

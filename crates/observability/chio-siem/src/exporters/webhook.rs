@@ -25,7 +25,10 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
 use chio_core::receipt::decision::Decision;
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, ContractRequestBuilder,
+    HttpEgressContract,
+};
 
 /// Authentication mode for the webhook exporter.
 ///
@@ -131,7 +134,7 @@ impl Default for WebhookConfig {
 /// Notification-oriented exporter that POSTs one receipt per HTTP request.
 pub struct WebhookExporter {
     config: WebhookConfig,
-    client: reqwest::Client,
+    client: ContractClient,
 }
 
 impl WebhookExporter {
@@ -282,7 +285,7 @@ impl WebhookExporter {
         true
     }
 
-    fn build_request(&self, event: &SiemEvent) -> Result<reqwest::RequestBuilder, ExportError> {
+    fn build_request(&self, event: &SiemEvent) -> Result<ContractRequestBuilder, ExportError> {
         let mut req = match self.config.method {
             WebhookMethod::Post => self.client.post(&self.config.url),
             WebhookMethod::Put => self.client.put(&self.config.url),

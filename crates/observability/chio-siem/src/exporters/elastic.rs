@@ -15,7 +15,9 @@ use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 
 /// Authentication configuration for the Elasticsearch exporter.
 ///
@@ -71,13 +73,13 @@ impl Default for ElasticConfig {
 /// using the `/_bulk` API with NDJSON index action + document pairs.
 pub struct ElasticsearchExporter {
     config: ElasticConfig,
-    client: reqwest::Client,
+    client: ContractClient,
 }
 
 impl ElasticsearchExporter {
     /// Create a new ElasticsearchExporter with the given configuration.
     ///
-    /// Builds a `reqwest::Client` with rustls TLS and returns an error if the
+    /// Builds a `ContractClient` with rustls TLS and returns an error if the
     /// client cannot be constructed.
     ///
     /// Returns an error if `config.endpoint` is not an `https://` URL

@@ -10,7 +10,7 @@
 //! All HTTP traffic is expected to go through the [`AsyncGuardAdapter`] -
 //! this module exposes the single-attempt [`ExternalGuard::eval`] surface
 //! and does not embed retry/caching/rate-limiting of its own. The adapter
-//! composes a [`reqwest::Client`] internally so that the underlying
+//! composes a [`ContractClient`] internally so that the underlying
 //! transport is re-used across calls, but every network request is issued
 //! from inside [`ExternalGuard::eval`] which the adapter drives.
 //!
@@ -36,9 +36,10 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chio_core_types::receipt::metadata::GuardEvidence;
+use chio_egress_contract::ContractClient;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use reqwest::{Client, StatusCode};
+use reqwest::StatusCode;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -208,12 +209,12 @@ struct GuardrailText<'a> {
 /// [`ExternalGuard`] that calls Bedrock `ApplyGuardrail`.
 pub struct BedrockGuardrailGuard {
     cfg: BedrockGuardrailConfig,
-    http: Client,
+    http: ContractClient,
     egress_contract: chio_egress_contract::HttpEgressContract,
 }
 
 impl BedrockGuardrailGuard {
-    /// Construct a guard with an internally-owned [`reqwest::Client`].
+    /// Construct a guard with an internally-owned [`ContractClient`].
     pub fn new(cfg: BedrockGuardrailConfig) -> Result<Self, ExternalGuardError> {
         let egress_contract = http_egress::contract_for_url(GUARD_NAME, &cfg.apply_url())?;
         let http = http_egress::client_for_contract(&egress_contract, cfg.timeout)?;
@@ -222,18 +223,6 @@ impl BedrockGuardrailGuard {
             http,
             egress_contract,
         })
-    }
-
-    /// Construct a guard from a caller-supplied client handle.
-    ///
-    /// The supplied client is not reused. The guard rebuilds an internal client
-    /// from its egress contract so automatic redirect following cannot bypass
-    /// per-hop contract validation.
-    pub fn with_client(
-        cfg: BedrockGuardrailConfig,
-        _http: Client,
-    ) -> Result<Self, ExternalGuardError> {
-        Self::new(cfg)
     }
 
     /// Build a [`GuardEvidence`] record for the verdict that

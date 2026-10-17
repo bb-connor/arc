@@ -8,4 +8,4 @@ pub use chio_egress_contract::{HttpEgressContract, HttpEgressError, ValidatedHtt
 
 #[cfg(feature = "reqwest-egress")]
 #[allow(unused_imports)]
-pub use chio_egress_contract::{client_builder_with_contract, send_with_contract};
+pub use chio_egress_contract::{client_builder_with_contract, send_with_contract, ContractClient};

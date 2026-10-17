@@ -14,9 +14,9 @@ use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chio_core_types::receipt::metadata::GuardEvidence;
+use chio_egress_contract::ContractClient;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue};
-use reqwest::Client;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -183,12 +183,12 @@ pub struct VirusTotalEvidence {
 pub struct VirusTotalGuard {
     cfg: VirusTotalConfig,
     base_url: String,
-    http: Client,
+    http: ContractClient,
     egress_contract: chio_egress_contract::HttpEgressContract,
 }
 
 impl VirusTotalGuard {
-    /// Build a guard with an internally-owned [`reqwest::Client`].
+    /// Build a guard with an internally-owned [`ContractClient`].
     pub fn new(cfg: VirusTotalConfig) -> Result<Self, ExternalGuardError> {
         let base_url = cfg.resolved_base_url();
         let egress_contract = http_egress::contract_for_url(GUARD_NAME, &base_url)?;
@@ -199,15 +199,6 @@ impl VirusTotalGuard {
             http,
             egress_contract,
         })
-    }
-
-    /// Build from a caller-supplied client handle.
-    ///
-    /// The supplied client is not reused. The guard rebuilds an internal client
-    /// from its egress contract so automatic redirect following cannot bypass
-    /// per-hop contract validation.
-    pub fn with_client(cfg: VirusTotalConfig, _http: Client) -> Result<Self, ExternalGuardError> {
-        Self::new(cfg)
     }
 
     /// Build a [`GuardEvidence`] record for a prior decision.

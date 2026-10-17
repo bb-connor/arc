@@ -28,7 +28,9 @@ use chio_core::session::{
     OAuthBearerFederatedClaims, RequestOwnershipSnapshot, SessionAuthContext, SessionAuthMethod,
     SessionId,
 };
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 use chio_kernel::operator_report::{
     CHIO_OAUTH_REQUEST_TIME_AUTHORIZATION_DETAILS_CLAIM,
     CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
@@ -52,7 +54,6 @@ use chio_mcp_adapter::transport::StdioMcpTransport;
 use hmac::{Hmac, Mac};
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
-use reqwest::Client as HttpClient;
 use rsa::pkcs1v15::{Signature as RsaPkcs1v15Signature, VerifyingKey as RsaPkcs1v15VerifyingKey};
 use rsa::pss::{Signature as RsaPssSignature, VerifyingKey as RsaPssVerifyingKey};
 use rsa::signature::Verifier as _;
@@ -861,7 +862,7 @@ struct JwtBearerVerifier {
 #[derive(Clone)]
 struct IntrospectionBearerVerifier {
     clock: RemoteClock,
-    client: HttpClient,
+    client: ContractClient,
     introspection_url: Url,
     client_id: Option<String>,
     client_secret: Option<String>,

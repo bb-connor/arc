@@ -320,7 +320,7 @@ async fn safe_browsing_with_default_client_rejects_redirect_before_target_contac
         .await;
 
     let cfg = SafeBrowsingConfig::new("sb-key").with_base_url(start.uri());
-    let guard = SafeBrowsingGuard::with_client(cfg, reqwest::Client::new()).expect("guard build");
+    let guard = SafeBrowsingGuard::new(cfg).expect("guard build");
 
     let error = guard
         .eval(&make_ctx(
