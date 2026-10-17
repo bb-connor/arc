@@ -2,8 +2,9 @@
 
 The extension exposes a localhost evaluator at ``http://127.0.0.1:9090/v1/evaluate``
 that accepts a JSON tool-call description and returns a non-authoritative
-evaluation observation. Handlers must require an authoritative
-``mediated_decision`` / ``prevent`` allow before executing.
+evaluation observation. Handlers must require an authorized, authoritative
+``prevent`` allow before executing. The Lambda extension is a detect-only
+observer and never returns one, so every extension response is denied.
 Because Lambda handlers are typically synchronous, this client is synchronous by
 default and uses :class:`httpx.Client` under the hood.
 
@@ -43,10 +44,9 @@ class EvaluateVerdict:
     """Outcome of a single ``POST /v1/evaluate`` call."""
 
     decision: str
-    receipt_id: str
+    observation_id: str
     authorized: bool
     authoritative: bool
-    receipt_kind: str
     boundary_class: str
     reason: str | None
     capability_id: str
@@ -61,7 +61,6 @@ class EvaluateVerdict:
             self.decision == "allow"
             and self.authorized
             and self.authoritative
-            and self.receipt_kind == "mediated_decision"
             and self.boundary_class == "prevent"
         )
 
@@ -141,7 +140,6 @@ class ChioLambdaClient:
         capability_id: str,
         tool_server: str,
         tool_name: str,
-        scope: str | None = None,
         arguments: dict[str, Any] | None = None,
     ) -> EvaluateVerdict:
         """Ask the extension to evaluate a single tool call.
@@ -155,10 +153,9 @@ class ChioLambdaClient:
             Tool server identifier.
         tool_name:
             Name of the invoked tool. Must be non-empty.
-        scope:
-            Optional scope name (e.g. ``"db:read"``) surfaced in the receipt.
         arguments:
-            Optional tool arguments, forwarded verbatim in the receipt.
+            Optional tool arguments passed to capability evaluation. They are
+            not echoed in the response or stored in the observation.
 
         Returns
         -------
@@ -176,8 +173,6 @@ class ChioLambdaClient:
             "tool_server": tool_server,
             "tool_name": tool_name,
         }
-        if scope is not None:
-            body["scope"] = scope
         if arguments is not None:
             body["arguments"] = arguments
 
@@ -193,16 +188,15 @@ class ChioLambdaClient:
         try:
             return EvaluateVerdict(
                 decision=str(data["decision"]),
-                receipt_id=str(data["receipt_id"]),
+                observation_id=str(data["observation_id"]),
                 authorized=bool(data.get("authorized", False)),
                 authoritative=bool(data.get("authoritative", False)),
-                receipt_kind=str(data.get("receipt_kind", "")),
                 boundary_class=str(data.get("boundary_class", "")),
                 reason=data.get("reason"),
                 capability_id=str(data.get("capability_id", capability_id)),
                 tool_server=str(data.get("tool_server", tool_server)),
                 tool_name=str(data.get("tool_name", tool_name)),
-                timestamp=int(data.get("timestamp", 0)),
+                timestamp=int(data["timestamp"]),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ChioLambdaError(

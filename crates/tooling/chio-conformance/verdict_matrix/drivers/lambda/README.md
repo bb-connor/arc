@@ -3,7 +3,8 @@
 A Lambda deployment-shape client for the Chio verdict matrix. It loads the
 shared scenario corpus, sends supported cases to an operator-supplied Chio
 sidecar, and compares `(verdict, reason_code, scope_set)` tuples.
-The matrix registry associates this driver with the Lambda extension package.
+It exercises only that sidecar. It does not run or test the detect-only
+`chio-lambda-extension`, and its matrix results make no claim about it.
 
 ## Usage
 

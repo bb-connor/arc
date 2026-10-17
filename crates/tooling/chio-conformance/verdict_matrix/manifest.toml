@@ -117,7 +117,9 @@ entrypoint = "drivers/lambda"
 command = "cargo test -p chio-verdict-matrix-driver-lambda --quiet"
 underlying_driver = "rust-kernel"
 matrix_role = "deployment-shape"
-package = "chio-lambda-extension"
+# Probes a Chio sidecar over POST /chio/evaluate. It does not run
+# sdks/lambda/chio-lambda-extension, so the matrix makes no claim about it.
+package = "chio-verdict-matrix-driver-lambda"
 requires_sidecar_env = ["CHIO_VERDICT_MATRIX_SIDECAR_URL", "CHIO_SIDECAR_URL"]
 
 [drivers.k8s-admission-webhook]

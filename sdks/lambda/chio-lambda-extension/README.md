@@ -1,53 +1,71 @@
 # chio-lambda-extension
 
-The Chio kernel packaged as an **AWS Lambda Extension**. Runs in-process
-alongside the function handler, exposes a localhost HTTP evaluator, and
-flushes receipts to DynamoDB when the Lambda execution environment is
-being recycled.
+A detect-only Chio observer packaged as an **AWS Lambda Extension**. It runs
+alongside the function handler, exposes a localhost HTTP evaluator that runs
+portable capability evaluation, and writes each unsigned observation record
+to DynamoDB before answering.
+
+## Status: detect-only
+
+* Evaluation results are **observations, not authorizations**. Every
+  response carries `authorized: false`, `authoritative: false` and
+  `boundary_class: "detect_only"`. The companion Python client treats every
+  such response as a deny.
+* Observations are **not Chio receipts**. They are unsigned JSON records with
+  no kernel signature, so nothing downstream can verify them as receipts.
+* No guard implementations are bundled. The guard pipeline must be selected
+  explicitly with `CHIO_GUARDS=none`; any other value refuses to boot.
+* Evaluation checks the capability token signature against the configured
+  trusted issuers, its time window, and its tool scope.
 
 ## What it does
 
 * **Registers** with the Lambda Extensions Runtime API for the `INVOKE` and
   `SHUTDOWN` lifecycle events.
 * **Serves** an HTTP evaluator on `127.0.0.1:9090` that accepts JSON tool
-  call descriptions, returns an allow / deny verdict with a receipt ID,
-  and buffers the receipt for batch persistence.
-* **Flushes** the buffered receipts to a configurable DynamoDB table when
-  the `SHUTDOWN` event arrives (or when the buffer fills up).
-* **Fails closed** on missing environment variables, unreachable Runtime
-  API, or unreachable DynamoDB: the binary exits non-zero and the Lambda
-  handler's localhost calls will error loudly instead of silently
-  bypassing policy.
+  call descriptions and returns the observed allow / deny outcome with an
+  observation ID.
+* **Writes through** each observation to a configurable DynamoDB table with
+  one `PutItem` before the response is sent. Nothing is buffered, so there
+  is no capacity limit and nothing to flush on `SHUTDOWN`.
+* **Fails closed**: missing or malformed configuration, or an unreachable
+  Runtime API, exits non-zero at boot. An unreadable trusted clock, or an
+  observation write that fails or exceeds 2 seconds, fails the evaluate
+  request with HTTP 503 instead of answering without a stored record.
 
-This crate is intentionally **outside** the main Chio Cargo workspace so it
-can be versioned, released, and Lambda-layer-packaged on its own schedule.
+This crate is **outside** the main Chio Cargo workspace (it declares its own
+`[workspace]` and lock file). CI builds, lints and tests it through its own
+manifest.
 
 ## Configuration
 
-| Variable               | Required | Default             | Meaning                                         |
-|------------------------|----------|---------------------|-------------------------------------------------|
-| `CHIO_RECEIPT_TABLE`    | yes      | _(none)_            | DynamoDB table name receipts are flushed into.  |
-| `CHIO_EXTENSION_ADDR`   | no       | `127.0.0.1:9090`    | Local socket address for the evaluator.         |
-| `AWS_LAMBDA_RUNTIME_API` | auto   | set by Lambda       | Advertised by the Lambda runtime at boot.       |
-| `AWS_REGION` etc.      | auto     | set by Lambda       | Standard AWS SDK credential discovery.          |
-| `RUST_LOG`             | no       | `chio_lambda_extension=info` | Tracing filter.                         |
+| Variable                      | Required | Default             | Meaning                                         |
+|-------------------------------|----------|---------------------|-------------------------------------------------|
+| `CHIO_OBSERVATION_TABLE`      | yes      | _(none)_            | DynamoDB table observations are written to.     |
+| `CHIO_GUARDS`                 | yes      | _(none)_            | Guard set. The only accepted value is `none`.   |
+| `CHIO_TRUSTED_ISSUERS`        | yes      | _(none)_            | JSON array of trusted issuer public keys (hex). |
+| `CHIO_CAPABILITY_TOKENS_JSON` | no       | _(none)_            | JSON object of capability tokens by ID, used when a request carries no inline token. |
+| `CHIO_EXTENSION_ADDR`         | no       | `127.0.0.1:9090`    | Local socket address for the evaluator.         |
+| `AWS_LAMBDA_RUNTIME_API`      | auto     | set by Lambda       | Advertised by the Lambda runtime at boot.       |
+| `AWS_REGION` etc.             | auto     | set by Lambda       | Standard AWS SDK credential discovery.          |
+| `RUST_LOG`                    | no       | `chio_lambda_extension=info` | Tracing filter.                        |
 
 ## DynamoDB schema
 
 The extension does **not** create the table; provision it in your IaC:
 
 ```yaml
-ReceiptTable:
+ObservationTable:
   Type: AWS::DynamoDB::Table
   Properties:
     BillingMode: PAY_PER_REQUEST
     AttributeDefinitions:
-      - AttributeName: receipt_id
+      - AttributeName: observation_id
         AttributeType: S
       - AttributeName: timestamp
         AttributeType: N
     KeySchema:
-      - AttributeName: receipt_id
+      - AttributeName: observation_id
         KeyType: HASH        # partition key
       - AttributeName: timestamp
         KeyType: RANGE       # sort key
@@ -57,18 +75,17 @@ Every item written by the extension carries:
 
 | attribute        | type | meaning                                    |
 |------------------|------|--------------------------------------------|
-| `receipt_id`     | S    | UUIDv7 unique receipt identifier.          |
-| `timestamp`      | N    | Unix seconds at evaluation time.           |
+| `observation_id` | S    | UUIDv7 unique observation identifier.      |
+| `timestamp`      | N    | Unix seconds from the trusted clock.       |
 | `capability_id`  | S    | Capability token the call was bound to.    |
 | `tool_server`    | S    | Tool server identifier.                    |
 | `tool_name`      | S    | Name of the invoked tool.                  |
-| `decision`       | S    | `allow` or `deny`.                         |
+| `decision`       | S    | Observed `allow` or `deny`.                |
 | `reason`         | S    | Optional deny reason.                      |
-| `payload`        | S    | Canonical-JSON serialised receipt body.    |
+| `payload`        | S    | JSON of the full observation response.     |
 
-Throttled writes (`ProvisionedThroughputExceededException`) and any items
-returned in `UnprocessedItems` are retried with exponential backoff up to
-five attempts, capped well under the ~2 second SHUTDOWN budget.
+Each write uses the AWS SDK's standard retry policy, bounded by the 2 second
+write timeout.
 
 ## Evaluator HTTP surface
 
@@ -90,29 +107,43 @@ Request:
   "capability_id": "cap-01HW...",
   "tool_server":  "tools.example",
   "tool_name":    "database-query",
-  "scope":        "db:read",
   "arguments":    {"sql": "SELECT 1"}
 }
 ```
 
-Response:
+The capability token is supplied inline as `capability`, in the
+`x-chio-capability` header, or by ID through `CHIO_CAPABILITY_TOKENS_JSON`.
+Trusted issuers come only from `CHIO_TRUSTED_ISSUERS`. Unknown fields,
+including `scope` and `trusted_issuers`, are rejected with HTTP 400.
+
+Response (HTTP 200):
 
 ```json
 {
-  "receipt_id":    "01908f4a-...",
-  "decision":      "allow",
-  "reason":        null,
-  "capability_id": "cap-01HW...",
-  "tool_server":   "tools.example",
-  "tool_name":     "database-query",
-  "timestamp":     1713225600
+  "observation_id": "01908f4a-...",
+  "decision":       "allow",
+  "authorized":     false,
+  "authoritative":  false,
+  "boundary_class": "detect_only",
+  "reason":         null,
+  "metadata":       null,
+  "capability_id":  "cap-01HW...",
+  "tool_server":    "tools.example",
+  "tool_name":      "database-query",
+  "timestamp":      1713225600
 }
 ```
 
-A missing `capability_id` or `tool_name` deterministically returns
-`"decision": "deny"` with a descriptive `reason`. More sophisticated
-policy evaluation is wired in a subsequent phase (the `chio-kernel`
-dependency is already pulled in so the expansion is mechanical).
+A missing `capability_id`, `tool_server` or `tool_name`, an unresolvable or
+untrusted capability token, or an out-of-scope call returns
+`"decision": "deny"` with a descriptive `reason`.
+
+Error responses (HTTP 503, no observation is recorded):
+
+| `error`                  | Meaning                                         |
+|--------------------------|-------------------------------------------------|
+| `clock_unavailable`      | The trusted clock could not be read; `message` is the clock error code. |
+| `observation_unrecorded` | The DynamoDB write failed or timed out.         |
 
 ## Build
 
@@ -163,18 +194,20 @@ bin/chio-lambda-extension    # same binary, on PATH for debugging
 ```bash
 aws lambda publish-layer-version \
   --layer-name chio-kernel-extension \
-  --description 'Chio protocol kernel as Lambda Extension' \
+  --description 'Chio detect-only observer as Lambda Extension' \
   --zip-file fileb://dist/chio-extension-arm64.zip \
   --compatible-architectures arm64 \
   --compatible-runtimes python3.11 python3.12 python3.13 nodejs20.x nodejs22.x
 ```
 
 Then reference the layer ARN on your function and grant the function's
-execution role `dynamodb:BatchWriteItem` on `CHIO_RECEIPT_TABLE`.
+execution role `dynamodb:PutItem` on `CHIO_OBSERVATION_TABLE`.
 
 ## Using from Python
 
-Install the companion client:
+Install the companion client. Against this detect-only extension every
+verdict is denied, so `verdict.denied` is always true and `@chio_tool`
+handler bodies do not run.
 
 ```bash
 pip install chio-lambda-python  # or use the in-repo workspace dep
@@ -189,16 +222,15 @@ verdict = client.evaluate(
     capability_id="cap-01HW...",
     tool_server="tools.example",
     tool_name="database-query",
-    scope="db:read",
     arguments={"sql": "SELECT 1"},
 )
 if verdict.denied:
     return {"statusCode": 403, "body": verdict.reason}
 
 # Option 2: decorator (evaluates before the function body runs)
-@chio_tool(scope="db:read", tool_server="tools.example", tool_name="database-query")
+@chio_tool(tool_server="tools.example", tool_name="database-query")
 def handler(event, context, capability_id):
-    # Body only runs if evaluate() returned "allow"
+    # Body only runs on an authoritative prevent allow
     return run_query(event["body"])
 ```
 

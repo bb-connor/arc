@@ -19,10 +19,9 @@ def _allow_response(_request: httpx.Request) -> httpx.Response:
         200,
         json={
             "decision": "allow",
-            "receipt_id": "r-allow",
+            "observation_id": "r-allow",
             "authorized": True,
             "authoritative": True,
-            "receipt_kind": "mediated_decision",
             "boundary_class": "prevent",
             "reason": None,
             "capability_id": "cap-1",
@@ -38,7 +37,7 @@ def _deny_response(_request: httpx.Request) -> httpx.Response:
         200,
         json={
             "decision": "deny",
-            "receipt_id": "r-deny",
+            "observation_id": "r-deny",
             "reason": "not authorized",
             "capability_id": "cap-1",
             "tool_server": "srv",
@@ -55,7 +54,7 @@ def _unreachable(_request: httpx.Request) -> httpx.Response:
 def test_decorator_allows_and_calls_wrapped_function() -> None:
     client = _client(_allow_response)
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(event: dict[str, Any], context: object) -> dict[str, Any]:
         return {"event": event}
 
@@ -67,7 +66,7 @@ def test_decorator_injects_capability_id_when_requested() -> None:
     client = _client(_allow_response)
     captured: dict[str, Any] = {}
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(
         event: dict[str, Any], context: object, capability_id: str
     ) -> None:
@@ -81,20 +80,20 @@ def test_decorator_injects_verdict_when_requested() -> None:
     client = _client(_allow_response)
     captured: dict[str, Any] = {}
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(event: dict[str, Any], context: object, verdict: Any) -> None:
         captured["verdict"] = verdict
 
     handler({"chio_capability_id": "cap-1"}, None)
     assert captured["verdict"].allowed is True
-    assert captured["verdict"].receipt_id == "r-allow"
+    assert captured["verdict"].observation_id == "r-allow"
 
 
 def test_decorator_denies_raises_and_skips_handler() -> None:
     client = _client(_deny_response)
     called = False
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(event: dict[str, Any], context: object) -> None:
         nonlocal called
         called = True
@@ -110,7 +109,7 @@ def test_decorator_unreachable_fails_closed() -> None:
     client = _client(_unreachable)
     called = False
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(event: dict[str, Any], context: object) -> None:
         nonlocal called
         called = True
@@ -124,7 +123,7 @@ def test_decorator_unreachable_fails_closed() -> None:
 def test_decorator_requires_capability_id() -> None:
     client = _client(_allow_response)
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(event: dict[str, Any], context: object) -> None:
         pass
 
@@ -140,7 +139,7 @@ def test_decorator_capability_from_environment(
     client = _client(_allow_response)
     monkeypatch.setenv("CHIO_CAPABILITY_ID", "cap-env")
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(event: dict[str, Any], context: object) -> str:
         return "ok"
 
@@ -150,7 +149,7 @@ def test_decorator_capability_from_environment(
 def test_decorator_explicit_capability_id_overrides_event() -> None:
     client = _client(_allow_response)
 
-    @chio_tool(scope="db:read", tool_server="srv", tool_name="tool", client=client)
+    @chio_tool(tool_server="srv", tool_name="tool", client=client)
     def handler(
         event: dict[str, Any], context: object, capability_id: str
     ) -> str:
@@ -177,7 +176,6 @@ def test_decorator_custom_arguments_extractor() -> None:
     client = _client(responder)
 
     @chio_tool(
-        scope="db:read",
         tool_server="srv",
         tool_name="tool",
         client=client,

@@ -37,7 +37,6 @@ DEFAULT_CAPABILITY_EVENT_KEY = "chio_capability_id"
 
 def chio_tool(
     *,
-    scope: str,
     tool_server: str,
     tool_name: str,
     client: ChioLambdaClient | None = None,
@@ -49,12 +48,10 @@ def chio_tool(
 
     Parameters
     ----------
-    scope:
-        Capability scope name passed to the extension (e.g. ``"db:read"``).
     tool_server:
-        Tool server identifier recorded on the receipt.
+        Tool server identifier recorded on the observation.
     tool_name:
-        Tool name recorded on the receipt.
+        Tool name recorded on the observation.
     client:
         Optional custom :class:`ChioLambdaClient`. The default is lazily
         constructed on first use and reused for the lifetime of the
@@ -115,7 +112,6 @@ def chio_tool(
                 capability_id=capability_id,
                 tool_server=tool_server,
                 tool_name=tool_name,
-                scope=scope,
                 arguments=extract_arguments(event),
             )
             if verdict.denied:

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.93"
 license = "Apache-2.0"
-description = "Chio kernel packaged as an AWS Lambda Extension. Runs in-process alongside the function handler, exposes a localhost:9090 HTTP evaluator, and flushes receipts to DynamoDB on SHUTDOWN."
+description = "Detect-only Chio observer packaged as an AWS Lambda Extension. Exposes a localhost:9090 HTTP evaluator that runs portable capability evaluation and flushes unsigned observation records to DynamoDB on SHUTDOWN. It does not authorize calls or sign receipts."
 repository = "https://github.com/backbay-labs/chio"
 publish = false
 
@@ -22,10 +22,8 @@ name = "chio-lambda-extension"
 path = "src/main.rs"
 
 [dependencies]
-chio-kernel = { path = "../../../crates/kernel/chio-kernel" }
 chio-kernel-core = { path = "../../../crates/kernel/chio-kernel-core" }
 chio-core-types = { path = "../../../crates/core/chio-core-types" }
-chio-store-sqlite = { path = "../../../crates/platform/chio-store-sqlite" }
 
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "time", "net", "io-util"] }
 hyper = { version = "1", features = ["full"] }

@@ -20,8 +20,6 @@
 //! the rest of the extension can be exercised with unit tests that do not need
 //! a live Lambda environment.
 
-use std::time::Duration;
-
 use serde::Deserialize;
 use tracing::{debug, info, warn};
 
@@ -174,17 +172,9 @@ pub async fn next_event(handle: &ExtensionHandle) -> Result<ExtensionEvent, Life
 }
 
 /// Run the lifecycle loop until a SHUTDOWN event is received or an error
-/// occurs. On SHUTDOWN the supplied `on_shutdown` closure is awaited; its
-/// result is logged but not propagated because once we return from this
-/// function the sandbox is seconds from being frozen regardless.
-pub async fn run_loop<F, Fut>(
-    handle: ExtensionHandle,
-    mut on_shutdown: F,
-) -> Result<(), LifecycleError>
-where
-    F: FnMut(ShutdownEvent) -> Fut,
-    Fut: std::future::Future<Output = ()>,
-{
+/// occurs. Observations are written through per request, so SHUTDOWN has no
+/// state to flush.
+pub async fn run_loop(handle: ExtensionHandle) -> Result<(), LifecycleError> {
     loop {
         match next_event(&handle).await {
             Ok(ExtensionEvent::Invoke(event)) => {
@@ -198,16 +188,8 @@ where
                 info!(
                     reason = %event.shutdown_reason,
                     deadline_ms = event.deadline_ms,
-                    "SHUTDOWN event - flushing state"
+                    "SHUTDOWN event"
                 );
-                // Bound the shutdown work: Lambda gives us ~2 seconds. Give
-                // ourselves a 1.5 second ceiling so we still return to the
-                // Runtime API before it force-kills us.
-                let budget = Duration::from_millis(1_500);
-                let result = tokio::time::timeout(budget, on_shutdown(event)).await;
-                if result.is_err() {
-                    warn!("SHUTDOWN flush exceeded {budget:?}");
-                }
                 return Ok(());
             }
             Err(err) => {
@@ -280,8 +262,8 @@ mod reqwest_like {
         }
 
         pub(super) async fn send(self) -> Result<HttpResponse, LifecycleError> {
-            let parsed = parse_url(&self.url)
-                .map_err(|err| LifecycleError::Transport(err.to_string()))?;
+            let parsed =
+                parse_url(&self.url).map_err(|err| LifecycleError::Transport(err.to_string()))?;
             trace!(host = %parsed.host_port, path = %parsed.path, "runtime api request");
 
             let stream = TcpStream::connect(&parsed.host_port)

@@ -28,10 +28,9 @@ def test_evaluate_allow_returns_verdict() -> None:
             200,
             json={
                 "decision": "allow",
-                "receipt_id": "rcpt-1",
+                "observation_id": "obs-1",
                 "authorized": True,
                 "authoritative": True,
-                "receipt_kind": "mediated_decision",
                 "boundary_class": "prevent",
                 "reason": None,
                 "capability_id": "cap-1",
@@ -48,7 +47,7 @@ def test_evaluate_allow_returns_verdict() -> None:
 
     assert verdict.allowed
     assert not verdict.denied
-    assert verdict.receipt_id == "rcpt-1"
+    assert verdict.observation_id == "obs-1"
     assert verdict.decision == "allow"
     assert verdict.authorized
     assert verdict.authoritative
@@ -60,7 +59,7 @@ def test_evaluate_raw_allow_without_authority_denies() -> None:
             200,
             json={
                 "decision": "allow",
-                "receipt_id": "rcpt-raw",
+                "observation_id": "obs-raw",
                 "reason": None,
                 "capability_id": "cap-1",
                 "tool_server": "srv",
@@ -78,15 +77,8 @@ def test_evaluate_raw_allow_without_authority_denies() -> None:
     assert not verdict.allowed
 
 
-@pytest.mark.parametrize(
-    ("receipt_kind", "boundary_class"),
-    [
-        ("trace_observation", "detect_only"),
-        ("mediated_decision", "advisory_only"),
-    ],
-)
-def test_evaluate_allow_without_mediated_prevent_semantics_denies(
-    receipt_kind: str,
+@pytest.mark.parametrize("boundary_class", ["detect_only", "advisory_only"])
+def test_evaluate_allow_without_prevent_boundary_denies(
     boundary_class: str,
 ) -> None:
     def handler(_request: httpx.Request) -> httpx.Response:
@@ -94,10 +86,9 @@ def test_evaluate_allow_without_mediated_prevent_semantics_denies(
             200,
             json={
                 "decision": "allow",
-                "receipt_id": "rcpt-observed",
+                "observation_id": "obs-observed",
                 "authorized": True,
                 "authoritative": True,
-                "receipt_kind": receipt_kind,
                 "boundary_class": boundary_class,
                 "reason": None,
                 "capability_id": "cap-1",
@@ -122,7 +113,7 @@ def test_evaluate_deny_reports_reason() -> None:
             200,
             json={
                 "decision": "deny",
-                "receipt_id": "rcpt-2",
+                "observation_id": "obs-2",
                 "reason": "missing tool_name",
                 "capability_id": "cap-1",
                 "tool_server": "srv",
@@ -140,7 +131,7 @@ def test_evaluate_deny_reports_reason() -> None:
     assert verdict.reason == "missing tool_name"
 
 
-def test_evaluate_forwards_scope_and_arguments() -> None:
+def test_evaluate_forwards_arguments_only() -> None:
     captured: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -149,10 +140,9 @@ def test_evaluate_forwards_scope_and_arguments() -> None:
             200,
             json={
                 "decision": "allow",
-                "receipt_id": "r",
+                "observation_id": "r",
                 "authorized": True,
                 "authoritative": True,
-                "receipt_kind": "mediated_decision",
                 "boundary_class": "prevent",
                 "reason": None,
                 "capability_id": "c",
@@ -167,11 +157,10 @@ def test_evaluate_forwards_scope_and_arguments() -> None:
             capability_id="c",
             tool_server="s",
             tool_name="t",
-            scope="db:read",
             arguments={"sql": "SELECT 1"},
         )
 
-    assert captured["scope"] == "db:read"
+    assert set(captured) == {"capability_id", "tool_server", "tool_name", "arguments"}
     assert captured["arguments"] == {"sql": "SELECT 1"}
 
 
@@ -245,7 +234,7 @@ def test_evaluate_unknown_decision_treated_as_deny() -> None:
             200,
             json={
                 "decision": "maybe",
-                "receipt_id": "r",
+                "observation_id": "r",
                 "reason": None,
                 "capability_id": "c",
                 "tool_server": "s",
@@ -271,3 +260,24 @@ def test_health_returns_payload() -> None:
         payload = client.health()
 
     assert payload["status"] == "ok"
+
+
+def test_evaluate_missing_timestamp_is_malformed() -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "decision": "deny",
+                "observation_id": "obs-no-time",
+                "reason": None,
+                "capability_id": "c",
+                "tool_server": "s",
+                "tool_name": "t",
+            },
+        )
+
+    with (
+        ChioLambdaClient(transport=_mock_transport(handler)) as client,
+        pytest.raises(ChioLambdaError, match="malformed"),
+    ):
+        client.evaluate(capability_id="c", tool_server="s", tool_name="t")

@@ -7,6 +7,12 @@ exposes an evaluator on `http://127.0.0.1:9090`. This package wraps that
 endpoint with a typed synchronous client and a `@chio_tool` decorator so a
 handler can gate every invocation with a capability check.
 
+The extension is a detect-only observer: every response carries
+`authorized: false`, `authoritative: false` and `boundary_class: "detect_only"`.
+`verdict.allowed` requires an authorized, authoritative `prevent` allow, so
+against this extension every verdict is denied and `@chio_tool` handler
+bodies do not run.
+
 ## Install
 
 ```bash
@@ -34,7 +40,6 @@ def handler(event, context):
             capability_id=event["chio_capability_id"],
             tool_server="tools.example",
             tool_name="database-query",
-            scope="db:read",
             arguments={"sql": event["body"]},
         )
     except ChioLambdaError as exc:
@@ -51,7 +56,7 @@ def handler(event, context):
     return {
         "statusCode": 200,
         "body": result,
-        "headers": {"X-Chio-Receipt": verdict.receipt_id},
+        "headers": {"X-Chio-Observation": verdict.observation_id},
     }
 ```
 
@@ -61,12 +66,11 @@ def handler(event, context):
 from chio_lambda import chio_tool
 
 @chio_tool(
-    scope="db:read",
     tool_server="tools.example",
     tool_name="database-query",
 )
 def handler(event, context, capability_id, verdict):
-    # Runs only if the extension returns allow. The decorator injects
+    # Runs only on an authoritative prevent allow. The decorator injects
     # `capability_id` and `verdict` if the wrapped function declares them.
     return run_query(event["body"])
 ```
@@ -100,8 +104,10 @@ required.
 
 * `ChioLambdaClient.evaluate` raises `ChioLambdaError` when the extension is
   unreachable, times out, returns 5xx, returns non-JSON, or returns a JSON
-  body missing `decision` / `receipt_id`.
-* Any `decision` value other than the literal string `"allow"` is
-  surfaced as `verdict.denied == True`.
-* `@chio_tool` raises on both deny and unreachable. Handlers only run when
-  the extension unambiguously said `allow`.
+  body missing `decision` / `observation_id`.
+* `verdict.allowed` is true only for `decision == "allow"` with
+  `authorized`, `authoritative` and `boundary_class == "prevent"`; every
+  other response, including any detect-only observation, is
+  `verdict.denied == True`.
+* `@chio_tool` raises on both deny and unreachable. Handlers only run on an
+  authoritative `prevent` allow.

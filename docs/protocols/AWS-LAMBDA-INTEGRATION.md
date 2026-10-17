@@ -1,6 +1,9 @@
 # AWS Lambda Integration: Serverless Tool Server Security
 
 > **Status**: Tier 1 -- proposed April 2026
+> **Implemented**: `sdks/lambda/chio-lambda-extension` is a detect-only
+> observer. It records unsigned observations, signs no receipts, runs no
+> guards, and authorizes nothing. The design below is not implemented.
 > **Priority**: High -- serverless functions are a natural deployment model
 > for tool servers. Lambda Extensions provide a sidecar-equivalent mechanism
 > that can run the Chio kernel alongside each function invocation.

@@ -46,4 +46,5 @@ COMPOSITION_CONTRACTS = {
     "crates/security/chio-keyring/src/sqlite/opening.rs::open_with_topology::native-adapter": "cc818edc66838142e5f66c6173823336ed60ee8bbf768fd35475d246ab7555ac",
     "crates/platform/chio-control-plane/src/issuance/reputation.rs::inspect_local_reputation_with_read_context::native-adapter": "4981059f1cf5eef7d129bc8c641c02c11b273228095c8010c4e96b5413b52a6b",
     "crates/platform/chio-control-plane/src/issuance/reputation.rs::build_local_reputation_corpus_with_read_context::native-adapter": "6a76fbe1c1e7f0b45c8601d993e127938d7cddb0bd0b662440705308897cf354",
+    "sdks/lambda/chio-lambda-extension/src/main.rs::native_clock::native-adapter": "a17ac0fd6005e451665b025912248d79d3b1e8a58b4daa37eeb27308451967e6",
 }
