@@ -403,20 +403,35 @@ fn incomplete_duplicate_or_reordered_recovery_coverage_refuses_at_open() -> Test
 fn global_catalog_without_the_recovery_kind_refuses_at_open() -> TestResult {
     let store = provisioned()?;
     let raw = Connection::open(&store.database)?;
+    let sql: String = raw.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = 'authority_global_commits'",
+        [],
+        |row| row.get(0),
+    )?;
+    let open = sql
+        .find("projection_kind IN (")
+        .ok_or("projection kind CHECK is missing")?
+        + "projection_kind IN (".len();
+    let close = open
+        + sql[open..]
+            .find(')')
+            .ok_or("projection kind CHECK is unterminated")?;
+    let kinds: Vec<&str> = sql[open..close].split(", ").collect();
+    let retained: Vec<&str> = kinds
+        .iter()
+        .copied()
+        .filter(|kind| *kind != "'recovery'")
+        .collect();
+    assert_eq!(retained.len() + 1, kinds.len());
+    let stripped = format!("{}{}{}", &sql[..open], retained.join(", "), &sql[close..]);
     raw.execute_batch("PRAGMA writable_schema = ON;")?;
     let changed = raw.execute(
-        "UPDATE sqlite_schema SET sql = replace(sql, ', ''recovery'',', ',')
+        "UPDATE sqlite_schema SET sql = ?1
          WHERE type = 'table' AND name = 'authority_global_commits'",
-        [],
+        [&stripped],
     )?;
     raw.execute_batch("PRAGMA writable_schema = OFF;")?;
     drop(raw);
     assert_eq!(changed, 1);
-    let sql: String = Connection::open(&store.database)?.query_row(
-        "SELECT sql FROM sqlite_schema WHERE name = 'authority_global_commits'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert!(sql.contains("'stop_epoch', 'work_delegation'") && !sql.contains("'recovery'"));
     assert_open_refused(&store, "global authority commit schema is not canonical")
 }
