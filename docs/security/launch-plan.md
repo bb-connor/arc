@@ -341,8 +341,9 @@ Remaining Task 9/runtime work is explicit: the mandatory resolver port is not a
 production authenticated request source. The reference runtime still needs to
 compose retained admission/request state, current capability and policy checks,
 submitter authentication, collection and kernel execution replay into a tested
-durable lifecycle. The default sidecar's mediated endpoint continues to reject
-threshold input without its threshold policy resolver. Callback fixtures and
+durable lifecycle. The default sidecar's mediated request has no threshold
+fields and refuses `approval_tokens` and `threshold_approval_proposal` as unknown
+fields. Callback fixtures and
 disabled endpoints do not close that requirement.
 
 The next integration must establish these boundaries together:

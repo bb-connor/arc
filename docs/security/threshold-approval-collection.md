@@ -125,8 +125,9 @@ transition cannot be accepted.
 `ProtectProxy::with_threshold_approval_context_resolver` accepts an explicitly
 configured trusted source. Without it, threshold collector endpoints remain
 unavailable. The default sidecar does not yet supply a production request-context
-resolver; its mediated evaluation endpoint continues to reject threshold input
-because no threshold policy resolver is configured there. A configured collection
+resolver; its mediated evaluation request has no threshold fields and refuses
+`approval_tokens` and `threshold_approval_proposal` as unknown fields. A
+configured collection
 callback alone is not end-to-end runtime qualification.
 
 ### Kernel-owned original request resolver

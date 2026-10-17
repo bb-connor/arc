@@ -32,7 +32,7 @@ async fn mediated_authorization_rejects_unconfigured_supplemental_authorization(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn mediated_authorization_rejects_threshold_approval_without_policy_runtime() {
+async fn mediated_request_refuses_approval_tokens_outside_the_approval_id_route() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let approver = Keypair::generate();
@@ -40,6 +40,7 @@ async fn mediated_authorization_rejects_threshold_approval_without_policy_runtim
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
     let cap =
         issue_cost_bearing_capability(&kernel, &agent, "cost-srv", "compute", 100, 1000, "USD");
+    let cap_id = cap.id.clone();
     let state = mediated_test_state(signer, Arc::clone(&budget), Vec::new());
     let approval_token = GovernedApprovalToken::sign(
         GovernedApprovalTokenBody {
@@ -47,7 +48,7 @@ async fn mediated_authorization_rejects_threshold_approval_without_policy_runtim
             approver: approver.public_key(),
             subject: agent.public_key(),
             governed_intent_hash: "a".repeat(64),
-            request_id: "mediated-threshold-request".to_string(),
+            request_id: "mediated-approval-request".to_string(),
             threshold_proposal_hash: Some("b".repeat(64)),
             issued_at: 1,
             expires_at: 2,
@@ -56,27 +57,53 @@ async fn mediated_authorization_rejects_threshold_approval_without_policy_runtim
         &approver,
     )
     .unwrap();
-    // The mediated product does not install a threshold requirement resolver, so
-    // it rejects the advertised fields at the boundary instead of forwarding a
-    // request the kernel cannot authorize.
+    let approval_token = serde_json::to_value(approval_token).unwrap();
+    for (field, value) in [
+        ("approval_token", approval_token.clone()),
+        ("approval_tokens", serde_json::json!([approval_token])),
+        (
+            "threshold_approval_proposal",
+            serde_json::json!({ "proposal_hash": "b".repeat(64) }),
+        ),
+    ] {
+        let mut body = serde_json::json!({
+            "capability": cap,
+            "tool_server": "cost-srv",
+            "tool_name": "compute",
+            "request_id": "mediated-approval-request",
+            "parameters": { "invoice": "inv-approval" },
+        });
+        body[field] = value;
+
+        let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
+
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{field}: {json}");
+        assert_eq!(
+            json["message"], "urn:chio:error:attest:signed-json-invalid-shape",
+            "{field}: {json}"
+        );
+    }
+
     let body = serde_json::json!({
         "capability": cap,
         "tool_server": "cost-srv",
         "tool_name": "compute",
-        "request_id": "mediated-threshold-request",
-        "parameters": { "invoice": "inv-threshold" },
-        "approval_tokens": [approval_token]
+        "parameters": { "invoice": "inv-approval" },
+        "approval_id": "ap-retained",
+        "governed_intent": {
+            "id": "caller-intent", "server_id": "cost-srv", "tool_name": "compute",
+            "purpose": "caller envelope beside a retained approval"
+        }
     });
-
     let (status, json) = post_evaluate(Arc::clone(&state), &body).await;
-
-    assert_eq!(status, StatusCode::BAD_REQUEST);
-    assert!(
-        json["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("no threshold policy resolver is configured")),
-        "{json}"
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{json}");
+    assert_eq!(
+        json["message"],
+        "use approval_id to redeem the retained server-built approval"
     );
+
+    let usage = budget.get_usage(&cap_id, 0).unwrap();
+    assert!(usage.is_none() || usage.unwrap().committed_cost_units().unwrap() == 0);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

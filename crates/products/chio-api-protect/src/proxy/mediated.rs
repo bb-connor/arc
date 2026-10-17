@@ -1,8 +1,6 @@
 use super::*;
 
-use chio_core_types::capability::governance::{
-    GovernedTransactionIntent, ThresholdApprovalProposal,
-};
+use chio_core_types::capability::governance::GovernedTransactionIntent;
 use chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
 use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof};
@@ -247,6 +245,7 @@ pub(crate) fn build_mediation_kernel(
 }
 
 #[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     capability: chio_core_types::capability::token::CapabilityToken,
     tool_server: String,
@@ -264,19 +263,9 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// can be authorized instead of denied.
     #[serde(default)]
     governed_intent: Option<GovernedTransactionIntent>,
-    /// Legacy direct token field, rejected in favor of a retained approval_id.
-    #[serde(default)]
-    approval_token: Option<GovernedApprovalToken>,
     /// Server-assigned identifier of a retained, signed approval.
     #[serde(default)]
     approval_id: Option<String>,
-    /// Reserved threshold approval fields. The mediated product does not yet
-    /// configure a threshold policy resolver, so either field is rejected at the
-    /// HTTP boundary instead of being advertised as an unusable kernel feature.
-    #[serde(default)]
-    approval_tokens: Vec<GovernedApprovalToken>,
-    #[serde(default)]
-    threshold_approval_proposal: Option<ThresholdApprovalProposal>,
     /// Optional DPoP proof-of-possession. Forwarded so a grant carrying
     /// `dpop_required` can verify the proof instead of denying fail-closed.
     #[serde(default)]
@@ -311,21 +300,13 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
             Ok(parsed) => parsed,
             Err(error) => return input::rejected(error),
         };
-    if parsed.approval_token.is_some()
-        || (parsed.approval_id.is_some() && parsed.governed_intent.is_some())
-    {
+    if parsed.approval_id.is_some() && parsed.governed_intent.is_some() {
         return sidecar_bad_request("use approval_id to redeem the retained server-built approval")
             .into_response();
     }
     if parsed.supplemental_authorization.is_some() {
         return sidecar_bad_request(
             "supplemental_authorization is unavailable: no supplemental verifier is configured",
-        )
-        .into_response();
-    }
-    if !parsed.approval_tokens.is_empty() || parsed.threshold_approval_proposal.is_some() {
-        return sidecar_bad_request(
-            "threshold approvals are unavailable on the mediated endpoint: no threshold policy resolver is configured",
         )
         .into_response();
     }
@@ -561,7 +542,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         // rejected one above, so it always takes the authorization-reserve path.
         execution_nonce: presented_nonce,
         governed_intent: parsed.governed_intent,
-        approval_token: parsed.approval_token,
+        approval_token: None,
         approval_tokens: Vec::new(),
         threshold_approval_proposal: None,
         supplemental_authorization: None,
