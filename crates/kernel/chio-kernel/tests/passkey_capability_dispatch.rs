@@ -37,7 +37,7 @@ fn signed_capability(
     seed: u8,
 ) -> (PasskeyCapability, chio_core_types::crypto::PublicKey) {
     let backend = Ed25519Backend::new(Keypair::from_seed(&[seed; 32]));
-    let public = backend.public_key();
+    let public = backend.public_key().unwrap();
     let backend_arc: Arc<dyn SigningBackend> = Arc::new(backend);
     let svc = IssuerService::with_signer(audience, backend_arc);
     let req = MintRequest {
@@ -105,7 +105,7 @@ fn dispatch_rejects_expired_capability_fail_closed() {
 fn dispatch_rejects_foreign_issuer_signature_fail_closed() {
     let (cap, _real_public) = signed_capability(AUDIENCE, 53);
     let foreign = Ed25519Backend::new(Keypair::from_seed(&[101u8; 32]));
-    let foreign_public = foreign.public_key();
+    let foreign_public = foreign.public_key().unwrap();
     let verifier = PasskeyCapabilityVerifier::new(AUDIENCE, foreign_public);
     let res = verifier.verify(&cap, fixed_now());
     assert!(matches!(res, Err(CustodyError::AssertionRejected(_))));

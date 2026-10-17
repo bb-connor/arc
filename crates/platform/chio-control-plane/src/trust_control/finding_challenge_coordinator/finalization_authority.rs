@@ -148,7 +148,11 @@ impl FindingChallengeCoordinator {
         if body.bond_snapshot_envelope_sha256 == retained_body.bond_snapshot_envelope_sha256
             || body.finalized_at <= retained_body.finalized_at
             || body.finalization_authority_id != self.finalization_pin.authority_id
-            || body.finalization_key != self.finalization_authority.public_key()?
+            || body.finalization_key
+                != self
+                    .finalization_authority
+                    .public_key()
+                    .map_err(|_| ChallengeCoordinatorError::Signing)?
             || body.finalization_key_epoch != self.finalization_pin.key_epoch
             || body.finalization_valid_from != self.finalization_pin.valid_from
             || body.finalization_valid_until != self.finalization_pin.valid_until

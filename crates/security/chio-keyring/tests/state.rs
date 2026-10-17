@@ -114,8 +114,14 @@ impl Fixture {
 
     fn auditor_public_keys(&self) -> BTreeMap<String, chio_core_types::PublicKey> {
         BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
+            (
+                "audit.a".to_string(),
+                backend(80).public_key().test_unwrap(),
+            ),
+            (
+                "audit.b".to_string(),
+                backend(81).public_key().test_unwrap(),
+            ),
         ])
     }
 
@@ -133,7 +139,11 @@ impl Fixture {
             event_id: EventId::new("event.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-            key_id: derive_key_id(self.old.public_key().test_unwrap().algorithm(), &self.old.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                self.old.public_key().test_unwrap().algorithm(),
+                &self.old.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: self.old.public_key().test_unwrap().algorithm(),
             public_key: self.old.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
@@ -158,7 +168,11 @@ impl Fixture {
             event_id: EventId::new("event.rotation.1").test_unwrap(),
             previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
             authority_id: genesis.body.authority_id.clone(),
-            key_id: derive_key_id(self.new.public_key().test_unwrap().algorithm(), &self.new.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                self.new.public_key().test_unwrap().algorithm(),
+                &self.new.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: self.new.public_key().test_unwrap().algorithm(),
             public_key: self.new.public_key().test_unwrap(),
             operation: KeyLogOperation::Rotate {
@@ -360,23 +374,44 @@ fn auditor_policy_requires_exactly_two_unique_identifiers_and_role_keys() {
     assert!(base
         .clone()
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
-            ("audit.c".to_string(), backend(82).public_key().test_unwrap()),
+            (
+                "audit.a".to_string(),
+                backend(80).public_key().test_unwrap()
+            ),
+            (
+                "audit.b".to_string(),
+                backend(81).public_key().test_unwrap()
+            ),
+            (
+                "audit.c".to_string(),
+                backend(82).public_key().test_unwrap()
+            ),
         ]))
         .is_err());
     assert!(base
         .clone()
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.b".to_string(), backend(80).public_key().test_unwrap()),
+            (
+                "audit.a".to_string(),
+                backend(80).public_key().test_unwrap()
+            ),
+            (
+                "audit.b".to_string(),
+                backend(80).public_key().test_unwrap()
+            ),
         ]))
         .is_err());
     assert!(base
         .clone()
         .with_auditor_roots(BTreeMap::from([
-            ("audit valid".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
+            (
+                "audit valid".to_string(),
+                backend(80).public_key().test_unwrap()
+            ),
+            (
+                "audit.b".to_string(),
+                backend(81).public_key().test_unwrap()
+            ),
         ]))
         .is_err());
 
@@ -400,7 +435,10 @@ fn auditor_keys_cannot_overlap_any_fixed_or_lifecycle_authority_role() {
             .policy_without_auditors()
             .with_auditor_roots(BTreeMap::from([
                 ("audit.a".to_string(), overlapping_key),
-                ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
+                (
+                    "audit.b".to_string(),
+                    backend(81).public_key().test_unwrap()
+                ),
             ]))
             .is_err());
     }
@@ -408,8 +446,11 @@ fn auditor_keys_cannot_overlap_any_fixed_or_lifecycle_authority_role() {
     let policy = fixture.policy();
     let auditor = backend(80);
     let mut active_overlap = fixture.genesis();
-    active_overlap.body.key_id =
-        derive_key_id(auditor.public_key().test_unwrap().algorithm(), &auditor.public_key().test_unwrap()).test_unwrap();
+    active_overlap.body.key_id = derive_key_id(
+        auditor.public_key().test_unwrap().algorithm(),
+        &auditor.public_key().test_unwrap(),
+    )
+    .test_unwrap();
     active_overlap.body.algorithm = auditor.public_key().test_unwrap().algorithm();
     active_overlap.body.public_key = auditor.public_key().test_unwrap();
     active_overlap.authorizations = KeyLogAuthorizations::bootstrap(
@@ -420,8 +461,11 @@ fn auditor_keys_cannot_overlap_any_fixed_or_lifecycle_authority_role() {
 
     let genesis = fixture.genesis();
     let mut pending_overlap = fixture.rotation(&genesis);
-    pending_overlap.body.key_id =
-        derive_key_id(auditor.public_key().test_unwrap().algorithm(), &auditor.public_key().test_unwrap()).test_unwrap();
+    pending_overlap.body.key_id = derive_key_id(
+        auditor.public_key().test_unwrap().algorithm(),
+        &auditor.public_key().test_unwrap(),
+    )
+    .test_unwrap();
     pending_overlap.body.algorithm = auditor.public_key().test_unwrap().algorithm();
     pending_overlap.body.public_key = auditor.public_key().test_unwrap();
     pending_overlap.authorizations = KeyLogAuthorizations::rotation(
@@ -443,14 +487,26 @@ fn configuration_binding_commits_the_canonical_auditor_roster() {
     let changed_identifier = base
         .clone()
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.c".to_string(), backend(81).public_key().test_unwrap()),
+            (
+                "audit.a".to_string(),
+                backend(80).public_key().test_unwrap(),
+            ),
+            (
+                "audit.c".to_string(),
+                backend(81).public_key().test_unwrap(),
+            ),
         ]))
         .test_unwrap();
     let changed_key = base
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.b".to_string(), backend(82).public_key().test_unwrap()),
+            (
+                "audit.a".to_string(),
+                backend(80).public_key().test_unwrap(),
+            ),
+            (
+                "audit.b".to_string(),
+                backend(82).public_key().test_unwrap(),
+            ),
         ]))
         .test_unwrap();
 
@@ -825,7 +881,11 @@ fn review_recovery_requires_new_key_proof_and_distinct_threshold_authorizers() {
         event_id: EventId::new("event.recover.1").test_unwrap(),
         previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
         authority_id: genesis.body.authority_id.clone(),
-        key_id: derive_key_id(recovered.public_key().test_unwrap().algorithm(), &recovered.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            recovered.public_key().test_unwrap().algorithm(),
+            &recovered.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: recovered.public_key().test_unwrap().algorithm(),
         public_key: recovered.public_key().test_unwrap(),
         operation: KeyLogOperation::Recover {
@@ -966,7 +1026,10 @@ fn review_policy_rejects_weak_artifact_time_and_auditor_roots() {
     let auditor_rejected = policy
         .with_auditor_roots(BTreeMap::from([
             ("audit.a".to_string(), weak),
-            ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
+            (
+                "audit.b".to_string(),
+                backend(81).public_key().test_unwrap(),
+            ),
         ]))
         .is_err();
     assert!(
@@ -1075,7 +1138,13 @@ fn complete_history_and_replay_reject_malformed_sequences_and_role_key_overlap()
     let second = KeyLogState::replay([&genesis], &history, &policy).test_unwrap();
     assert_eq!(first, second);
     assert!(first
-        .key(&derive_key_id(backend(99).public_key().test_unwrap().algorithm(), &backend(99).public_key().test_unwrap()).test_unwrap())
+        .key(
+            &derive_key_id(
+                backend(99).public_key().test_unwrap().algorithm(),
+                &backend(99).public_key().test_unwrap()
+            )
+            .test_unwrap()
+        )
         .is_err());
 }
 

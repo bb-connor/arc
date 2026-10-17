@@ -55,18 +55,18 @@ impl Fixture {
         let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
             log_id: LogId::new("log.retained-host")?,
             authority_id: AuthorityId::new("authority.retained-host")?,
-            bootstrap_key: bootstrap.public_key(),
-            operator_key: operator.public_key(),
+            bootstrap_key: bootstrap.public_key()?,
+            operator_key: operator.public_key()?,
             witness_roster_id: WitnessRosterId::new("roster.retained-host")?,
-            witness_keys: BTreeMap::from([(witness_id.clone(), witness.public_key())]),
+            witness_keys: BTreeMap::from([(witness_id.clone(), witness.public_key().unwrap())]),
             recovery_policy_id: RecoveryPolicyId::new("recovery.retained-host")?,
             recovery_keys: BTreeMap::new(),
             recovery_threshold: 0,
             max_checkpoint_future_skew: 0,
         })?
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".into(), backend(6).public_key()),
-            ("audit.b".into(), backend(7).public_key()),
+            ("audit.a".into(), backend(6).public_key().unwrap()),
+            ("audit.b".into(), backend(7).public_key().unwrap()),
         ]))?;
         let clock = Arc::new(MutableClock {
             millis: AtomicU64::new(1_000),
@@ -85,9 +85,9 @@ impl Fixture {
             event_id: EventId::new("event.genesis")?,
             previous_event_hash: None,
             authority_id: policy.authority_id().clone(),
-            key_id: derive_key_id(old.algorithm(), &old.public_key())?,
-            algorithm: old.algorithm(),
-            public_key: old.public_key(),
+            key_id: derive_key_id(old.public_key()?.algorithm(), &old.public_key()?)?,
+            algorithm: old.public_key().unwrap().algorithm(),
+            public_key: old.public_key()?,
             operation: KeyLogOperation::Genesis,
             effective_at: 1_000,
             verify_until: None,
@@ -109,9 +109,9 @@ impl Fixture {
             event_id: EventId::new("event.rotation")?,
             previous_event_hash: Some(genesis.envelope_hash()?),
             authority_id: policy.authority_id().clone(),
-            key_id: derive_key_id(new.algorithm(), &new.public_key())?,
-            algorithm: new.algorithm(),
-            public_key: new.public_key(),
+            key_id: derive_key_id(new.public_key()?.algorithm(), &new.public_key()?)?,
+            algorithm: new.public_key().unwrap().algorithm(),
+            public_key: new.public_key()?,
             operation: KeyLogOperation::Rotate {
                 previous_key_id: genesis.body.key_id,
                 witness_roster_id: policy.witness_roster_id().clone(),
@@ -178,8 +178,8 @@ impl Fixture {
             previous_event_hash: Some(self.rotation.envelope_hash()?),
             authority_id: self.genesis.body.authority_id.clone(),
             key_id: self.genesis.body.key_id,
-            algorithm: self.old.algorithm(),
-            public_key: self.old.public_key(),
+            algorithm: self.old.public_key().unwrap().algorithm(),
+            public_key: self.old.public_key()?,
             operation,
             effective_at: 4_000,
             verify_until: None,
@@ -204,22 +204,22 @@ fn kg2_retained_host_excludes_key_at_owned_clock_deadline() -> TestResult {
     let authority = fixture.authority()?;
     assert!(authority
         .trusted_public_keys()
-        .contains(&fixture.old.public_key()));
+        .contains(&fixture.old.public_key().unwrap()));
     fixture.clock.millis.store(9_000, Ordering::SeqCst);
     let state = fixture.store.load_state()?.ok_or("missing state")?;
     assert!(!state
         .witnessed_verification_keys_at(9_000)
         .iter()
-        .any(|key| key.public_key == fixture.old.public_key()));
+        .any(|key| key.public_key == fixture.old.public_key().unwrap()));
     assert!(
         !authority
             .trusted_public_keys()
-            .contains(&fixture.old.public_key()),
+            .contains(&fixture.old.public_key().unwrap()),
         "retained authority cached the expired issuer"
     );
     assert!(
         authority
-            .check_issuer_lifecycle(&fixture.old.public_key(), 1, 2)
+            .check_issuer_lifecycle(&fixture.old.public_key().unwrap(), 1, 2)
             .is_err(),
         "caller time must not override owned deadline"
     );
@@ -236,15 +236,15 @@ fn kg2_retained_host_excludes_retired_and_revoked_keys() -> TestResult {
         assert!(!state
             .witnessed_verification_keys_at(4_000)
             .iter()
-            .any(|key| key.public_key == fixture.old.public_key()));
+            .any(|key| key.public_key == fixture.old.public_key().unwrap()));
         assert!(
             !authority
                 .trusted_public_keys()
-                .contains(&fixture.old.public_key()),
+                .contains(&fixture.old.public_key().unwrap()),
             "retained authority cached terminal issuer"
         );
         assert!(authority
-            .check_issuer_lifecycle(&fixture.old.public_key(), 1, 4)
+            .check_issuer_lifecycle(&fixture.old.public_key().unwrap(), 1, 4)
             .is_err());
     }
     Ok(())
@@ -254,10 +254,10 @@ fn kg2_retained_host_excludes_retired_and_revoked_keys() -> TestResult {
 fn kg2_retained_host_rejects_issuance_at_or_after_rotation_cutoff() -> TestResult {
     let fixture = Fixture::new()?;
     let authority = fixture.authority()?;
-    authority.check_issuer_lifecycle(&fixture.old.public_key(), 1, 2)?;
+    authority.check_issuer_lifecycle(&fixture.old.public_key().unwrap(), 1, 2)?;
     assert!(
         authority
-            .check_issuer_lifecycle(&fixture.old.public_key(), 2, 2)
+            .check_issuer_lifecycle(&fixture.old.public_key().unwrap(), 2, 2)
             .is_err(),
         "old issuer signed at the deactivation cutoff"
     );
@@ -274,7 +274,7 @@ fn kg2_retained_host_refuses_owned_clock_outage() -> TestResult {
         "clock outage must not use cached keys"
     );
     assert!(authority
-        .check_issuer_lifecycle(&fixture.old.public_key(), 1, 2)
+        .check_issuer_lifecycle(&fixture.old.public_key().unwrap(), 1, 2)
         .is_err());
     Ok(())
 }

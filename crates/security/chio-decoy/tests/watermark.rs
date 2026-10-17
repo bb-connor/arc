@@ -4,9 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use chio_core_types::{
-    Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use chio_decoy::{
     Clock, DecoyCreateRequest, PrivateDecoyRegistry, SecretMaterial, SignedWatermarkEnvelope,
     TrustedWatermarkKey, WatermarkIssueError, WatermarkIssueRequest, WatermarkIssuer,

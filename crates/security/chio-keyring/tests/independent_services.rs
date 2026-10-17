@@ -392,8 +392,11 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         event_id: EventId::new("event.independent.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: AuthorityId::new("authority.independent.processes").test_unwrap(),
-        key_id: derive_key_id(fixture.active.public_key().test_unwrap().algorithm(), &fixture.active.public_key().test_unwrap())
-            .test_unwrap(),
+        key_id: derive_key_id(
+            fixture.active.public_key().test_unwrap().algorithm(),
+            &fixture.active.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: fixture.active.public_key().test_unwrap().algorithm(),
         public_key: fixture.active.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
@@ -697,7 +700,11 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
         event_id: EventId::new("event.independent.rotation").test_unwrap(),
         previous_event_hash: Some(event.envelope_hash().test_unwrap()),
         authority_id: event.body.authority_id.clone(),
-        key_id: derive_key_id(rotated.public_key().test_unwrap().algorithm(), &rotated.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            rotated.public_key().test_unwrap().algorithm(),
+            &rotated.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: rotated.public_key().test_unwrap().algorithm(),
         public_key: rotated.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
@@ -1028,7 +1035,11 @@ impl Fixture {
             event_id: EventId::new("event.independent.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.independent.processes").test_unwrap(),
-            key_id: derive_key_id(self.active.public_key().test_unwrap().algorithm(), &self.active.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                self.active.public_key().test_unwrap().algorithm(),
+                &self.active.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: self.active.public_key().test_unwrap().algorithm(),
             public_key: self.active.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
@@ -1309,7 +1320,11 @@ fn authority_current_selector_refuses_after_router_poison() {
         event_id: EventId::new("event.independent.poison-rotation").test_unwrap(),
         previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
         authority_id: genesis.body.authority_id.clone(),
-        key_id: derive_key_id(rotated.public_key().test_unwrap().algorithm(), &rotated.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            rotated.public_key().test_unwrap().algorithm(),
+            &rotated.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: rotated.public_key().test_unwrap().algorithm(),
         public_key: rotated.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {

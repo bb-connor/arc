@@ -317,13 +317,13 @@ fn dropped_boot_handle_preserves_receipt_authority_without_issuer_trust() -> Tes
     let mut kernel = make_kernel(make_config());
     let classical = kernel.public_key();
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
-    let key = backend.public_key();
+    let key = backend.public_key().unwrap();
     drop(backend);
-    assert!(kernel.receipt_signing_public_key() == key);
+    assert!(kernel.receipt_signing_public_key().unwrap() == key);
     assert!(kernel.public_key() == classical);
     assert!(!kernel.capability_issuer_is_trusted(&key));
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
-    assert!(receipt.kernel_key == key?);
+    assert!(receipt.kernel_key == key);
     assert!(receipt.verify_signature()?);
     Ok(())
 }
@@ -517,10 +517,10 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
 #[test]
 fn capability_only_floor_setter_does_not_reconfigure_receipt_authority() -> TestResult {
     let mut kernel = make_kernel(make_config());
-    let previous_key = kernel.receipt_signing_public_key();
+    let previous_key = kernel.receipt_signing_public_key().unwrap();
     kernel.set_capability_crypto_floor(KernelCryptoFloor::PqRequired);
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
-    assert!(receipt.kernel_key == previous_key?);
+    assert!(receipt.kernel_key == previous_key);
     assert!(receipt.verify_signature()?);
     assert_eq!(
         kernel.signing_authority.floor,

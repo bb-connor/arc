@@ -23,14 +23,14 @@ pub(super) fn policy_document() -> KeyLogPolicyDocument {
         schema: chio_keyring::KEY_LOG_POLICY_DOCUMENT_SCHEMA.into(),
         log_id: "log.native.broker".into(),
         authority_id: "authority.native.broker".into(),
-        bootstrap_public_key: backend(230).public_key().to_hex(),
-        operator_public_key: backend(231).public_key().to_hex(),
+        bootstrap_public_key: backend(230).public_key().unwrap().to_hex(),
+        operator_public_key: backend(231).public_key().unwrap().to_hex(),
         witness_roster_id: "witnesses.native.broker".into(),
         witness_public_keys: (0..3_u8)
             .map(|i| {
                 (
                     format!("witness.{i}"),
-                    backend(240 + i).public_key().to_hex(),
+                    backend(240 + i).public_key().unwrap().to_hex(),
                 )
             })
             .collect(),
@@ -39,10 +39,15 @@ pub(super) fn policy_document() -> KeyLogPolicyDocument {
         recovery_threshold: 0,
         artifact_time_public_keys: BTreeMap::from([(
             "clock.native.broker".into(),
-            backend(233).public_key().to_hex(),
+            backend(233).public_key().unwrap().to_hex(),
         )]),
         auditor_public_keys: (0..2_u8)
-            .map(|i| (format!("audit.{i}"), backend(250 + i).public_key().to_hex()))
+            .map(|i| {
+                (
+                    format!("audit.{i}"),
+                    backend(250 + i).public_key().unwrap().to_hex(),
+                )
+            })
             .collect(),
         max_checkpoint_future_skew_millis: 60_000,
     }
@@ -94,7 +99,7 @@ impl KeyServices {
             let client = UnixKeyLogWitnessClient::new(
                 socket.clone(),
                 WitnessId::new(&identifier)?,
-                backend(240 + index).public_key(),
+                backend(240 + index).public_key()?,
                 policy.configuration_binding()?,
             )?;
             let started = Instant::now();

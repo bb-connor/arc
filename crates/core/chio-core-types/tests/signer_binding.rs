@@ -255,7 +255,10 @@ fn approval_signers_reject_embedded_approver_mismatches() {
         &backend,
     )
     .is_err());
-    assert_ne!(embedded_approver.public_key(), backend.public_key().unwrap());
+    assert_ne!(
+        embedded_approver.public_key(),
+        backend.public_key().unwrap()
+    );
 }
 
 #[test]

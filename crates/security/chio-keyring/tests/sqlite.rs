@@ -5,8 +5,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Barrier};
 
 use chio_core_types::{
-    Ed25519Backend, Keypair, PublicKey, Result as CoreResult, Signature, SigningAlgorithm,
-    SigningBackend,
+    Ed25519Backend, Keypair, PublicKey, Result as CoreResult, Signature, SigningBackend,
 };
 use chio_keyring::{
     derive_key_id, durable_storage_identity, AnchorId, AuthorityId, BootstrapAuthorization,
@@ -115,8 +114,14 @@ impl Fixture {
     fn policy(&self) -> KeyLogPolicy {
         self.policy_without_auditors()
             .with_auditor_roots(BTreeMap::from([
-                ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-                ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
+                (
+                    "audit.a".to_string(),
+                    backend(80).public_key().test_unwrap(),
+                ),
+                (
+                    "audit.b".to_string(),
+                    backend(81).public_key().test_unwrap(),
+                ),
             ]))
             .test_unwrap()
     }
@@ -129,7 +134,11 @@ impl Fixture {
             event_id: EventId::new("event.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-            key_id: derive_key_id(self.old.public_key().test_unwrap().algorithm(), &self.old.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                self.old.public_key().test_unwrap().algorithm(),
+                &self.old.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: self.old.public_key().test_unwrap().algorithm(),
             public_key: self.old.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
@@ -159,7 +168,11 @@ impl Fixture {
             event_id: EventId::new(event_id).test_unwrap(),
             previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
             authority_id: genesis.body.authority_id.clone(),
-            key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+            key_id: derive_key_id(
+                new.public_key().test_unwrap().algorithm(),
+                &new.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
             algorithm: new.public_key().test_unwrap().algorithm(),
             public_key: new.public_key().test_unwrap(),
             operation: KeyLogOperation::Rotate {
@@ -231,8 +244,14 @@ fn durable_store_rejects_changed_security_configuration() {
     let changed_auditor_policy = fixture
         .policy_without_auditors()
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
-            ("audit.b".to_string(), backend(82).public_key().test_unwrap()),
+            (
+                "audit.a".to_string(),
+                backend(80).public_key().test_unwrap(),
+            ),
+            (
+                "audit.b".to_string(),
+                backend(82).public_key().test_unwrap(),
+            ),
         ]))
         .test_unwrap();
     assert!(SqliteKeyLogStore::open(&path, changed_auditor_policy).is_err());

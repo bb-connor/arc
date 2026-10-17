@@ -228,7 +228,9 @@ pub(super) fn admit_capability_authority(
     state: &TrustServiceState,
     inner: Box<dyn CapabilityAuthority>,
 ) -> Result<Box<dyn CapabilityAuthority>, Response> {
-    let key = inner.authority_public_key();
+    let key = inner
+        .authority_public_key()
+        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &error.to_string()))?;
     let context = signing_admission(state, &key)?;
     Ok(Box::new(AdmittedCapabilityAuthority {
         state: state.clone(),
@@ -277,8 +279,8 @@ impl AdmittedCapabilityAuthority {
 }
 
 impl CapabilityAuthority for AdmittedCapabilityAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.key.clone()
+    fn authority_public_key(&self) -> Result<PublicKey, chio_kernel::KernelError> {
+        Ok(self.key.clone())
     }
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {

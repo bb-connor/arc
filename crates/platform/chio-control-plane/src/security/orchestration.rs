@@ -946,7 +946,9 @@ impl ProductionActiveDefenseOrchestrator {
         let finding_authority: Arc<dyn ActiveResponseFindingAuthority> =
             Arc::new(NativeActiveResponseFindingAuthority::new(
                 Arc::clone(&indexed_evidence_store),
-                vec![lifecycle.signer_public_key()?],
+                vec![lifecycle
+                    .signer_public_key()
+                    .map_err(|_| PortError::unavailable())?],
             )?);
         let attestor = Arc::new(AttestedCorrelationWriter::new(
             Arc::clone(&receipt_sink),

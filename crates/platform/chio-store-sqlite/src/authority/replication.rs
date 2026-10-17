@@ -90,7 +90,7 @@ impl SqliteCapabilityAuthority {
         }
         persist_snapshot(&transaction, &anchor.snapshot)?;
         insert_anchor(&transaction, anchor, now)?;
-        let status = Self::read_status_from_connection(&transaction)?;
+        Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
         Ok(true)
     }
@@ -182,7 +182,7 @@ impl SqliteCapabilityAuthority {
         replication.latest = Some(snapshot.clone());
         replication.observed_ms = now.get();
         write_replication(&transaction, &replication)?;
-        let status = Self::read_status_from_connection(&transaction)?;
+        Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
         Ok(changed)
     }

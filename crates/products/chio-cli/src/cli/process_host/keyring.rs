@@ -151,7 +151,7 @@ struct ParentAuthority {
 }
 
 impl chio_kernel::CapabilityAuthority for ParentAuthority {
-    fn authority_public_key(&self) -> chio_core_types::PublicKey {
+    fn authority_public_key(&self) -> Result<chio_core_types::PublicKey, chio_kernel::KernelError> {
         self.inner.authority_public_key()
     }
 

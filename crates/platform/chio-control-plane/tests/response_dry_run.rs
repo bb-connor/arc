@@ -29,8 +29,8 @@ fn signed_report() -> TestResult<(ResponseSimulationReport, ChioReceipt, chio_co
     };
     let signer = Ed25519Backend::new(Keypair::from_seed(&[71; 32]));
     let receipt =
-        ChioReceipt::sign_with_backend(report.receipt_body(signer.public_key())?, &signer)?;
-    Ok((report, receipt, signer.public_key()))
+        ChioReceipt::sign_with_backend(report.receipt_body(signer.public_key()?)?, &signer)?;
+    Ok((report, receipt, signer.public_key()?))
 }
 
 #[test]

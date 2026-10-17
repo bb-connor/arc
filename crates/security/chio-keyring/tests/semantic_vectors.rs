@@ -164,8 +164,14 @@ impl PositiveContext {
         let active_receipt =
             load_receipt("positive/key-log-enterprise-receipt-envelope-active-v1.json");
 
-        assert_eq!(genesis.body.public_key, keys.old_artifact.public_key().test_unwrap());
-        assert_eq!(rotation.body.public_key, keys.new_artifact.public_key().test_unwrap());
+        assert_eq!(
+            genesis.body.public_key,
+            keys.old_artifact.public_key().test_unwrap()
+        );
+        assert_eq!(
+            rotation.body.public_key,
+            keys.new_artifact.public_key().test_unwrap()
+        );
         genesis
             .validate_common(
                 0,

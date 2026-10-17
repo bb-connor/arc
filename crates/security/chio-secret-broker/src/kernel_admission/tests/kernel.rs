@@ -198,8 +198,10 @@ fn registered_composite_execution(
     #[cfg(target_os = "linux")]
     let (mut peer, ipc) = {
         let signer = Arc::new(Ed25519Backend::new(Keypair::from_seed(&[34; 32])));
-        let peer =
-            super::registration_peer::RegistrationPeer::new(directory.path(), signer.public_key())?;
+        let peer = super::registration_peer::RegistrationPeer::new(
+            directory.path(),
+            signer.public_key()?,
+        )?;
         let ipc = Arc::new(BrokerAdmissionParticipant::new(
             peer.config.clone(),
             signer,

@@ -176,7 +176,11 @@ fn genesis(bootstrap: &Ed25519Backend, authority: &Ed25519Backend) -> SignedKeyL
         event_id: EventId::new("event.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-        key_id: derive_key_id(authority.public_key().test_unwrap().algorithm(), &authority.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            authority.public_key().test_unwrap().algorithm(),
+            &authority.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: authority.public_key().test_unwrap().algorithm(),
         public_key: authority.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
@@ -204,7 +208,11 @@ fn rotation(
         event_id: EventId::new("event.rotation.1").test_unwrap(),
         previous_event_hash: Some(previous.envelope_hash().test_unwrap()),
         authority_id: previous.body.authority_id.clone(),
-        key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            new.public_key().test_unwrap().algorithm(),
+            &new.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: new.public_key().test_unwrap().algorithm(),
         public_key: new.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
@@ -300,7 +308,11 @@ fn key_id_binds_algorithm_and_complete_self_describing_public_key() {
     assert_eq!(ed25519, derive_key_id(key.algorithm(), &key).test_unwrap());
     assert_ne!(
         ed25519,
-        derive_key_id(backend(3).public_key().test_unwrap().algorithm(), &backend(3).public_key().test_unwrap()).test_unwrap()
+        derive_key_id(
+            backend(3).public_key().test_unwrap().algorithm(),
+            &backend(3).public_key().test_unwrap()
+        )
+        .test_unwrap()
     );
 }
 
@@ -315,21 +327,29 @@ fn genesis_and_rotation_require_exact_authorization_sets() {
         .test_unwrap();
 
     let rotation = rotation(&genesis, &old, &new);
-    rotation.verify_rotation(&old.public_key().test_unwrap()).test_unwrap();
+    rotation
+        .verify_rotation(&old.public_key().test_unwrap())
+        .test_unwrap();
 
     let mut bad_old = rotation.clone();
     bad_old.authorizations.old_key =
         Some(OldKeyAuthorization::sign(&bad_old.body, &backend(8)).test_unwrap());
-    assert!(bad_old.verify_rotation(&old.public_key().test_unwrap()).is_err());
+    assert!(bad_old
+        .verify_rotation(&old.public_key().test_unwrap())
+        .is_err());
 
     let mut bad_new = rotation.clone();
     bad_new.authorizations.new_key =
         Some(NewKeyProofOfPossession::sign(&bad_new.body, &backend(8)).test_unwrap());
-    assert!(bad_new.verify_rotation(&old.public_key().test_unwrap()).is_err());
+    assert!(bad_new
+        .verify_rotation(&old.public_key().test_unwrap())
+        .is_err());
 
     let mut missing = rotation;
     missing.authorizations.new_key = None;
-    assert!(missing.verify_rotation(&old.public_key().test_unwrap()).is_err());
+    assert!(missing
+        .verify_rotation(&old.public_key().test_unwrap())
+        .is_err());
 }
 
 #[test]

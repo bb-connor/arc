@@ -1,7 +1,7 @@
 //! Shared boot-selected authority for proposals and ordinary receipts.
 
 use super::*;
-use chio_core::crypto::{SigningAlgorithm, SigningBackend, SigningOutcome};
+use chio_core::crypto::{SigningBackend, SigningOutcome};
 
 #[cfg(test)]
 #[path = "signing_authority/forwarding_tests.rs"]

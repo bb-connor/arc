@@ -11,7 +11,9 @@ impl ChioKernel {
         self.threshold_approval_requirement_resolver = Some(resolver);
     }
 
-    pub(super) fn threshold_proposal_signing_key(&self) -> Result<chio_core::PublicKey, KernelError> {
+    pub(super) fn threshold_proposal_signing_key(
+        &self,
+    ) -> Result<chio_core::PublicKey, KernelError> {
         self.receipt_signing_public_key()
     }
 

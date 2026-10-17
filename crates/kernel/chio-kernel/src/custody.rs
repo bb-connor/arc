@@ -137,7 +137,10 @@ mod tests {
 
     fn signed_cap_for_audience(audience: &str) -> (PasskeyCapability, PublicKey) {
         let backend = Ed25519Backend::new(Keypair::from_seed(&[41u8; 32]));
-        let public = backend.public_key();
+        let public = match backend.public_key() {
+            Ok(key) => key,
+            Err(e) => panic!("backend public key must read: {e}"),
+        };
         let backend_arc: Arc<dyn SigningBackend> = Arc::new(backend);
         let svc = IssuerService::with_signer(audience, backend_arc);
         let req = MintRequest {
@@ -198,7 +201,10 @@ mod tests {
         // public key, so a foreign issuer never produces a verifying
         // capability.
         let other_backend = Ed25519Backend::new(Keypair::from_seed(&[99u8; 32]));
-        let other_public = other_backend.public_key();
+        let other_public = match other_backend.public_key() {
+            Ok(key) => key,
+            Err(e) => panic!("backend public key must read: {e}"),
+        };
         let verifier = PasskeyCapabilityVerifier::new(AUDIENCE, other_public);
         let res = verifier.verify(&cap, fixed_now());
         assert!(matches!(res, Err(CustodyError::AssertionRejected(_))));

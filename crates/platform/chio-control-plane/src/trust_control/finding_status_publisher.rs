@@ -85,7 +85,9 @@ impl FindingStatusEpochPublisher {
             .map_err(|error| error.to_string())?;
         if max_epoch_age_secs == 0
             || max_epoch_age_secs > FINDING_STATUS_MAX_EPOCH_AGE_SECS
-            || operator_signer.public_key()
+            || operator_signer
+                .public_key()
+                .map_err(|error| error.to_string())?
                 != operator.authority.key().map_err(|e| e.to_string())?
         {
             return Err("finding status publisher configuration is not authorized".to_owned());
@@ -175,7 +177,10 @@ impl FindingStatusEpochPublisher {
             key_domain_nonce: FINDING_STATUS_KEY_DOMAIN_NONCE,
             map_epoch,
             operator_id: self.operator.authority.authority_id.clone(),
-            operator_key: self.operator_signer.public_key()?,
+            operator_key: self
+                .operator_signer
+                .public_key()
+                .map_err(|error| error.to_string())?,
             operator_key_epoch: self.operator.authority.key_epoch,
             root_hash: hex::encode(map.root().root_hash),
             tree_depth: u16::try_from(FINDING_STATUS_SPARSE_DEPTH)

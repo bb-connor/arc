@@ -7,9 +7,7 @@ use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use chio_core_types::{
-    Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use chio_keyring::{
     derive_key_id, AnchorId, ArtifactTimeAnchorKind, AuthorityId, BootstrapAuthorization, EventId,
     EventReason, KeyLogAuthorizations, KeyLogEventBody, KeyLogOperation, KeyLogPolicy,
@@ -125,7 +123,11 @@ fn ready_log(path: &Path) -> ReadyLog {
         event_id: EventId::new("event.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: authority_id.clone(),
-        key_id: derive_key_id(old.public_key().test_unwrap().algorithm(), &old.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            old.public_key().test_unwrap().algorithm(),
+            &old.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: old.public_key().test_unwrap().algorithm(),
         public_key: old.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
@@ -147,7 +149,11 @@ fn ready_log(path: &Path) -> ReadyLog {
         event_id: EventId::new("event.rotation.1").test_unwrap(),
         previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
         authority_id,
-        key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+        key_id: derive_key_id(
+            new.public_key().test_unwrap().algorithm(),
+            &new.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
         algorithm: new.public_key().test_unwrap().algorithm(),
         public_key: new.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
@@ -246,12 +252,18 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     assert_eq!(first.signing_epoch, 0);
     assert_eq!(
         first.key_id,
-        derive_key_id(ready.old.public_key().test_unwrap().algorithm(), &ready.old.public_key().test_unwrap()).test_unwrap()
+        derive_key_id(
+            ready.old.public_key().test_unwrap().algorithm(),
+            &ready.old.public_key().test_unwrap()
+        )
+        .test_unwrap()
     );
     let mut corrupted_evidence = first.clone();
     corrupted_evidence.artifact_signature =
         ready.old.sign_bytes(b"corrupted evidence").test_unwrap();
-    assert!(corrupted_evidence.verify(&ready.old.public_key().test_unwrap()).is_err());
+    assert!(corrupted_evidence
+        .verify(&ready.old.public_key().test_unwrap())
+        .is_err());
     assert!(router
         .sign_canonical(1, &serde_json::json!({"artifact": 2}))
         .is_err());
@@ -271,7 +283,11 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     assert_eq!(second.signing_epoch, 1);
     assert_eq!(
         second.key_id,
-        derive_key_id(ready.new.public_key().test_unwrap().algorithm(), &ready.new.public_key().test_unwrap()).test_unwrap()
+        derive_key_id(
+            ready.new.public_key().test_unwrap().algorithm(),
+            &ready.new.public_key().test_unwrap()
+        )
+        .test_unwrap()
     );
     assert_eq!(
         ready.store.load_artifact_signatures().test_unwrap().len(),
@@ -336,7 +352,11 @@ fn retired_backend_drop_panic_leaves_the_selector_usable() {
     assert_eq!(signed.signing_epoch, 1);
     assert_eq!(
         signed.key_id,
-        derive_key_id(ready.new.public_key().test_unwrap().algorithm(), &ready.new.public_key().test_unwrap()).test_unwrap()
+        derive_key_id(
+            ready.new.public_key().test_unwrap().algorithm(),
+            &ready.new.public_key().test_unwrap()
+        )
+        .test_unwrap()
     );
 }
 
@@ -564,7 +584,11 @@ fn remote_verifier_accepts_pre_activation_anchor_and_rejects_post_activation_or_
         &directory,
         "remote-artifact-source.sqlite",
     ));
-    let old_key_id = derive_key_id(ready.old.public_key().test_unwrap().algorithm(), &ready.old.public_key().test_unwrap()).test_unwrap();
+    let old_key_id = derive_key_id(
+        ready.old.public_key().test_unwrap().algorithm(),
+        &ready.old.public_key().test_unwrap(),
+    )
+    .test_unwrap();
     let router = KeyringSigningRouter::open_enterprise(
         Arc::clone(&ready.store),
         Box::new(ready.old.clone()),

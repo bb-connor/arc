@@ -39,7 +39,7 @@ fn compensated_replay_retains_signer(cancelled: bool) -> TestResult {
     let receipts_before = kernel.receipt_log().len();
     replace_receipt_authority(&mut kernel);
     assert_ne!(
-        kernel.receipt_signing_public_key(),
+        kernel.receipt_signing_public_key().unwrap(),
         response.receipt.kernel_key
     );
     let replay = kernel.evaluate_tool_call_blocking(&request)?;

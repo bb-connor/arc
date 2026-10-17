@@ -6,7 +6,7 @@ use crate::admission_operation::{
     AdmissionRecoveryError, AdmissionRecoveryFailureKind, AdmissionRecoveryPhase,
 };
 use crate::tool_outcome::FrozenReceiptSigningIdentityV1;
-use chio_core::crypto::{Ed25519Backend, SigningAlgorithm, SigningBackend};
+use chio_core::crypto::{Ed25519Backend, SigningBackend};
 use chio_core::{PublicKey, Signature};
 
 const SIGNER_UNAVAILABLE: &str = "original receipt signing authority is unavailable";
@@ -81,9 +81,9 @@ fn assert_signer_unavailable(result: Result<(), KernelError>) {
 #[test]
 fn replaced_signer_defers_until_the_original_authority_returns() -> TestResult {
     let (mut kernel, store, _lapsed) = finalizing("replaced-signer-deferral")?;
-    let original_key = kernel.receipt_signing_public_key();
+    let original_key = kernel.receipt_signing_public_key().unwrap();
     replace_receipt_authority(&mut kernel);
-    assert_ne!(kernel.receipt_signing_public_key(), original_key);
+    assert_ne!(kernel.receipt_signing_public_key().unwrap(), original_key);
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
     let status = recovery_status(&store)?.ok_or("replaced signer deferral")?;
     assert!(status.quarantined);
@@ -125,7 +125,7 @@ fn replaced_signer_defers_until_the_original_authority_returns() -> TestResult {
         .receipt
         .clone()
         .ok_or("original signer receipt")?;
-    assert_eq!(receipt.kernel_key, original_key?);
+    assert_eq!(receipt.kernel_key, original_key);
     Ok(())
 }
 
@@ -196,8 +196,8 @@ fn malformed_retained_identity_stays_global_before_signer_comparison() -> TestRe
     let expected =
         crate::tool_outcome::ToolOutcomeError::Binding("raw.receipt_signing_floor").to_string();
     for key in [
-        kernel.receipt_signing_public_key(),
-        Keypair::generate().public_key().unwrap(),
+        kernel.receipt_signing_public_key().unwrap(),
+        Keypair::generate().public_key(),
     ] {
         let mut value = serde_json::to_value(&current)?;
         value["public_key"] = serde_json::to_value(&key)?;

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::admission_operation::AdmissionMutationSequencer;
-use chio_core::crypto::{Ed25519Backend, SigningAlgorithm, SigningBackend, SigningOutcome};
+use chio_core::crypto::{Ed25519Backend, SigningBackend, SigningOutcome};
 use chio_core::{PublicKey, Signature};
 use std::sync::{mpsc, Mutex};
 

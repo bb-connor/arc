@@ -994,15 +994,27 @@ impl FindingChallengeCoordinator {
             pin.key()
                 .map_err(|_| ChallengeCoordinatorError::AuthorityPinMismatch(label))
         };
-        if evaluator_authority.public_key() != pin(&config.challenge_evaluator, "evaluator")? {
+        if evaluator_authority
+            .public_key()
+            .map_err(|_| ChallengeCoordinatorError::Signing)?
+            != pin(&config.challenge_evaluator, "evaluator")?
+        {
             return Err(ChallengeCoordinatorError::AuthorityPinMismatch("evaluator"));
         }
-        if finalization_authority.public_key() != pin(&config.venue_finalization, "finalization")? {
+        if finalization_authority
+            .public_key()
+            .map_err(|_| ChallengeCoordinatorError::Signing)?
+            != pin(&config.venue_finalization, "finalization")?
+        {
             return Err(ChallengeCoordinatorError::AuthorityPinMismatch(
                 "finalization",
             ));
         }
-        if penalty_authority.public_key() != pin(&config.market_penalty, "penalty")? {
+        if penalty_authority
+            .public_key()
+            .map_err(|_| ChallengeCoordinatorError::Signing)?
+            != pin(&config.market_penalty, "penalty")?
+        {
             return Err(ChallengeCoordinatorError::AuthorityPinMismatch("penalty"));
         }
         let fee_schedule_operators = config
@@ -1012,9 +1024,18 @@ impl FindingChallengeCoordinator {
         // the roster that may sign one must not contain a key this lane
         // signs with: such a key would authorize its own inputs.
         for operator in &fee_schedule_operators {
-            if operator == &evaluator_authority.public_key()
-                || operator == &finalization_authority.public_key()
-                || operator == &penalty_authority.public_key()
+            if operator
+                == &evaluator_authority
+                    .public_key()
+                    .map_err(|_| ChallengeCoordinatorError::Signing)?
+                || operator
+                    == &finalization_authority
+                        .public_key()
+                        .map_err(|_| ChallengeCoordinatorError::Signing)?
+                || operator
+                    == &penalty_authority
+                        .public_key()
+                        .map_err(|_| ChallengeCoordinatorError::Signing)?
             {
                 return Err(ChallengeCoordinatorError::AuthorityPinMismatch(
                     "fee schedule operator",

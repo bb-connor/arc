@@ -130,9 +130,15 @@ fn install_alert_outbox(
 fn apply_escalation_plan(fixture: &HostFixture, created_at_unix_ms: u64) {
     let tenant_id =
         TenantId::new("tenant-host-lifecycle").unwrap_or_else(|error| panic!("tenant: {error}"));
-    let executor_identity =
-        ActiveResponseExecutorAuthorityIdentity::new(fixture.config.signer.public_key(), 1)
-            .unwrap_or_else(|error| panic!("executor identity: {error}"));
+    let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
+        fixture
+            .config
+            .signer
+            .public_key()
+            .unwrap_or_else(|error| panic!("signer key: {error}")),
+        1,
+    )
+    .unwrap_or_else(|error| panic!("executor identity: {error}"));
     let canonical_contribution = CanonicalBody::new(b"{\"channel\":\"security\"}".to_vec())
         .unwrap_or_else(|error| panic!("escalation contribution: {error}"));
     let contribution_hash =

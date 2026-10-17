@@ -443,7 +443,7 @@ fn pending_approval_transports_the_signed_proposal_without_dispatch() -> TestRes
     assert!(receipt.verify_signature()?);
     assert_eq!(
         receipt.kernel_key,
-        fixture.kernel.receipt_signing_public_key()
+        fixture.kernel.receipt_signing_public_key().unwrap()
     );
     assert_eq!(
         receipt.content_hash,

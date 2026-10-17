@@ -145,7 +145,7 @@ struct PolicyBackedCapabilityAuthority {
 }
 
 impl CapabilityAuthority for PolicyBackedCapabilityAuthority {
-    fn authority_public_key(&self) -> PublicKey {
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
         self.inner.authority_public_key()
     }
 
@@ -268,7 +268,7 @@ impl PolicyBackedCapabilityAuthority {
                     subject,
                     &scope,
                     ttl_seconds,
-                    &self.inner.authority_public_key(),
+                    &self.inner.authority_public_key()?,
                     limit,
                     self.clock.unix_millis()?,
                 )?;
@@ -283,7 +283,7 @@ impl PolicyBackedCapabilityAuthority {
                     subject,
                     &scope,
                     ttl_seconds,
-                    &self.inner.authority_public_key(),
+                    &self.inner.authority_public_key()?,
                     self.clock.unix_millis()?,
                 )?;
                 capability

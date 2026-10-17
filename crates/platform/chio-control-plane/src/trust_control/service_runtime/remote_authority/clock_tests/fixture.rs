@@ -207,7 +207,7 @@ pub(super) fn rotated_status() -> TestResult<(TrustAuthorityStatus, PublicKey, P
         root.path().join("issuer.db"),
         Arc::new(chio_security_types::clock::FixedClock::new(100)),
     )?;
-    let old = source.authority_public_key();
+    let old = source.authority_public_key().unwrap();
     let current = source.rotate_with_verification_deadline(110)?.public_key;
     let status = crate::trust_control::report_validation::authority_status_response(
         "sqlite".into(),
