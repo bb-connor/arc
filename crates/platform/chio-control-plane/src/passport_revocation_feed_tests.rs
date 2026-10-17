@@ -147,3 +147,56 @@ fn a_cursor_beyond_i64_is_refused() -> TestResult {
     );
     Ok(())
 }
+
+const LEAVES_SCHEMA_PATH: &str =
+    "spec/schemas/chio-trust/v1/passport-revocation-leaves.schema.json";
+const LEAVES_SCHEMA: &str =
+    include_str!("../../../../spec/schemas/chio-trust/v1/passport-revocation-leaves.schema.json");
+const POSITIVE_PAGE: &str =
+    include_str!("../../../../spec/vectors/passport-revocation/v1/leaves-page.positive.json");
+const UNKNOWN_FIELD_PAGE: &str = include_str!(
+    "../../../../spec/vectors/passport-revocation/v1/leaves-page.unknown-field.negative.json"
+);
+
+fn validate_against_schema(document: &str) -> Result<(), chio_spec_validate::ValidateError> {
+    let schema: serde_json::Value = serde_json::from_str(LEAVES_SCHEMA).map_err(|error| {
+        chio_spec_validate::ValidateError::Json(LEAVES_SCHEMA_PATH.into(), error)
+    })?;
+    let document: serde_json::Value = serde_json::from_str(document)
+        .map_err(|error| chio_spec_validate::ValidateError::Json("vector".into(), error))?;
+    chio_spec_validate::validate_value(
+        Path::new(LEAVES_SCHEMA_PATH),
+        &schema,
+        Path::new("vector"),
+        &document,
+    )
+}
+
+#[test]
+fn the_published_page_is_the_positive_vector_and_satisfies_the_schema() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let registry = dir.path().join("passport-statuses.json");
+    let oracle = oracle(&registry)?;
+    oracle.revoke(passport_revocation_key("sha256:passport-a"), 1_000)?;
+    oracle.revoke(passport_revocation_key("sha256:passport-b"), 2_000)?;
+    let page = passport_revocation_leaves_page(&registry, 0)?;
+    assert_eq!(
+        serde_json::to_value(&page)?,
+        serde_json::from_str::<serde_json::Value>(POSITIVE_PAGE)?
+    );
+    assert_eq!(page.schema, "chio.trust.passport-revocation-leaves.v1");
+    validate_against_schema(POSITIVE_PAGE)?;
+    Ok(())
+}
+
+#[test]
+fn a_page_with_an_unknown_field_is_refused_by_the_schema_and_the_decoder() {
+    assert!(matches!(
+        validate_against_schema(UNKNOWN_FIELD_PAGE),
+        Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+    ));
+    assert!(
+        serde_json::from_str::<super::PassportRevocationLeavesPage>(UNKNOWN_FIELD_PAGE)
+            .is_err_and(|error| error.to_string().contains("unknown field `insertedAt`"))
+    );
+}

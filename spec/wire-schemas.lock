@@ -4825,6 +4825,11 @@ files = ["crates/kernel/chio-kernel/src/admission_operation/retained_request.rs"
 first_seen = "28d826e3e6"
 
 [[schema]]
+value = "chio.revocation-partner-registry.v1"
+files = ["crates/platform/chio-control-plane/src/revocation_partner.rs"]
+first_seen = "f56682bdd1"
+
+[[schema]]
 value = "chio.risk.adjudication-jurisdiction-receipt.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/platform/chio-enterprise-export/src/artifacts.rs", "crates/platform/chio-trust-market-context/src/evidence.rs", "crates/products/chio-cli/src/cli/dispatch/proof/risk.rs", "crates/products/chio-proof-room/src/lib.rs"]
 first_seen = "1b9620751d"
@@ -5573,6 +5578,11 @@ first_seen = "3e05970851"
 value = "chio.trust.key-state.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs", "crates/trust/chio-selective-disclosure/src/crypto_context/types.rs"]
 first_seen = "1b9620751d"
+
+[[schema]]
+value = "chio.trust.passport-revocation-leaves.v1"
+files = ["crates/platform/chio-control-plane/src/passport_revocation_feed.rs"]
+first_seen = "ede20ca706"
 
 [[schema]]
 value = "chio.trust.reputation-import-report.v1"

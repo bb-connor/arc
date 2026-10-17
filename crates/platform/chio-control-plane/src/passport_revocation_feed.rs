@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::passport_revocation::passport_revocation_oracle_path;
 
-pub const PASSPORT_REVOCATION_LEAVES_SCHEMA: &str = "chio.passport-revocation-leaves.v1";
+pub const PASSPORT_REVOCATION_LEAVES_SCHEMA: &str = "chio.trust.passport-revocation-leaves.v1";
 
 /// Most leaves in one page.
 pub const MAX_PASSPORT_REVOCATION_PAGE_LEAVES: usize = 256;

@@ -4698,7 +4698,7 @@ partners:
   `chio-revocation-oracle:v1:epoch-root` domain; its `issued_at_unix_ms` is
   the signing time and its `signer_id` is the authority public key in hex
 - `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
-  `chio.passport-revocation-leaves.v1` page of the leaves with a sequence
+  `chio.trust.passport-revocation-leaves.v1` page of the leaves with a sequence
   number above `after`, in insertion order, at most 256 leaves and 512 KiB
 - a partner's operator-local revocation partner registry binds the issuer URL
   carried as the signed `iss` of its passports to the pinned authority key and
