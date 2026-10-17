@@ -3452,7 +3452,6 @@ semantics:
 - `senderConstraint.subjectKeySource`
 - `senderConstraint.matchedGrantIndex`
 - `senderConstraint.proofRequired`
-- optional `senderConstraint.proofType`
 - optional `senderConstraint.proofSchema`
 - `senderConstraint.runtimeAssuranceBound`
 - `senderConstraint.delegatedCallChainBound`
@@ -3504,8 +3503,7 @@ through `cnf`:
 - `cnf["x5t#S256"]`
 - `cnf.chioAttestationSha256`
 
-Chio DPoP sender binding is unavailable on this edge until it holds durable
-replay custody for authentication proofs. A request carrying
+Chio DPoP sender binding is refused on this edge. A request carrying
 `chio_sender_dpop_public_key` is refused as `invalid_request`. A token whose
 `cnf` carries `chioSenderKey`, and any request presenting a `DPoP` header, is
 refused with `urn:chio:error:transport:dpop-sender-proof-unavailable` and is
