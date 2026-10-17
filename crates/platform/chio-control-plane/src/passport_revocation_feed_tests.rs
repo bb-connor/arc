@@ -200,3 +200,77 @@ fn a_page_with_an_unknown_field_is_refused_by_the_schema_and_the_decoder() {
             .is_err_and(|error| error.to_string().contains("unknown field `insertedAt`"))
     );
 }
+
+const ROOT_SCHEMA_PATH: &str = "spec/schemas/chio-trust/v1/passport-revocation-root.schema.json";
+const ROOT_SCHEMA: &str =
+    include_str!("../../../../spec/schemas/chio-trust/v1/passport-revocation-root.schema.json");
+const POSITIVE_ROOT: &str =
+    include_str!("../../../../spec/vectors/passport-revocation/v1/root.positive.json");
+const UNKNOWN_FIELD_ROOT: &str = include_str!(
+    "../../../../spec/vectors/passport-revocation/v1/root.unknown-field.negative.json"
+);
+
+fn validate_root(document: &str) -> Result<(), chio_spec_validate::ValidateError> {
+    let schema: serde_json::Value = serde_json::from_str(ROOT_SCHEMA)
+        .map_err(|error| chio_spec_validate::ValidateError::Json(ROOT_SCHEMA_PATH.into(), error))?;
+    let document: serde_json::Value = serde_json::from_str(document)
+        .map_err(|error| chio_spec_validate::ValidateError::Json("vector".into(), error))?;
+    chio_spec_validate::validate_value(
+        Path::new(ROOT_SCHEMA_PATH),
+        &schema,
+        Path::new("vector"),
+        &document,
+    )
+}
+
+#[test]
+fn the_published_root_is_the_positive_vector_and_satisfies_the_schema() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let registry = dir.path().join("passport-statuses.json");
+    let oracle = oracle(&registry)?;
+    oracle.revoke(passport_revocation_key("sha256:passport-a"), 1_000)?;
+    oracle.revoke(passport_revocation_key("sha256:passport-b"), 2_000)?;
+    let document = super::PassportRevocationRootDocument::new(sign_passport_revocation_root(
+        &registry,
+        authority(),
+        5_000,
+    )?);
+    assert_eq!(
+        serde_json::to_value(&document)?,
+        serde_json::from_str::<serde_json::Value>(POSITIVE_ROOT)?
+    );
+    assert_eq!(document.schema, "chio.trust.passport-revocation-root.v1");
+    validate_root(POSITIVE_ROOT)?;
+    let decoded: super::PassportRevocationRootDocument = serde_json::from_str(POSITIVE_ROOT)?;
+    decoded
+        .into_signed_root()?
+        .verify(&passport_revocation_root_verifier(
+            &authority().public_key(),
+        ))?;
+    Ok(())
+}
+
+#[test]
+fn a_root_with_an_unknown_field_is_refused_by_the_schema_and_the_decoder() {
+    assert!(matches!(
+        validate_root(UNKNOWN_FIELD_ROOT),
+        Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+    ));
+    assert!(
+        serde_json::from_str::<super::PassportRevocationRootDocument>(UNKNOWN_FIELD_ROOT)
+            .is_err_and(|error| error.to_string().contains("unknown field `issuedAt`"))
+    );
+}
+
+#[test]
+fn a_root_document_of_another_schema_is_refused() -> TestResult {
+    let mut document: super::PassportRevocationRootDocument = serde_json::from_str(POSITIVE_ROOT)?;
+    document.schema = "chio.trust.passport-revocation-root.v2".to_owned();
+    assert_eq!(
+        document.into_signed_root(),
+        Err(PassportRevocationFeedError::UnsupportedRootSchema(
+            "chio.trust.passport-revocation-root.v2".to_owned()
+        ))
+    );
+    Ok(())
+}

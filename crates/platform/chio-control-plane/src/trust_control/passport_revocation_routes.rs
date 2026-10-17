@@ -5,7 +5,7 @@ use super::passport_handlers::public_authority_trust::run_public_authority_trust
 use super::*;
 
 use crate::passport_revocation_feed::{
-    passport_revocation_leaves_page, sign_passport_revocation_root,
+    passport_revocation_leaves_page, sign_passport_revocation_root, PassportRevocationRootDocument,
 };
 
 const FEED_REQUIRES_REGISTRY: &str = "passport revocation feed requires --passport-statuses-file";
@@ -39,7 +39,7 @@ pub(crate) async fn handle_public_passport_revocation_root(
             Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
         };
         match sign_passport_revocation_root(registry, authority, now) {
-            Ok(signed) => Json(signed).into_response(),
+            Ok(signed) => Json(PassportRevocationRootDocument::new(signed)).into_response(),
             Err(error) => plain_http_error(StatusCode::CONFLICT, &error.to_string()),
         }
     })

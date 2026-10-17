@@ -9,7 +9,8 @@ use chio_egress_contract::HttpEgressContract;
 use chio_revocation_oracle::{EpochRoot, SignedEpochRoot};
 
 use crate::passport_revocation_feed::{
-    PassportRevocationLeavesPage, MAX_PASSPORT_REVOCATION_PAGE_BYTES,
+    PassportRevocationLeavesPage, PassportRevocationRootDocument,
+    MAX_PASSPORT_REVOCATION_PAGE_BYTES,
 };
 use crate::passport_revocation_mirror::{
     PartnerRevocationError, PartnerRevocationMirror, PartnerRevocationSource,
@@ -61,11 +62,14 @@ impl PartnerRevocationFeed {
 
 impl PartnerRevocationSource for PartnerRevocationFeed {
     fn signed_root(&mut self) -> Result<SignedEpochRoot, PartnerRevocationError> {
-        self.get(
+        let document: PassportRevocationRootDocument = self.get(
             &format!("{}{PUBLIC_PASSPORT_REVOCATION_ROOT_PATH}", self.base),
             MAX_SIGNED_ROOT_BYTES,
             "partner revocation root endpoint",
-        )
+        )?;
+        document.into_signed_root().map_err(|error| {
+            PartnerRevocationError::MalformedRoot(self.partner_id.clone(), error.to_string())
+        })
     }
 
     fn leaves_after(

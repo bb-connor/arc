@@ -4,14 +4,13 @@ use std::path::{Path, PathBuf};
 use chio_credentials::{
     PassportLifecycleRecord, PassportLifecycleState, PassportStatusDistribution,
 };
-use chio_revocation_oracle::SignedEpochRoot;
 use chio_security_types::clock::FixedClock;
 
 use super::*;
 use crate::passport_revocation::revoke_passport_status;
 use crate::passport_revocation_feed::{
     passport_revocation_root_verifier, PassportRevocationLeavesPage,
-    PASSPORT_REVOCATION_LEAVES_SCHEMA,
+    PassportRevocationRootDocument, PASSPORT_REVOCATION_LEAVES_SCHEMA,
 };
 use crate::passport_revocation_mirror::{
     partner_revocation_mirror_path, PartnerRevocationError, PartnerRevocationMirror,
@@ -149,7 +148,9 @@ async fn the_root_route_signs_the_oracle_root_with_the_authority_key() -> TestRe
     )?;
     let (status, body) = get(&partner.state, PUBLIC_PASSPORT_REVOCATION_ROOT_PATH).await?;
     assert_eq!(status, StatusCode::OK);
-    let signed: SignedEpochRoot = serde_json::from_slice(&body)?;
+    let document: PassportRevocationRootDocument = serde_json::from_slice(&body)?;
+    assert_eq!(document.schema, "chio.trust.passport-revocation-root.v1");
+    let signed = document.into_signed_root()?;
     signed.verify(&passport_revocation_root_verifier(
         &partner.authority.public_key(),
     ))?;

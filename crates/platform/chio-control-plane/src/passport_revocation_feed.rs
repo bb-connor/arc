@@ -18,6 +18,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::passport_revocation::passport_revocation_oracle_path;
 
+pub const PASSPORT_REVOCATION_ROOT_SCHEMA: &str = "chio.trust.passport-revocation-root.v1";
+
 pub const PASSPORT_REVOCATION_LEAVES_SCHEMA: &str = "chio.trust.passport-revocation-leaves.v1";
 
 /// Most leaves in one page.
@@ -42,10 +44,40 @@ pub enum PassportRevocationFeedError {
     },
     #[error("passport revocation root signing failed: {0}")]
     Signing(String),
+    #[error("unsupported passport revocation root schema `{0}`")]
+    UnsupportedRootSchema(String),
     #[error("passport revocation leaf cursor {0} is out of range")]
     CursorOutOfRange(u64),
     #[error("passport revocation leaf {0} cannot be published: {1}")]
     UnpublishableLeaf(u64, String),
+}
+
+/// The published signed epoch root.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PassportRevocationRootDocument {
+    pub schema: String,
+    pub signed_root: SignedEpochRoot,
+}
+
+impl PassportRevocationRootDocument {
+    #[must_use]
+    pub fn new(signed_root: SignedEpochRoot) -> Self {
+        Self {
+            schema: PASSPORT_REVOCATION_ROOT_SCHEMA.to_owned(),
+            signed_root,
+        }
+    }
+
+    /// The carried signed root, refusing a document of any other schema.
+    pub fn into_signed_root(self) -> Result<SignedEpochRoot, PassportRevocationFeedError> {
+        if self.schema != PASSPORT_REVOCATION_ROOT_SCHEMA {
+            return Err(PassportRevocationFeedError::UnsupportedRootSchema(
+                self.schema,
+            ));
+        }
+        Ok(self.signed_root)
+    }
 }
 
 /// One revocation leaf in the oracle's insertion order.
