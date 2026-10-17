@@ -169,3 +169,11 @@ fn a_missing_registry_file_is_refused() -> TestResult {
     ));
     Ok(())
 }
+
+#[test]
+fn the_registry_schema_identifier_is_v1() {
+    assert_eq!(
+        REVOCATION_PARTNER_REGISTRY_SCHEMA,
+        "chio.revocation-partner-registry.v1"
+    );
+}
