@@ -55,6 +55,49 @@ in the same PR.
 - New artifact roles are listed in a separate `artifacts` array; each entry's
   file also appears in `files`.
 
+## Schema-only rejections the M1 decoders must enforce
+
+The generated Rust bindings in `crates/core/chio-core-types/src/_generated/`
+enforce unknown-member rejection, closed enums, required members, string
+patterns and string lengths. They do not enforce `const`, `maximum`,
+`minItems`, `maxItems`, or the `if`/`then`/`else`, `not` and conditional
+`oneOf` rules, so the following invalid examples under
+`spec/schemas/chio-wire/v1/root_authority/examples/invalid/` decode through
+the generated types. Each is a rule the hand-written decoder or load check of
+that type must enforce in M1. The list is pinned by
+`crates/core/chio-core-types/tests/root_authority_generated_examples.rs`; a
+generator change that starts enforcing one of these removes it from both.
+
+| Example | Rule the M1 decoder enforces |
+|---|---|
+| `delegation-context.id-jag-without-provider-record`, `delegation-context.id-jag-without-identity-digest` | provider-backed kinds carry `provider_record_id` and `provider_identity_digest` |
+| `delegation-context.static-bearer-with-provider-record` | non-provider kinds carry neither provider member |
+| `delegation-context.id-jag-without-kid` | `oauth_id_jag`, `entra_jwt` and `entra_agent_id` carry `key_snapshot_digest`, `kid`, `alg` and `artifact_digest` |
+| `delegation-context.static-bearer-with-kid`, `delegation-context.static-bearer-issuer`, `delegation-context.static-bearer-claims` | `operator_static_bearer`: issuer `urn:chio:operator`, no key or artifact members, no claims |
+| `delegation-context.retained-on-static-bearer` | `artifact_retained` is `false` except for `oauth_id_jag` |
+| `delegation-context.entra-claim-on-id-jag` | `azp`, `appid`, `oid`, `tid` only for the Entra kinds |
+| `delegation-context.subject-tenant-salt-ref` | subject `salt_ref` is `anchor.sub`, tenant `salt_ref` is `anchor.tenant` |
+| `enterprise-provider-identity.both-key-sources`, `.no-key-source`, `.introspection-with-jwks-url` | `oidc_jwks` has exactly one of `jwks_url` and `jwks`; `oauth_introspection` has `introspection_url` and neither |
+| `idp-key-snapshot.rsa-without-modulus`, `idp-key-snapshot.ec-without-y` | per-`kty` JWK members (RSA `n`/`e`, EC `crv`/`x`/`y`, OKP `crv`/`x`) |
+| `presentation.too-many-ancestors` | at most 16 ancestors |
+| `root-policy.clock-skew-61` | `max_clock_skew_secs` at most 60 |
+| `root-policy.disclosure-default-inline` | `disclosure.default` is `committed` |
+| `root-policy.id-jag-without-provider-record`, `.id-jag-without-identity-digest` | provider-backed rules carry both provider members in `match` |
+| `root-policy.id-jag-without-allowed-algs` | JWT kinds carry `allowed_algs` |
+| `root-policy.static-bearer-with-provider-record`, `root-policy.local-as-with-allowed-algs` | non-provider kinds carry no provider members, `allowed_algs` or `idp_scope_projection` |
+| `root-policy.static-bearer-without-principal`, `root-policy.principal-on-entra` | `principal` and `tenant_value` exactly on `operator_static_bearer` |
+| `root-policy.entra-max-assertion-lifetime` | no `max_assertion_lifetime_secs` on the Entra kinds |
+| `root-policy.retain-artifact-on-entra` | `retain_idp_artifact` only on `oauth_id_jag` |
+| `root-policy.entra-claim-on-id-jag` | Entra claims recorded or matched only by Entra rules |
+| `root-policy.too-many-exchange-keys` | at most 16 exchange keys |
+| `verifier-trust.empty-kernel-keys` | at least one kernel, exchange and root policy key |
+
+The generated `schema` members are plain strings (the `const` is dropped), so
+the M1 decoder of each type also checks its `schema` value. The generated maps
+(`disclosure.tools`, `idp_scope_projection`, `idp_keys`, `pep_keys`) are
+`HashMap`s; signed and content-addressed bodies are always produced through
+canonical JSON, never by serializing a generated value directly.
+
 ## Checks
 
 The positive receipts of `tests/bindings/vectors/receipt/committed/v1.json`
