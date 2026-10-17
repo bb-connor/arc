@@ -1,31 +1,22 @@
 //! Response sanitization guard: scans tool results for secrets, PII/PHI,
 //! and other sensitive data, then redacts them before the agent sees them.
 //!
-//! This module exposes two layered APIs:
+//! [`OutputSanitizer`] carries the secret, PII and PHI detectors, the
+//! configurable allowlist/denylist, deterministic overlap resolution, and the
+//! redaction strategies. `SanitizerHook` runs it on the post-invocation path.
 //!
-//! - A simple, backwards-compatible [`ResponseSanitizationGuard`] that uses a
-//!   small fixed pattern set and Block/Redact binary actions.
-//! - A full-featured [`OutputSanitizer`] with secret detectors, configurable
-//!   allowlist/denylist, deterministic overlap resolution, and multiple
-//!   redaction strategies.
-//!
-//! The guard fails closed: if pattern compilation fails or an internal error
-//! occurs, the response is blocked.
+//! The sanitizer fails closed: if a built-in pattern fails to compile, the
+//! whole scanned output is redacted.
 
 mod detectors;
 mod formatting;
 mod overlap;
 mod sanitizer;
-mod simple;
 mod types;
 mod validators;
 mod vault;
 
 pub use sanitizer::OutputSanitizer;
-pub use simple::{
-    build_pattern, ResponseSanitizationGuard, SanitizationAction, ScanResult, SensitivePattern,
-    SensitivityLevel,
-};
 pub use types::{
     AllowlistConfig, CategoryConfig, DenylistConfig, EntropyConfig, OutputSanitizerConfig,
     OutputSanitizerConfigError, ProcessingStats, Redaction, RedactionStrategy, SanitizationResult,

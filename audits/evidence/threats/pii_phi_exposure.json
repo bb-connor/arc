@@ -3,9 +3,9 @@
   "needs_real_run": false,
   "status": "partial",
   "closure_scope": "structured-text-pii-phi-detection",
-  "deferred_follow_up": "Built-in structured-text PII and PHI detection has real mutation evidence, but comprehensive sensitive-data protection remains DEFERRED-FOLLOW-UP. The conformance test proves a benign JSON response remains clean while SSN and MRN markers are blocked or redacted without retaining the raw identifiers. Regex detection cannot cover every identifier or context, and this test does not scan image or binary output or prove that regulated deployments enable the guard with local patterns. Follow-up work must qualify deployment-specific detectors, non-text extraction, guard activation policy, and recall and false-positive evaluation.",
-  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs calls ResponseSanitizationGuard::scan_response on a benign JSON control and on a payload containing SSN and MRN markers. Block mode must report both findings; redact mode must remove both raw identifiers and record at least two redactions. A targeted cargo-mutants run replaced ResponseSanitizationGuard::scan with vec![]; the sensitive payload was classified clean and the block assertion caught the leak bypass. PARTIAL: local identifier patterns, non-text content, deployment activation, and detector-quality qualification remain deferred.",
-  "ran_at": "2026-09-04T20:32:27Z",
+  "deferred_follow_up": "Built-in structured-text PII and PHI redaction has real mutation evidence, but comprehensive sensitive-data protection remains DEFERRED-FOLLOW-UP. The conformance test proves a benign JSON response passes SanitizerHook untouched while SSN and MRN markers are redacted without retaining the raw identifiers in the response or the receipt evidence. Regex detection cannot cover every identifier or context, and this test does not scan image or binary output or prove that regulated deployments load local denylist patterns. Follow-up work must qualify deployment-specific detectors, non-text extraction, and recall and false-positive evaluation.",
+  "note": "Real partial mutation evidence. The conformance test at crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs runs the default SanitizerHook through PostInvocationPipeline on a benign JSON control and on a payload containing SSN and MRN markers. The benign control must Allow with no evidence; the PHI payload must Redact, drop every raw identifier from the response and the evidence, name the pii_ssn and pii_mrn detectors, and record at least two redactions. A targeted cargo-mutants run replaced build_compiled_patterns with Ok(vec![]); the sensitive payload passed unredacted and the test caught the leak. PARTIAL: local identifier patterns, non-text content, and detector-quality qualification remain deferred.",
+  "ran_at": "2026-10-17T19:21:53Z",
   "survivors": [],
   "test_path": "crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs",
   "evidence_status": "cargo-mutants-run",
@@ -14,5 +14,5 @@
   "timestamp_kind": "cargo-mutants-run",
   "timestamp_note": "ran_at was captured immediately after the targeted one-mutant cargo-mutants run completed.",
   "baseline_command": "cargo test -p chio-conformance --test threats -- pii_phi_exposure",
-  "reproduction_command": "cargo mutants -p chio-guards --no-config -F 'replace ResponseSanitizationGuard::scan ->.*vec!\\[\\]' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 -j 1 --caught -- pii_phi_exposure"
+  "reproduction_command": "cargo mutants -p chio-guards --no-config -f crates/guards/chio-guards/src/response_sanitization/detectors.rs -F 'build_compiled_patterns.*Ok\\(vec!\\[\\]\\)' --baseline skip -C '--package=chio-conformance' --timeout 600 --build-timeout 600 --caught -- pii_phi_exposure"
 }
