@@ -170,18 +170,9 @@ pub(crate) fn cmd_trust_provider_upsert(
             .upsert_enterprise_provider(&provider.provider_id, &provider)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let mut registry = load_enterprise_provider_registry_local(path)?;
-        registry.upsert(provider.clone());
-        registry.save(path)?;
-        registry
-            .providers
-            .get(&provider.provider_id)
-            .cloned()
-            .ok_or_else(|| {
-                CliError::cli_other_error(
-                    "provider upsert did not persist the requested record".to_string(),
-                )
-            })?
+        EnterpriseProviderRegistry::update(path, |registry| {
+            Ok::<_, CliError>(registry.upsert(provider))
+        })?
     };
 
     if json_output {
@@ -206,9 +197,9 @@ pub(crate) fn cmd_trust_provider_delete(
             .delete_enterprise_provider(provider_id)?
     } else {
         let path = require_enterprise_providers_file(enterprise_providers_file)?;
-        let mut registry = load_enterprise_provider_registry_local(path)?;
-        let deleted = registry.remove(provider_id);
-        registry.save(path)?;
+        let deleted = EnterpriseProviderRegistry::update(path, |registry| {
+            Ok::<_, CliError>(registry.remove(provider_id))
+        })?;
         trust_control::EnterpriseProviderDeleteResponse {
             provider_id: provider_id.to_string(),
             deleted,

@@ -389,7 +389,7 @@ pub(crate) enum ReplaceStage {
 /// happens after the rename: the new file is already in place, and the result
 /// is `CliError::PersistedWithoutDurability`. The directory sync is performed
 /// on Unix only; other platforms rely on the file sync and the atomic rename.
-pub(crate) fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
+fn replace_file(path: &Path, bytes: &[u8]) -> Result<(), CliError> {
     let random = chio_core::Keypair::generate().public_key().to_hex();
     replace_file_via(path, bytes, &random)
 }

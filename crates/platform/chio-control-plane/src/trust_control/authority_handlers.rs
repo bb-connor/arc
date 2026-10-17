@@ -350,22 +350,25 @@ pub(crate) async fn handle_upsert_enterprise_provider(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_enterprise_provider_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{
+        configured_registry_file, run_registry_transaction, RegistryOperationError,
     };
-    record.provider_id = provider_id.clone();
-    registry.upsert(record);
-    let Some(saved) = registry.providers.get(&provider_id).cloned() else {
-        return plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "enterprise provider upsert did not persist the requested record",
-        );
+    let path = match configured_registry_file(
+        state.config.enterprise_providers_file.as_deref(),
+        "--enterprise-providers-file",
+        "enterprise provider",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
     };
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(saved).into_response()
+    record.provider_id = provider_id;
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        EnterpriseProviderRegistry::update(&path, |registry| {
+            Ok::<_, RegistryOperationError>(registry.upsert(record))
+        })
+    })
+    .await
 }
 
 pub(crate) async fn handle_delete_enterprise_provider(
@@ -376,19 +379,28 @@ pub(crate) async fn handle_delete_enterprise_provider(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    let (path, mut registry) = match load_enterprise_provider_registry_for_admin(&state.config) {
-        Ok(values) => values,
-        Err(error) => return plain_http_error(StatusCode::CONFLICT, &error.to_string()),
+    use super::registry_write_lane::{
+        configured_registry_file, run_registry_transaction, RegistryOperationError,
     };
-    let deleted = registry.remove(&provider_id);
-    if let Err(error) = registry.save(&path) {
-        return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
-    }
-    Json(EnterpriseProviderDeleteResponse {
-        provider_id,
-        deleted,
+    let path = match configured_registry_file(
+        state.config.enterprise_providers_file.as_deref(),
+        "--enterprise-providers-file",
+        "enterprise provider",
+    ) {
+        Ok(path) => path,
+        Err(response) => return response,
+    };
+    let lane = state.operator_registry_write_lane.clone();
+    run_registry_transaction(&lane, move || {
+        EnterpriseProviderRegistry::update(&path, |registry| {
+            let deleted = registry.remove(&provider_id);
+            Ok::<_, RegistryOperationError>(EnterpriseProviderDeleteResponse {
+                provider_id,
+                deleted,
+            })
+        })
     })
-    .into_response()
+    .await
 }
 
 pub(crate) async fn handle_list_federation_policies(
