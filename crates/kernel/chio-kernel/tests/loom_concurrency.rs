@@ -1043,6 +1043,8 @@ impl NonAtomicReceiptStore {
     /// read-modify-write below is not atomic on its own.
     fn append(&self, receipt_id: u8) {
         // Step 1: snapshot the next free slot (the check).
+        // SAFETY: the caller holds `receipt_store_write_lock`, so no other
+        // thread accesses `len` while this read runs.
         let idx = self.len.with(|len| unsafe { *len });
         // Step 2: yield so loom explores schedules where a competing
         // append runs between the snapshot and the write-back below.
@@ -1051,13 +1053,22 @@ impl NonAtomicReceiptStore {
         // publish the new length (the write). Two racing appends that
         // both snapshotted the same idx both land here; the later write
         // wins and the earlier receipt is lost.
+        // SAFETY: the caller holds `receipt_store_write_lock`, so this is the
+        // only access to `slots`; the index is bounds-checked.
         self.slots
             .with_mut(|slots| unsafe { (*slots)[idx] = receipt_id });
+        // SAFETY: the caller holds `receipt_store_write_lock`, so this is the
+        // only access to `len`.
         self.len.with_mut(|len| unsafe { *len = idx + 1 });
     }
 
+    /// Callers must have joined every appending thread.
     fn snapshot(&self) -> Vec<u8> {
+        // SAFETY: every appending thread has joined, so no write to `len`
+        // can run concurrently with this read.
         let len = self.len.with(|len| unsafe { *len });
+        // SAFETY: every appending thread has joined, so no write to `slots`
+        // can run concurrently with this read.
         let slots = self.slots.with(|slots| unsafe { *slots });
         slots[..len].to_vec()
     }
