@@ -1638,6 +1638,12 @@
       "schemaFile": "spec/schemas/chio-trust/v1/passport-revocation-leaves.schema.json"
     },
     {
+      "schema": "chio.trust.passport-revocation-root.v1",
+      "artifactKind": "trust_passport_revocation_root",
+      "introducedBy": "federated-passport-revocation-v1",
+      "schemaFile": "spec/schemas/chio-trust/v1/passport-revocation-root.schema.json"
+    },
+    {
       "schema": "chio.disclosure.verifier-privacy-profile.v1",
       "artifactKind": "disclosure_verifier_privacy_profile",
       "introducedBy": "crypto-context-v1",

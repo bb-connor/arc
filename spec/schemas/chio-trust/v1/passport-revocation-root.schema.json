@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio.world/schemas/chio-trust/v1/passport-revocation-root.schema.json",
+  "title": "Chio Passport Revocation Root",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "signedRoot"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.trust.passport-revocation-root.v1"
+    },
+    "signedRoot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "signature"
+      ],
+      "properties": {
+        "root": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "epoch",
+            "root_hash",
+            "leaf_count",
+            "issued_at_unix_ms"
+          ],
+          "properties": {
+            "epoch": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            },
+            "root_hash": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "minItems": 32,
+              "maxItems": 32
+            },
+            "leaf_count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            },
+            "issued_at_unix_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 18446744073709551615
+            }
+          }
+        },
+        "signature": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "signer_id",
+            "algorithm",
+            "signature_bytes"
+          ],
+          "properties": {
+            "signer_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "algorithm": {
+              "const": "ed25519"
+            },
+            "signature_bytes": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "minItems": 64,
+              "maxItems": 64
+            }
+          }
+        }
+      }
+    }
+  }
+}

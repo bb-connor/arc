@@ -5585,6 +5585,11 @@ files = ["crates/platform/chio-control-plane/src/passport_revocation_feed.rs"]
 first_seen = "ede20ca706"
 
 [[schema]]
+value = "chio.trust.passport-revocation-root.v1"
+files = ["crates/platform/chio-control-plane/src/passport_revocation_feed.rs"]
+first_seen = "626791b4f7"
+
+[[schema]]
 value = "chio.trust.reputation-import-report.v1"
 files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "1b9620751d"

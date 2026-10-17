@@ -101,6 +101,8 @@ pub enum PartnerRevocationError {
     RootMismatch { partner_id: String, epoch: u64 },
     #[error("partner `{partner_id}` is {behind} revocation leaves ahead, beyond the {MAX_PARTNER_SYNC_LEAVES}-leaf sync bound")]
     TooFarBehind { partner_id: String, behind: u64 },
+    #[error("partner `{0}` revocation root document is malformed: {1}")]
+    MalformedRoot(String, String),
     #[error("partner `{0}` revocation leaves page is malformed: {1}")]
     MalformedPage(String, String),
     #[error("partner `{0}` revocation leaves ended before the signed root's leaf count")]

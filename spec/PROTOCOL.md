@@ -4693,8 +4693,9 @@ Portable lifecycle resolution itself remains Chio-native and operator-scoped:
 Trust-control also publishes its passport revocation set to federation
 partners:
 
-- `GET /v1/public/passport/revocations/root` returns the oracle's
-  `SignedEpochRoot`, signed with the trust-control authority key over the
+- `GET /v1/public/passport/revocations/root` returns a
+  `chio.trust.passport-revocation-root.v1` document whose `signedRoot` is the
+  oracle's `SignedEpochRoot`, signed with the trust-control authority key over the
   `chio-revocation-oracle:v1:epoch-root` domain; its `issued_at_unix_ms` is
   the signing time and its `signer_id` is the authority public key in hex
 - `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
