@@ -122,6 +122,52 @@ def c7(binary, root):
     }
 
 
+def c6(binary, root):
+    """A call that returns while stopped stays Finalizing with its output withheld."""
+    node = Host(binary, root / "C6")
+    control = node.publications.with_suffix(".control")
+    control.write_text("hold-after")
+    first = Serving(node, "first")
+    outcome = {}
+    caller = threading.Thread(
+        target=lambda: outcome.update(
+            response=invoke(first.client, "c6-append", "append", {"report": "C6"})
+        )
+    )
+    caller.start()
+    wait_for_hold(node.publications.with_suffix(".held"), first.host)
+    epoch = stop(node)
+    control.write_text("ready")
+    caller.join(timeout=90)
+    assert not caller.is_alive(), "held call never returned under the stop"
+    during = outcome["response"]
+    assert during["verdict"] != "allow" and during["output"] is None, during
+    assert ready_state(first)["withheld_operations"] == 1
+    kill(first.host)
+    assert node.lines() == 1
+    second = Serving(node, "second")
+    status = ready_state(second)
+    assert status["readiness"] == {"state": "ready_stopped"}, status
+    assert status["withheld_operations"] == 1, status
+    retried = invoke(second.client, "c6-append", "append", {"report": "C6"})
+    assert retried["verdict"] != "allow" and retried["output"] is None, retried
+    node.stop(second.host)
+    resume_offline(node, epoch)
+    third = Serving(node, "third")
+    released = invoke(third.client, "c6-append", "append", {"report": "C6"})
+    assert released["verdict"] == "allow" and released["output"] is not None, released
+    again = invoke(third.client, "c6-append", "append", {"report": "C6"})
+    assert again["receipt_json"] == released["receipt_json"]
+    node.stop(third.host)
+    assert node.lines() == 1
+    return {
+        "cutpoint": "C6",
+        "receipts": [during["receipt_json"], released["receipt_json"]],
+        "kernel_key": node.kernel_key,
+        "publications": node.lines(),
+    }
+
+
 def c8(binary, root):
     node = Host(binary, root / "C8")
     first = Serving(node, "first")
@@ -147,7 +193,9 @@ def c8(binary, root):
 
 
 def exercise(binary, root):
-    return {"cases": [released_hold(binary, root), c7(binary, root), c8(binary, root)]}
+    return {
+        "cases": [released_hold(binary, root), c7(binary, root), c6(binary, root), c8(binary, root)]
+    }
 
 
 if __name__ == "__main__":
