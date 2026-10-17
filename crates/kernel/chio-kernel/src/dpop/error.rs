@@ -45,8 +45,6 @@ pub enum DpopError {
     Malformed(#[source] serde_json::Error),
     #[error("required DPoP proof missing")]
     MissingProof,
-    #[error("DPoP nonce store not configured")]
-    MissingStore,
     #[error("DPoP replay authority not configured")]
     MissingAuthority,
     #[error("DPoP canonical encoding failed: {0}")]
@@ -79,7 +77,6 @@ impl DpopError {
             Self::Unavailable => "urn:chio:error:kernel:dpop-unavailable",
             Self::Malformed(..) => "urn:chio:error:kernel:dpop-malformed",
             Self::MissingProof => "urn:chio:error:kernel:dpop-missing-proof",
-            Self::MissingStore => "urn:chio:error:kernel:dpop-missing-store",
             Self::MissingAuthority => "urn:chio:error:kernel:dpop-missing-configuration",
             Self::Encoding(..) => "urn:chio:error:kernel:dpop-encoding",
             Self::Signing(..) => "urn:chio:error:kernel:dpop-signing",

@@ -3140,17 +3140,6 @@ codes:
     consumed_by:
       - chio-kernel
 
-  - urn: "urn:chio:error:kernel:dpop-missing-store"
-    domain: kernel
-    severity: error
-    summary: "Security boundary refused: dpop-missing-store."
-    help: "Restore the named invariant and present fresh evidence for the exact request."
-    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE"
-    since: "0.1.0"
-    stability: stable
-    consumed_by:
-      - chio-kernel
-
   - urn: "urn:chio:error:kernel:dpop-not-yet-valid"
     domain: kernel
     severity: error

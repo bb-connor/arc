@@ -683,8 +683,6 @@ pub struct ChioKernel {
     pub(super) checkpoint_seq_counter: AtomicU64,
     /// seq of the last receipt included in the previous checkpoint batch.
     pub(super) last_checkpoint_seq: AtomicU64,
-    /// Volatile replay source retained for explicit retirement.
-    pub(super) dpop_nonce_store: Option<dpop::DpopNonceStore>,
     /// Independently selected and activated durable replay domain.
     pub(super) dpop_authority: Option<dpop::authority::DpopReplayAuthority>,
     /// Execution-nonce config (TTL, capacity, strict-mode flag).
