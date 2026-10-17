@@ -95,10 +95,9 @@ operation does not reconstruct policy execution or prove log completeness.
 
 `open_cli_durable_admission_runtime` validates participant paths and, when
 applicable, distinct database paths before opening local or remote admission
-state. The CLI selects DPoP authority from `kernel.dpop_replay_authority` or
-`CHIO_DPOP_REPLAY_AUTHORITY_FILE`; simultaneous selection refuses. The file
-loader bounds a regular input to 4096 bytes and rejects duplicate fields.
-Attachment verifies the selected descriptor against the active durable store.
+state. The CLI selects DPoP authority only from `kernel.dpop_replay_authority`
+in a Chio policy file; HushSpec policies and `api protect` carry none, so
+their proof-required grants are refused. Attachment verifies the selected descriptor against the active durable store.
 A configured descriptor with admission disabled refuses startup.
 A remote runtime requires a control token. The default admission mode
 is `SideEffecting`; enabled modes require a session/admission database path. `run` and
