@@ -130,6 +130,9 @@ impl FindingHostedDatabaseProfile {
 pub struct FindingHostedIdentityProfile {
     pub capability_authorities: Vec<String>,
     pub maximum_capability_ttl_secs: u64,
+    /// Validated replay-domain descriptor every capability DPoP proof must
+    /// sign. Its identifiers are labels bound into the proof; replay custody
+    /// is the hosted PostgreSQL nonce store.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
     pub nonce_capacity: u64,
@@ -1508,6 +1511,34 @@ mod tests {
             nonce_capacity: 10_000,
             api_key_pepper_env: "CHIO_API_KEY_PEPPER".to_owned(),
         };
+        for (uuid, reason) in [
+            ("not-a-uuid", "destination store UUID is invalid"),
+            (
+                "00000000-0000-0000-0000-000000000000",
+                "destination store UUID is not canonical",
+            ),
+        ] {
+            let refused =
+                serde_json::from_value::<FindingHostedIdentityProfile>(serde_json::json!({
+                    "capabilityAuthorities": ["a".repeat(64)],
+                    "maximumCapabilityTtlSecs": 300,
+                    "dpopReplayAuthority": {
+                        "destination_store_uuid": uuid,
+                        "dpop_authority_id": "hosted-dpop",
+                        "expectation_id": "a".repeat(64),
+                        "proof_ttl_secs": 60,
+                        "max_clock_skew_secs": 5
+                    },
+                    "nonceCapacity": 10_000,
+                    "apiKeyPepperEnv": "CHIO_API_KEY_PEPPER"
+                }));
+            assert!(
+                refused
+                    .as_ref()
+                    .is_err_and(|error| error.to_string().contains(reason)),
+                "{refused:?}"
+            );
+        }
         let encoded = serde_json::to_string(&identity);
         assert!(encoded.is_ok());
         if let Ok(encoded) = encoded {

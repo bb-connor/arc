@@ -53,10 +53,11 @@ impl HostedTenantAuthPolicy {
 }
 
 /// Authenticator configuration: pinned capability authorities, the DPoP
-/// replay authority whose freshness bounds every proof must name, per-tenant
-/// nonce capacity, and the per-tenant method policies. A tenant allowing
-/// capability DPoP requires the replay authority. Validated in full at
-/// construction.
+/// replay authority every proof must name, per-tenant nonce capacity, and the
+/// per-tenant method policies. A tenant allowing capability DPoP requires the
+/// replay authority. Its identifiers are validated labels bound into the
+/// signed proof; replay custody is the durable nonce store behind the
+/// repository. Validated in full at construction.
 #[derive(Clone, Debug)]
 pub struct HostedAuthenticatorConfig {
     pub deployment_id: String,
