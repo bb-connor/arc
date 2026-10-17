@@ -53,7 +53,9 @@ use crate::redaction::redact_for_operator_log;
 use chio_core::crypto::PublicKey;
 use chio_core::receipt::body::chio_receipt_id;
 use chio_core::receipt::{body::ChioReceipt, decision::Decision, metadata::GuardEvidence};
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 
 // -- Severity -----------------------------------------------------------------
 
@@ -239,7 +241,7 @@ pub struct Alert {
 pub struct PagerDutyBackend {
     routing_key: Zeroizing<String>,
     endpoint: String,
-    client: reqwest::Client,
+    client: ContractClient,
     egress_contract: HttpEgressContract,
 }
 
@@ -375,7 +377,7 @@ impl AlertBackend for PagerDutyBackend {
 pub struct OpsGenieBackend {
     api_key: Zeroizing<String>,
     endpoint: String,
-    client: reqwest::Client,
+    client: ContractClient,
     tags: Vec<String>,
     egress_contract: HttpEgressContract,
 }

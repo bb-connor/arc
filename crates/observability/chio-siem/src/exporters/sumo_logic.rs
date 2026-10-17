@@ -20,7 +20,9 @@ use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 
 /// On-the-wire format for the Sumo Logic batch body.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -75,7 +77,7 @@ impl Default for SumoLogicConfig {
 /// SIEM exporter that POSTs Chio receipt batches to a Sumo Logic HTTP Source.
 pub struct SumoLogicExporter {
     config: SumoLogicConfig,
-    client: reqwest::Client,
+    client: ContractClient,
     allow_plaintext: bool,
 }
 

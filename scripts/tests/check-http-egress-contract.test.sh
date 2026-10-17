@@ -56,10 +56,12 @@ done
 # helper and dispatches through send_with_contract.
 mkdir -p "$work/positive/crates/chio-fake-positive/src"
 cat > "$work/positive/crates/chio-fake-positive/src/lib.rs" <<'EOF'
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 
 pub async fn dispatch(contract: &HttpEgressContract) {
-    let client: reqwest::Client = client_builder_with_contract(contract).build().unwrap();
+    let client: ContractClient = client_builder_with_contract(contract).build().unwrap();
     let req = client.get("https://example.com").build().unwrap();
     let _ = send_with_contract(contract, &client, req).await;
 }
@@ -187,9 +189,8 @@ pub fn dispatch() {
 }
 EOF
 
-# Synthetic negative: dispatches through send_with_contract but accepts a
-# caller-supplied client, so the lint cannot prove automatic redirects were
-# disabled through client_builder_with_contract.
+# Synthetic negative: dispatches through send_with_contract but names a plain
+# reqwest client type instead of ContractClient.
 mkdir -p "$work/negative_send_without_builder/crates/chio-fake-send/src"
 cat > "$work/negative_send_without_builder/crates/chio-fake-send/src/lib.rs" <<'EOF'
 use chio_egress_contract::{send_with_contract, HttpEgressContract};
@@ -221,9 +222,9 @@ EOF
 # Synthetic positive: ClientBuilder with the contract helper.
 mkdir -p "$work/positive_builder/crates/chio-fake-pos-builder/src"
 cat > "$work/positive_builder/crates/chio-fake-pos-builder/src/lib.rs" <<'EOF'
-use chio_egress_contract::{client_builder_with_contract, HttpEgressContract};
+use chio_egress_contract::{client_builder_with_contract, ContractClient, HttpEgressContract};
 
-pub fn make_client(contract: &HttpEgressContract) -> reqwest::Client {
+pub fn make_client(contract: &HttpEgressContract) -> ContractClient {
     client_builder_with_contract(contract).build().unwrap()
 }
 EOF
@@ -346,7 +347,7 @@ if [[ $negative_blocking_top_level_get_status -eq 0 ]]; then
 fi
 
 if [[ $negative_send_without_builder_status -eq 0 ]]; then
-    echo "FAIL: lint should reject send_with_contract without client_builder_with_contract" >&2
+    echo "FAIL: lint should reject send_with_contract beside a plain reqwest client type" >&2
     exit 1
 fi
 
@@ -365,4 +366,4 @@ if [[ $positive_classified_status -ne 0 ]]; then
     exit 1
 fi
 
-echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, send-without-builder, and mixed-file forms)."
+echo "OK: HttpEgressContract lint correctly accepts wired or classified callers and rejects bare reqwest dispatch (including ClientBuilder, Client::new/default, blocking, imported, alias, execute, top-level get, mention-only, plain-client send, and mixed-file forms)."

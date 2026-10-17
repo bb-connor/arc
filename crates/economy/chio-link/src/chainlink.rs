@@ -4,8 +4,10 @@ use alloy_provider::{Provider, ProviderBuilder};
 use alloy_rpc_client::ClientBuilder as AlloyClientBuilder;
 use alloy_sol_types::sol;
 use alloy_transport::{TransportError, TransportErrorKind, TransportFut};
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
-use reqwest::{Client, Url};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
+use reqwest::Url;
 use std::task;
 use tower::Service;
 
@@ -29,7 +31,7 @@ sol! {
 #[derive(Clone, Debug)]
 pub(crate) struct ContractJsonRpcTransport {
     url: Url,
-    http_client: Client,
+    http_client: ContractClient,
     egress_contract: HttpEgressContract,
 }
 

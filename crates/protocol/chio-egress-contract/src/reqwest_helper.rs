@@ -1,7 +1,7 @@
 use crate::{HttpEgressContract, HttpEgressError, PreparedHttpEgressContract};
 use reqwest::header::{
-    HeaderMap, HeaderName, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST, LOCATION,
-    PROXY_AUTHORIZATION,
+    HeaderMap, HeaderName, HeaderValue, AUTHORIZATION, CONTENT_LENGTH, CONTENT_TYPE, COOKIE, HOST,
+    LOCATION, PROXY_AUTHORIZATION,
 };
 use reqwest::{Method, StatusCode, Url};
 use serde::de::DeserializeOwned;
@@ -51,14 +51,144 @@ impl ContractResponse {
     }
 }
 
-/// Wrap a `reqwest::Client::execute` call with [`HttpEgressContract`]
+/// HTTP client whose only constructor is [`ContractClientBuilder::build`].
+/// It never follows redirects, never retries, ignores proxies and resolves
+/// through the contract resolver. It exposes request construction but no
+/// dispatch; [`send_with_contract`] is the only way to send.
+///
+/// ```no_run
+/// # async fn demo(contract: chio_egress_contract::HttpEgressContract) -> Result<(), Box<dyn std::error::Error>> {
+/// let client = chio_egress_contract::client_builder_with_contract(&contract).build()?;
+/// let request = client.get("https://example.test/").build()?;
+/// chio_egress_contract::send_with_contract(&contract, &client, request).await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// A plain `reqwest::Client` cannot become one:
+///
+/// ```compile_fail,E0451
+/// fn wrap(inner: reqwest::Client) -> chio_egress_contract::ContractClient {
+///     chio_egress_contract::ContractClient { inner }
+/// }
+/// ```
+///
+/// and cannot be handed to the contract helper:
+///
+/// ```compile_fail,E0308
+/// # async fn demo(contract: chio_egress_contract::HttpEgressContract, request: reqwest::Request) {
+/// let client = reqwest::Client::new();
+/// let _ = chio_egress_contract::send_with_contract(&contract, &client, request).await;
+/// # }
+/// ```
+#[derive(Debug, Clone)]
+pub struct ContractClient {
+    inner: reqwest::Client,
+}
+
+impl ContractClient {
+    pub fn request<U: reqwest::IntoUrl>(&self, method: Method, url: U) -> ContractRequestBuilder {
+        ContractRequestBuilder {
+            inner: self.inner.request(method, url),
+        }
+    }
+
+    pub fn get<U: reqwest::IntoUrl>(&self, url: U) -> ContractRequestBuilder {
+        self.request(Method::GET, url)
+    }
+
+    pub fn post<U: reqwest::IntoUrl>(&self, url: U) -> ContractRequestBuilder {
+        self.request(Method::POST, url)
+    }
+
+    pub fn put<U: reqwest::IntoUrl>(&self, url: U) -> ContractRequestBuilder {
+        self.request(Method::PUT, url)
+    }
+}
+
+/// Request under construction for a [`ContractClient`]. It builds a
+/// `reqwest::Request` for [`send_with_contract`] and has no way to send.
+#[must_use]
+pub struct ContractRequestBuilder {
+    inner: reqwest::RequestBuilder,
+}
+
+impl ContractRequestBuilder {
+    pub fn header<K, V>(self, key: K, value: V) -> Self
+    where
+        HeaderName: TryFrom<K>,
+        <HeaderName as TryFrom<K>>::Error: Into<http::Error>,
+        HeaderValue: TryFrom<V>,
+        <HeaderValue as TryFrom<V>>::Error: Into<http::Error>,
+    {
+        Self {
+            inner: self.inner.header(key, value),
+        }
+    }
+
+    pub fn headers(self, headers: HeaderMap) -> Self {
+        Self {
+            inner: self.inner.headers(headers),
+        }
+    }
+
+    pub fn basic_auth<U: std::fmt::Display, P: std::fmt::Display>(
+        self,
+        username: U,
+        password: Option<P>,
+    ) -> Self {
+        Self {
+            inner: self.inner.basic_auth(username, password),
+        }
+    }
+
+    pub fn bearer_auth<T: std::fmt::Display>(self, token: T) -> Self {
+        Self {
+            inner: self.inner.bearer_auth(token),
+        }
+    }
+
+    pub fn body<T: Into<reqwest::Body>>(self, body: T) -> Self {
+        Self {
+            inner: self.inner.body(body),
+        }
+    }
+
+    pub fn json<T: serde::Serialize + ?Sized>(self, json: &T) -> Self {
+        Self {
+            inner: self.inner.json(json),
+        }
+    }
+
+    pub fn form<T: serde::Serialize + ?Sized>(self, form: &T) -> Self {
+        Self {
+            inner: self.inner.form(form),
+        }
+    }
+
+    pub fn query<T: serde::Serialize + ?Sized>(self, query: &T) -> Self {
+        Self {
+            inner: self.inner.query(query),
+        }
+    }
+
+    pub fn version(self, version: reqwest::Version) -> Self {
+        Self {
+            inner: self.inner.version(version),
+        }
+    }
+
+    pub fn build(self) -> Result<reqwest::Request, reqwest::Error> {
+        self.inner.build()
+    }
+}
+
+/// Wrap a [`ContractClient`] dispatch with [`HttpEgressContract`]
 /// enforcement before each network hop and while reading the response body.
-/// The supplied client must be built with [`client_builder_with_contract`],
-/// which disables reqwest's automatic redirect following so this helper can
-/// validate each `Location` target before issuing the next request.
+/// Redirects are followed here, one validated `Location` hop at a time.
 pub async fn send_with_contract(
     contract: &HttpEgressContract,
-    client: &reqwest::Client,
+    client: &ContractClient,
     request: reqwest::Request,
 ) -> Result<ContractResponse, HttpEgressError> {
     let prepared = contract.prepare()?;
@@ -75,11 +205,14 @@ pub async fn send_with_contract(
             has_body: request.body().is_some(),
         };
 
-        let response = client.execute(request).await.map_err(map_reqwest_error)?;
+        let response = client
+            .inner
+            .execute(request)
+            .await
+            .map_err(map_reqwest_error)?;
         if response.url() != &request_url {
             return Err(HttpEgressError::InvalidUrl(
-                "reqwest client followed a redirect internally; build it with client_builder_with_contract"
-                    .to_string(),
+                "contract client followed a redirect internally".to_string(),
             ));
         }
 
@@ -139,8 +272,10 @@ impl ContractClientBuilder {
         self
     }
 
-    pub fn build(self) -> Result<reqwest::Client, reqwest::Error> {
-        self.inner.build()
+    pub fn build(self) -> Result<ContractClient, reqwest::Error> {
+        Ok(ContractClient {
+            inner: self.inner.build()?,
+        })
     }
 }
 
@@ -221,7 +356,7 @@ struct RedirectRequestParts {
 }
 
 fn build_redirect_request(
-    client: &reqwest::Client,
+    client: &ContractClient,
     reusable_request: Option<reqwest::Request>,
     original: RedirectRequestParts,
     status: StatusCode,
@@ -239,7 +374,7 @@ fn build_redirect_request(
         || matches!(status, StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND)
             && original.method == Method::POST;
     if rewrite_to_get {
-        let mut builder = client.request(Method::GET, next_url);
+        let mut builder = client.inner.request(Method::GET, next_url);
         for (name, value) in &original.headers {
             if should_drop_redirect_header(name, cross_origin, true) {
                 continue;

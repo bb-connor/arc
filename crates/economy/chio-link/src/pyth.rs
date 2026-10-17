@@ -1,5 +1,7 @@
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
-use reqwest::{Client, Url};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
+use reqwest::Url;
 use serde::Deserialize;
 
 use crate::config::{PairConfig, PythFeedConfig};
@@ -8,7 +10,7 @@ use crate::{ExchangeRate, OracleBackend, OracleBackendKind, OracleFuture, PriceO
 #[derive(Debug)]
 pub struct PythHermesClient {
     base_url: String,
-    http_client: Client,
+    http_client: ContractClient,
     egress_contract: HttpEgressContract,
 }
 
@@ -81,7 +83,7 @@ impl OracleBackend for PythHermesClient {
 }
 
 async fn read_pyth_rate(
-    http_client: &Client,
+    http_client: &ContractClient,
     base_url: &str,
     pair: &PairConfig,
     feed: &PythFeedConfig,

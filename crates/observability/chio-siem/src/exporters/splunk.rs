@@ -11,7 +11,8 @@ use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::exporters::require_https_endpoint;
 use crate::redaction::redact_for_operator_log;
 use chio_egress_contract::{
-    client_builder_with_contract, send_with_contract, ContractResponse, HttpEgressContract,
+    client_builder_with_contract, send_with_contract, ContractClient, ContractResponse,
+    HttpEgressContract,
 };
 
 const DEFAULT_HEC_TIMEOUT: Duration = Duration::from_secs(30);
@@ -65,13 +66,13 @@ impl Default for SplunkConfig {
 /// return an error if the endpoint URL uses a plain `http://` scheme.
 pub struct SplunkHecExporter {
     config: SplunkConfig,
-    client: reqwest::Client,
+    client: ContractClient,
 }
 
 impl SplunkHecExporter {
     /// Create a new SplunkHecExporter with the given configuration.
     ///
-    /// Builds a `reqwest::Client` with rustls TLS and returns an error if the
+    /// Builds a `ContractClient` with rustls TLS and returns an error if the
     /// client cannot be constructed.
     ///
     /// Returns an error if `config.endpoint` is not an `https://` URL

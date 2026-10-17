@@ -18,9 +18,9 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use chio_core_types::receipt::metadata::GuardEvidence;
+use chio_egress_contract::ContractClient;
 use chio_kernel::Verdict;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
-use reqwest::Client;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -212,12 +212,12 @@ struct PromptFeedback {
 /// Guard wrapping Vertex AI safety ratings.
 pub struct VertexSafetyGuard {
     cfg: VertexSafetyConfig,
-    http: Client,
+    http: ContractClient,
     egress_contract: chio_egress_contract::HttpEgressContract,
 }
 
 impl VertexSafetyGuard {
-    /// Build a guard with an internally-owned [`reqwest::Client`].
+    /// Build a guard with an internally-owned [`ContractClient`].
     pub fn new(cfg: VertexSafetyConfig) -> Result<Self, ExternalGuardError> {
         let egress_contract = http_egress::contract_for_url(GUARD_NAME, &cfg.generate_url())?;
         let http = http_egress::client_for_contract(&egress_contract, cfg.timeout)?;
@@ -226,15 +226,6 @@ impl VertexSafetyGuard {
             http,
             egress_contract,
         })
-    }
-
-    /// Build a guard from a caller-supplied client handle.
-    ///
-    /// The supplied client is not reused. The guard rebuilds an internal client
-    /// from its egress contract so automatic redirect following cannot bypass
-    /// per-hop contract validation.
-    pub fn with_client(cfg: VertexSafetyConfig, _http: Client) -> Result<Self, ExternalGuardError> {
-        Self::new(cfg)
     }
 
     /// Build a [`GuardEvidence`] record for a prior decision.

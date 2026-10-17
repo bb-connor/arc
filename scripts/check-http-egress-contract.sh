@@ -116,6 +116,7 @@ DISPATCH_REGEX="\\.execute\\(|\\.send\\(\\)|\\.send_string\\(|\\.send_json\\(|\\
 INDIRECT_BINDING_REGEX="let[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*(reqwest(::blocking)?::Client::(builder|new|default)|reqwest(::blocking)?::ClientBuilder::|Client::(builder|new|default)|ClientBuilder::|[A-Za-z_][A-Za-z0-9_]*::Client::(builder|new|default)|[A-Za-z_][A-Za-z0-9_]*::ClientBuilder::)"
 INDIRECT_DISPATCH_REGEX="\\.(get|post|put|delete|patch|head|execute|send)\\("
 CLASSIFICATION_MARKER="CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST:"
+PLAIN_CLIENT_TYPE_REGEX="reqwest(::blocking)?::(Client|ClientBuilder|RequestBuilder)\\b|use[[:space:]]+reqwest(::blocking)?::(\\{[^;]*\\b)?(Client|ClientBuilder|RequestBuilder)\\b"
 REQWEST_GAP_LINE_REGEX="reqwest(::blocking)?::(Client|ClientBuilder)::(builder|new|default)\\(|reqwest(::blocking)?::(get|post|put|delete|patch|head)\\(|(^|[^A-Za-z0-9_])(Client|ClientBuilder)::(builder|new|default)\\(|(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*::(Client|ClientBuilder)::(builder|new|default)\\(|(^|[^A-Za-z0-9_])[A-Za-z_][A-Za-z0-9_]*::(get|post|put|delete|patch|head)\\(|\\.send\\(\\)"
 REQWEST_EXECUTE_GAP_LINE_REGEX="(^|[^A-Za-z0-9_])([A-Za-z_][A-Za-z0-9_]*\\.)*([A-Za-z_][A-Za-z0-9_]*_)?client[A-Za-z0-9_]*\\.execute\\("
 
@@ -180,12 +181,17 @@ for file in "${CANDIDATE_FILES[@]}"; do
             ;;
     esac
 
-    # Any send_with_contract caller must also construct the reqwest client via
-    # client_builder_with_contract so automatic redirects are disabled.
-    if grep -qE "\\bsend_with_contract\\b" "$file" \
-        && ! grep -qE "\\bclient_builder_with_contract\\b" "$file"; then
-        failed+=("$file")
-        continue
+    # send_with_contract accepts only a ContractClient. A caller file that
+    # also names a plain reqwest client or request builder type fails.
+    if grep -qE "\\bsend_with_contract\\b" "$file"; then
+        plain_client_lines=$(grep -nE "$PLAIN_CLIENT_TYPE_REGEX" "$file" \
+            | grep -vE "^[0-9]+:[[:space:]]*//" || true)
+        if [[ -n "$plain_client_lines" ]]; then
+            while IFS= read -r plain_line; do
+                failed+=("$file:$plain_line")
+            done <<< "$plain_client_lines"
+            continue
+        fi
     fi
 
     # If the file has no dispatch method calls and no indirectly-bound
@@ -226,7 +232,8 @@ if [[ ${#failed[@]} -gt 0 ]]; then
     done
     echo "" >&2
     echo "Add either an explicit HttpEgressContract field on the dispatch struct" >&2
-    echo "or route every call through chio_egress_contract::send_with_contract." >&2
+    echo "or route every call through chio_egress_contract::send_with_contract" >&2
+    echo "with a ContractClient from client_builder_with_contract." >&2
     exit 1
 fi
 

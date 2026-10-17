@@ -123,7 +123,7 @@ pub(crate) struct ProxyState {
     pub(crate) stop: chio_kernel::stop::StopControl,
     pub(crate) signer_keypair: Keypair,
     pub(crate) upstream: String,
-    pub(crate) http_client: reqwest::Client,
+    pub(crate) http_client: chio_http_core::ContractClient,
     pub(crate) egress_contract: HttpEgressContract,
     pub(crate) approval_admin: ApprovalAdmin,
     pub(crate) approval_config: Option<super::approval_authority::ProtectApprovalConfig>,

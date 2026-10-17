@@ -3026,6 +3026,9 @@ single-authority `HttpEgressContract` from
 `CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL` (tenant namespace
 `proof.public-settlement.rpc`, redirects disabled, `max_redirect_chain` of
 zero, `max_response_bytes` of 1 MiB) and enforce it on every JSON-RPC call.
+`send_with_contract` accepts only a `ContractClient`, whose sole constructor
+is `client_builder_with_contract`; that client disables automatic redirects,
+transport retries, and proxies, and has no dispatch method of its own.
 A workspace lint at `scripts/check-http-egress-contract.sh`
 catches regressions; a self-test at
 `scripts/tests/check-http-egress-contract.test.sh` proves the lint accepts

@@ -659,10 +659,10 @@ fn is_ipv6_private_or_special_use(address: &Ipv6Addr) -> bool {
         || (segments[0] == 0x2001 && segments[1] == 0x0db8)
 }
 
-/// Optional helper that pairs a `reqwest::Client` dispatch with
-/// `HttpEgressContract` enforcement. Behind the `reqwest-egress` feature so
-/// callers that already depend on `reqwest` get a single fail-closed entry
-/// point and substrate adapters can keep their existing client builder.
+/// Optional reqwest transport that dispatches only through a
+/// `ContractClient` under `HttpEgressContract` enforcement. Behind the
+/// `reqwest-egress` feature so callers that already depend on `reqwest` get
+/// a single fail-closed entry point.
 #[cfg(feature = "reqwest-egress")]
 pub mod reqwest_helper;
 
@@ -674,7 +674,8 @@ pub use operator_readiness::{OperatorReadinessError, OperatorReadinessProbe};
 #[cfg(feature = "reqwest-egress")]
 #[allow(unused_imports)]
 pub use reqwest_helper::{
-    client_builder_with_contract, send_with_contract, ContractClientBuilder, ContractResponse,
+    client_builder_with_contract, send_with_contract, ContractClient, ContractClientBuilder,
+    ContractRequestBuilder, ContractResponse,
 };
 
 impl HttpEgressContract {

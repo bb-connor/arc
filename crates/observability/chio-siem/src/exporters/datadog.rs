@@ -21,7 +21,9 @@ use crate::alerting::AlertSeverity;
 use crate::event::SiemEvent;
 use crate::exporter::{ExportError, ExportFuture, Exporter};
 use crate::redaction::redact_for_operator_log;
-use chio_egress_contract::{client_builder_with_contract, send_with_contract, HttpEgressContract};
+use chio_egress_contract::{
+    client_builder_with_contract, send_with_contract, ContractClient, HttpEgressContract,
+};
 
 /// Configuration for the Datadog Logs exporter.
 #[derive(Debug, Clone)]
@@ -66,7 +68,7 @@ impl Default for DatadogConfig {
 /// SIEM exporter that POSTs Chio receipt batches to Datadog's Log Intake API.
 pub struct DatadogExporter {
     config: DatadogConfig,
-    client: reqwest::Client,
+    client: ContractClient,
     logs_url: String,
 }
 

@@ -1,4 +1,5 @@
 //! A protocol refusal must never replay one native HTTP attempt.
+use super::ContractClient;
 use crate::{
     client_builder_with_contract, send_with_contract, HttpEgressContract, HttpEgressError,
 };
@@ -77,10 +78,12 @@ async fn refused_attempts(
     let server = tokio::spawn(refuse_http2_streams(listener, observed.clone()));
     let mut contract = HttpEgressContract::permissive_for_tests(&authority);
     contract.max_redirect_chain = 0;
-    let client = builder(&contract)
-        .timeout(Duration::from_secs(5))
-        .http2_prior_knowledge()
-        .build()?;
+    let client = ContractClient {
+        inner: builder(&contract)
+            .timeout(Duration::from_secs(5))
+            .http2_prior_knowledge()
+            .build()?,
+    };
     let request = client
         .post(format!("http://{authority}/native-attempt"))
         .version(reqwest::Version::HTTP_2)
