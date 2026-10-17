@@ -81,35 +81,41 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
         Err(response) => return response,
     };
 
-    let enterprise_provider_summary = state
+    let enterprise_provider_summary = match state
         .enterprise_provider_registry
-        .as_deref()
-        .map(|registry| {
-            let validated_count = registry
+        .as_ref()
+        .map(EnterpriseProviderRegistryFile::load)
+    {
+        Some(Ok(registry)) => json!({
+            "configured": true,
+            "available": true,
+            "count": registry.providers.len(),
+            "validatedCount": registry
                 .providers
                 .values()
                 .filter(|record| record.is_validated_enabled())
-                .count();
-            let invalid_count = registry
+                .count(),
+            "invalidCount": registry
                 .providers
                 .values()
                 .filter(|record| !record.validation_errors.is_empty())
-                .count();
-            json!({
-                "configured": true,
-                "count": registry.providers.len(),
-                "validatedCount": validated_count,
-                "invalidCount": invalid_count,
-            })
-        })
-        .unwrap_or_else(|| {
-            json!({
-                "configured": false,
-                "count": 0,
-                "validatedCount": 0,
-                "invalidCount": 0,
-            })
-        });
+                .count(),
+        }),
+        Some(Err(_)) => json!({
+            "configured": true,
+            "available": false,
+            "count": 0,
+            "validatedCount": 0,
+            "invalidCount": 0,
+        }),
+        None => json!({
+            "configured": false,
+            "available": false,
+            "count": 0,
+            "validatedCount": 0,
+            "invalidCount": 0,
+        }),
+    };
     let shared_hosted_owner_stats =
         state
             .factory
