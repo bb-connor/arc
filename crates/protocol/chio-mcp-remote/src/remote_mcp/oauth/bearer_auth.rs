@@ -25,6 +25,7 @@ pub(super) async fn authenticate_session_request<'a>(
     protected_resource_metadata: Option<&ProtectedResourceMetadata>,
 ) -> Result<SessionAuthContext, Response> {
     let headers = headers.into();
+    sender_constraint::refuse_presented_dpop(&headers, protected_resource_metadata)?;
     let token = extract_bearer_token(&headers, protected_resource_metadata)?;
     let origin = headers
         .get(ORIGIN)

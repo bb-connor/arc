@@ -132,3 +132,92 @@ async fn sender_key_rejection_keeps_decode_source_out_of_the_wire_response() {
     assert_eq!(value["error"], "invalid_request");
     assert!(!String::from_utf8_lossy(&body).contains("private-invalid-key"));
 }
+
+fn bearer_with_dpop(token: &str) -> HeaderMap {
+    let mut headers = dpop_header(b"presented-proof");
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {token}")).expect("bearer header"),
+    );
+    headers
+}
+
+fn assert_unavailable_response(response: Response) {
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let cause = response
+        .extensions()
+        .get::<Arc<SenderConstraintError>>()
+        .expect("typed sender refusal");
+    assert_eq!(cause.to_string(), UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn static_bearer_presenting_dpop_is_refused() {
+    let auth_mode = RemoteAuthMode::StaticBearer {
+        token: "static-token".into(),
+    };
+    let response =
+        authenticate_session_request(&bearer_with_dpop("static-token"), &auth_mode, None)
+            .await
+            .expect_err("a presented DPoP proof never rides a static bearer");
+    assert_unavailable_response(response);
+    let mut plain = HeaderMap::new();
+    plain.insert(
+        AUTHORIZATION,
+        HeaderValue::from_static("Bearer static-token"),
+    );
+    assert!(authenticate_session_request(&plain, &auth_mode, None)
+        .await
+        .is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn session_credential_presenting_dpop_is_refused_before_lookup(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    }
+    let mut config = test_remote_config();
+    config.policy_path = directory.path().join("policy.yaml");
+    std::fs::write(
+        &config.policy_path,
+        "kernel:\n  allow_ephemeral_receipt_log: true\n  durable_admission_mode: all\n",
+    )?;
+    config.session_db_path = Some(directory.path().join("sessions.db"));
+    config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(directory.path()));
+    config.wrapped_args.clear();
+    config.test_transport = Some(Arc::new(TestSessionTransport));
+    configure_signed_manifest(&mut config, directory.path());
+    let factory = RemoteSessionFactory::new(config.clone())?;
+    let state = RemoteAppState {
+        sessions: Arc::new(RemoteSessionLedger::new(
+            config.clock.clone(),
+            config.lifecycle_policy()?,
+            None,
+            None,
+        )?),
+        factory: Arc::new(factory),
+        auth_mode: Arc::new(RemoteAuthMode::StaticBearer {
+            token: "remote-auth-token".into(),
+        }),
+        enterprise_provider_registry: None,
+        admin_token: Some("admin-token".into()),
+        protected_resource_metadata: None,
+        authorization_server_metadata: None,
+        local_auth_server: None,
+    };
+    let headers = bearer_with_dpop("chio_session_v1_presented");
+    let response = remote_mcp_session_credentials::authenticate_request(
+        &state,
+        SenderRequest::from(&headers),
+        "POST",
+        MCP_ENDPOINT_PATH,
+    )
+    .await
+    .err()
+    .ok_or("a session credential with a DPoP header was admitted")?;
+    assert_unavailable_response(response);
+    Ok(())
+}
