@@ -215,7 +215,7 @@ pub(crate) fn verify_threshold_approval_set_with_requirement(
             return Err(threshold_denied("approval token signer is not valid"));
         }
         let digest = token
-            .token_digest()
+            .artifact_digest()
             .map_err(|error| threshold_denied(&format!("approval token digest failed: {error}")))?;
         if !token_ids.insert(token.id.clone())
             || !token_digests.insert(digest.clone())
