@@ -19,8 +19,6 @@ any outbound calls during the TTFRH first-run bench.
 
 List them at runtime with `create-chio-app --list`.
 
-There is no Cloudflare Workers template: a Workers integration requires the caller-delivery executor protocol, which is not available yet.
-
 ## Behavior
 
 `create-chio-app <template>` copies the corresponding `templates/<slug>`
