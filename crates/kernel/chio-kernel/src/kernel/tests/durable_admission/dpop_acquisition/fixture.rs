@@ -24,7 +24,7 @@ pub(super) fn fixture(
     let agent = make_keypair();
     let mut grant = make_grant("durable-server", "mutate");
     grant.dpop_required = Some(true);
-    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 3600);
     let mut request = make_request_with_arguments(
         "prepared-dpop-owner",
         &capability,

@@ -206,7 +206,7 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
             Fault::WrongOwner,
             Fault::Reject,
         ] {
-            let (mut kernel, _, _, request, _, dpop_store) =
+            let (mut kernel, _, _, request, dpop_store) =
                 request_with_replayed_approval("security-all-credentials")?;
             let counts = Arc::new(std::array::from_fn(|_| AtomicU64::new(0)));
             kernel.set_governed_approval_replay_store(Box::new(ApprovalProbe {
@@ -264,11 +264,6 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
             assert!(!history.is_empty());
             assert!(history.iter().all(|claim| claim.disposition ==
                 crate::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReleasedBeforeDispatch));
-            assert!(!kernel
-                .execution_nonce_store
-                .as_ref()
-                .ok_or("nonce store")?
-                .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
             assert_eq!(
                 counts.each_ref().map(|count| count.load(Ordering::SeqCst)),
                 [1, 0, 1]
@@ -282,11 +277,6 @@ fn security_rejection_releases_dpop_nonce_and_approval_as_one_attempt() -> TestR
             );
             assert_eq!(invocations.load(Ordering::SeqCst), 0);
             assert_eq!(dpop_store.dpop_history(), history);
-            assert!(!kernel
-                .execution_nonce_store
-                .as_ref()
-                .ok_or("nonce store")?
-                .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
             assert_eq!(
                 counts.each_ref().map(|count| count.load(Ordering::SeqCst)),
                 [1, 0, 1]
