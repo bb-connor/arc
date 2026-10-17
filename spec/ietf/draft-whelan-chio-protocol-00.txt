@@ -5360,12 +5360,12 @@ Internet-Draft                Chio Protocol               September 2026
    (Section 5.8).  The submission carries no sender proof: the kernel
    denies a call for which a matching grant requires one (Section 5.4).
 
-
-
-
-
-
-
+   The members of params._meta in Table 39 carry the other inputs of a
+   native request (Table 31). _meta has to be an object, and each member
+   has to have the structure of its native equivalent; the edge answers
+   -32602 otherwise.  The edge also answers -32602 to a member name
+   without its chio prefix (for example approvalToken) and to
+   route_selection.
 
 
 
@@ -5377,13 +5377,6 @@ Whelan                    Expires 3 April 2027                 [Page 96]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   The members of params._meta in Table 39 carry the other inputs of a
-   native request (Table 31). _meta has to be an object, and each member
-   has to have the structure of its native equivalent; the edge answers
-   -32602 otherwise.  The edge also answers -32602 to a member name
-   without its chio prefix (for example approvalToken) and to
-   route_selection.
 
       +===============================+=============================+
       | Member                        | Native equivalent           |
@@ -5421,6 +5414,13 @@ Internet-Draft                Chio Protocol               September 2026
    metadata as route_selection.
 
    The following request is illustrative.
+
+
+
+
+
+
+
 
 
 
