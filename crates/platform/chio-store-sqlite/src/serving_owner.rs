@@ -383,6 +383,8 @@ impl SqliteAuthorityStore {
             crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
                 &mut connection,
             )?;
+            crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
+            crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
             crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
                 .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
             crate::finding_market_store::initialize_finding_market_schema(&mut connection)
@@ -535,6 +537,8 @@ impl SqliteAuthorityStore {
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
             &mut connection,
         )?;
+        crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
+        crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_market_store::initialize_finding_market_schema(&mut connection)
@@ -634,6 +638,8 @@ impl SqliteAuthorityStore {
         crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
             &mut connection,
         )?;
+        crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
+        crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
         crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
         crate::finding_market_store::initialize_finding_market_schema(&mut connection)
@@ -987,6 +993,22 @@ impl SqliteAuthorityStore {
         &self,
     ) -> crate::channel_lifecycle_store::SqliteChannelLifecycleStore {
         crate::channel_lifecycle_store::SqliteChannelLifecycleStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
+    pub fn delegation_store(&self) -> crate::delegation_store::SqliteDelegationStore {
+        crate::delegation_store::SqliteDelegationStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
+    pub fn work_graph_store(&self) -> crate::work_graph_store::SqliteWorkGraphStore {
+        crate::work_graph_store::SqliteWorkGraphStore::open_alongside(
             self.connection.clone(),
             self.owner.clone(),
         )
@@ -1697,6 +1719,8 @@ fn verify_authority_store_invariants(
     crate::channel_release_publisher_store::verify_channel_release_publisher_invariants(
         connection,
     )?;
+    crate::delegation_store::verify_work_delegation_invariants(connection)?;
+    crate::work_graph_store::verify_work_graph_invariants(connection)?;
     Ok(())
 }
 

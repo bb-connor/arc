@@ -6,7 +6,7 @@ This is the source contract for WORK-W1.0. The public Work client, owner service
 
 | Input | Exact commit | Scope |
 | --- | --- | --- |
-| Inspected main | `a520638fa064faa58223feb625a9d8b306b1ea7e` | Existing native kernel, process, serving-owner, manifest and treaty APIs |
+| Inspected main | `10d70b88a311fbe3d51ba90254f02321cebb973b` plus the qualified D1/S1 stores | Existing native kernel, process, serving-owner, manifest and treaty APIs |
 | Remaining work source | `cafdc970e4f89bddf810647e4228a605ed9f498a` ([#1173](https://github.com/bb-connor/arc/pull/1173)) | F1 funded-work example source; D1 and additive S1 are on inspected main |
 | Pending recovery | `4b9229dca4329141ba3c929264ef71aee12e37c6` ([#1179](https://github.com/bb-connor/arc/pull/1179)) | Exact process reservation/origin, semantic, knowledge and confined-return interfaces; unqualified integration input |
 
@@ -20,7 +20,7 @@ All paths in this section refer to inspected main.
 
 | Owner and source | Actual interface | Construction and exposure boundary |
 | --- | --- | --- |
-| `SqliteAuthorityStore`, `crates/platform/chio-store-sqlite/src/serving_owner.rs` | `provision(database_path: impl AsRef<Path>, lock_root: impl AsRef<Path>) -> Result<(), SqliteServingOwnerError>`; `open_serving(database_path, lock_root) -> Result<Self, SqliteServingOwnerError>`; `open_serving_with_clock(database_path, lock_root, Arc<dyn Clock>) -> Result<Self, SqliteServingOwnerError>`; `mutation_fence(&self) -> StoreMutationFence` | One serving connection and owner; `crates/platform/chio-control-plane/src/durable_admission.rs` composes it. Work delegation/graph factories do not exist. New authoritative tables must join the closed projection catalog, global-commit chain, integrity verification and relocation checks. |
+| `SqliteAuthorityStore`, `crates/platform/chio-store-sqlite/src/serving_owner.rs` | `provision(database_path: impl AsRef<Path>, lock_root: impl AsRef<Path>) -> Result<(), SqliteServingOwnerError>`; `open_serving(database_path, lock_root) -> Result<Self, SqliteServingOwnerError>`; `open_serving_with_clock(database_path, lock_root, Arc<dyn Clock>) -> Result<Self, SqliteServingOwnerError>`; `mutation_fence(&self) -> StoreMutationFence` | One serving connection and owner; `crates/platform/chio-control-plane/src/durable_admission.rs` composes it. `delegation_store(&self) -> SqliteDelegationStore` and `work_graph_store(&self) -> SqliteWorkGraphStore` are the only D1/S1 constructors; both share the serving connection, owner and fence. New authoritative tables must join the closed projection catalog, global-commit chain, integrity verification and relocation checks. |
 | `SqliteCapabilityAuthority`, `crates/platform/chio-store-sqlite/src/authority.rs` | `open(path: impl AsRef<Path>) -> Result<Self, AuthorityStoreError>`; `open_with_clock(path, Arc<dyn Clock>)`; `CapabilityAuthority::issue_capability(&self, subject: &PublicKey, scope: ChioScope, ttl_seconds: u64) -> Result<CapabilityToken, KernelError>` | Separate issuer/key custody, not a serving-store adapter. Issuance creates a fresh UUID, signs and commits, but exposes no retained body indexed by a Work issuance ID. W1.4a must extend this owner before a lost reply can resolve without issuing again. |
 | `ProcessRuntime`, `crates/kernel/chio-process/src/lib.rs` | `open(path: impl AsRef<Path>, kernel: Arc<ChioKernel>) -> Result<Self, ProcessError>`; `tool_request(&self, process_id: &str, operation_key: &str, server_id: &str, tool_name: &str, arguments: Value) -> Result<ToolCallRequest, ProcessError>` | Trusted host construction; capabilities and checkpoints remain in the protected process journal. Route/security-profile/supplemental-authority configuration is host-selected. |
 | Process dispatch, same source | async `invoke_known_only(&self, process_id: &str, operation_key: &str, request: &ToolCallRequest) -> Result<ToolCallResponse, ProcessError>` | Pins no redispatch after unknown outcome, including read-only tools. Ordinary `invoke` permits bounded fresh read-only attempts and cannot implement Work's unknown-effect rule. |
@@ -33,9 +33,9 @@ All paths in this section refer to inspected main.
 
 ### D1 and S1 prerequisites
 
-`chio-workflow::delegation` defines `DelegationStore::open`, `create_root`, `slot`, `allocation_digest`, `subdivide`, `select`, `claim_dispatch` and `seal_dispatch` in `crates/platform/chio-workflow/src/delegation/store.rs`. The store is owner-local SQLite with one stamped v1 schema; it is not part of the serving authority. The kernel delegated-work guard that admits a sealed permit at a receiver is not on main; it depends on the checked-output zero-charge contract.
+`chio-workflow::delegation` defines the D1 records, signing domains and pure transition rules (`crates/platform/chio-workflow/src/delegation/{types,transition}.rs`); it owns no storage. The only allocator is `SqliteDelegationStore` in `crates/platform/chio-store-sqlite/src/delegation_store.rs`, with `create_root`, `slot`, `allocation_digest`, `subdivide`, `select`, `claim_dispatch`, `seal_dispatch` and `historical_dispatch`. Every mutation takes `(command_id: &str, ..., fence: &StoreMutationFence, trusted_now_unix_ms: u64)`, runs in one immediate transaction behind the serving fence, binds the command ID to its exact request digest (`CommandConflict` on a changed body) and appends one `work_delegation` event to the global commit chain. The kernel delegated-work guard that admits a sealed permit at a receiver is not on main; it depends on the checked-output zero-charge contract.
 
-`seal_dispatch(&self, binding: &DispatchBinding, now: u64, issuer: &Keypair) -> Result<Signed<DispatchPermit>>` commits exact signed permit bytes and dispatched state together. It checks live validity before returning an existing permit, so it cannot supply historical readback after expiry. There is no original-command preparation lookup, qualified serving fence or Work issuer journal. W1.2 must add authorized retained-permit readback without fresh liveness and must remove superseded writers when routing all producers to the qualified store.
+`seal_dispatch(&self, command_id: &str, binding: &DispatchBinding, issuer: &Keypair, fence: &StoreMutationFence, trusted_now_unix_ms: u64) -> Result<Signed<DispatchPermit>>` commits exact signed permit bytes and dispatched state together; a replayed command returns the retained bytes. `historical_dispatch(&self, binding: &DispatchBinding, issuer: &PublicKey) -> Result<Option<Signed<DispatchPermit>>>` reads a retained permit without fresh liveness, so an expired permit stays readable as history while fresh sealing refuses. Sealed allocations are never released.
 
 Main's `crates/kernel/chio-swarm-authority/src/verifier.rs` supplies `verify_swarm_authority_for_admission` and `verify_swarm_authority_bundle`, plus `mint_swarm_join_receipt(request: SwarmJoinReceiptMintRequest, keypair: &Keypair) -> Result<SwarmJoinReceipt, SwarmAuthorityError>`. Minting signs supplied parent/result claims and retains no issuance transaction. The verifier's `all_success` parent receipt-set check is not an evaluator decision over exact producer output.
 
@@ -47,7 +47,9 @@ Main also has:
 - `extend_swarm_authority_bundle(&self, expected_bundle_sha256: &str, candidate: SwarmAuthorityBundle, trusted_keys: &[PublicKey]) -> Result<(), ChioRuntimeError>` on the runtime store, with a public `chio-runtime` wrapper;
 - the required `RuntimeAdmissionStore::swarm_authority_bundle_for_graph(&self, task_graph_id: &str, graph_sha256: &str)`, which admission uses to resolve the exact signed graph version a request references.
 
-The extension transaction checks the expected head, verifies the extension, archives the predecessor by task-graph digest and commits the successor. The caller already holds the signed candidate before the CAS, so this is not a publish-after-commit issuer. It exposes no original issuance-ID readback. W1.2/W1.4a must retain unsigned drafts and publish only the qualified committed artifact, while resolving an original success after later extensions. Main has no `SqliteDelegationStore`, `work_graph_store.rs`, `SqliteAuthorityStore::delegation_store()` or `work_graph_store()`.
+The extension transaction checks the expected head, verifies the extension, archives the predecessor by task-graph digest and commits the successor. The caller already holds the signed candidate before the CAS, so this is not a publish-after-commit issuer. It exposes no original issuance-ID readback.
+
+`SqliteWorkGraphStore` in `crates/platform/chio-store-sqlite/src/work_graph_store.rs` is the qualified S1 issuer: `provision_root(bundle, trusted_keys, fence, trusted_now_unix_ms)` and `advance(expected_bundle_sha256, candidate, trusted_keys, fence, trusted_now_unix_ms) -> Result<WorkGraphIssuance>` verify the bundle or strict additive extension, archive the predecessor by task-graph digest and retain the issuance by candidate digest under one `work_graph` global commit. `issuance(&self, bundle_sha256)` resolves an acknowledged-lost advance to its original success after later heads; `head` and `version` read the current and archived bundles. W1.4a must still retain unsigned drafts and publish only the committed artifact. The runtime store's `extend_swarm_authority_bundle` remains on main as a separate writer of runtime graph copies.
 
 ### Manifest, treaty and evaluator provenance
 
@@ -173,7 +175,7 @@ Release admission commits its owner record before delivery. `release_into` reaut
 | Treaty predicate | Depth 32, 1024 nodes, 64 KiB JSON, 1024-byte atom | `chio-runtime-core/src/treaty/predicate.rs` |
 | Native deadlines | Default guard/dispatch deadlines are zero (unbounded); receipt append defaults to 5000 ms | `chio-kernel/src/kernel/kernel_struct.rs` |
 | HTTP service | 15-second timeout; bounded blocking lanes hold permits until worker completion | `chio-control-plane/src/trust_control/service_types/{paths,blocking}.rs` |
-| D1 | 64 children, 4096 slots/root, depth 32, 64 effects, 256 readers, 65536-byte nested envelope, MAX_UNITS 9007199254740991, 16 predicate clauses | `chio-workflow/src/delegation/{types,store}.rs` |
+| D1 | 64 children, 4096 slots/root, depth 32, 64 effects, 256 readers, 65536-byte nested envelope, MAX_UNITS 9007199254740991, 16 predicate clauses | `chio-workflow/src/delegation/{types,transition}.rs` |
 | Pending artifact publication | 16 direct dependencies, exact recovery-scope equality | Recovery source `admission_operation_store/knowledge/{publication,traversal}.rs` |
 
 ### Work profile limits to implement
@@ -195,7 +197,7 @@ The 16-parent limit matches the pending artifact dependency ceiling. Full-scope 
 
 ### Manifest dependency graph
 
-`cargo metadata --no-deps --offline --locked --format-version 1` identifies 181 workspace members at the main pin. It has no resolved external dependency graph. The following edges are read from manifest declarations; no compilation or isolated/unified feature qualification is claimed.
+`cargo metadata --no-deps --offline --locked --format-version 1` identifies 182 workspace members at the main pin. It has no resolved external dependency graph. The following edges are read from manifest declarations; no compilation or isolated/unified feature qualification is claimed.
 
 | Package | Existing declared dependencies relevant to Work |
 | --- | --- |
@@ -203,7 +205,8 @@ The 16-parent limit matches the pending artifact dependency ceiling. Full-scope 
 | `chio-runtime-core` | No feature section; unconditional kernel, federation, swarm-authority, weights, runtime-proof-parity, attest-buyer-core and SQLite |
 | `chio-control-plane` | Default empty; kernel enables finding-market; settle/store-sqlite unconditional; runtime-core dev-only; no normal process/workflow/runtime dependency |
 | `chio-process` | Default empty; `worker-server` enables Tokio/rand/hex/base64; `mailboxes` enables async-trait/manifest/Tokio; kernel unconditional |
-| `chio-workflow` | Core, workflow-preflight and SQLite (the D1 store) unconditional |
+| `chio-workflow` | Core and workflow-preflight unconditional; no SQLite |
+| `chio-store-sqlite` | Workflow (D1 rules) and swarm-authority (S1 verifiers) unconditional for the qualified stores; settle with defaults |
 | `chio-settle` | Default `web3`; disabling defaults leaves secrecy as the direct normal dependency and disables the library, not an available chain-free settlement implementation |
 
 Runtime/runtime-core/process reach default-web3 settle through kernel. Control-plane and store-sqlite also depend on settle with defaults. Workflow reaches web3 through core. A root package's `--no-default-features` does not disable transitive defaults, and an opt-in Work feature alone proves no isolation. W1.1/W1.7 must compare declared and resolved isolated/unified graphs, reject dependency cycles and keep optional funded composition out of authority-free client DTOs.
@@ -213,7 +216,7 @@ Runtime/runtime-core/process reach default-web3 settle through kernel. Control-p
 | Step | Deliverable | Dependency and complete acceptance |
 | --- | --- | --- |
 | Substrate | D1 rules and additive S1 on main with their original tests | Landed; the kernel delegated-work guard waits for the checked-output contract |
-| W1.1 / W1.2 | Strict v1 contracts and qualified single-writer work stores | Substrate APIs; concrete bounds and schema-refusal vectors; no parallel allocator |
+| W1.1 / W1.2 | Strict v1 contracts and qualified single-writer work stores | On main: `chio.work.v1` contracts and the serving-owner D1/S1 stores with exact schema refusal; no parallel allocator |
 | W1.3a | Manifest/treaty/catalog projection | Available native owners and D1 where referenced; unsupported semantic profiles refuse |
 | W1.4a | Pure bindings plus durable role-local intent/issuance/readback | Qualified D1/S1/capability issuers; issuer durability is not deferred to generic REC |
 | W1.5a / W1.6a | Exact acceptance evidence, pure join inputs, scoped indexes and issuer readback | No unavailable release/capture owner is replaced by a boolean or cache |
@@ -234,4 +237,4 @@ W1.3 and W1.4 require the split because semantic installation and exact protecte
 - Revoked recipient, changed current predicate, expired reservation and wrong resource/scope deny result materialization and dependent capture. Historical settlement remains separate from current release.
 - Saturated/expired queues fail before mutation; dropped response futures retain permits and original obligations until owner completion or supervised handoff.
 
-No runtime test result is recorded by this source inventory. The first implementing slices run full library/integration suites for every changed crate and strict all-target Clippy, with genuine behavioral RED/GREEN evidence. The D1 and swarm-extension suites run on main; REC suites cannot be counted as passed against a main tree where they do not exist. The complete Work runtime exit and release qualification remain open.
+No runtime test result is recorded by this source inventory. The first implementing slices run full library/integration suites for every changed crate and strict all-target Clippy, with genuine behavioral RED/GREEN evidence. The qualified D1/S1 store suites (`chio-store-sqlite` `work_delegation_authority`, `work_graph_authority`) and swarm-extension suites run on main; REC suites cannot be counted as passed against a main tree where they do not exist. The complete Work runtime exit and release qualification remain open.

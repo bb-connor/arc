@@ -3136,6 +3136,7 @@ dependencies = [
  "chio-swarm-authority",
  "chio-test-support",
  "chio-transaction-passport",
+ "chio-workflow",
  "criterion",
  "frost-ed25519",
  "hex",
@@ -3298,10 +3299,8 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-workflow-preflight",
- "rusqlite",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror 1.0.69",
  "tracing",
 ]

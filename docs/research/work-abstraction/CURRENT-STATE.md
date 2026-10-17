@@ -5,10 +5,10 @@ The [source manifest](SOURCES.json) and [integration inventory](INTEGRATION.md) 
 | Capability | Inspected main | Required integration |
 | --- | --- | --- |
 | Native execution and process identity | Durable admission, retained requests/nonces, `ProcessRuntime::invoke_known_only` | Complete Work request custody and scoped original-operation adapter |
-| Serving ownership | `SqliteAuthorityStore` fences, integrity and global commits | Qualified D1/S1 factories and one v1 schema per store |
+| Serving ownership | `SqliteAuthorityStore` fences, integrity, global commits and the qualified D1/S1 factories | Work issuers for capability offers and agreements |
 | Capability signing | `SqliteCapabilityAuthority` issues fresh UUID-bound tokens | Original Work issuance-ID intent and exact-body readback |
-| D1 delegation | `chio-workflow::delegation` rules and an owner-local v1 store; no kernel delegated-work guard | Serving-owner qualification; the guard after the checked-output contract |
-| S1 graph | Fixed bundles, pure minting/verifiers and additive extension with retained graph versions | Retained unsigned drafts, commit-before-publication and original-success readback |
+| D1 delegation | `chio-workflow::delegation` rules; `SqliteDelegationStore` under the serving fence with command binding and historical permit readback; no kernel delegated-work guard | The guard after the checked-output contract |
+| S1 graph | Fixed bundles, pure minting/verifiers and `SqliteWorkGraphStore` head CAS with retained versions and original-success issuance readback | Retained unsigned drafts and commit-before-publication |
 | Working terms | Verified manifests and native treaty admission | Audience-scoped catalogs; semantic generations after REC |
 | Acceptance | Native receipts; no generic Work evaluator/projector | Exact evaluator/procedure/producer/artifact mapping, ordinary charged evaluation |
 | Semantic/knowledge recovery | Absent | Actual #1179 reservation/origin/authority, semantic, knowledge and confined-return owners |

@@ -1216,8 +1216,8 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/security_state/native_mutation.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=0446885a9e1955bf8b8644861b4ee6d706dc8b99130a01b14cae6e4142fb177d, rust_symbols=join_native_flow,join_native_output,join_native,JoinAuthorization,mutate_native_egress,Capture::record,Capture::scope,CapturePlan::validate,CapturePlan::permits_table,is_native_flow_join_table,DisableCapture::drop,join_native_nonce_preflight,CapturePlan,CapturePlan::max_changes)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/security_state/native_mutation/compaction.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=32f7e6d14ec655798b053925646415f4740db40d3684f208ad2cedef2345b0a7, rust_symbols=Compaction::scope,Compaction::record,Scope::install,Scope::restore,Scope::finish,Scope::drop,authorize,validate_dead,compact_native_rows)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/security_state/native_mutation/sql_scope.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/security_state/native_mutation/sql_scope.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=bdb25692b76716fa7fdbfe9057f160f5e07c11e16fcf4428e357b8cdc7329199, rust_symbols=SqlMutationScope::install,SqlMutationScope::finish,SqlMutationScope::clear,SqlMutationScope::drop,authorize,permits_native_table)
-- `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=1da982bdc3244527af52cc63c60aff01a0faa2afc9cd10b27d6108d2ff3952ba, rust_symbols=GLOBAL_COMMIT_SCHEMA,budget_event_reference_digest,initialize_global_commit_schema,verify_global_commit_schema,global_schema_catalog)
-- `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=0e828daae9700191ed97cb13c1458958b82d79ead0c79ec3119e711e80d06d77, rust_symbols=projection_reference_digest)
+- `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=9ad14b5388d7cee7264464a59a4ad8054a51dd03d4cdd0b114b4902d09b4eb0f, rust_symbols=GLOBAL_COMMIT_SCHEMA,budget_event_reference_digest,initialize_global_commit_schema,verify_global_commit_schema,global_schema_catalog)
+- `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain/projection_reference.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=d2a4eb14696439e975167dba6c4a06f7aee925196e3bff7d1d1b1f13e944e698, rust_symbols=projection_reference_digest)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/tool_outcome_native_output.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/tool_outcome_native_output.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=3784cb17e96d52303e568a3cd0213c1ac70379d0b08d849974b019e5b005505d, rust_symbols=verify_native_output_artifacts)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=e08415417f4e44214a774a37160f4e137bfe175632f730ead7ba5313fd815079, rust_symbols=VerifiedProjection,verify_outcome_projection,load_verified_projection,load_projection_artifacts,load_verified_projection_with_retained_inputs)
 - `formal/proof-manifest.toml::mirror::crates/platform/chio-store-sqlite/src/tool_outcome_security_release.rs->formal/apalache/PostAdmissionDropGuard.tla` (`manual_mirror`, `abstraction_anchor`): `crates/platform/chio-store-sqlite/src/tool_outcome_security_release.rs` -> `formal/apalache/PostAdmissionDropGuard.tla` (model_kind=tla, normalized_sha256=b702b8ce63f6947c9c975a8d8cce0f3cfadd7e3b0883647ee0aaa490481bf9a1, rust_symbols=has_release_namespace,verify_unstamped_source,predecessor_schema,verify_pre_migration,participant_digest,load,verify_projection,require_terminal_release,SqliteToolOutcomeStore::persist_security_release)
@@ -1295,7 +1295,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `d9a3c87eb94bb644bc0ca131f34117217519f5021110a01d4b1e1fa563ce1a68`
+- Input digest: `4619abfd89acc3633e80074a1fca9a5f22fd4b8452a4052708c121ab73a8ca69`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1306,7 +1306,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `.dst/harnesses.toml`: `02c022579994294816ab40683c211766ef131b18a6cd13c2c5692f91fd62f1a1`
 - `.kani/harnesses.toml`: `ca35873e230f172eb9d581c4b5fbbba9709aaa135181d332064a48afaee0aebf`
 - `.loom/harnesses.toml`: `07b7f087e6e7f484c16be0d7cd079def72dcc35e536e02bf241337fc915b562b`
-- `Cargo.lock`: `e96bb0bc4b7d69ac91bb098e79eea63668be6d05102a6c680b089adb431e0a45`
+- `Cargo.lock`: `f750183dcb37bc0df2e122c0dbbfcae63ca856d299cb4277155dc1722eef5b7a`
 - `Cargo.toml`: `83dbb7bd85bf75ec384a0e5d6f199af88d44ea8dbc13463e96fa2261fa0e9707`
 - `audits/evidence/mutants/chio-weights/2026-05-08.json`: `452aaf5734039a489967a629ec3c6b1b9d1351e06ec1f8e76c136ae389477ca7`
 - `audits/mutation/per-crate-configs/chio-anchor.toml`: `9d5a1f0e850ddadc3e621dd67282bb36460e13d3cb6e1af06a3fc03597af8ec3`
@@ -1565,7 +1565,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/mutation/evidence/spec-mutants-7b24142e8523fe08e501063dbf3d4f6cea3397be.json`: `82878e03aaafa1ceeb1f791386cffd57f9f88453b24113bd51e43b67996a66c2`
 - `formal/mutation/evidence/spec-mutants-d292f14df1c493873199f4f9d969ade00472ff28.json`: `d7b7a63401bfb071af87743ec07191e380c29ee1e306cca1fe35859a8194e623`
 - `formal/mutation/registry.toml`: `48387345d00fe7c53e777326f73e31370f7bc3d362a09f1059cadc06c98b6bb6`
-- `formal/proof-manifest.toml`: `00bfa605b38fa48a720f808e9e5496f54ea75773a31cb324cc9a96a3b7f4cfae`
+- `formal/proof-manifest.toml`: `eb029df45fd0479610d53c6a8e9bb6eff25252f375c9bb7a214b9cab8a470a48`
 - `formal/rust-verification/creusot-contracts.toml`: `83000c98743013d3d6d468976a163edaf16d0d621070410d741f146bf61a28a5`
 - `formal/rust-verification/formal-mutants.toml`: `5f15de2f3833b11db3d783d05ab6efcd2c49840ede010fe7ec54fc2846c48fc6`
 - `formal/rust-verification/kani-harnesses.toml`: `60b49af814071bb16f3e027749b26fb9c86d032a00bb022aa0719b6d15c7506f`
@@ -1589,7 +1589,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/tla/trace/TraceEvaluateRevocationPropagation.tla`: `a7e923ace268ed8ca2575fed423c5a963776b2f34929fb547f3d3b61aed81589`
 - `fuzz/owners.toml`: `b3569c8aedf4d8175cc9809fbe052198acad8d6cf18f6ebff6a0248759e1f465`
 - `fuzz/target-map.toml`: `d51f046241b1f125ea8e93e51a40e6411b3b8ed5444c7fd93d72aad7ff036f26`
-- `git-worktree://rust-files`: `289d2bcac58ed8693af0a530900f45a52f07f181aca7be45ee422afcd68889ba`
+- `git-worktree://rust-files`: `d4471fb08a2267e02e2e59a8a4974d1a1e4ad33eaf76fde53214a55f2d0bd864`
 - `releases.toml`: `8fa34f25cfafa13c5230e5f7305d45cb95ac276e2f2f65d9aaa87a1af3f7431d`
 - `rust-toolchain.toml`: `24ef3b9d3edbd850aa386cb0a98e10450b0030991a4537cb359f54d49dbbb33a`
 - `scripts/check-apalache-negative.sh`: `9441ad16cab3d4edf8c92d542920a60691217f09b65b9be70793b5fbcf24e4a5`

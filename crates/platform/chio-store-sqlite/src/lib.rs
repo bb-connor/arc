@@ -65,6 +65,7 @@ pub mod clearing_lifecycle_store;
 #[cfg(test)]
 mod clock_consumer_tests;
 pub mod dead_letters;
+pub mod delegation_store;
 pub mod economic_state_cache;
 pub mod encrypted_blob;
 pub mod enterprise_migration_state;
@@ -114,6 +115,7 @@ mod store_connection;
 #[cfg(test)]
 mod text_bounds_tests;
 pub mod tool_outcome_store;
+pub mod work_graph_store;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
