@@ -183,6 +183,7 @@ fn config_with(
         verifier_policies_file: None,
         verifier_challenge_db_path: Some(db_path.to_path_buf()),
         passport_statuses_file: None,
+        revocation_partners_file: None,
         passport_issuance_offers_file: None,
         certification_registry_file: None,
         certification_discovery_file: None,
