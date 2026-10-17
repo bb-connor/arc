@@ -63,7 +63,7 @@ use super::finding_reveal_server::{
 };
 use super::finding_status_publisher::FindingStatusEpochPublisher;
 use super::finding_status_verifier::MarketFindingStatusVerifier;
-use super::FindingMarketConfig;
+use super::{FindingMarketConfig, TrustStop};
 
 const MAX_CREDENTIAL_TEXT_BYTES: usize = 512;
 const FINDING_OPERATOR_PURCHASE_JOB_SCHEMA: &str = "chio.finding.operator-purchase-job.v1";
@@ -154,6 +154,7 @@ pub struct FindingOperatorPurchaseExecutor {
     authority_status: Arc<dyn FindingAuthorityStatusResolver>,
     keys: FindingOperatorPurchaseKeys,
     buyers: Vec<FindingOperatorBuyerCredential>,
+    stop: TrustStop,
     #[cfg(test)]
     stop_after_purchase_job_once: std::sync::atomic::AtomicBool,
     #[cfg(test)]
@@ -249,6 +250,7 @@ impl FindingOperatorPurchaseExecutor {
             .wait_for_writer_ready(std::time::Duration::from_secs(30))
             .map_err(|error| error.to_string())?;
         Ok(Self {
+            stop: TrustStop::for_authority(Some(&storage.authority)),
             authority: storage.authority,
             bundle_store,
             payload_store,
@@ -463,7 +465,7 @@ impl FindingOperatorPurchaseExecutor {
         })
     }
 
-    fn build_kernel(
+    pub(crate) fn build_kernel(
         &self,
         bundle: &FindingOperatorBundle,
     ) -> Result<ChioKernel, FindingPurchaseExecutionError> {
@@ -491,11 +493,8 @@ impl FindingOperatorPurchaseExecutor {
         kernel
             .set_receipt_store_handle(self.receipt_store.clone())
             .map_err(execution_internal)?;
+        kernel.set_stop_control(self.stop.control().clone());
         let operations = Arc::new(self.authority.admission_operation_store());
-        kernel.set_stop_control(chio_kernel::stop::StopControl::durable(
-            &operations,
-            self.authority.mutation_fence(),
-        ));
         kernel
             .set_durable_admission_store(
                 operations,
@@ -1558,6 +1557,10 @@ impl FindingOperatorPurchaseExecutor {
 
 #[async_trait::async_trait]
 impl FindingPurchaseExecutor for FindingOperatorPurchaseExecutor {
+    fn stop_control(&self) -> chio_kernel::stop::StopControl {
+        self.stop.control().clone()
+    }
+
     fn mutation_fence(&self) -> chio_kernel::admission_operation::StoreMutationFence {
         self.authority.mutation_fence()
     }

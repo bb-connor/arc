@@ -45,6 +45,27 @@ impl TrustStop {
         }
     }
 
+    /// The stop of a node serving purchases is the purchase executor's, so the
+    /// routes drive the same control every purchase kernel holds.
+    pub(crate) fn for_serving(
+        authority: Option<&Arc<SqliteAuthorityStore>>,
+        purchase_executor: Option<&super::finding_purchase_routes::SharedFindingPurchaseExecutor>,
+    ) -> Result<Self, CliError> {
+        let Some(executor) = purchase_executor else {
+            return Ok(Self::for_authority(authority));
+        };
+        let control = executor.stop_control();
+        if !control.is_durable() {
+            return Err(CliError::cli_other_error(
+                "finding purchase executor stop control is not durable".to_string(),
+            ));
+        }
+        Ok(Self {
+            control,
+            _store: None,
+        })
+    }
+
     pub(crate) fn control(&self) -> &StopControl {
         &self.control
     }

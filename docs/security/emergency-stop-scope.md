@@ -32,8 +32,8 @@ Every kernel a host constructs binds the same `StopHeads`:
   and its mediation kernel, durable over the sidecar's admission authority when
   a receipt database is configured;
 - trust control holds one `StopControl`, durable on its joint admission
-  authority when one is configured, and cognition-market purchase kernels load
-  that durable stop when they are built;
+  authority when one is configured; with a cognition-market purchase executor
+  that control is the executor's, bound to every purchase kernel it builds;
 - a process host binds the one kernel it serves.
 
 A stop through any kernel or control surface of a host therefore reaches every
