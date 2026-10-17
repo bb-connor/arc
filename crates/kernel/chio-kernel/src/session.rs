@@ -147,7 +147,7 @@ pub struct InflightRequest {
 }
 
 impl InflightRequest {
-    #[cfg_attr(loom, allow(dead_code))]
+    #[cfg(not(loom))]
     pub(crate) fn guard_invocation_attempt_id(&self) -> &str {
         &self.guard_invocation_attempt_id
     }
@@ -322,7 +322,7 @@ impl InflightRegistry {
         Ok(())
     }
 
-    #[cfg_attr(loom, allow(dead_code))]
+    #[cfg(not(loom))]
     pub(crate) fn try_mark_dispatch_started(
         &self,
         request_id: &RequestId,
@@ -344,7 +344,7 @@ impl InflightRegistry {
         Ok(())
     }
 
-    #[cfg_attr(loom, allow(dead_code))]
+    #[cfg(not(loom))]
     pub(crate) fn mark_dispatch_finished(&self, request_id: &RequestId) {
         write_lock(&self.dispatching).remove(request_id);
     }
@@ -395,8 +395,8 @@ impl InflightRegistry {
     }
 }
 
+#[cfg(not(loom))]
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(loom, allow(dead_code))]
 pub(crate) enum DispatchStartFailure {
     RequestNotInflight,
     CancellationRequested { reason: Option<String> },
@@ -1506,7 +1506,7 @@ impl Session {
         self.inflight.mark_cancellation_requested(request_id)
     }
 
-    #[cfg_attr(loom, allow(dead_code))]
+    #[cfg(not(loom))]
     pub(crate) fn request_cancellation_with_reason(
         &self,
         request_id: &RequestId,
@@ -1516,7 +1516,7 @@ impl Session {
             .mark_cancellation_requested_with_reason(request_id, Some(reason))
     }
 
-    #[cfg_attr(loom, allow(dead_code))]
+    #[cfg(not(loom))]
     pub(crate) fn try_mark_request_dispatch_started(
         &self,
         request_id: &RequestId,
@@ -1527,7 +1527,7 @@ impl Session {
         })
     }
 
-    #[cfg_attr(loom, allow(dead_code))]
+    #[cfg(not(loom))]
     pub(crate) fn mark_request_dispatch_finished(&self, request_id: &RequestId) {
         self.inflight.mark_dispatch_finished(request_id);
     }
