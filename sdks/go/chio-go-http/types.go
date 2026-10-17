@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: edd4db223f71003535d91fc1664ea95781f5b12ebc6119553c9dccf3029db407
+// Schema content SHA-256: 5157f006f0cc63ca59249efe94866c83a9e5c391475979c4bc53d37263a3adf5
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -160,6 +160,11 @@ const (
 	CapabilityGrantOperationRead       CapabilityGrantOperation = "read"
 	CapabilityGrantOperationReadResult CapabilityGrantOperation = "read_result"
 	CapabilityGrantOperationSubscribe  CapabilityGrantOperation = "subscribe"
+)
+
+// Defines values for CapabilityPresentationSchema.
+const (
+	CapabilityPresentationSchemaChioCapabilityPresentationV1 CapabilityPresentationSchema = "chio.capability-presentation.v1"
 )
 
 // Defines values for CapabilitySecurityBindingSchema.
@@ -575,6 +580,11 @@ const (
 	ReceiptDeliveryContractSchemaChioDeliveryContractV1 ReceiptDeliveryContractSchema = "chio.delivery-contract.v1"
 )
 
+// Defines values for ReceiptDisclosureSchema.
+const (
+	ReceiptDisclosureSchemaChioReceiptDisclosureV1 ReceiptDisclosureSchema = "chio.receipt-disclosure.v1"
+)
+
 // Defines values for ReceiptFindingDeliveryDigestCheck.
 const (
 	ReceiptFindingDeliveryDigestCheckMatched    ReceiptFindingDeliveryDigestCheck = "matched"
@@ -726,6 +736,30 @@ const (
 // Defines values for ReceiptRecordDecision3Verdict.
 const (
 	ReceiptRecordDecision3VerdictIncomplete ReceiptRecordDecision3Verdict = "incomplete"
+)
+
+// Defines values for ReceiptSettlementClosureRail.
+const (
+	ReceiptSettlementClosureRailX402 ReceiptSettlementClosureRail = "x402"
+)
+
+// Defines values for ReceiptSettlementClosureSchema.
+const (
+	ReceiptSettlementClosureSchemaChioSettlementClosureV1 ReceiptSettlementClosureSchema = "chio.settlement-closure.v1"
+)
+
+// Defines values for ReceiptSettlementClosureRailRefKind.
+const (
+	ReceiptSettlementClosureRailRefKindX402PaymentPayload      ReceiptSettlementClosureRailRefKind = "x402.payment_payload"
+	ReceiptSettlementClosureRailRefKindX402PaymentRequirements ReceiptSettlementClosureRailRefKind = "x402.payment_requirements"
+	ReceiptSettlementClosureRailRefKindX402SettlementResponse  ReceiptSettlementClosureRailRefKind = "x402.settlement_response"
+)
+
+// Defines values for ReceiptSettlementClosureSettlementState.
+const (
+	ReceiptSettlementClosureSettlementStateAuthorizedPending ReceiptSettlementClosureSettlementState = "authorized_pending"
+	ReceiptSettlementClosureSettlementStateFailed            ReceiptSettlementClosureSettlementState = "failed"
+	ReceiptSettlementClosureSettlementStateSettled           ReceiptSettlementClosureSettlementState = "settled"
 )
 
 // Defines values for RecoveryActionIntentSchema.
@@ -3101,6 +3135,113 @@ const (
 // Defines values for ResultStreamCompleteStatus.
 const (
 	ResultStreamCompleteStatusStreamComplete ResultStreamCompleteStatus = "stream_complete"
+)
+
+// Defines values for RootAuthorityDelegationContextSchema.
+const (
+	RootAuthorityDelegationContextSchemaChioDelegationContextV1 RootAuthorityDelegationContextSchema = "chio.delegation-context.v1"
+)
+
+// Defines values for RootAuthorityDelegationContextSubjectCommitmentSaltRef.
+const (
+	RootAuthorityDelegationContextSubjectCommitmentSaltRefAnchorSub RootAuthorityDelegationContextSubjectCommitmentSaltRef = "anchor.sub"
+)
+
+// Defines values for RootAuthorityDelegationContextTenantCommitmentSaltRef.
+const (
+	RootAuthorityDelegationContextTenantCommitmentSaltRefAnchorTenant RootAuthorityDelegationContextTenantCommitmentSaltRef = "anchor.tenant"
+)
+
+// Defines values for RootAuthorityIdpKeySnapshotSchema.
+const (
+	RootAuthorityIdpKeySnapshotSchemaChioIdpKeySnapshotV1 RootAuthorityIdpKeySnapshotSchema = "chio.idp-key-snapshot.v1"
+)
+
+// Defines values for RootAuthorityRevocationRequestSchema.
+const (
+	RootAuthorityRevocationRequestSchemaChioRevocationRequestV1 RootAuthorityRevocationRequestSchema = "chio.revocation-request.v1"
+)
+
+// Defines values for RootAuthorityRootAnchorAnchorKind.
+const (
+	RootAuthorityRootAnchorAnchorKindChioLocalAs          RootAuthorityRootAnchorAnchorKind = "chio_local_as"
+	RootAuthorityRootAnchorAnchorKindChioOperatorKey      RootAuthorityRootAnchorAnchorKind = "chio_operator_key"
+	RootAuthorityRootAnchorAnchorKindEntraAgentId         RootAuthorityRootAnchorAnchorKind = "entra_agent_id"
+	RootAuthorityRootAnchorAnchorKindEntraJwt             RootAuthorityRootAnchorAnchorKind = "entra_jwt"
+	RootAuthorityRootAnchorAnchorKindOauthIdJag           RootAuthorityRootAnchorAnchorKind = "oauth_id_jag"
+	RootAuthorityRootAnchorAnchorKindOauthIntrospection   RootAuthorityRootAnchorAnchorKind = "oauth_introspection"
+	RootAuthorityRootAnchorAnchorKindOidcJwt              RootAuthorityRootAnchorAnchorKind = "oidc_jwt"
+	RootAuthorityRootAnchorAnchorKindOperatorStaticBearer RootAuthorityRootAnchorAnchorKind = "operator_static_bearer"
+)
+
+// Defines values for RootAuthorityRootAnchorHolderClass.
+const (
+	RootAuthorityRootAnchorHolderClassCaller      RootAuthorityRootAnchorHolderClass = "caller"
+	RootAuthorityRootAnchorHolderClassEdgeSession RootAuthorityRootAnchorHolderClass = "edge_session"
+)
+
+// Defines values for RootAuthorityRootAnchorJwkCrv.
+const (
+	RootAuthorityRootAnchorJwkCrvEd25519 RootAuthorityRootAnchorJwkCrv = "Ed25519"
+	RootAuthorityRootAnchorJwkCrvP256    RootAuthorityRootAnchorJwkCrv = "P-256"
+	RootAuthorityRootAnchorJwkCrvP384    RootAuthorityRootAnchorJwkCrv = "P-384"
+	RootAuthorityRootAnchorJwkCrvP521    RootAuthorityRootAnchorJwkCrv = "P-521"
+)
+
+// Defines values for RootAuthorityRootAnchorJwkKty.
+const (
+	RootAuthorityRootAnchorJwkKtyEC  RootAuthorityRootAnchorJwkKty = "EC"
+	RootAuthorityRootAnchorJwkKtyOKP RootAuthorityRootAnchorJwkKty = "OKP"
+	RootAuthorityRootAnchorJwkKtyRSA RootAuthorityRootAnchorJwkKty = "RSA"
+)
+
+// Defines values for RootAuthorityRootAnchorJwkUse.
+const (
+	RootAuthorityRootAnchorJwkUseSig RootAuthorityRootAnchorJwkUse = "sig"
+)
+
+// Defines values for RootAuthorityRootAnchorJwsAlgorithm.
+const (
+	RootAuthorityRootAnchorJwsAlgorithmES256 RootAuthorityRootAnchorJwsAlgorithm = "ES256"
+	RootAuthorityRootAnchorJwsAlgorithmES384 RootAuthorityRootAnchorJwsAlgorithm = "ES384"
+	RootAuthorityRootAnchorJwsAlgorithmES512 RootAuthorityRootAnchorJwsAlgorithm = "ES512"
+	RootAuthorityRootAnchorJwsAlgorithmEdDSA RootAuthorityRootAnchorJwsAlgorithm = "EdDSA"
+	RootAuthorityRootAnchorJwsAlgorithmPS256 RootAuthorityRootAnchorJwsAlgorithm = "PS256"
+	RootAuthorityRootAnchorJwsAlgorithmPS384 RootAuthorityRootAnchorJwsAlgorithm = "PS384"
+	RootAuthorityRootAnchorJwsAlgorithmPS512 RootAuthorityRootAnchorJwsAlgorithm = "PS512"
+	RootAuthorityRootAnchorJwsAlgorithmRS256 RootAuthorityRootAnchorJwsAlgorithm = "RS256"
+	RootAuthorityRootAnchorJwsAlgorithmRS384 RootAuthorityRootAnchorJwsAlgorithm = "RS384"
+	RootAuthorityRootAnchorJwsAlgorithmRS512 RootAuthorityRootAnchorJwsAlgorithm = "RS512"
+)
+
+// Defines values for RootAuthorityRootPolicySchema.
+const (
+	RootAuthorityRootPolicySchemaChioRootPolicyV1 RootAuthorityRootPolicySchema = "chio.root-policy.v1"
+)
+
+// Defines values for RootAuthorityRootPolicyRootPolicyDisclosureDefault.
+const (
+	RootAuthorityRootPolicyRootPolicyDisclosureDefaultCommitted RootAuthorityRootPolicyRootPolicyDisclosureDefault = "committed"
+)
+
+// Defines values for RootAuthorityRootPolicyRootPolicyRuleRecordedClaims.
+const (
+	RootAuthorityRootPolicyRootPolicyRuleRecordedClaimsCommitted RootAuthorityRootPolicyRootPolicyRuleRecordedClaims = "committed"
+	RootAuthorityRootPolicyRootPolicyRuleRecordedClaimsPlain     RootAuthorityRootPolicyRootPolicyRuleRecordedClaims = "plain"
+)
+
+// Defines values for RootAuthorityVerifierTrustRequiredColumns.
+const (
+	RootAuthorityVerifierTrustRequiredColumnsContent         RootAuthorityVerifierTrustRequiredColumns = "content"
+	RootAuthorityVerifierTrustRequiredColumnsDecision        RootAuthorityVerifierTrustRequiredColumns = "decision"
+	RootAuthorityVerifierTrustRequiredColumnsDelegationChain RootAuthorityVerifierTrustRequiredColumns = "delegation_chain"
+	RootAuthorityVerifierTrustRequiredColumnsIdentityRoot    RootAuthorityVerifierTrustRequiredColumns = "identity_root"
+	RootAuthorityVerifierTrustRequiredColumnsSettlement      RootAuthorityVerifierTrustRequiredColumns = "settlement"
+)
+
+// Defines values for RootAuthorityVerifierTrustSchema.
+const (
+	RootAuthorityVerifierTrustSchemaChioVerifierTrustV1 RootAuthorityVerifierTrustSchema = "chio.verifier-trust.v1"
 )
 
 // Defines values for SecurityBrokerAdminControlReceiptBodyV1Operation.
@@ -5587,6 +5728,22 @@ type CapabilityGrantToolGrant struct {
 	ToolName string `json:"tool_name"`
 }
 
+// CapabilityPresentation `chio.capability-presentation.v1` (PROTOCOL 5.6.5), carried in MCP `_meta.chioCapability`. The envelope is unsigned; every member inside is verified independently.
+type CapabilityPresentation struct {
+	// Ancestors Signed ancestors ordered root to parent. A root presented alone has an empty list.
+	Ancestors []CapabilityToken `json:"ancestors"`
+
+	// DelegationContext `chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.
+	DelegationContext *RootAuthorityDelegationContext `json:"delegation_context,omitempty"`
+
+	// Leaf A Chio capability token with typed caveats, attenuation fields, attenuation proof, budget share, and hybrid signing support folded into the unreleased v1 wire shape.
+	Leaf   CapabilityToken              `json:"leaf"`
+	Schema CapabilityPresentationSchema `json:"schema"`
+}
+
+// CapabilityPresentationSchema defines model for CapabilityPresentation.Schema.
+type CapabilityPresentationSchema string
+
 // CapabilityRevocation A single revocation entry recording that a previously issued capability token (identified by its `id`) is no longer valid as of `revoked_at`. Mirrors `RevocationRecord` in `crates/kernel/chio-kernel/src/revocation_store.rs` (the kernel's persisted revocation row), and is the wire-level companion to the `capability_revoked` kernel notification under `chio-wire/v1/kernel/capability_revoked.schema.json`. Operators read these entries from `/admin/revocations` (hosted edge) and from the trust-control revocation list.
 type CapabilityRevocation struct {
 	// CapabilityId The `id` field of the revoked CapabilityToken. Used to match revocations against presented tokens.
@@ -6815,6 +6972,30 @@ type ReceiptDeliveryContractSchema string
 // ReceiptDeliveryContractDigest defines model for ReceiptDeliveryContractDigest.
 type ReceiptDeliveryContractDigest = string
 
+// ReceiptDisclosure `chio.receipt-disclosure.v1` (PROTOCOL "Committed Receipts And Disclosure"): an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening.
+type ReceiptDisclosure struct {
+	Openings []ReceiptDisclosureOpening `json:"openings"`
+
+	// ReceiptId `id` of the receipt whose commitments these openings open.
+	ReceiptId string                  `json:"receipt_id"`
+	Schema    ReceiptDisclosureSchema `json:"schema"`
+}
+
+// ReceiptDisclosureSchema defines model for ReceiptDisclosure.Schema.
+type ReceiptDisclosureSchema string
+
+// ReceiptDisclosureOpening defines model for ReceiptDisclosureOpening.
+type ReceiptDisclosureOpening struct {
+	// Payload The committed value. `null` is a salt-only opening, valid only where the holder already has the payload (the caller copy, `caller` bundles and the PDP response to the enforcement point that sent the arguments).
+	Payload interface{} `json:"payload"`
+
+	// Salt A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+	Salt RootAuthorityRootAnchorSalt `json:"salt"`
+
+	// SaltRef Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`).
+	SaltRef string `json:"salt_ref"`
+}
+
 // ReceiptFindingDelivery defines model for ReceiptFindingDelivery.
 type ReceiptFindingDelivery struct {
 	AcceptedBidEnvelopeSha256       ReceiptFindingDeliveryDigest           `json:"accepted_bid_envelope_sha256"`
@@ -7114,6 +7295,51 @@ type ReceiptRecordToolCallAction struct {
 	// Parameters The parameters that were passed to the tool (or attempted). Free-form JSON value (mirrors `serde_json::Value`).
 	Parameters interface{} `json:"parameters"`
 }
+
+// ReceiptSettlementClosure `chio.settlement-closure.v1` (PROTOCOL 6.7), signed by the kernel key over the signing wrapper. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
+type ReceiptSettlementClosure struct {
+	// Amount Integer minor units as a decimal string.
+	Amount string `json:"amount"`
+
+	// Asset Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`.
+	Asset  ReceiptSettlementClosureAsset `json:"asset"`
+	HoldId string                        `json:"hold_id"`
+
+	// KernelKey Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+	KernelKey  RootAuthorityRootAnchorPublicKeyHex `json:"kernel_key"`
+	ObservedAt int64                               `json:"observed_at"`
+	Rail       ReceiptSettlementClosureRail        `json:"rail"`
+	RailRefs   []ReceiptSettlementClosureRailRef   `json:"rail_refs"`
+	Schema     ReceiptSettlementClosureSchema      `json:"schema"`
+
+	// Signature Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+	Signature         RootAuthorityRootAnchorSignatureHex     `json:"signature"`
+	State             ReceiptSettlementClosureSettlementState `json:"state"`
+	TerminalReceiptId string                                  `json:"terminal_receipt_id"`
+}
+
+// ReceiptSettlementClosureRail defines model for ReceiptSettlementClosure.Rail.
+type ReceiptSettlementClosureRail string
+
+// ReceiptSettlementClosureSchema defines model for ReceiptSettlementClosure.Schema.
+type ReceiptSettlementClosureSchema string
+
+// ReceiptSettlementClosureAsset Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`.
+type ReceiptSettlementClosureAsset = string
+
+// ReceiptSettlementClosureRailRef defines model for ReceiptSettlementClosureRailRef.
+type ReceiptSettlementClosureRailRef struct {
+	// Digest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Digest RootAuthorityRootAnchorDigest       `json:"digest"`
+	Id     *string                             `json:"id,omitempty"`
+	Kind   ReceiptSettlementClosureRailRefKind `json:"kind"`
+}
+
+// ReceiptSettlementClosureRailRefKind defines model for ReceiptSettlementClosureRailRef.Kind.
+type ReceiptSettlementClosureRailRefKind string
+
+// ReceiptSettlementClosureSettlementState defines model for ReceiptSettlementClosureSettlementState.
+type ReceiptSettlementClosureSettlementState string
 
 // RecoveryActionIntent defines model for RecoveryActionIntent.
 type RecoveryActionIntent struct {
@@ -13133,6 +13359,319 @@ type ResultStreamComplete struct {
 
 // ResultStreamCompleteStatus defines model for ResultStreamComplete.Status.
 type ResultStreamCompleteStatus string
+
+// RootAuthorityDelegationContext `chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.
+type RootAuthorityDelegationContext struct {
+	Anchor RootAuthorityDelegationContextDelegationAnchor `json:"anchor"`
+
+	// EffectiveRootScopeHash SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	EffectiveRootScopeHash RootAuthorityRootAnchorDigest                    `json:"effective_root_scope_hash"`
+	Exchange               RootAuthorityDelegationContextDelegationExchange `json:"exchange"`
+
+	// RootPolicyRuleId `rule_id` of the root policy rule that matched.
+	RootPolicyRuleId string                               `json:"root_policy_rule_id"`
+	Schema           RootAuthorityDelegationContextSchema `json:"schema"`
+}
+
+// RootAuthorityDelegationContextSchema defines model for RootAuthorityDelegationContext.Schema.
+type RootAuthorityDelegationContextSchema string
+
+// RootAuthorityDelegationContextDelegationAnchor defines model for RootAuthorityDelegationContextDelegationAnchor.
+type RootAuthorityDelegationContextDelegationAnchor struct {
+	// Alg Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+	Alg *RootAuthorityRootAnchorJwsAlgorithm `json:"alg,omitempty"`
+
+	// ArtifactDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ArtifactDigest *RootAuthorityRootAnchorDigest `json:"artifact_digest,omitempty"`
+
+	// ArtifactRetained True only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`.
+	ArtifactRetained bool `json:"artifact_retained"`
+
+	// Claims Only the claims the matched rule names in `recorded_claims`, each plain or committed per the rule.
+	Claims map[string]interface{} `json:"claims"`
+
+	// Issuer Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`.
+	Issuer string `json:"issuer"`
+
+	// KeySnapshotDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	KeySnapshotDigest *RootAuthorityRootAnchorDigest `json:"key_snapshot_digest,omitempty"`
+	Kid               *string                        `json:"kid,omitempty"`
+
+	// Kind Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+	Kind RootAuthorityRootAnchorAnchorKind `json:"kind"`
+
+	// ReplayKeyDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ReplayKeyDigest RootAuthorityRootAnchorDigest `json:"replay_key_digest"`
+
+	// Subject `SHA-256("chio.delegation-context.subject.v1\0" || salt || utf8(subject))`.
+	Subject RootAuthorityDelegationContextSubjectCommitment `json:"subject"`
+
+	// Tenant `SHA-256("chio.delegation-context.tenant.v1\0" || salt || utf8(tenant))`.
+	Tenant   RootAuthorityDelegationContextTenantCommitment `json:"tenant"`
+	TokenExp int64                                          `json:"token_exp"`
+	TokenIat int64                                          `json:"token_iat"`
+}
+
+// RootAuthorityDelegationContextDelegationExchange defines model for RootAuthorityDelegationContextDelegationExchange.
+type RootAuthorityDelegationContextDelegationExchange struct {
+	// ExchangeKey Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+	ExchangeKey RootAuthorityRootAnchorPublicKeyHex `json:"exchange_key"`
+	ExchangedAt int64                               `json:"exchanged_at"`
+
+	// Holder Who holds the root capability's subject key (PROTOCOL 5.6.6).
+	Holder RootAuthorityRootAnchorHolderClass `json:"holder"`
+
+	// RequestDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	RequestDigest RootAuthorityRootAnchorDigest `json:"request_digest"`
+}
+
+// RootAuthorityDelegationContextSubjectCommitment `SHA-256("chio.delegation-context.subject.v1\0" || salt || utf8(subject))`.
+type RootAuthorityDelegationContextSubjectCommitment struct {
+	// Commit SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Commit  RootAuthorityRootAnchorDigest                          `json:"commit"`
+	SaltRef RootAuthorityDelegationContextSubjectCommitmentSaltRef `json:"salt_ref"`
+}
+
+// RootAuthorityDelegationContextSubjectCommitmentSaltRef defines model for RootAuthorityDelegationContextSubjectCommitment.SaltRef.
+type RootAuthorityDelegationContextSubjectCommitmentSaltRef string
+
+// RootAuthorityDelegationContextTenantCommitment `SHA-256("chio.delegation-context.tenant.v1\0" || salt || utf8(tenant))`.
+type RootAuthorityDelegationContextTenantCommitment struct {
+	// Commit SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Commit  RootAuthorityRootAnchorDigest                         `json:"commit"`
+	SaltRef RootAuthorityDelegationContextTenantCommitmentSaltRef `json:"salt_ref"`
+}
+
+// RootAuthorityDelegationContextTenantCommitmentSaltRef defines model for RootAuthorityDelegationContextTenantCommitment.SaltRef.
+type RootAuthorityDelegationContextTenantCommitmentSaltRef string
+
+// RootAuthorityIdpKeySnapshot `chio.idp-key-snapshot.v1` (PROTOCOL 5.6.4), signed by the exchange key over the signing wrapper. It records the key set the exchange fetched from an identity provider and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement, not identity-provider evidence.
+type RootAuthorityIdpKeySnapshot struct {
+	// ExchangeKey Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+	ExchangeKey RootAuthorityRootAnchorPublicKeyHex `json:"exchange_key"`
+	Issuer      string                              `json:"issuer"`
+	Keys        []RootAuthorityRootAnchorJwk        `json:"keys"`
+	ObservedAt  int64                               `json:"observed_at"`
+	Schema      RootAuthorityIdpKeySnapshotSchema   `json:"schema"`
+
+	// Signature Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+	Signature RootAuthorityRootAnchorSignatureHex `json:"signature"`
+
+	// Source The pinned `jwks_uri` the keys were fetched from.
+	Source string `json:"source"`
+}
+
+// RootAuthorityIdpKeySnapshotSchema defines model for RootAuthorityIdpKeySnapshot.Schema.
+type RootAuthorityIdpKeySnapshotSchema string
+
+// RootAuthorityRevocationRequest `chio.revocation-request.v1` (PROTOCOL 5.6.7), signed by `revoker_key` over the signing wrapper. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
+type RootAuthorityRevocationRequest struct {
+	IssuedAt int64 `json:"issued_at"`
+
+	// PresentationDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	PresentationDigest RootAuthorityRootAnchorDigest `json:"presentation_digest"`
+	Reason             string                        `json:"reason"`
+
+	// RevokerKey Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+	RevokerKey RootAuthorityRootAnchorPublicKeyHex  `json:"revoker_key"`
+	Schema     RootAuthorityRevocationRequestSchema `json:"schema"`
+
+	// Signature Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+	Signature          RootAuthorityRootAnchorSignatureHex `json:"signature"`
+	TargetCapabilityId string                              `json:"target_capability_id"`
+}
+
+// RootAuthorityRevocationRequestSchema defines model for RootAuthorityRevocationRequest.Schema.
+type RootAuthorityRevocationRequestSchema string
+
+// RootAuthorityRootAnchor The `root_anchor` member of a root `chio.capability.v1` body (PROTOCOL 5.6.1). A delegated token copies it byte for byte from its root. The `$defs` here are shared by every root-authority schema.
+type RootAuthorityRootAnchor struct {
+	// AnchoredAt Unix seconds. Equals `exchange.exchanged_at` of the delegation context.
+	AnchoredAt int64 `json:"anchored_at"`
+
+	// AssertionExp Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it.
+	AssertionExp int64 `json:"assertion_exp"`
+
+	// ContextDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	ContextDigest RootAuthorityRootAnchorDigest `json:"context_digest"`
+
+	// Kind Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+	Kind RootAuthorityRootAnchorAnchorKind `json:"kind"`
+
+	// RootPolicyDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	RootPolicyDigest RootAuthorityRootAnchorDigest `json:"root_policy_digest"`
+}
+
+// RootAuthorityRootAnchorAnchorKind Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+type RootAuthorityRootAnchorAnchorKind string
+
+// RootAuthorityRootAnchorCommitment A salted commitment whose salt is held in the disclosure store under `salt_ref`.
+type RootAuthorityRootAnchorCommitment struct {
+	// Commit SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	Commit  RootAuthorityRootAnchorDigest `json:"commit"`
+	SaltRef string                        `json:"salt_ref"`
+}
+
+// RootAuthorityRootAnchorDigest SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+type RootAuthorityRootAnchorDigest = string
+
+// RootAuthorityRootAnchorHolderClass Who holds the root capability's subject key (PROTOCOL 5.6.6).
+type RootAuthorityRootAnchorHolderClass string
+
+// RootAuthorityRootAnchorJwk A public JSON Web Key. Private key members are not admitted.
+type RootAuthorityRootAnchorJwk struct {
+	// Alg Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+	Alg *RootAuthorityRootAnchorJwsAlgorithm `json:"alg,omitempty"`
+	Crv *RootAuthorityRootAnchorJwkCrv       `json:"crv,omitempty"`
+	E   *string                              `json:"e,omitempty"`
+	Kid string                               `json:"kid"`
+	Kty RootAuthorityRootAnchorJwkKty        `json:"kty"`
+	N   *string                              `json:"n,omitempty"`
+	Use *RootAuthorityRootAnchorJwkUse       `json:"use,omitempty"`
+	X   *string                              `json:"x,omitempty"`
+	Y   *string                              `json:"y,omitempty"`
+}
+
+// RootAuthorityRootAnchorJwkCrv defines model for RootAuthorityRootAnchorJwk.Crv.
+type RootAuthorityRootAnchorJwkCrv string
+
+// RootAuthorityRootAnchorJwkKty defines model for RootAuthorityRootAnchorJwk.Kty.
+type RootAuthorityRootAnchorJwkKty string
+
+// RootAuthorityRootAnchorJwkUse defines model for RootAuthorityRootAnchorJwk.Use.
+type RootAuthorityRootAnchorJwkUse string
+
+// RootAuthorityRootAnchorJwsAlgorithm Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+type RootAuthorityRootAnchorJwsAlgorithm string
+
+// RootAuthorityRootAnchorPublicKeyHex Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+type RootAuthorityRootAnchorPublicKeyHex = string
+
+// RootAuthorityRootAnchorSalt A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+type RootAuthorityRootAnchorSalt = string
+
+// RootAuthorityRootAnchorSignatureHex Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+type RootAuthorityRootAnchorSignatureHex = string
+
+// RootAuthorityRootPolicy `chio.root-policy.v1` (PROTOCOL 5.6.4), signed by the provider's policy key over the signing wrapper. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts.
+type RootAuthorityRootPolicy struct {
+	Disclosure   RootAuthorityRootPolicyRootPolicyDisclosure `json:"disclosure"`
+	ExchangeKeys []RootAuthorityRootAnchorPublicKeyHex       `json:"exchange_keys"`
+	PolicyId     string                                      `json:"policy_id"`
+
+	// PolicyKey Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+	PolicyKey RootAuthorityRootAnchorPublicKeyHex     `json:"policy_key"`
+	Rules     []RootAuthorityRootPolicyRootPolicyRule `json:"rules"`
+	Schema    RootAuthorityRootPolicySchema           `json:"schema"`
+
+	// Signature Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+	Signature  RootAuthorityRootAnchorSignatureHex `json:"signature"`
+	ValidFrom  int64                               `json:"valid_from"`
+	ValidUntil int64                               `json:"valid_until"`
+}
+
+// RootAuthorityRootPolicySchema defines model for RootAuthorityRootPolicy.Schema.
+type RootAuthorityRootPolicySchema string
+
+// RootAuthorityRootPolicyInlineFields defines model for RootAuthorityRootPolicyInlineFields.
+type RootAuthorityRootPolicyInlineFields struct {
+	InlineFields []string `json:"inline_fields"`
+}
+
+// RootAuthorityRootPolicyRootPolicyDisclosure defines model for RootAuthorityRootPolicyRootPolicyDisclosure.
+type RootAuthorityRootPolicyRootPolicyDisclosure struct {
+	// Default The only allowed value.
+	Default RootAuthorityRootPolicyRootPolicyDisclosureDefault `json:"default"`
+
+	// Tools `server/tool` to the RFC 6901 pointers that may appear in plaintext in that tool's receipts. A tool not listed is fully committed.
+	Tools *map[string]RootAuthorityRootPolicyToolDisclosure `json:"tools,omitempty"`
+}
+
+// RootAuthorityRootPolicyRootPolicyDisclosureDefault The only allowed value.
+type RootAuthorityRootPolicyRootPolicyDisclosureDefault string
+
+// RootAuthorityRootPolicyRootPolicyMatch defines model for RootAuthorityRootPolicyRootPolicyMatch.
+type RootAuthorityRootPolicyRootPolicyMatch struct {
+	AllowedAlgs *[]RootAuthorityRootAnchorJwsAlgorithm `json:"allowed_algs,omitempty"`
+
+	// AnchorKind Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+	AnchorKind RootAuthorityRootAnchorAnchorKind `json:"anchor_kind"`
+
+	// Claims Claim name to the values it must take for the rule to match.
+	Claims *map[string][]string `json:"claims,omitempty"`
+	Issuer string               `json:"issuer"`
+
+	// JwksUri Required for every JWKS-verified kind. Keys are fetched only from it.
+	JwksUri *string `json:"jwks_uri,omitempty"`
+}
+
+// RootAuthorityRootPolicyRootPolicyRule defines model for RootAuthorityRootPolicyRootPolicyRule.
+type RootAuthorityRootPolicyRootPolicyRule struct {
+	// CapabilityTtlSecs Defaults to 300.
+	CapabilityTtlSecs *int64 `json:"capability_ttl_secs,omitempty"`
+
+	// CeilingScope What a capability token authorizes. Mirrors `ChioScope` in `chio-core-types`.
+	CeilingScope CapabilityTokenChioScope `json:"ceiling_scope"`
+
+	// CeilingScopeHash SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+	CeilingScopeHash RootAuthorityRootAnchorDigest        `json:"ceiling_scope_hash"`
+	HolderClasses    []RootAuthorityRootAnchorHolderClass `json:"holder_classes"`
+
+	// IdpScopeProjection Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.
+	IdpScopeProjection *map[string][]string                   `json:"idp_scope_projection,omitempty"`
+	Match              RootAuthorityRootPolicyRootPolicyMatch `json:"match"`
+
+	// MaxAssertionLifetimeSecs Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.
+	MaxAssertionLifetimeSecs *int64 `json:"max_assertion_lifetime_secs,omitempty"`
+	MaxClockSkewSecs         *int64 `json:"max_clock_skew_secs,omitempty"`
+
+	// Principal Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind.
+	Principal *string `json:"principal,omitempty"`
+
+	// RecordedClaims Claims copied into the delegation context, each plain or committed.
+	RecordedClaims map[string]RootAuthorityRootPolicyRootPolicyRuleRecordedClaims `json:"recorded_claims"`
+
+	// RetainIdpArtifact Allowed only on `oauth_id_jag` rules.
+	RetainIdpArtifact *bool  `json:"retain_idp_artifact,omitempty"`
+	RuleId            string `json:"rule_id"`
+
+	// TenantClaim Claim that identifies the caller's tenant (`iss` for per-organization issuers, `tid` for Entra).
+	TenantClaim *string `json:"tenant_claim,omitempty"`
+
+	// TenantValue Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind.
+	TenantValue *string `json:"tenant_value,omitempty"`
+}
+
+// RootAuthorityRootPolicyRootPolicyRuleRecordedClaims defines model for RootAuthorityRootPolicyRootPolicyRule.RecordedClaims.
+type RootAuthorityRootPolicyRootPolicyRuleRecordedClaims string
+
+// RootAuthorityRootPolicyToolDisclosure defines model for RootAuthorityRootPolicyToolDisclosure.
+type RootAuthorityRootPolicyToolDisclosure struct {
+	Parameters RootAuthorityRootPolicyInlineFields `json:"parameters"`
+	Result     RootAuthorityRootPolicyInlineFields `json:"result"`
+}
+
+// RootAuthorityVerifierTrust `chio.verifier-trust.v1` (PROTOCOL 5.6.8): a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
+type RootAuthorityVerifierTrust struct {
+	CheckpointKeys *[]RootAuthorityRootAnchorPublicKeyHex `json:"checkpoint_keys,omitempty"`
+	ExchangeKeys   []RootAuthorityRootAnchorPublicKeyHex  `json:"exchange_keys"`
+
+	// IdpKeys Issuer to the identity-provider keys the verifier pins itself.
+	IdpKeys    *map[string][]RootAuthorityRootAnchorJwk `json:"idp_keys,omitempty"`
+	KernelKeys []RootAuthorityRootAnchorPublicKeyHex    `json:"kernel_keys"`
+
+	// PepKeys Policy enforcement point id to its pinned key.
+	PepKeys         *map[string]RootAuthorityRootAnchorPublicKeyHex `json:"pep_keys,omitempty"`
+	RequiredColumns *[]RootAuthorityVerifierTrustRequiredColumns    `json:"required_columns,omitempty"`
+	RootPolicyKeys  []RootAuthorityRootAnchorPublicKeyHex           `json:"root_policy_keys"`
+	Schema          RootAuthorityVerifierTrustSchema                `json:"schema"`
+}
+
+// RootAuthorityVerifierTrustRequiredColumns defines model for RootAuthorityVerifierTrust.RequiredColumns.
+type RootAuthorityVerifierTrustRequiredColumns string
+
+// RootAuthorityVerifierTrustSchema defines model for RootAuthorityVerifierTrust.Schema.
+type RootAuthorityVerifierTrustSchema string
 
 // SecurityBrokerAdminControlReceiptBodyV1 defines model for SecurityBrokerAdminControlReceiptBodyV1.
 type SecurityBrokerAdminControlReceiptBodyV1 struct {

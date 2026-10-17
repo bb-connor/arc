@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: f4a0d25218cff7721aa90d06d0f8f2517e35590d797482dabac2db29091fe271
+# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -12,22 +12,27 @@ from __future__ import annotations
 
 from .admission_metadata_schema import ChioDurableAdmissionReceiptMetadata, CompensationStatus, Digest, DispatchCommit, DispatchLaunch, Identifier, LaunchRef, NativeLaunch, PositiveIJsonInteger, ProjectedDispatchState, ProjectedState, ProviderAttempt, StoreFence, WorkerProfile
 from .delivery_contract_schema import ChioDeliveryContractReceiptMetadata, Digest, Result
+from .disclosure_schema import ChioReceiptDisclosure, Opening
 from .finding_delivery_schema import ChioFindingDeliveryReceiptMetadata, Digest, DigestCheck, HierarchicalIdentifier, IJsonU64NonZero, Identifier, MediaTypeCheck, SettlementMode, StatusProof, TransformProfile
 from .inclusion_proof_schema import ChioReceiptMerkleInclusionProof
 from .lineage_statement_schema import ChioReceiptLineageStatement, EvidenceClass, RelationKind, SessionAnchorReference
 from .record_schema import ActorRef, Algorithm, BbsReceiptSignature, BoundaryClass, ChioReceiptRecord, Decision, Decision3, Decision4, Decision5, Decision6, GuardEvidence, ObservationOutcome, ReceiptKind, RedactionMode, ToolCallAction, ToolOrigin, TrustLevel
+from .settlement_closure_schema import Asset, ChioSettlementClosure, Kind, Rail, RailRef, SettlementState
 
 __all__ = [
     "ActorRef",
     "Algorithm",
+    "Asset",
     "BbsReceiptSignature",
     "BoundaryClass",
     "ChioDeliveryContractReceiptMetadata",
     "ChioDurableAdmissionReceiptMetadata",
     "ChioFindingDeliveryReceiptMetadata",
+    "ChioReceiptDisclosure",
     "ChioReceiptLineageStatement",
     "ChioReceiptMerkleInclusionProof",
     "ChioReceiptRecord",
+    "ChioSettlementClosure",
     "CompensationStatus",
     "Decision",
     "Decision3",
@@ -43,20 +48,25 @@ __all__ = [
     "HierarchicalIdentifier",
     "IJsonU64NonZero",
     "Identifier",
+    "Kind",
     "LaunchRef",
     "MediaTypeCheck",
     "NativeLaunch",
     "ObservationOutcome",
+    "Opening",
     "PositiveIJsonInteger",
     "ProjectedDispatchState",
     "ProjectedState",
     "ProviderAttempt",
+    "Rail",
+    "RailRef",
     "ReceiptKind",
     "RedactionMode",
     "RelationKind",
     "Result",
     "SessionAnchorReference",
     "SettlementMode",
+    "SettlementState",
     "StatusProof",
     "StoreFence",
     "ToolCallAction",
