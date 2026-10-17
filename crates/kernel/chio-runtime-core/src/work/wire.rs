@@ -80,7 +80,9 @@ pub struct WorkJoinDraftRefV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkOwnerOperationRefV1 {
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub operation: OperationRef,
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub scope: RecoveryScopeV1,
 }
 
@@ -290,6 +292,7 @@ pub enum WorkAppliedV1 {
         view: Box<WorkViewV1>,
     },
     CancelObserved {
+        #[serde(deserialize_with = "super::decode::recovery_contract")]
         control: WorkflowControlV1,
     },
 }
@@ -420,7 +423,9 @@ pub enum WorkAcceptanceDecisionV1 {
 #[serde(deny_unknown_fields)]
 pub struct WorkAcceptanceV1 {
     pub handle: WorkHandleV1,
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub producer: OperationRef,
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub artifact: ArtifactVersionRefV1,
     pub artifact_digest: WorkArtifactDigest,
     pub contract_digest: ContractDigest,
@@ -433,7 +438,9 @@ pub struct WorkAcceptanceV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorkResultReferenceV1 {
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub artifact: ArtifactVersionRefV1,
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub release: ReleaseDispositionV1,
 }
 
@@ -496,9 +503,11 @@ pub enum WorkObservationV1<T> {
 #[serde(deny_unknown_fields)]
 pub struct WorkViewV1 {
     pub handle: WorkHandleV1,
+    #[serde(deserialize_with = "super::decode::recovery_observation")]
     pub execution: WorkObservationV1<EffectObservationV1>,
     pub acceptance: WorkObservationV1<WorkAcceptanceV1>,
     pub result_reference: WorkObservationV1<WorkResultReferenceV1>,
+    #[serde(deserialize_with = "super::decode::recovery_observation")]
     pub recovery: WorkObservationV1<WorkRecoveryLinkV1>,
     pub settlement: WorkObservationV1<WorkSettlementRefV1>,
     pub bilateral_delivery: WorkObservationV1<WorkDeliveryRefV1>,
@@ -563,6 +572,7 @@ pub struct WorkResponseV1 {
 pub struct WorkJoinParentV1 {
     pub task_id: WorkTaskId,
     pub receipt_id: WorkReceiptId,
+    #[serde(deserialize_with = "super::decode::recovery_contract")]
     pub artifact_ref: ArtifactVersionRefV1,
     pub artifact_digest: WorkArtifactDigest,
     pub acceptance_evidence_digest: WorkEvidenceDigest,

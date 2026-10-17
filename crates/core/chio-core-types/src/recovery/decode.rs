@@ -82,6 +82,13 @@ pub fn decode_contract_with_limits<T: DeserializeOwned + Serialize>(
     Ok(typed)
 }
 
+/// Charges a contract embedded in a larger document at the default limits,
+/// over the canonical bytes `decode_contract` would read.
+pub fn check_contract_limits(value: &serde_json::Value) -> Result<(), ContractError> {
+    let canonical = crate::canonical::canonicalize(value).map_err(|_| ContractError::Malformed)?;
+    super::preflight::check(canonical.as_bytes(), RecoveryDecodeLimits::default())
+}
+
 /// Capability tokens sign their canonical body, so their exported envelope may
 /// carry any whitespace. Intake is bounded, lossless and closed before the
 /// kernel's capability verifier evaluates authority.
