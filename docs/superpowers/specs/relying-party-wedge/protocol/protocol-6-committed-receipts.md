@@ -61,9 +61,16 @@ Commitments:
   length, so the concatenation is unambiguous.
 - A verifier selects the domain from the commitment's position in the receipt,
   never from the opening.
-- For stream outputs the content preimage is the concatenated per-chunk digest
-  preimage. Per-chunk digests are not written to any signed field, metadata or
-  evidence, because they are unsalted.
+- The content preimage has three forms. A value output uses the canonical JSON
+  of the result. An empty output (no result) uses the zero-length byte string,
+  so its commitment is `SHA-256(domain || salt)`. A stream output uses the
+  concatenation of the lowercase hex SHA-256 of each canonical chunk; a stream
+  with no chunks is an empty output. A verifier derives the preimage from its
+  own copy of the output (or from the absence of one) and never from an
+  opening's `payload`: a `payload: null` opening is salt only and supplies no
+  preimage, so the literal `null` is never an output preimage. Per-chunk
+  digests are not written to any signed field, metadata or evidence, because
+  they are unsalted.
 - Salts are never in the signed body. They are returned to the producer's host
   with the signed receipt and written to the disclosure store keyed by
   `(receipt_id, salt_ref)` where a store exists.
@@ -113,7 +120,7 @@ An unsigned, self-verifying opening:
 ```json
 {
   "schema": "chio.receipt-disclosure.v1",
-  "receipt_id": "rcpt_sha256:...",
+  "receipt_id": "5a1f...c4",
   "openings": [
     { "salt_ref": "params", "salt": "b64u:...", "payload": null },
     { "salt_ref": "content", "salt": "b64u:...", "payload": { "...": "canonical result" } },
@@ -127,6 +134,9 @@ An unsigned, self-verifying opening:
   to the enforcement point that sent the arguments (section 6.1).
 - A verifier opens a commitment by recomputing it. A mismatch marks that field
   `rejected` and the receipt as tampered disclosure.
+- A verifier rejects an opening document in which the same `salt` value appears
+  for more than one `salt_ref`, and marks the receipt as tampered disclosure. A
+  producer draws a fresh salt for every field.
 - Deleting a receipt's openings from the disclosure store makes its
   commitments permanently hiding and leaves the signed receipt valid.
 
