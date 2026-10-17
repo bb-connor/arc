@@ -181,6 +181,7 @@ TENANT_DOMAIN = b"chio.delegation-context.tenant.v1\x00"
 CONTEXT_DIGEST_DOMAIN = b"chio.delegation-context.v1\x00"
 ROOT_POLICY_DIGEST_DOMAIN = b"chio.root-policy.v1\x00"
 CHAIN_DIGEST_DOMAIN = b"chio.receipt.chain-digest.v1\x00"
+PROVIDER_IDENTITY_DIGEST_DOMAIN = b"chio.enterprise-provider-identity.v1\x00"
 
 COMMITMENT_DOMAINS = {
     "params": PARAMETERS_DOMAIN,
@@ -649,6 +650,10 @@ def delegation_context(subject: str, tenant: str, exchange_key: str) -> dict:
             "key_snapshot_digest": digest_str(b"fixture:idp-key-snapshot"),
             "kid": "k-fixture-1",
             "kind": "oauth_id_jag",
+            "provider_identity_digest": digest_str(
+                PROVIDER_IDENTITY_DIGEST_DOMAIN + canonical_json(FIXTURE_PROVIDER_IDENTITY)
+            ),
+            "provider_record_id": FIXTURE_PROVIDER_IDENTITY["provider_id"],
             "replay_key_digest": digest_str(b"fixture:replay-key"),
             "subject": {
                 "commit": commitment(SUBJECT_DOMAIN, FIXTURE_SALTS["anchor.sub"], subject.encode("utf-8")),
@@ -680,6 +685,18 @@ STREAM_CHUNKS = [{"delta": "Road"}, {"delta": "map"}]
 SUBJECT_VALUE = "00u1fixturesubject"
 TENANT_VALUE = "tenant-fixture"
 FIXTURE_ROOT_POLICY_BODY = {"policy_id": "fixture-policy", "schema": "chio.root-policy.v1"}
+# Synthetic enterprise provider record identity projection; the delegation
+# context pins its digest the way a root policy rule does.
+FIXTURE_PROVIDER_IDENTITY = {
+    "audiences": [],
+    "issuer": "https://idp.fixture.example",
+    "jwks_url": "https://idp.fixture.example/oauth2/v1/keys",
+    "kind": "oidc_jwks",
+    "provider_id": "fixture-provider",
+    "schema": "chio.enterprise-provider-identity.v1",
+    "subject_mapping": {"principal_source": "sub", "tenant_id_field": "iss"},
+    "trust_material_ref": "fixture-trust-material",
+}
 FIXTURE_ROOT_TOKEN = {"fixture": "root-capability-placeholder", "id": "cap-fixture-root"}
 
 
@@ -1076,6 +1093,7 @@ def build_committed_document(keys: Keys, known: frozenset[str]) -> dict:
         "cases": cases,
         "commitment_domains": {ref: domain.decode("ascii").replace("\x00", "\\0") for ref, domain in COMMITMENT_DOMAINS.items()},
         "fixture_material": "Every key, salt and body in this file is a fixed test fixture. Production salts are 32 fresh bytes per receipt per field.",
+        "fixture_provider_identity": FIXTURE_PROVIDER_IDENTITY,
         "fixture_salts": {ref: salt.hex() for ref, salt in FIXTURE_SALTS.items()},
         "generated_by": GENERATED_BY,
         "generator": GENERATOR,
