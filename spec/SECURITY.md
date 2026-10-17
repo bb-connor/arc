@@ -321,8 +321,8 @@ Residual risk:
 - regex-based pattern detection is inherently incomplete; novel PII formats
   or obfuscated values (base64-encoded SSNs, split across fields) may evade
   detection
-- the ICD-10 pattern may produce false positives on short alphanumeric strings
-  in non-medical contexts
+- the medical record number detector requires an `MRN` marker; unmarked
+  record numbers and other local identifiers need operator denylist patterns
 - image or binary content in tool responses is not scanned
 
 ### 2.9 Agent Velocity Abuse

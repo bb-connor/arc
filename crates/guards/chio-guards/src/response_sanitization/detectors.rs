@@ -226,7 +226,7 @@ pub(super) fn build_compiled_patterns() -> Result<Vec<CompiledPattern>, regex::E
             category: SensitiveCategory::Pii,
             data_type: "medical_record_number",
             confidence: 0.9,
-            recommended: RedactionStrategy::Mask,
+            recommended: RedactionStrategy::Drop,
             regex: compile_required_pattern(r"(?i)\bMRN[:\s#]*\d{6,12}\b")?,
             validator: None,
         },

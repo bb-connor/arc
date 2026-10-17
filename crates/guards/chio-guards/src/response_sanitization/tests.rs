@@ -30,6 +30,20 @@ fn redacts_medical_record_number() {
 }
 
 #[test]
+fn medical_record_number_is_dropped_whole() {
+    let sanitizer = OutputSanitizer::new();
+    assert_eq!(sanitizer.sanitize_text("MRN 123456789").sanitized, "");
+    assert_eq!(
+        sanitizer
+            .sanitize_text("Patient MRN 123456789 admitted")
+            .sanitized,
+        "Patient  admitted"
+    );
+    let value = sanitizer.sanitize_value(&serde_json::json!({"mrn": "MRN 123456789"}));
+    assert_eq!(value.value, serde_json::json!({"mrn": null}));
+}
+
+#[test]
 fn medical_record_number_requires_marker_and_digit_count() {
     let sanitizer = OutputSanitizer::new();
     for input in ["MRN 12345", "SMRN 1234567", "MRN 1234567890123"] {
