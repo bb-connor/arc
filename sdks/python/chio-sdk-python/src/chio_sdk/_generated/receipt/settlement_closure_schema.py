@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
+# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -55,7 +55,7 @@ class RailRef(BaseModel):
         extra="forbid",
     )
     kind: Kind
-    id: constr(min_length=1) | None = None
+    id: constr(pattern=r"^[^\u0000]+$", min_length=1, max_length=256) | None = None
     digest: root_anchor_schema.Digest = Field(
         ..., description="Digest over the canonical JSON of the decoded base64 payload."
     )
@@ -63,7 +63,7 @@ class RailRef(BaseModel):
 
 class ChioSettlementClosure(BaseModel):
     """
-    `chio.settlement-closure.v1` (PROTOCOL 6.7), signed by the kernel key over the signing wrapper. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
+    `chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
     """
 
     model_config = ConfigDict(
@@ -71,14 +71,14 @@ class ChioSettlementClosure(BaseModel):
     )
     schema_: Literal["chio.settlement-closure.v1"] = Field(..., alias="schema")
     terminal_receipt_id: constr(pattern=r"^[0-9a-f]{64}$")
-    hold_id: constr(min_length=1)
+    hold_id: root_anchor_schema.Identifier
     rail: Rail
     state: SettlementState
     asset: Asset
-    amount: constr(pattern=r"^(0|[1-9][0-9]*)$") = Field(
+    amount: constr(pattern=r"^(0|[1-9][0-9]{0,38})$", max_length=39) = Field(
         ..., description="Integer minor units as a decimal string."
     )
-    rail_refs: list[RailRef] = Field(..., min_length=1)
+    rail_refs: list[RailRef] = Field(..., max_length=8, min_length=1)
     observed_at: conint(ge=0)
     kernel_key: root_anchor_schema.PublicKeyHex
     signature: root_anchor_schema.SignatureHex

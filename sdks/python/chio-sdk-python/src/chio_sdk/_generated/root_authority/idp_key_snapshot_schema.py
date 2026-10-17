@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
+# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -20,18 +20,21 @@ from . import root_anchor_schema
 
 class ChioIdpKeySnapshot(BaseModel):
     """
-    `chio.idp-key-snapshot.v1` (PROTOCOL 5.6.4), signed by the exchange key over the signing wrapper. It records the key set the exchange fetched from an identity provider and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement, not identity-provider evidence.
+    `chio.idp-key-snapshot.v1`, signed by the exchange key. It records the key set the exchange fetched for an enterprise provider record, or took from the record's inline `jwks`, and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement of what the identity provider published, not identity-provider evidence.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     schema_: Literal["chio.idp-key-snapshot.v1"] = Field(..., alias="schema")
-    issuer: constr(min_length=1)
-    source: constr(pattern=r"^https://[^\s]+$") = Field(
-        ..., description="The pinned `jwks_uri` the keys were fetched from."
+    issuer: root_anchor_schema.Uri
+    source: root_anchor_schema.HttpsUrl | constr(
+        pattern=r"^registry:[^\u0000\s]{1,128}$", max_length=137
+    ) = Field(
+        ...,
+        description="The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.",
     )
-    keys: list[root_anchor_schema.Jwk]
+    keys: list[root_anchor_schema.Jwk] = Field(..., max_length=64)
     observed_at: conint(ge=0)
     exchange_key: root_anchor_schema.PublicKeyHex
     signature: root_anchor_schema.SignatureHex

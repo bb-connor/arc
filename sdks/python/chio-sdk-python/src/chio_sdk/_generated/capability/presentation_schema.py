@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
+# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -21,7 +21,7 @@ from . import token_schema
 
 class ChioCapabilityPresentation(BaseModel):
     """
-    `chio.capability-presentation.v1` (PROTOCOL 5.6.5), carried in MCP `_meta.chioCapability`. The envelope is unsigned; every member inside is verified independently.
+    `chio.capability-presentation.v1`, carried in MCP `_meta.chioCapability`: a leaf capability, its signed ancestors and, when the presenter is not the session holder, the delegation context. The envelope is unsigned; every member inside is verified independently. Decoding is strict.
     """
 
     model_config = ConfigDict(
@@ -31,7 +31,8 @@ class ChioCapabilityPresentation(BaseModel):
     leaf: token_schema.ChioCapabilitytoken
     ancestors: list[token_schema.ChioCapabilitytoken] = Field(
         ...,
-        description="Signed ancestors ordered root to parent. A root presented alone has an empty list.",
+        description="Signed ancestors ordered root to parent, at most 16. A root presented alone has an empty list.",
+        max_length=16,
     )
     delegation_context: delegation_context_schema.ChioDelegationContext | None = Field(
         None,

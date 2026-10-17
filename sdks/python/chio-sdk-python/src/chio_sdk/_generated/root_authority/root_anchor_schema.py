@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
+# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, RootModel, conint, constr
 
 class AnchorKind(Enum):
     """
-    Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     """
 
     oauth_id_jag = "oauth_id_jag"
@@ -29,6 +29,31 @@ class AnchorKind(Enum):
     chio_local_as = "chio_local_as"
     chio_operator_key = "chio_operator_key"
     operator_static_bearer = "operator_static_bearer"
+
+
+class Identifier(
+    RootModel[constr(pattern=r"^[^\u0000]+$", min_length=1, max_length=128)]
+):
+    root: constr(pattern=r"^[^\u0000]+$", min_length=1, max_length=128) = Field(
+        ...,
+        description="A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    )
+
+
+class Text(RootModel[constr(pattern=r"^[^\u0000]+$", min_length=1, max_length=1024)]):
+    root: constr(pattern=r"^[^\u0000]+$", min_length=1, max_length=1024) = Field(
+        ..., description="A bounded NUL-free string."
+    )
+
+
+class Uri(RootModel[constr(pattern=r"^[^\u0000\s]+$", min_length=1, max_length=2048)]):
+    root: constr(pattern=r"^[^\u0000\s]+$", min_length=1, max_length=2048) = Field(
+        ..., description="A bounded URI or URN, such as an issuer."
+    )
+
+
+class HttpsUrl(RootModel[constr(pattern=r"^https://[^\u0000\s]+$", max_length=2048)]):
+    root: constr(pattern=r"^https://[^\u0000\s]+$", max_length=2048)
 
 
 class Digest(RootModel[constr(pattern=r"^sha256:[0-9a-f]{64}$")]):
@@ -45,6 +70,12 @@ class Salt(RootModel[constr(pattern=r"^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$
     )
 
 
+class SaltRef(
+    RootModel[constr(pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$", max_length=64)]
+):
+    root: constr(pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$", max_length=64)
+
+
 class PublicKeyHex(
     RootModel[
         constr(
@@ -56,22 +87,22 @@ class PublicKeyHex(
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     ) = Field(
         ...,
-        description="Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+        description="Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     )
 
 
 class SignatureHex(
     RootModel[
         constr(
-            pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
+            pattern=r"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
         )
     ]
 ):
     root: constr(
-        pattern=r"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
+        pattern=r"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\+mldsa65)$"
     ) = Field(
         ...,
-        description="Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+        description="Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     )
 
 
@@ -84,16 +115,42 @@ class Commitment(BaseModel):
         extra="forbid",
     )
     commit: Digest
-    salt_ref: constr(pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$")
+    salt_ref: SaltRef
 
 
 class HolderClass(Enum):
     """
-    Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     """
 
     edge_session = "edge_session"
     caller = "caller"
+
+
+class ClaimValue(RootModel[Text | list[Text] | Commitment]):
+    root: Text | list[Text] | Commitment = Field(
+        ...,
+        description="A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    )
+
+
+class RecordedClaims(BaseModel):
+    """
+    The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    client_id: ClaimValue | None = None
+    scope: ClaimValue | None = None
+    sub: ClaimValue | None = None
+    aud: ClaimValue | None = None
+    resource: ClaimValue | None = None
+    azp: ClaimValue | None = None
+    appid: ClaimValue | None = None
+    oid: ClaimValue | None = None
+    tid: ClaimValue | None = None
 
 
 class Kty(Enum):
@@ -111,6 +168,10 @@ class Crv(Enum):
     P_384 = "P-384"
     P_521 = "P-521"
     Ed25519 = "Ed25519"
+
+
+class X5cItem(RootModel[constr(pattern=r"^[A-Za-z0-9+/]+={0,2}$", max_length=16384)]):
+    root: constr(pattern=r"^[A-Za-z0-9+/]+={0,2}$", max_length=16384)
 
 
 class JwsAlgorithm(Enum):
@@ -132,7 +193,7 @@ class JwsAlgorithm(Enum):
 
 class ChioRootAnchor(BaseModel):
     """
-    The `root_anchor` member of a root `chio.capability.v1` body (PROTOCOL 5.6.1). A delegated token copies it byte for byte from its root. The `$defs` here are shared by every root-authority schema.
+    The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
     """
 
     model_config = ConfigDict(
@@ -159,18 +220,25 @@ class ChioRootAnchor(BaseModel):
 
 class Jwk(BaseModel):
     """
-    A public JSON Web Key. Private key members are not admitted.
+    A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
-    kid: constr(min_length=1)
+    kid: Identifier
     kty: Kty
     alg: JwsAlgorithm | None = None
     use: Use | None = None
-    n: constr(pattern=r"^[A-Za-z0-9_-]+$") | None = None
-    e: constr(pattern=r"^[A-Za-z0-9_-]+$") | None = None
+    n: constr(pattern=r"^[A-Za-z0-9_-]+$", max_length=1400) | None = None
+    e: constr(pattern=r"^[A-Za-z0-9_-]+$", max_length=16) | None = None
     crv: Crv | None = None
-    x: constr(pattern=r"^[A-Za-z0-9_-]+$") | None = None
-    y: constr(pattern=r"^[A-Za-z0-9_-]+$") | None = None
+    x: constr(pattern=r"^[A-Za-z0-9_-]+$", max_length=128) | None = None
+    y: constr(pattern=r"^[A-Za-z0-9_-]+$", max_length=128) | None = None
+    x5c: list[X5cItem] | None = Field(None, max_length=8)
+    x5t: constr(pattern=r"^[A-Za-z0-9_-]+$", max_length=64) | None = None
+    x5t_S256: constr(pattern=r"^[A-Za-z0-9_-]+$", max_length=64) | None = Field(
+        None, alias="x5t#S256"
+    )
+    issuer: Uri | None = None
+    cloud_instance_name: Identifier | None = None

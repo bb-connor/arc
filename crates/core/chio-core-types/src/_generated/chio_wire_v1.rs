@@ -15158,13 +15158,13 @@ pub mod capability_presentation {
             value.parse()
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -16509,7 +16509,7 @@ pub mod capability_presentation {
             value.clone()
         }
     }
-    ///`chio.capability-presentation.v1` (PROTOCOL 5.6.5), carried in MCP `_meta.chioCapability`. The envelope is unsigned; every member inside is verified independently.
+    ///`chio.capability-presentation.v1`, carried in MCP `_meta.chioCapability`: a leaf capability, its signed ancestors and, when the presenter is not the session holder, the delegation context. The envelope is unsigned; every member inside is verified independently. Decoding is strict.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -16517,7 +16517,7 @@ pub mod capability_presentation {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/presentation.schema.json",
     ///  "title": "Chio Capability Presentation",
-    ///  "description": "`chio.capability-presentation.v1` (PROTOCOL 5.6.5), carried in MCP `_meta.chioCapability`. The envelope is unsigned; every member inside is verified independently.",
+    ///  "description": "`chio.capability-presentation.v1`, carried in MCP `_meta.chioCapability`: a leaf capability, its signed ancestors and, when the presenter is not the session holder, the delegation context. The envelope is unsigned; every member inside is verified independently. Decoding is strict.",
     ///  "type": "object",
     ///  "required": [
     ///    "ancestors",
@@ -16526,7 +16526,7 @@ pub mod capability_presentation {
     ///  ],
     ///  "properties": {
     ///    "ancestors": {
-    ///      "description": "Signed ancestors ordered root to parent. A root presented alone has an empty list.",
+    ///      "description": "Signed ancestors ordered root to parent, at most 16. A root presented alone has an empty list.",
     ///      "type": "array",
     ///      "items": {
     ///        "title": "Chio CapabilityToken",
@@ -16730,11 +16730,12 @@ pub mod capability_presentation {
     ///          }
     ///        },
     ///        "additionalProperties": false
-    ///      }
+    ///      },
+    ///      "maxItems": 16
     ///    },
     ///    "delegation_context": {
     ///      "title": "Chio Delegation Context",
-    ///      "description": "`chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.",
+    ///      "description": "`chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.",
     ///      "type": "object",
     ///      "required": [
     ///        "anchor",
@@ -16756,9 +16757,11 @@ pub mod capability_presentation {
     ///          "$ref": "#/$defs/DelegationExchange"
     ///        },
     ///        "root_policy_rule_id": {
-    ///          "description": "`rule_id` of the root policy rule that matched.",
+    ///          "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///          "type": "string",
-    ///          "minLength": 1
+    ///          "maxLength": 128,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\u0000]+$"
     ///        },
     ///        "schema": {
     ///          "type": "string",
@@ -16982,7 +16985,7 @@ pub mod capability_presentation {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioCapabilityPresentation {
-        ///Signed ancestors ordered root to parent. A root presented alone has an empty list.
+        ///Signed ancestors ordered root to parent, at most 16. A root presented alone has an empty list.
         pub ancestors: ::std::vec::Vec<ChioCapabilityToken>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub delegation_context: ::std::option::Option<ChioDelegationContext>,
@@ -18368,14 +18371,14 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///`chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.
+    ///`chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
     ///  "title": "Chio Delegation Context",
-    ///  "description": "`chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.",
+    ///  "description": "`chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.",
     ///  "type": "object",
     ///  "required": [
     ///    "anchor",
@@ -18397,9 +18400,11 @@ pub mod capability_presentation {
     ///      "$ref": "#/$defs/DelegationExchange"
     ///    },
     ///    "root_policy_rule_id": {
-    ///      "description": "`rule_id` of the root policy rule that matched.",
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "schema": {
     ///      "type": "string",
@@ -18417,7 +18422,7 @@ pub mod capability_presentation {
         ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
         pub effective_root_scope_hash: ChioDelegationContextEffectiveRootScopeHash,
         pub exchange: DelegationExchange,
-        ///`rule_id` of the root policy rule that matched.
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         pub root_policy_rule_id: ChioDelegationContextRootPolicyRuleId,
         pub schema: ::std::string::String,
     }
@@ -18510,15 +18515,17 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///`rule_id` of the root policy rule that matched.
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "`rule_id` of the root policy rule that matched.",
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -18546,8 +18553,16 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for ChioDelegationContextRootPolicyRuleId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -18642,6 +18657,58 @@ pub mod capability_presentation {
             }
         }
     }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -18659,8 +18726,7 @@ pub mod capability_presentation {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -18671,88 +18737,11 @@ pub mod capability_presentation {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///`Constraint`
@@ -19748,13 +19737,45 @@ pub mod capability_presentation {
     ///      "type": "boolean"
     ///    },
     ///    "claims": {
-    ///      "description": "Only the claims the matched rule names in `recorded_claims`, each plain or committed per the rule.",
-    ///      "type": "object"
+    ///      "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///      "type": "object",
+    ///      "properties": {
+    ///        "appid": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "aud": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "azp": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "client_id": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "oid": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "resource": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "scope": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "sub": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        },
+    ///        "tid": {
+    ///          "$ref": "#/$defs/ClaimValue"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
     ///    },
     ///    "issuer": {
-    ///      "description": "Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`.",
+    ///      "description": "A bounded URI or URN, such as an issuer.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 2048,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000\\s]+$"
     ///    },
     ///    "key_snapshot_digest": {
     ///      "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
@@ -19762,11 +19783,14 @@ pub mod capability_presentation {
     ///      "pattern": "^sha256:[0-9a-f]{64}$"
     ///    },
     ///    "kid": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "kind": {
-    ///      "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///      "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///      "type": "string",
     ///      "enum": [
     ///        "oauth_id_jag",
@@ -19778,6 +19802,18 @@ pub mod capability_presentation {
     ///        "chio_operator_key",
     ///        "operator_static_bearer"
     ///      ]
+    ///    },
+    ///    "provider_identity_digest": {
+    ///      "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
+    ///      "type": "string",
+    ///      "pattern": "^sha256:[0-9a-f]{64}$"
+    ///    },
+    ///    "provider_record_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "replay_key_digest": {
     ///      "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
@@ -19814,17 +19850,23 @@ pub mod capability_presentation {
         pub artifact_digest: ::std::option::Option<DelegationAnchorArtifactDigest>,
         ///True only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`.
         pub artifact_retained: bool,
-        ///Only the claims the matched rule names in `recorded_claims`, each plain or committed per the rule.
-        pub claims: ::serde_json::Map<::std::string::String, ::serde_json::Value>,
-        ///Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`.
+        pub claims: DelegationAnchorClaims,
+        ///A bounded URI or URN, such as an issuer.
         pub issuer: DelegationAnchorIssuer,
         ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub key_snapshot_digest: ::std::option::Option<DelegationAnchorKeySnapshotDigest>,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub kid: ::std::option::Option<DelegationAnchorKid>,
-        ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+        ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
         pub kind: DelegationAnchorKind,
+        ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub provider_identity_digest: ::std::option::Option<DelegationAnchorProviderIdentityDigest>,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub provider_record_id: ::std::option::Option<DelegationAnchorProviderRecordId>,
         ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
         pub replay_key_digest: DelegationAnchorReplayKeyDigest,
         pub subject: SubjectCommitment,
@@ -20033,15 +20075,100 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`.
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`.",
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct DelegationAnchorClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&DelegationAnchorClaims> for DelegationAnchorClaims {
+        fn from(value: &DelegationAnchorClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for DelegationAnchorClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
     ///}
     /// ```
     /// </details>
@@ -20067,8 +20194,16 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for DelegationAnchorIssuer {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -20187,14 +20322,17 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///`DelegationAnchorKid`
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -20220,8 +20358,16 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for DelegationAnchorKid {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -20260,13 +20406,13 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -20382,6 +20528,170 @@ pub mod capability_presentation {
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
+    pub struct DelegationAnchorProviderIdentityDigest(::std::string::String);
+    impl ::std::ops::Deref for DelegationAnchorProviderIdentityDigest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DelegationAnchorProviderIdentityDigest> for ::std::string::String {
+        fn from(value: DelegationAnchorProviderIdentityDigest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DelegationAnchorProviderIdentityDigest>
+        for DelegationAnchorProviderIdentityDigest
+    {
+        fn from(value: &DelegationAnchorProviderIdentityDigest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for DelegationAnchorProviderIdentityDigest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^sha256:[0-9a-f]{64}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^sha256:[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DelegationAnchorProviderIdentityDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DelegationAnchorProviderIdentityDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DelegationAnchorProviderIdentityDigest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for DelegationAnchorProviderIdentityDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct DelegationAnchorProviderRecordId(::std::string::String);
+    impl ::std::ops::Deref for DelegationAnchorProviderRecordId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<DelegationAnchorProviderRecordId> for ::std::string::String {
+        fn from(value: DelegationAnchorProviderRecordId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&DelegationAnchorProviderRecordId> for DelegationAnchorProviderRecordId {
+        fn from(value: &DelegationAnchorProviderRecordId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for DelegationAnchorProviderRecordId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for DelegationAnchorProviderRecordId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for DelegationAnchorProviderRecordId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for DelegationAnchorProviderRecordId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for DelegationAnchorProviderRecordId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
+    ///  "type": "string",
+    ///  "pattern": "^sha256:[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
     pub struct DelegationAnchorReplayKeyDigest(::std::string::String);
     impl ::std::ops::Deref for DelegationAnchorReplayKeyDigest {
         type Target = ::std::string::String;
@@ -20461,7 +20771,7 @@ pub mod capability_presentation {
     ///  ],
     ///  "properties": {
     ///    "exchange_key": {
-    ///      "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///      "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///      "type": "string",
     ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
@@ -20470,7 +20780,7 @@ pub mod capability_presentation {
     ///      "minimum": 0.0
     ///    },
     ///    "holder": {
-    ///      "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///      "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///      "type": "string",
     ///      "enum": [
     ///        "edge_session",
@@ -20490,10 +20800,10 @@ pub mod capability_presentation {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct DelegationExchange {
-        ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+        ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
         pub exchange_key: DelegationExchangeExchangeKey,
         pub exchanged_at: u64,
-        ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+        ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
         pub holder: DelegationExchangeHolder,
         ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
         pub request_digest: DelegationExchangeRequestDigest,
@@ -20503,13 +20813,13 @@ pub mod capability_presentation {
             value.clone()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -20588,13 +20898,13 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -21668,13 +21978,13 @@ pub mod capability_presentation {
             value.parse()
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -21746,13 +22056,178 @@ pub mod capability_presentation {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -21761,6 +22236,9 @@ pub mod capability_presentation {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -21773,11 +22251,14 @@ pub mod capability_presentation {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -21789,6 +22270,7 @@ pub mod capability_presentation {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -21799,10 +22281,31 @@ pub mod capability_presentation {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -21816,10 +22319,14 @@ pub mod capability_presentation {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -21831,6 +22338,16 @@ pub mod capability_presentation {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -21932,6 +22449,7 @@ pub mod capability_presentation {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -21958,6 +22476,9 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -21989,79 +22510,6 @@ pub mod capability_presentation {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -22162,6 +22610,7 @@ pub mod capability_presentation {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -22188,6 +22637,9 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -22309,6 +22761,7 @@ pub mod capability_presentation {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -22335,6 +22788,9 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -22377,6 +22833,245 @@ pub mod capability_presentation {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -22384,6 +23079,7 @@ pub mod capability_presentation {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -22410,6 +23106,9 @@ pub mod capability_presentation {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -22889,13 +23588,13 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -22972,6 +23671,89 @@ pub mod capability_presentation {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///`RequireApprovalAboveConstraint`
@@ -23244,15 +24026,96 @@ pub mod capability_presentation {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -23281,14 +24144,14 @@ pub mod capability_presentation {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -23563,6 +24426,90 @@ pub mod capability_presentation {
                 })
         }
     }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///Authorization to invoke a single tool. Mirrors `ToolGrant`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -23773,6 +24720,90 @@ pub mod capability_presentation {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for ToolGrantToolName {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -50623,13 +51654,13 @@ pub mod receipt_disclosure {
             }
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -50731,7 +51762,7 @@ pub mod receipt_disclosure {
             value.parse()
         }
     }
-    ///`chio.receipt-disclosure.v1` (PROTOCOL "Committed Receipts And Disclosure"): an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening.
+    ///`chio.receipt-disclosure.v1`: an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening. The same salt under two `salt_ref` values marks the receipt as tampered disclosure.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -50739,7 +51770,7 @@ pub mod receipt_disclosure {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/disclosure.schema.json",
     ///  "title": "Chio Receipt Disclosure",
-    ///  "description": "`chio.receipt-disclosure.v1` (PROTOCOL \"Committed Receipts And Disclosure\"): an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening.",
+    ///  "description": "`chio.receipt-disclosure.v1`: an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening. The same salt under two `salt_ref` values marks the receipt as tampered disclosure.",
     ///  "type": "object",
     ///  "required": [
     ///    "openings",
@@ -50752,6 +51783,7 @@ pub mod receipt_disclosure {
     ///      "items": {
     ///        "$ref": "#/$defs/Opening"
     ///      },
+    ///      "maxItems": 64,
     ///      "minItems": 1
     ///    },
     ///    "receipt_id": {
@@ -50857,6 +51889,58 @@ pub mod receipt_disclosure {
                 })
         }
     }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -50874,8 +51958,7 @@ pub mod receipt_disclosure {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -50886,88 +51969,11 @@ pub mod receipt_disclosure {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
@@ -51048,13 +52054,13 @@ pub mod receipt_disclosure {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -51126,13 +52132,178 @@ pub mod receipt_disclosure {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -51141,6 +52312,9 @@ pub mod receipt_disclosure {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -51153,11 +52327,14 @@ pub mod receipt_disclosure {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -51169,6 +52346,7 @@ pub mod receipt_disclosure {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -51179,10 +52357,31 @@ pub mod receipt_disclosure {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -51196,10 +52395,14 @@ pub mod receipt_disclosure {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -51211,6 +52414,16 @@ pub mod receipt_disclosure {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -51312,6 +52525,7 @@ pub mod receipt_disclosure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -51338,6 +52552,9 @@ pub mod receipt_disclosure {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -51369,79 +52586,6 @@ pub mod receipt_disclosure {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -51542,6 +52686,7 @@ pub mod receipt_disclosure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -51568,6 +52713,9 @@ pub mod receipt_disclosure {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -51689,6 +52837,7 @@ pub mod receipt_disclosure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -51715,6 +52864,9 @@ pub mod receipt_disclosure {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -51757,6 +52909,245 @@ pub mod receipt_disclosure {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -51764,6 +53155,7 @@ pub mod receipt_disclosure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -51790,6 +53182,9 @@ pub mod receipt_disclosure {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -51972,8 +53367,8 @@ pub mod receipt_disclosure {
     ///      "pattern": "^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
     ///    },
     ///    "salt_ref": {
-    ///      "description": "Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`).",
     ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
     ///    }
     ///  },
@@ -51988,7 +53383,6 @@ pub mod receipt_disclosure {
         pub payload: ::serde_json::Value,
         ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
         pub salt: OpeningSalt,
-        ///Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`).
         pub salt_ref: OpeningSaltRef,
     }
     impl ::std::convert::From<&Opening> for Opening {
@@ -52076,14 +53470,14 @@ pub mod receipt_disclosure {
                 })
         }
     }
-    ///Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`).
+    ///`OpeningSaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`).",
     ///  "type": "string",
+    ///  "maxLength": 64,
     ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
     ///}
     /// ```
@@ -52110,6 +53504,9 @@ pub mod receipt_disclosure {
     impl ::std::str::FromStr for OpeningSaltRef {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| {
                     ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
@@ -52154,13 +53551,13 @@ pub mod receipt_disclosure {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -52237,6 +53634,89 @@ pub mod receipt_disclosure {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
@@ -52319,15 +53799,96 @@ pub mod receipt_disclosure {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -52356,14 +53917,14 @@ pub mod receipt_disclosure {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -52393,6 +53954,174 @@ pub mod receipt_disclosure {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -54548,13 +56277,13 @@ pub mod receipt_settlement_closure {
             }
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -54741,7 +56470,7 @@ pub mod receipt_settlement_closure {
                 })
         }
     }
-    ///`chio.settlement-closure.v1` (PROTOCOL 6.7), signed by the kernel key over the signing wrapper. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
+    ///`chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -54749,7 +56478,7 @@ pub mod receipt_settlement_closure {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/settlement-closure.schema.json",
     ///  "title": "Chio Settlement Closure",
-    ///  "description": "`chio.settlement-closure.v1` (PROTOCOL 6.7), signed by the kernel key over the signing wrapper. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.",
+    ///  "description": "`chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.",
     ///  "type": "object",
     ///  "required": [
     ///    "amount",
@@ -54768,17 +56497,21 @@ pub mod receipt_settlement_closure {
     ///    "amount": {
     ///      "description": "Integer minor units as a decimal string.",
     ///      "type": "string",
-    ///      "pattern": "^(0|[1-9][0-9]*)$"
+    ///      "maxLength": 39,
+    ///      "pattern": "^(0|[1-9][0-9]{0,38})$"
     ///    },
     ///    "asset": {
     ///      "$ref": "#/$defs/Asset"
     ///    },
     ///    "hold_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "kernel_key": {
-    ///      "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///      "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///      "type": "string",
     ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
@@ -54797,6 +56530,7 @@ pub mod receipt_settlement_closure {
     ///      "items": {
     ///        "$ref": "#/$defs/RailRef"
     ///      },
+    ///      "maxItems": 8,
     ///      "minItems": 1
     ///    },
     ///    "schema": {
@@ -54804,9 +56538,9 @@ pub mod receipt_settlement_closure {
     ///      "const": "chio.settlement-closure.v1"
     ///    },
     ///    "signature": {
-    ///      "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///      "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///      "type": "string",
-    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
     ///    "state": {
     ///      "$ref": "#/$defs/SettlementState"
@@ -54826,14 +56560,15 @@ pub mod receipt_settlement_closure {
         ///Integer minor units as a decimal string.
         pub amount: ChioSettlementClosureAmount,
         pub asset: Asset,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         pub hold_id: ChioSettlementClosureHoldId,
-        ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+        ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
         pub kernel_key: ChioSettlementClosureKernelKey,
         pub observed_at: u64,
         pub rail: ChioSettlementClosureRail,
         pub rail_refs: ::std::vec::Vec<RailRef>,
         pub schema: ::std::string::String,
-        ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+        ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
         pub signature: ChioSettlementClosureSignature,
         pub state: SettlementState,
         pub terminal_receipt_id: ChioSettlementClosureTerminalReceiptId,
@@ -54851,7 +56586,8 @@ pub mod receipt_settlement_closure {
     ///{
     ///  "description": "Integer minor units as a decimal string.",
     ///  "type": "string",
-    ///  "pattern": "^(0|[1-9][0-9]*)$"
+    ///  "maxLength": 39,
+    ///  "pattern": "^(0|[1-9][0-9]{0,38})$"
     ///}
     /// ```
     /// </details>
@@ -54877,10 +56613,15 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for ChioSettlementClosureAmount {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 39usize {
+                return Err("longer than 39 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^(0|[1-9][0-9]*)$").unwrap());
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^(0|[1-9][0-9]{0,38})$").unwrap()
+                });
             if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^(0|[1-9][0-9]*)$\"".into());
+                return Err("doesn't match pattern \"^(0|[1-9][0-9]{0,38})$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -54919,14 +56660,17 @@ pub mod receipt_settlement_closure {
                 })
         }
     }
-    ///`ChioSettlementClosureHoldId`
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -54952,8 +56696,16 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for ChioSettlementClosureHoldId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -54992,13 +56744,13 @@ pub mod receipt_settlement_closure {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -55149,15 +56901,15 @@ pub mod receipt_settlement_closure {
             value.parse()
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -55186,14 +56938,14 @@ pub mod receipt_settlement_closure {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -55311,6 +57063,58 @@ pub mod receipt_settlement_closure {
                 })
         }
     }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -55328,8 +57132,7 @@ pub mod receipt_settlement_closure {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -55340,88 +57143,11 @@ pub mod receipt_settlement_closure {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
@@ -55502,13 +57228,13 @@ pub mod receipt_settlement_closure {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -55580,13 +57306,178 @@ pub mod receipt_settlement_closure {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -55595,6 +57486,9 @@ pub mod receipt_settlement_closure {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -55607,11 +57501,14 @@ pub mod receipt_settlement_closure {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -55623,6 +57520,7 @@ pub mod receipt_settlement_closure {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -55633,10 +57531,31 @@ pub mod receipt_settlement_closure {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -55650,10 +57569,14 @@ pub mod receipt_settlement_closure {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -55665,6 +57588,16 @@ pub mod receipt_settlement_closure {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -55766,6 +57699,7 @@ pub mod receipt_settlement_closure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -55792,6 +57726,9 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -55823,79 +57760,6 @@ pub mod receipt_settlement_closure {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -55996,6 +57860,7 @@ pub mod receipt_settlement_closure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -56022,6 +57887,9 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -56143,6 +58011,7 @@ pub mod receipt_settlement_closure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -56169,6 +58038,9 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -56211,6 +58083,245 @@ pub mod receipt_settlement_closure {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -56218,6 +58329,7 @@ pub mod receipt_settlement_closure {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -56244,6 +58356,9 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -56404,13 +58519,13 @@ pub mod receipt_settlement_closure {
             value.parse()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -56508,7 +58623,9 @@ pub mod receipt_settlement_closure {
     ///    },
     ///    "id": {
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 256,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "kind": {
     ///      "type": "string",
@@ -56622,7 +58739,9 @@ pub mod receipt_settlement_closure {
     /// ```json
     ///{
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 256,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -56648,8 +58767,16 @@ pub mod receipt_settlement_closure {
     impl ::std::str::FromStr for RailRefId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -56770,6 +58897,89 @@ pub mod receipt_settlement_closure {
             value.parse()
         }
     }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
+        }
+    }
     ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
     ///
     /// <details><summary>JSON schema</summary>
@@ -56839,6 +59049,87 @@ pub mod receipt_settlement_closure {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for Salt {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SaltRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -56932,15 +59223,15 @@ pub mod receipt_settlement_closure {
             value.parse()
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -56969,14 +59260,14 @@ pub mod receipt_settlement_closure {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -57006,6 +59297,174 @@ pub mod receipt_settlement_closure {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -124523,7 +126982,7 @@ pub mod result_stream_complete {
         }
     }
 }
-pub mod root_authority_idp_key_snapshot {
+pub mod root_authority_enterprise_provider_identity {
     /// Error types.
     pub mod error {
         /// Error from a `TryFrom` or `FromStr` implementation.
@@ -124550,13 +127009,13 @@ pub mod root_authority_idp_key_snapshot {
             }
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -124658,39 +127117,1148 @@ pub mod root_authority_idp_key_snapshot {
             value.parse()
         }
     }
-    ///`chio.idp-key-snapshot.v1` (PROTOCOL 5.6.4), signed by the exchange key over the signing wrapper. It records the key set the exchange fetched from an identity provider and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement, not identity-provider evidence.
+    ///`chio.enterprise-provider-identity.v1`: the unsigned, content-addressed identity projection of one enterprise provider record. A root policy rule pins `SHA-256("chio.enterprise-provider-identity.v1\0" || canonical_json(projection))` as `provider_identity_digest`. The projection excludes `enabled`, other provenance labels and validation errors. Decoding is strict.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json",
-    ///  "title": "Chio IdP Key Snapshot",
-    ///  "description": "`chio.idp-key-snapshot.v1` (PROTOCOL 5.6.4), signed by the exchange key over the signing wrapper. It records the key set the exchange fetched from an identity provider and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement, not identity-provider evidence.",
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/enterprise-provider-identity.schema.json",
+    ///  "title": "Chio Enterprise Provider Identity",
+    ///  "description": "`chio.enterprise-provider-identity.v1`: the unsigned, content-addressed identity projection of one enterprise provider record. A root policy rule pins `SHA-256(\"chio.enterprise-provider-identity.v1\\0\" || canonical_json(projection))` as `provider_identity_digest`. The projection excludes `enabled`, other provenance labels and validation errors. Decoding is strict.",
     ///  "type": "object",
     ///  "required": [
-    ///    "exchange_key",
+    ///    "audiences",
     ///    "issuer",
-    ///    "keys",
-    ///    "observed_at",
+    ///    "kind",
+    ///    "provider_id",
     ///    "schema",
-    ///    "signature",
-    ///    "source"
+    ///    "subject_mapping",
+    ///    "trust_material_ref"
     ///  ],
     ///  "properties": {
-    ///    "exchange_key": {
-    ///      "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///    "audiences": {
+    ///      "description": "The record's `trust_boundary.allowed_audiences`.",
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded URI or URN, such as an issuer.",
+    ///        "type": "string",
+    ///        "maxLength": 2048,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000\\s]+$"
+    ///      },
+    ///      "maxItems": 32,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "introspection_url": {
     ///      "type": "string",
-    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///      "maxLength": 2048,
+    ///      "pattern": "^https://[^\\u0000\\s]+$"
     ///    },
     ///    "issuer": {
+    ///      "description": "A bounded URI or URN, such as an issuer.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 2048,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000\\s]+$"
     ///    },
+    ///    "jwks": {
+    ///      "$ref": "#/$defs/InlineJwks"
+    ///    },
+    ///    "jwks_url": {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "pattern": "^https://[^\\u0000\\s]+$"
+    ///    },
+    ///    "kind": {
+    ///      "description": "Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.",
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "oidc_jwks",
+    ///        "oauth_introspection"
+    ///      ]
+    ///    },
+    ///    "provider_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "schema": {
+    ///      "type": "string",
+    ///      "const": "chio.enterprise-provider-identity.v1"
+    ///    },
+    ///    "subject_mapping": {
+    ///      "$ref": "#/$defs/SubjectMapping"
+    ///    },
+    ///    "trust_material_ref": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioEnterpriseProviderIdentity {
+        ///The record's `trust_boundary.allowed_audiences`.
+        pub audiences: Vec<ChioEnterpriseProviderIdentityAudiencesItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub introspection_url:
+            ::std::option::Option<ChioEnterpriseProviderIdentityIntrospectionUrl>,
+        ///A bounded URI or URN, such as an issuer.
+        pub issuer: ChioEnterpriseProviderIdentityIssuer,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub jwks: ::std::option::Option<InlineJwks>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub jwks_url: ::std::option::Option<ChioEnterpriseProviderIdentityJwksUrl>,
+        ///Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.
+        pub kind: ChioEnterpriseProviderIdentityKind,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub provider_id: ChioEnterpriseProviderIdentityProviderId,
+        pub schema: ::std::string::String,
+        pub subject_mapping: SubjectMapping,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub trust_material_ref: ChioEnterpriseProviderIdentityTrustMaterialRef,
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentity> for ChioEnterpriseProviderIdentity {
+        fn from(value: &ChioEnterpriseProviderIdentity) -> Self {
+            value.clone()
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEnterpriseProviderIdentityAudiencesItem(::std::string::String);
+    impl ::std::ops::Deref for ChioEnterpriseProviderIdentityAudiencesItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEnterpriseProviderIdentityAudiencesItem> for ::std::string::String {
+        fn from(value: ChioEnterpriseProviderIdentityAudiencesItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentityAudiencesItem>
+        for ChioEnterpriseProviderIdentityAudiencesItem
+    {
+        fn from(value: &ChioEnterpriseProviderIdentityAudiencesItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityAudiencesItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityAudiencesItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioEnterpriseProviderIdentityAudiencesItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioEnterpriseProviderIdentityAudiencesItem
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEnterpriseProviderIdentityAudiencesItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioEnterpriseProviderIdentityIntrospectionUrl`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEnterpriseProviderIdentityIntrospectionUrl(::std::string::String);
+    impl ::std::ops::Deref for ChioEnterpriseProviderIdentityIntrospectionUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEnterpriseProviderIdentityIntrospectionUrl>
+        for ::std::string::String
+    {
+        fn from(value: ChioEnterpriseProviderIdentityIntrospectionUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentityIntrospectionUrl>
+        for ChioEnterpriseProviderIdentityIntrospectionUrl
+    {
+        fn from(value: &ChioEnterpriseProviderIdentityIntrospectionUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityIntrospectionUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityIntrospectionUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioEnterpriseProviderIdentityIntrospectionUrl
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioEnterpriseProviderIdentityIntrospectionUrl
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEnterpriseProviderIdentityIntrospectionUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEnterpriseProviderIdentityIssuer(::std::string::String);
+    impl ::std::ops::Deref for ChioEnterpriseProviderIdentityIssuer {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEnterpriseProviderIdentityIssuer> for ::std::string::String {
+        fn from(value: ChioEnterpriseProviderIdentityIssuer) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentityIssuer>
+        for ChioEnterpriseProviderIdentityIssuer
+    {
+        fn from(value: &ChioEnterpriseProviderIdentityIssuer) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityIssuer {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityIssuer {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioEnterpriseProviderIdentityIssuer {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioEnterpriseProviderIdentityIssuer {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEnterpriseProviderIdentityIssuer {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioEnterpriseProviderIdentityJwksUrl`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEnterpriseProviderIdentityJwksUrl(::std::string::String);
+    impl ::std::ops::Deref for ChioEnterpriseProviderIdentityJwksUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEnterpriseProviderIdentityJwksUrl> for ::std::string::String {
+        fn from(value: ChioEnterpriseProviderIdentityJwksUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentityJwksUrl>
+        for ChioEnterpriseProviderIdentityJwksUrl
+    {
+        fn from(value: &ChioEnterpriseProviderIdentityJwksUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityJwksUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityJwksUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioEnterpriseProviderIdentityJwksUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioEnterpriseProviderIdentityJwksUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEnterpriseProviderIdentityJwksUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Record kinds a root policy rule may reference. `scim` and `saml` records are never referenced.",
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "oidc_jwks",
+    ///    "oauth_introspection"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ChioEnterpriseProviderIdentityKind {
+        #[serde(rename = "oidc_jwks")]
+        OidcJwks,
+        #[serde(rename = "oauth_introspection")]
+        OauthIntrospection,
+    }
+    impl ::std::convert::From<&Self> for ChioEnterpriseProviderIdentityKind {
+        fn from(value: &ChioEnterpriseProviderIdentityKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ChioEnterpriseProviderIdentityKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::OidcJwks => f.write_str("oidc_jwks"),
+                Self::OauthIntrospection => f.write_str("oauth_introspection"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "oidc_jwks" => Ok(Self::OidcJwks),
+                "oauth_introspection" => Ok(Self::OauthIntrospection),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioEnterpriseProviderIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioEnterpriseProviderIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEnterpriseProviderIdentityProviderId(::std::string::String);
+    impl ::std::ops::Deref for ChioEnterpriseProviderIdentityProviderId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEnterpriseProviderIdentityProviderId> for ::std::string::String {
+        fn from(value: ChioEnterpriseProviderIdentityProviderId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentityProviderId>
+        for ChioEnterpriseProviderIdentityProviderId
+    {
+        fn from(value: &ChioEnterpriseProviderIdentityProviderId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityProviderId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityProviderId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioEnterpriseProviderIdentityProviderId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioEnterpriseProviderIdentityProviderId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEnterpriseProviderIdentityProviderId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioEnterpriseProviderIdentityTrustMaterialRef(::std::string::String);
+    impl ::std::ops::Deref for ChioEnterpriseProviderIdentityTrustMaterialRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioEnterpriseProviderIdentityTrustMaterialRef>
+        for ::std::string::String
+    {
+        fn from(value: ChioEnterpriseProviderIdentityTrustMaterialRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioEnterpriseProviderIdentityTrustMaterialRef>
+        for ChioEnterpriseProviderIdentityTrustMaterialRef
+    {
+        fn from(value: &ChioEnterpriseProviderIdentityTrustMaterialRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioEnterpriseProviderIdentityTrustMaterialRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioEnterpriseProviderIdentityTrustMaterialRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for ChioEnterpriseProviderIdentityTrustMaterialRef
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for ChioEnterpriseProviderIdentityTrustMaterialRef
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioEnterpriseProviderIdentityTrustMaterialRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
+    ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A salted commitment whose salt is held in the disclosure store under `salt_ref`.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "commit",
+    ///    "salt_ref"
+    ///  ],
+    ///  "properties": {
+    ///    "commit": {
+    ///      "$ref": "#/$defs/Digest"
+    ///    },
+    ///    "salt_ref": {
+    ///      "$ref": "#/$defs/SaltRef"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Commitment {
+        pub commit: Digest,
+        pub salt_ref: SaltRef,
+    }
+    impl ::std::convert::From<&Commitment> for Commitment {
+        fn from(value: &Commitment) -> Self {
+            value.clone()
+        }
+    }
+    ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
+    ///  "type": "string",
+    ///  "pattern": "^sha256:[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Digest(::std::string::String);
+    impl ::std::ops::Deref for Digest {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Digest> for ::std::string::String {
+        fn from(value: Digest) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Digest> for Digest {
+        fn from(value: &Digest) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Digest {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^sha256:[0-9a-f]{64}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^sha256:[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Digest {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Digest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "edge_session",
+    ///    "caller"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum HolderClass {
+        #[serde(rename = "edge_session")]
+        EdgeSession,
+        #[serde(rename = "caller")]
+        Caller,
+    }
+    impl ::std::convert::From<&Self> for HolderClass {
+        fn from(value: &HolderClass) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for HolderClass {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::EdgeSession => f.write_str("edge_session"),
+                Self::Caller => f.write_str("caller"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for HolderClass {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "edge_session" => Ok(Self::EdgeSession),
+                "caller" => Ok(Self::Caller),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HolderClass {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HolderClass {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HolderClass {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`HttpsUrl`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwks`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "keys"
+    ///  ],
+    ///  "properties": {
     ///    "keys": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///        "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///        "type": "object",
     ///        "required": [
     ///          "kid",
@@ -124699,6 +128267,9 @@ pub mod root_authority_idp_key_snapshot {
     ///        "properties": {
     ///          "alg": {
     ///            "$ref": "#/$defs/JwsAlgorithm"
+    ///          },
+    ///          "cloud_instance_name": {
+    ///            "$ref": "#/$defs/Identifier"
     ///          },
     ///          "crv": {
     ///            "type": "string",
@@ -124711,11 +128282,14 @@ pub mod root_authority_idp_key_snapshot {
     ///          },
     ///          "e": {
     ///            "type": "string",
+    ///            "maxLength": 16,
     ///            "pattern": "^[A-Za-z0-9_-]+$"
     ///          },
+    ///          "issuer": {
+    ///            "$ref": "#/$defs/Uri"
+    ///          },
     ///          "kid": {
-    ///            "type": "string",
-    ///            "minLength": 1
+    ///            "$ref": "#/$defs/Identifier"
     ///          },
     ///          "kty": {
     ///            "type": "string",
@@ -124727,6 +128301,7 @@ pub mod root_authority_idp_key_snapshot {
     ///          },
     ///          "n": {
     ///            "type": "string",
+    ///            "maxLength": 1400,
     ///            "pattern": "^[A-Za-z0-9_-]+$"
     ///          },
     ///          "use": {
@@ -124737,15 +128312,3082 @@ pub mod root_authority_idp_key_snapshot {
     ///          },
     ///          "x": {
     ///            "type": "string",
+    ///            "maxLength": 128,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "x5c": {
+    ///            "type": "array",
+    ///            "items": {
+    ///              "type": "string",
+    ///              "maxLength": 16384,
+    ///              "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///            },
+    ///            "maxItems": 8
+    ///          },
+    ///          "x5t": {
+    ///            "type": "string",
+    ///            "maxLength": 64,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "x5t#S256": {
+    ///            "type": "string",
+    ///            "maxLength": 64,
     ///            "pattern": "^[A-Za-z0-9_-]+$"
     ///          },
     ///          "y": {
     ///            "type": "string",
+    ///            "maxLength": 128,
     ///            "pattern": "^[A-Za-z0-9_-]+$"
     ///          }
     ///        },
     ///        "additionalProperties": false
-    ///      }
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct InlineJwks {
+        pub keys: ::std::vec::Vec<InlineJwksKeysItem>,
+    }
+    impl ::std::convert::From<&InlineJwks> for InlineJwks {
+        fn from(value: &InlineJwks) -> Self {
+            value.clone()
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kid",
+    ///    "kty"
+    ///  ],
+    ///  "properties": {
+    ///    "alg": {
+    ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
+    ///    },
+    ///    "crv": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "P-256",
+    ///        "P-384",
+    ///        "P-521",
+    ///        "Ed25519"
+    ///      ]
+    ///    },
+    ///    "e": {
+    ///      "type": "string",
+    ///      "maxLength": 16,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
+    ///    "kid": {
+    ///      "$ref": "#/$defs/Identifier"
+    ///    },
+    ///    "kty": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "RSA",
+    ///        "EC",
+    ///        "OKP"
+    ///      ]
+    ///    },
+    ///    "n": {
+    ///      "type": "string",
+    ///      "maxLength": 1400,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "use": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "sig"
+    ///      ]
+    ///    },
+    ///    "x": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "y": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct InlineJwksKeysItem {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub alg: ::std::option::Option<JwsAlgorithm>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub crv: ::std::option::Option<InlineJwksKeysItemCrv>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub e: ::std::option::Option<InlineJwksKeysItemE>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
+        pub kty: InlineJwksKeysItemKty,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub n: ::std::option::Option<InlineJwksKeysItemN>,
+        #[serde(
+            rename = "use",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub use_: ::std::option::Option<InlineJwksKeysItemUse>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x: ::std::option::Option<InlineJwksKeysItemX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<InlineJwksKeysItemX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<InlineJwksKeysItemX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<InlineJwksKeysItemX5tS256>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub y: ::std::option::Option<InlineJwksKeysItemY>,
+    }
+    impl ::std::convert::From<&InlineJwksKeysItem> for InlineJwksKeysItem {
+        fn from(value: &InlineJwksKeysItem) -> Self {
+            value.clone()
+        }
+    }
+    ///`InlineJwksKeysItemCrv`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "P-256",
+    ///    "P-384",
+    ///    "P-521",
+    ///    "Ed25519"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum InlineJwksKeysItemCrv {
+        #[serde(rename = "P-256")]
+        P256,
+        #[serde(rename = "P-384")]
+        P384,
+        #[serde(rename = "P-521")]
+        P521,
+        Ed25519,
+    }
+    impl ::std::convert::From<&Self> for InlineJwksKeysItemCrv {
+        fn from(value: &InlineJwksKeysItemCrv) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for InlineJwksKeysItemCrv {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::P256 => f.write_str("P-256"),
+                Self::P384 => f.write_str("P-384"),
+                Self::P521 => f.write_str("P-521"),
+                Self::Ed25519 => f.write_str("Ed25519"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemCrv {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "P-256" => Ok(Self::P256),
+                "P-384" => Ok(Self::P384),
+                "P-521" => Ok(Self::P521),
+                "Ed25519" => Ok(Self::Ed25519),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemCrv {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemCrv {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemCrv {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`InlineJwksKeysItemE`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemE(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemE {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemE> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemE) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemE> for InlineJwksKeysItemE {
+        fn from(value: &InlineJwksKeysItemE) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemE {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemE {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemE {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemE {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemE {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwksKeysItemKty`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "RSA",
+    ///    "EC",
+    ///    "OKP"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum InlineJwksKeysItemKty {
+        #[serde(rename = "RSA")]
+        Rsa,
+        #[serde(rename = "EC")]
+        Ec,
+        #[serde(rename = "OKP")]
+        Okp,
+    }
+    impl ::std::convert::From<&Self> for InlineJwksKeysItemKty {
+        fn from(value: &InlineJwksKeysItemKty) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for InlineJwksKeysItemKty {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Rsa => f.write_str("RSA"),
+                Self::Ec => f.write_str("EC"),
+                Self::Okp => f.write_str("OKP"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemKty {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "RSA" => Ok(Self::Rsa),
+                "EC" => Ok(Self::Ec),
+                "OKP" => Ok(Self::Okp),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemKty {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemKty {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemKty {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`InlineJwksKeysItemN`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 1400,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemN(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemN {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemN> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemN) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemN> for InlineJwksKeysItemN {
+        fn from(value: &InlineJwksKeysItemN) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemN {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemN {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemN {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemN {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemN {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwksKeysItemUse`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "sig"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum InlineJwksKeysItemUse {
+        #[serde(rename = "sig")]
+        Sig,
+    }
+    impl ::std::convert::From<&Self> for InlineJwksKeysItemUse {
+        fn from(value: &InlineJwksKeysItemUse) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for InlineJwksKeysItemUse {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Sig => f.write_str("sig"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemUse {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "sig" => Ok(Self::Sig),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemUse {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemUse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemUse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`InlineJwksKeysItemX`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemX(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemX {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemX> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemX) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemX> for InlineJwksKeysItemX {
+        fn from(value: &InlineJwksKeysItemX) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemX {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemX {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemX {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemX {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemX {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwksKeysItemX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemX5cItem(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemX5cItem> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemX5cItem> for InlineJwksKeysItemX5cItem {
+        fn from(value: &InlineJwksKeysItemX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwksKeysItemX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemX5t(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemX5t> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemX5t> for InlineJwksKeysItemX5t {
+        fn from(value: &InlineJwksKeysItemX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwksKeysItemX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemX5tS256(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemX5tS256> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemX5tS256> for InlineJwksKeysItemX5tS256 {
+        fn from(value: &InlineJwksKeysItemX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`InlineJwksKeysItemY`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct InlineJwksKeysItemY(::std::string::String);
+    impl ::std::ops::Deref for InlineJwksKeysItemY {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<InlineJwksKeysItemY> for ::std::string::String {
+        fn from(value: InlineJwksKeysItemY) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&InlineJwksKeysItemY> for InlineJwksKeysItemY {
+        fn from(value: &InlineJwksKeysItemY) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for InlineJwksKeysItemY {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for InlineJwksKeysItemY {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for InlineJwksKeysItemY {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for InlineJwksKeysItemY {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for InlineJwksKeysItemY {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "kid",
+    ///    "kty"
+    ///  ],
+    ///  "properties": {
+    ///    "alg": {
+    ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
+    ///    },
+    ///    "crv": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "P-256",
+    ///        "P-384",
+    ///        "P-521",
+    ///        "Ed25519"
+    ///      ]
+    ///    },
+    ///    "e": {
+    ///      "type": "string",
+    ///      "maxLength": 16,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
+    ///    "kid": {
+    ///      "$ref": "#/$defs/Identifier"
+    ///    },
+    ///    "kty": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "RSA",
+    ///        "EC",
+    ///        "OKP"
+    ///      ]
+    ///    },
+    ///    "n": {
+    ///      "type": "string",
+    ///      "maxLength": 1400,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "use": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "sig"
+    ///      ]
+    ///    },
+    ///    "x": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "y": {
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct Jwk {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub alg: ::std::option::Option<JwsAlgorithm>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub crv: ::std::option::Option<JwkCrv>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub e: ::std::option::Option<JwkE>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
+        pub kty: JwkKty,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub n: ::std::option::Option<JwkN>,
+        #[serde(
+            rename = "use",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub use_: ::std::option::Option<JwkUse>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub y: ::std::option::Option<JwkY>,
+    }
+    impl ::std::convert::From<&Jwk> for Jwk {
+        fn from(value: &Jwk) -> Self {
+            value.clone()
+        }
+    }
+    ///`JwkCrv`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "P-256",
+    ///    "P-384",
+    ///    "P-521",
+    ///    "Ed25519"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum JwkCrv {
+        #[serde(rename = "P-256")]
+        P256,
+        #[serde(rename = "P-384")]
+        P384,
+        #[serde(rename = "P-521")]
+        P521,
+        Ed25519,
+    }
+    impl ::std::convert::From<&Self> for JwkCrv {
+        fn from(value: &JwkCrv) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for JwkCrv {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::P256 => f.write_str("P-256"),
+                Self::P384 => f.write_str("P-384"),
+                Self::P521 => f.write_str("P-521"),
+                Self::Ed25519 => f.write_str("Ed25519"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for JwkCrv {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "P-256" => Ok(Self::P256),
+                "P-384" => Ok(Self::P384),
+                "P-521" => Ok(Self::P521),
+                "Ed25519" => Ok(Self::Ed25519),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkCrv {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkCrv {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkCrv {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`JwkE`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkE(::std::string::String);
+    impl ::std::ops::Deref for JwkE {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkE> for ::std::string::String {
+        fn from(value: JwkE) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkE> for JwkE {
+        fn from(value: &JwkE) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkE {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkE {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkE {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkE {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkE {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkKty`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "RSA",
+    ///    "EC",
+    ///    "OKP"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum JwkKty {
+        #[serde(rename = "RSA")]
+        Rsa,
+        #[serde(rename = "EC")]
+        Ec,
+        #[serde(rename = "OKP")]
+        Okp,
+    }
+    impl ::std::convert::From<&Self> for JwkKty {
+        fn from(value: &JwkKty) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for JwkKty {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Rsa => f.write_str("RSA"),
+                Self::Ec => f.write_str("EC"),
+                Self::Okp => f.write_str("OKP"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for JwkKty {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "RSA" => Ok(Self::Rsa),
+                "EC" => Ok(Self::Ec),
+                "OKP" => Ok(Self::Okp),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkKty {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkKty {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkKty {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`JwkN`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 1400,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkN(::std::string::String);
+    impl ::std::ops::Deref for JwkN {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkN> for ::std::string::String {
+        fn from(value: JwkN) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkN> for JwkN {
+        fn from(value: &JwkN) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkN {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkN {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkN {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkN {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkN {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkUse`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "sig"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum JwkUse {
+        #[serde(rename = "sig")]
+        Sig,
+    }
+    impl ::std::convert::From<&Self> for JwkUse {
+        fn from(value: &JwkUse) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for JwkUse {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Sig => f.write_str("sig"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for JwkUse {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "sig" => Ok(Self::Sig),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkUse {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkUse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkUse {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`JwkX`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX(::std::string::String);
+    impl ::std::ops::Deref for JwkX {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX> for ::std::string::String {
+        fn from(value: JwkX) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX> for JwkX {
+        fn from(value: &JwkX) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkY`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkY(::std::string::String);
+    impl ::std::ops::Deref for JwkY {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkY> for ::std::string::String {
+        fn from(value: JwkY) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkY> for JwkY {
+        fn from(value: &JwkY) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkY {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkY {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkY {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkY {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkY {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.",
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "RS256",
+    ///    "RS384",
+    ///    "RS512",
+    ///    "PS256",
+    ///    "PS384",
+    ///    "PS512",
+    ///    "ES256",
+    ///    "ES384",
+    ///    "ES512",
+    ///    "EdDSA"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum JwsAlgorithm {
+        #[serde(rename = "RS256")]
+        Rs256,
+        #[serde(rename = "RS384")]
+        Rs384,
+        #[serde(rename = "RS512")]
+        Rs512,
+        #[serde(rename = "PS256")]
+        Ps256,
+        #[serde(rename = "PS384")]
+        Ps384,
+        #[serde(rename = "PS512")]
+        Ps512,
+        #[serde(rename = "ES256")]
+        Es256,
+        #[serde(rename = "ES384")]
+        Es384,
+        #[serde(rename = "ES512")]
+        Es512,
+        #[serde(rename = "EdDSA")]
+        EdDsa,
+    }
+    impl ::std::convert::From<&Self> for JwsAlgorithm {
+        fn from(value: &JwsAlgorithm) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for JwsAlgorithm {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Rs256 => f.write_str("RS256"),
+                Self::Rs384 => f.write_str("RS384"),
+                Self::Rs512 => f.write_str("RS512"),
+                Self::Ps256 => f.write_str("PS256"),
+                Self::Ps384 => f.write_str("PS384"),
+                Self::Ps512 => f.write_str("PS512"),
+                Self::Es256 => f.write_str("ES256"),
+                Self::Es384 => f.write_str("ES384"),
+                Self::Es512 => f.write_str("ES512"),
+                Self::EdDsa => f.write_str("EdDSA"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for JwsAlgorithm {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "RS256" => Ok(Self::Rs256),
+                "RS384" => Ok(Self::Rs384),
+                "RS512" => Ok(Self::Rs512),
+                "PS256" => Ok(Self::Ps256),
+                "PS384" => Ok(Self::Ps384),
+                "PS512" => Ok(Self::Ps512),
+                "ES256" => Ok(Self::Es256),
+                "ES384" => Ok(Self::Es384),
+                "ES512" => Ok(Self::Es512),
+                "EdDSA" => Ok(Self::EdDsa),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwsAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwsAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwsAlgorithm {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct PublicKeyHex(::std::string::String);
+    impl ::std::ops::Deref for PublicKeyHex {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<PublicKeyHex> for ::std::string::String {
+        fn from(value: PublicKeyHex) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&PublicKeyHex> for PublicKeyHex {
+        fn from(value: &PublicKeyHex) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for PublicKeyHex {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for PublicKeyHex {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for PublicKeyHex {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for PublicKeyHex {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for PublicKeyHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
+        }
+    }
+    ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).",
+    ///  "type": "string",
+    ///  "pattern": "^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Salt(::std::string::String);
+    impl ::std::ops::Deref for Salt {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Salt> for ::std::string::String {
+        fn from(value: Salt) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Salt> for Salt {
+        fn from(value: &Salt) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Salt {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$\"".into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Salt {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Salt {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Salt {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Salt {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SaltRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SignatureHex(::std::string::String);
+    impl ::std::ops::Deref for SignatureHex {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SignatureHex> for ::std::string::String {
+        fn from(value: SignatureHex) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SignatureHex> for SignatureHex {
+        fn from(value: &SignatureHex) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SignatureHex {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SignatureHex {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SignatureHex {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SignatureHex {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`SubjectMapping`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "principal_source",
+    ///    "tenant_id_field"
+    ///  ],
+    ///  "properties": {
+    ///    "principal_source": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    },
+    ///    "tenant_id_field": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct SubjectMapping {
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub principal_source: SubjectMappingPrincipalSource,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        pub tenant_id_field: SubjectMappingTenantIdField,
+    }
+    impl ::std::convert::From<&SubjectMapping> for SubjectMapping {
+        fn from(value: &SubjectMapping) -> Self {
+            value.clone()
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SubjectMappingPrincipalSource(::std::string::String);
+    impl ::std::ops::Deref for SubjectMappingPrincipalSource {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SubjectMappingPrincipalSource> for ::std::string::String {
+        fn from(value: SubjectMappingPrincipalSource) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SubjectMappingPrincipalSource> for SubjectMappingPrincipalSource {
+        fn from(value: &SubjectMappingPrincipalSource) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SubjectMappingPrincipalSource {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SubjectMappingPrincipalSource {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SubjectMappingPrincipalSource {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SubjectMappingPrincipalSource {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SubjectMappingPrincipalSource {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SubjectMappingTenantIdField(::std::string::String);
+    impl ::std::ops::Deref for SubjectMappingTenantIdField {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SubjectMappingTenantIdField> for ::std::string::String {
+        fn from(value: SubjectMappingTenantIdField) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SubjectMappingTenantIdField> for SubjectMappingTenantIdField {
+        fn from(value: &SubjectMappingTenantIdField) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SubjectMappingTenantIdField {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SubjectMappingTenantIdField {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SubjectMappingTenantIdField {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SubjectMappingTenantIdField {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SubjectMappingTenantIdField {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
+pub mod root_authority_idp_key_snapshot {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "oauth_id_jag",
+    ///    "entra_jwt",
+    ///    "entra_agent_id",
+    ///    "oidc_jwt",
+    ///    "oauth_introspection",
+    ///    "chio_local_as",
+    ///    "chio_operator_key",
+    ///    "operator_static_bearer"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum AnchorKind {
+        #[serde(rename = "oauth_id_jag")]
+        OauthIdJag,
+        #[serde(rename = "entra_jwt")]
+        EntraJwt,
+        #[serde(rename = "entra_agent_id")]
+        EntraAgentId,
+        #[serde(rename = "oidc_jwt")]
+        OidcJwt,
+        #[serde(rename = "oauth_introspection")]
+        OauthIntrospection,
+        #[serde(rename = "chio_local_as")]
+        ChioLocalAs,
+        #[serde(rename = "chio_operator_key")]
+        ChioOperatorKey,
+        #[serde(rename = "operator_static_bearer")]
+        OperatorStaticBearer,
+    }
+    impl ::std::convert::From<&Self> for AnchorKind {
+        fn from(value: &AnchorKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for AnchorKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::OauthIdJag => f.write_str("oauth_id_jag"),
+                Self::EntraJwt => f.write_str("entra_jwt"),
+                Self::EntraAgentId => f.write_str("entra_agent_id"),
+                Self::OidcJwt => f.write_str("oidc_jwt"),
+                Self::OauthIntrospection => f.write_str("oauth_introspection"),
+                Self::ChioLocalAs => f.write_str("chio_local_as"),
+                Self::ChioOperatorKey => f.write_str("chio_operator_key"),
+                Self::OperatorStaticBearer => f.write_str("operator_static_bearer"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for AnchorKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "oauth_id_jag" => Ok(Self::OauthIdJag),
+                "entra_jwt" => Ok(Self::EntraJwt),
+                "entra_agent_id" => Ok(Self::EntraAgentId),
+                "oidc_jwt" => Ok(Self::OidcJwt),
+                "oauth_introspection" => Ok(Self::OauthIntrospection),
+                "chio_local_as" => Ok(Self::ChioLocalAs),
+                "chio_operator_key" => Ok(Self::ChioOperatorKey),
+                "operator_static_bearer" => Ok(Self::OperatorStaticBearer),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for AnchorKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for AnchorKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for AnchorKind {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`chio.idp-key-snapshot.v1`, signed by the exchange key. It records the key set the exchange fetched for an enterprise provider record, or took from the record's inline `jwks`, and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement of what the identity provider published, not identity-provider evidence.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json",
+    ///  "title": "Chio IdP Key Snapshot",
+    ///  "description": "`chio.idp-key-snapshot.v1`, signed by the exchange key. It records the key set the exchange fetched for an enterprise provider record, or took from the record's inline `jwks`, and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement of what the identity provider published, not identity-provider evidence.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "exchange_key",
+    ///    "issuer",
+    ///    "keys",
+    ///    "observed_at",
+    ///    "schema",
+    ///    "signature",
+    ///    "source"
+    ///  ],
+    ///  "properties": {
+    ///    "exchange_key": {
+    ///      "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "issuer": {
+    ///      "description": "A bounded URI or URN, such as an issuer.",
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000\\s]+$"
+    ///    },
+    ///    "keys": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
+    ///        "type": "object",
+    ///        "required": [
+    ///          "kid",
+    ///          "kty"
+    ///        ],
+    ///        "properties": {
+    ///          "alg": {
+    ///            "$ref": "#/$defs/JwsAlgorithm"
+    ///          },
+    ///          "cloud_instance_name": {
+    ///            "$ref": "#/$defs/Identifier"
+    ///          },
+    ///          "crv": {
+    ///            "type": "string",
+    ///            "enum": [
+    ///              "P-256",
+    ///              "P-384",
+    ///              "P-521",
+    ///              "Ed25519"
+    ///            ]
+    ///          },
+    ///          "e": {
+    ///            "type": "string",
+    ///            "maxLength": 16,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "issuer": {
+    ///            "$ref": "#/$defs/Uri"
+    ///          },
+    ///          "kid": {
+    ///            "$ref": "#/$defs/Identifier"
+    ///          },
+    ///          "kty": {
+    ///            "type": "string",
+    ///            "enum": [
+    ///              "RSA",
+    ///              "EC",
+    ///              "OKP"
+    ///            ]
+    ///          },
+    ///          "n": {
+    ///            "type": "string",
+    ///            "maxLength": 1400,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "use": {
+    ///            "type": "string",
+    ///            "enum": [
+    ///              "sig"
+    ///            ]
+    ///          },
+    ///          "x": {
+    ///            "type": "string",
+    ///            "maxLength": 128,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "x5c": {
+    ///            "type": "array",
+    ///            "items": {
+    ///              "type": "string",
+    ///              "maxLength": 16384,
+    ///              "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///            },
+    ///            "maxItems": 8
+    ///          },
+    ///          "x5t": {
+    ///            "type": "string",
+    ///            "maxLength": 64,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "x5t#S256": {
+    ///            "type": "string",
+    ///            "maxLength": 64,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          },
+    ///          "y": {
+    ///            "type": "string",
+    ///            "maxLength": 128,
+    ///            "pattern": "^[A-Za-z0-9_-]+$"
+    ///          }
+    ///        },
+    ///        "additionalProperties": false
+    ///      },
+    ///      "maxItems": 64
     ///    },
     ///    "observed_at": {
     ///      "type": "integer",
@@ -124756,14 +131398,24 @@ pub mod root_authority_idp_key_snapshot {
     ///      "const": "chio.idp-key-snapshot.v1"
     ///    },
     ///    "signature": {
-    ///      "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///      "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///      "type": "string",
-    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
     ///    "source": {
-    ///      "description": "The pinned `jwks_uri` the keys were fetched from.",
-    ///      "type": "string",
-    ///      "pattern": "^https://[^\\s]+$"
+    ///      "description": "The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.",
+    ///      "oneOf": [
+    ///        {
+    ///          "type": "string",
+    ///          "maxLength": 2048,
+    ///          "pattern": "^https://[^\\u0000\\s]+$"
+    ///        },
+    ///        {
+    ///          "type": "string",
+    ///          "maxLength": 137,
+    ///          "pattern": "^registry:[^\\u0000\\s]{1,128}$"
+    ///        }
+    ///      ]
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -124773,15 +131425,16 @@ pub mod root_authority_idp_key_snapshot {
     #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
     #[serde(deny_unknown_fields)]
     pub struct ChioIdPKeySnapshot {
-        ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+        ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
         pub exchange_key: ChioIdPKeySnapshotExchangeKey,
+        ///A bounded URI or URN, such as an issuer.
         pub issuer: ChioIdPKeySnapshotIssuer,
         pub keys: ::std::vec::Vec<ChioIdPKeySnapshotKeysItem>,
         pub observed_at: u64,
         pub schema: ::std::string::String,
-        ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+        ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
         pub signature: ChioIdPKeySnapshotSignature,
-        ///The pinned `jwks_uri` the keys were fetched from.
+        ///The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.
         pub source: ChioIdPKeySnapshotSource,
     }
     impl ::std::convert::From<&ChioIdPKeySnapshot> for ChioIdPKeySnapshot {
@@ -124789,13 +131442,13 @@ pub mod root_authority_idp_key_snapshot {
             value.clone()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -124874,14 +131527,17 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
-    ///`ChioIdPKeySnapshotIssuer`
+    ///A bounded URI or URN, such as an issuer.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
     ///}
     /// ```
     /// </details>
@@ -124907,8 +131563,16 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for ChioIdPKeySnapshotIssuer {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -124947,13 +131611,13 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -124962,6 +131626,9 @@ pub mod root_authority_idp_key_snapshot {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -124974,11 +131641,14 @@ pub mod root_authority_idp_key_snapshot {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -124990,6 +131660,7 @@ pub mod root_authority_idp_key_snapshot {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -125000,10 +131671,31 @@ pub mod root_authority_idp_key_snapshot {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -125017,10 +131709,14 @@ pub mod root_authority_idp_key_snapshot {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<ChioIdPKeySnapshotKeysItemCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<ChioIdPKeySnapshotKeysItemE>,
-        pub kid: ChioIdPKeySnapshotKeysItemKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: ChioIdPKeySnapshotKeysItemKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<ChioIdPKeySnapshotKeysItemN>,
@@ -125032,6 +131728,16 @@ pub mod root_authority_idp_key_snapshot {
         pub use_: ::std::option::Option<ChioIdPKeySnapshotKeysItemUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<ChioIdPKeySnapshotKeysItemX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<ChioIdPKeySnapshotKeysItemX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<ChioIdPKeySnapshotKeysItemX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<ChioIdPKeySnapshotKeysItemX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<ChioIdPKeySnapshotKeysItemY>,
     }
@@ -125133,6 +131839,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -125159,6 +131866,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -125190,79 +131900,6 @@ pub mod root_authority_idp_key_snapshot {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotKeysItemE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`ChioIdPKeySnapshotKeysItemKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct ChioIdPKeySnapshotKeysItemKid(::std::string::String);
-    impl ::std::ops::Deref for ChioIdPKeySnapshotKeysItemKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<ChioIdPKeySnapshotKeysItemKid> for ::std::string::String {
-        fn from(value: ChioIdPKeySnapshotKeysItemKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&ChioIdPKeySnapshotKeysItemKid> for ChioIdPKeySnapshotKeysItemKid {
-        fn from(value: &ChioIdPKeySnapshotKeysItemKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotKeysItemKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioIdPKeySnapshotKeysItemKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioIdPKeySnapshotKeysItemKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotKeysItemKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -125363,6 +132000,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -125389,6 +132027,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -125510,6 +132151,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -125536,6 +132178,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -125578,6 +132223,249 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
+    ///`ChioIdPKeySnapshotKeysItemX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioIdPKeySnapshotKeysItemX5cItem(::std::string::String);
+    impl ::std::ops::Deref for ChioIdPKeySnapshotKeysItemX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotKeysItemX5cItem> for ::std::string::String {
+        fn from(value: ChioIdPKeySnapshotKeysItemX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioIdPKeySnapshotKeysItemX5cItem>
+        for ChioIdPKeySnapshotKeysItemX5cItem
+    {
+        fn from(value: &ChioIdPKeySnapshotKeysItemX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotKeysItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioIdPKeySnapshotKeysItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioIdPKeySnapshotKeysItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotKeysItemX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioIdPKeySnapshotKeysItemX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioIdPKeySnapshotKeysItemX5t(::std::string::String);
+    impl ::std::ops::Deref for ChioIdPKeySnapshotKeysItemX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotKeysItemX5t> for ::std::string::String {
+        fn from(value: ChioIdPKeySnapshotKeysItemX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioIdPKeySnapshotKeysItemX5t> for ChioIdPKeySnapshotKeysItemX5t {
+        fn from(value: &ChioIdPKeySnapshotKeysItemX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotKeysItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioIdPKeySnapshotKeysItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioIdPKeySnapshotKeysItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotKeysItemX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioIdPKeySnapshotKeysItemX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioIdPKeySnapshotKeysItemX5tS256(::std::string::String);
+    impl ::std::ops::Deref for ChioIdPKeySnapshotKeysItemX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotKeysItemX5tS256> for ::std::string::String {
+        fn from(value: ChioIdPKeySnapshotKeysItemX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioIdPKeySnapshotKeysItemX5tS256>
+        for ChioIdPKeySnapshotKeysItemX5tS256
+    {
+        fn from(value: &ChioIdPKeySnapshotKeysItemX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotKeysItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioIdPKeySnapshotKeysItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioIdPKeySnapshotKeysItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotKeysItemX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`ChioIdPKeySnapshotKeysItemY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -125585,6 +132473,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -125611,6 +132500,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for ChioIdPKeySnapshotKeysItemY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -125653,15 +132545,15 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -125690,14 +132582,14 @@ pub mod root_authority_idp_key_snapshot {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -125738,33 +132630,35 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
-    ///The pinned `jwks_uri` the keys were fetched from.
+    ///The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "The pinned `jwks_uri` the keys were fetched from.",
-    ///  "type": "string",
-    ///  "pattern": "^https://[^\\s]+$"
+    ///  "description": "The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.",
+    ///  "oneOf": [
+    ///    {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "pattern": "^https://[^\\u0000\\s]+$"
+    ///    },
+    ///    {
+    ///      "type": "string",
+    ///      "maxLength": 137,
+    ///      "pattern": "^registry:[^\\u0000\\s]{1,128}$"
+    ///    }
+    ///  ]
     ///}
     /// ```
     /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct ChioIdPKeySnapshotSource(::std::string::String);
-    impl ::std::ops::Deref for ChioIdPKeySnapshotSource {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ChioIdPKeySnapshotSource {
+        Variant0(ChioIdPKeySnapshotSourceVariant0),
+        Variant1(ChioIdPKeySnapshotSourceVariant1),
     }
-    impl ::std::convert::From<ChioIdPKeySnapshotSource> for ::std::string::String {
-        fn from(value: ChioIdPKeySnapshotSource) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&ChioIdPKeySnapshotSource> for ChioIdPKeySnapshotSource {
+    impl ::std::convert::From<&Self> for ChioIdPKeySnapshotSource {
         fn from(value: &ChioIdPKeySnapshotSource) -> Self {
             value.clone()
         }
@@ -125772,12 +132666,13 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for ChioIdPKeySnapshotSource {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^https://[^\\s]+$").unwrap());
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^https://[^\\s]+$\"".into());
+            if let Ok(v) = value.parse() {
+                Ok(Self::Variant0(v))
+            } else if let Ok(v) = value.parse() {
+                Ok(Self::Variant1(v))
+            } else {
+                Err("string conversion failed for all variants".into())
             }
-            Ok(Self(value.to_string()))
         }
     }
     impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotSource {
@@ -125802,7 +132697,94 @@ pub mod root_authority_idp_key_snapshot {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotSource {
+    impl ::std::fmt::Display for ChioIdPKeySnapshotSource {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match self {
+                Self::Variant0(x) => x.fmt(f),
+                Self::Variant1(x) => x.fmt(f),
+            }
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotSourceVariant0> for ChioIdPKeySnapshotSource {
+        fn from(value: ChioIdPKeySnapshotSourceVariant0) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotSourceVariant1> for ChioIdPKeySnapshotSource {
+        fn from(value: ChioIdPKeySnapshotSourceVariant1) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    ///`ChioIdPKeySnapshotSourceVariant0`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioIdPKeySnapshotSourceVariant0(::std::string::String);
+    impl ::std::ops::Deref for ChioIdPKeySnapshotSourceVariant0 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotSourceVariant0> for ::std::string::String {
+        fn from(value: ChioIdPKeySnapshotSourceVariant0) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioIdPKeySnapshotSourceVariant0> for ChioIdPKeySnapshotSourceVariant0 {
+        fn from(value: &ChioIdPKeySnapshotSourceVariant0) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioIdPKeySnapshotSourceVariant0 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotSourceVariant0 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioIdPKeySnapshotSourceVariant0 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioIdPKeySnapshotSourceVariant0 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotSourceVariant0 {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -125812,6 +132794,139 @@ pub mod root_authority_idp_key_snapshot {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///`ChioIdPKeySnapshotSourceVariant1`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 137,
+    ///  "pattern": "^registry:[^\\u0000\\s]{1,128}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioIdPKeySnapshotSourceVariant1(::std::string::String);
+    impl ::std::ops::Deref for ChioIdPKeySnapshotSourceVariant1 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioIdPKeySnapshotSourceVariant1> for ::std::string::String {
+        fn from(value: ChioIdPKeySnapshotSourceVariant1) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioIdPKeySnapshotSourceVariant1> for ChioIdPKeySnapshotSourceVariant1 {
+        fn from(value: &ChioIdPKeySnapshotSourceVariant1) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioIdPKeySnapshotSourceVariant1 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 137usize {
+                return Err("longer than 137 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^registry:[^\\u0000\\s]{1,128}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^registry:[^\\u0000\\s]{1,128}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioIdPKeySnapshotSourceVariant1 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioIdPKeySnapshotSourceVariant1 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioIdPKeySnapshotSourceVariant1 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioIdPKeySnapshotSourceVariant1 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
         }
     }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
@@ -125831,8 +132946,7 @@ pub mod root_authority_idp_key_snapshot {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -125843,88 +132957,11 @@ pub mod root_authority_idp_key_snapshot {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
@@ -126005,13 +133042,13 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -126083,13 +133120,178 @@ pub mod root_authority_idp_key_snapshot {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -126098,6 +133300,9 @@ pub mod root_authority_idp_key_snapshot {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -126110,11 +133315,14 @@ pub mod root_authority_idp_key_snapshot {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -126126,6 +133334,7 @@ pub mod root_authority_idp_key_snapshot {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -126136,10 +133345,31 @@ pub mod root_authority_idp_key_snapshot {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -126153,10 +133383,14 @@ pub mod root_authority_idp_key_snapshot {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -126168,6 +133402,16 @@ pub mod root_authority_idp_key_snapshot {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -126269,6 +133513,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -126295,6 +133540,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -126326,79 +133574,6 @@ pub mod root_authority_idp_key_snapshot {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -126499,6 +133674,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -126525,6 +133701,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -126646,6 +133825,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -126672,6 +133852,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -126714,6 +133897,245 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -126721,6 +134143,7 @@ pub mod root_authority_idp_key_snapshot {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -126747,6 +134170,9 @@ pub mod root_authority_idp_key_snapshot {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -126907,13 +134333,13 @@ pub mod root_authority_idp_key_snapshot {
             value.parse()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -126990,6 +134416,89 @@ pub mod root_authority_idp_key_snapshot {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
@@ -127072,15 +134581,96 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -127109,14 +134699,14 @@ pub mod root_authority_idp_key_snapshot {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -127157,6 +134747,174 @@ pub mod root_authority_idp_key_snapshot {
                 })
         }
     }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
 }
 pub mod root_authority_revocation_request {
     /// Error types.
@@ -127185,13 +134943,13 @@ pub mod root_authority_revocation_request {
             }
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -127293,7 +135051,7 @@ pub mod root_authority_revocation_request {
             value.parse()
         }
     }
-    ///`chio.revocation-request.v1` (PROTOCOL 5.6.7), signed by `revoker_key` over the signing wrapper. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
+    ///`chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -127301,7 +135059,7 @@ pub mod root_authority_revocation_request {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/revocation-request.schema.json",
     ///  "title": "Chio Revocation Request",
-    ///  "description": "`chio.revocation-request.v1` (PROTOCOL 5.6.7), signed by `revoker_key` over the signing wrapper. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.",
+    ///  "description": "`chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.",
     ///  "type": "object",
     ///  "required": [
     ///    "issued_at",
@@ -127325,10 +135083,11 @@ pub mod root_authority_revocation_request {
     ///    "reason": {
     ///      "type": "string",
     ///      "maxLength": 256,
-    ///      "minLength": 1
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "revoker_key": {
-    ///      "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///      "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///      "type": "string",
     ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
@@ -127337,13 +135096,16 @@ pub mod root_authority_revocation_request {
     ///      "const": "chio.revocation-request.v1"
     ///    },
     ///    "signature": {
-    ///      "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///      "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///      "type": "string",
-    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
     ///    "target_capability_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -127357,11 +135119,12 @@ pub mod root_authority_revocation_request {
         ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
         pub presentation_digest: ChioRevocationRequestPresentationDigest,
         pub reason: ChioRevocationRequestReason,
-        ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+        ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
         pub revoker_key: ChioRevocationRequestRevokerKey,
         pub schema: ::std::string::String,
-        ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+        ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
         pub signature: ChioRevocationRequestSignature,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         pub target_capability_id: ChioRevocationRequestTargetCapabilityId,
     }
     impl ::std::convert::From<&ChioRevocationRequest> for ChioRevocationRequest {
@@ -127457,7 +135220,8 @@ pub mod root_authority_revocation_request {
     ///{
     ///  "type": "string",
     ///  "maxLength": 256,
-    ///  "minLength": 1
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -127488,6 +135252,11 @@ pub mod root_authority_revocation_request {
             }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -127526,13 +135295,13 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -127611,15 +135380,15 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -127648,14 +135417,14 @@ pub mod root_authority_revocation_request {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -127696,14 +135465,17 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
-    ///`ChioRevocationRequestTargetCapabilityId`
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -127731,8 +135503,16 @@ pub mod root_authority_revocation_request {
     impl ::std::str::FromStr for ChioRevocationRequestTargetCapabilityId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -127771,6 +135551,58 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -127788,8 +135620,7 @@ pub mod root_authority_revocation_request {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -127800,88 +135631,11 @@ pub mod root_authority_revocation_request {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
@@ -127962,13 +135716,13 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -128040,13 +135794,178 @@ pub mod root_authority_revocation_request {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -128055,6 +135974,9 @@ pub mod root_authority_revocation_request {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -128067,11 +135989,14 @@ pub mod root_authority_revocation_request {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -128083,6 +136008,7 @@ pub mod root_authority_revocation_request {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -128093,10 +136019,31 @@ pub mod root_authority_revocation_request {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -128110,10 +136057,14 @@ pub mod root_authority_revocation_request {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -128125,6 +136076,16 @@ pub mod root_authority_revocation_request {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -128226,6 +136187,7 @@ pub mod root_authority_revocation_request {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -128252,6 +136214,9 @@ pub mod root_authority_revocation_request {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -128283,79 +136248,6 @@ pub mod root_authority_revocation_request {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -128456,6 +136348,7 @@ pub mod root_authority_revocation_request {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -128482,6 +136375,9 @@ pub mod root_authority_revocation_request {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -128603,6 +136499,7 @@ pub mod root_authority_revocation_request {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -128629,6 +136526,9 @@ pub mod root_authority_revocation_request {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -128671,6 +136571,245 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -128678,6 +136817,7 @@ pub mod root_authority_revocation_request {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -128704,6 +136844,9 @@ pub mod root_authority_revocation_request {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -128864,13 +137007,13 @@ pub mod root_authority_revocation_request {
             value.parse()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -128947,6 +137090,89 @@ pub mod root_authority_revocation_request {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
@@ -129029,15 +137255,96 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -129066,14 +137373,14 @@ pub mod root_authority_revocation_request {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -129114,6 +137421,174 @@ pub mod root_authority_revocation_request {
                 })
         }
     }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
 }
 pub mod root_authority_root_anchor {
     /// Error types.
@@ -129142,13 +137617,13 @@ pub mod root_authority_root_anchor {
             }
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -129250,7 +137725,7 @@ pub mod root_authority_root_anchor {
             value.parse()
         }
     }
-    ///The `root_anchor` member of a root `chio.capability.v1` body (PROTOCOL 5.6.1). A delegated token copies it byte for byte from its root. The `$defs` here are shared by every root-authority schema.
+    ///The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -129258,7 +137733,7 @@ pub mod root_authority_root_anchor {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/root-anchor.schema.json",
     ///  "title": "Chio Root Anchor",
-    ///  "description": "The `root_anchor` member of a root `chio.capability.v1` body (PROTOCOL 5.6.1). A delegated token copies it byte for byte from its root. The `$defs` here are shared by every root-authority schema.",
+    ///  "description": "The `root_anchor` member of a root `chio.capability.v1` body. It names how the root was anchored, binds the delegation context and root policy by digest, and is copied byte for byte into every delegated token. The `$defs` here are shared by every root-authority schema.",
     ///  "type": "object",
     ///  "required": [
     ///    "anchored_at",
@@ -129312,6 +137787,58 @@ pub mod root_authority_root_anchor {
             value.clone()
         }
     }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -129329,8 +137856,7 @@ pub mod root_authority_root_anchor {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -129341,88 +137867,11 @@ pub mod root_authority_root_anchor {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
@@ -129503,13 +137952,13 @@ pub mod root_authority_root_anchor {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -129581,13 +138030,178 @@ pub mod root_authority_root_anchor {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -129596,6 +138210,9 @@ pub mod root_authority_root_anchor {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -129608,11 +138225,14 @@ pub mod root_authority_root_anchor {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -129624,6 +138244,7 @@ pub mod root_authority_root_anchor {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -129634,10 +138255,31 @@ pub mod root_authority_root_anchor {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -129651,10 +138293,14 @@ pub mod root_authority_root_anchor {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -129666,6 +138312,16 @@ pub mod root_authority_root_anchor {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -129767,6 +138423,7 @@ pub mod root_authority_root_anchor {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -129793,6 +138450,9 @@ pub mod root_authority_root_anchor {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -129824,79 +138484,6 @@ pub mod root_authority_root_anchor {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -129997,6 +138584,7 @@ pub mod root_authority_root_anchor {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -130023,6 +138611,9 @@ pub mod root_authority_root_anchor {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -130144,6 +138735,7 @@ pub mod root_authority_root_anchor {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -130170,6 +138762,9 @@ pub mod root_authority_root_anchor {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -130212,6 +138807,245 @@ pub mod root_authority_root_anchor {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -130219,6 +139053,7 @@ pub mod root_authority_root_anchor {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -130245,6 +139080,9 @@ pub mod root_authority_root_anchor {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -130405,13 +139243,13 @@ pub mod root_authority_root_anchor {
             value.parse()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -130488,6 +139326,89 @@ pub mod root_authority_root_anchor {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
@@ -130570,15 +139491,96 @@ pub mod root_authority_root_anchor {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -130607,14 +139609,14 @@ pub mod root_authority_root_anchor {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -130644,6 +139646,174 @@ pub mod root_authority_root_anchor {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -130937,13 +140107,13 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -132365,7 +141535,7 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///`chio.root-policy.v1` (PROTOCOL 5.6.4), signed by the provider's policy key over the signing wrapper. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts.
+    ///`chio.root-policy.v1`, signed by the provider's policy key. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts. Provider identity (issuer, keys, endpoints, audiences, principal and tenant claims) is never held here: a provider-backed rule names an enterprise provider record and pins the digest of its identity projection. Decoding is strict: an unknown member at any level rejects at load.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -132373,7 +141543,7 @@ pub mod root_authority_root_policy {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/root-policy.schema.json",
     ///  "title": "Chio Root Policy",
-    ///  "description": "`chio.root-policy.v1` (PROTOCOL 5.6.4), signed by the provider's policy key over the signing wrapper. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts.",
+    ///  "description": "`chio.root-policy.v1`, signed by the provider's policy key. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts. Provider identity (issuer, keys, endpoints, audiences, principal and tenant claims) is never held here: a provider-backed rule names an enterprise provider record and pins the digest of its identity projection. Decoding is strict: an unknown member at any level rejects at load.",
     ///  "type": "object",
     ///  "required": [
     ///    "disclosure",
@@ -132393,19 +141563,23 @@ pub mod root_authority_root_policy {
     ///    "exchange_keys": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///        "type": "string",
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
+    ///      "maxItems": 16,
     ///      "minItems": 1,
     ///      "uniqueItems": true
     ///    },
     ///    "policy_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "policy_key": {
-    ///      "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///      "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///      "type": "string",
     ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
@@ -132414,6 +141588,7 @@ pub mod root_authority_root_policy {
     ///      "items": {
     ///        "$ref": "#/$defs/RootPolicyRule"
     ///      },
+    ///      "maxItems": 64,
     ///      "minItems": 1
     ///    },
     ///    "schema": {
@@ -132421,9 +141596,9 @@ pub mod root_authority_root_policy {
     ///      "const": "chio.root-policy.v1"
     ///    },
     ///    "signature": {
-    ///      "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///      "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///      "type": "string",
-    ///      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///      "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///    },
     ///    "valid_from": {
     ///      "type": "integer",
@@ -132443,12 +141618,13 @@ pub mod root_authority_root_policy {
     pub struct ChioRootPolicy {
         pub disclosure: RootPolicyDisclosure,
         pub exchange_keys: Vec<ChioRootPolicyExchangeKeysItem>,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         pub policy_id: ChioRootPolicyPolicyId,
-        ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+        ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
         pub policy_key: ChioRootPolicyPolicyKey,
         pub rules: ::std::vec::Vec<RootPolicyRule>,
         pub schema: ::std::string::String,
-        ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+        ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
         pub signature: ChioRootPolicySignature,
         pub valid_from: u64,
         pub valid_until: u64,
@@ -132458,13 +141634,13 @@ pub mod root_authority_root_policy {
             value.clone()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -132543,14 +141719,17 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///`ChioRootPolicyPolicyId`
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -132576,8 +141755,16 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for ChioRootPolicyPolicyId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -132616,13 +141803,13 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -132701,15 +141888,15 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -132738,14 +141925,14 @@ pub mod root_authority_root_policy {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -132842,6 +142029,135 @@ pub mod root_authority_root_policy {
             }
         }
     }
+    ///`ClaimMode`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "plain",
+    ///    "committed"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum ClaimMode {
+        #[serde(rename = "plain")]
+        Plain,
+        #[serde(rename = "committed")]
+        Committed,
+    }
+    impl ::std::convert::From<&Self> for ClaimMode {
+        fn from(value: &ClaimMode) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for ClaimMode {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Plain => f.write_str("plain"),
+                Self::Committed => f.write_str("committed"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for ClaimMode {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "plain" => Ok(Self::Plain),
+                "committed" => Ok(Self::Committed),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ClaimMode {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ClaimMode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ClaimMode {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -132859,8 +142175,7 @@ pub mod root_authority_root_policy {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -132871,88 +142186,11 @@ pub mod root_authority_root_policy {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///`Constraint`
@@ -134827,13 +144065,13 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -134905,6 +144143,171 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
+    ///`HttpsUrl`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`InlineFields`
     ///
     /// <details><summary>JSON schema</summary>
@@ -134920,8 +144323,10 @@ pub mod root_authority_root_policy {
     ///      "type": "array",
     ///      "items": {
     ///        "type": "string",
+    ///        "maxLength": 256,
     ///        "pattern": "^(/([^~/]|~[01])*)+$"
     ///      },
+    ///      "maxItems": 64,
     ///      "uniqueItems": true
     ///    }
     ///  },
@@ -134946,6 +144351,7 @@ pub mod root_authority_root_policy {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 256,
     ///  "pattern": "^(/([^~/]|~[01])*)+$"
     ///}
     /// ```
@@ -134972,6 +144378,9 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for InlineFieldsInlineFieldsItem {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| {
                     ::regress::Regex::new("^(/([^~/]|~[01])*)+$").unwrap()
@@ -135016,13 +144425,13 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -135031,6 +144440,9 @@ pub mod root_authority_root_policy {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -135043,11 +144455,14 @@ pub mod root_authority_root_policy {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -135059,6 +144474,7 @@ pub mod root_authority_root_policy {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -135069,10 +144485,31 @@ pub mod root_authority_root_policy {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -135086,10 +144523,14 @@ pub mod root_authority_root_policy {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -135101,6 +144542,16 @@ pub mod root_authority_root_policy {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -135202,6 +144653,7 @@ pub mod root_authority_root_policy {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -135228,6 +144680,9 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -135259,79 +144714,6 @@ pub mod root_authority_root_policy {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -135432,6 +144814,7 @@ pub mod root_authority_root_policy {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -135458,6 +144841,9 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -135579,6 +144965,7 @@ pub mod root_authority_root_policy {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -135605,6 +144992,9 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -135647,6 +145037,245 @@ pub mod root_authority_root_policy {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -135654,6 +145283,7 @@ pub mod root_authority_root_policy {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -135680,6 +145310,9 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -135838,6 +145471,926 @@ pub mod root_authority_root_policy {
             value: ::std::string::String,
         ) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
+        }
+    }
+    ///Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "aud": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "azp": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "client_id": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "oid": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "resource": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "scope": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "sub": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    },
+    ///    "tid": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "description": "A bounded NUL-free string.",
+    ///        "type": "string",
+    ///        "maxLength": 1024,
+    ///        "minLength": 1,
+    ///        "pattern": "^[^\\u0000]+$"
+    ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct MatchClaims {
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub appid: ::std::vec::Vec<MatchClaimsAppidItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub aud: ::std::vec::Vec<MatchClaimsAudItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub azp: ::std::vec::Vec<MatchClaimsAzpItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub client_id: ::std::vec::Vec<MatchClaimsClientIdItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub oid: ::std::vec::Vec<MatchClaimsOidItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub resource: ::std::vec::Vec<MatchClaimsResourceItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub scope: ::std::vec::Vec<MatchClaimsScopeItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub sub: ::std::vec::Vec<MatchClaimsSubItem>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub tid: ::std::vec::Vec<MatchClaimsTidItem>,
+    }
+    impl ::std::convert::From<&MatchClaims> for MatchClaims {
+        fn from(value: &MatchClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for MatchClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsAppidItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsAppidItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsAppidItem> for ::std::string::String {
+        fn from(value: MatchClaimsAppidItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsAppidItem> for MatchClaimsAppidItem {
+        fn from(value: &MatchClaimsAppidItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsAppidItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsAppidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsAppidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsAppidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsAppidItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsAudItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsAudItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsAudItem> for ::std::string::String {
+        fn from(value: MatchClaimsAudItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsAudItem> for MatchClaimsAudItem {
+        fn from(value: &MatchClaimsAudItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsAudItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsAudItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsAudItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsAudItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsAudItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsAzpItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsAzpItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsAzpItem> for ::std::string::String {
+        fn from(value: MatchClaimsAzpItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsAzpItem> for MatchClaimsAzpItem {
+        fn from(value: &MatchClaimsAzpItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsAzpItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsAzpItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsAzpItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsAzpItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsAzpItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsClientIdItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsClientIdItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsClientIdItem> for ::std::string::String {
+        fn from(value: MatchClaimsClientIdItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsClientIdItem> for MatchClaimsClientIdItem {
+        fn from(value: &MatchClaimsClientIdItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsClientIdItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsClientIdItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsClientIdItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsClientIdItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsClientIdItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsOidItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsOidItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsOidItem> for ::std::string::String {
+        fn from(value: MatchClaimsOidItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsOidItem> for MatchClaimsOidItem {
+        fn from(value: &MatchClaimsOidItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsOidItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsOidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsOidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsOidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsOidItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsResourceItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsResourceItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsResourceItem> for ::std::string::String {
+        fn from(value: MatchClaimsResourceItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsResourceItem> for MatchClaimsResourceItem {
+        fn from(value: &MatchClaimsResourceItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsResourceItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsResourceItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsResourceItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsResourceItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsResourceItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsScopeItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsScopeItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsScopeItem> for ::std::string::String {
+        fn from(value: MatchClaimsScopeItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsScopeItem> for MatchClaimsScopeItem {
+        fn from(value: &MatchClaimsScopeItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsScopeItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsScopeItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsScopeItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsScopeItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsScopeItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsSubItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsSubItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsSubItem> for ::std::string::String {
+        fn from(value: MatchClaimsSubItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsSubItem> for MatchClaimsSubItem {
+        fn from(value: &MatchClaimsSubItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsSubItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsSubItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsSubItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsSubItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsSubItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct MatchClaimsTidItem(::std::string::String);
+    impl ::std::ops::Deref for MatchClaimsTidItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<MatchClaimsTidItem> for ::std::string::String {
+        fn from(value: MatchClaimsTidItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&MatchClaimsTidItem> for MatchClaimsTidItem {
+        fn from(value: &MatchClaimsTidItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for MatchClaimsTidItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for MatchClaimsTidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for MatchClaimsTidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for MatchClaimsTidItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for MatchClaimsTidItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
         }
     }
     ///A monetary amount in the currency's smallest minor unit. Mirrors `MonetaryAmount`.
@@ -136159,13 +146712,13 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -136242,6 +146795,172 @@ pub mod root_authority_root_policy {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///Claims copied into the delegation context, each plain or committed. The claim set is closed.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Claims copied into the delegation context, each plain or committed. The claim set is closed.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimMode"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaimModes {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimMode>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimMode>,
+    }
+    impl ::std::convert::From<&RecordedClaimModes> for RecordedClaimModes {
+        fn from(value: &RecordedClaimModes) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaimModes {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///`RequireApprovalAboveConstraint`
@@ -136453,8 +147172,13 @@ pub mod root_authority_root_policy {
     ///    "tools": {
     ///      "description": "`server/tool` to the RFC 6901 pointers that may appear in plaintext in that tool's receipts. A tool not listed is fully committed.",
     ///      "type": "object",
+    ///      "maxProperties": 1024,
     ///      "additionalProperties": {
     ///        "$ref": "#/$defs/ToolDisclosure"
+    ///      },
+    ///      "propertyNames": {
+    ///        "maxLength": 256,
+    ///        "pattern": "^[^\\u0000/]+/[^\\u0000]+$"
     ///      }
     ///    }
     ///  },
@@ -136472,23 +147196,104 @@ pub mod root_authority_root_policy {
             default,
             skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
         )]
-        pub tools: ::std::collections::HashMap<::std::string::String, ToolDisclosure>,
+        pub tools: ::std::collections::HashMap<RootPolicyDisclosureToolsKey, ToolDisclosure>,
     }
     impl ::std::convert::From<&RootPolicyDisclosure> for RootPolicyDisclosure {
         fn from(value: &RootPolicyDisclosure) -> Self {
             value.clone()
         }
     }
-    ///`RootPolicyMatch`
+    ///`RootPolicyDisclosureToolsKey`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "type": "string",
+    ///  "maxLength": 256,
+    ///  "pattern": "^[^\\u0000/]+/[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RootPolicyDisclosureToolsKey(::std::string::String);
+    impl ::std::ops::Deref for RootPolicyDisclosureToolsKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RootPolicyDisclosureToolsKey> for ::std::string::String {
+        fn from(value: RootPolicyDisclosureToolsKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RootPolicyDisclosureToolsKey> for RootPolicyDisclosureToolsKey {
+        fn from(value: &RootPolicyDisclosureToolsKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RootPolicyDisclosureToolsKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 256usize {
+                return Err("longer than 256 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[^\\u0000/]+/[^\\u0000]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000/]+/[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RootPolicyDisclosureToolsKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyDisclosureToolsKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyDisclosureToolsKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RootPolicyDisclosureToolsKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.",
     ///  "type": "object",
     ///  "required": [
-    ///    "anchor_kind",
-    ///    "issuer"
+    ///    "anchor_kind"
     ///  ],
     ///  "properties": {
     ///    "allowed_algs": {
@@ -136509,11 +147314,12 @@ pub mod root_authority_root_policy {
     ///          "EdDSA"
     ///        ]
     ///      },
+    ///      "maxItems": 10,
     ///      "minItems": 1,
     ///      "uniqueItems": true
     ///    },
     ///    "anchor_kind": {
-    ///      "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///      "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///      "type": "string",
     ///      "enum": [
     ///        "oauth_id_jag",
@@ -136527,25 +147333,19 @@ pub mod root_authority_root_policy {
     ///      ]
     ///    },
     ///    "claims": {
-    ///      "description": "Claim name to the values it must take for the rule to match.",
-    ///      "type": "object",
-    ///      "additionalProperties": {
-    ///        "type": "array",
-    ///        "items": {
-    ///          "type": "string",
-    ///          "minLength": 1
-    ///        },
-    ///        "minItems": 1
-    ///      }
+    ///      "$ref": "#/$defs/MatchClaims"
     ///    },
-    ///    "issuer": {
+    ///    "provider_identity_digest": {
+    ///      "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "pattern": "^sha256:[0-9a-f]{64}$"
     ///    },
-    ///    "jwks_uri": {
-    ///      "description": "Required for every JWKS-verified kind. Keys are fetched only from it.",
+    ///    "provider_record_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "pattern": "^https://[^\\s]+$"
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -136557,21 +147357,16 @@ pub mod root_authority_root_policy {
     pub struct RootPolicyMatch {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub allowed_algs: ::std::option::Option<Vec<RootPolicyMatchAllowedAlgsItem>>,
-        ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+        ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
         pub anchor_kind: RootPolicyMatchAnchorKind,
-        ///Claim name to the values it must take for the rule to match.
-        #[serde(
-            default,
-            skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
-        )]
-        pub claims: ::std::collections::HashMap<
-            ::std::string::String,
-            ::std::vec::Vec<RootPolicyMatchClaimsValueItem>,
-        >,
-        pub issuer: RootPolicyMatchIssuer,
-        ///Required for every JWKS-verified kind. Keys are fetched only from it.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub jwks_uri: ::std::option::Option<RootPolicyMatchJwksUri>,
+        pub claims: ::std::option::Option<MatchClaims>,
+        ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub provider_identity_digest: ::std::option::Option<RootPolicyMatchProviderIdentityDigest>,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub provider_record_id: ::std::option::Option<RootPolicyMatchProviderRecordId>,
     }
     impl ::std::convert::From<&RootPolicyMatch> for RootPolicyMatch {
         fn from(value: &RootPolicyMatch) -> Self {
@@ -136696,13 +147491,13 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -136804,201 +147599,59 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    ///`RootPolicyMatchClaimsValueItem`
+    ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "pattern": "^sha256:[0-9a-f]{64}$"
     ///}
     /// ```
     /// </details>
     #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     #[serde(transparent)]
-    pub struct RootPolicyMatchClaimsValueItem(::std::string::String);
-    impl ::std::ops::Deref for RootPolicyMatchClaimsValueItem {
+    pub struct RootPolicyMatchProviderIdentityDigest(::std::string::String);
+    impl ::std::ops::Deref for RootPolicyMatchProviderIdentityDigest {
         type Target = ::std::string::String;
         fn deref(&self) -> &::std::string::String {
             &self.0
         }
     }
-    impl ::std::convert::From<RootPolicyMatchClaimsValueItem> for ::std::string::String {
-        fn from(value: RootPolicyMatchClaimsValueItem) -> Self {
+    impl ::std::convert::From<RootPolicyMatchProviderIdentityDigest> for ::std::string::String {
+        fn from(value: RootPolicyMatchProviderIdentityDigest) -> Self {
             value.0
         }
     }
-    impl ::std::convert::From<&RootPolicyMatchClaimsValueItem> for RootPolicyMatchClaimsValueItem {
-        fn from(value: &RootPolicyMatchClaimsValueItem) -> Self {
+    impl ::std::convert::From<&RootPolicyMatchProviderIdentityDigest>
+        for RootPolicyMatchProviderIdentityDigest
+    {
+        fn from(value: &RootPolicyMatchProviderIdentityDigest) -> Self {
             value.clone()
         }
     }
-    impl ::std::str::FromStr for RootPolicyMatchClaimsValueItem {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RootPolicyMatchClaimsValueItem {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyMatchClaimsValueItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyMatchClaimsValueItem {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for RootPolicyMatchClaimsValueItem {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`RootPolicyMatchIssuer`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct RootPolicyMatchIssuer(::std::string::String);
-    impl ::std::ops::Deref for RootPolicyMatchIssuer {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<RootPolicyMatchIssuer> for ::std::string::String {
-        fn from(value: RootPolicyMatchIssuer) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&RootPolicyMatchIssuer> for RootPolicyMatchIssuer {
-        fn from(value: &RootPolicyMatchIssuer) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for RootPolicyMatchIssuer {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RootPolicyMatchIssuer {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyMatchIssuer {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyMatchIssuer {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for RootPolicyMatchIssuer {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///Required for every JWKS-verified kind. Keys are fetched only from it.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Required for every JWKS-verified kind. Keys are fetched only from it.",
-    ///  "type": "string",
-    ///  "pattern": "^https://[^\\s]+$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct RootPolicyMatchJwksUri(::std::string::String);
-    impl ::std::ops::Deref for RootPolicyMatchJwksUri {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<RootPolicyMatchJwksUri> for ::std::string::String {
-        fn from(value: RootPolicyMatchJwksUri) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&RootPolicyMatchJwksUri> for RootPolicyMatchJwksUri {
-        fn from(value: &RootPolicyMatchJwksUri) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for RootPolicyMatchJwksUri {
+    impl ::std::str::FromStr for RootPolicyMatchProviderIdentityDigest {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^https://[^\\s]+$").unwrap());
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^sha256:[0-9a-f]{64}$").unwrap()
+                });
             if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^https://[^\\s]+$\"".into());
+                return Err("doesn't match pattern \"^sha256:[0-9a-f]{64}$\"".into());
             }
             Ok(Self(value.to_string()))
         }
     }
-    impl ::std::convert::TryFrom<&str> for RootPolicyMatchJwksUri {
+    impl ::std::convert::TryFrom<&str> for RootPolicyMatchProviderIdentityDigest {
         type Error = self::error::ConversionError;
         fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyMatchJwksUri {
+    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyMatchProviderIdentityDigest {
         type Error = self::error::ConversionError;
         fn try_from(
             value: &::std::string::String,
@@ -137006,7 +147659,7 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyMatchJwksUri {
+    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyMatchProviderIdentityDigest {
         type Error = self::error::ConversionError;
         fn try_from(
             value: ::std::string::String,
@@ -137014,7 +147667,91 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    impl<'de> ::serde::Deserialize<'de> for RootPolicyMatchJwksUri {
+    impl<'de> ::serde::Deserialize<'de> for RootPolicyMatchProviderIdentityDigest {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RootPolicyMatchProviderRecordId(::std::string::String);
+    impl ::std::ops::Deref for RootPolicyMatchProviderRecordId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RootPolicyMatchProviderRecordId> for ::std::string::String {
+        fn from(value: RootPolicyMatchProviderRecordId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RootPolicyMatchProviderRecordId> for RootPolicyMatchProviderRecordId {
+        fn from(value: &RootPolicyMatchProviderRecordId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RootPolicyMatchProviderRecordId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RootPolicyMatchProviderRecordId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyMatchProviderRecordId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyMatchProviderRecordId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RootPolicyMatchProviderRecordId {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -137045,6 +147782,7 @@ pub mod root_authority_root_policy {
     ///    "capability_ttl_secs": {
     ///      "description": "Defaults to 300.",
     ///      "type": "integer",
+    ///      "maximum": 86400.0,
     ///      "minimum": 1.0
     ///    },
     ///    "ceiling_scope": {
@@ -137080,25 +147818,35 @@ pub mod root_authority_root_policy {
     ///    "holder_classes": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///        "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///        "type": "string",
     ///        "enum": [
     ///          "edge_session",
     ///          "caller"
     ///        ]
     ///      },
+    ///      "maxItems": 2,
     ///      "minItems": 1,
     ///      "uniqueItems": true
     ///    },
     ///    "idp_scope_projection": {
     ///      "description": "Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.",
     ///      "type": "object",
+    ///      "maxProperties": 256,
     ///      "additionalProperties": {
     ///        "type": "array",
     ///        "items": {
+    ///          "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///          "type": "string",
-    ///          "minLength": 1
-    ///        }
+    ///          "maxLength": 128,
+    ///          "minLength": 1,
+    ///          "pattern": "^[^\\u0000]+$"
+    ///        },
+    ///        "maxItems": 256
+    ///      },
+    ///      "propertyNames": {
+    ///        "maxLength": 128,
+    ///        "pattern": "^[^\\u0000]+$"
     ///      }
     ///    },
     ///    "match": {
@@ -137107,6 +147855,7 @@ pub mod root_authority_root_policy {
     ///    "max_assertion_lifetime_secs": {
     ///      "description": "Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.",
     ///      "type": "integer",
+    ///      "maximum": 86400.0,
     ///      "minimum": 1.0
     ///    },
     ///    "max_clock_skew_secs": {
@@ -137115,38 +147864,32 @@ pub mod root_authority_root_policy {
     ///      "minimum": 0.0
     ///    },
     ///    "principal": {
-    ///      "description": "Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind.",
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "recorded_claims": {
-    ///      "description": "Claims copied into the delegation context, each plain or committed.",
-    ///      "type": "object",
-    ///      "additionalProperties": {
-    ///        "type": "string",
-    ///        "enum": [
-    ///          "plain",
-    ///          "committed"
-    ///        ]
-    ///      }
+    ///      "$ref": "#/$defs/RecordedClaimModes"
     ///    },
     ///    "retain_idp_artifact": {
     ///      "description": "Allowed only on `oauth_id_jag` rules.",
     ///      "type": "boolean"
     ///    },
     ///    "rule_id": {
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
-    ///    },
-    ///    "tenant_claim": {
-    ///      "description": "Claim that identifies the caller's tenant (`iss` for per-organization issuers, `tid` for Entra).",
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    },
     ///    "tenant_value": {
-    ///      "description": "Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind.",
+    ///      "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///      "type": "string",
-    ///      "minLength": 1
+    ///      "maxLength": 128,
+    ///      "minLength": 1,
+    ///      "pattern": "^[^\\u0000]+$"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -137169,7 +147912,7 @@ pub mod root_authority_root_policy {
             skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
         )]
         pub idp_scope_projection: ::std::collections::HashMap<
-            ::std::string::String,
+            RootPolicyRuleIdpScopeProjectionKey,
             ::std::vec::Vec<RootPolicyRuleIdpScopeProjectionValueItem>,
         >,
         #[serde(rename = "match")]
@@ -137179,20 +147922,16 @@ pub mod root_authority_root_policy {
         pub max_assertion_lifetime_secs: ::std::option::Option<::std::num::NonZeroU64>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub max_clock_skew_secs: ::std::option::Option<i64>,
-        ///Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind.
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub principal: ::std::option::Option<RootPolicyRulePrincipal>,
-        ///Claims copied into the delegation context, each plain or committed.
-        pub recorded_claims:
-            ::std::collections::HashMap<::std::string::String, RootPolicyRuleRecordedClaimsValue>,
+        pub recorded_claims: RecordedClaimModes,
         ///Allowed only on `oauth_id_jag` rules.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub retain_idp_artifact: ::std::option::Option<bool>,
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         pub rule_id: RootPolicyRuleRuleId,
-        ///Claim that identifies the caller's tenant (`iss` for per-organization issuers, `tid` for Entra).
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub tenant_claim: ::std::option::Option<RootPolicyRuleTenantClaim>,
-        ///Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind.
+        ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub tenant_value: ::std::option::Option<RootPolicyRuleTenantValue>,
     }
@@ -137335,13 +148074,13 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -137413,14 +148152,98 @@ pub mod root_authority_root_policy {
             value.parse()
         }
     }
-    ///`RootPolicyRuleIdpScopeProjectionValueItem`
+    ///`RootPolicyRuleIdpScopeProjectionKey`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct RootPolicyRuleIdpScopeProjectionKey(::std::string::String);
+    impl ::std::ops::Deref for RootPolicyRuleIdpScopeProjectionKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<RootPolicyRuleIdpScopeProjectionKey> for ::std::string::String {
+        fn from(value: RootPolicyRuleIdpScopeProjectionKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&RootPolicyRuleIdpScopeProjectionKey>
+        for RootPolicyRuleIdpScopeProjectionKey
+    {
+        fn from(value: &RootPolicyRuleIdpScopeProjectionKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for RootPolicyRuleIdpScopeProjectionKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for RootPolicyRuleIdpScopeProjectionKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyRuleIdpScopeProjectionKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyRuleIdpScopeProjectionKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for RootPolicyRuleIdpScopeProjectionKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -137448,8 +148271,16 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for RootPolicyRuleIdpScopeProjectionValueItem {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -137488,15 +148319,17 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind.
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind.",
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -137522,8 +148355,16 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for RootPolicyRulePrincipal {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -137562,91 +148403,17 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///`RootPolicyRuleRecordedClaimsValue`
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "enum": [
-    ///    "plain",
-    ///    "committed"
-    ///  ]
-    ///}
-    /// ```
-    /// </details>
-    #[derive(
-        ::serde::Deserialize,
-        ::serde::Serialize,
-        Clone,
-        Copy,
-        Debug,
-        Eq,
-        Hash,
-        Ord,
-        PartialEq,
-        PartialOrd,
-    )]
-    pub enum RootPolicyRuleRecordedClaimsValue {
-        #[serde(rename = "plain")]
-        Plain,
-        #[serde(rename = "committed")]
-        Committed,
-    }
-    impl ::std::convert::From<&Self> for RootPolicyRuleRecordedClaimsValue {
-        fn from(value: &RootPolicyRuleRecordedClaimsValue) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::fmt::Display for RootPolicyRuleRecordedClaimsValue {
-        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-            match *self {
-                Self::Plain => f.write_str("plain"),
-                Self::Committed => f.write_str("committed"),
-            }
-        }
-    }
-    impl ::std::str::FromStr for RootPolicyRuleRecordedClaimsValue {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            match value {
-                "plain" => Ok(Self::Plain),
-                "committed" => Ok(Self::Committed),
-                _ => Err("invalid value".into()),
-            }
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RootPolicyRuleRecordedClaimsValue {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyRuleRecordedClaimsValue {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyRuleRecordedClaimsValue {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    ///`RootPolicyRuleRuleId`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -137672,8 +148439,16 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for RootPolicyRuleRuleId {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -137712,89 +148487,17 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Claim that identifies the caller's tenant (`iss` for per-organization issuers, `tid` for Entra).
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Claim that identifies the caller's tenant (`iss` for per-organization issuers, `tid` for Entra).",
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
     ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct RootPolicyRuleTenantClaim(::std::string::String);
-    impl ::std::ops::Deref for RootPolicyRuleTenantClaim {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<RootPolicyRuleTenantClaim> for ::std::string::String {
-        fn from(value: RootPolicyRuleTenantClaim) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&RootPolicyRuleTenantClaim> for RootPolicyRuleTenantClaim {
-        fn from(value: &RootPolicyRuleTenantClaim) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for RootPolicyRuleTenantClaim {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for RootPolicyRuleTenantClaim {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for RootPolicyRuleTenantClaim {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for RootPolicyRuleTenantClaim {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for RootPolicyRuleTenantClaim {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind.
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "description": "Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind.",
-    ///  "type": "string",
-    ///  "minLength": 1
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
     ///}
     /// ```
     /// </details>
@@ -137820,8 +148523,16 @@ pub mod root_authority_root_policy {
     impl ::std::str::FromStr for RootPolicyRuleTenantValue {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             if value.chars().count() < 1usize {
                 return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
             }
             Ok(Self(value.to_string()))
         }
@@ -137940,15 +148651,96 @@ pub mod root_authority_root_policy {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -137977,14 +148769,14 @@ pub mod root_authority_root_policy {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -138014,6 +148806,90 @@ pub mod root_authority_root_policy {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -138280,6 +149156,90 @@ pub mod root_authority_root_policy {
                 })
         }
     }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
 }
 pub mod root_authority_verifier_trust {
     /// Error types.
@@ -138308,13 +149268,13 @@ pub mod root_authority_verifier_trust {
             }
         }
     }
-    ///Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.
+    ///Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode.",
+    ///  "description": "Closed set of anchor kinds. `oauth_id_jag`, `entra_jwt`, `entra_agent_id`, `oidc_jwt` and `oauth_introspection` are provider-backed: they verify against an enterprise provider record. Unknown kinds reject at decode.",
     ///  "type": "string",
     ///  "enum": [
     ///    "oauth_id_jag",
@@ -138416,7 +149376,7 @@ pub mod root_authority_verifier_trust {
             value.parse()
         }
     }
-    ///`chio.verifier-trust.v1` (PROTOCOL 5.6.8): a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
+    ///`chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
@@ -138424,7 +149384,7 @@ pub mod root_authority_verifier_trust {
     ///{
     ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/verifier-trust.schema.json",
     ///  "title": "Chio Verifier Trust",
-    ///  "description": "`chio.verifier-trust.v1` (PROTOCOL 5.6.8): a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.",
+    ///  "description": "`chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.",
     ///  "type": "object",
     ///  "required": [
     ///    "exchange_keys",
@@ -138436,28 +149396,32 @@ pub mod root_authority_verifier_trust {
     ///    "checkpoint_keys": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///        "type": "string",
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
+    ///      "maxItems": 64,
     ///      "uniqueItems": true
     ///    },
     ///    "exchange_keys": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///        "type": "string",
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
     ///      "uniqueItems": true
     ///    },
     ///    "idp_keys": {
     ///      "description": "Issuer to the identity-provider keys the verifier pins itself.",
     ///      "type": "object",
+    ///      "maxProperties": 64,
     ///      "additionalProperties": {
     ///        "type": "array",
     ///        "items": {
-    ///          "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///          "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///          "type": "object",
     ///          "required": [
     ///            "kid",
@@ -138466,6 +149430,9 @@ pub mod root_authority_verifier_trust {
     ///          "properties": {
     ///            "alg": {
     ///              "$ref": "#/$defs/JwsAlgorithm"
+    ///            },
+    ///            "cloud_instance_name": {
+    ///              "$ref": "#/$defs/Identifier"
     ///            },
     ///            "crv": {
     ///              "type": "string",
@@ -138478,11 +149445,14 @@ pub mod root_authority_verifier_trust {
     ///            },
     ///            "e": {
     ///              "type": "string",
+    ///              "maxLength": 16,
     ///              "pattern": "^[A-Za-z0-9_-]+$"
     ///            },
+    ///            "issuer": {
+    ///              "$ref": "#/$defs/Uri"
+    ///            },
     ///            "kid": {
-    ///              "type": "string",
-    ///              "minLength": 1
+    ///              "$ref": "#/$defs/Identifier"
     ///            },
     ///            "kty": {
     ///              "type": "string",
@@ -138494,6 +149464,7 @@ pub mod root_authority_verifier_trust {
     ///            },
     ///            "n": {
     ///              "type": "string",
+    ///              "maxLength": 1400,
     ///              "pattern": "^[A-Za-z0-9_-]+$"
     ///            },
     ///            "use": {
@@ -138504,33 +149475,66 @@ pub mod root_authority_verifier_trust {
     ///            },
     ///            "x": {
     ///              "type": "string",
+    ///              "maxLength": 128,
+    ///              "pattern": "^[A-Za-z0-9_-]+$"
+    ///            },
+    ///            "x5c": {
+    ///              "type": "array",
+    ///              "items": {
+    ///                "type": "string",
+    ///                "maxLength": 16384,
+    ///                "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///              },
+    ///              "maxItems": 8
+    ///            },
+    ///            "x5t": {
+    ///              "type": "string",
+    ///              "maxLength": 64,
+    ///              "pattern": "^[A-Za-z0-9_-]+$"
+    ///            },
+    ///            "x5t#S256": {
+    ///              "type": "string",
+    ///              "maxLength": 64,
     ///              "pattern": "^[A-Za-z0-9_-]+$"
     ///            },
     ///            "y": {
     ///              "type": "string",
+    ///              "maxLength": 128,
     ///              "pattern": "^[A-Za-z0-9_-]+$"
     ///            }
     ///          },
     ///          "additionalProperties": false
-    ///        }
+    ///        },
+    ///        "maxItems": 64
+    ///      },
+    ///      "propertyNames": {
+    ///        "maxLength": 2048,
+    ///        "pattern": "^[^\\u0000\\s]+$"
     ///      }
     ///    },
     ///    "kernel_keys": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///        "type": "string",
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
     ///      "uniqueItems": true
     ///    },
     ///    "pep_keys": {
     ///      "description": "Policy enforcement point id to its pinned key.",
     ///      "type": "object",
+    ///      "maxProperties": 256,
     ///      "additionalProperties": {
-    ///        "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///        "type": "string",
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///      },
+    ///      "propertyNames": {
+    ///        "maxLength": 128,
+    ///        "pattern": "^[^\\u0000]+$"
     ///      }
     ///    },
     ///    "required_columns": {
@@ -138545,15 +149549,18 @@ pub mod root_authority_verifier_trust {
     ///          "settlement"
     ///        ]
     ///      },
+    ///      "maxItems": 5,
     ///      "uniqueItems": true
     ///    },
     ///    "root_policy_keys": {
     ///      "type": "array",
     ///      "items": {
-    ///        "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///        "type": "string",
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
+    ///      "maxItems": 64,
+    ///      "minItems": 1,
     ///      "uniqueItems": true
     ///    },
     ///    "schema": {
@@ -138577,7 +149584,7 @@ pub mod root_authority_verifier_trust {
             skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
         )]
         pub idp_keys: ::std::collections::HashMap<
-            ::std::string::String,
+            ChioVerifierTrustIdpKeysKey,
             ::std::vec::Vec<ChioVerifierTrustIdpKeysValueItem>,
         >,
         pub kernel_keys: Vec<ChioVerifierTrustKernelKeysItem>,
@@ -138587,7 +149594,7 @@ pub mod root_authority_verifier_trust {
             skip_serializing_if = ":: std :: collections :: HashMap::is_empty"
         )]
         pub pep_keys:
-            ::std::collections::HashMap<::std::string::String, ChioVerifierTrustPepKeysValue>,
+            ::std::collections::HashMap<ChioVerifierTrustPepKeysKey, ChioVerifierTrustPepKeysValue>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub required_columns: ::std::option::Option<Vec<ChioVerifierTrustRequiredColumnsItem>>,
         pub root_policy_keys: Vec<ChioVerifierTrustRootPolicyKeysItem>,
@@ -138598,13 +149605,13 @@ pub mod root_authority_verifier_trust {
             value.clone()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -138685,13 +149692,13 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -138772,13 +149779,92 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`ChioVerifierTrustIdpKeysKey`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioVerifierTrustIdpKeysKey(::std::string::String);
+    impl ::std::ops::Deref for ChioVerifierTrustIdpKeysKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioVerifierTrustIdpKeysKey> for ::std::string::String {
+        fn from(value: ChioVerifierTrustIdpKeysKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioVerifierTrustIdpKeysKey> for ChioVerifierTrustIdpKeysKey {
+        fn from(value: &ChioVerifierTrustIdpKeysKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioVerifierTrustIdpKeysKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioVerifierTrustIdpKeysKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioVerifierTrustIdpKeysKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioVerifierTrustIdpKeysKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustIdpKeysKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -138787,6 +149873,9 @@ pub mod root_authority_verifier_trust {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -138799,11 +149888,14 @@ pub mod root_authority_verifier_trust {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -138815,6 +149907,7 @@ pub mod root_authority_verifier_trust {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -138825,10 +149918,31 @@ pub mod root_authority_verifier_trust {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -138842,10 +149956,14 @@ pub mod root_authority_verifier_trust {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemE>,
-        pub kid: ChioVerifierTrustIdpKeysValueItemKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: ChioVerifierTrustIdpKeysValueItemKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemN>,
@@ -138857,6 +149975,16 @@ pub mod root_authority_verifier_trust {
         pub use_: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<ChioVerifierTrustIdpKeysValueItemX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<ChioVerifierTrustIdpKeysValueItemY>,
     }
@@ -138960,6 +150088,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -138988,6 +150117,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -139019,81 +150151,6 @@ pub mod root_authority_verifier_trust {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustIdpKeysValueItemE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`ChioVerifierTrustIdpKeysValueItemKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct ChioVerifierTrustIdpKeysValueItemKid(::std::string::String);
-    impl ::std::ops::Deref for ChioVerifierTrustIdpKeysValueItemKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<ChioVerifierTrustIdpKeysValueItemKid> for ::std::string::String {
-        fn from(value: ChioVerifierTrustIdpKeysValueItemKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&ChioVerifierTrustIdpKeysValueItemKid>
-        for ChioVerifierTrustIdpKeysValueItemKid
-    {
-        fn from(value: &ChioVerifierTrustIdpKeysValueItemKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for ChioVerifierTrustIdpKeysValueItemKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for ChioVerifierTrustIdpKeysValueItemKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for ChioVerifierTrustIdpKeysValueItemKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustIdpKeysValueItemKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -139194,6 +150251,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -139222,6 +150280,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -139343,6 +150404,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -139371,6 +150433,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -139413,6 +150478,251 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
+    ///`ChioVerifierTrustIdpKeysValueItemX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioVerifierTrustIdpKeysValueItemX5cItem(::std::string::String);
+    impl ::std::ops::Deref for ChioVerifierTrustIdpKeysValueItemX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioVerifierTrustIdpKeysValueItemX5cItem> for ::std::string::String {
+        fn from(value: ChioVerifierTrustIdpKeysValueItemX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioVerifierTrustIdpKeysValueItemX5cItem>
+        for ChioVerifierTrustIdpKeysValueItemX5cItem
+    {
+        fn from(value: &ChioVerifierTrustIdpKeysValueItemX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioVerifierTrustIdpKeysValueItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioVerifierTrustIdpKeysValueItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioVerifierTrustIdpKeysValueItemX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustIdpKeysValueItemX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioVerifierTrustIdpKeysValueItemX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioVerifierTrustIdpKeysValueItemX5t(::std::string::String);
+    impl ::std::ops::Deref for ChioVerifierTrustIdpKeysValueItemX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioVerifierTrustIdpKeysValueItemX5t> for ::std::string::String {
+        fn from(value: ChioVerifierTrustIdpKeysValueItemX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioVerifierTrustIdpKeysValueItemX5t>
+        for ChioVerifierTrustIdpKeysValueItemX5t
+    {
+        fn from(value: &ChioVerifierTrustIdpKeysValueItemX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioVerifierTrustIdpKeysValueItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioVerifierTrustIdpKeysValueItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioVerifierTrustIdpKeysValueItemX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustIdpKeysValueItemX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioVerifierTrustIdpKeysValueItemX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioVerifierTrustIdpKeysValueItemX5tS256(::std::string::String);
+    impl ::std::ops::Deref for ChioVerifierTrustIdpKeysValueItemX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioVerifierTrustIdpKeysValueItemX5tS256> for ::std::string::String {
+        fn from(value: ChioVerifierTrustIdpKeysValueItemX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioVerifierTrustIdpKeysValueItemX5tS256>
+        for ChioVerifierTrustIdpKeysValueItemX5tS256
+    {
+        fn from(value: &ChioVerifierTrustIdpKeysValueItemX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioVerifierTrustIdpKeysValueItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioVerifierTrustIdpKeysValueItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioVerifierTrustIdpKeysValueItemX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustIdpKeysValueItemX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`ChioVerifierTrustIdpKeysValueItemY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -139420,6 +150730,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -139448,6 +150759,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for ChioVerifierTrustIdpKeysValueItemY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -139490,13 +150804,13 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -139575,13 +150889,92 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///`ChioVerifierTrustPepKeysKey`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioVerifierTrustPepKeysKey(::std::string::String);
+    impl ::std::ops::Deref for ChioVerifierTrustPepKeysKey {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioVerifierTrustPepKeysKey> for ::std::string::String {
+        fn from(value: ChioVerifierTrustPepKeysKey) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioVerifierTrustPepKeysKey> for ChioVerifierTrustPepKeysKey {
+        fn from(value: &ChioVerifierTrustPepKeysKey) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioVerifierTrustPepKeysKey {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioVerifierTrustPepKeysKey {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioVerifierTrustPepKeysKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioVerifierTrustPepKeysKey {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioVerifierTrustPepKeysKey {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -139752,13 +151145,13 @@ pub mod root_authority_verifier_trust {
             value.parse()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -139839,6 +151232,58 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
+    ///A recorded claim: a plain string, a plain list of strings, or a committed value.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A recorded claim: a plain string, a plain list of strings, or a committed value.",
+    ///  "oneOf": [
+    ///    {
+    ///      "$ref": "#/$defs/Text"
+    ///    },
+    ///    {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Text"
+    ///      },
+    ///      "maxItems": 64
+    ///    },
+    ///    {
+    ///      "$ref": "#/$defs/Commitment"
+    ///    }
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(untagged)]
+    pub enum ClaimValue {
+        Variant0(Text),
+        Variant1(::std::vec::Vec<Text>),
+        Variant2(Commitment),
+    }
+    impl ::std::convert::From<&Self> for ClaimValue {
+        fn from(value: &ClaimValue) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::From<Text> for ClaimValue {
+        fn from(value: Text) -> Self {
+            Self::Variant0(value)
+        }
+    }
+    impl ::std::convert::From<::std::vec::Vec<Text>> for ClaimValue {
+        fn from(value: ::std::vec::Vec<Text>) -> Self {
+            Self::Variant1(value)
+        }
+    }
+    impl ::std::convert::From<Commitment> for ClaimValue {
+        fn from(value: Commitment) -> Self {
+            Self::Variant2(value)
+        }
+    }
     ///A salted commitment whose salt is held in the disclosure store under `salt_ref`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -139856,8 +151301,7 @@ pub mod root_authority_verifier_trust {
     ///      "$ref": "#/$defs/Digest"
     ///    },
     ///    "salt_ref": {
-    ///      "type": "string",
-    ///      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///      "$ref": "#/$defs/SaltRef"
     ///    }
     ///  },
     ///  "additionalProperties": false
@@ -139868,88 +151312,11 @@ pub mod root_authority_verifier_trust {
     #[serde(deny_unknown_fields)]
     pub struct Commitment {
         pub commit: Digest,
-        pub salt_ref: CommitmentSaltRef,
+        pub salt_ref: SaltRef,
     }
     impl ::std::convert::From<&Commitment> for Commitment {
         fn from(value: &Commitment) -> Self {
             value.clone()
-        }
-    }
-    ///`CommitmentSaltRef`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct CommitmentSaltRef(::std::string::String);
-    impl ::std::ops::Deref for CommitmentSaltRef {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<CommitmentSaltRef> for ::std::string::String {
-        fn from(value: CommitmentSaltRef) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&CommitmentSaltRef> for CommitmentSaltRef {
-        fn from(value: &CommitmentSaltRef) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for CommitmentSaltRef {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
-                ::std::sync::LazyLock::new(|| {
-                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
-                });
-            if PATTERN.find(value).is_none() {
-                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for CommitmentSaltRef {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for CommitmentSaltRef {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
         }
     }
     ///SHA-256 digest as `sha256:` followed by 64 lowercase hex characters.
@@ -140030,13 +151397,13 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
-    ///Who holds the root capability's subject key (PROTOCOL 5.6.6).
+    ///Who holds the root capability's subject key: the edge session or a Chio-aware caller.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6).",
+    ///  "description": "Who holds the root capability's subject key: the edge session or a Chio-aware caller.",
     ///  "type": "string",
     ///  "enum": [
     ///    "edge_session",
@@ -140108,13 +151475,178 @@ pub mod root_authority_verifier_trust {
             value.parse()
         }
     }
-    ///A public JSON Web Key. Private key members are not admitted.
+    ///`HttpsUrl`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "A public JSON Web Key. Private key members are not admitted.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "pattern": "^https://[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct HttpsUrl(::std::string::String);
+    impl ::std::ops::Deref for HttpsUrl {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<HttpsUrl> for ::std::string::String {
+        fn from(value: HttpsUrl) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&HttpsUrl> for HttpsUrl {
+        fn from(value: &HttpsUrl) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for HttpsUrl {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^https://[^\\u0000\\s]+$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^https://[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for HttpsUrl {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for HttpsUrl {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded identifier. NUL characters are rejected because identifiers feed NUL-delimited hash inputs.",
+    ///  "type": "string",
+    ///  "maxLength": 128,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Identifier(::std::string::String);
+    impl ::std::ops::Deref for Identifier {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Identifier> for ::std::string::String {
+        fn from(value: Identifier) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Identifier> for Identifier {
+        fn from(value: &Identifier) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Identifier {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Identifier {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Identifier {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A public JSON Web Key with the RFC 7517 and RFC 7518 members identity providers publish, plus Entra's `issuer` and `cloud_instance_name`. Private key members are not admitted.",
     ///  "type": "object",
     ///  "required": [
     ///    "kid",
@@ -140123,6 +151655,9 @@ pub mod root_authority_verifier_trust {
     ///  "properties": {
     ///    "alg": {
     ///      "$ref": "#/$defs/JwsAlgorithm"
+    ///    },
+    ///    "cloud_instance_name": {
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "crv": {
     ///      "type": "string",
@@ -140135,11 +151670,14 @@ pub mod root_authority_verifier_trust {
     ///    },
     ///    "e": {
     ///      "type": "string",
+    ///      "maxLength": 16,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
+    ///    "issuer": {
+    ///      "$ref": "#/$defs/Uri"
+    ///    },
     ///    "kid": {
-    ///      "type": "string",
-    ///      "minLength": 1
+    ///      "$ref": "#/$defs/Identifier"
     ///    },
     ///    "kty": {
     ///      "type": "string",
@@ -140151,6 +151689,7 @@ pub mod root_authority_verifier_trust {
     ///    },
     ///    "n": {
     ///      "type": "string",
+    ///      "maxLength": 1400,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "use": {
@@ -140161,10 +151700,31 @@ pub mod root_authority_verifier_trust {
     ///    },
     ///    "x": {
     ///      "type": "string",
+    ///      "maxLength": 128,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5c": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "type": "string",
+    ///        "maxLength": 16384,
+    ///        "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///      },
+    ///      "maxItems": 8
+    ///    },
+    ///    "x5t": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
+    ///      "pattern": "^[A-Za-z0-9_-]+$"
+    ///    },
+    ///    "x5t#S256": {
+    ///      "type": "string",
+    ///      "maxLength": 64,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    },
     ///    "y": {
     ///      "type": "string",
+    ///      "maxLength": 128,
     ///      "pattern": "^[A-Za-z0-9_-]+$"
     ///    }
     ///  },
@@ -140178,10 +151738,14 @@ pub mod root_authority_verifier_trust {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub alg: ::std::option::Option<JwsAlgorithm>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub cloud_instance_name: ::std::option::Option<Identifier>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub crv: ::std::option::Option<JwkCrv>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub e: ::std::option::Option<JwkE>,
-        pub kid: JwkKid,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub issuer: ::std::option::Option<Uri>,
+        pub kid: Identifier,
         pub kty: JwkKty,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub n: ::std::option::Option<JwkN>,
@@ -140193,6 +151757,16 @@ pub mod root_authority_verifier_trust {
         pub use_: ::std::option::Option<JwkUse>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub x: ::std::option::Option<JwkX>,
+        #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+        pub x5c: ::std::vec::Vec<JwkX5cItem>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub x5t: ::std::option::Option<JwkX5t>,
+        #[serde(
+            rename = "x5t#S256",
+            default,
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        pub x5t_s256: ::std::option::Option<JwkX5tS256>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub y: ::std::option::Option<JwkY>,
     }
@@ -140294,6 +151868,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 16,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -140320,6 +151895,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for JwkE {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16usize {
+                return Err("longer than 16 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -140351,79 +151929,6 @@ pub mod root_authority_verifier_trust {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for JwkE {
-        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-        where
-            D: ::serde::Deserializer<'de>,
-        {
-            ::std::string::String::deserialize(deserializer)?
-                .parse()
-                .map_err(|e: self::error::ConversionError| {
-                    <D::Error as ::serde::de::Error>::custom(e.to_string())
-                })
-        }
-    }
-    ///`JwkKid`
-    ///
-    /// <details><summary>JSON schema</summary>
-    ///
-    /// ```json
-    ///{
-    ///  "type": "string",
-    ///  "minLength": 1
-    ///}
-    /// ```
-    /// </details>
-    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    #[serde(transparent)]
-    pub struct JwkKid(::std::string::String);
-    impl ::std::ops::Deref for JwkKid {
-        type Target = ::std::string::String;
-        fn deref(&self) -> &::std::string::String {
-            &self.0
-        }
-    }
-    impl ::std::convert::From<JwkKid> for ::std::string::String {
-        fn from(value: JwkKid) -> Self {
-            value.0
-        }
-    }
-    impl ::std::convert::From<&JwkKid> for JwkKid {
-        fn from(value: &JwkKid) -> Self {
-            value.clone()
-        }
-    }
-    impl ::std::str::FromStr for JwkKid {
-        type Err = self::error::ConversionError;
-        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            if value.chars().count() < 1usize {
-                return Err("shorter than 1 characters".into());
-            }
-            Ok(Self(value.to_string()))
-        }
-    }
-    impl ::std::convert::TryFrom<&str> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<&::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: &::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl ::std::convert::TryFrom<::std::string::String> for JwkKid {
-        type Error = self::error::ConversionError;
-        fn try_from(
-            value: ::std::string::String,
-        ) -> ::std::result::Result<Self, self::error::ConversionError> {
-            value.parse()
-        }
-    }
-    impl<'de> ::serde::Deserialize<'de> for JwkKid {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,
@@ -140524,6 +152029,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 1400,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -140550,6 +152056,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for JwkN {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1400usize {
+                return Err("longer than 1400 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -140671,6 +152180,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -140697,6 +152207,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for JwkX {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -140739,6 +152252,245 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
+    ///`JwkX5cItem`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 16384,
+    ///  "pattern": "^[A-Za-z0-9+/]+={0,2}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5cItem(::std::string::String);
+    impl ::std::ops::Deref for JwkX5cItem {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5cItem> for ::std::string::String {
+        fn from(value: JwkX5cItem) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5cItem> for JwkX5cItem {
+        fn from(value: &JwkX5cItem) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5cItem {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 16384usize {
+                return Err("longer than 16384 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[A-Za-z0-9+/]+={0,2}$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9+/]+={0,2}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5cItem {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5cItem {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5t`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5t(::std::string::String);
+    impl ::std::ops::Deref for JwkX5t {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5t> for ::std::string::String {
+        fn from(value: JwkX5t) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5t> for JwkX5t {
+        fn from(value: &JwkX5t) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5t {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5t {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5t {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`JwkX5tS256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 64,
+    ///  "pattern": "^[A-Za-z0-9_-]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct JwkX5tS256(::std::string::String);
+    impl ::std::ops::Deref for JwkX5tS256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<JwkX5tS256> for ::std::string::String {
+        fn from(value: JwkX5tS256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&JwkX5tS256> for JwkX5tS256 {
+        fn from(value: &JwkX5tS256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for JwkX5tS256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[A-Za-z0-9_-]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for JwkX5tS256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for JwkX5tS256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`JwkY`
     ///
     /// <details><summary>JSON schema</summary>
@@ -140746,6 +152498,7 @@ pub mod root_authority_verifier_trust {
     /// ```json
     ///{
     ///  "type": "string",
+    ///  "maxLength": 128,
     ///  "pattern": "^[A-Za-z0-9_-]+$"
     ///}
     /// ```
@@ -140772,6 +152525,9 @@ pub mod root_authority_verifier_trust {
     impl ::std::str::FromStr for JwkY {
         type Err = self::error::ConversionError;
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 128usize {
+                return Err("longer than 128 characters".into());
+            }
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
                 ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[A-Za-z0-9_-]+$").unwrap());
             if PATTERN.find(value).is_none() {
@@ -140932,13 +152688,13 @@ pub mod root_authority_verifier_trust {
             value.parse()
         }
     }
-    ///Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).
+    ///Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`).",
+    ///  "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
     ///  "type": "string",
     ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
@@ -141015,6 +152771,89 @@ pub mod root_authority_verifier_trust {
                 .map_err(|e: self::error::ConversionError| {
                     <D::Error as ::serde::de::Error>::custom(e.to_string())
                 })
+        }
+    }
+    ///The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256("chio.delegation-context.claim.v1\0" || utf8(name) || 0x00 || salt || canonical_json(value))`.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The closed set of identity-provider claims a root policy rule may record. A committed claim is `SHA-256(\"chio.delegation-context.claim.v1\\0\" || utf8(name) || 0x00 || salt || canonical_json(value))`.",
+    ///  "type": "object",
+    ///  "properties": {
+    ///    "appid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "aud": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "azp": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "client_id": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "oid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "resource": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "scope": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "sub": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    },
+    ///    "tid": {
+    ///      "$ref": "#/$defs/ClaimValue"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct RecordedClaims {
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub appid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub aud: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub azp: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub client_id: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub oid: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub resource: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub scope: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub sub: ::std::option::Option<ClaimValue>,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub tid: ::std::option::Option<ClaimValue>,
+    }
+    impl ::std::convert::From<&RecordedClaims> for RecordedClaims {
+        fn from(value: &RecordedClaims) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::default::Default for RecordedClaims {
+        fn default() -> Self {
+            Self {
+                appid: Default::default(),
+                aud: Default::default(),
+                azp: Default::default(),
+                client_id: Default::default(),
+                oid: Default::default(),
+                resource: Default::default(),
+                scope: Default::default(),
+                sub: Default::default(),
+                tid: Default::default(),
+            }
         }
     }
     ///A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters).
@@ -141097,15 +152936,96 @@ pub mod root_authority_verifier_trust {
                 })
         }
     }
-    ///Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).
+    ///`SaltRef`
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5).",
     ///  "type": "string",
-    ///  "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///  "maxLength": 64,
+    ///  "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct SaltRef(::std::string::String);
+    impl ::std::ops::Deref for SaltRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<SaltRef> for ::std::string::String {
+        fn from(value: SaltRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&SaltRef> for SaltRef {
+        fn from(value: &SaltRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for SaltRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 64usize {
+                return Err("longer than 64 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| {
+                    ::regress::Regex::new("^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$").unwrap()
+                });
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for SaltRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for SaltRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "Self-describing signature encoding: bare Ed25519 hex, `p256:` or `p384:` DER hex, or the hybrid form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$"
     ///}
     /// ```
     /// </details>
@@ -141134,14 +153054,14 @@ pub mod root_authority_verifier_trust {
             static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
                 || {
                     ::regress::Regex::new(
-                        "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+                        "^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
                     )
                     .unwrap()
                 },
             );
             if PATTERN.find(value).is_none() {
                 return Err(
-                    "doesn't match pattern \"^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
+                    "doesn't match pattern \"^([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}|hybrid:([0-9a-f]{128}|p256:([0-9a-f]{2}){8,72}|p384:([0-9a-f]{2}){8,104}):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$\""
                         .into(),
                 );
             }
@@ -141171,6 +153091,174 @@ pub mod root_authority_verifier_trust {
         }
     }
     impl<'de> ::serde::Deserialize<'de> for SignatureHex {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded NUL-free string.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded NUL-free string.",
+    ///  "type": "string",
+    ///  "maxLength": 1024,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Text(::std::string::String);
+    impl ::std::ops::Deref for Text {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Text> for ::std::string::String {
+        fn from(value: Text) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Text> for Text {
+        fn from(value: &Text) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Text {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 1024usize {
+                return Err("longer than 1024 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Text {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Text {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///A bounded URI or URN, such as an issuer.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "A bounded URI or URN, such as an issuer.",
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1,
+    ///  "pattern": "^[^\\u0000\\s]+$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct Uri(::std::string::String);
+    impl ::std::ops::Deref for Uri {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<Uri> for ::std::string::String {
+        fn from(value: Uri) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&Uri> for Uri {
+        fn from(value: &Uri) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for Uri {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[^\\u0000\\s]+$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[^\\u0000\\s]+$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Uri {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for Uri {
         fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
         where
             D: ::serde::Deserializer<'de>,

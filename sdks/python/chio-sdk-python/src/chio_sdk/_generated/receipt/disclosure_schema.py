@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
+# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -22,9 +22,9 @@ class Opening(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    salt_ref: constr(pattern=r"^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$") = Field(
+    salt_ref: root_anchor_schema.SaltRef = Field(
         ...,
-        description="Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`).",
+        description="Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant` or a committed claim).",
     )
     salt: root_anchor_schema.Salt
     payload: Any = Field(
@@ -35,7 +35,7 @@ class Opening(BaseModel):
 
 class ChioReceiptDisclosure(BaseModel):
     """
-    `chio.receipt-disclosure.v1` (PROTOCOL "Committed Receipts And Disclosure"): an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening.
+    `chio.receipt-disclosure.v1`: an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening. The same salt under two `salt_ref` values marks the receipt as tampered disclosure.
     """
 
     model_config = ConfigDict(
@@ -45,4 +45,4 @@ class ChioReceiptDisclosure(BaseModel):
     receipt_id: constr(pattern=r"^[0-9a-f]{64}$") = Field(
         ..., description="`id` of the receipt whose commitments these openings open."
     )
-    openings: list[Opening] = Field(..., min_length=1)
+    openings: list[Opening] = Field(..., max_length=64, min_length=1)

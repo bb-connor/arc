@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 7bc9c9d39014b0d2234c7f929e827c2ab02e825f9cb23c608c135695ce3ed4d1
+# Schema sha256: 0af56141a972612c241d2cc1bd9864563082780e874ad502c5f6715b447b3fc2
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -20,42 +20,70 @@ from ..capability import token_schema
 from . import root_anchor_schema
 
 
-class RecordedClaims(Enum):
-    plain = "plain"
-    committed = "committed"
-
-
-class Claim(RootModel[constr(min_length=1)]):
-    root: constr(min_length=1)
-
-
-class RootPolicyMatch(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-    )
-    anchor_kind: root_anchor_schema.AnchorKind
-    issuer: constr(min_length=1)
-    jwks_uri: constr(pattern=r"^https://[^\s]+$") | None = Field(
-        None,
-        description="Required for every JWKS-verified kind. Keys are fetched only from it.",
-    )
-    allowed_algs: list[root_anchor_schema.JwsAlgorithm] | None = Field(
-        None, min_length=1
-    )
-    claims: dict[str, list[Claim]] | None = Field(
-        None, description="Claim name to the values it must take for the rule to match."
-    )
-
-
-class InlineField(RootModel[constr(pattern=r"^(/([^~/]|~[01])*)+$")]):
-    root: constr(pattern=r"^(/([^~/]|~[01])*)+$")
+class InlineField(RootModel[constr(pattern=r"^(/([^~/]|~[01])*)+$", max_length=256)]):
+    root: constr(pattern=r"^(/([^~/]|~[01])*)+$", max_length=256)
 
 
 class InlineFields(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    inline_fields: list[InlineField]
+    inline_fields: list[InlineField] = Field(..., max_length=64)
+
+
+class MatchClaims(BaseModel):
+    """
+    Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    client_id: list[root_anchor_schema.Text] | None = Field(
+        None, max_length=64, min_length=1
+    )
+    scope: list[root_anchor_schema.Text] | None = Field(
+        None, max_length=64, min_length=1
+    )
+    sub: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
+    aud: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
+    resource: list[root_anchor_schema.Text] | None = Field(
+        None, max_length=64, min_length=1
+    )
+    azp: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
+    appid: list[root_anchor_schema.Text] | None = Field(
+        None, max_length=64, min_length=1
+    )
+    oid: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
+    tid: list[root_anchor_schema.Text] | None = Field(None, max_length=64, min_length=1)
+
+
+class ClaimMode(Enum):
+    plain = "plain"
+    committed = "committed"
+
+
+class RootPolicyMatch(BaseModel):
+    """
+    What a token must satisfy for the rule to match. Its `iss` must equal the issuer of the named provider record.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    anchor_kind: root_anchor_schema.AnchorKind
+    provider_record_id: root_anchor_schema.Identifier | None = Field(
+        None,
+        description="`provider_id` of the enterprise provider record this rule verifies against. Required for provider-backed kinds and absent otherwise.",
+    )
+    provider_identity_digest: root_anchor_schema.Digest | None = Field(
+        None,
+        description='`SHA-256("chio.enterprise-provider-identity.v1\\0" || canonical_json(projection))` over the record\'s identity projection. A record whose projection differs denies.',
+    )
+    allowed_algs: list[root_anchor_schema.JwsAlgorithm] | None = Field(
+        None, max_length=10, min_length=1
+    )
+    claims: MatchClaims | None = None
 
 
 class ToolDisclosure(BaseModel):
@@ -64,6 +92,25 @@ class ToolDisclosure(BaseModel):
     )
     parameters: InlineFields
     result: InlineFields
+
+
+class RecordedClaimModes(BaseModel):
+    """
+    Claims copied into the delegation context, each plain or committed. The claim set is closed.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    client_id: ClaimMode | None = None
+    scope: ClaimMode | None = None
+    sub: ClaimMode | None = None
+    aud: ClaimMode | None = None
+    resource: ClaimMode | None = None
+    azp: ClaimMode | None = None
+    appid: ClaimMode | None = None
+    oid: ClaimMode | None = None
+    tid: ClaimMode | None = None
 
 
 class RootPolicyDisclosure(BaseModel):
@@ -81,27 +128,22 @@ class RootPolicyRule(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    rule_id: constr(min_length=1)
+    rule_id: root_anchor_schema.Identifier
     match: RootPolicyMatch
-    tenant_claim: constr(min_length=1) | None = Field(
-        None,
-        description="Claim that identifies the caller's tenant (`iss` for per-organization issuers, `tid` for Entra).",
-    )
-    idp_scope_projection: dict[str, list[constr(min_length=1)]] | None = Field(
+    idp_scope_projection: dict[str, list[root_anchor_schema.Identifier]] | None = Field(
         None,
         description="Identity-provider scope value to the `server/tool` names it projects to. A scope value absent here denies the exchange.",
     )
     ceiling_scope: token_schema.ChioScope
     ceiling_scope_hash: root_anchor_schema.Digest
-    recorded_claims: dict[str, RecordedClaims] = Field(
-        ...,
-        description="Claims copied into the delegation context, each plain or committed.",
+    recorded_claims: RecordedClaimModes
+    holder_classes: list[root_anchor_schema.HolderClass] = Field(
+        ..., max_length=2, min_length=1
     )
-    holder_classes: list[root_anchor_schema.HolderClass] = Field(..., min_length=1)
-    capability_ttl_secs: conint(ge=1) | None = Field(
+    capability_ttl_secs: conint(ge=1, le=86400) | None = Field(
         None, description="Defaults to 300."
     )
-    max_assertion_lifetime_secs: conint(ge=1) | None = Field(
+    max_assertion_lifetime_secs: conint(ge=1, le=86400) | None = Field(
         None,
         description="Defaults to 300. Absent on `entra_jwt` and `entra_agent_id` rules.",
     )
@@ -109,11 +151,11 @@ class RootPolicyRule(BaseModel):
     retain_idp_artifact: bool | None = Field(
         None, description="Allowed only on `oauth_id_jag` rules."
     )
-    principal: constr(min_length=1) | None = Field(
+    principal: root_anchor_schema.Identifier | None = Field(
         None,
         description="Operator-configured principal. Required on `operator_static_bearer` rules and rejected on every other kind.",
     )
-    tenant_value: constr(min_length=1) | None = Field(
+    tenant_value: root_anchor_schema.Identifier | None = Field(
         None,
         description="Operator-configured tenant. Required on `operator_static_bearer` rules and rejected on every other kind.",
     )
@@ -121,19 +163,21 @@ class RootPolicyRule(BaseModel):
 
 class ChioRootPolicy(BaseModel):
     """
-    `chio.root-policy.v1` (PROTOCOL 5.6.4), signed by the provider's policy key over the signing wrapper. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts.
+    `chio.root-policy.v1`, signed by the provider's policy key. It names the exchange keys, the anchor rules that admit roots and the disclosure policy for committed receipts. Provider identity (issuer, keys, endpoints, audiences, principal and tenant claims) is never held here: a provider-backed rule names an enterprise provider record and pins the digest of its identity projection. Decoding is strict: an unknown member at any level rejects at load.
     """
 
     model_config = ConfigDict(
         extra="forbid",
     )
     schema_: Literal["chio.root-policy.v1"] = Field(..., alias="schema")
-    policy_id: constr(min_length=1)
+    policy_id: root_anchor_schema.Identifier
     policy_key: root_anchor_schema.PublicKeyHex = Field(
         ..., description="Must equal the policy key pinned in the edge configuration."
     )
-    exchange_keys: list[root_anchor_schema.PublicKeyHex] = Field(..., min_length=1)
-    rules: list[RootPolicyRule] = Field(..., min_length=1)
+    exchange_keys: list[root_anchor_schema.PublicKeyHex] = Field(
+        ..., max_length=16, min_length=1
+    )
+    rules: list[RootPolicyRule] = Field(..., max_length=64, min_length=1)
     disclosure: RootPolicyDisclosure
     valid_from: conint(ge=0)
     valid_until: conint(ge=0)
