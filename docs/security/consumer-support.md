@@ -191,7 +191,7 @@ remain explicitly versioned; it cannot be reported as current-v2 verification.
   cases. Now uses the shared exact listed/executed inventory checker. Its wrapper
   calibration rejects missing, renamed, ignored and zero-match tests. Real Rust
   cases passed in `/tmp/chio-m4-peer-gate-complete.log`.
-- `check-authenticated-caller-delivery.sh`: all 61 M3 cases remain required for
+- `check-authenticated-caller-delivery.sh`: all 66 M3 cases remain required for
   the changed dependency closure, including native release/declassification.
 - `check-flow-security.sh`: registry, policy/topology, flow, constructor and
   installation cases remain required; no broad unsupported-profile waiver.

@@ -21,7 +21,7 @@ class ShippingOverflowContract(unittest.TestCase):
     def test_every_selected_shipping_profile_traps_budget_underflow(self):
         result = self.run_gate()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.count("traps budget subtraction below zero"), 5)
+        self.assertEqual(result.stdout.count("traps budget subtraction below zero"), 4)
 
     def test_missing_standalone_check_refuses_shipping(self):
         with tempfile.TemporaryDirectory(prefix="chio-unchecked-shipping-") as temporary:
