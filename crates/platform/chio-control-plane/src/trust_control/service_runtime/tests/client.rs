@@ -161,7 +161,7 @@ fn request_text_without_service_auth_reads_text_response() {
 
 #[test]
 fn trust_control_get_wrappers_encode_queries_and_service_auth() {
-    let server = StaticResponseServer::spawn(200, "{}", "application/json", 26);
+    let server = StaticResponseServer::spawn(200, "{}", "application/json", 25);
     let client = build_client(&server.url, "secret").test_expect("build client");
 
     let _ = client.list_revocations(&RevocationQuery {
@@ -329,7 +329,6 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         economic_limit: Some(27),
         read_context: None,
     };
-    let _ = client.operator_report(&operator_query);
     let _ = client.metered_billing_report(&operator_query);
     let _ = client.authorization_context_report(&operator_query);
     let _ = client.authorization_profile_metadata();
@@ -366,7 +365,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
     );
 
     let requests = server.requests();
-    assert_eq!(requests.len(), 26);
+    assert_eq!(requests.len(), 25);
     assert_bearer_request(
         &requests[0],
         "GET",
@@ -559,40 +558,29 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
     assert_bearer_request(
         &requests[17],
         "GET",
-        OPERATOR_REPORT_PATH,
-        &[
-            "capabilityId=cap-operator",
-            "agentSubject=agent-10",
-            "groupLimit=21",
-            "authorizationLimit=26",
-        ],
-    );
-    assert_bearer_request(
-        &requests[18],
-        "GET",
         METERED_BILLING_REPORT_PATH,
         &["meteredLimit=25"],
     );
     assert_bearer_request(
-        &requests[19],
+        &requests[18],
         "GET",
         AUTHORIZATION_CONTEXT_REPORT_PATH,
         &["authorizationLimit=26"],
     );
     assert_bearer_request(
-        &requests[20],
+        &requests[19],
         "GET",
         AUTHORIZATION_PROFILE_METADATA_PATH,
         &[],
     );
     assert_bearer_request(
-        &requests[21],
+        &requests[20],
         "GET",
         AUTHORIZATION_REVIEW_PACK_PATH,
         &["authorizationLimit=26"],
     );
     assert_bearer_request(
-        &requests[22],
+        &requests[21],
         "GET",
         UNDERWRITING_INPUT_PATH,
         &[
@@ -603,7 +591,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         ],
     );
     assert_bearer_request(
-        &requests[23],
+        &requests[22],
         "GET",
         UNDERWRITING_DECISION_PATH,
         &[
@@ -614,7 +602,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         ],
     );
     assert_bearer_request(
-        &requests[24],
+        &requests[23],
         "GET",
         UNDERWRITING_DECISIONS_REPORT_PATH,
         &[
@@ -626,7 +614,7 @@ fn trust_control_get_wrappers_encode_queries_and_service_auth() {
         ],
     );
     assert_bearer_request(
-        &requests[25],
+        &requests[24],
         "GET",
         &path_with_encoded_param(LOCAL_REPUTATION_PATH, "subject_key", "subject/key 9"),
         &["since=170", "until=180"],

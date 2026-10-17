@@ -552,33 +552,6 @@ impl TrustControlClient {
         self.get_json_with_query(FEDERATION_EVIDENCE_SHARES_PATH, query)
     }
 
-    // Kept for API parity with the trust-control service surface even though
-    // the current CLI command set does not invoke it directly.
-    #[allow(dead_code)]
-    pub fn cost_attribution_report(
-        &self,
-        query: &CostAttributionQuery,
-    ) -> Result<CostAttributionReport, CliError> {
-        self.get_json_with_query(COST_ATTRIBUTION_PATH, query)
-    }
-
-    // Kept for API parity with the trust-control service surface even though
-    // the current CLI command set does not invoke it directly.
-    #[allow(dead_code)]
-    pub fn operator_report(&self, query: &OperatorReportQuery) -> Result<OperatorReport, CliError> {
-        self.get_json_with_query(OPERATOR_REPORT_PATH, query)
-    }
-
-    // Kept for API parity with the trust-control service surface even though
-    // the current CLI command set does not invoke it directly.
-    #[allow(dead_code)]
-    pub fn comptroller_surface(
-        &self,
-        query: &OperatorReportQuery,
-    ) -> Result<ComptrollerSurfaceReport, CliError> {
-        self.get_json_with_query(COMPTROLLER_SURFACE_PATH, query)
-    }
-
     pub fn behavioral_feed(
         &self,
         query: &BehavioralFeedQuery,
