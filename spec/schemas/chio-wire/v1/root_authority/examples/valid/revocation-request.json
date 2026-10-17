@@ -1,0 +1,9 @@
+{
+  "schema": "chio.revocation-request.v1",
+  "target_capability_id": "cap-example-child",
+  "revoker_key": "ca93ac1705187071d67b83c7ff0efe8108e8ec4530575d7726879333dbdabe7c",
+  "presentation_digest": "sha256:bfac314fefdc07451af1792a81cbaeda24a9363f7d4d4b7ff2938c4231ea7e36",
+  "reason": "subagent_retired",
+  "issued_at": 1792235000,
+  "signature": "1b1caf7c99e592fcce897ba785dc2fcdf8c948ec24e64c0442fb26be809b4fd15436d0b5f1a59f2cec8d4448cd8c79d1863101d518f6f62421ec0a310de02d0f"
+}

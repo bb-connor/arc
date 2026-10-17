@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/disclosure.schema.json",
+  "title": "Chio Receipt Disclosure",
+  "description": "`chio.receipt-disclosure.v1` (PROTOCOL \"Committed Receipts And Disclosure\"): an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "receipt_id",
+    "openings"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.receipt-disclosure.v1"
+    },
+    "receipt_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "`id` of the receipt whose commitments these openings open."
+    },
+    "openings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Opening"
+      }
+    }
+  },
+  "$defs": {
+    "Opening": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "salt_ref",
+        "salt",
+        "payload"
+      ],
+      "properties": {
+        "salt_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
+          "description": "Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`)."
+        },
+        "salt": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/Salt"
+        },
+        "payload": {
+          "description": "The committed value. `null` is a salt-only opening, valid only where the holder already has the payload (the caller copy, `caller` bundles and the PDP response to the enforcement point that sent the arguments)."
+        }
+      }
+    }
+  }
+}

@@ -2672,12 +2672,6 @@
       "schemaFile": "spec/schemas/chio-wire/v1/security/mcp-cage-launch-policy-v1.schema.json"
     },
     {
-      "schema": "chio.security-event-body.v1",
-      "artifactKind": "security_event_body",
-      "introducedBy": "active-defense-v1",
-      "schemaFile": "spec/schemas/chio-wire/v1/security/security-event-body-v1.schema.json"
-    },
-    {
       "schema": "chio.security.tool-flow-declaration.v1",
       "artifactKind": "security_tool_flow_declaration",
       "introducedBy": "active-defense-v1",
@@ -3197,6 +3191,30 @@
       "artifactKind": "policy_maintenance_view",
       "introducedBy": "recovery-product",
       "schemaFile": "spec/schemas/chio-wire/v1/recovery/policy-maintenance-view.schema.json"
+    },
+    {
+      "schema": "chio.root-policy.v1",
+      "artifactKind": "root_policy",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/root_authority/root-policy.schema.json"
+    },
+    {
+      "schema": "chio.idp-key-snapshot.v1",
+      "artifactKind": "idp_key_snapshot",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json"
+    },
+    {
+      "schema": "chio.revocation-request.v1",
+      "artifactKind": "revocation_request",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/root_authority/revocation-request.schema.json"
+    },
+    {
+      "schema": "chio.settlement-closure.v1",
+      "artifactKind": "settlement_closure",
+      "introducedBy": "root-authority-v1",
+      "schemaFile": "spec/schemas/chio-wire/v1/receipt/settlement-closure.schema.json"
     }
   ]
 }

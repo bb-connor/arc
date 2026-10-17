@@ -1,0 +1,20 @@
+{
+  "schema": "chio.settlement-closure.v1",
+  "terminal_receipt_id": "ca5a95522fe8248feabf78f5379c6ed28d0011913bfd47748c93cdd88e43ad20",
+  "hold_id": "hold-example-1",
+  "rail": "x402",
+  "state": "settled",
+  "asset": "caip19:eip155:84532/erc20:0x036cbd53842c5426634e7929541ec2318f3dcf7e",
+  "amount": "250000",
+  "rail_refs": [
+    {
+      "kind": "x402.settlement_response",
+      "id": "eip155:84532:0x5e9c",
+      "digest": "sha256:1b525965e4c48272426bcb3dc2a30acec62527ff6efaa0155ce8d32dd7881882",
+      "pad": 0
+    }
+  ],
+  "observed_at": 1792234990,
+  "kernel_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "signature": "7cd97412c7afe22ab67faff1b7eefe524477c6c86e7c8df95da870d5d5d069eb29a1ea26f5aec33b87cf090b48b08b1af2bc1cd4892b3dee4e7e97e67cb9d27c"
+}

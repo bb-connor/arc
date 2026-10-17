@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/root-anchor.schema.json",
+  "title": "Chio Root Anchor",
+  "description": "The `root_anchor` member of a root `chio.capability.v1` body (PROTOCOL 5.6.1). A delegated token copies it byte for byte from its root. The `$defs` here are shared by every root-authority schema.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "context_digest",
+    "root_policy_digest",
+    "anchored_at",
+    "assertion_exp"
+  ],
+  "properties": {
+    "kind": {
+      "$ref": "#/$defs/AnchorKind"
+    },
+    "context_digest": {
+      "$ref": "#/$defs/Digest",
+      "description": "SHA-256 over `chio.delegation-context.v1\\0 || canonical_json(context)`."
+    },
+    "root_policy_digest": {
+      "$ref": "#/$defs/Digest",
+      "description": "SHA-256 over `chio.root-policy.v1\\0 || canonical_json(policy signing body)`."
+    },
+    "anchored_at": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix seconds. Equals `exchange.exchanged_at` of the delegation context."
+    },
+    "assertion_exp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix seconds. Equals `anchor.token_exp` of the delegation context. A root's `expires_at` must not exceed it."
+    }
+  },
+  "$defs": {
+    "AnchorKind": {
+      "type": "string",
+      "enum": [
+        "oauth_id_jag",
+        "entra_jwt",
+        "entra_agent_id",
+        "oidc_jwt",
+        "oauth_introspection",
+        "chio_local_as",
+        "chio_operator_key",
+        "operator_static_bearer"
+      ],
+      "description": "Closed set of anchor kinds (PROTOCOL 5.6.2). Unknown kinds reject at decode."
+    },
+    "Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "description": "SHA-256 digest as `sha256:` followed by 64 lowercase hex characters."
+    },
+    "Salt": {
+      "type": "string",
+      "pattern": "^b64u:[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$",
+      "description": "A 32-byte salt as `b64u:` followed by its canonical unpadded base64url encoding (43 characters)."
+    },
+    "PublicKeyHex": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+      "description": "Self-describing public key encoding of PROTOCOL 4.4 (`PublicKey::to_hex`)."
+    },
+    "SignatureHex": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+|hybrid:([0-9a-f]{128}|p256:[0-9a-f]+|p384:[0-9a-f]+):[0-9a-f]{6618}:(ed25519|p256|p384)\\+mldsa65)$",
+      "description": "Self-describing signature encoding over the signing wrapper (PROTOCOL 4.5)."
+    },
+    "Commitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "salt_ref"
+      ],
+      "description": "A salted commitment whose salt is held in the disclosure store under `salt_ref`.",
+      "properties": {
+        "commit": {
+          "$ref": "#/$defs/Digest"
+        },
+        "salt_ref": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$"
+        }
+      }
+    },
+    "HolderClass": {
+      "type": "string",
+      "enum": [
+        "edge_session",
+        "caller"
+      ],
+      "description": "Who holds the root capability's subject key (PROTOCOL 5.6.6)."
+    },
+    "Jwk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kid",
+        "kty"
+      ],
+      "description": "A public JSON Web Key. Private key members are not admitted.",
+      "properties": {
+        "kid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kty": {
+          "type": "string",
+          "enum": [
+            "RSA",
+            "EC",
+            "OKP"
+          ]
+        },
+        "alg": {
+          "$ref": "#/$defs/JwsAlgorithm"
+        },
+        "use": {
+          "type": "string",
+          "enum": [
+            "sig"
+          ]
+        },
+        "n": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "e": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "crv": {
+          "type": "string",
+          "enum": [
+            "P-256",
+            "P-384",
+            "P-521",
+            "Ed25519"
+          ]
+        },
+        "x": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "y": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        }
+      }
+    },
+    "JwsAlgorithm": {
+      "type": "string",
+      "enum": [
+        "RS256",
+        "RS384",
+        "RS512",
+        "PS256",
+        "PS384",
+        "PS512",
+        "ES256",
+        "ES384",
+        "ES512",
+        "EdDSA"
+      ],
+      "description": "Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted."
+    }
+  }
+}

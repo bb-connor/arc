@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json",
+  "title": "Chio IdP Key Snapshot",
+  "description": "`chio.idp-key-snapshot.v1` (PROTOCOL 5.6.4), signed by the exchange key over the signing wrapper. It records the key set the exchange fetched from an identity provider and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement, not identity-provider evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "issuer",
+    "source",
+    "keys",
+    "observed_at",
+    "exchange_key",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.idp-key-snapshot.v1"
+    },
+    "issuer": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "pattern": "^https://[^\\s]+$",
+      "description": "The pinned `jwks_uri` the keys were fetched from."
+    },
+    "keys": {
+      "type": "array",
+      "items": {
+        "$ref": "root-anchor.schema.json#/$defs/Jwk"
+      }
+    },
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "exchange_key": {
+      "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
+    },
+    "signature": {
+      "$ref": "root-anchor.schema.json#/$defs/SignatureHex"
+    }
+  }
+}

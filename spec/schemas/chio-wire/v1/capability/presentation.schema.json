@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/presentation.schema.json",
+  "title": "Chio Capability Presentation",
+  "description": "`chio.capability-presentation.v1` (PROTOCOL 5.6.5), carried in MCP `_meta.chioCapability`. The envelope is unsigned; every member inside is verified independently.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "leaf",
+    "ancestors"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.capability-presentation.v1"
+    },
+    "leaf": {
+      "$ref": "token.schema.json"
+    },
+    "ancestors": {
+      "type": "array",
+      "description": "Signed ancestors ordered root to parent. A root presented alone has an empty list.",
+      "items": {
+        "$ref": "token.schema.json"
+      }
+    },
+    "delegation_context": {
+      "$ref": "../root_authority/delegation-context.schema.json",
+      "description": "Required when the presenter is not the session holder, so the verifier can recompute `context_digest`."
+    }
+  }
+}

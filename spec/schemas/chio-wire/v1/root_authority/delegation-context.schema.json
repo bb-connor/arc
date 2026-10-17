@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/delegation-context.schema.json",
+  "title": "Chio Delegation Context",
+  "description": "`chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "anchor",
+    "exchange",
+    "root_policy_rule_id",
+    "effective_root_scope_hash"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.delegation-context.v1"
+    },
+    "anchor": {
+      "$ref": "#/$defs/DelegationAnchor"
+    },
+    "exchange": {
+      "$ref": "#/$defs/DelegationExchange"
+    },
+    "root_policy_rule_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "`rule_id` of the root policy rule that matched."
+    },
+    "effective_root_scope_hash": {
+      "$ref": "root-anchor.schema.json#/$defs/Digest",
+      "description": "Equals the scope hash of the minted root."
+    }
+  },
+  "$defs": {
+    "DelegationAnchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "issuer",
+        "artifact_retained",
+        "replay_key_digest",
+        "token_iat",
+        "token_exp",
+        "subject",
+        "tenant",
+        "claims"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "root-anchor.schema.json#/$defs/AnchorKind"
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`."
+        },
+        "key_snapshot_digest": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest",
+          "description": "Digest of the `chio.idp-key-snapshot.v1` in force when the assertion was verified."
+        },
+        "kid": {
+          "type": "string",
+          "minLength": 1
+        },
+        "alg": {
+          "$ref": "root-anchor.schema.json#/$defs/JwsAlgorithm"
+        },
+        "artifact_digest": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest",
+          "description": "SHA-256 of the exact compact JWS bytes received."
+        },
+        "artifact_retained": {
+          "type": "boolean",
+          "description": "True only for `oauth_id_jag` under a rule with `retain_idp_artifact: true`."
+        },
+        "replay_key_digest": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest"
+        },
+        "token_iat": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "token_exp": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "subject": {
+          "$ref": "#/$defs/SubjectCommitment"
+        },
+        "tenant": {
+          "$ref": "#/$defs/TenantCommitment"
+        },
+        "claims": {
+          "type": "object",
+          "description": "Only the claims the matched rule names in `recorded_claims`, each plain or committed per the rule."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "operator_static_bearer"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "issuer": {
+                "const": "urn:chio:operator"
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "key_snapshot_digest"
+                  ]
+                },
+                {
+                  "required": [
+                    "kid"
+                  ]
+                },
+                {
+                  "required": [
+                    "alg"
+                  ]
+                },
+                {
+                  "required": [
+                    "artifact_digest"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "oauth_id_jag",
+                  "entra_jwt",
+                  "entra_agent_id"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "key_snapshot_digest",
+              "kid",
+              "alg",
+              "artifact_digest"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "oauth_id_jag"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "else": {
+            "properties": {
+              "artifact_retained": {
+                "const": false
+              }
+            }
+          }
+        }
+      ]
+    },
+    "DelegationExchange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exchange_key",
+        "exchanged_at",
+        "request_digest",
+        "holder"
+      ],
+      "properties": {
+        "exchange_key": {
+          "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex",
+          "description": "Equals the issuer key of the minted root."
+        },
+        "exchanged_at": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "request_digest": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest"
+        },
+        "holder": {
+          "$ref": "root-anchor.schema.json#/$defs/HolderClass"
+        }
+      }
+    },
+    "SubjectCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "salt_ref"
+      ],
+      "description": "`SHA-256(\"chio.delegation-context.subject.v1\\0\" || salt || utf8(subject))`.",
+      "properties": {
+        "commit": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest"
+        },
+        "salt_ref": {
+          "type": "string",
+          "const": "anchor.sub"
+        }
+      }
+    },
+    "TenantCommitment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "salt_ref"
+      ],
+      "description": "`SHA-256(\"chio.delegation-context.tenant.v1\\0\" || salt || utf8(tenant))`.",
+      "properties": {
+        "commit": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest"
+        },
+        "salt_ref": {
+          "type": "string",
+          "const": "anchor.tenant"
+        }
+      }
+    }
+  }
+}

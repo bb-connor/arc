@@ -1,0 +1,23 @@
+{
+  "schema": "chio.receipt-disclosure.v1",
+  "receipt_id": "6f32860910ca0fb2a20c7fda143666b09dbf8db5238195c90a586fb542ff0cad",
+  "openings": [
+    {
+      "salt_ref": "params",
+      "salt": "b64u:EBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA=",
+      "payload": null
+    },
+    {
+      "salt_ref": "content",
+      "salt": "b64u:ERERERERERERERERERERERERERERERERERERERERERE",
+      "payload": {
+        "lines": 42
+      }
+    },
+    {
+      "salt_ref": "anchor.sub",
+      "salt": "b64u:EhISEhISEhISEhISEhISEhISEhISEhISEhISEhISEhI",
+      "payload": "00u1examplesubject"
+    }
+  ]
+}

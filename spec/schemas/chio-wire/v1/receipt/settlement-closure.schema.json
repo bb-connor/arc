@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/settlement-closure.schema.json",
+  "title": "Chio Settlement Closure",
+  "description": "`chio.settlement-closure.v1` (PROTOCOL 6.7), signed by the kernel key over the signing wrapper. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "terminal_receipt_id",
+    "hold_id",
+    "rail",
+    "state",
+    "asset",
+    "amount",
+    "rail_refs",
+    "observed_at",
+    "kernel_key",
+    "signature"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.settlement-closure.v1"
+    },
+    "terminal_receipt_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "hold_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rail": {
+      "type": "string",
+      "enum": [
+        "x402"
+      ]
+    },
+    "state": {
+      "$ref": "#/$defs/SettlementState"
+    },
+    "asset": {
+      "$ref": "#/$defs/Asset"
+    },
+    "amount": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$",
+      "description": "Integer minor units as a decimal string."
+    },
+    "rail_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/RailRef"
+      }
+    },
+    "observed_at": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "kernel_key": {
+      "$ref": "../root_authority/root-anchor.schema.json#/$defs/PublicKeyHex"
+    },
+    "signature": {
+      "$ref": "../root_authority/root-anchor.schema.json#/$defs/SignatureHex"
+    }
+  },
+  "$defs": {
+    "SettlementState": {
+      "type": "string",
+      "enum": [
+        "settled",
+        "authorized_pending",
+        "failed"
+      ]
+    },
+    "Asset": {
+      "type": "string",
+      "pattern": "^(iso4217:[A-Z]{3}|caip19:[-a-z0-9]{3,8}:[-_a-zA-Z0-9]{1,32}/[-a-z0-9]{3,8}:[-.%a-zA-Z0-9]{1,128})$",
+      "description": "Typed asset: `iso4217:<CODE>` or `caip19:<chain>/<namespace>:<reference>`."
+    },
+    "RailRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "digest"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "x402.payment_requirements",
+            "x402.payment_payload",
+            "x402.settlement_response"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/Digest",
+          "description": "Digest over the canonical JSON of the decoded base64 payload."
+        }
+      }
+    }
+  }
+}
