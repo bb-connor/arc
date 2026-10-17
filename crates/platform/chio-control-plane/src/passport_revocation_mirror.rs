@@ -1,10 +1,10 @@
 //! Per-partner mirrors of a federation partner's passport revocation feed.
 //!
 //! A mirror is its own durable revocation oracle kept beside this operator's
-//! passport lifecycle registry, plus the partner's last accepted signed root
+//! revocation partner registry, plus the partner's last accepted signed root
 //! and the partner sequence number it covers. A sync verifies the partner's
-//! signed root against the trust-control authority key pinned in the partner
-//! card, fetches the leaves after the mirror's cursor, replays them into a
+//! signed root against the trust-control authority key pinned in the
+//! revocation partner registry, fetches the leaves after the mirror's cursor, replays them into a
 //! staged tree and commits only when the staged root equals the signed root
 //! and the signed root does not roll back the accepted one. A refused sync
 //! leaves the mirror unchanged; a root that contradicts the accepted history
@@ -13,8 +13,8 @@
 //! Every fetch happens before the mirror's write transaction opens.
 //!
 //! A door admits a partner passport only while the accepted root still
-//! verifies against the pinned key, is younger than the partner card's
-//! revocation freshness TTL, and does not hold the passport.
+//! verifies against the pinned key, is younger than the partner's revocation
+//! freshness TTL, and does not hold the passport.
 
 use std::path::{Path, PathBuf};
 
@@ -26,11 +26,11 @@ use chio_revocation_oracle::{
 use chio_security_types::clock::Clock;
 use rusqlite::{params, OptionalExtension};
 
-use crate::partner_card::PartnerCard;
 use crate::passport_revocation_feed::{
     passport_revocation_root_verifier, PassportRevocationLeaf, PassportRevocationLeavesPage,
     MAX_PASSPORT_REVOCATION_PAGE_LEAVES, PASSPORT_REVOCATION_LEAVES_SCHEMA,
 };
+use crate::revocation_partner::RevocationPartner;
 
 /// Most leaves one sync replays. A partner further ahead than this is refused.
 pub const MAX_PARTNER_SYNC_LEAVES: u64 = 65_536;
@@ -127,7 +127,7 @@ pub trait PartnerRevocationSource {
     ) -> Result<PassportRevocationLeavesPage, PartnerRevocationError>;
 }
 
-/// The mirror of `partner_id` kept beside the lifecycle registry at
+/// The mirror of `partner_id` kept beside the revocation partner registry at
 /// `registry`: `<registry file name>.partner-<partner_id>.revocations.sqlite3`.
 pub fn partner_revocation_mirror_path(
     registry: &Path,
@@ -139,7 +139,7 @@ pub fn partner_revocation_mirror_path(
         .ok_or_else(|| {
             PartnerRevocationError::MirrorUnavailable(
                 partner_id.to_owned(),
-                "passport lifecycle registry path has no UTF-8 file name".to_owned(),
+                "revocation partner registry path has no UTF-8 file name".to_owned(),
             )
         })?;
     Ok(registry.with_file_name(format!("{name}.partner-{partner_id}.revocations.sqlite3")))
@@ -241,26 +241,26 @@ impl PartnerRevocationMirror {
             .map_err(mirror_unavailable(&self.partner_id))
     }
 
-    /// Refuses unless the accepted root verifies against `card`'s pinned key
-    /// and is fresh at `now_unix_ms` under `card`'s freshness TTL.
+    /// Refuses unless the accepted root verifies against `partner`'s pinned key
+    /// and is fresh at `now_unix_ms` under `partner`'s freshness TTL.
     pub fn require_fresh(
         &self,
-        card: &PartnerCard,
+        partner: &RevocationPartner,
         now_unix_ms: u64,
     ) -> Result<AcceptedPartnerRoot, PartnerRevocationError> {
         let accepted = self
             .accepted()?
             .ok_or_else(|| PartnerRevocationError::NoVerifiedRoot(self.partner_id.clone()))?;
-        verify_signature(card, &accepted.signed_root)?;
+        verify_signature(partner, &accepted.signed_root)?;
         let root = &accepted.signed_root.root;
-        check_not_future(card, root, now_unix_ms)?;
-        let config = FreshnessConfig::with_offline_grace(card.revocation_freshness_ttl_ms(), 0);
+        check_not_future(partner, root, now_unix_ms)?;
+        let config = FreshnessConfig::with_offline_grace(partner.revocation_freshness_ttl_ms(), 0);
         verify_fresh_epoch_root(root, now_unix_ms.max(root.issued_at_unix_ms), config).map_err(
             |_| PartnerRevocationError::StaleRoot {
-                partner_id: card.partner_id.clone(),
+                partner_id: partner.partner_id.clone(),
                 issued_at_unix_ms: root.issued_at_unix_ms,
                 now_unix_ms,
-                ttl_ms: card.revocation_freshness_ttl_ms(),
+                ttl_ms: partner.revocation_freshness_ttl_ms(),
             },
         )?;
         let local = self
@@ -279,11 +279,11 @@ impl PartnerRevocationMirror {
     /// Refuses `passport_id` unless the mirror is fresh and does not hold it.
     pub fn check_passport(
         &self,
-        card: &PartnerCard,
+        partner: &RevocationPartner,
         passport_id: &str,
         now_unix_ms: u64,
     ) -> Result<(), PartnerRevocationError> {
-        self.require_fresh(card, now_unix_ms)?;
+        self.require_fresh(partner, now_unix_ms)?;
         let revoked = self
             .oracle
             .is_revoked(&passport_revocation_key(passport_id))
@@ -301,12 +301,12 @@ impl PartnerRevocationMirror {
     /// `source`, then applies them at the time `clock` reads after the fetch.
     pub fn sync(
         &self,
-        card: &PartnerCard,
+        partner: &RevocationPartner,
         source: &mut dyn PartnerRevocationSource,
         clock: &dyn Clock,
     ) -> Result<EpochRoot, PartnerRevocationError> {
         let offered = source.signed_root()?;
-        verify_signature(card, &offered)?;
+        verify_signature(partner, &offered)?;
         let accepted = self.accepted()?;
         let have = accepted
             .as_ref()
@@ -315,7 +315,7 @@ impl PartnerRevocationMirror {
         let behind = want.saturating_sub(have);
         if behind > MAX_PARTNER_SYNC_LEAVES {
             return Err(PartnerRevocationError::TooFarBehind {
-                partner_id: card.partner_id.clone(),
+                partner_id: partner.partner_id.clone(),
                 behind,
             });
         }
@@ -323,7 +323,7 @@ impl PartnerRevocationMirror {
         let mut leaves = Vec::new();
         while crate::integer::count(leaves.len()) < behind {
             let page = source.leaves_after(after)?;
-            check_page(card, &page, after)?;
+            check_page(partner, &page, after)?;
             after = page.leaves.last().map_or(after, |leaf| leaf.seq);
             leaves.extend(page.leaves);
         }
@@ -331,26 +331,26 @@ impl PartnerRevocationMirror {
             .unix_millis()
             .map_err(|error| PartnerRevocationError::Clock(error.to_string()))?
             .get();
-        self.apply(card, &offered, &leaves, now)
+        self.apply(partner, &offered, &leaves, now)
     }
 
     /// Replays `leaves` after the accepted cursor and commits `offered` only
     /// when the staged root equals it. No network I/O runs here.
     pub fn apply(
         &self,
-        card: &PartnerCard,
+        partner: &RevocationPartner,
         offered: &SignedEpochRoot,
         leaves: &[PassportRevocationLeaf],
         now_unix_ms: u64,
     ) -> Result<EpochRoot, PartnerRevocationError> {
-        verify_signature(card, offered)?;
-        check_not_future(card, &offered.root, now_unix_ms)?;
+        verify_signature(partner, offered)?;
+        check_not_future(partner, &offered.root, now_unix_ms)?;
         let offered_json = encode_root(offered).map_err(mirror_unavailable(&self.partner_id))?;
         let mut refusal = None;
         let outcome = self.oracle.transact(now_unix_ms, |txn| {
             let accepted = read_accepted(txn.connection())?;
             if let Some(accepted) = &accepted {
-                if let Err(error) = check_history(card, &accepted.signed_root, offered) {
+                if let Err(error) = check_history(partner, &accepted.signed_root, offered) {
                     refusal = Some(error);
                     return Err(refused());
                 }
@@ -372,7 +372,7 @@ impl PartnerRevocationMirror {
                     Ok(inserted) => inserted,
                     Err(error) => {
                         refusal = Some(PartnerRevocationError::MalformedPage(
-                            card.partner_id.clone(),
+                            partner.partner_id.clone(),
                             format!("leaf {} is not a valid revocation key: {error}", leaf.seq),
                         ));
                         return Err(refused());
@@ -380,7 +380,7 @@ impl PartnerRevocationMirror {
                 };
                 if !inserted {
                     refusal = Some(PartnerRevocationError::DuplicateLeaf {
-                        partner_id: card.partner_id.clone(),
+                        partner_id: partner.partner_id.clone(),
                         seq: leaf.seq,
                     });
                     return Err(refused());
@@ -389,7 +389,7 @@ impl PartnerRevocationMirror {
             }
             if !same_tree(&txn.epoch_root(), &offered.root) {
                 refusal = Some(PartnerRevocationError::RootMismatch {
-                    partner_id: card.partner_id.clone(),
+                    partner_id: partner.partner_id.clone(),
                     epoch: offered.root.epoch,
                 });
                 return Err(refused());
@@ -500,23 +500,23 @@ fn same_tree(left: &EpochRoot, right: &EpochRoot) -> bool {
 }
 
 fn verify_signature(
-    card: &PartnerCard,
+    partner: &RevocationPartner,
     root: &SignedEpochRoot,
 ) -> Result<(), PartnerRevocationError> {
     root.verify(&passport_revocation_root_verifier(
-        &card.authority_public_key,
+        &partner.authority_public_key,
     ))
-    .map_err(|_| PartnerRevocationError::UnverifiableRoot(card.partner_id.clone()))
+    .map_err(|_| PartnerRevocationError::UnverifiableRoot(partner.partner_id.clone()))
 }
 
 fn check_not_future(
-    card: &PartnerCard,
+    partner: &RevocationPartner,
     root: &EpochRoot,
     now_unix_ms: u64,
 ) -> Result<(), PartnerRevocationError> {
     if root.issued_at_unix_ms > now_unix_ms.saturating_add(MAX_PARTNER_ROOT_FUTURE_SKEW_MS) {
         return Err(PartnerRevocationError::FutureRoot {
-            partner_id: card.partner_id.clone(),
+            partner_id: partner.partner_id.clone(),
             issued_at_unix_ms: root.issued_at_unix_ms,
             now_unix_ms,
         });
@@ -525,11 +525,11 @@ fn check_not_future(
 }
 
 fn check_history(
-    card: &PartnerCard,
+    partner: &RevocationPartner,
     accepted: &SignedEpochRoot,
     offered: &SignedEpochRoot,
 ) -> Result<(), PartnerRevocationError> {
-    let partner_id = card.partner_id.clone();
+    let partner_id = partner.partner_id.clone();
     if offered.root.epoch < accepted.root.epoch {
         return Err(PartnerRevocationError::Rollback {
             partner_id,
@@ -554,12 +554,12 @@ fn check_history(
 }
 
 fn check_page(
-    card: &PartnerCard,
+    partner: &RevocationPartner,
     page: &PassportRevocationLeavesPage,
     after: u64,
 ) -> Result<(), PartnerRevocationError> {
     let malformed = |reason: &str| {
-        PartnerRevocationError::MalformedPage(card.partner_id.clone(), reason.to_owned())
+        PartnerRevocationError::MalformedPage(partner.partner_id.clone(), reason.to_owned())
     };
     if page.schema != PASSPORT_REVOCATION_LEAVES_SCHEMA {
         return Err(malformed("unsupported schema"));
@@ -569,7 +569,7 @@ fn check_page(
     }
     if page.leaves.is_empty() {
         return Err(PartnerRevocationError::TruncatedLeaves(
-            card.partner_id.clone(),
+            partner.partner_id.clone(),
         ));
     }
     if page.leaves.len() > MAX_PASSPORT_REVOCATION_PAGE_LEAVES {

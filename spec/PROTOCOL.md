@@ -4700,9 +4700,10 @@ partners:
 - `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
   `chio.passport-revocation-leaves.v1` page of the leaves with a sequence
   number above `after`, in insertion order, at most 256 leaves and 512 KiB
-- a partner pins the authority key and a `revocationFreshnessTtlSeconds` of 1
-  to 300 seconds in its `chio.partner-card-registry.v1` card; a card without
-  the TTL, or with a TTL outside that range, is refused at load
+- a partner's operator-local revocation partner registry binds the issuer URL
+  carried as the signed `iss` of its passports to the pinned authority key and
+  a `revocationFreshnessTtlSeconds` of 1 to 300 seconds; an entry without the
+  TTL, or with a TTL outside that range, refuses the registry
 - the partner rebuilds the tree from the leaves and accepts the signed root
   only when the rebuilt root, epoch and leaf count equal it; a root that does
   not verify against the pinned key, rolls back the accepted epoch or signing

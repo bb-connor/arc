@@ -8,13 +8,13 @@ use super::*;
 use chio_egress_contract::HttpEgressContract;
 use chio_revocation_oracle::{EpochRoot, SignedEpochRoot};
 
-use crate::partner_card::PartnerCard;
 use crate::passport_revocation_feed::{
     PassportRevocationLeavesPage, MAX_PASSPORT_REVOCATION_PAGE_BYTES,
 };
 use crate::passport_revocation_mirror::{
     PartnerRevocationError, PartnerRevocationMirror, PartnerRevocationSource,
 };
+use crate::revocation_partner::RevocationPartner;
 
 use super::portable_issuer_fetch::{
     build_portable_fetch_agent, pin_checked_https_addrs, portable_fetch_transport_error,
@@ -83,9 +83,11 @@ impl PartnerRevocationSource for PartnerRevocationFeed {
     }
 }
 
-/// The strict HTTPS egress contract for `card`'s trust-control host.
-fn partner_feed_contract(card: &PartnerCard) -> Result<(Url, HttpEgressContract), CliError> {
-    let url = Url::parse(&card.trust_control_url).map_err(|error| {
+/// The strict HTTPS egress contract for `partner`'s issuer host.
+fn partner_feed_contract(
+    partner: &RevocationPartner,
+) -> Result<(Url, HttpEgressContract), CliError> {
+    let url = Url::parse(&partner.issuer).map_err(|error| {
         CliError::cli_other_error(format!("partner trust-control URL is invalid: {error}"))
     })?;
     let contract = crate::anchor_egress::strict_https_contract(
@@ -97,20 +99,20 @@ fn partner_feed_contract(card: &PartnerCard) -> Result<(Url, HttpEgressContract)
     Ok((url, contract))
 }
 
-/// Syncs the mirror at `mirror_path` from `card`'s partner over the bounded
+/// Syncs the mirror at `mirror_path` from `partner` over the bounded
 /// strict transport, sampling acceptance time from `clock` after the fetch.
 pub fn sync_partner_revocation_mirror(
-    card: PartnerCard,
+    partner: RevocationPartner,
     mirror_path: PathBuf,
     clock: Arc<dyn chio_security_types::clock::Clock>,
 ) -> Result<EpochRoot, PartnerRevocationError> {
-    let partner_id = card.partner_id.clone();
+    let partner_id = partner.partner_id.clone();
     let fetch_error =
         |error: CliError| PartnerRevocationError::Fetch(partner_id.clone(), error.to_string());
     let deadline = PortableFetchDeadline::start().map_err(fetch_error)?;
     let outcome = run_portable_fetch(&PORTABLE_ISSUER_FETCH_POOL, deadline, move |deadline| {
         Ok(sync_over_strict_transport(
-            &card,
+            &partner,
             &mirror_path,
             clock.as_ref(),
             &deadline,
@@ -120,18 +122,19 @@ pub fn sync_partner_revocation_mirror(
 }
 
 fn sync_over_strict_transport(
-    card: &PartnerCard,
+    partner: &RevocationPartner,
     mirror_path: &Path,
     clock: &dyn chio_security_types::clock::Clock,
     deadline: &PortableFetchDeadline,
 ) -> Result<EpochRoot, PartnerRevocationError> {
-    let fetch_error =
-        |error: CliError| PartnerRevocationError::Fetch(card.partner_id.clone(), error.to_string());
-    let (url, contract) = partner_feed_contract(card).map_err(fetch_error)?;
+    let fetch_error = |error: CliError| {
+        PartnerRevocationError::Fetch(partner.partner_id.clone(), error.to_string())
+    };
+    let (url, contract) = partner_feed_contract(partner).map_err(fetch_error)?;
     let pinned =
         pin_checked_https_addrs(&contract, &url, system_resolve_host).map_err(fetch_error)?;
     let agent = build_portable_fetch_agent(pinned, true, deadline).map_err(fetch_error)?;
-    let mirror = PartnerRevocationMirror::open(mirror_path, &card.partner_id)?;
-    let mut feed = PartnerRevocationFeed::new(&card.partner_id, &card.trust_control_url, agent);
-    mirror.sync(card, &mut feed, clock)
+    let mirror = PartnerRevocationMirror::open(mirror_path, &partner.partner_id)?;
+    let mut feed = PartnerRevocationFeed::new(&partner.partner_id, &partner.issuer, agent);
+    mirror.sync(partner, &mut feed, clock)
 }

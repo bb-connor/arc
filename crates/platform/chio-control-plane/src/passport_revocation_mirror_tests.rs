@@ -10,13 +10,13 @@ use super::{
     partner_revocation_mirror_path, PartnerRevocationError, PartnerRevocationMirror,
     PartnerRevocationSource, MAX_PARTNER_ROOT_FUTURE_SKEW_MS, MAX_PARTNER_SYNC_LEAVES,
 };
-use crate::partner_card::{PartnerCard, PartnerFederationPolicy};
 use crate::passport_revocation::passport_revocation_oracle_path;
 use crate::passport_revocation_feed::{
     passport_revocation_leaves_page, passport_revocation_root_signer_id,
     sign_passport_revocation_root, PassportRevocationLeaf, PassportRevocationLeavesPage,
     MAX_PASSPORT_REVOCATION_PAGE_LEAVES, PASSPORT_REVOCATION_LEAVES_SCHEMA,
 };
+use crate::revocation_partner::RevocationPartner;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -27,19 +27,17 @@ fn authority() -> Keypair {
     Keypair::from_seed(&[21; 32])
 }
 
-fn card_for(key: &Keypair) -> PartnerCard {
-    PartnerCard {
+fn partner_for(key: &Keypair) -> RevocationPartner {
+    RevocationPartner {
         partner_id: PARTNER.to_owned(),
-        trust_control_url: "https://trust.acme.example".to_owned(),
+        issuer: "https://trust.acme.example".to_owned(),
         authority_public_key: key.public_key(),
-        federation_policy: PartnerFederationPolicy {
-            revocation_freshness_ttl_seconds: Some(TTL_SECONDS),
-        },
+        revocation_freshness_ttl_seconds: Some(TTL_SECONDS),
     }
 }
 
-fn card() -> PartnerCard {
-    card_for(&authority())
+fn partner() -> RevocationPartner {
+    partner_for(&authority())
 }
 
 /// Partner A: a passport registry path whose revocation oracle it publishes.
@@ -114,7 +112,7 @@ impl PartnerRevocationSource for FeedSource<'_> {
 
 /// Operator B's mirror of partner A.
 fn mirror(dir: &Path) -> Result<PartnerRevocationMirror, Box<dyn std::error::Error>> {
-    let path = partner_revocation_mirror_path(&dir.join("b-passport-statuses.json"), PARTNER)?;
+    let path = partner_revocation_mirror_path(&dir.join("b-revocation-partners.json"), PARTNER)?;
     Ok(PartnerRevocationMirror::open(&path, PARTNER)?)
 }
 
@@ -127,11 +125,11 @@ fn sign(root: EpochRoot, key: &Keypair) -> Result<SignedEpochRoot, Box<dyn std::
 }
 
 #[test]
-fn the_mirror_path_sits_beside_the_registry_per_partner() -> TestResult {
-    let registry = Path::new("/srv/chio/passport-statuses.json");
+fn the_mirror_path_sits_beside_the_partner_registry_per_partner() -> TestResult {
+    let registry = Path::new("/srv/chio/revocation-partners.json");
     assert_eq!(
         partner_revocation_mirror_path(registry, PARTNER)?,
-        PathBuf::from("/srv/chio/passport-statuses.json.partner-acme.revocations.sqlite3")
+        PathBuf::from("/srv/chio/revocation-partners.json.partner-acme.revocations.sqlite3")
     );
     Ok(())
 }
@@ -144,20 +142,20 @@ fn a_revocation_at_the_partner_denies_after_the_next_sync_on_the_same_handle() -
 
     a.revoke("passport-other", 1_000)?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000),
         &FixedClock::from_millis(10_000),
     )?;
-    b.check_passport(&card(), "passport-held", 10_000)?;
+    b.check_passport(&partner(), "passport-held", 10_000)?;
 
     a.revoke("passport-held", 11_000)?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(12_000),
         &FixedClock::from_millis(12_000),
     )?;
     assert_eq!(
-        b.check_passport(&card(), "passport-held", 12_000),
+        b.check_passport(&partner(), "passport-held", 12_000),
         Err(PartnerRevocationError::Revoked {
             partner_id: PARTNER.to_owned(),
             passport_id: "passport-held".to_owned(),
@@ -175,7 +173,7 @@ fn a_mirror_with_no_verified_root_denies() -> TestResult {
     let dir = tempfile::tempdir()?;
     let b = mirror(dir.path())?;
     assert_eq!(
-        b.check_passport(&card(), "passport-held", 10_000),
+        b.check_passport(&partner(), "passport-held", 10_000),
         Err(PartnerRevocationError::NoVerifiedRoot(PARTNER.to_owned()))
     );
     Ok(())
@@ -187,14 +185,14 @@ fn a_root_older_than_the_freshness_ttl_denies() -> TestResult {
     let dir = tempfile::tempdir()?;
     let b = mirror(dir.path())?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000),
         &FixedClock::from_millis(10_000),
     )?;
     let ttl_ms = TTL_SECONDS * 1_000;
-    b.check_passport(&card(), "passport-held", 10_000 + ttl_ms)?;
+    b.check_passport(&partner(), "passport-held", 10_000 + ttl_ms)?;
     assert_eq!(
-        b.check_passport(&card(), "passport-held", 10_001 + ttl_ms),
+        b.check_passport(&partner(), "passport-held", 10_001 + ttl_ms),
         Err(PartnerRevocationError::StaleRoot {
             partner_id: PARTNER.to_owned(),
             issued_at_unix_ms: 10_000,
@@ -214,7 +212,7 @@ fn a_root_signed_by_another_key_is_refused_and_changes_nothing() -> TestResult {
     let mut forged = a.source(10_000);
     forged.signer = Keypair::from_seed(&[99; 32]);
     assert_eq!(
-        b.sync(&card(), &mut forged, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut forged, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::UnverifiableRoot(PARTNER.to_owned()))
     );
     assert_eq!(b.accepted()?, None);
@@ -232,23 +230,23 @@ fn a_tampered_signature_is_refused() -> TestResult {
     let mut source = a.source(10_000);
     source.root_override = Some(signed);
     assert_eq!(
-        b.sync(&card(), &mut source, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut source, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::UnverifiableRoot(PARTNER.to_owned()))
     );
     Ok(())
 }
 
 #[test]
-fn a_rotated_card_key_no_longer_verifies_the_accepted_root() -> TestResult {
+fn a_rotated_partner_key_no_longer_verifies_the_accepted_root() -> TestResult {
     let a = Publisher::new()?;
     let dir = tempfile::tempdir()?;
     let b = mirror(dir.path())?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000),
         &FixedClock::from_millis(10_000),
     )?;
-    let rotated = card_for(&Keypair::from_seed(&[22; 32]));
+    let rotated = partner_for(&Keypair::from_seed(&[22; 32]));
     assert_eq!(
         b.check_passport(&rotated, "passport-held", 10_000),
         Err(PartnerRevocationError::UnverifiableRoot(PARTNER.to_owned()))
@@ -265,7 +263,7 @@ fn an_older_epoch_is_refused_as_a_rollback() -> TestResult {
     let old = sign_passport_revocation_root(&a.registry, authority(), 10_000)?;
     a.revoke("passport-b", 11_000)?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(12_000),
         &FixedClock::from_millis(12_000),
     )?;
@@ -273,7 +271,7 @@ fn an_older_epoch_is_refused_as_a_rollback() -> TestResult {
     let mut replay = a.source(13_000);
     replay.root_override = Some(old);
     assert_eq!(
-        b.sync(&card(), &mut replay, &FixedClock::from_millis(13_000)),
+        b.sync(&partner(), &mut replay, &FixedClock::from_millis(13_000)),
         Err(PartnerRevocationError::Rollback {
             partner_id: PARTNER.to_owned(),
             accepted: 2,
@@ -298,14 +296,14 @@ fn an_older_attestation_of_the_same_epoch_is_refused() -> TestResult {
     let b = mirror(dir.path())?;
     let earlier = sign_passport_revocation_root(&a.registry, authority(), 10_000)?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(12_000),
         &FixedClock::from_millis(12_000),
     )?;
     let mut replay = a.source(13_000);
     replay.root_override = Some(earlier);
     assert_eq!(
-        b.sync(&card(), &mut replay, &FixedClock::from_millis(13_000)),
+        b.sync(&partner(), &mut replay, &FixedClock::from_millis(13_000)),
         Err(PartnerRevocationError::AttestationRollback {
             partner_id: PARTNER.to_owned(),
             accepted: 12_000,
@@ -322,14 +320,14 @@ fn a_newer_attestation_of_the_same_root_refreshes_without_leaves() -> TestResult
     let b = mirror(dir.path())?;
     a.revoke("passport-a", 1_000)?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000),
         &FixedClock::from_millis(10_000),
     )?;
     let mut refresh = a.source(70_000);
-    b.sync(&card(), &mut refresh, &FixedClock::from_millis(70_000))?;
+    b.sync(&partner(), &mut refresh, &FixedClock::from_millis(70_000))?;
     assert_eq!(refresh.pages_served, 0);
-    b.check_passport(&card(), "passport-held", 70_000 + TTL_SECONDS * 1_000)?;
+    b.check_passport(&partner(), "passport-held", 70_000 + TTL_SECONDS * 1_000)?;
     Ok(())
 }
 
@@ -346,7 +344,7 @@ fn leaves_that_do_not_rebuild_the_signed_root_are_refused_and_recorded() -> Test
         epoch_nonce: passport_revocation_key("passport-decoy").epoch_nonce.get(),
     }]);
     assert_eq!(
-        b.sync(&card(), &mut lying, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut lying, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::RootMismatch {
             partner_id: PARTNER.to_owned(),
             epoch: 1,
@@ -369,7 +367,7 @@ fn two_signed_roots_for_one_epoch_are_refused_as_equivocation_and_recorded() -> 
     let b = mirror(dir.path())?;
     a.revoke("passport-a", 1_000)?;
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000),
         &FixedClock::from_millis(10_000),
     )?;
@@ -381,7 +379,11 @@ fn two_signed_roots_for_one_epoch_are_refused_as_equivocation_and_recorded() -> 
     let mut equivocating = a.source(11_000);
     equivocating.root_override = Some(sign(other, &authority())?);
     assert_eq!(
-        b.sync(&card(), &mut equivocating, &FixedClock::from_millis(11_000)),
+        b.sync(
+            &partner(),
+            &mut equivocating,
+            &FixedClock::from_millis(11_000)
+        ),
         Err(PartnerRevocationError::Equivocation {
             partner_id: PARTNER.to_owned(),
             epoch: 1,
@@ -406,7 +408,7 @@ fn a_root_dated_past_the_skew_is_refused() -> TestResult {
     let ahead = 10_001 + MAX_PARTNER_ROOT_FUTURE_SKEW_MS;
     assert_eq!(
         b.sync(
-            &card(),
+            &partner(),
             &mut a.source(ahead),
             &FixedClock::from_millis(10_000)
         ),
@@ -417,11 +419,11 @@ fn a_root_dated_past_the_skew_is_refused() -> TestResult {
         })
     );
     b.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000 + MAX_PARTNER_ROOT_FUTURE_SKEW_MS),
         &FixedClock::from_millis(10_000),
     )?;
-    b.check_passport(&card(), "passport-held", 10_000)?;
+    b.check_passport(&partner(), "passport-held", 10_000)?;
     Ok(())
 }
 
@@ -439,7 +441,7 @@ fn leaves_that_end_before_the_signed_count_are_refused() -> TestResult {
         epoch_nonce: passport_revocation_key("passport-a").epoch_nonce.get(),
     }]);
     assert_eq!(
-        b.sync(&card(), &mut short, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut short, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::TruncatedLeaves(PARTNER.to_owned()))
     );
     assert_eq!(b.accepted()?, None);
@@ -461,7 +463,7 @@ fn a_page_out_of_sequence_is_refused() -> TestResult {
     let mut reordered = a.source(10_000);
     reordered.leaves_override = Some(vec![leaf(2, "passport-b"), leaf(1, "passport-a")]);
     assert_eq!(
-        b.sync(&card(), &mut reordered, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut reordered, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::MalformedPage(
             PARTNER.to_owned(),
             "leaf sequence is not strictly increasing".to_owned()
@@ -470,7 +472,7 @@ fn a_page_out_of_sequence_is_refused() -> TestResult {
     let mut repeated = a.source(10_000);
     repeated.leaves_override = Some(vec![leaf(1, "passport-a"), leaf(2, "passport-a")]);
     assert_eq!(
-        b.sync(&card(), &mut repeated, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut repeated, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::DuplicateLeaf {
             partner_id: PARTNER.to_owned(),
             seq: 2,
@@ -495,7 +497,7 @@ fn a_partner_beyond_the_sync_bound_is_refused_before_any_page() -> TestResult {
     let mut far = a.source(10_000);
     far.root_override = Some(sign(root, &authority())?);
     assert_eq!(
-        b.sync(&card(), &mut far, &FixedClock::from_millis(10_000)),
+        b.sync(&partner(), &mut far, &FixedClock::from_millis(10_000)),
         Err(PartnerRevocationError::TooFarBehind {
             partner_id: PARTNER.to_owned(),
             behind,
@@ -520,22 +522,22 @@ fn a_sync_spans_pages_and_resumes_from_the_cursor() -> TestResult {
         },
     )?;
     let mut first = a.source(10_000);
-    b.sync(&card(), &mut first, &FixedClock::from_millis(10_000))?;
+    b.sync(&partner(), &mut first, &FixedClock::from_millis(10_000))?;
     assert_eq!(first.pages_served, 2);
 
     a.revoke("passport-late", 11_000)?;
     let mut second = a.source(12_000);
-    b.sync(&card(), &mut second, &FixedClock::from_millis(12_000))?;
+    b.sync(&partner(), &mut second, &FixedClock::from_millis(12_000))?;
     assert_eq!(second.pages_served, 1);
     assert_eq!(
-        b.check_passport(&card(), "passport-late", 12_000),
+        b.check_passport(&partner(), "passport-late", 12_000),
         Err(PartnerRevocationError::Revoked {
             partner_id: PARTNER.to_owned(),
             passport_id: "passport-late".to_owned(),
         })
     );
     assert_eq!(
-        b.check_passport(&card(), "passport-0", 12_000),
+        b.check_passport(&partner(), "passport-0", 12_000),
         Err(PartnerRevocationError::Revoked {
             partner_id: PARTNER.to_owned(),
             passport_id: "passport-0".to_owned(),
@@ -552,12 +554,12 @@ fn a_second_handle_on_the_mirror_observes_a_sync_without_reopening() -> TestResu
     let door = mirror(dir.path())?;
     a.revoke("passport-held", 1_000)?;
     syncer.sync(
-        &card(),
+        &partner(),
         &mut a.source(10_000),
         &FixedClock::from_millis(10_000),
     )?;
     assert_eq!(
-        door.check_passport(&card(), "passport-held", 10_000),
+        door.check_passport(&partner(), "passport-held", 10_000),
         Err(PartnerRevocationError::Revoked {
             partner_id: PARTNER.to_owned(),
             passport_id: "passport-held".to_owned(),
