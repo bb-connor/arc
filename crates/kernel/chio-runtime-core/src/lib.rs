@@ -147,7 +147,7 @@ pub use serde_io::{
 pub use store::{
     InMemoryRuntimeAdmissionStore, JsonRuntimeAdmissionStore, JsonRuntimeTrustFloorStateStore,
     LayeredRuntimeAdmissionStore, RuntimeAdmissionStore, RuntimeTrustFloorStore,
-    SqliteRuntimeOrchestrationStore,
+    SqliteRuntimeOrchestrationStore, SwarmGraphSource,
 };
 pub use treaty::{
     bilateral_dsse_consistency_model, bilateral_invocation_binding_sha256,

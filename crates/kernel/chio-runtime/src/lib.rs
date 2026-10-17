@@ -137,6 +137,8 @@ pub type WeightsBindingMode = chio_runtime_core::WeightsBindingMode;
 
 mod admission_hook;
 pub use admission_hook::ChioRuntimeAdmissionHook;
+mod swarm_graphs;
+pub use swarm_graphs::IssuedSwarmGraphs;
 
 pub(crate) type RuntimeCoreError = chio_runtime_core::ChioRuntimeError;
 

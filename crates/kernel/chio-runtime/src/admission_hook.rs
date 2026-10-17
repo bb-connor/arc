@@ -11,6 +11,7 @@ pub struct ChioRuntimeAdmissionHook<S> {
     runtime_pheromone_policy: Option<SignedRuntimePheromonePolicy>,
     runtime_peer_weights: Option<SignedRuntimePeerWeights>,
     swarm_witness_keys: Vec<chio_core_types::PublicKey>,
+    swarm_graphs: Option<std::sync::Arc<IssuedSwarmGraphs>>,
     fixed_now_unix_ms: Option<u64>,
     operation_owned_binding: Option<
         chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
@@ -29,6 +30,7 @@ impl<S> ChioRuntimeAdmissionHook<S> {
             runtime_pheromone_policy: None,
             runtime_peer_weights: None,
             swarm_witness_keys: Vec::new(),
+            swarm_graphs: None,
             fixed_now_unix_ms: None,
             operation_owned_binding: None,
         }
@@ -84,6 +86,12 @@ impl<S> ChioRuntimeAdmissionHook<S> {
     }
 
     #[must_use]
+    pub fn with_swarm_graphs(mut self, graphs: IssuedSwarmGraphs) -> Self {
+        self.swarm_graphs = Some(std::sync::Arc::new(graphs));
+        self
+    }
+
+    #[must_use]
     pub fn with_fixed_now_unix_ms(mut self, now_unix_ms: u64) -> Self {
         self.fixed_now_unix_ms = Some(now_unix_ms);
         self
@@ -114,6 +122,9 @@ impl<S> ChioRuntimeAdmissionHook<S> {
             hook = hook.with_runtime_pheromone_policy(policy.clone(), peer_weights.clone());
         }
         hook = hook.with_swarm_witness_keys(self.swarm_witness_keys.clone());
+        if let Some(graphs) = &self.swarm_graphs {
+            hook = hook.with_swarm_graph_source(graphs.clone());
+        }
         if let Some(binding) = &self.operation_owned_binding {
             hook = hook.with_operation_owned_runtime_replay(binding.clone());
         }

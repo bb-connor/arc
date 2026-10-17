@@ -1,13 +1,11 @@
 use super::traits::RuntimeAdmissionStore;
 use crate::validation::{validate_non_empty, validate_state_label};
 use crate::*;
-use chio_swarm_authority::SwarmAuthorityBundle;
 
 /// Process-local state shared by clones, with mutex-linearized trust-floor transitions.
 #[derive(Debug, Clone, Default)]
 pub struct InMemoryRuntimeAdmissionStore {
     bundles: Arc<Mutex<BTreeMap<String, RuntimeAdmissionBundle>>>,
-    swarm_authority_bundles: Arc<Mutex<BTreeMap<String, SwarmAuthorityBundle>>>,
     treaty_artifacts: Arc<Mutex<BTreeMap<(String, String), TreatyRuntimeArtifactRecord>>>,
     consumed_leases: Arc<Mutex<BTreeSet<String>>>,
     consumed_treaty_continuations: Arc<Mutex<BTreeSet<String>>>,
@@ -70,33 +68,6 @@ impl InMemoryRuntimeAdmissionStore {
         );
         Ok(())
     }
-
-    pub fn insert_swarm_authority_bundle(
-        &self,
-        bundle: SwarmAuthorityBundle,
-    ) -> Result<(), ChioRuntimeError> {
-        validate_non_empty(
-            &bundle.task_graph.graph_id,
-            "runtime_swarm_authority_empty_graph_id",
-        )?;
-        let bundle_sha256 = canonical_sha256(&bundle)?;
-        let mut bundles = self.swarm_authority_bundles.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime swarm authority bundle store is poisoned".to_string())
-        })?;
-        if let Some(existing) = bundles.get(&bundle.task_graph.graph_id) {
-            if canonical_sha256(existing)? == bundle_sha256 {
-                return Ok(());
-            }
-            return Err(ChioRuntimeError::Rejected {
-                code: "duplicate_swarm_authority_bundle_mismatch",
-                detail:
-                    "runtime swarm authority bundle graph id already exists with a different hash"
-                        .to_string(),
-            });
-        }
-        bundles.insert(bundle.task_graph.graph_id.clone(), bundle);
-        Ok(())
-    }
 }
 
 impl RuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
@@ -121,24 +92,6 @@ impl RuntimeAdmissionStore for InMemoryRuntimeAdmissionStore {
         Ok(treaty_artifacts
             .get(&(evidence_kind.to_string(), evidence_id.to_string()))
             .cloned())
-    }
-
-    fn swarm_authority_bundle(
-        &self,
-        task_graph_id: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        let bundles = self.swarm_authority_bundles.lock().map_err(|_| {
-            ChioRuntimeError::Store("runtime swarm authority bundle store is poisoned".to_string())
-        })?;
-        Ok(bundles.get(task_graph_id).cloned())
-    }
-
-    fn swarm_authority_bundle_for_graph(
-        &self,
-        task_graph_id: &str,
-        _graph_sha256: &str,
-    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
-        self.swarm_authority_bundle(task_graph_id)
     }
 
     fn consume_destructive_lease(

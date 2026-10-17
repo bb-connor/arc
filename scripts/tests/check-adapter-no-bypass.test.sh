@@ -16,7 +16,7 @@ fi
 
 policy="${repo_root}/xtask/src/adapter_no_bypass.rs"
 for marker in \
-  "verify_swarm_authority_reference_from_store" \
+  "verify_swarm_authority_reference" \
   "routePlanReceiptSha256" \
   "consume_swarm_continuation" \
   "admit_capability_budget" \

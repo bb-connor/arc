@@ -19,7 +19,7 @@ mod treaty_ref;
 use crate::pheromone_policy::{evaluate_runtime_pheromone_policy, RuntimePolicyEvaluationInput};
 use metadata::{runtime_context_denial_metadata, runtime_denial_metadata};
 use request::{admission_ref_from_request, request_has_chio_runtime_context};
-use swarm_authority::verify_swarm_authority_reference_from_store;
+use swarm_authority::verify_swarm_authority_reference;
 use swarm_ref::swarm_ref_from_request;
 use treaty_evidence::verify_treaty_reference_from_store;
 use treaty_ref::treaty_ref_from_request;
@@ -191,6 +191,7 @@ pub struct ChioRuntimeAdmissionHook<S> {
     runtime_pheromone_policy: Option<SignedRuntimePheromonePolicy>,
     runtime_peer_weights: Option<SignedRuntimePeerWeights>,
     swarm_witness_keys: Vec<PublicKey>,
+    swarm_graphs: Option<Arc<dyn SwarmGraphSource>>,
     fixed_now_unix_ms: Option<u64>,
     operation_owned_binding: Option<
         chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAuthorityBindingV1,
@@ -209,6 +210,7 @@ impl<S> ChioRuntimeAdmissionHook<S> {
             runtime_pheromone_policy: None,
             runtime_peer_weights: None,
             swarm_witness_keys: Vec::new(),
+            swarm_graphs: None,
             fixed_now_unix_ms: None,
             operation_owned_binding: None,
         }
@@ -267,6 +269,13 @@ impl<S> ChioRuntimeAdmissionHook<S> {
     #[must_use]
     pub fn with_swarm_witness_keys(mut self, witness_keys: Vec<PublicKey>) -> Self {
         self.swarm_witness_keys = witness_keys;
+        self
+    }
+
+    /// The qualified S1 graph issuer that swarm-bound requests resolve against.
+    #[must_use]
+    pub fn with_swarm_graph_source(mut self, source: Arc<dyn SwarmGraphSource>) -> Self {
+        self.swarm_graphs = Some(source);
         self
     }
 
@@ -499,8 +508,8 @@ where
         let verified_swarm = swarm_reference
             .as_ref()
             .map(|reference| {
-                verify_swarm_authority_reference_from_store(
-                    &self.store,
+                verify_swarm_authority_reference(
+                    self.swarm_graphs.as_deref(),
                     reference,
                     context.request,
                     &self.swarm_witness_keys,

@@ -67,6 +67,21 @@ fn route(swarm: &SwarmAuthorityBundle, task: &str) -> TestResult<serde_json::Val
     )
 }
 
+fn advance(
+    fixture: &Fixture,
+    prior: &SwarmAuthorityBundle,
+    next: SwarmAuthorityBundle,
+) -> TestResult {
+    fixture.authority.work_graph_store().advance(
+        &canonical_test_hash(prior)?,
+        next,
+        &trusted_swarm_witness_keys(),
+        &fixture.authority.mutation_fence(),
+        NOW,
+    )?;
+    Ok(())
+}
+
 fn kernel(fixture: &Fixture, key: &Keypair) -> TestResult<ChioKernel> {
     let hook = fixture
         .hook()?
@@ -91,8 +106,8 @@ fn kernel(fixture: &Fixture, key: &Keypair) -> TestResult<ChioKernel> {
 fn native_swarm_evolution_runs_added_work_and_preserves_original_replay() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let (prior, next) = swarm_evolution::versions()?;
-    let fixture = Fixture::with_request(true, |store| {
-        store.insert_swarm_authority_bundle(prior.clone())?;
+    let fixture = Fixture::with_request(true, |store, authority| {
+        issue_root(authority, &prior)?;
         request(store, &prior, "task-child-a", "original")
     })?;
     let key = Keypair::generate();
@@ -109,12 +124,7 @@ fn native_swarm_evolution_runs_added_work_and_preserves_original_replay() -> Tes
             .clone(),
     )?;
     let original_history = history(&fixture, &reference)?;
-    swarm_evolution::open(&fixture._directory.path().join("runtime.sqlite3"))?
-        .extend_swarm_authority_bundle(
-            &canonical_test_hash(&prior)?,
-            next.clone(),
-            &trusted_swarm_witness_keys(),
-        )?;
+    advance(&fixture, &prior, next.clone())?;
     let added = request(&fixture.source, &next, "task-child-b", "added")?;
     let second = live
         .evaluate_tool_call_blocking_with_metadata(&added, Some(route(&next, "task-child-b")?))?;
@@ -146,16 +156,11 @@ fn native_swarm_evolution_runs_added_work_and_preserves_original_replay() -> Tes
 fn native_swarm_evolution_keeps_unstarted_original_work_executable() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let (prior, next) = swarm_evolution::versions()?;
-    let fixture = Fixture::with_request(true, |store| {
-        store.insert_swarm_authority_bundle(prior.clone())?;
+    let fixture = Fixture::with_request(true, |store, authority| {
+        issue_root(authority, &prior)?;
         request(store, &prior, "task-child-a", "unstarted")
     })?;
-    swarm_evolution::open(&fixture._directory.path().join("runtime.sqlite3"))?
-        .extend_swarm_authority_bundle(
-            &canonical_test_hash(&prior)?,
-            next,
-            &trusted_swarm_witness_keys(),
-        )?;
+    advance(&fixture, &prior, next)?;
     let fixture = fixture.reopen()?;
     let live = kernel(&fixture, &Keypair::generate())?;
     let response = live.evaluate_tool_call_blocking_with_metadata(

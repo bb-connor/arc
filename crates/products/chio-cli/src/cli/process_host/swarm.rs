@@ -203,13 +203,26 @@ pub(super) fn provision(
         runtime.authority_clock(),
     )
     .map_err(error)?;
+    let authority_store = authority
+        .local_authority_store()
+        .ok_or_else(|| error("swarm graphs require a local qualified authority"))?;
+    let graphs = authority_store.work_graph_store();
     let mut calls = Vec::new();
     for (graph, bundle) in plan.graphs.iter().zip(&bundles) {
         calls.extend(requests::prepare(
             graph, bundle, runtime, record, &admission, &source,
         )?);
-        source
-            .insert_swarm_authority_bundle(bundle.clone())
+        graphs
+            .provision_root(
+                bundle.clone(),
+                &[issuer.public_key()],
+                &graphs.mutation_fence(),
+                runtime
+                    .authority_clock()
+                    .unix_millis()
+                    .map_err(error)?
+                    .get(),
+            )
             .map_err(error)?;
     }
     let calls = serde_json::json!({
@@ -348,11 +361,17 @@ pub(super) fn install(
         return Err(error("swarm source generation is not active"));
     }
     source.verify_exact(active.snapshot()).map_err(error)?;
+    let authority_store = authority
+        .local_authority_store()
+        .ok_or_else(|| error("swarm graphs require a local qualified authority"))?;
     kernel.set_federation_local_kernel_id(&signed.body.admission.local_kernel_id);
     kernel.set_runtime_admission_hook(Arc::new(
         ChioRuntimeAdmissionHook::new(signed.body.admission, source)
             .with_operation_owned_runtime_replay(signed.body.binding)
-            .with_swarm_witness_keys(vec![key.public_key()]),
+            .with_swarm_witness_keys(vec![key.public_key()])
+            .with_swarm_graph_source(Arc::new(chio_runtime::IssuedSwarmGraphs::new(
+                &authority_store,
+            ))),
     ));
     kernel.require_swarm_admission();
     Ok(())

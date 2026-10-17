@@ -8,7 +8,7 @@ mod evolution;
 #[test]
 fn live_swarm_without_future_results_uses_durable_continuation_custody() -> TestResult {
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
-    let fixture = Fixture::with_request(true, |source| {
+    let fixture = Fixture::with_request(true, |source, authority| {
         let mut swarm = runtime_swarm_bundle(false)?;
         swarm.join_receipts.clear();
         swarm.terminal_receipts.clear();
@@ -30,7 +30,7 @@ fn live_swarm_without_future_results_uses_durable_continuation_custody() -> Test
             .ok_or("missing governed context")?["chioAdmission"]["bundleSha256"] =
             serde_json::json!(runtime_admission_bundle_sha256(&admission)?);
         source.insert_bundle(admission)?;
-        source.insert_swarm_authority_bundle(swarm)?;
+        issue_root(authority, &swarm)?;
         Ok(request)
     })?;
     let hook = fixture

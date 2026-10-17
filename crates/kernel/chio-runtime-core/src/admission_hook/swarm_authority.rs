@@ -9,25 +9,28 @@ use super::swarm_ref::{SwarmAuthorityReference, SwarmEvidenceReference};
 use super::swarm_request_binding::verify_swarm_request_binding;
 use crate::*;
 
-pub(super) fn verify_swarm_authority_reference_from_store<S>(
-    store: &S,
+pub(super) fn verify_swarm_authority_reference(
+    source: Option<&dyn SwarmGraphSource>,
     reference: &SwarmAuthorityReference,
     request: &chio_kernel::ToolCallRequest,
     trusted_witness_keys: &[PublicKey],
     route_metadata: Option<&serde_json::Value>,
     now_unix_ms: u64,
-) -> Result<VerifiedSwarmAuthorityReference, ChioRuntimeError>
-where
-    S: RuntimeAdmissionStore,
-{
-    let Some(mut bundle) = store.swarm_authority_bundle_for_graph(
+) -> Result<VerifiedSwarmAuthorityReference, ChioRuntimeError> {
+    let Some(source) = source else {
+        return rejected(
+            "missing_chio_swarm_authority_bundle",
+            "swarm-bound request requires the qualified swarm graph issuer",
+        );
+    };
+    let Some(mut bundle) = source.swarm_graph(
         &reference.task_graph.evidence_id,
         &reference.task_graph.artifact_sha256,
     )?
     else {
         return rejected(
             "missing_chio_swarm_authority_bundle",
-            "swarm-bound request referenced authority evidence that is not in the verifier-owned store",
+            "swarm-bound request referenced a graph version the issuer has not issued",
         );
     };
     bundle.now_unix_ms = now_unix_ms;

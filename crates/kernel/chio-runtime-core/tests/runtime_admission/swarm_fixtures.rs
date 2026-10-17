@@ -224,3 +224,71 @@ pub(super) fn runtime_swarm_revocation_root(
         "revokedTaskIds": revoked_task_ids,
     }))
 }
+
+/// Retained signed graphs served to the hook in place of the S1 issuer. Hook
+/// tests use it to present malformed or stale evidence the issuer refuses.
+#[derive(Debug)]
+pub(super) struct RetainedSwarmGraphs(Vec<SwarmAuthorityBundle>);
+
+impl chio_runtime_core::SwarmGraphSource for RetainedSwarmGraphs {
+    fn swarm_graph(
+        &self,
+        graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        for bundle in &self.0 {
+            if bundle.task_graph.graph_id == graph_id
+                && canonical_test_hash(&bundle.task_graph)
+                    .map_err(|error| ChioRuntimeError::Store(error.to_string()))?
+                    == graph_sha256
+            {
+                return Ok(Some(bundle.clone()));
+            }
+        }
+        Ok(None)
+    }
+}
+
+pub(super) fn retained_swarm_graphs(
+    bundle: &SwarmAuthorityBundle,
+) -> std::sync::Arc<RetainedSwarmGraphs> {
+    std::sync::Arc::new(RetainedSwarmGraphs(vec![bundle.clone()]))
+}
+
+/// Test view of the qualified S1 issuer owned by the fixture authority.
+pub(super) struct IssuedGraphs(
+    pub(super) chio_store_sqlite::work_graph_store::SqliteWorkGraphStore,
+);
+
+impl std::fmt::Debug for IssuedGraphs {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("IssuedGraphs")
+            .finish_non_exhaustive()
+    }
+}
+
+impl chio_runtime_core::SwarmGraphSource for IssuedGraphs {
+    fn swarm_graph(
+        &self,
+        graph_id: &str,
+        graph_sha256: &str,
+    ) -> Result<Option<SwarmAuthorityBundle>, ChioRuntimeError> {
+        self.0
+            .version(graph_id, graph_sha256)
+            .map_err(|error| ChioRuntimeError::Store(error.to_string()))
+    }
+}
+
+pub(super) fn issue_root(
+    authority: &chio_store_sqlite::SqliteAuthorityStore,
+    swarm: &SwarmAuthorityBundle,
+) -> Result<(), Box<dyn std::error::Error>> {
+    authority.work_graph_store().provision_root(
+        swarm.clone(),
+        &trusted_swarm_witness_keys(),
+        &authority.mutation_fence(),
+        1_800_000_001_000,
+    )?;
+    Ok(())
+}

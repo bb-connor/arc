@@ -9,7 +9,7 @@ use chio_kernel::{
 };
 use chio_runtime::{
     ChioRuntimeAdmissionHook, ChioRuntimeAdmissionStore, ChioRuntimeError,
-    InMemoryRuntimeAdmissionStore, RuntimeAdmissionProfile, SwarmAuthorityBundle,
+    InMemoryRuntimeAdmissionStore, IssuedSwarmGraphs, RuntimeAdmissionProfile,
     CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA, CHIO_RUNTIME_TRUST_FLOOR_STATE_SCHEMA,
 };
 
@@ -303,64 +303,40 @@ fn runtime_admission_store_boundary_is_chio_owned() {
 }
 
 #[test]
-fn runtime_admission_store_boundary_exposes_swarm_authority(
+fn runtime_admission_hook_resolves_swarm_authority_from_the_issuer(
 ) -> Result<(), Box<dyn std::error::Error>> {
     fn accepts_swarm_store(store: &dyn ChioRuntimeAdmissionStore) {
-        let _ = store.swarm_authority_bundle("swarm-graph-proof-valid");
         let _ = store.consume_swarm_continuation("continuation-child-a", "admission-runtime");
         let _ = store.release_swarm_continuation("continuation-child-a", "admission-runtime");
     }
 
-    let bundle = SwarmAuthorityBundle {
-        task_graph: serde_json::from_str(include_str!(
-            "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/task-graph.json"
-        ))?,
-        continuation_tokens: vec![
-            serde_json::from_str(include_str!(
-                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/continuation-child-a.json"
-            ))?,
-            serde_json::from_str(include_str!(
-                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/continuation-child-b.json"
-            ))?,
-        ],
-        witness_chains: vec![
-            serde_json::from_str(include_str!(
-                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/witness-child-a.json"
-            ))?,
-            serde_json::from_str(include_str!(
-                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/witness-child-b.json"
-            ))?,
-        ],
-        join_receipts: vec![serde_json::from_str(include_str!(
-            "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/join-receipt.json"
-        ))?],
-        route_plan_receipts: vec![
-            serde_json::from_str(include_str!(
-                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/route-child-a.json"
-            ))?,
-            serde_json::from_str(include_str!(
-                "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/route-child-b.json"
-            ))?,
-        ],
-        budget_pool: serde_json::from_str(include_str!(
-            "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/budget-pool.json"
-        ))?,
-        revocation_epoch: serde_json::from_str(include_str!(
-            "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/revocation-epoch.json"
-        ))?,
-        terminal_receipts: vec![serde_json::from_str(include_str!(
-            "../../../../fixtures/proof-room/swarm-authority/valid-recursive-delegation/terminal-graph-receipt.json"
-        ))?],
-        now_unix_ms: 1_800_000_000_000,
-    };
-    let store = InMemoryRuntimeAdmissionStore::new();
-    store.insert_swarm_authority_bundle(bundle.clone())?;
-    accepts_swarm_store(&store);
-    let loaded = store
-        .swarm_authority_bundle(&bundle.task_graph.graph_id)?
-        .ok_or_else(|| std::io::Error::other("swarm bundle not returned from facade store"))?;
-    assert_eq!(loaded.task_graph.graph_id, bundle.task_graph.graph_id);
+    let directory = tempfile::tempdir()?;
+    std::fs::set_permissions(
+        directory.path(),
+        std::os::unix::fs::PermissionsExt::from_mode(0o700),
+    )?;
+    let database = directory.path().join("authority.sqlite3");
+    let locks = directory.path().join("locks");
+    std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+        .create(&locks)?;
+    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks)?;
+    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        chio_test_support::clock::clock(),
+    )?;
+    let graphs = IssuedSwarmGraphs::new(&authority);
+    assert_eq!(
+        chio_runtime_core::SwarmGraphSource::swarm_graph(
+            &graphs,
+            "swarm-graph-proof-valid",
+            &"0".repeat(64)
+        )?,
+        None
+    );
 
+    let store = InMemoryRuntimeAdmissionStore::new();
+    accepts_swarm_store(&store);
     let _hook = ChioRuntimeAdmissionHook::new(
         RuntimeAdmissionProfile {
             schema: CHIO_RUNTIME_ADMISSION_PROFILE_SCHEMA.to_string(),
@@ -372,7 +348,8 @@ fn runtime_admission_store_boundary_exposes_swarm_authority(
         },
         store,
     )
-    .with_swarm_witness_keys(vec![Keypair::from_seed(&[31u8; 32]).public_key()]);
+    .with_swarm_witness_keys(vec![Keypair::from_seed(&[31u8; 32]).public_key()])
+    .with_swarm_graphs(graphs);
     Ok(())
 }
 

@@ -100,37 +100,11 @@ fn sqlite_bundle_readback_binds_digest_and_index_across_restart() -> Result<(), 
 }
 
 #[test]
-fn sqlite_swarm_and_treaty_readback_rejects_substitution() -> Result<(), Box<dyn Error>> {
+fn sqlite_treaty_readback_rejects_substitution() -> Result<(), Box<dyn Error>> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("artifacts.sqlite3");
     let store = SqliteRuntimeOrchestrationStore::open(&path)?;
-    let original = swarm_authority_bundle_fixture()?;
-    store.insert_swarm_authority_bundle(original.clone())?;
-    assert_eq!(
-        store
-            .swarm_authority_bundle(&original.task_graph.graph_id)?
-            .ok_or("missing swarm")?
-            .task_graph
-            .graph_id,
-        original.task_graph.graph_id
-    );
     let connection = rusqlite::Connection::open(&path)?;
-    let mut replacement = original.clone();
-    replacement.task_graph.graph_id = "other-valid-graph".into();
-    let digest =
-        chio_core_types::hashing::sha256_hex(&chio_core_types::canonical_json_bytes(&replacement)?);
-    connection.execute(
-        "UPDATE runtime_swarm_authority_bundles SET raw_json=?1, bundle_sha256=?2",
-        rusqlite::params![serde_json::to_string(&replacement)?, digest],
-    )?;
-    assert_eq!(
-        store
-            .swarm_authority_bundle(&original.task_graph.graph_id)
-            .err()
-            .ok_or("accepted wrong graph")?
-            .code(),
-        "runtime_stored_bundle_binding_mismatch"
-    );
     store.insert_treaty_runtime_artifact(
         "scope",
         "scope-1",
@@ -153,52 +127,6 @@ fn sqlite_swarm_and_treaty_readback_rejects_substitution() -> Result<(), Box<dyn
             .ok_or("accepted wrong artifact")?
             .code(),
         "runtime_stored_artifact_binding_mismatch"
-    );
-    Ok(())
-}
-
-#[test]
-fn runtime_clock_fault_refuses_swarm_write_without_a_partial_row() -> Result<(), Box<dyn Error>> {
-    use chio_security_types::clock::{Clock, ClockError, ClockReading};
-    struct BrokenClock;
-    impl Clock for BrokenClock {
-        fn read(&self) -> Result<ClockReading, ClockError> {
-            Err(ClockError::BeforeEpoch)
-        }
-    }
-    let directory = tempfile::tempdir()?;
-    let path = directory.path().join("clock.sqlite3");
-    let store =
-        SqliteRuntimeOrchestrationStore::open_with_clock(&path, std::sync::Arc::new(BrokenClock))?;
-    let bundle = swarm_authority_bundle_fixture()?;
-    let error = store
-        .insert_swarm_authority_bundle(bundle.clone())
-        .err()
-        .ok_or("accepted broken clock")?;
-    assert_eq!(error.code(), ClockError::BeforeEpoch.code());
-    assert!(error
-        .source()
-        .and_then(|source| source.downcast_ref::<ClockError>())
-        .is_some());
-    assert_eq!(
-        store.swarm_authority_bundle(&bundle.task_graph.graph_id)?,
-        None
-    );
-    drop(store);
-    let store = SqliteRuntimeOrchestrationStore::open_with_clock(
-        &path,
-        std::sync::Arc::new(chio_security_types::clock::FixedClock::from_millis(
-            1_800_000_000_000,
-        )),
-    )?;
-    store.insert_swarm_authority_bundle(bundle.clone())?;
-    assert_eq!(
-        store
-            .swarm_authority_bundle(&bundle.task_graph.graph_id)?
-            .ok_or("missing accepted bundle")?
-            .task_graph
-            .graph_id,
-        bundle.task_graph.graph_id
     );
     Ok(())
 }

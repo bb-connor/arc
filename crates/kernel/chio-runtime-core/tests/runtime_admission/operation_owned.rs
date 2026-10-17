@@ -113,7 +113,7 @@ impl Fixture {
     }
 
     fn new(activate: bool) -> TestResult<Self> {
-        Self::with_request(activate, |source| {
+        Self::with_request(activate, |source, _| {
             let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
             let mut admission_bundle = bundle();
             admission_bundle.binding.origin_kernel_id = None;
@@ -138,7 +138,10 @@ impl Fixture {
 
     fn with_request(
         activate: bool,
-        prepare: impl FnOnce(&SqliteRuntimeOrchestrationStore) -> TestResult<ToolCallRequest>,
+        prepare: impl FnOnce(
+            &SqliteRuntimeOrchestrationStore,
+            &SqliteAuthorityStore,
+        ) -> TestResult<ToolCallRequest>,
     ) -> TestResult<Self> {
         let directory = tempfile::tempdir()?;
         std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
@@ -153,7 +156,7 @@ impl Fixture {
         )?;
         let source =
             SqliteRuntimeOrchestrationStore::open(directory.path().join("runtime.sqlite3"))?;
-        let request = prepare(&source)?;
+        let request = prepare(&source, &authority)?;
         let store = authority.admission_operation_store();
         let fence = authority.mutation_fence();
         let source_id = AdmissionIdentifier::try_new("source_id", "live-runtime-source")?;
@@ -202,7 +205,8 @@ impl Fixture {
         .with_runtime_trust_input(trust, keys)
         .with_pheromone_query_report(report)
         .with_runtime_pheromone_policy(policy, weights)
-        .with_operation_owned_runtime_replay(self.binding.clone()))
+        .with_operation_owned_runtime_replay(self.binding.clone())
+        .with_swarm_graph_source(Arc::new(IssuedGraphs(self.authority.work_graph_store()))))
     }
 
     fn kernel(

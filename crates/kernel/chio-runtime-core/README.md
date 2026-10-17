@@ -48,7 +48,7 @@ A kernel host installs `ChioRuntimeAdmissionHook` to mediate actual dispatch.
 ## Guarantees
 
 - `evaluate_runtime_admission` checks profile freshness and exact stored request binding.
-- `ChioRuntimeAdmissionHook` resolves treaty and swarm evidence from its store.
+- `ChioRuntimeAdmissionHook` resolves treaty evidence from its store and swarm authority only from the qualified S1 issuer; without the issuer it refuses swarm-bound requests.
 - Trust-floor transitions require atomic validation and recording by the backend.
 - Destructive leases and single-use continuations use store reservation operations.
 - Operation-owned replay requires an explicitly bound, verified replay source.

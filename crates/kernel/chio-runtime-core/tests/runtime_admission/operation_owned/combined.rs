@@ -57,14 +57,14 @@ impl CombinedFixture {
             local_key.clone(),
         )?;
         prepare(&mut treaty, &origin_key, &local_key)?;
-        let inner = Fixture::with_request(true, |source| {
+        let inner = Fixture::with_request(true, |source, authority| {
             let args = serde_json::json!({"record": "vendor-ledger-7", "value": "closed"});
             let mut admission = bundle();
             admission.binding.tool_args_sha256 = tool_args_sha256(&args)?;
             let hash = runtime_admission_bundle_sha256(&admission)?;
             source.insert_bundle(admission)?;
             insert_treaty_runtime_fixture(source, &treaty)?;
-            source.insert_swarm_authority_bundle(swarm.clone())?;
+            issue_root(authority, &swarm)?;
             // Imported markers model an earlier legacy consumer. They must
             // exclude the entire new live claim, not only the colliding member.
             match retired {
