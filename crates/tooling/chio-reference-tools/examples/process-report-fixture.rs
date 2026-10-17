@@ -7,11 +7,11 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::PathBuf,
-    time::Duration,
 };
 
-/// Polls of the control file, one millisecond apart, before a hold fails.
-const HOLD_POLLS: u32 = 600_000;
+/// Reads of the control file before a hold fails. The native syscall profile
+/// grants no sleep, so each poll is one file read.
+const HOLD_POLLS: u32 = 50_000_000;
 
 struct Reports {
     publications: PathBuf,
@@ -42,7 +42,7 @@ impl Reports {
             if self.control()? == "ready" {
                 return Ok(());
             }
-            std::thread::sleep(Duration::from_millis(1));
+            std::hint::spin_loop();
         }
         Err(ToolError::Failed("fixture hold was not released".into()))
     }

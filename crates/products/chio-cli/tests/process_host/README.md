@@ -13,8 +13,15 @@ effect (C1, control `hold-before`) or after it (C2, `hold-after`), always with
 an uncheckpointed authority WAL (C5), and for C4 also kills the restarted host
 before output, after `ready` and after one inspect. The fixture writes the
 granted `publications.held` marker and waits for control `ready` within a fixed
-number of polls. These cases discharge REST-1 TEST-03 only for the
+number of control-file reads; the native syscall profile grants no sleep. These cases discharge REST-1 TEST-03 only for the
 non-recovery native lifecycle; they are not recovery-runtime qualification.
+
+`process_host_keeps_a_durable_stop_across_os_death` runs `stop_os_death.py`.
+C7 SIGKILLs the host right after a durable stop: the restart is
+`ready_stopped`, refuses its first call with the stop denial and keeps the
+epoch until an offline resume. C8 refuses a call while stopped, kills the host
+and resumes: the same request identity then dispatches exactly once. Same
+scope as above.
 
 Native tests require Linux x86_64 with the qualified cage enforcement features,
 a non-root operator, a static position-independent `chio-cage-init`, and a
