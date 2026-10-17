@@ -285,6 +285,65 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     KeyringSigningRouter::open(reopened_store, Box::new(ready.new)).test_unwrap();
 }
 
+struct PanicOnDropBackend(Ed25519Backend);
+
+impl SigningBackend for PanicOnDropBackend {
+    fn algorithm(&self) -> SigningAlgorithm {
+        self.0.algorithm()
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.0.public_key()
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+        self.0.sign_bytes(message)
+    }
+}
+
+impl Drop for PanicOnDropBackend {
+    fn drop(&mut self) {
+        panic!("retired backend drop panicked");
+    }
+}
+
+#[test]
+fn retired_backend_drop_panic_leaves_the_selector_usable() {
+    let directory = private_tempdir().test_unwrap();
+    let path = trusted_temp_path(&directory, "router.sqlite");
+    let ready = ready_log(&path);
+    let router = KeyringSigningRouter::open(
+        Arc::clone(&ready.store),
+        Box::new(PanicOnDropBackend(ready.old.clone())),
+    )
+    .test_unwrap();
+    let mut staged = router
+        .stage_pending(
+            ready.rotation.body.event_id.clone(),
+            Box::new(ready.new.clone()),
+        )
+        .test_unwrap();
+
+    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        router.activate_rotation(&mut staged, &ready.checkpoint_hash, &ready.operator)
+    }));
+    assert!(matches!(panicked, Err(payload)
+        if payload.downcast_ref::<&str>().copied() == Some("retired backend drop panicked")));
+
+    assert_eq!(
+        router.active_public_key().test_unwrap(),
+        ready.new.public_key()
+    );
+    let signed = router
+        .sign_canonical(1, &serde_json::json!({"artifact": "after-retired-drop"}))
+        .test_unwrap();
+    assert_eq!(signed.signing_epoch, 1);
+    assert_eq!(
+        signed.key_id,
+        derive_key_id(ready.new.algorithm(), &ready.new.public_key()).test_unwrap()
+    );
+}
+
 #[test]
 fn concurrent_duplicate_signing_returns_one_durable_artifact() {
     let directory = private_tempdir().test_unwrap();

@@ -546,7 +546,9 @@ impl KeyringSigningRouter {
             if router.pending_lease.as_ref() == Some(&staged.lease) {
                 router.pending_lease = None;
             }
-            staged.backend.take();
+            let discarded = staged.backend.take();
+            drop(router);
+            drop(discarded);
             return Ok(());
         }
         let pending = router
@@ -584,8 +586,10 @@ impl KeyringSigningRouter {
         ))?;
         router.active_key_id = staged.lease.key_id;
         router.signing_epoch = activated.signing_epoch();
-        router.active = backend;
+        let retired = std::mem::replace(&mut router.active, backend);
         router.pending_lease = None;
+        drop(router);
+        drop(retired);
         Ok(())
     }
 
