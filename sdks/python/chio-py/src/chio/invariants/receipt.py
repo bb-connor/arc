@@ -93,8 +93,8 @@ def _receipt_semantics(receipt: dict[str, Any]) -> tuple[str, str]:
     return receipt["receipt_kind"], receipt["boundary_class"]
 
 
-def _result_label(receipt_kind: str, boundary_class: str, decision: str) -> str:
-    if receipt_kind == "mediated_decision" and boundary_class == "prevent" and decision == "allow":
+def _result_label(semantic_authorized: bool, receipt_kind: str, decision: str) -> str:
+    if semantic_authorized:
         return "Authorized"
     if receipt_kind == "trace_observation":
         return "Observed"
@@ -152,7 +152,12 @@ def verify_receipt(
         else "none"
     )
     receipt_kind, boundary_class = _receipt_semantics(receipt)
-    semantic_authorized = receipt_kind == "mediated_decision" and boundary_class == "prevent" and decision == "allow"
+    semantic_authorized = (
+        receipt_kind == "mediated_decision"
+        and boundary_class == "prevent"
+        and receipt.get("observation_outcome") is None
+        and decision == "allow"
+    )
     receipt_id_valid = receipt["id"] == _content_addressed_receipt_id(receipt)
     signature_valid = (
         receipt_id_valid
@@ -185,7 +190,7 @@ def verify_receipt(
         "receipt_kind": receipt_kind,
         "boundary_class": boundary_class,
         "trust_level": receipt["trust_level"],
-        "result": _result_label(receipt_kind, boundary_class, decision),
+        "result": _result_label(semantic_authorized, receipt_kind, decision),
         "authorized": authorized,
         "signer_key_hex": receipt["kernel_key"],
         "signer_trusted": signer_trusted,

@@ -1188,6 +1188,24 @@ fn receipt_vector_fixture_matches_checked_in_json() {
 }
 
 #[test]
+#[ignore = "regenerator: recompute every expected block of the checked-in receipt corpus with verify_receipt; run with --ignored, then `cargo xtask freeze-vectors`"]
+fn refresh_receipt_vector_expectations() {
+    let path = receipt_fixture_path();
+    let raw = fs::read_to_string(&path).test_unwrap("read receipt fixture");
+    let mut fixture: Value = serde_json::from_str(&raw).test_unwrap("parse receipt fixture");
+    for case in fixture["cases"]
+        .as_array_mut()
+        .test_unwrap("receipt cases array")
+    {
+        let receipt: ChioReceipt =
+            serde_json::from_value(case["receipt"].clone()).test_unwrap("parse receipt case");
+        let verification = verify_receipt(&receipt).test_unwrap("verify receipt case");
+        case["expected"] = serde_json::to_value(verification).test_unwrap("serialize verification");
+    }
+    fs::write(&path, pretty_json(&fixture)).test_unwrap("write receipt fixture");
+}
+
+#[test]
 #[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
 fn signing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&signing_fixture_path(), &signing_vector_fixture());

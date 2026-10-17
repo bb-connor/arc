@@ -123,7 +123,11 @@ func VerifyReceiptWithTrustedSigners(
 	if !semanticallySignable(receipt, verdict) {
 		signatureValid = false
 	}
-	semanticAuthorized := receiptKind == "mediated_decision" && boundaryClass == "prevent" && verdict == "allow"
+	observationOutcome, hasObservationOutcome := receipt["observation_outcome"]
+	semanticAuthorized := receiptKind == "mediated_decision" &&
+		boundaryClass == "prevent" &&
+		(!hasObservationOutcome || observationOutcome == nil) &&
+		verdict == "allow"
 	signerTrusted := false
 	if len(trustedSigners) > 0 {
 		for _, signer := range trustedSigners {
@@ -143,7 +147,7 @@ func VerifyReceiptWithTrustedSigners(
 		ParameterHashValid: parameterHashValid,
 		ReceiptIDValid:     receiptIDValid,
 		ReceiptKind:        receiptKind,
-		Result:             resultLabel(receiptKind, boundaryClass, verdict),
+		Result:             resultLabel(semanticAuthorized, receiptKind, verdict),
 		SignerKeyHex:       kernelKey,
 		SignerTrusted:      signerTrusted,
 		SignatureValid:     signatureValid,
@@ -225,8 +229,8 @@ func receiptSemantics(receipt map[string]any) (string, string) {
 	return receiptKind, boundaryClass
 }
 
-func resultLabel(receiptKind string, boundaryClass string, decision string) string {
-	if receiptKind == "mediated_decision" && boundaryClass == "prevent" && decision == "allow" {
+func resultLabel(semanticAuthorized bool, receiptKind string, decision string) string {
+	if semanticAuthorized {
 		return "Authorized"
 	}
 	switch receiptKind {
