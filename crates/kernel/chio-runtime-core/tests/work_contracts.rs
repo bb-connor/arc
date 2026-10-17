@@ -6,7 +6,7 @@ mod positives;
 
 use chio_runtime_core::work::{
     decode_work_join_inputs, decode_work_request, decode_work_response, WorkContractError,
-    MAX_WORK_REQUEST_BYTES,
+    MAX_WORK_ENTRIES, MAX_WORK_NODES, MAX_WORK_REQUEST_BYTES,
 };
 use positives::*;
 use serde::{Deserialize, Serialize};
@@ -79,6 +79,63 @@ fn nested(depth: usize) -> Value {
     (0..depth).fold(json!(1), |inner, _| json!([inner]))
 }
 
+/// Nodes and entries as the decoder charges them: one node per container,
+/// key, string and scalar; one entry per container and per separator.
+fn charges(value: &Value) -> (usize, usize) {
+    let container =
+        |len: usize, inner: (usize, usize)| (1 + inner.0, 1 + len.saturating_sub(1) + inner.1);
+    let sum = |items: Vec<(usize, usize)>| {
+        items
+            .into_iter()
+            .fold((0, 0), |(n, e), (dn, de)| (n + dn, e + de))
+    };
+    match value {
+        Value::Object(map) => container(
+            map.len(),
+            sum(map
+                .values()
+                .map(|v| {
+                    let (n, e) = charges(v);
+                    (n + 1, e)
+                })
+                .collect()),
+        ),
+        Value::Array(items) => container(items.len(), sum(items.iter().map(charges).collect())),
+        _ => (1, 0),
+    }
+}
+
+/// An Offer frame charging exactly `nodes` nodes. Well-formed JSON spends at
+/// least one entry per two nodes, so the entry bound always fires first; the
+/// node bound is reached only by scalars without separators, which the
+/// preflight charges before the parser refuses the text.
+fn offer_with_nodes(nodes: usize) -> TestResult<String> {
+    let frame = prepare(offer_proposal(json!({"pad": []})));
+    let (base, _) = charges(&frame);
+    let room = nodes.checked_sub(base).ok_or("node base over budget")?;
+    let text = serde_json::to_string(&frame)?;
+    if text.matches("\"pad\":[]").count() != 1 {
+        return Err("pad is not unique in the node frame".into());
+    }
+    Ok(text.replacen(
+        "\"pad\":[]",
+        &format!("\"pad\":[{}]", vec!["0"; room].join(" ")),
+        1,
+    ))
+}
+
+/// An Offer whose arguments bring the frame to exactly `entries` entries.
+fn offer_with_entries(entries: usize) -> TestResult<Value> {
+    let (_, base) = charges(&prepare(offer_proposal(json!({"list": [0]}))));
+    let room = entries.checked_sub(base).ok_or("entry base over budget")?;
+    let frame = prepare(offer_proposal(json!({"list": vec![0; room + 1]})));
+    let (nodes, used) = charges(&frame);
+    if used != entries || nodes > MAX_WORK_NODES {
+        return Err(format!("entry frame charges {nodes} nodes and {used} entries").into());
+    }
+    Ok(frame)
+}
+
 fn corpus() -> TestResult<Corpus> {
     let mut vectors = Vec::new();
     for (name, contract, value) in positives()? {
@@ -141,7 +198,24 @@ fn corpus() -> TestResult<Corpus> {
         Some("work.schema"),
     )?);
 
+    vectors.push(vector(
+        "opaque-arguments-schema",
+        "request",
+        &prepare(offer_proposal(
+            json!({"schema": "chio.work.notes", "version": 2}),
+        )),
+        true,
+        None,
+    )?);
+
     let text = serde_json::to_string(&base)?;
+    vectors.push(raw(
+        "trailing-comma",
+        "request",
+        text.replacen('}', ",}", 1),
+        false,
+        Some("work.malformed"),
+    )?);
     vectors.push(raw(
         "duplicate-top-level-key",
         "request",
@@ -153,6 +227,37 @@ fn corpus() -> TestResult<Corpus> {
         "duplicate-nested-key",
         "request",
         text.replacen("\"arguments\":{", "\"arguments\":{\"query\":\"x\",", 1),
+        true,
+        Some("work.duplicate_key"),
+    )?);
+    let select = prepare(
+        json!({"kind": "select", "offer": serde_json::to_value(offer()?)?,
+        "request_id": "request-a", "capability_hash": "0".repeat(64), "expected_revision": 0}),
+    );
+    let select_text = serde_json::to_string(&select)?;
+    if select_text.matches("\"price_units\":").count() != 1 {
+        return Err("offer price is not unique in the select frame".into());
+    }
+    vectors.push(raw(
+        "duplicate-d1-envelope-key",
+        "request",
+        select_text.replacen("\"price_units\":", "\"price_units\":20,\"price_units\":", 1),
+        true,
+        Some("work.duplicate_key"),
+    )?);
+    let observed = serde_json::to_string(&json!({"schema": "chio.work.response.v1", "version": 1,
+        "body": {"kind": "query", "result": {"kind": "work", "view": view()}}}))?;
+    if observed.matches("\"kind\":\"unknown\"").count() != 1 {
+        return Err("execution observation is not unique in the view frame".into());
+    }
+    vectors.push(raw(
+        "duplicate-rec0a-observation-key",
+        "response",
+        observed.replacen(
+            "\"kind\":\"unknown\"",
+            "\"kind\":\"unknown\",\"kind\":\"unknown\"",
+            1,
+        ),
         true,
         Some("work.duplicate_key"),
     )?);
@@ -208,6 +313,34 @@ fn corpus() -> TestResult<Corpus> {
         "depth-one-over",
         "request",
         &prepare(offer_proposal(json!({"deep": nested(33 - depth_base)}))),
+        true,
+        Some("work.bounds"),
+    )?);
+    vectors.push(raw(
+        "nodes-maximum",
+        "request",
+        offer_with_nodes(MAX_WORK_NODES)?,
+        false,
+        Some("work.malformed"),
+    )?);
+    vectors.push(raw(
+        "nodes-one-over",
+        "request",
+        offer_with_nodes(MAX_WORK_NODES + 1)?,
+        false,
+        Some("work.bounds"),
+    )?);
+    vectors.push(vector(
+        "entries-maximum",
+        "request",
+        &offer_with_entries(MAX_WORK_ENTRIES)?,
+        true,
+        None,
+    )?);
+    vectors.push(vector(
+        "entries-one-over",
+        "request",
+        &offer_with_entries(MAX_WORK_ENTRIES + 1)?,
         true,
         Some("work.bounds"),
     )?);
@@ -347,6 +480,23 @@ fn corpus() -> TestResult<Corpus> {
         };
         vectors.push(binding(name, &value, field)?);
     }
+    let mut other_program = submit_commitment.clone();
+    other_program["body"]["command"]["action"]["commitment"]["handle"]["program_id"] =
+        json!("program-b");
+    vectors.push(binding(
+        "commitment-program-mismatch",
+        &other_program,
+        "program_id",
+    )?);
+    let mut agreement_program = prepare(json!({"kind": "agreement", "commitment": commitment()?,
+        "terms": {"kind": "unpaid", "terms_reference": "terms-a"}}));
+    agreement_program["body"]["preparation"]["proposal"]["commitment"]["handle"]["program_id"] =
+        json!("program-b");
+    vectors.push(binding(
+        "agreement-program-mismatch",
+        &agreement_program,
+        "program_id",
+    )?);
     let funded = prepare(json!({"kind": "agreement", "commitment": commitment()?,
         "terms": {"kind": "funded", "funding_profile_id": "funding-a", "terms_reference": "terms-a"}}));
     vectors.push(vector(
@@ -394,6 +544,45 @@ fn corpus() -> TestResult<Corpus> {
         "acceptance-evidence-one-over",
         "response",
         &evidence,
+        false,
+        Some("work.bounds"),
+    )?);
+
+    let reconciled = |view: Value| {
+        json!({"schema": "chio.work.response.v1", "version": 1,
+        "body": {"kind": "command", "result": {
+            "command_ref": {"program_id": "program-a", "command_id": "command-a",
+                "command_digest": "0".repeat(64)},
+            "outcome": {"kind": "applied", "revision": 1,
+                "result": {"kind": "reconciled", "view": view}}}}})
+    };
+    let mut over_evidence = view();
+    over_evidence["acceptance"]["value"]["evidence"] =
+        json!((0..17).map(|n| format!("evidence-{n}")).collect::<Vec<_>>());
+    vectors.push(vector(
+        "reconciled-acceptance-evidence-one-over",
+        "response",
+        &reconciled(over_evidence.clone()),
+        false,
+        Some("work.bounds"),
+    )?);
+    let mut duplicate_operation = view();
+    duplicate_operation["recovery"]["value"]["available"] =
+        json!(["cancel_workflow", "cancel_workflow"]);
+    vectors.push(vector(
+        "reconciled-recovery-duplicate-operation",
+        "response",
+        &reconciled(duplicate_operation),
+        false,
+        Some("work.conflict"),
+    )?);
+    let mut queried = reconciled(over_evidence);
+    queried["body"] = json!({"kind": "query", "result": {
+        "kind": "command", "result": queried["body"]["result"].take()}});
+    vectors.push(vector(
+        "queried-command-acceptance-evidence-one-over",
+        "response",
+        &queried,
         false,
         Some("work.bounds"),
     )?);
@@ -489,7 +678,14 @@ fn schemas_agree_with_every_vector() -> TestResult {
             "response" => &response,
             _ => &join_inputs,
         };
-        let value: Value = serde_json::from_str(&vector.wire)?;
+        let Ok(value) = serde_json::from_str::<Value>(&vector.wire) else {
+            assert!(
+                !vector.schema_valid,
+                "{} is not JSON but claims schema validity",
+                vector.name
+            );
+            continue;
+        };
         let errors = validator
             .iter_errors(&value)
             .map(|e| format!("{} at {}", e, e.instance_path()))
