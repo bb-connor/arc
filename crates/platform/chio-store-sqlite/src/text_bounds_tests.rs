@@ -424,6 +424,91 @@ fn receipt_checkpoint_refuses_nul_padding() -> TestResult {
 }
 
 #[test]
+fn work_delegation_store_refuses_nul_padding() -> TestResult {
+    let catalog = catalog(include_str!("delegation_store.sql"))?;
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_delegation_namespace",
+        "namespace",
+        Bound::ExactText(HEX64),
+    )?;
+    for column in ["slot_id", "parent_id", "root_id"] {
+        assert_column_refuses_nul_padding(
+            &catalog,
+            "work_delegation_slots",
+            column,
+            Bound::Text("slot"),
+        )?;
+    }
+    for column in ["slot", "selection"] {
+        assert_column_refuses_nul_padding(
+            &catalog,
+            "work_delegation_slots",
+            column,
+            Bound::Text("{}"),
+        )?;
+    }
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_delegation_permits",
+        "permit",
+        Bound::Text("{}"),
+    )?;
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_delegation_commands",
+        "command_id",
+        Bound::Text("command"),
+    )?;
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_delegation_commands",
+        "request_digest",
+        Bound::ExactText(HEX64),
+    )?;
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_delegation_events",
+        "state_digest",
+        Bound::ExactText(HEX64),
+    )
+}
+
+#[test]
+fn work_graph_store_refuses_nul_padding() -> TestResult {
+    let catalog = catalog(include_str!("work_graph_store.sql"))?;
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_graph_heads",
+        "graph_id",
+        Bound::Text("graph"),
+    )?;
+    assert_column_refuses_nul_padding(
+        &catalog,
+        "work_graph_heads",
+        "bundle_sha256",
+        Bound::ExactText(HEX64),
+    )?;
+    for column in ["graph_sha256", "bundle_sha256", "successor_bundle_sha256"] {
+        assert_column_refuses_nul_padding(
+            &catalog,
+            "work_graph_versions",
+            column,
+            Bound::ExactText(HEX64),
+        )?;
+    }
+    for column in ["bundle_sha256", "parent_bundle_sha256"] {
+        assert_column_refuses_nul_padding(
+            &catalog,
+            "work_graph_issuances",
+            column,
+            Bound::ExactText(HEX64),
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
 fn approval_store_refuses_nul_padding() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("approvals.sqlite3");

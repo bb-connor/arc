@@ -405,7 +405,7 @@ fn global_catalog_without_the_recovery_kind_refuses_at_open() -> TestResult {
     let raw = Connection::open(&store.database)?;
     raw.execute_batch("PRAGMA writable_schema = ON;")?;
     let changed = raw.execute(
-        "UPDATE sqlite_schema SET sql = replace(sql, ', ''recovery'')', ')')
+        "UPDATE sqlite_schema SET sql = replace(sql, ', ''recovery'',', ',')
          WHERE type = 'table' AND name = 'authority_global_commits'",
         [],
     )?;
@@ -417,6 +417,6 @@ fn global_catalog_without_the_recovery_kind_refuses_at_open() -> TestResult {
         [],
         |row| row.get(0),
     )?;
-    assert!(sql.contains("'stop_epoch')") && !sql.contains("'recovery'"));
+    assert!(sql.contains("'stop_epoch', 'work_delegation'") && !sql.contains("'recovery'"));
     assert_open_refused(&store, "global authority commit schema is not canonical")
 }

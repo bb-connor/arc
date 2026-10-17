@@ -12,6 +12,8 @@ pub(super) fn projection_reference_digest(
         "recovery" => {
             crate::admission_operation_store::recovery_projection_reference(connection, key, sequence)
         }
+        "work_delegation" => crate::delegation_store::projection_reference(connection, key, sequence),
+        "work_graph" => crate::work_graph_store::projection_reference(connection, key, sequence),
         "stop_epoch" => {
             crate::admission_operation_store::stop_epoch_projection_reference(connection, key, sequence)
         }

@@ -2212,7 +2212,9 @@ dependencies = [
  "chio-settle",
  "chio-sqlite-file-identity",
  "chio-supervisor",
+ "chio-swarm-authority",
  "chio-transaction-passport",
+ "chio-workflow",
  "hex",
  "hmac 0.12.1",
  "libc",
@@ -2332,7 +2334,6 @@ version = "0.1.0"
 dependencies = [
  "chio-core",
  "chio-workflow-preflight",
- "rusqlite",
  "serde",
  "serde_json",
  "thiserror 1.0.69",

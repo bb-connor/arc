@@ -52,7 +52,9 @@ chio-security-types = { workspace = true, features = ["std"] }
 chio-settle = { workspace = true }
 chio-sqlite-file-identity = { version = "=0.1.0", path = "../chio-sqlite-file-identity" }
 chio-supervisor = { workspace = true }
+chio-swarm-authority = { workspace = true }
 chio-transaction-passport = { workspace = true }
+chio-workflow = { workspace = true }
 hex = { workspace = true }
 hmac = { workspace = true }
 sha2 = { workspace = true }
@@ -82,7 +84,6 @@ chio-quarantine = { workspace = true }
 # `cargo bench` only.
 chio-store-sqlite = { workspace = true, features = ["security-admission-test-support"] }
 chio-test-support = { workspace = true }
-chio-swarm-authority = { workspace = true }
 chio-open-market = { workspace = true }
 criterion = { workspace = true }
 frost-ed25519 = { workspace = true }

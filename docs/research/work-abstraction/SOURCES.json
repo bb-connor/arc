@@ -3,12 +3,12 @@
   "scope": "source inventory; runtime qualification pending",
   "sources": {
     "main": {
-      "commit": "a520638fa064faa58223feb625a9d8b306b1ea7e",
+      "commit": "10d70b88a311fbe3d51ba90254f02321cebb973b",
       "status": "inspected_main",
       "files": [
         {
           "path": "Cargo.toml",
-          "sha256": "f056415355918634a4a695621264b1865328ccaf710c7141ae6d3a7a20f59bae"
+          "sha256": "83dbb7bd85bf75ec384a0e5d6f199af88d44ea8dbc13463e96fa2261fa0e9707"
         },
         {
           "path": "crates/core/chio-core-types/src/capability/governance.rs",
@@ -32,7 +32,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation.rs",
-          "sha256": "b74905964dd17f5183ec13ffee4fdb0d8a95fc6c57bcbd7fbc0b938006cc09d8"
+          "sha256": "5a02e772fa83805aa92cfd5d697be7b37650dc4db03887940dc5c767af7ac403"
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/caller_dispatch_context.rs",
@@ -56,7 +56,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/admission_operation/store.rs",
-          "sha256": "1221cff2be84a181d242f1f6ae33563823315294bb5285096ffa23d41d7fd300"
+          "sha256": "a176d8b756ff9a77cf66c0a324e83ae77163cd435d17efd471eedb6aed67797d"
         },
         {
           "path": "crates/kernel/chio-kernel/src/approval.rs",
@@ -80,7 +80,7 @@
         },
         {
           "path": "crates/kernel/chio-kernel/src/kernel/kernel_struct.rs",
-          "sha256": "e5df8617d2d09b456fb695d244a642d1d1702d095b4e22e70350d31205898148"
+          "sha256": "889a78af34f9af68acad33801cf8c6fd0a176dde2ff3f1085e21c77e7eb84f37"
         },
         {
           "path": "crates/kernel/chio-kernel/src/runtime.rs",
@@ -92,7 +92,7 @@
         },
         {
           "path": "crates/kernel/chio-process/src/lib.rs",
-          "sha256": "b908431bb14039edce2922a1b08c99bbc09724be4be1cf3033ad5232654206b6"
+          "sha256": "a1f2bd33386c95b289bb61b6f252c0bdfa4b15e0e46e6d2527b5fbba9ae8932d"
         },
         {
           "path": "crates/kernel/chio-process/src/registry.rs",
@@ -116,7 +116,7 @@
         },
         {
           "path": "crates/kernel/chio-runtime-core/Cargo.toml",
-          "sha256": "9e9140c780909eb08bf9b60cbfcf8799d99ca580b359aa72dd300f55b29a6962"
+          "sha256": "6364fed5276b61bebfe82f9fe49afc156a758680edf7ed2ad48addec1b2ee68b"
         },
         {
           "path": "crates/kernel/chio-runtime-core/src/admission_hook/request.rs",
@@ -168,7 +168,7 @@
         },
         {
           "path": "crates/platform/chio-control-plane/Cargo.toml",
-          "sha256": "70b195919fc38f18f5c9bab5c6836838497c2bebece5031392f569da37d576e7"
+          "sha256": "6d45aeadb7a61e89647459e420b7ae4fb6464b391853e8d257728d1b62eef313"
         },
         {
           "path": "crates/platform/chio-control-plane/src/durable_admission.rs",
@@ -200,27 +200,43 @@
         },
         {
           "path": "crates/platform/chio-store-sqlite/Cargo.toml",
-          "sha256": "c94d860baa2731fb57caf57c731d433a38c8b081a4238cd9af58d9768e306f3a"
+          "sha256": "9fd84436767082895b577a02a9b9fe5cb88895011d0fcd7647e0b34f2406412c"
         },
         {
           "path": "crates/platform/chio-store-sqlite/src/authority.rs",
           "sha256": "7d77f2f4b52c78c59ef3f447aba49b18f7b2576327919345a684eaacc2ea8225"
         },
         {
+          "path": "crates/platform/chio-store-sqlite/src/delegation_store.rs",
+          "sha256": "afe1de616e4c95d9b22b1d6447effc3259a8aa6120df7ba5aecde54fea0d7c3c"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/delegation_store.sql",
+          "sha256": "6dcee396bc44ea7a333f7cf51a5a6e5ec7113cd212c2030e9261fc2bc98d8b80"
+        },
+        {
           "path": "crates/platform/chio-store-sqlite/src/serving_owner.rs",
-          "sha256": "97a81dbbcf3b3cc75fd7ee2eb6d7b27c4e6f6ce72a8b2f2b864449e173763701"
+          "sha256": "df841d9774dd2791547a5b2ee030b6340cee86452600d41af07953bde26e9aee"
         },
         {
           "path": "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",
-          "sha256": "74c3aef6a394eb1489ce25c8338bd7f827e338f51ebb4324454d9d365121c0d3"
+          "sha256": "37591c8d4c2ba05db796d16a57645ebab7c86ecb3fc87f5dcfcfdc5da91cfe74"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/work_graph_store.rs",
+          "sha256": "932fe809e15426db7ab3270b74e689411aaabd55c005cd8297cadf5d5dcaa540"
+        },
+        {
+          "path": "crates/platform/chio-store-sqlite/src/work_graph_store.sql",
+          "sha256": "c7a9866625eff7bb1a31e1eef59fb70f0d28eb5a912402167e5dcbb40891b78c"
         },
         {
           "path": "crates/platform/chio-workflow/Cargo.toml",
-          "sha256": "a0e56be0934d3f12cd99923d6ac07228a98e355f53d15c568919a429028b2860"
+          "sha256": "2e2c10c5180d125be471e4b495a31d1cf88c79f0d3ca2485dfdb2f3495ba5dae"
         },
         {
-          "path": "crates/platform/chio-workflow/src/delegation/store.rs",
-          "sha256": "43340f33181b2bc8ea7c0088988805c659b458356f56e84f8f7f9b89e49f9a31"
+          "path": "crates/platform/chio-workflow/src/delegation/transition.rs",
+          "sha256": "b36040cf1ee28b6bc1579dd7ae3415d1a48817bd64893a4998a344529ce572b0"
         },
         {
           "path": "crates/platform/chio-workflow/src/delegation/types.rs",
@@ -232,7 +248,7 @@
         },
         {
           "path": "crates/security/chio-flow/src/declassification.rs",
-          "sha256": "8b5aa98ccf9f81be1fa55053c0144013009b27401a18878045aa9e88136e3eff"
+          "sha256": "599300aedc5b23f0fd44a9ea5988537887db07ceada7f10edb39d843b6d01e05"
         },
         {
           "path": "crates/trust/chio-federation/src/treaty.rs",
@@ -268,7 +284,7 @@
         },
         {
           "path": "docs/superpowers/specs/2026-10-03-work-runtime-design.md",
-          "sha256": "2002ab9daa685615cbd5fde4d4e4bbf552c076476579ac8ce1d1fbad9a31ee50"
+          "sha256": "2cbfa4ca7e2229041e060b6c720380a0b234a82c0795ac04b10e669bf1e0881a"
         },
         {
           "path": "rust-toolchain.toml",
@@ -395,7 +411,7 @@
   },
   "validation": {
     "workspace_metadata": "cargo metadata --no-deps --offline --locked --format-version 1",
-    "workspace_members": 181,
+    "workspace_members": 182,
     "external_features_resolved": false,
     "runtime_tests": "not_run",
     "runtime_exit": "pending_substrate_issuers_and_recovery",

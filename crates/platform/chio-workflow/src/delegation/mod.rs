@@ -1,16 +1,18 @@
-//! Experimental dynamic work allocation under one resource owner's authority.
+//! Dynamic work allocation under one resource owner's authority.
 //!
-//! This module reserves ceilings, not funds. Its signed records are evidence,
-//! never native invocation authority. The owner must protect the SQLite database
-//! and clock and qualify receiving hosts, including all their observable channels.
-//! Only trusted configuration may call `create_root` or supply receiver enrollment.
-//! Native kernels still validate capabilities, account actual costs and own replay.
-//! Dispatched allocations are never released by this API, even on a timeout.
+//! This module defines the D1 records, signing domains and transition rules.
+//! It reserves ceilings, not funds. Its signed records are evidence, never
+//! native invocation authority. Production allocation state lives in the
+//! serving authority's qualified store,
+//! `chio_store_sqlite::delegation_store::SqliteDelegationStore`, which applies
+//! these rules inside its fenced transactions. Only trusted configuration may
+//! create a root or supply receiver enrollment. Native kernels still validate
+//! capabilities, account actual costs and own replay. Dispatched allocations
+//! are never released, even on a timeout.
 
-mod store;
+pub mod transition;
 mod types;
 
-pub use store::DelegationStore;
 pub use types::*;
 
 #[derive(Debug, thiserror::Error)]
@@ -29,12 +31,6 @@ pub enum DelegationError {
     Expired,
     #[error("result does not meet the agreed acceptance predicate")]
     Rejected,
-    #[error("delegation store is unavailable")]
-    Unavailable,
-    #[error("delegation store schema version {found} is not the current version")]
-    StaleSchema { found: i32 },
-    #[error(transparent)]
-    Database(#[from] rusqlite::Error),
 }
 
 pub type Result<T> = std::result::Result<T, DelegationError>;
