@@ -79,7 +79,7 @@ not change:
 
 - stdio and hosted edges still require `initialize` followed by `notifications/initialized`
 - hosted HTTP uses `POST /mcp` for requests and `GET /mcp` plus `Last-Event-ID` for live notification replay
-- caller-supplied `_meta.modelMetadata` enters the runtime as asserted provenance unless a trusted subsystem upgrades it later
+- caller-supplied `_meta.chioModelMetadata` enters the runtime as asserted provenance unless a trusted subsystem upgrades it later
 
 ## Example
 

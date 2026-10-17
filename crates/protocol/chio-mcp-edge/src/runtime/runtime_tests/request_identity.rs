@@ -110,7 +110,7 @@ fn request_bound_artifacts_require_a_caller_supplied_request_identity() {
         "name": "read_file",
         "arguments": { "path": "/tmp/demo.txt" },
         "_meta": {
-            "supplementalAuthorization": {
+            "chioSupplementalAuthorization": {
                 "signed_extension": "opaque"
             }
         }

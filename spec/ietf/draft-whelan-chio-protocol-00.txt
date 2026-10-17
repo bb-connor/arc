@@ -5365,11 +5365,11 @@ Internet-Draft                Chio Protocol               September 2026
    (Section 5.8).  The submission carries no sender proof: the kernel
    denies a call for which a matching grant requires one (Section 5.4).
 
-   The members of params._meta in Table 39 carry the other inputs of a
-   native request (Table 31).  When a member and its alias are both
-   present, the edge uses the member. _meta has to be an object, and
-   each member has to have the structure of its native equivalent; the
-   edge answers -32602 otherwise.
+
+
+
+
+
 
 
 
@@ -5378,53 +5378,53 @@ Whelan                    Expires 3 April 2027                 [Page 96]
 Internet-Draft                Chio Protocol               September 2026
 
 
-        +===========================+=============================+
-        | Member                    | Native equivalent           |
-        +===========================+=============================+
-        | chioRequestId             | id                          |
-        +---------------------------+-----------------------------+
-        | modelMetadata             | none (Section 11.7)         |
-        +---------------------------+-----------------------------+
-        | executionNonce            | execution_nonce             |
-        +---------------------------+-----------------------------+
-        | governedIntent            | governed_intent             |
-        +---------------------------+-----------------------------+
-        | approvalToken             | approval_token              |
-        +---------------------------+-----------------------------+
-        | approvalTokens            | approval_tokens             |
-        +---------------------------+-----------------------------+
-        | thresholdApprovalProposal | threshold_approval_proposal |
-        +---------------------------+-----------------------------+
-        | supplementalAuthorization | supplemental_authorization  |
-        +---------------------------+-----------------------------+
-        | routeSelection            | none                        |
-        +---------------------------+-----------------------------+
+   The members of params._meta in Table 39 carry the other inputs of a
+   native request (Table 31). _meta has to be an object, and each member
+   has to have the structure of its native equivalent; the edge answers
+   -32602 otherwise.  The edge also answers -32602 to a member name
+   without its chio prefix (for example approvalToken) and to
+   route_selection.
+
+      +===============================+=============================+
+      | Member                        | Native equivalent           |
+      +===============================+=============================+
+      | chioRequestId                 | id                          |
+      +-------------------------------+-----------------------------+
+      | chioModelMetadata             | none (Section 11.7)         |
+      +-------------------------------+-----------------------------+
+      | chioExecutionNonce            | execution_nonce             |
+      +-------------------------------+-----------------------------+
+      | chioGovernedIntent            | governed_intent             |
+      +-------------------------------+-----------------------------+
+      | chioApprovalToken             | approval_token              |
+      +-------------------------------+-----------------------------+
+      | chioApprovalTokens            | approval_tokens             |
+      +-------------------------------+-----------------------------+
+      | chioThresholdApprovalProposal | threshold_approval_proposal |
+      +-------------------------------+-----------------------------+
+      | chioSupplementalAuthorization | supplemental_authorization  |
+      +-------------------------------+-----------------------------+
+      | chioRouteSelection            | none                        |
+      +-------------------------------+-----------------------------+
 
                Table 39: Chio Members of _meta in tools/call
 
-    +===========================+=====================================+
-    | Member                    | Accepted alias                      |
-    +===========================+=====================================+
-    | chioRequestId             | none                                |
-    +---------------------------+-------------------------------------+
-    | modelMetadata             | chioModelMetadata                   |
-    +---------------------------+-------------------------------------+
-    | executionNonce            | chioExecutionNonce                  |
-    +---------------------------+-------------------------------------+
-    | governedIntent            | chioGovernedIntent                  |
-    +---------------------------+-------------------------------------+
-    | approvalToken             | chioApprovalToken                   |
-    +---------------------------+-------------------------------------+
-    | approvalTokens            | chioApprovalTokens                  |
-    +---------------------------+-------------------------------------+
-    | thresholdApprovalProposal | chioThresholdApprovalProposal       |
-    +---------------------------+-------------------------------------+
-    | supplementalAuthorization | chioSupplementalAuthorization       |
-    +---------------------------+-------------------------------------+
-    | routeSelection            | route_selection, chioRouteSelection |
-    +---------------------------+-------------------------------------+
+   chioRequestId is a non-empty string of at most 2048 UTF-8 octets,
+   with no leading or trailing whitespace and no control characters.
+   The kernel uses it as the request identifier.  Without it, the edge
+   uses the request identifier bound in a presented execution nonce, or
+   assigns a new identifier to each call.  A request that carries
+   approval members or chioSupplementalAuthorization MUST carry
+   chioRequestId, and the approval members have to follow the
+   combination rules of Section 10.2; the edge answers -32602 otherwise.
+   The kernel records chioRouteSelection, an object, in the receipt's
+   metadata as route_selection.
 
-                  Table 40: Accepted Chio Metadata Aliases
+   The following request is illustrative.
+
+
+
+
 
 
 
@@ -5433,19 +5433,6 @@ Whelan                    Expires 3 April 2027                 [Page 97]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   chioRequestId is a non-empty string of at most 2048 UTF-8 octets,
-   with no leading or trailing whitespace and no control characters.
-   The kernel uses it as the request identifier.  Without it, the edge
-   uses the request identifier bound in a presented execution nonce, or
-   assigns a new identifier to each call.  A request that carries
-   approval members or supplementalAuthorization MUST carry
-   chioRequestId, and the approval members have to follow the
-   combination rules of Section 10.2; the edge answers -32602 otherwise.
-   The kernel records routeSelection, an object, in the receipt's
-   metadata as route_selection.
-
-   The following request is illustrative.
 
    {
      "jsonrpc": "2.0",
@@ -5456,7 +5443,7 @@ Internet-Draft                Chio Protocol               September 2026
        "arguments": {"text": "hi"},
        "_meta": {
          "chioRequestId": "req-7",
-         "modelMetadata": {
+         "chioModelMetadata": {
            "model_id": "m-1",
            "safety_tier": "standard",
            "provider": "p"
@@ -5481,15 +5468,6 @@ Internet-Draft                Chio Protocol               September 2026
       streamed error instead describes the stream delivery in content
       and records the reason in structuredContent.chioToolStream.reason.
 
-
-
-
-
-Whelan                    Expires 3 April 2027                 [Page 98]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    *  For a call that needs a URL elicitation, the edge returns JSON-RPC
       error -32042 with data.elicitations.
 
@@ -5504,6 +5482,14 @@ Internet-Draft                Chio Protocol               September 2026
    If the client enabled chunk notifications at initialization, the edge
    sends one notifications/chio/tool_call_chunk notification per chunk
    before the result.  Its params members are requestId (the JSON-RPC id
+
+
+
+Whelan                    Expires 3 April 2027                 [Page 98]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
    of the call), chunkIndex, totalChunks, and chunk.  The result's
    structuredContent.chioToolStream then has mode set to
    notification_stream.  Otherwise a retained stream's chioToolStream
@@ -5518,7 +5504,7 @@ Internet-Draft                Chio Protocol               September 2026
 11.7.  Model Metadata
 
    A client can describe the model on whose behalf it calls a tool, in
-   the modelMetadata member of _meta (Table 41).
+   the chioModelMetadata member of _meta (Table 40).
 
       +==================+========+==========+=====================+
       | Field            | Type   | Presence | Meaning             |
@@ -5534,7 +5520,21 @@ Internet-Draft                Chio Protocol               September 2026
       |                  |        |          | edge                |
       +------------------+--------+----------+---------------------+
 
-                         Table 41: Model Metadata
+                         Table 40: Model Metadata
+
+   The edge has not verified this metadata, so it MUST set
+   provenance_class to asserted, whatever value the client sent.  The
+   other provenance classes, observed and verified, are not available to
+   a client.  The kernel evaluates model constraints (Section 5.3)
+   against the metadata; those constraints do not consider the
+   provenance class.  The kernel records the metadata in the receipt's
+   metadata.model_metadata member, where provenance_class is always
+   present.  For the request above, the receipt records:
+
+
+
+
+
 
 
 
@@ -5545,15 +5545,6 @@ Whelan                    Expires 3 April 2027                 [Page 99]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   The edge has not verified this metadata, so it MUST set
-   provenance_class to asserted, whatever value the client sent.  The
-   other provenance classes, observed and verified, are not available to
-   a client.  The kernel evaluates model constraints (Section 5.3)
-   against the metadata; those constraints do not consider the
-   provenance class.  The kernel records the metadata in the receipt's
-   metadata.model_metadata member, where provenance_class is always
-   present.  For the request above, the receipt records:
 
    {
      "model_metadata": {
@@ -5591,9 +5582,18 @@ Internet-Draft                Chio Protocol               September 2026
 12.1.  Capability Issuance
 
    POST /v1/capabilities/issue issues a direct capability token, one
-   with an empty delegation chain.  Table 42 lists the request members.
+   with an empty delegation chain.  Table 41 lists the request members.
    A 200 response has one member, capability, which holds the token
    (Section 5.1).
+
+
+
+
+
+
+
+
+
 
 
 
@@ -5619,7 +5619,7 @@ Internet-Draft                Chio Protocol               September 2026
      |                    |         |          | when absent         |
      +--------------------+---------+----------+---------------------+
 
-                     Table 42: Issuance Request Members
+                     Table 41: Issuance Request Members
 
    The service signs the token with its authority key.  The token's
    subject is subjectPublicKey, its issued_at is the current time, and
@@ -5745,16 +5745,16 @@ Internet-Draft                Chio Protocol               September 2026
    |                      |        |          | outside this document |
    +----------------------+--------+----------+-----------------------+
    | delegationPolicy     | object | OPTIONAL | Signed delegation     |
-   |                      |        |          | policy (Table 44)     |
+   |                      |        |          | policy (Table 43)     |
    +----------------------+--------+----------+-----------------------+
    | upstreamCapabilityId | string | OPTIONAL | Parent capability     |
    |                      |        |          | that the delegation   |
    |                      |        |          | policy names          |
    +----------------------+--------+----------+-----------------------+
 
-               Table 43: Delegated Issuance Request Members
+               Table 42: Delegated Issuance Request Members
 
-   A delegationPolicy has two members: body (Table 44) and signature,
+   A delegationPolicy has two members: body (Table 43) and signature,
    the signature of signerPublicKey over the canonical encoding of body
    (Section 4.5).
 
@@ -5806,7 +5806,7 @@ Internet-Draft                Chio Protocol               September 2026
    |                    |         |          | bound                  |
    +--------------------+---------+----------+------------------------+
 
-                 Table 44: Delegation Policy Body Members
+                 Table 43: Delegation Policy Body Members
 
    The service MUST perform these checks, in this order, and reject the
    request at the first that fails:
@@ -5862,7 +5862,7 @@ Internet-Draft                Chio Protocol               September 2026
    of that record.  The delegation appears in the service's records, not
    in the token's delegation chain (Section 5.5).
 
-   A 200 response has the members in Table 45.
+   A 200 response has the members in Table 44.
 
 
 
@@ -5915,12 +5915,12 @@ Internet-Draft                Chio Protocol               September 2026
    |                              |      |           |lineage parent  |
    +------------------------------+------+-----------+----------------+
 
-              Table 45: Delegated Issuance Response Members
+              Table 44: Delegated Issuance Response Members
 
 12.3.  Receipt Query
 
    GET /v1/receipts/query returns the stored receipts that match its
-   query parameters (Table 46).  Every parameter is OPTIONAL, and the
+   query parameters (Table 45).  Every parameter is OPTIONAL, and the
    filters that are present all apply.
 
 
@@ -5974,7 +5974,7 @@ Internet-Draft                Chio Protocol               September 2026
    |              |         | the range 1 to 200                      |
    +--------------+---------+-----------------------------------------+
 
-                    Table 46: Receipt Query Parameters
+                    Table 45: Receipt Query Parameters
 
    The service MUST reject the query with 400 if minCost exceeds
    maxCost, if minCost or maxCost is present without costCurrency, or if
@@ -6173,7 +6173,7 @@ Internet-Draft                Chio Protocol               September 2026
 
 15.2.  Transport Security
 
-   Table 47 states the transport requirements for each surface.  TLS
+   Table 46 states the transport requirements for each surface.  TLS
    supplies channel protection; [RFC8446] defines TLS 1.3.
 
    +===============+==============+====================+===============+
@@ -6209,7 +6209,7 @@ Internet-Draft                Chio Protocol               September 2026
    |               |              |                    | network       |
    +---------------+--------------+--------------------+---------------+
 
-                 Table 47: Transport Security Requirements
+                 Table 46: Transport Security Requirements
 
 
 
@@ -6218,7 +6218,7 @@ Whelan                    Expires 3 April 2027                [Page 111]
 Internet-Draft                Chio Protocol               September 2026
 
 
-   A deployment that is missing a transport property that Table 47
+   A deployment that is missing a transport property that Table 46
    requires MUST deny the request or restrict itself to a local
    development configuration.  A deployment MUST NOT claim
    confidentiality, peer authentication, or replay resistance for
@@ -6755,7 +6755,7 @@ Internet-Draft                Chio Protocol               September 2026
           | capability_revoked | Kernel to agent | Section 10.2 |
           +--------------------+-----------------+--------------+
 
-                   Table 48: Initial Native Message Types
+                   Table 47: Initial Native Message Types
 
    The shared heartbeat allocation defines a payload in each direction.
    Registering a new type does not make old decoders accept it.  A

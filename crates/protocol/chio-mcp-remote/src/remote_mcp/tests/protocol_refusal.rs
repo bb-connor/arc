@@ -170,7 +170,7 @@ fn protocol_refusal_original_ingress_is_durable_without_logging_or_dispatch() ->
                 allowed_model_ids: vec!["allowed-model".into()],
                 min_safety_tier: None,
             },
-            json!({"name":"read_file","arguments":{},"_meta":{"modelMetadata":{"model_id":"denied-model"}}}),
+            json!({"name":"read_file","arguments":{},"_meta":{"chioModelMetadata":{"model_id":"denied-model"}}}),
             false,
             "capability_not_matched",
         ),

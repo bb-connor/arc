@@ -364,8 +364,10 @@ Hosted MCP negotiation rules:
 
 ### 3.5 Model Metadata Admission
 
-- Hosted `tools/call` requests **MAY** carry model metadata under either
-  `_meta.modelMetadata` or `_meta.chioModelMetadata`.
+- Hosted `tools/call` requests **MAY** carry model metadata under
+  `_meta.chioModelMetadata`. Every Chio member of `_meta` carries the `chio`
+  prefix; the hosted edge refuses the unprefixed name (for example
+  `_meta.modelMetadata`) with JSON-RPC error `-32602`.
 - The hosted edge normalizes that payload into Chio request `model_metadata`.
 - Caller-supplied metadata **MUST** be treated as `asserted` provenance at
   admission time even if the caller marks it `verified`.

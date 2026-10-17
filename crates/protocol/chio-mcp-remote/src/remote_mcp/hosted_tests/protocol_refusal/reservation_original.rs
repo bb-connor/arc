@@ -32,21 +32,19 @@ async fn exchange(
 }
 
 #[tokio::test]
-async fn mcp_reserve_original_definite_alias_refusal_releases_only_its_pending_call() -> TestResult
-{
+async fn mcp_reserve_original_definite_meta_refusal_releases_only_its_pending_call() -> TestResult {
     let fixture = fixture()?;
     let session = initialize(&fixture).await?;
     let token = credential(&fixture, &session).await?;
-    let mut rejected = call(31, "definite-alias-refusal");
-    rejected["params"]["_meta"]["approvalToken"] = json!("rejected-first-alias");
-    rejected["params"]["_meta"]["chioApprovalToken"] = json!("rejected-second-alias");
+    let mut rejected = call(31, "definite-meta-refusal");
+    rejected["params"]["_meta"]["approvalToken"] = json!("rejected-unprefixed-member");
 
     // Both attempts take the actual authenticated HTTP path. The redemption
-    // validator rejects these aliases before McpInboxSender::send can enqueue.
+    // validator rejects the unprefixed member before McpInboxSender::send can enqueue.
     let refused = exchange(&fixture, &token, &session, &rejected).await?;
     let repeated_refusal = exchange(&fixture, &token, &session, &rejected).await?;
     let calls_after_refusal = fixture.calls.load(Ordering::SeqCst);
-    let valid = call(32, "after-definite-alias-refusal");
+    let valid = call(32, "after-definite-meta-refusal");
     let completed = exchange(&fixture, &token, &session, &valid).await?;
     let replay = exchange(&fixture, &token, &session, &valid).await?;
     let calls_after_replay = fixture.calls.load(Ordering::SeqCst);
@@ -62,7 +60,10 @@ async fn mcp_reserve_original_definite_alias_refusal_releases_only_its_pending_c
     fixture.state.sessions.shutdown_all_active().await?;
     fixture.state.factory.shutdown_shared_upstream_owner()?;
 
-    assert!(refused.0.is_client_error(), "invalid aliases were admitted");
+    assert!(
+        refused.0.is_client_error(),
+        "an unprefixed approval token was admitted"
+    );
     assert_eq!(calls_after_refusal, 0, "a refused call reached the tool");
     assert_eq!(
         repeated_refusal, refused,

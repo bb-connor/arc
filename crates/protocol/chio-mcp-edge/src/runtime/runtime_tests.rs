@@ -1164,7 +1164,7 @@ fn tools_call_jsonrpc_preserves_governed_swarm_context() {
                 "name": "read_file",
                 "arguments": { "path": "/tmp/demo.txt" },
                 "_meta": {
-                    "governedIntent": {
+                    "chioGovernedIntent": {
                         "id": "intent:chio:mcp-swarm-no-hook",
                         "server_id": "srv",
                         "tool_name": "read_file",
@@ -1209,7 +1209,7 @@ fn tools_call_jsonrpc_passes_route_selection_metadata_to_runtime_admission() {
                 "name": "read_file",
                 "arguments": { "path": "/tmp/demo.txt" },
                 "_meta": {
-                    "routeSelection": {
+                    "chioRouteSelection": {
                         "selectedRouteId": "mcp:task-child-a",
                         "selectedTargetProtocol": "mcp"
                     }
@@ -1579,7 +1579,7 @@ fn tools_call_uses_meta_model_metadata_and_records_asserted_provenance() {
                 "name": "read_file",
                 "arguments": { "path": "/tmp/demo.txt" },
                 "_meta": {
-                    "modelMetadata": {
+                    "chioModelMetadata": {
                         "model_id": "gpt-5",
                         "safety_tier": "high",
                         "provider": "openai",
