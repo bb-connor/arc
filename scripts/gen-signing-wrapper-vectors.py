@@ -74,9 +74,8 @@ WRAPPER_PREFIX = b"chio.signing-wrapper.v1\x00"
 WRAPPER_LEN = 88
 MAX_SAFE_INTEGER = 2**53 - 1
 
-# Registry rows that never carry a wrapper: a payload schema named as another
-# row's payloadSchemaFile, and a DPoP profile id that collapses to v1.
-EXCLUDED_WRAPPER_IDS = frozenset({"chio.security-event-body.v1", "chio.dpop_proof.v2"})
+# Registry rows that never carry a wrapper: a DPoP profile id that collapses to v1.
+EXCLUDED_WRAPPER_IDS = frozenset({"chio.dpop_proof.v2"})
 
 # Wrapper ids that PROTOCOL section 4.5 names but `spec/schemas/registry.json`
 # does not list yet. Each id is registered with its type before any
@@ -111,7 +110,6 @@ SECTION_4_5_UNREGISTERED_IDS = (
     "chio.frost.dkg-package.v1",
     "chio.governed-approval-token.v1",
     "chio.governed-upstream-call-chain-proof.v1",
-    "chio.idp-key-snapshot.v1",
     "chio.key-log.witness-statement.v1",
     "chio.mcp.operator-approval.v1",
     "chio.mcp.session-credential-call.v1",
@@ -126,12 +124,9 @@ SECTION_4_5_UNREGISTERED_IDS = (
     "chio.public-issuer-discovery.v1",
     "chio.public-verifier-discovery.v1",
     "chio.reputation-credential.v1",
-    "chio.revocation-request.v1",
-    "chio.root-policy.v1",
     "chio.runtime.tool-server-ack-signature.v1",
     "chio.session-compliance-certificate.v1",
     "chio.session_anchor.v1",
-    "chio.settlement-closure.v1",
     "chio.signed-admission-terminal-projection.v1",
     "chio.signed-watermark-envelope.v1",
     "chio.signer-readiness-probe.v1",

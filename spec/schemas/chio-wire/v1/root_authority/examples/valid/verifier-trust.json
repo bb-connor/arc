@@ -10,9 +10,9 @@
     "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
   ],
   "idp_keys": {
-    "https://idp.example.com": [
+    "https://acme.okta.com": [
       {
-        "kid": "k-example-1",
+        "kid": "k-okta-1",
         "kty": "RSA",
         "alg": "RS256",
         "use": "sig",
@@ -22,7 +22,7 @@
     ]
   },
   "pep_keys": {
-    "gateway-eu": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1"
+    "kong-prod-eu": "6e7a1cdd29b0b78fd13af4c5598feff4ef2a97166e3ca6f2e4fbfccd80505bf1"
   },
   "checkpoint_keys": [],
   "required_columns": [

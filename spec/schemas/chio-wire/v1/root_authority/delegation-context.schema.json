@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/delegation-context.schema.json",
   "title": "Chio Delegation Context",
-  "description": "`chio.delegation-context.v1` (PROTOCOL 5.6.3): the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`.",
+  "description": "`chio.delegation-context.v1`: the content-addressed, unsigned record of one root exchange. It is bound into the signed root through `root_anchor.context_digest`. Decoding is strict: an unknown member at any level rejects.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -24,8 +24,7 @@
       "$ref": "#/$defs/DelegationExchange"
     },
     "root_policy_rule_id": {
-      "type": "string",
-      "minLength": 1,
+      "$ref": "root-anchor.schema.json#/$defs/Identifier",
       "description": "`rule_id` of the root policy rule that matched."
     },
     "effective_root_scope_hash": {
@@ -53,17 +52,23 @@
           "$ref": "root-anchor.schema.json#/$defs/AnchorKind"
         },
         "issuer": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Exact issuer of the anchoring assertion; `urn:chio:operator` for `operator_static_bearer`."
+          "$ref": "root-anchor.schema.json#/$defs/Uri",
+          "description": "The provider record's issuer for provider-backed kinds; `urn:chio:operator` for `operator_static_bearer`."
+        },
+        "provider_record_id": {
+          "$ref": "root-anchor.schema.json#/$defs/Identifier",
+          "description": "The enterprise provider record the exchange verified against. Present exactly for provider-backed kinds."
+        },
+        "provider_identity_digest": {
+          "$ref": "root-anchor.schema.json#/$defs/Digest",
+          "description": "Digest of the record's `chio.enterprise-provider-identity.v1` projection; equals the matched rule's. Present exactly for provider-backed kinds."
         },
         "key_snapshot_digest": {
           "$ref": "root-anchor.schema.json#/$defs/Digest",
           "description": "Digest of the `chio.idp-key-snapshot.v1` in force when the assertion was verified."
         },
         "kid": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "root-anchor.schema.json#/$defs/Identifier"
         },
         "alg": {
           "$ref": "root-anchor.schema.json#/$defs/JwsAlgorithm"
@@ -94,11 +99,51 @@
           "$ref": "#/$defs/TenantCommitment"
         },
         "claims": {
-          "type": "object",
-          "description": "Only the claims the matched rule names in `recorded_claims`, each plain or committed per the rule."
+          "$ref": "root-anchor.schema.json#/$defs/RecordedClaims",
+          "description": "Exactly the claims the matched rule names in `recorded_claims`, each plain or committed per the rule."
         }
       },
       "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "oauth_id_jag",
+                  "entra_jwt",
+                  "entra_agent_id",
+                  "oidc_jwt",
+                  "oauth_introspection"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "provider_record_id",
+              "provider_identity_digest"
+            ]
+          },
+          "else": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "provider_record_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "provider_identity_digest"
+                  ]
+                }
+              ]
+            }
+          }
+        },
         {
           "if": {
             "properties": {
@@ -114,6 +159,9 @@
             "properties": {
               "issuer": {
                 "const": "urn:chio:operator"
+              },
+              "claims": {
+                "maxProperties": 0
               }
             },
             "not": {
@@ -164,6 +212,51 @@
               "alg",
               "artifact_digest"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "enum": [
+                  "entra_jwt",
+                  "entra_agent_id"
+                ]
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "else": {
+            "properties": {
+              "claims": {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "azp"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "appid"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "oid"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "tid"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
           }
         },
         {

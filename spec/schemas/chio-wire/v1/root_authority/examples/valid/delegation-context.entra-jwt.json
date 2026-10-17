@@ -1,0 +1,40 @@
+{
+  "schema": "chio.delegation-context.v1",
+  "anchor": {
+    "kind": "entra_jwt",
+    "issuer": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0",
+    "provider_record_id": "acme-entra",
+    "provider_identity_digest": "sha256:ad4b8dabfa30a65a4948ea060fa818659d407f0a1056d43c3644a9fe554c1723",
+    "key_snapshot_digest": "sha256:3aeca53fb6088ca8ba89d785f12153cfc1ed21197617aa7d17886be48640467f",
+    "kid": "JYhAcTPMZ_LX6DBlOWQ7Hn0NeXE",
+    "alg": "RS256",
+    "artifact_digest": "sha256:cd36b537365257d2d7a2789136e5c4db82ff6c849b3299fd4aa9352367a42093",
+    "artifact_retained": false,
+    "replay_key_digest": "sha256:a7c5c5f5cbc33ea500a4850df79e890cbbd624c42fbfdc537570c5078096f4fd",
+    "token_iat": 1792234790,
+    "token_exp": 1792235090,
+    "subject": {
+      "commit": "sha256:a9491f4c1bf7b0cffbadcba2db8f028e4b3f2867cb59e1f3a0bc1968f3c51242",
+      "salt_ref": "anchor.sub"
+    },
+    "tenant": {
+      "commit": "sha256:e9da86d351cf9a7642d8c50195c3f466220911a15c177809bd1161a51e8c5f24",
+      "salt_ref": "anchor.tenant"
+    },
+    "claims": {
+      "azp": "11111111-1111-1111-1111-111111111111",
+      "tid": {
+        "commit": "sha256:c71179c23b75ed3a1ecfc1e15aee1a886c5687541b1dfeec4295ec1e7f468b0f",
+        "salt_ref": "claim.tid"
+      }
+    }
+  },
+  "exchange": {
+    "exchange_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",
+    "exchanged_at": 1792234795,
+    "request_digest": "sha256:17b5572df64ca4c5d85ebc30de03ba93e0252194856055fb4f77f28132eca528",
+    "holder": "edge_session"
+  },
+  "root_policy_rule_id": "entra-crm",
+  "effective_root_scope_hash": "sha256:483eba3dba450204705ba97fd71c49deaf180145ae1580ca17a1913f0c7e56f7"
+}

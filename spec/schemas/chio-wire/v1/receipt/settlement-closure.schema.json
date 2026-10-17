@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/settlement-closure.schema.json",
   "title": "Chio Settlement Closure",
-  "description": "`chio.settlement-closure.v1` (PROTOCOL 6.7), signed by the kernel key over the signing wrapper. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.",
+  "description": "`chio.settlement-closure.v1`, signed by the kernel key. Exactly one closure may exist per `authorized_pending` terminal receipt, and its `hold_id` must match that receipt's settlement block.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -28,8 +28,7 @@
       "pattern": "^[0-9a-f]{64}$"
     },
     "hold_id": {
-      "type": "string",
-      "minLength": 1
+      "$ref": "../root_authority/root-anchor.schema.json#/$defs/Identifier"
     },
     "rail": {
       "type": "string",
@@ -45,7 +44,8 @@
     },
     "amount": {
       "type": "string",
-      "pattern": "^(0|[1-9][0-9]*)$",
+      "maxLength": 39,
+      "pattern": "^(0|[1-9][0-9]{0,38})$",
       "description": "Integer minor units as a decimal string."
     },
     "rail_refs": {
@@ -53,7 +53,8 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/RailRef"
-      }
+      },
+      "maxItems": 8
     },
     "observed_at": {
       "type": "integer",
@@ -98,7 +99,9 @@
         },
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[^\\u0000]+$"
         },
         "digest": {
           "$ref": "../root_authority/root-anchor.schema.json#/$defs/Digest",

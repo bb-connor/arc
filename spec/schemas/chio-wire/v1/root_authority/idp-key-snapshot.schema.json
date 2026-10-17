@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/idp-key-snapshot.schema.json",
   "title": "Chio IdP Key Snapshot",
-  "description": "`chio.idp-key-snapshot.v1` (PROTOCOL 5.6.4), signed by the exchange key over the signing wrapper. It records the key set the exchange fetched from an identity provider and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement, not identity-provider evidence.",
+  "description": "`chio.idp-key-snapshot.v1`, signed by the exchange key. It records the key set the exchange fetched for an enterprise provider record, or took from the record's inline `jwks`, and is in force from `observed_at` until the next snapshot for the same issuer. It is the provider's statement of what the identity provider published, not identity-provider evidence.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,19 +20,27 @@
       "const": "chio.idp-key-snapshot.v1"
     },
     "issuer": {
-      "type": "string",
-      "minLength": 1
+      "$ref": "root-anchor.schema.json#/$defs/Uri"
     },
     "source": {
-      "type": "string",
-      "pattern": "^https://[^\\s]+$",
-      "description": "The pinned `jwks_uri` the keys were fetched from."
+      "description": "The record's `jwks_url`, or `registry:<provider_id>` for a record with an inline `jwks`.",
+      "oneOf": [
+        {
+          "$ref": "root-anchor.schema.json#/$defs/HttpsUrl"
+        },
+        {
+          "type": "string",
+          "maxLength": 137,
+          "pattern": "^registry:[^\\u0000\\s]{1,128}$"
+        }
+      ]
     },
     "keys": {
       "type": "array",
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/Jwk"
-      }
+      },
+      "maxItems": 64
     },
     "observed_at": {
       "type": "integer",

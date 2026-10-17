@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/capability/presentation.schema.json",
   "title": "Chio Capability Presentation",
-  "description": "`chio.capability-presentation.v1` (PROTOCOL 5.6.5), carried in MCP `_meta.chioCapability`. The envelope is unsigned; every member inside is verified independently.",
+  "description": "`chio.capability-presentation.v1`, carried in MCP `_meta.chioCapability`: a leaf capability, its signed ancestors and, when the presenter is not the session holder, the delegation context. The envelope is unsigned; every member inside is verified independently. Decoding is strict.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,10 +20,11 @@
     },
     "ancestors": {
       "type": "array",
-      "description": "Signed ancestors ordered root to parent. A root presented alone has an empty list.",
+      "description": "Signed ancestors ordered root to parent, at most 16. A root presented alone has an empty list.",
       "items": {
         "$ref": "token.schema.json"
-      }
+      },
+      "maxItems": 16
     },
     "delegation_context": {
       "$ref": "../root_authority/delegation-context.schema.json",

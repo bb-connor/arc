@@ -16,7 +16,7 @@
       "salt_ref": "anchor.tenant"
     },
     "claims": {},
-    "kid": "k-example-1"
+    "kid": "k-okta-1"
   },
   "exchange": {
     "exchange_key": "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394",

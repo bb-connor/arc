@@ -3,10 +3,12 @@
 
 Every file under `spec/schemas/chio-wire/v1/root_authority/examples/valid/`
 must validate against its schema, and every file under `.../invalid/` must
-fail. An example selects its schema by the file-name stem before the first
-`.` (`root-policy.alg-hs256.json` selects `root-policy.schema.json`). When the
-schema pins a `schema` member, a valid example must carry that exact value.
-Every schema in `SCHEMAS` needs at least one valid example.
+fail for the reason `examples/invalid-expectations.json` pins: the instance
+path and keyword of the best-matching error. An example selects its schema by
+the file-name stem before the first `.` (`root-policy.alg-hs256.json` selects
+`root-policy.schema.json`). When the schema pins a `schema` member, a valid
+example must carry that exact value. Every schema in `SCHEMAS` needs at least
+one valid example.
 
 References resolve the way the codegen resolves them: a relative `$ref` is a
 path relative to the referencing file, and an absolute `$ref` names a `$id`
@@ -29,12 +31,14 @@ from referencing.jsonschema import DRAFT202012
 ROOT = Path(__file__).resolve().parents[1]
 WIRE = ROOT / "spec/schemas/chio-wire/v1"
 EXAMPLES = WIRE / "root_authority/examples"
+EXPECTATIONS = EXAMPLES / "invalid-expectations.json"
 BASE_URI = "https://chio-protocol.dev/schemas/chio-wire/v1/"
 
 SCHEMAS = {
     "root-anchor": "root_authority/root-anchor.schema.json",
     "delegation-context": "root_authority/delegation-context.schema.json",
     "root-policy": "root_authority/root-policy.schema.json",
+    "enterprise-provider-identity": "root_authority/enterprise-provider-identity.schema.json",
     "idp-key-snapshot": "root_authority/idp-key-snapshot.schema.json",
     "verifier-trust": "root_authority/verifier-trust.schema.json",
     "revocation-request": "root_authority/revocation-request.schema.json",
@@ -99,6 +103,10 @@ def main() -> int:
         covered.add(rel)
         print(f"ok valid   {example.name}")
 
+    expectations = json.loads(EXPECTATIONS.read_text(encoding="utf-8"))
+    names = {example.name for example in invalid_files}
+    for name in sorted(names ^ set(expectations)):
+        failures.append(f"invalid example {name} is not paired with an expectation")
     for example in invalid_files:
         rel = schema_for(example)
         instance = json.loads(example.read_text(encoding="utf-8"))
@@ -106,8 +114,15 @@ def main() -> int:
         if error is None:
             failures.append(f"invalid example {example.name} validates against {rel}")
             continue
-        location = "/".join(str(part) for part in error.absolute_path) or "(root)"
-        print(f"ok invalid {example.name}: {location}: {error.message[:120]}")
+        location = "".join(f"/{part}" for part in error.absolute_path)
+        expected = expectations.get(example.name, {})
+        if (location, error.validator) != (expected.get("path"), expected.get("keyword")):
+            failures.append(
+                f"invalid example {example.name} fails at {location or '(root)'} ({error.validator}), "
+                f"expected {expected.get('path') or '(root)'} ({expected.get('keyword')}): {error.message[:120]}"
+            )
+            continue
+        print(f"ok invalid {example.name}: {location or '(root)'}: {error.validator}")
 
     for rel in sorted(set(SCHEMAS.values()) - covered):
         failures.append(f"schema {rel} has no passing valid example")

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/receipt/disclosure.schema.json",
   "title": "Chio Receipt Disclosure",
-  "description": "`chio.receipt-disclosure.v1` (PROTOCOL \"Committed Receipts And Disclosure\"): an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening.",
+  "description": "`chio.receipt-disclosure.v1`: an unsigned, self-verifying opening of a committed receipt's salted commitments. A verifier opens a commitment by recomputing it; the commitment domain comes from the commitment's position in the receipt, never from the opening. The same salt under two `salt_ref` values marks the receipt as tampered disclosure.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -25,7 +25,8 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/Opening"
-      }
+      },
+      "maxItems": 64
     }
   },
   "$defs": {
@@ -39,9 +40,8 @@
       ],
       "properties": {
         "salt_ref": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)*$",
-          "description": "Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant`)."
+          "$ref": "../root_authority/root-anchor.schema.json#/$defs/SaltRef",
+          "description": "Names the commitment this opening opens (`params`, `content`, `anchor.sub`, `anchor.tenant` or a committed claim)."
         },
         "salt": {
           "$ref": "../root_authority/root-anchor.schema.json#/$defs/Salt"

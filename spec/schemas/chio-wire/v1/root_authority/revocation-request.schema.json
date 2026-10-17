@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/revocation-request.schema.json",
   "title": "Chio Revocation Request",
-  "description": "`chio.revocation-request.v1` (PROTOCOL 5.6.7), signed by `revoker_key` over the signing wrapper. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.",
+  "description": "`chio.revocation-request.v1`, signed by `revoker_key`. A caller asks the provider to revoke one of its own delegated descendants; `revoker_key` must be the subject of a strict ancestor of the target in the presentation named by `presentation_digest`.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -20,8 +20,7 @@
       "const": "chio.revocation-request.v1"
     },
     "target_capability_id": {
-      "type": "string",
-      "minLength": 1
+      "$ref": "root-anchor.schema.json#/$defs/Identifier"
     },
     "revoker_key": {
       "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
@@ -32,7 +31,8 @@
     "reason": {
       "type": "string",
       "minLength": 1,
-      "maxLength": 256
+      "maxLength": 256,
+      "pattern": "^[^\\u0000]+$"
     },
     "issued_at": {
       "type": "integer",

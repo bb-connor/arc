@@ -1,30 +1,30 @@
 {
   "schema": "chio.root-policy.v1",
-  "policy_id": "rp-example",
+  "policy_id": "rp_acme_all_kinds",
   "policy_key": "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1",
   "exchange_keys": [
     "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
   ],
   "rules": [
     {
-      "rule_id": "id-jag-crm",
+      "rule_id": "okta-crm-agents",
       "match": {
         "anchor_kind": "oauth_id_jag",
-        "issuer": "https://idp.example.com",
-        "jwks_uri": "https://idp.example.com/oauth2/v1/keys",
+        "provider_record_id": "acme-okta",
+        "provider_identity_digest": "sha256:eba2bdd1bff4ffd93cdd19b349c62676c3580522201a061d8635d894c36195d1",
         "allowed_algs": [
           "RS256"
         ],
         "claims": {
           "client_id": [
-            "mcp-client-example"
+            "mcp-client-claude"
           ]
         }
       },
-      "tenant_claim": "iss",
       "idp_scope_projection": {
         "crm.read": [
-          "crm/search"
+          "crm/search",
+          "crm/get"
         ],
         "crm.write": [
           "crm/update"
@@ -35,6 +35,13 @@
           {
             "server_id": "crm",
             "tool_name": "search",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "get",
             "operations": [
               "invoke"
             ]
@@ -66,13 +73,60 @@
       "rule_id": "entra-crm",
       "match": {
         "anchor_kind": "entra_jwt",
-        "issuer": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0",
-        "jwks_uri": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/discovery/v2.0/keys",
+        "provider_record_id": "acme-entra",
+        "provider_identity_digest": "sha256:ad4b8dabfa30a65a4948ea060fa818659d407f0a1056d43c3644a9fe554c1723",
         "allowed_algs": [
           "RS256"
         ]
       },
-      "tenant_claim": "tid",
+      "idp_scope_projection": {
+        "CRM.Read": [
+          "crm/search"
+        ]
+      },
+      "ceiling_scope": {
+        "grants": [
+          {
+            "server_id": "crm",
+            "tool_name": "search",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "get",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "update",
+            "operations": [
+              "invoke"
+            ]
+          }
+        ]
+      },
+      "ceiling_scope_hash": "sha256:5128a2c589cad4c6868605fda684d2c6f7225344a9fb50ea096a4b2b604d9eb5",
+      "recorded_claims": {
+        "azp": "plain",
+        "tid": "committed"
+      },
+      "holder_classes": [
+        "edge_session"
+      ],
+      "capability_ttl_secs": 300,
+      "max_clock_skew_secs": 30
+    },
+    {
+      "rule_id": "introspection-crm",
+      "match": {
+        "anchor_kind": "oauth_introspection",
+        "provider_record_id": "acme-introspection",
+        "provider_identity_digest": "sha256:00819a76e5e9d2f59e48236c30fb444f337d1c5ff79449746ff2b5c46b33d77c"
+      },
       "idp_scope_projection": {
         "crm.read": [
           "crm/search"
@@ -89,6 +143,13 @@
           },
           {
             "server_id": "crm",
+            "tool_name": "get",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
             "tool_name": "update",
             "operations": [
               "invoke"
@@ -98,25 +159,29 @@
       },
       "ceiling_scope_hash": "sha256:5128a2c589cad4c6868605fda684d2c6f7225344a9fb50ea096a4b2b604d9eb5",
       "recorded_claims": {
-        "oid": "committed"
+        "client_id": "plain"
       },
       "holder_classes": [
         "edge_session"
-      ],
-      "capability_ttl_secs": 300,
-      "max_clock_skew_secs": 30
+      ]
     },
     {
       "rule_id": "dev-static",
       "match": {
-        "anchor_kind": "operator_static_bearer",
-        "issuer": "urn:chio:operator"
+        "anchor_kind": "operator_static_bearer"
       },
       "ceiling_scope": {
         "grants": [
           {
             "server_id": "crm",
             "tool_name": "search",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "get",
             "operations": [
               "invoke"
             ]
@@ -138,6 +203,46 @@
       "capability_ttl_secs": 300,
       "principal": "dev:alice",
       "tenant_value": "dev"
+    },
+    {
+      "rule_id": "local-as",
+      "match": {
+        "anchor_kind": "chio_local_as"
+      },
+      "ceiling_scope": {
+        "grants": [
+          {
+            "server_id": "crm",
+            "tool_name": "search",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "get",
+            "operations": [
+              "invoke"
+            ]
+          },
+          {
+            "server_id": "crm",
+            "tool_name": "update",
+            "operations": [
+              "invoke"
+            ]
+          }
+        ]
+      },
+      "ceiling_scope_hash": "sha256:5128a2c589cad4c6868605fda684d2c6f7225344a9fb50ea096a4b2b604d9eb5",
+      "recorded_claims": {
+        "client_id": "plain",
+        "scope": "plain"
+      },
+      "holder_classes": [
+        "edge_session",
+        "caller"
+      ]
     }
   ],
   "disclosure": {

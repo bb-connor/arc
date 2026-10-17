@@ -1,0 +1,16 @@
+{
+  "schema": "chio.enterprise-provider-identity.v1",
+  "provider_id": "acme-introspection",
+  "kind": "oauth_introspection",
+  "issuer": "https://auth.acme.example",
+  "introspection_url": "https://auth.acme.example/oauth2/introspect",
+  "audiences": [
+    "https://crm.acme.example"
+  ],
+  "subject_mapping": {
+    "principal_source": "sub",
+    "tenant_id_field": "iss"
+  },
+  "trust_material_ref": "acme-introspection",
+  "jwks_url": "https://auth.acme.example/keys"
+}

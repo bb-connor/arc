@@ -2,7 +2,7 @@
   "schema": "chio.delegation-context.v1",
   "anchor": {
     "kind": "operator_static_bearer",
-    "issuer": "https://idp.example.com",
+    "issuer": "https://acme.okta.com",
     "artifact_retained": false,
     "replay_key_digest": "sha256:a8d5951b0e84672ecd89c9089affe7796acec1e116c048f4f03d19fb5f8b0c06",
     "token_iat": 1792234795,

@@ -1,0 +1,32 @@
+{
+  "schema": "chio.enterprise-provider-identity.v1",
+  "provider_id": "acme-entra",
+  "kind": "oidc_jwks",
+  "issuer": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "RSA",
+        "use": "sig",
+        "kid": "JYhAcTPMZ_LX6DBlOWQ7Hn0NeXE",
+        "x5t": "JYhAcTPMZ_LX6DBlOWQ7Hn0NeXE",
+        "n": "u1SU1LfVLPHCozMxH2Mo4lgOEePzNm0tRgeLezV6ffAt0gunVTLw7onLRnrq0_IzW7yWR7QkrmBL7jTKEn5u-qKhbwKfBstIs-bMY2Zkp18gnTxKLxoS2tFczGkPLPgizskuemMghRniWaoLcyehkd3qqGElvW_VDL5AaWTg0nLVkjRo9z-40RQzuVaE8AkAFmxZzow3x-VJYKdjykkJ0iT9wCS0DRTXu269V264Vf_3jvredZiKRkgwlL9xNAwxXFg0x_XFw005UWVRIkdgcKWTjpBP2dPwVZ4WWC-9aGVd-Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbcmw",
+        "e": "AQAB",
+        "x5c": [
+          "MIIC/jCCAeagAwIBAgIJAOCJOVRxNKcNMA0GCSqGSIb3DQEBCwUAMC0xKzApBgNVBAMTImFjY291bnRzLmFjY2Vzc2NvbnRyb2wud2luZG93cy5uZXQ="
+        ],
+        "cloud_instance_name": "microsoftonline.com",
+        "issuer": "https://login.microsoftonline.com/00000000-0000-0000-0000-000000000001/v2.0"
+      }
+    ],
+    "pad": 0
+  },
+  "audiences": [
+    "api://acme-crm"
+  ],
+  "subject_mapping": {
+    "principal_source": "oid",
+    "tenant_id_field": "tid"
+  },
+  "trust_material_ref": "entra-tenant-acme"
+}

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/root_authority/verifier-trust.schema.json",
   "title": "Chio Verifier Trust",
-  "description": "`chio.verifier-trust.v1` (PROTOCOL 5.6.8): a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.",
+  "description": "`chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,21 +21,27 @@
       "uniqueItems": true,
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
-      }
+      },
+      "minItems": 1,
+      "maxItems": 64
     },
     "exchange_keys": {
       "type": "array",
       "uniqueItems": true,
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
-      }
+      },
+      "minItems": 1,
+      "maxItems": 64
     },
     "root_policy_keys": {
       "type": "array",
       "uniqueItems": true,
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
-      }
+      },
+      "minItems": 1,
+      "maxItems": 64
     },
     "idp_keys": {
       "type": "object",
@@ -44,7 +50,13 @@
         "type": "array",
         "items": {
           "$ref": "root-anchor.schema.json#/$defs/Jwk"
-        }
+        },
+        "maxItems": 64
+      },
+      "maxProperties": 64,
+      "propertyNames": {
+        "maxLength": 2048,
+        "pattern": "^[^\\u0000\\s]+$"
       }
     },
     "pep_keys": {
@@ -52,6 +64,11 @@
       "description": "Policy enforcement point id to its pinned key.",
       "additionalProperties": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
+      },
+      "maxProperties": 256,
+      "propertyNames": {
+        "maxLength": 128,
+        "pattern": "^[^\\u0000]+$"
       }
     },
     "checkpoint_keys": {
@@ -59,7 +76,8 @@
       "uniqueItems": true,
       "items": {
         "$ref": "root-anchor.schema.json#/$defs/PublicKeyHex"
-      }
+      },
+      "maxItems": 64
     },
     "required_columns": {
       "type": "array",
@@ -73,7 +91,8 @@
           "content",
           "settlement"
         ]
-      }
+      },
+      "maxItems": 5
     }
   }
 }

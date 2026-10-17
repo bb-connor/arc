@@ -1,10 +1,10 @@
 {
   "schema": "chio.idp-key-snapshot.v1",
-  "issuer": "https://idp.example.com",
-  "source": "https://idp.example.com/oauth2/v1/keys",
+  "issuer": "https://acme.okta.com",
+  "source": "https://acme.okta.com/oauth2/v1/keys",
   "keys": [
     {
-      "kid": "k-example-1",
+      "kid": "k-okta-1",
       "kty": "RSA",
       "alg": "RS256",
       "use": "sig",

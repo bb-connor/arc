@@ -2,9 +2,11 @@
   "schema": "chio.delegation-context.v1",
   "anchor": {
     "kind": "oauth_id_jag",
-    "issuer": "https://idp.example.com",
+    "issuer": "https://acme.okta.com",
+    "provider_record_id": "acme-okta",
+    "provider_identity_digest": "sha256:eba2bdd1bff4ffd93cdd19b349c62676c3580522201a061d8635d894c36195d1",
     "key_snapshot_digest": "sha256:3aeca53fb6088ca8ba89d785f12153cfc1ed21197617aa7d17886be48640467f",
-    "kid": "k-example-1",
+    "kid": "k-okta-1",
     "alg": "RS256",
     "artifact_digest": "sha256:cd36b537365257d2d7a2789136e5c4db82ff6c849b3299fd4aa9352367a42093",
     "artifact_retained": false,
@@ -20,9 +22,10 @@
       "salt_ref": "anchor.tenant"
     },
     "claims": {
-      "client_id": "mcp-client-example",
+      "client_id": 7,
       "scope": [
-        "crm.read"
+        "crm.read",
+        "crm.write"
       ]
     }
   },
@@ -32,6 +35,6 @@
     "request_digest": "sha256:17b5572df64ca4c5d85ebc30de03ba93e0252194856055fb4f77f28132eca528",
     "holder": "edge_session"
   },
-  "root_policy_rule_id": "id-jag-crm",
+  "root_policy_rule_id": "okta-crm-agents",
   "effective_root_scope_hash": "sha256:483eba3dba450204705ba97fd71c49deaf180145ae1580ca17a1913f0c7e56f7"
 }
