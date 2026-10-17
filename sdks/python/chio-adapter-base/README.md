@@ -5,7 +5,7 @@ Shared security and receipt primitives for the Chio Python adapter family.
 > **Status: shipping.** The first non-pre-release line is `0.2.0`;
 > publish that package before external adapters consume the
 > `>=0.2.0,<0.3` pin. See `CHANGELOG.md` for release notes and
-> `ADAPTER-MIGRATION.md` for the adapter-author migration recipe.
+> `AUTHORING.md` for the adapter authoring guide.
 
 ## Why this package exists
 
@@ -109,8 +109,8 @@ constrains Q2.
 
 The chio-hermes precedent is documented in
 `docs/integrations/CHIO-ADAPTER-BASE.md` (this file's
-"chio-hermes precedent reconciliation" section); the migration
-mechanics for adapter authors live in `ADAPTER-MIGRATION.md`.
+"chio-hermes precedent reconciliation" section); the
+adapter authoring guide is `AUTHORING.md`.
 
 ## Public API
 
@@ -169,8 +169,8 @@ Choose a `chio-adapter-base` floor pin by which helpers an adapter calls:
   next; the call sites are byte-identical across 0.1.x and 0.2.0.
 
 `docs/integrations/CHIO-ADAPTER-BASE.md` Section 4 carries the
-current per-adapter pin table. `ADAPTER-MIGRATION.md` is the
-adapter-author recipe for bumping a floor pin from 0.1.x to 0.2.0.
+current per-adapter pin table. `AUTHORING.md` is the
+adapter authoring guide.
 
 ## Design notes
 

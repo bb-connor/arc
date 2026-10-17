@@ -98,8 +98,8 @@ against a real adapter so shape additions land once, in
                   positional_table=my_table)
   ```
 
-  See `ADAPTER-MIGRATION.md` section 5 for the recipe and the test
-  assertions to add when collapsing a local helper.
+  See `AUTHORING.md` ("Positional tables" and "Tests") for the recipe
+  and the test assertions to add when collapsing a local helper.
 
 ### Notes
 - Wire shape: `bind_and_redact` returns
@@ -111,7 +111,7 @@ against a real adapter so shape additions land once, in
   with migration guidance.
 
 ### Migration from 0.1.x
-See `ADAPTER-MIGRATION.md`. Most adapters that already pin
+See `AUTHORING.md`. Most adapters that already pin
 `chio-adapter-base>=0.1.1,<0.2` and call `bind_and_redact` can bump
 to `>=0.2.0,<0.3` after the 0.2.0 package is published. Adapters
 with a local helper (the chio-prefect `_task_parameters` shape)
