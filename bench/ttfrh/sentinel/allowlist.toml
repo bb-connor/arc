@@ -25,9 +25,6 @@ hosts = [
 [templates.fastapi-langchain]
 hosts = []
 
-[templates.cloudflare-worker]
-hosts = []
-
 [notes]
 schema_version = "1"
 last_reviewed_iso = "2026-04-30"

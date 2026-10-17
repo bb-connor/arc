@@ -52,12 +52,11 @@ describe("parseArgs", () => {
 });
 
 describe("template registry", () => {
-  test("lists all three known templates", () => {
+  test("lists all known templates", () => {
     const slugs = listTemplateSlugs();
     expect(slugs).toContain("next-ai-sdk-receipts");
     expect(slugs).toContain("fastapi-langchain");
-    expect(slugs).toContain("cloudflare-worker");
-    expect(slugs.length).toBe(3);
+    expect(slugs.length).toBe(2);
   });
 
   test("each entry pins a bench runner", () => {
