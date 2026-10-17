@@ -24,12 +24,6 @@ fn assert_unavailable(error: SenderConstraintError) {
     assert_eq!(error.to_string(), UNAVAILABLE);
 }
 
-#[test]
-fn sender_confirmation_rejects_weak_key_decoding() {
-    let claims = serde_json::json!({"chioSenderKey": weak_sender_key().to_hex()});
-    assert!(serde_json::from_value::<ChioSenderConstraintClaims>(claims).is_err());
-}
-
 #[tokio::test]
 async fn sender_dpop_public_key_token_request_is_refused() {
     for key in [

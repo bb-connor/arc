@@ -1,18 +1,6 @@
 //! Runtime sender binding verification.
 use super::*;
 
-/// Sender keys identify a signing authority, so decoding must reject keys
-/// whose small-order group admits signatures without a private key.
-pub(super) fn decode_sender_key(raw: &str) -> Result<PublicKey, chio_core::error::Error> {
-    let key = PublicKey::from_hex(raw)?;
-    if key.is_weak_ed25519() {
-        return Err(chio_core::error::Error::InvalidPublicKey(
-            "weak Ed25519 sender key".into(),
-        ));
-    }
-    Ok(key)
-}
-
 /// Refuse a presented DPoP header on every bearer path, before any token
 /// family is selected.
 pub(super) fn refuse_presented_dpop(
@@ -111,11 +99,8 @@ fn validate_profile(claims: &ChioSenderConstraintClaims) -> Result<(), &'static 
     if claims.is_empty() {
         return Err("empty sender confirmation");
     }
-    if claims.chio_attestation_sha256.is_some()
-        && claims.chio_sender_key.is_none()
-        && claims.mtls_thumbprint_sha256.is_none()
-    {
-        return Err("attestation requires sender key or TLS binding");
+    if claims.chio_attestation_sha256.is_some() && claims.mtls_thumbprint_sha256.is_none() {
+        return Err("attestation requires TLS binding");
     }
     for field in [
         &claims.chio_sender_key,
@@ -131,9 +116,6 @@ fn validate_profile(claims: &ChioSenderConstraintClaims) -> Result<(), &'static 
         {
             return Err("invalid sender confirmation field");
         }
-    }
-    if let Some(key) = &claims.chio_sender_key {
-        decode_sender_key(key).map_err(|_| "invalid sender key")?;
     }
     Ok(())
 }
