@@ -457,7 +457,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
       verifyReceipt: (receipt) => {
@@ -473,6 +472,34 @@ describe("receipt authority verification", () => {
     expect(modelCalls).toBe(1);
     expect(seenReceipts).toHaveLength(1);
     expect(seenReceipts[0]?.["id"]).toBe("r-explicit");
+  });
+
+  it("evaluates through the sidecar even when an EdgeRuntime global is present", async () => {
+    const globals = globalThis as Record<string, unknown>;
+    globals["EdgeRuntime"] = "edge-runtime";
+    const seenPaths: string[] = [];
+    let modelCalls = 0;
+    const fetchMock = async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      seenPaths.push(url);
+      return jsonResponse({ body: evaluateResponseBody("r-edge-global") });
+    };
+
+    try {
+      const wrapped = wrapWithChio(mockModel(() => {
+          modelCalls += 1;
+        }), {
+        sidecarUrl: "http://sidecar.test",
+        fetch: fetchMock as typeof fetch,
+        verifyReceipt: () => authorityAllow(),
+      });
+      await wrapped.doGenerate(callOptions("search"));
+    } finally {
+      delete globals["EdgeRuntime"];
+    }
+
+    expect(seenPaths).toEqual(["http://sidecar.test/chio/evaluate"]);
+    expect(modelCalls).toBe(1);
   });
 
   it("defaults to /chio/verify when no verifyReceipt is configured", async () => {
@@ -499,7 +526,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -548,7 +574,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       // sidecarUrl deliberately omitted to exercise the documented default.
       fetch: fetchMock as typeof fetch,
     });
@@ -583,7 +608,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -614,7 +638,6 @@ describe("receipt authority verification", () => {
       // Neither `sidecarUrl` nor `verifyReceipt` is configured. The
       // middleware must still authorize because both default to the
       // local sidecar and the authority response says allow.
-      runtime: "node",
       fetch: fetchMock as typeof fetch,
     });
 
@@ -639,7 +662,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -663,7 +685,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
       verifyReceipt: () => ({
@@ -685,83 +706,6 @@ describe("receipt authority verification", () => {
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(modelCalls).toBe(0);
-  });
-
-  it("denies on edge runtime without an explicit verifyReceipt (no fetch fallback)", async () => {
-    // Guards: the edge runtime must not fall back to a localhost /chio/verify
-    // fetch (unreachable from Vercel/Workers); it denies with a clear reason instead.
-    // We must keep this verification in-process for
-    // edge runtimes (or via an explicit verifier) because the
-    // in-process @chio-protocol/edge `verify_receipt` binding needs a
-    // binary envelope the JSON `/chio/evaluate` response does not carry.
-    //
-    // To exercise applyReceiptAuthority on the edge path we have to bypass
-    // the `options.evaluate` short-circuit, so we stub the dynamic import
-    // of `@chio-protocol/edge` rather than the option. The stubbed
-    // wasm-level evaluator returns an allow envelope; the middleware then
-    // reaches applyReceiptAuthority and must deny because no verifyReceipt
-    // was provided and the fetch fallback is disabled on edge.
-    mock.module("@chio-protocol/edge", () => ({
-      evaluate: () => ({
-        verdict: { verdict: "allow" },
-        receipt: { id: "r-edge-no-verifier", verdict: { verdict: "allow" } },
-      }),
-    }));
-
-    let modelCalls = 0;
-    let fetchCalls = 0;
-    const fetchMock = async () => {
-      fetchCalls += 1;
-      throw new Error(
-        "edge runtime must not fall through to fetch-based /chio/verify",
-      );
-    };
-
-    const wrapped = wrapWithChio(mockModel(() => {
-        modelCalls += 1;
-      }), {
-      runtime: "edge",
-      sidecarUrl: "http://sidecar.test",
-      fetch: fetchMock as typeof fetch,
-    });
-
-    await expect(wrapped.doGenerate(callOptions("search")))
-      .rejects
-      .toThrow(ChioMiddlewareDeniedError);
-    expect(modelCalls).toBe(0);
-    expect(fetchCalls).toBe(0);
-  });
-
-  it("authorizes on edge runtime when an explicit verifyReceipt is configured", async () => {
-    // Edge callers can still authorize by supplying their own verifier
-    // (the documented edge path uses @chio-protocol/edge `verify_receipt`
-    // directly). The middleware must not require fetch in that case.
-    mock.module("@chio-protocol/edge", () => ({
-      evaluate: () => ({
-        verdict: { verdict: "allow" },
-        receipt: { id: "r-edge-with-verifier", verdict: { verdict: "allow" } },
-      }),
-    }));
-
-    let modelCalls = 0;
-    let fetchCalls = 0;
-    const fetchMock = async () => {
-      fetchCalls += 1;
-      throw new Error("edge runtime with verifyReceipt must not hit fetch");
-    };
-
-    const wrapped = wrapWithChio(mockModel(() => {
-        modelCalls += 1;
-      }), {
-      runtime: "edge",
-      fetch: fetchMock as typeof fetch,
-      verifyReceipt: () => authorityAllow(),
-    });
-
-    const result = await wrapped.doGenerate(callOptions("search"));
-    expect(result).toEqual(GENERATE_RESULT);
-    expect(modelCalls).toBe(1);
-    expect(fetchCalls).toBe(0);
   });
 
   it("fails closed when /chio/verify response omits required authority fields", async () => {
@@ -791,7 +735,6 @@ describe("receipt authority verification", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -855,7 +798,6 @@ describe("receipt verdict lifting", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -895,7 +837,6 @@ describe("receipt verdict lifting", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -927,7 +868,6 @@ describe("receipt verdict lifting", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
@@ -975,7 +915,6 @@ describe("receipt verdict lifting", () => {
     const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
       }), {
-      runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });

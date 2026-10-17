@@ -59,27 +59,19 @@ A call that declares no tools is not evaluated. Denials throw
 and the underlying model is never invoked. Allowed streams are returned
 untouched.
 
-The default Edge path consumes `@chio-protocol/edge` dynamically. Node uses
-`fetch` against `/chio/evaluate`. Tests can inject `evaluate` directly.
+## Evaluation
 
-## Runtime selection
-
-The runtime path is selected as follows:
-
-- `runtime: "edge"` (or detected `EdgeRuntime` global) - dynamic `import`
-  of `@chio-protocol/edge` evaluates the wasm artifact in-process.
-- `runtime: "node"` (default outside Edge) - HTTP POST to a Chio sidecar at
-  `sidecarUrl` (default `http://127.0.0.1:9090/chio/evaluate`).
-- `runtime: "auto"` (the default) - picks Edge when `EdgeRuntime` is set,
-  Node otherwise.
-
-A custom `evaluate` callback short-circuits both paths and is the
-recommended seam for unit tests.
+Every evaluation is an HTTP POST with `fetch` to a Chio sidecar at
+`sidecarUrl` (default `http://127.0.0.1:9090/chio/evaluate`). There is no
+in-process evaluator: the middleware holds no capability token, so it cannot
+authorize a call locally, and it does not load `@chio-protocol/edge`. Hosts
+that cannot reach a sidecar (Vercel Edge, Workers) must point `sidecarUrl` at
+a reachable one or supply `evaluate`. A custom `evaluate` callback replaces the
+sidecar call and is the recommended seam for unit tests.
 
 ## Receipt verification
 
 An allow verdict authorizes the call only after the receipt passes
 verification. The middleware uses `verifyReceipt` when supplied and otherwise
-POSTs the receipt to the sidecar's `/chio/verify` route. On the Edge runtime
-there is no fetch fallback, so a `verifyReceipt` is required; without one the
-call is denied.
+POSTs the receipt to the sidecar's `/chio/verify` route. A missing or
+unreachable verification denies the call.

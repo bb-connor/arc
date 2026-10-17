@@ -2,15 +2,14 @@
   "name": "@chio-protocol/ai-sdk-middleware",
   "version": "0.1.0",
   "type": "module",
-  "description": "Chio verdict middleware for Vercel AI SDK language models. Edge and Node runtime split, verdict evaluation at the tool-use boundary.",
+  "description": "Chio verdict middleware for Vercel AI SDK language models. verdict evaluation at the tool-use boundary through a Chio sidecar.",
   "license": "Apache-2.0",
   "keywords": [
     "chio",
     "vercel-ai-sdk",
     "middleware",
     "verdict",
-    "agent-protocol",
-    "edge-runtime"
+    "agent-protocol"
   ],
   "sideEffects": false,
   "main": "./dist/index.js",
@@ -39,13 +38,7 @@
     "typescript": "~5.7.0"
   },
   "peerDependencies": {
-    "ai": ">=7 <8",
-    "@chio-protocol/edge": ">=0.1.0 <1"
-  },
-  "peerDependenciesMeta": {
-    "@chio-protocol/edge": {
-      "optional": true
-    }
+    "ai": ">=7 <8"
   },
   "publishConfig": {
     "access": "public"

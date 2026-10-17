@@ -8,19 +8,12 @@ import {
   type ToolUseCandidate,
 } from "./middleware.js";
 
-export type ChioRuntime = "edge" | "node";
-
 export interface RuntimeEvaluationOptions {
-  runtime?: ChioRuntime | "auto" | undefined;
   request?: LanguageModelInvocation | undefined;
   toolUse?: ToolUseCandidate | undefined;
   sidecarUrl?: string | undefined;
   fetch?: typeof fetch | undefined;
 }
-
-type EdgeModule = {
-  evaluate?: (requestJson: string) => Promise<unknown> | unknown;
-};
 
 export async function evaluateWithChio(
   options: ChioMiddlewareOptions,
@@ -28,7 +21,6 @@ export async function evaluateWithChio(
 ): Promise<ChioEvaluation> {
   if (options.evaluate != null) {
     return options.evaluate({
-      runtime: normalizeRuntime(runtimeOptions.runtime),
       request: runtimeOptions.request,
       toolUse: runtimeOptions.toolUse,
     });
@@ -42,33 +34,23 @@ export async function evaluateWithChio(
     request: runtimeOptions.request ?? null,
   };
 
-  const runtime = normalizeRuntime(runtimeOptions.runtime);
-  let evaluation: ChioEvaluation;
-  if (runtime === "edge") {
-    const edge = await importOptionalEdge();
-    if (typeof edge.evaluate !== "function") {
-      throw new Error("@chio-protocol/edge did not expose evaluate()");
-    }
-    evaluation = normalizeEvaluation(await edge.evaluate(JSON.stringify(payload)));
-  } else {
-    const fetchImpl = runtimeOptions.fetch ?? options.fetch ?? globalThis.fetch;
-    if (fetchImpl == null) {
-      throw new Error("no fetch implementation available for Chio node runtime evaluation");
-    }
-    const sidecarUrl = resolveSidecarUrl(runtimeOptions.sidecarUrl ?? options.sidecarUrl);
-    const response = await fetchImpl(`${sidecarUrl}/chio/evaluate`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) {
-      throw new Error(`Chio sidecar returned ${response.status}`);
-    }
-    evaluation = normalizeEvaluation(await response.json());
+  const fetchImpl = runtimeOptions.fetch ?? options.fetch ?? globalThis.fetch;
+  if (fetchImpl == null) {
+    throw new Error("no fetch implementation available for Chio sidecar evaluation");
   }
+  const sidecarUrl = resolveSidecarUrl(runtimeOptions.sidecarUrl ?? options.sidecarUrl);
+  const response = await fetchImpl(`${sidecarUrl}/chio/evaluate`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Chio sidecar returned ${response.status}`);
+  }
+  const evaluation = normalizeEvaluation(await response.json());
 
   if (evaluation.verdict !== "allow") {
     return evaluation;
@@ -88,13 +70,6 @@ export async function evaluateWithChio(
  * sidecar response is non-OK or unreachable, when no fetch is available,
  * or when the resulting authority is missing required fields.
  *
- * On the edge runtime path the fetch-based fallback is deliberately
- * disabled: Vercel/Workers deployments cannot reliably reach the
- * documented localhost sidecar, and the in-process `@chio-protocol/edge`
- * verifier needs a binary receipt envelope that the JSON receipt body
- * does not carry. Edge callers without an explicit `verifyReceipt` are
- * therefore denied with a clear reason, so silent allow-as-deny on the
- * unreachable sidecar can never happen.
  */
 async function applyReceiptAuthority(
   evaluation: ChioEvaluation,
@@ -120,21 +95,6 @@ async function applyReceiptAuthority(
       );
     }
     return mergeAuthorityOrDeny(evaluation, authority);
-  }
-
-  // Edge runtimes (Vercel/Cloudflare Workers) often cannot make outbound
-  // fetch to the documented localhost sidecar, and the in-process
-  // `@chio-protocol/edge` `verify_receipt` binding requires a binary
-  // envelope the JSON `/chio/evaluate` response does not include. Fail
-  // closed with an actionable reason rather than letting the call fall
-  // through to a fetch that will be unreachable and silently turn an
-  // otherwise-allowed tool use into a misleading transport error.
-  const runtime = normalizeRuntime(runtimeOptions.runtime);
-  if (runtime === "edge") {
-    return denyForReason(
-      evaluation,
-      "Chio edge runtime requires an explicit verifyReceipt; the fetch-based /chio/verify fallback is unreachable from Vercel/Workers and the in-process edge verifier needs a binary envelope not present on /chio/evaluate responses",
-    );
   }
 
   // Reuse the same default localhost sidecar URL that the evaluate path
@@ -269,27 +229,6 @@ function stringifyError(error: unknown): string {
 
 function resolveSidecarUrl(value: string | undefined): string {
   return (value ?? "http://127.0.0.1:9090").replace(/\/+$/, "");
-}
-
-function normalizeRuntime(runtime: ChioRuntime | "auto" | undefined): ChioRuntime {
-  if (runtime === "edge" || runtime === "node") {
-    return runtime;
-  }
-  return typeof EdgeRuntime === "string" ? "edge" : "node";
-}
-
-declare const EdgeRuntime: string | undefined;
-
-async function importOptionalEdge(): Promise<EdgeModule> {
-  // Use a native dynamic import expression rather than a `Function`-built
-  // importer. Vercel/Next edge runtimes block runtime code evaluation
-  // (`new Function`, `eval`), and would throw before `@chio-protocol/edge`
-  // could load -- silently bypassing every guarded tool invocation.
-  // Bundlers that statically analyse `import(...)` will still treat the
-  // specifier as a separate chunk because the import is awaited at call
-  // time only, after the runtime check above has selected the edge path.
-  const specifier = "@chio-protocol/edge";
-  return import(/* @vite-ignore */ /* webpackIgnore: true */ specifier) as Promise<EdgeModule>;
 }
 
 function normalizeEvaluation(value: unknown): ChioEvaluation {
