@@ -51,6 +51,9 @@ use chio_security_types::{
 };
 use chio_test_support::prelude::*;
 
+#[path = "adapters/concurrent_post_invocation.rs"]
+mod concurrent_post_invocation;
+
 #[path = "adapters/security_callbacks.rs"]
 mod security_callbacks;
 
