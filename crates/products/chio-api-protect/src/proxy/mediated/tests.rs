@@ -1091,7 +1091,6 @@ fn build_budget_store_local_sqlite_when_no_control_url() {
         control_token: None,
         budget_db: Some(db.to_string_lossy().to_string()),
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -1129,7 +1128,6 @@ fn build_budget_store_remote_is_not_hold_capable() {
         control_token: Some("token".to_string()),
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -1170,7 +1168,6 @@ fn build_budget_store_prefers_local_hold_capable_when_both_configured() {
         control_token: Some("token".to_string()),
         budget_db: Some(db.to_string_lossy().to_string()),
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -1210,7 +1207,6 @@ fn revocation_db_config(revocation_db: Option<String>) -> ProtectConfig {
         control_token: None,
         budget_db: None,
         revocation_db,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     }

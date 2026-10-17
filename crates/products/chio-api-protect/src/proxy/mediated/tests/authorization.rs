@@ -1167,7 +1167,6 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
         control_token: Some("token".to_string()),
         budget_db: Some(db.to_string_lossy().to_string()),
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };

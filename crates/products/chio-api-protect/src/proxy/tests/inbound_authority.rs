@@ -161,7 +161,6 @@ fn spec_config() -> ProtectConfig {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: true,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     }

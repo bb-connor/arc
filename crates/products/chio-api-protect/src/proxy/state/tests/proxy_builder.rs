@@ -385,7 +385,6 @@ fn minimal_config() -> ProtectConfig {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     }

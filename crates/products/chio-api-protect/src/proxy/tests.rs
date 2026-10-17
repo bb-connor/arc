@@ -1709,7 +1709,6 @@ async fn run_refuses_to_start_without_durable_receipts_unless_opted_in() {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     };
@@ -1750,7 +1749,6 @@ async fn run_refuses_to_start_with_an_in_memory_receipt_path_unless_opted_in() {
             control_token: None,
             budget_db: None,
             revocation_db: None,
-            require_nonce: false,
             allow_advisory: false,
             upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         };
