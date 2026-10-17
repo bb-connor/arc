@@ -810,6 +810,9 @@ run_exact_target --label "native runtime validity contract" --allow-filtered --e
   -- cargo test -p chio-kernel --lib admission_operation::runtime_participant::validity_tests::
 
 run_exact_target --label "native runtime signed freshness" --allow-filtered --expected \
+  operation_owned::combined::native_validity::native_runtime_deadline_includes_every_selected_signed_time_bound \
+  operation_owned::combined::native_validity::native_runtime_deadline_includes_the_verified_bilateral_capability_lease \
+  operation_owned::combined::native_validity::native_runtime_revalidation_binds_nonempty_signed_treaty_swarm_and_original_plan \
   operation_owned::combined::native_validity::native_swarm_evolution_preserves_treaty_and_original_physical_claim \
   -- cargo test -p chio-runtime-core --test runtime_admission operation_owned::combined::native_validity::
 
