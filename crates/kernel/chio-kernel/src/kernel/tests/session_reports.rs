@@ -248,6 +248,27 @@ fn failed_signer_cannot_fall_back_to_an_independent_key() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn receipt_signing_public_key_fails_closed_on_unreadable_identity() -> TestResult {
+    let mut kernel = make_kernel(make_config());
+    let (context, operation) = report_operation(&kernel)?;
+    kernel.signing_authority.backend =
+        Arc::new(crate::authority::tests::UnreadableSelectorBackend(
+            chio_core::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(&[63; 32])),
+        ));
+    assert!(matches!(
+        kernel.receipt_signing_public_key(),
+        Err(KernelError::ReceiptSigningFailed(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.record_session_tool_failure(&context, &operation),
+        Err(KernelError::ReceiptSigningFailed(_))
+    ));
+    assert!(kernel.receipt_log().receipts().is_empty());
+    Ok(())
+}
+
 #[cfg(feature = "pq")]
 #[test]
 fn report_refuses_classical_signer_below_boot_floor() -> TestResult {
