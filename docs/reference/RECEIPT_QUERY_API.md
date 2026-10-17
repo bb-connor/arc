@@ -604,7 +604,7 @@ Supported envelope schemas:
 | `chio receipt flush` | `chio.cli.receipt.flush.v1` |
 | `chio receipt checkpoint status` | `chio.cli.receipt.checkpoint_status.v1` |
 | `chio receipt checkpoint create` | `chio.cli.receipt.checkpoint_create.v1` |
-| `chio receipt checkpoint verify` | `chio.cli.receipt.checkpoint_verify.v1` |
+| `chio receipt audit` | `chio.cli.receipt.audit.v1` |
 
 `chio receipt flush --timeout-ms <n>` treats the timeout as the receipt writer
 flush-barrier timeout. It is not a whole-command timeout. A timeout means the
@@ -616,7 +616,7 @@ contiguous `claim_receipt_log_entries.entry_seq` range, loads canonical bytes,
 loads the predecessor checkpoint, builds and signs the checkpoint, inserts it,
 and validates the checkpoint projections in one `IMMEDIATE` transaction.
 
-`chio receipt checkpoint status` and `chio receipt checkpoint verify` return a
+`chio receipt checkpoint status` and `chio receipt audit` return a
 non-zero exit status when checkpoint chain or projection integrity fails.
 
 ## Operator Report Endpoint

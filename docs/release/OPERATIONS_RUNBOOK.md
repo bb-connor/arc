@@ -392,7 +392,7 @@ chio receipt checkpoint create \
   --receipt-db /var/lib/chio/receipts.sqlite3 \
   --kernel-seed-file /etc/chio/kernel.seed \
   --max-batch 1000
-chio receipt checkpoint verify --receipt-db /var/lib/chio/receipts.sqlite3
+chio receipt audit --receipt-db /var/lib/chio/receipts.sqlite3
 ```
 
 Use `--json` for automation. The envelope `schema` value is stable and the
@@ -401,7 +401,7 @@ Use `--json` for automation. The envelope `schema` value is stable and the
 Human output includes the committed and checkpointed entry sequences, the
 uncheckpointed range, writer counters, database size, WAL checkpoint
 observation, checkpoint sequence, next range, and checkpoint or writer errors.
-`chio receipt checkpoint status` and `chio receipt checkpoint verify` exit
+`chio receipt checkpoint status` and `chio receipt audit` exit
 non-zero when checkpoint chain or projection integrity fails.
 
 `--timeout-ms` on `chio receipt flush` is the receipt writer flush-barrier

@@ -25,13 +25,13 @@ pub(crate) use format::{
     render_receipt_health_human, render_receipt_retention_repair_human,
     ReceiptOperatorJsonEnvelope, CHIO_CLI_RECEIPT_AUDIT_SCHEMA,
     CHIO_CLI_RECEIPT_CHECKPOINT_CREATE_SCHEMA, CHIO_CLI_RECEIPT_CHECKPOINT_STATUS_SCHEMA,
-    CHIO_CLI_RECEIPT_CHECKPOINT_VERIFY_SCHEMA, CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
+    CHIO_CLI_RECEIPT_FLUSH_SCHEMA,
     CHIO_CLI_RECEIPT_HEALTH_SCHEMA, CHIO_CLI_RECEIPT_RETENTION_REPAIR_SCHEMA,
 };
 #[allow(unused_imports)]
 pub(crate) use health::{
     cmd_receipt_audit, cmd_receipt_checkpoint_create, cmd_receipt_checkpoint_status,
-    cmd_receipt_checkpoint_verify, cmd_receipt_flush, cmd_receipt_health,
+    cmd_receipt_flush, cmd_receipt_health,
     cmd_receipt_retention_repair, load_existing_kernel_checkpoint_keypair, local_receipt_store,
     receipt_checkpoint_report_error, receipt_health_report_error,
 };

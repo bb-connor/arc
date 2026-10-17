@@ -1035,11 +1035,6 @@ files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
 first_seen = "0acd05adbf"
 
 [[schema]]
-value = "chio.cli.receipt.checkpoint_verify.v1"
-files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
-first_seen = "0acd05adbf"
-
-[[schema]]
 value = "chio.cli.receipt.flush.v1"
 files = ["crates/products/chio-cli/src/cli/trust/receipt/format.rs"]
 first_seen = "0acd05adbf"
