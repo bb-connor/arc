@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-197 of 606 identifier constants in the security crates are unpinned.
+197 of 605 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (66)
 
@@ -154,7 +154,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:187` `ENFORCEMENT_ROOT_DOMAIN` = `chio.finding.enforcement-root.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_handlers.rs:101` `FINDING_CHALLENGE_STATUS_SCHEMA` = `chio.finding.challenge-status.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs:33` `FINDING_HOSTED_PROFILE_SCHEMA` = `chio.finding.hosted-operator-profile.v1`
-- `crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs:338` `FINDING_HOSTED_CANARY_OBSERVATION_SCHEMA` = `chio.finding.hosted-canary-observation.v1`
+- `crates/platform/chio-control-plane/src/trust_control/finding_hosted_profile.rs:341` `FINDING_HOSTED_CANARY_OBSERVATION_SCHEMA` = `chio.finding.hosted-canary-observation.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:15` `FINDING_OPERATOR_PROFILE_SCHEMA` = `chio.finding.operator-profile.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:16` `FINDING_OPERATOR_CLIENT_PROFILE_SCHEMA` = `chio.finding.operator-client-profile.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_operator_profile.rs:17` `FINDING_OPERATOR_BUYER_CLIENT_SCHEMA` = `chio.finding.buyer-client.v1`
