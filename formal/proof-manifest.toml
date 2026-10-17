@@ -461,12 +461,12 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/core/chio-core-types/src/capability/scope.rs"
 rust_symbols = ["Operation", "Constraint", "ToolGrant", "ChioScope"]
-normalized_sha256 = "bca5c1a97d8fd13ff970df171c9954604544472dfdcc92d5aae0ffa283bc9088"
+normalized_sha256 = "c8d3bfa667d08623e7c49f16c15ff583edc33c25f33959a94696efd0fd625191"
 symbol_sha256 = [
   { symbol = "Operation", sha256 = "fe28608332bd4700fd795bbac8be595534762cfccd30ba2b8987949326a883dd" },
-  { symbol = "Constraint", sha256 = "5811e2490f1adfc3dc5d59cc929bf8238382d72494cd28a7e889c9b211aee4d6" },
-  { symbol = "ToolGrant", sha256 = "7ad8417ae9d9ce34196fd253d6d239fb2da629998b51a8d71d7e742d19e4d796" },
-  { symbol = "ChioScope", sha256 = "9f2349b675c3f8655c5880e0c954ed89dc1b84b214612084b841d82bad96f3f1" },
+  { symbol = "Constraint", sha256 = "7cce0a89703723dcd101d44e50b2b239fa45cdad745fc5f5089925e07fc92f3a" },
+  { symbol = "ToolGrant", sha256 = "ae91c5163222f26106e96bc4dbd73bc4871bcfab054d789d4c88cb8b2f68e4fa" },
+  { symbol = "ChioScope", sha256 = "9346d69e5c39d63cffa8dc526b7acfd1d6f472f0098a356366237dd299b7497a" },
 ]
 
 [[mirror]]
@@ -475,10 +475,10 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/core/chio-core-types/src/capability/attenuation.rs"
 rust_symbols = ["Attenuation", "DelegationLink"]
-normalized_sha256 = "2cbdad355d1c53a739150989209cc8137caa7a7adb5ac0bb80cc9443b9245506"
+normalized_sha256 = "82af6b74e292ced672d9bdf230a9cb57af181109575895a31aacfe7ee2241547"
 symbol_sha256 = [
-  { symbol = "Attenuation", sha256 = "0d56e3bed35006a6b3c5c2a1db1c4674309ed52680fe5caba5798eaeed9d1cfc" },
-  { symbol = "DelegationLink", sha256 = "924d6ea228f9f2648faac9c6ab5c1eb7c05bc6ce0086ca987024e632d7c9b16a" },
+  { symbol = "Attenuation", sha256 = "283c66c05fe1b35d2d5060946334571ba9dc731d72d737da6cb2c41944e56104" },
+  { symbol = "DelegationLink", sha256 = "f39fd4842ff3e7051447a99e0e63fe17399a94bead0b3b1f8d4a1b9cb862ec38" },
 ]
 
 [[mirror]]
@@ -487,9 +487,9 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/core/chio-core-types/src/capability/token.rs"
 rust_symbols = ["CapabilityToken", "CapabilityToken::is_valid_at", "CapabilityToken::is_expired_at"]
-normalized_sha256 = "64080ea14f54f681a53f82875a697a5988c3c8f73c0064af664a652e9231ee8b"
+normalized_sha256 = "9cfe2688f13f68045ff78797d36dbd98197ea2e11826de656fc8e4f0f1c94b06"
 symbol_sha256 = [
-  { symbol = "CapabilityToken", sha256 = "79b324f68548f452bf5b4b9bce5249266a574e9ddc370819f28ffa280818d621" },
+  { symbol = "CapabilityToken", sha256 = "219d44af9dacfa6783d6360d274f56859682a8ad8e498e4d2de346cee5dc6b31" },
   { symbol = "CapabilityToken::is_valid_at", sha256 = "5f6a6b5921beae84abffed358141eb64d6fd75b961b3c788fdbe8158b970bf18" },
   { symbol = "CapabilityToken::is_expired_at", sha256 = "8155d06ac8056d5d12c2f72e943ec74189da973e69d8d772f9b3dc10eaa92311" },
 ]
