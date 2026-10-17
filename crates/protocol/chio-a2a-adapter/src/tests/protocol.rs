@@ -146,6 +146,86 @@ fn parse_tool_input_rejects_unknown_push_authentication_fields() {
 }
 
 #[test]
+fn parse_tool_input_rejects_camel_case_spellings() {
+    let cases = [
+        (
+            json!({ "message": "hello", "contextId": "ctx-1" }),
+            "contextId",
+        ),
+        (json!({ "message": "hello", "taskId": "task-1" }), "taskId"),
+        (
+            json!({ "message": "hello", "referenceTaskIds": ["task-0"] }),
+            "referenceTaskIds",
+        ),
+        (
+            json!({ "message": "hello", "messageMetadata": {} }),
+            "messageMetadata",
+        ),
+        (
+            json!({ "message": "hello", "historyLength": 1 }),
+            "historyLength",
+        ),
+        (
+            json!({ "message": "hello", "returnImmediately": true }),
+            "returnImmediately",
+        ),
+        (json!({ "getTask": { "id": "task-1" } }), "getTask"),
+        (
+            json!({ "subscribeTask": { "id": "task-1" } }),
+            "subscribeTask",
+        ),
+        (json!({ "cancelTask": { "id": "task-1" } }), "cancelTask"),
+        (
+            json!({
+                "createPushNotificationConfig": {
+                    "task_id": "task-1",
+                    "url": "https://callback.example/hook"
+                }
+            }),
+            "createPushNotificationConfig",
+        ),
+        (
+            json!({
+                "getPushNotificationConfig": { "task_id": "task-1", "id": "cfg-1" }
+            }),
+            "getPushNotificationConfig",
+        ),
+        (
+            json!({ "listPushNotificationConfigs": { "task_id": "task-1" } }),
+            "listPushNotificationConfigs",
+        ),
+        (
+            json!({
+                "deletePushNotificationConfig": { "task_id": "task-1", "id": "cfg-1" }
+            }),
+            "deletePushNotificationConfig",
+        ),
+        (
+            json!({ "get_task": { "id": "task-1", "historyLength": 1 } }),
+            "historyLength",
+        ),
+        (
+            json!({
+                "list_push_notification_configs": { "task_id": "task-1", "pageSize": 10 }
+            }),
+            "pageSize",
+        ),
+        (
+            json!({
+                "list_push_notification_configs": { "task_id": "task-1", "pageToken": "next" }
+            }),
+            "pageToken",
+        ),
+    ];
+
+    for (input, field) in cases {
+        let error =
+            parse_tool_input(input).expect_err("camelCase tool input keys must fail closed");
+        assert_unknown_input_field(error, field);
+    }
+}
+
+#[test]
 fn send_message_schema_requirement_rejects_empty_surface() {
     let mut one_of = Vec::new();
     let error = append_send_message_schema_requirement(

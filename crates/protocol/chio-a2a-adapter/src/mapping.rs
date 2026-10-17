@@ -5,35 +5,35 @@ struct A2aToolInput {
     message: Option<String>,
     #[serde(default)]
     data: Option<Value>,
-    #[serde(default, alias = "contextId")]
+    #[serde(default)]
     context_id: Option<String>,
-    #[serde(default, alias = "taskId")]
+    #[serde(default)]
     task_id: Option<String>,
-    #[serde(default, alias = "referenceTaskIds")]
+    #[serde(default)]
     reference_task_ids: Option<Vec<String>>,
     #[serde(default)]
     metadata: Option<Value>,
-    #[serde(default, alias = "messageMetadata")]
+    #[serde(default)]
     message_metadata: Option<Value>,
-    #[serde(default, alias = "historyLength")]
+    #[serde(default)]
     history_length: Option<u32>,
-    #[serde(default, alias = "returnImmediately")]
+    #[serde(default)]
     return_immediately: Option<bool>,
     #[serde(default)]
     stream: Option<bool>,
-    #[serde(default, alias = "getTask")]
+    #[serde(default)]
     get_task: Option<A2aGetTaskToolInput>,
-    #[serde(default, alias = "subscribeTask")]
+    #[serde(default)]
     subscribe_task: Option<A2aSubscribeTaskToolInput>,
-    #[serde(default, alias = "cancelTask")]
+    #[serde(default)]
     cancel_task: Option<A2aCancelTaskToolInput>,
-    #[serde(default, alias = "createPushNotificationConfig")]
+    #[serde(default)]
     create_push_notification_config: Option<A2aCreatePushNotificationConfigToolInput>,
-    #[serde(default, alias = "getPushNotificationConfig")]
+    #[serde(default)]
     get_push_notification_config: Option<A2aPushNotificationConfigRefToolInput>,
-    #[serde(default, alias = "listPushNotificationConfigs")]
+    #[serde(default)]
     list_push_notification_configs: Option<A2aListPushNotificationConfigsToolInput>,
-    #[serde(default, alias = "deletePushNotificationConfig")]
+    #[serde(default)]
     delete_push_notification_config: Option<A2aPushNotificationConfigRefToolInput>,
 }
 
@@ -41,7 +41,7 @@ struct A2aToolInput {
 #[serde(deny_unknown_fields)]
 struct A2aGetTaskToolInput {
     id: String,
-    #[serde(default, alias = "historyLength")]
+    #[serde(default)]
     history_length: Option<u32>,
 }
 
@@ -91,9 +91,9 @@ struct A2aPushNotificationConfigRefToolInput {
 #[serde(deny_unknown_fields)]
 struct A2aListPushNotificationConfigsToolInput {
     task_id: String,
-    #[serde(default, alias = "pageSize")]
+    #[serde(default)]
     page_size: Option<u32>,
-    #[serde(default, alias = "pageToken")]
+    #[serde(default)]
     page_token: Option<String>,
 }
 
