@@ -61,16 +61,6 @@ impl SqliteReceiptStore {
         Ok(())
     }
 
-    /// Preserve revocations written by old proxy versions. New writes use the
-    /// existing durable sibling revocation store shared with the kernel.
-    pub(crate) fn load_revoked_capability_ids(&self) -> Result<HashSet<String>, ProtectError> {
-        Ok(self
-            .core
-            .legacy_revoked_capability_ids()?
-            .into_iter()
-            .collect())
-    }
-
     #[cfg(test)]
     pub(crate) fn load_tool_receipts(&self) -> Result<Vec<ChioReceipt>, ProtectError> {
         let page = self.core.query_receipts(&chio_kernel::ReceiptQuery {

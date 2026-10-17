@@ -429,6 +429,11 @@ impl ProtectProxy {
                 )),
                 None => None,
             };
+        if let Some(store) = &durable_receipt_store {
+            if store.holds_revocation_table()? {
+                return Err(ProtectError::RevocationsInReceiptStore);
+            }
+        }
 
         let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = durable_receipt_db {
             Arc::new(
@@ -515,10 +520,7 @@ impl ProtectProxy {
         let receipt_store = durable_receipt_store
             .as_ref()
             .map(|store| Mutex::new(SqliteReceiptStore::from_shared(Arc::clone(store))));
-        let mut revoked_capability_ids = match &receipt_store {
-            Some(store) => store.lock().await.load_revoked_capability_ids()?,
-            None => HashSet::new(),
-        };
+        let mut revoked_capability_ids = HashSet::new();
 
         // Enforce operator revocations recorded through the durable revocation
         // store that `chio trust revoke --revocation-db <path>` writes. Merging

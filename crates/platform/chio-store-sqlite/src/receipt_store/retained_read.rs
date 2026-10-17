@@ -31,22 +31,14 @@ pub(crate) struct RetainedSnapshot<'a> {
 }
 
 impl SqliteReceiptStore {
-    /// Revocations retained from the original API sidecar schema. These only
-    /// restrict authority; legacy mutable receipt rows are never adopted.
-    pub fn legacy_revoked_capability_ids(&self) -> Result<Vec<String>, ReceiptStoreError> {
+    /// Whether this receipt database file holds a `revoked_capabilities` table.
+    pub fn holds_revocation_table(&self) -> Result<bool, ReceiptStoreError> {
         let connection = self.connection()?;
-        let present: bool = connection.query_row(
+        Ok(connection.query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'revoked_capabilities')",
-            [], |row| row.get(0),
-        )?;
-        if !present {
-            return Ok(Vec::new());
-        }
-        let mut statement = connection.prepare("SELECT CASE WHEN octet_length(capability_id) <= 1024 THEN capability_id END FROM revoked_capabilities")?;
-        let ids = statement
-            .query_map([], |row| row.get(0))?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(ids)
+            [],
+            |row| row.get(0),
+        )?)
     }
 
     pub(crate) fn with_retained_snapshot<T, E>(
