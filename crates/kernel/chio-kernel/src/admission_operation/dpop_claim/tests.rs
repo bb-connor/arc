@@ -1,16 +1,16 @@
 use super::*;
-use crate::dpop::authority::{invocation_binding_digest, verify_authority_dpop_proof_stateless};
+use crate::dpop::authority::{invocation_binding_digest, verify_dpop_proof_stateless};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::Keypair;
 
 fn credential() -> DpopReplayCredentialV1 {
     let vector: serde_json::Value = serde_json::from_str(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../../tests/bindings/fixtures/dpop-authority-v2.json"
+        "/../../../tests/bindings/fixtures/dpop-authority-v1.json"
     )))
     .unwrap();
     let proof: crate::dpop::DpopProof = serde_json::from_value(vector["proof"].clone()).unwrap();
-    let authority: DpopReplayAuthorityV1 =
+    let authority: DpopReplayAuthority =
         serde_json::from_value(vector["authority"].clone()).unwrap();
     let issuer = Keypair::generate();
     let capability = CapabilityToken::sign(
@@ -27,7 +27,7 @@ fn credential() -> DpopReplayCredentialV1 {
         &issuer,
     )
     .unwrap();
-    let verified = verify_authority_dpop_proof_stateless(
+    let verified = verify_dpop_proof_stateless(
         &proof,
         &capability,
         "server",

@@ -422,7 +422,7 @@ fn check_full_mode_uses_output_fixture_for_output_sensitive_policy() {
 }
 
 #[test]
-fn inbound_authority_check_signs_with_its_owned_subject_key() {
+fn inbound_authority_check_refuses_a_proof_policy_without_a_policy_authority() {
     let directory = tempfile::tempdir().unwrap();
     let policy = directory.path().join("proof.yaml");
     std::fs::write(
@@ -448,12 +448,14 @@ fn inbound_authority_check_signs_with_its_owned_subject_key() {
         ])
         .output()
         .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        output.status.success(),
-        "stdout={} stderr={}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
+        !output.status.success(),
+        "stdout={}",
+        String::from_utf8_lossy(&output.stdout)
     );
-    let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(body["verdict"], "ALLOW");
+    assert!(
+        stderr.contains("urn:chio:error:kernel:dpop-missing-configuration"),
+        "stderr={stderr}"
+    );
 }

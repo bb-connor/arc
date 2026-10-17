@@ -1,6 +1,10 @@
 #![forbid(unsafe_code)]
 //! Shared MCP edge runtime and transport contracts for Chio.
 
+#[cfg(test)]
+#[path = "../../../../tests/bindings/support/dpop_authority.rs"]
+mod dpop_authority;
+
 use chio_core::session::RequestId;
 use chio_core::{
     CompletionResult, PromptDefinition, PromptResult, ResourceContent, ResourceDefinition,

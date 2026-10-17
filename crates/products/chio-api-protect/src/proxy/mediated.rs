@@ -5,7 +5,8 @@ use chio_core_types::capability::governance::{
 };
 use chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
-use chio_kernel::dpop::{DpopConfig, DpopNonceStore, DpopProof};
+use chio_kernel::dpop::authority::DpopReplayAuthority;
+use chio_kernel::dpop::DpopProof;
 use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
@@ -70,47 +71,30 @@ pub(crate) fn load_revocation_db_ids(
     Ok(ids)
 }
 
-/// Build a `ChioKernel` for tool-call mediation with the budget store, a strict
-/// execution-nonce config, and DPoP verification state installed.
-///
-/// The mediated `/v1/evaluate` route is a PURE pre-execution authorization gate.
-/// Strict execution-nonce mode is always on, so every request reaches the
-/// authorization preflight: the kernel verifies the capability (plus any DPoP
-/// proof, governed intent, and approval token), reserves the pre-execution
-/// budget hold and KEEPS IT OPEN, and mints a fresh execution nonce. It never
-/// dispatches a tool server, never consumes a presented nonce, and never signs
-/// a completed or settled spend. The caller presents the minted nonce to the
-/// real tool server, which verifies and consumes it and reconciles the reserved
-/// hold at the execution site.
-///
-/// A SINGLE kernel is built once at sidecar startup and reused for the process
-/// lifetime (held behind a `Mutex` in `ProxyState`). Reuse is load-bearing for
-/// security: the kernel's approval-token replay store and DPoP-nonce store live
-/// on the instance, so a per-request kernel would reset them every call and let
-/// an approval token or DPoP proof be replayed within its TTL. One instance
-/// keeps both replay stores authoritative across `/v1/evaluate` requests, and it
-/// is the same nonce store that mints on `/v1/evaluate` and verifies+consumes on
-/// `/v1/reconcile`, so a reconciled nonce cannot be replayed. The route never
-/// registers the caller-named `server_id`: the reserve-for-caller authorization
-/// path never dispatches a tool on this kernel and so no longer requires the
-/// target to be registered, which keeps the kernel's tool-server map from
-/// growing on every caller-arbitrary request.
-///
-/// `trusted_capability_issuers` are trusted as capability authorities in
-/// addition to the sidecar signer, so an externally minted capability that the
-/// sidecar's other endpoints accept is not rejected here as untrusted.
-///
-/// `payment_adapter` is the operator-configured payment rail. When present it is
-/// installed on the kernel so a governed `MustPrepay` (x402/ACP) quote is
-/// authorized and captured before the reserve-for-caller path mints a nonce.
-/// When `None` the kernel carries no adapter, so the governed prepayment gate
-/// denies `MustPrepay` fail-closed: only a configured adapter enables it.
+/// Independently configured mediation authorities and policy identity.
 pub(crate) struct MediationPolicy<'a> {
+    pub dpop_replay_authority: Option<&'a DpopReplayAuthority>,
     pub issuers: &'a [PublicKey],
     pub hash: Option<&'a str>,
     pub receipt_store: Option<Arc<dyn chio_kernel::ReceiptStore>>,
 }
 
+/// Build the kernel for caller reservation, authenticated start and report.
+///
+/// `/v1/evaluate` verifies the capability and supplied credentials, reserves the
+/// operation and budget, and returns an execution nonce. The nonce alone does
+/// not authorize execution. The authenticated start route commits dispatch for
+/// the independently configured caller executor and returns a signed
+/// authorization. The executor reports the result through the
+/// authenticated report route for guard evaluation and reconciliation.
+///
+/// One kernel serves the sidecar's requests. DPoP replay custody belongs to its
+/// durable admission authority and independently selected activated domain.
+/// Caller reservation does not register or dispatch the caller-named server.
+///
+/// `policy.issuers` adds capability authorities alongside the sidecar signer.
+/// The configured payment adapter enforces governed prepayment requirements;
+/// without an adapter those requirements deny access.
 pub(crate) fn build_mediation_kernel(
     signer: &Keypair,
     budget: MediationBudget,
@@ -203,22 +187,11 @@ pub(crate) fn build_mediation_kernel(
             clock.clone(),
         )),
     );
-    // Install DPoP verification state so a grant with `dpop_required` can verify
-    // a presented proof. Without it every dpop_required capability denies
-    // fail-closed with no way to present a proof.
-    kernel
-        .set_dpop_store(
-            DpopNonceStore::with_clock(
-                DpopConfig::default().nonce_store_capacity,
-                DpopConfig::default().nonce_store_capacity,
-                chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
-                std::time::Duration::from_secs(DpopConfig::default().proof_ttl_secs),
-                clock,
-            )
-            .map_err(|error| ProtectError::Config(error.to_string()))?,
-            DpopConfig::default(),
-        )
-        .map_err(|error| ProtectError::Config(error.to_string()))?;
+    if let Some(authority) = policy.dpop_replay_authority {
+        kernel
+            .set_operation_owned_dpop_authority(authority.clone())
+            .map_err(|error| ProtectError::Config(error.to_string()))?;
+    }
     // Install the operator's payment rail so the governed prepayment gate can
     // authorize and capture a MustPrepay (x402/ACP) quote before the
     // reserve-for-caller path mints a nonce. Absent an adapter the gate denies
@@ -264,7 +237,7 @@ pub(crate) struct SidecarEvaluateToolCallMediatedRequest {
     /// can be authorized instead of denied.
     #[serde(default)]
     governed_intent: Option<GovernedTransactionIntent>,
-    /// Legacy direct token field, rejected in favor of a retained approval_id.
+    /// Caller-supplied token, rejected; callers must use a retained approval_id.
     #[serde(default)]
     approval_token: Option<GovernedApprovalToken>,
     /// Server-assigned identifier of a retained, signed approval.
@@ -343,8 +316,8 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
     };
     // Under durable admission the reservation is the operation's own and an
     // approved retry presents the nonce the strict preflight issued. The
-    // legacy reservation mints nonces and never accepts one: a presented nonce
-    // would be consumed here instead of by the tool server that expects it.
+    // non-durable reservation mints nonces and never accepts one: a presented
+    // nonce would be consumed here instead of by the tool server that expects it.
     // The kernel mutex also owns the reuse check/claim/authorization/cleanup sequence.
     // No request-id claim can age out while its owner waits for this lock.
     let kernel = mediation_kernel.lock().await;
@@ -557,7 +530,7 @@ pub(crate) async fn sidecar_evaluate_tool_call_mediated_handler(
         agent_id,
         arguments: parsed.parameters,
         dpop_proof: parsed.dpop_proof,
-        // Only a durable approved retry presents a nonce; the legacy route
+        // Only a durable approved retry presents a nonce; the non-durable route
         // rejected one above, so it always takes the authorization-reserve path.
         execution_nonce: presented_nonce,
         governed_intent: parsed.governed_intent,
@@ -701,7 +674,7 @@ pub(crate) struct SidecarReconcileRequest {
 /// difference back to the grant, and signs a completed authoritative receipt.
 /// The `realized_cost` is the tool server's own report of what the call cost;
 /// binding it to an attested oracle cost is a later concern. Invalid credentials
-/// or mismatched arguments cannot authorize a settlement. The legacy profile
+/// or mismatched arguments cannot authorize a settlement. Non-durable admission
 /// rejects a consumed nonce. Durable admission can redeliver a completed
 /// operation's retained receipt without settling again; that replay never
 /// authorizes a second external execution.
@@ -740,9 +713,10 @@ pub(crate) async fn sidecar_reconcile_handler(
         );
     }
     // Settle on the shared kernel. The same instance minted the nonce, so its
-    // configured nonce authority prevents a second settlement. Legacy replay is
-    // rejected; durable completion can redeliver its retained receipt. The lock
-    // releases at the end of the block, before sidecar receipt-persistence I/O.
+    // configured nonce authority prevents a second settlement. Non-durable
+    // admission rejects replay; durable completion can redeliver its retained
+    // receipt. The lock releases at the end of the block, before sidecar
+    // receipt-persistence I/O.
     let reconciled = {
         let kernel = mediation_kernel.lock().await;
         if kernel.has_durable_admission_store() {

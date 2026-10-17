@@ -789,6 +789,16 @@ codes:
     consumed_by:
       - chio-http-core
       - chio-cli
+  - urn: "urn:chio:error:transport:dpop-sender-proof-unavailable"
+    domain: transport
+    severity: fatal
+    summary: "Chio DPoP sender binding is unavailable on this transport."
+    help: "Use a TLS-bound sender constraint or present the DPoP proof inside the tool call to an activated replay authority."
+    string_code: "CHIO-TRANSPORT-DPOP-SENDER-PROOF-UNAVAILABLE"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-mcp-remote
   - urn: "urn:chio:error:transport:dpop-verification-failed"
     domain: transport
     severity: fatal
@@ -3009,6 +3019,17 @@ codes:
     consumed_by:
       - chio-kernel
 
+  - urn: "urn:chio:error:kernel:dpop-authority-mismatch"
+    domain: kernel
+    severity: error
+    summary: "The DPoP proof names a different replay authority."
+    help: "Sign a fresh proof for the independently configured active replay authority."
+    string_code: "CHIO-KERNEL-DPOP-AUTHORITY-MISMATCH"
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-kernel
+
   - urn: "urn:chio:error:kernel:dpop-capability"
     domain: kernel
     severity: error
@@ -3114,17 +3135,6 @@ codes:
     summary: "Security boundary refused: dpop-missing-proof."
     help: "Restore the named invariant and present fresh evidence for the exact request."
     string_code: "CHIO-KERNEL-DPOP-MISSING-PROOF"
-    since: "0.1.0"
-    stability: stable
-    consumed_by:
-      - chio-kernel
-
-  - urn: "urn:chio:error:kernel:dpop-missing-store"
-    domain: kernel
-    severity: error
-    summary: "Security boundary refused: dpop-missing-store."
-    help: "Restore the named invariant and present fresh evidence for the exact request."
-    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE"
     since: "0.1.0"
     stability: stable
     consumed_by:
@@ -3251,16 +3261,6 @@ codes:
     consumed_by:
       - chio-kernel
 
-  - urn: "urn:chio:error:kernel:dpop-reservation-ownership"
-    domain: kernel
-    severity: error
-    summary: "DPoP reservation ownership was not confirmed at commit."
-    help: "Retain the marker and reconcile the original operation before retrying."
-    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP"
-    since: "0.1.0"
-    stability: stable
-    consumed_by:
-      - chio-kernel
   - urn: "urn:chio:error:transport:task-capacity-exceeded"
     domain: transport
     severity: error

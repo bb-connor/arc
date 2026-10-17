@@ -120,7 +120,7 @@ impl NativeHost {
         let receipts = SqliteReceiptStore::open(directory.join("kernel-receipts.sqlite3"))?;
         receipts.wait_for_writer_ready(Duration::from_secs(30))?;
         kernel.set_receipt_store_handle(Arc::new(receipts))?;
-        runtime.attach(&mut kernel)?;
+        runtime.attach(&mut kernel, None)?;
         let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
         let parent = match parent {
             Some(parent) => parent,

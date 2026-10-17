@@ -47,6 +47,7 @@ impl RevocationStore for PausingRevocationReadStore {
 }
 
 struct PanickingDispatchExecutionNonceStore {
+    inner: InMemoryExecutionNonceStore,
     panic_during_reserve: bool,
     panic_during_rollback: bool,
     reserve_calls: std::sync::Arc<AtomicU64>,
@@ -235,30 +236,32 @@ impl ExecutionNonceStore for PanickingDispatchExecutionNonceStore {
 
     fn reserve_for_dispatch(
         &self,
-        _nonce_id: &str,
-        _nonce_expires_at: i64,
-        _reservation_id: &str,
+        nonce_id: &str,
+        nonce_expires_at: i64,
+        reservation_id: &str,
     ) -> Result<bool, KernelError> {
         self.reserve_calls.fetch_add(1, Ordering::SeqCst);
         if self.panic_during_reserve {
             panic!("sensitive execution nonce reserve panic payload");
         }
-        Ok(true)
+        self.inner
+            .reserve_for_dispatch(nonce_id, nonce_expires_at, reservation_id)
     }
 
     fn rollback_dispatch_reservation(
         &self,
-        _nonce_id: &str,
-        _reservation_id: &str,
+        nonce_id: &str,
+        reservation_id: &str,
     ) -> Result<bool, KernelError> {
         self.rollback_calls.fetch_add(1, Ordering::SeqCst);
         if self.panic_during_rollback {
             panic!("sensitive execution nonce rollback panic payload");
         }
-        Ok(true)
+        self.inner
+            .rollback_dispatch_reservation(nonce_id, reservation_id)
     }
-    fn is_consumed(&self, _: &str) -> Result<bool, KernelError> {
-        Ok(false)
+    fn is_consumed(&self, nonce_id: &str) -> Result<bool, KernelError> {
+        self.inner.is_consumed(nonce_id)
     }
 }
 
@@ -345,24 +348,15 @@ pub(super) fn request_with_replayed_approval(
         Keypair,
         CapabilityToken,
         ToolCallRequest,
-        crate::execution_nonce::NonceBinding,
+        Arc<super::durable_admission::TestAdmissionOperationStore>,
     ),
     KernelError,
 > {
     let server = "dispatch-credentials-server";
     let tool = "execute";
     let agent = make_keypair();
-    let (mut kernel, capability) = make_dpop_kernel_and_cap(&agent, server, tool);
-    let nonce_config = ExecutionNonceConfig {
-        nonce_ttl_secs: 300,
-        nonce_store_capacity: 1024,
-        require_nonce: false,
-    };
-    kernel.set_execution_nonce_store(
-        nonce_config.clone(),
-        Box::new(InMemoryExecutionNonceStore::from_config(&nonce_config)),
-    );
-
+    let (mut kernel, capability, store) =
+        super::support_monetary::make_dpop_kernel_and_cap_with_store(&agent, server, tool);
     let arguments = serde_json::json!({"operation": "settle"});
     let mut request =
         make_request_with_arguments(request_id, &capability, tool, server, arguments.clone());
@@ -396,30 +390,23 @@ pub(super) fn request_with_replayed_approval(
         &arguments,
         &format!("dpop-{request_id}"),
     ));
-    let binding = binding_for_request(&capability, &request);
-    request.execution_nonce = Some(mint_execution_nonce(
-        &kernel.config.keypair,
-        binding.clone(),
-        &nonce_config,
-        i64::try_from(current_unix_timestamp()).unwrap_or(i64::MAX),
-    )?);
-
     kernel.consume_governed_approval_for_dispatch(&request)?;
-    Ok((kernel, agent, capability, request, binding))
+    Ok((kernel, agent, capability, request, store))
 }
 
 fn assert_earlier_credentials_remain_fresh(
     kernel: &ChioKernel,
     request: &ToolCallRequest,
     capability: &CapabilityToken,
-    binding: &crate::execution_nonce::NonceBinding,
+    store: &super::durable_admission::TestAdmissionOperationStore,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let execution_nonce = request
-        .execution_nonce
-        .as_ref()
-        .ok_or_else(|| std::io::Error::other("execution nonce missing"))?;
-    kernel.verify_presented_execution_nonce(execution_nonce, binding)?;
-    kernel.verify_dpop_for_request(request, capability)?;
+    kernel.verify_required_dpop_preview(request, capability)?;
+    let history = store.dpop_history();
+    assert!(!history.is_empty());
+    assert!(history.iter().all(|claim| {
+        claim.disposition ==
+        crate::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReleasedBeforeDispatch
+    }));
     Ok(())
 }
 
@@ -431,7 +418,14 @@ fn request_with_panicking_execution_nonce_store(
     let server = "dispatch-credential-panic-server";
     let tool = "execute";
     let agent = make_keypair();
-    let (mut kernel, capability) = make_dpop_kernel_and_cap(&agent, server, tool);
+    let mut kernel = make_kernel(make_config());
+    kernel.register_tool_server(Box::new(EchoServer::new(server, vec![tool])));
+    let capability = make_capability(
+        &kernel,
+        &agent,
+        make_scope(vec![make_grant(server, tool)]),
+        300,
+    );
     let nonce_config = ExecutionNonceConfig {
         nonce_ttl_secs: 300,
         nonce_store_capacity: 1024,
@@ -442,6 +436,7 @@ fn request_with_panicking_execution_nonce_store(
     kernel.set_execution_nonce_store(
         nonce_config.clone(),
         Box::new(PanickingDispatchExecutionNonceStore {
+            inner: InMemoryExecutionNonceStore::from_config(&nonce_config),
             panic_during_reserve,
             panic_during_rollback,
             reserve_calls: std::sync::Arc::clone(&reserve_calls),
@@ -452,14 +447,6 @@ fn request_with_panicking_execution_nonce_store(
     let arguments = serde_json::json!({"operation": "settle"});
     let mut request =
         make_request_with_arguments(request_id, &capability, tool, server, arguments.clone());
-    request.dpop_proof = Some(make_dpop_proof(
-        &agent,
-        &capability,
-        server,
-        tool,
-        &arguments,
-        &format!("dpop-{request_id}"),
-    ));
     let binding = binding_for_request(&capability, &request);
     request.execution_nonce = Some(mint_execution_nonce(
         &kernel.config.keypair,
@@ -607,7 +594,7 @@ fn dispatch_credential_reserve_panic_is_contained_and_rolled_back(
         kernel.reserve_dispatch_credentials(
             &request,
             &capability,
-            true,
+            false,
             current_unix_timestamp(),
             false,
         )
@@ -620,7 +607,11 @@ fn dispatch_credential_reserve_panic_is_contained_and_rolled_back(
     assert!(!error.contains("sensitive execution nonce reserve panic payload"));
     assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
     assert_eq!(rollback_calls.load(Ordering::SeqCst), 1);
-    kernel.verify_dpop_for_request(&request, &capability)?;
+    assert!(!kernel
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
     Ok(())
 }
 
@@ -637,7 +628,7 @@ fn dispatch_credential_rollback_panic_is_contained_and_aggregated(
     let reservation = kernel.reserve_dispatch_credentials(
         &request,
         &capability,
-        true,
+        false,
         current_unix_timestamp(),
         false,
     )?;
@@ -653,7 +644,11 @@ fn dispatch_credential_rollback_panic_is_contained_and_aggregated(
     assert!(!error.contains("sensitive execution nonce rollback panic payload"));
     assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
     assert_eq!(rollback_calls.load(Ordering::SeqCst), 1);
-    kernel.verify_dpop_for_request(&request, &capability)?;
+    assert!(kernel
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
     Ok(())
 }
 
@@ -670,7 +665,7 @@ fn dispatch_credential_drop_contains_rollback_panic_during_unwind(
     let reservation = kernel.reserve_dispatch_credentials(
         &request,
         &capability,
-        true,
+        false,
         current_unix_timestamp(),
         false,
     )?;
@@ -688,88 +683,56 @@ fn dispatch_credential_drop_contains_rollback_panic_during_unwind(
     );
     assert_eq!(reserve_calls.load(Ordering::SeqCst), 1);
     assert_eq!(rollback_calls.load(Ordering::SeqCst), 1);
-    kernel.verify_dpop_for_request(&request, &capability)?;
+    assert!(kernel
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(request.execution_nonce.as_ref().ok_or("nonce")?.nonce_id())?);
     Ok(())
 }
 
 #[test]
-fn committed_dispatch_credential_retains_replay_marker_under_capacity_pressure(
+fn committed_operation_owned_dpop_survives_reservation_drop(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let server = "committed-credential-capacity-server";
-    let tool = "execute";
     let agent = make_keypair();
-    let (mut kernel, capability) = make_dpop_kernel_and_cap(&agent, server, tool);
-    kernel
-        .set_dpop_store(
-            dpop::DpopNonceStore::new(1, Duration::from_secs(60))
-                .expect("positive replay store test capacities"),
-            dpop::DpopConfig::default(),
-        )
-        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
-
-    let arguments = serde_json::json!({"operation": "settle"});
-    let mut committed_request = make_request_with_arguments(
-        "committed-credential-capacity-first",
-        &capability,
-        tool,
-        server,
-        arguments.clone(),
+    let (kernel, capability, store) = super::support_monetary::make_dpop_kernel_and_cap_with_store(
+        &agent,
+        "durable-credential-server",
+        "execute",
     );
-    committed_request.dpop_proof = Some(make_dpop_proof(
+    let mut request = make_request(
+        "committed-dpop",
+        &capability,
+        "execute",
+        "durable-credential-server",
+    );
+    request.dpop_proof = Some(make_dpop_proof(
         &agent,
         &capability,
-        server,
-        tool,
-        &arguments,
-        "committed-credential-capacity-nonce-a",
+        &request.server_id,
+        &request.tool_name,
+        &request.arguments,
+        "committed-dpop-nonce",
     ));
-    let mut reservation = kernel.reserve_dispatch_credentials(
-        &committed_request,
-        &capability,
+    let admission = super::durable_admission::dpop_acquisition::claim(&kernel, &request);
+    let mut reservation = kernel.reserve_admitted_dispatch_credentials(
+        &request,
         true,
         current_unix_timestamp(),
-        false,
+        Some(&admission),
+        0,
     )?;
-    let _disposition = reservation.commit()?;
-
-    assert!(kernel
-        .verify_dpop_for_request(&committed_request, &capability)
-        .is_err());
-
-    let mut pressure_request = make_request_with_arguments(
-        "committed-credential-capacity-second",
-        &capability,
-        tool,
-        server,
-        arguments.clone(),
+    assert_eq!(
+        reservation.commit()?,
+        PaymentCredentialDisposition::RetainedAfterAuthorization
     );
-    pressure_request.dpop_proof = Some(make_dpop_proof(
-        &agent,
-        &capability,
-        server,
-        tool,
-        &arguments,
-        "committed-credential-capacity-nonce-b",
-    ));
-    let capacity_error = match kernel.reserve_dispatch_credentials(
-        &pressure_request,
-        &capability,
-        true,
-        current_unix_timestamp(),
-        false,
-    ) {
-        Ok(_) => {
-            return Err(std::io::Error::other(
-                "capacity pressure accepted a new credential after commit",
-            )
-            .into());
-        }
-        Err(error) => error,
-    };
-    assert!(capacity_error.to_string().contains("capacity exhausted"));
-    assert!(kernel
-        .verify_dpop_for_request(&committed_request, &capability)
-        .is_err());
+    drop(reservation);
+    let history = store.dpop_history();
+    assert_eq!(history.len(), 1);
+    assert_eq!(
+        history[0].disposition,
+        crate::admission_operation::dpop_claim::DpopReplayClaimDisposition::ReservedBeforeDispatch
+    );
     Ok(())
 }
 
@@ -989,8 +952,17 @@ fn hosted_url_elicitation_commits_credentials_fail_closed() -> Result<(), Box<dy
     );
     assert!(fixture
         .kernel
-        .verify_dpop_for_request(&fixture.request, &fixture.capability)
-        .is_err());
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(
+            fixture
+                .request
+                .execution_nonce
+                .as_ref()
+                .ok_or("nonce")?
+                .nonce_id()
+        )?);
     assert_eq!(fixture.kernel.receipt_log().len(), 1);
     Ok(())
 }
@@ -1046,8 +1018,17 @@ fn nested_url_elicitation_commits_credentials_fail_closed() -> Result<(), Box<dy
     );
     assert!(fixture
         .kernel
-        .verify_dpop_for_request(&fixture.request, &fixture.capability)
-        .is_err());
+        .execution_nonce_store
+        .as_ref()
+        .ok_or("nonce store")?
+        .is_consumed(
+            fixture
+                .request
+                .execution_nonce
+                .as_ref()
+                .ok_or("nonce")?
+                .nonce_id()
+        )?);
     assert_eq!(fixture.kernel.receipt_log().len(), 1);
     fixture
         .kernel
@@ -1317,7 +1298,7 @@ fn installing_runtime_trace_observer_starts_sequence_at_one(
 #[test]
 fn hosted_late_approval_replay_rolls_back_earlier_credentials(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (kernel, _agent, capability, request, binding) =
+    let (kernel, _agent, capability, request, store) =
         request_with_replayed_approval("hosted-credential-rollback")?;
 
     let response = kernel.evaluate_tool_call_blocking(&request)?;
@@ -1327,13 +1308,13 @@ fn hosted_late_approval_replay_rolls_back_earlier_credentials(
         .reason
         .as_deref()
         .is_some_and(|reason| reason.contains("approval token has already been consumed")));
-    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &binding)
+    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &store)
 }
 
 #[test]
 fn nested_late_approval_replay_rolls_back_credentials_and_dispatch_claim(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let (kernel, agent, capability, request, binding) =
+    let (kernel, agent, capability, request, store) =
         request_with_replayed_approval("nested-credential-rollback")?;
     let session_id = kernel.open_session(agent.public_key().to_hex(), vec![capability.clone()])?;
     kernel.activate_session(&session_id)?;
@@ -1346,7 +1327,7 @@ fn nested_late_approval_replay_rolls_back_credentials_and_dispatch_claim(
 
     assert_eq!(response.verdict, Verdict::Deny);
     kernel.request_session_cancellation(&session_id, &context.request_id)?;
-    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &binding)
+    assert_earlier_credentials_remain_fresh(&kernel, &request, &capability, &store)
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -21,8 +21,6 @@ use std::sync::atomic::Ordering;
 mod bearer_verifier;
 #[path = "tests/clock_custody.rs"]
 mod clock_custody;
-#[path = "tests/dpop_replay.rs"]
-mod dpop_replay;
 #[path = "tests/enterprise_provider_freshness.rs"]
 mod enterprise_provider_freshness;
 #[path = "tests/local_authorization.rs"]
@@ -31,6 +29,8 @@ mod local_authorization;
 mod protocol_refusal;
 #[path = "tests/resume_record.rs"]
 mod resume_record;
+#[path = "tests/sender_dpop_refusal.rs"]
+mod sender_dpop_refusal;
 #[path = "tests/session_recovery.rs"]
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
@@ -195,18 +195,6 @@ fn mcp_session_id_header_classifies_missing_invalid_and_valid_values() {
         mcp_session_id_header(&headers),
         McpSessionIdHeader::Valid("session-123".to_string())
     );
-}
-
-fn test_sender_dpop_runtime() -> (Arc<DpopNonceStore>, DpopConfig) {
-    let config = DpopConfig::default();
-    let store = Arc::new(
-        DpopNonceStore::new(
-            config.nonce_store_capacity,
-            Duration::from_secs(config.proof_ttl_secs),
-        )
-        .expect("positive replay store test capacities"),
-    );
-    (store, config)
 }
 
 fn test_kernel_config() -> chio_kernel::KernelConfig {
@@ -450,7 +438,6 @@ fn write_test_resume_hmac_keyring(directory: &FsPath) -> PathBuf {
 }
 
 fn test_local_authorization_server() -> LocalAuthorizationServer {
-    let (sender_dpop_nonce_store, sender_dpop_config) = test_sender_dpop_runtime();
     LocalAuthorizationServer {
         clock: RemoteClock::default(),
         signing_key: Keypair::generate(),
@@ -466,8 +453,6 @@ fn test_local_authorization_server() -> LocalAuthorizationServer {
             "client-abc".to_string(),
             HashSet::from(["https://client.example/callback".to_string()]),
         )])),
-        sender_dpop_nonce_store,
-        sender_dpop_config,
     }
 }
 
@@ -1226,11 +1211,11 @@ fn chio_oauth_discovery_profile_metadata_advertises_sender_constraints() {
         profile.sender_constraints.subject_binding,
         CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT
     );
-    assert!(profile
+    assert!(!profile
         .sender_constraints
         .proof_types_supported
         .iter()
-        .any(|proof| proof == CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP));
+        .any(|proof| proof == "chio_dpop_v1"));
     assert!(profile
         .sender_constraints
         .proof_types_supported
@@ -1313,7 +1298,7 @@ fn chio_oauth_discovery_validation_rejects_profile_mismatch() {
                 "senderConstraints": {
                     "schema": "chio.oauth.sender-constraint.v1",
                     "subjectBinding": CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT,
-                    "proofTypesSupported": [CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP],
+                    "proofTypesSupported": [chio_kernel::operator_report::CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS],
                     "proofRequiredWhen": "matchedGrant.dpopRequired == true",
                     "runtimeAssuranceBindingFields": ["runtimeAssuranceTier"],
                     "delegatedCallChainField": "callChain",
@@ -1404,7 +1389,6 @@ fn build_federated_principal_prefers_subject_over_client_id() {
             scope: None,
             scp: vec![],
             client_id: Some("client-abc".to_string()),
-            jti: None,
             oid: None,
             azp: None,
             appid: None,
@@ -1439,7 +1423,6 @@ fn build_federated_principal_azure_ad_prefers_oid_and_appid() {
             scope: None,
             scp: vec![],
             client_id: None,
-            jti: None,
             oid: Some("object-456".to_string()),
             azp: None,
             appid: Some("app-789".to_string()),
@@ -1477,7 +1460,6 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
             scope: None,
             scp: vec![],
             client_id: None,
-            jti: None,
             oid: Some("object-456".to_string()),
             azp: Some("client-azp".to_string()),
             appid: Some("client-app".to_string()),

@@ -36,6 +36,7 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
         true,
         None,
         None,
+        None,
     );
     state
         .mediation_kernel

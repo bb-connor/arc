@@ -333,7 +333,7 @@ pub(crate) fn cmd_trust_authorization_context_list(
                 row.authorization_details.len(),
                 row.sender_constraint.subject_key,
                 row.sender_constraint
-                    .proof_type
+                    .proof_schema
                     .as_deref()
                     .unwrap_or("none"),
                 row.transaction_context

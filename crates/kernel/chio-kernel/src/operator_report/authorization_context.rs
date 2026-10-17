@@ -208,7 +208,6 @@ impl Default for ChioOAuthSenderConstraintProfile {
             schema: CHIO_OAUTH_SENDER_CONSTRAINT_SCHEMA.to_string(),
             subject_binding: CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT.to_string(),
             proof_types_supported: vec![
-                CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP.to_string(),
                 CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS.to_string(),
                 CHIO_OAUTH_SENDER_PROOF_CHIO_ATTESTATION.to_string(),
             ],
@@ -299,8 +298,6 @@ pub struct AuthorizationContextSenderConstraint {
     pub issuer_key_source: String,
     pub matched_grant_index: u32,
     pub proof_required: bool,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub proof_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proof_schema: Option<String>,
     pub runtime_assurance_bound: bool,

@@ -1,21 +1,21 @@
-//! An immutable v2 proof domain retires v1 acceptance; it never restores lost
-//! history or translates legacy monotonic clocks into portable expiry.
+//! Activate an immutable signed proof domain over imported replay history.
+//! Activation cannot restore lost history or turn source-relative monotonic
+//! deadlines into portable expiry.
 use super::*;
 
 const TABLE: &str = "dpop_replay_authority_activations";
 
 impl SqliteAdmissionOperationStore {
-    /// Activate only the explicit v2 proof domain for this exact imported source.
+    /// Activate the exact configured proof domain for this imported source.
     /// This is trusted operator configuration, not a caller-supplied opt-in.
     /// A first activation verifies the actual retired source. Once committed,
     /// exact readback/retry depends only on durable authority, so process-local
     /// source loss cannot erase or recreate the activated generation.
     ///
-    /// Legacy v1 proofs are never admitted by this domain. Activation does not
-    /// grant an operation claim, enable the legacy verifier, or permit dispatch.
+    /// Activation does not grant an operation claim or permit dispatch.
     pub fn activate_dpop_replay_source(
         &self,
-        authority: &DpopReplayAuthorityV1,
+        authority: &DpopReplayAuthority,
         source: &dyn DpopReplaySourcePort,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
@@ -86,10 +86,10 @@ impl SqliteAdmissionOperationStore {
     /// A serialized descriptor alone is not proof of this activation.
     pub fn load_dpop_replay_activation(
         &self,
-        authority: &DpopReplayAuthorityV1,
+        authority: &DpopReplayAuthority,
         fence: &StoreMutationFence,
         trusted_now_unix_ms: u64,
-    ) -> Result<DpopReplayAuthorityV1, AdmissionOperationStoreError> {
+    ) -> Result<DpopReplayAuthority, AdmissionOperationStoreError> {
         let record = self
             .load_dpop_replay_migration(authority.dpop_authority_id(), fence, trusted_now_unix_ms)?
             .ok_or_else(|| invariant("DPoP authority is not registered"))?;
@@ -104,7 +104,7 @@ impl SqliteAdmissionOperationStore {
 
 fn require_binding(
     record: &DpopReplayMigrationRecordV1,
-    authority: &DpopReplayAuthorityV1,
+    authority: &DpopReplayAuthority,
 ) -> Result<(), String> {
     if authority.dpop_authority_id().as_str() != record.snapshot.dpop_authority_id()
         || authority.destination_store_uuid().as_str() != record.snapshot.destination_authority_id()
@@ -130,7 +130,7 @@ fn table_exists(connection: &Connection) -> Result<bool, String> {
 pub(super) fn load_authority(
     connection: &Connection,
     record: &DpopReplayMigrationRecordV1,
-) -> Result<Option<DpopReplayAuthorityV1>, String> {
+) -> Result<Option<DpopReplayAuthority>, String> {
     if !table_exists(connection)? {
         return Ok(None);
     }
@@ -140,7 +140,7 @@ pub(super) fn load_authority(
     let Some(bytes) = bytes else {
         return Ok(None);
     };
-    let authority: DpopReplayAuthorityV1 =
+    let authority: DpopReplayAuthority =
         chio_core::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
             .and_then(|input| input.decode_signed())
             .map_err(|_| "DPoP activation decode failed")?;

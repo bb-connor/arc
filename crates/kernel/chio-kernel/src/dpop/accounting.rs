@@ -16,9 +16,7 @@ impl DpopNonceState {
         Ok(())
     }
 
-    /// Validate the whole release before deleting any replay marker. Pruning
-    /// several expired entries and rolling back one owned reservation share
-    /// the same accounting rule.
+    /// Validate the whole expired-entry release before deleting any replay marker.
     pub(super) fn release_accounted_entries(
         &mut self,
         entries: &[((String, String), usize)],

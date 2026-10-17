@@ -65,6 +65,8 @@ fn changed_arguments_payload_context_and_selected_authority_deny_before_writes(
 #[test]
 fn live_credential_substitution_cannot_reuse_acquisition_or_commitment() -> AnchoredTestResult {
     use chio_core::crypto::Keypair;
+    use chio_kernel::admission_operation::AdmissionDigest;
+    use chio_kernel::dpop::authority::{DpopReplayAuthority, DpopReplayAuthorityInput};
     use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
     let fixture = fixture();
     hydrate(&fixture, &imported(&fixture, "source")?)?;
@@ -79,7 +81,16 @@ fn live_credential_substitution_cannot_reuse_acquisition_or_commitment() -> Anch
     pending.request.dpop_proof = Some(DpopProof::sign(
         DpopProofBody {
             schema: DPOP_SCHEMA.into(),
-            replay_authority: None,
+            replay_authority: DpopReplayAuthority::new(DpopReplayAuthorityInput {
+                destination_store_uuid: identifier("destination", &fixture.fence.store_uuid),
+                dpop_authority_id: identifier("authority", "egress-envelope-substitution"),
+                expectation_id: AdmissionDigest::try_new(
+                    "expectation",
+                    sha256_hex(b"egress-envelope-substitution"),
+                )?,
+                proof_ttl_secs: 60,
+                max_clock_skew_secs: 30,
+            })?,
             capability_id: original.capability.id.clone(),
             tool_server: original.server_id.clone(),
             tool_name: original.tool_name.clone(),

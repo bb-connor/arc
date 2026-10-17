@@ -825,6 +825,19 @@ pub const TRANSPORT_HTTP_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-http-core", "chio-cli"],
 };
 
+pub const TRANSPORT_DPOP_SENDER_PROOF_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:dpop-sender-proof-unavailable",
+    domain: Domain::Transport,
+    severity: Severity::Fatal,
+    summary: "Chio DPoP sender binding is unavailable on this transport.",
+    help: "Use a TLS-bound sender constraint or present the DPoP proof inside the tool call to an activated replay authority.",
+    string_code: "CHIO-TRANSPORT-DPOP-SENDER-PROOF-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub const TRANSPORT_DPOP_VERIFICATION_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:transport:dpop-verification-failed",
     domain: Domain::Transport,
@@ -3288,6 +3301,19 @@ pub const KERNEL_DPOP_ACTION: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel"],
 };
 
+pub const KERNEL_DPOP_AUTHORITY_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:kernel:dpop-authority-mismatch",
+    domain: Domain::Kernel,
+    severity: Severity::Error,
+    summary: "The DPoP proof names a different replay authority.",
+    help: "Sign a fresh proof for the independently configured active replay authority.",
+    string_code: "CHIO-KERNEL-DPOP-AUTHORITY-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-kernel"],
+};
+
 pub const KERNEL_DPOP_CAPABILITY: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:dpop-capability",
     domain: Domain::Kernel,
@@ -3412,19 +3438,6 @@ pub const KERNEL_DPOP_MISSING_PROOF: ErrorCodeSpec = ErrorCodeSpec {
     summary: "Security boundary refused: dpop-missing-proof.",
     help: "Restore the named invariant and present fresh evidence for the exact request.",
     string_code: "CHIO-KERNEL-DPOP-MISSING-PROOF",
-    jsonrpc_code: None,
-    since: "0.1.0",
-    stability: "stable",
-    consumed_by: &["chio-kernel"],
-};
-
-pub const KERNEL_DPOP_MISSING_STORE: ErrorCodeSpec = ErrorCodeSpec {
-    urn: "urn:chio:error:kernel:dpop-missing-store",
-    domain: Domain::Kernel,
-    severity: Severity::Error,
-    summary: "Security boundary refused: dpop-missing-store.",
-    help: "Restore the named invariant and present fresh evidence for the exact request.",
-    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE",
     jsonrpc_code: None,
     since: "0.1.0",
     stability: "stable",
@@ -3568,19 +3581,6 @@ pub const KERNEL_FINANCIAL_BUDGET_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
     summary: "Security boundary refused: financial-budget-exceeded.",
     help: "Restore the named invariant and present fresh evidence for the exact request.",
     string_code: "CHIO-KERNEL-FINANCIAL-BUDGET-EXCEEDED",
-    jsonrpc_code: None,
-    since: "0.1.0",
-    stability: "stable",
-    consumed_by: &["chio-kernel"],
-};
-
-pub const KERNEL_DPOP_RESERVATION_OWNERSHIP: ErrorCodeSpec = ErrorCodeSpec {
-    urn: "urn:chio:error:kernel:dpop-reservation-ownership",
-    domain: Domain::Kernel,
-    severity: Severity::Error,
-    summary: "DPoP reservation ownership was not confirmed at commit.",
-    help: "Retain the marker and reconcile the original operation before retrying.",
-    string_code: "CHIO-KERNEL-DPOP-RESERVATION-OWNERSHIP",
     jsonrpc_code: None,
     since: "0.1.0",
     stability: "stable",
@@ -3753,6 +3753,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSPORT_INVALID_REQUEST_SHAPE,
     TRANSPORT_AUTH_MISSING_OR_INVALID,
     TRANSPORT_HTTP_FAILED,
+    TRANSPORT_DPOP_SENDER_PROOF_UNAVAILABLE,
     TRANSPORT_DPOP_VERIFICATION_FAILED,
     TRANSPORT_UPSTREAM_FAILURE,
     TRANSPORT_METHOD_NOT_FOUND,
@@ -3936,6 +3937,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_APPROVAL_REPLAY_UNAVAILABLE,
     KERNEL_DPOP_ACCOUNTING,
     KERNEL_DPOP_ACTION,
+    KERNEL_DPOP_AUTHORITY_MISMATCH,
     KERNEL_DPOP_CAPABILITY,
     KERNEL_DPOP_CAPABILITY_CAPACITY,
     KERNEL_DPOP_CAPACITY,
@@ -3946,7 +3948,6 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_IDENTITY_OVERFLOW,
     KERNEL_DPOP_MISSING_CONFIGURATION,
     KERNEL_DPOP_MISSING_PROOF,
-    KERNEL_DPOP_MISSING_STORE,
     KERNEL_DPOP_NOT_YET_VALID,
     KERNEL_DPOP_REPLAYED,
     KERNEL_DPOP_SCHEMA,
@@ -3958,7 +3959,6 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_UNAVAILABLE,
     KERNEL_DPOP_WINDOW_OVERFLOW,
     KERNEL_FINANCIAL_BUDGET_EXCEEDED,
-    KERNEL_DPOP_RESERVATION_OWNERSHIP,
     TRANSPORT_TASK_CAPACITY_EXCEEDED,
     TRANSPORT_STREAM_CAPACITY_EXCEEDED,
     KERNEL_DPOP_INVALID_CAPACITY,

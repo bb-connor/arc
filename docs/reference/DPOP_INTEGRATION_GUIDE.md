@@ -1,119 +1,94 @@
 # Chio DPoP Integration Guide
 
-DPoP (Demonstration of Proof-of-Possession) is Chio's optional sender-constrained invocation profile. When a `ToolGrant` carries `dpop_required: Some(true)`, the kernel requires the agent to attach a fresh cryptographic proof with every invocation. The proof binds the call to the agent's keypair, the specific capability token, the target tool, and the exact arguments. Grants without `dpop_required: Some(true)` remain compatibility paths and should not be described as universally sender-constrained.
+DPoP (Demonstration of Proof-of-Possession) is Chio's sender-constrained
+invocation profile. When a `ToolGrant` carries `dpop_required: Some(true)`, the
+kernel requires a fresh cryptographic proof with every invocation. The proof
+binds the call to the agent's keypair, capability token, target tool, arguments
+and independently configured replay authority.
 
 ## When DPoP Is Required
 
-The `dpop_required` field on `ToolGrant` controls enforcement:
-
-```rust
-pub struct ToolGrant {
-    // ...
-    pub dpop_required: Option<bool>,
-}
-```
-
-`Some(true)` requires a valid DPoP proof. `None` and `Some(false)` both disable DPoP for that grant. When the kernel encounters a request against a DPoP-required grant and no proof is supplied (or the proof fails verification), the invocation is denied.
+The `dpop_required` field on `ToolGrant` controls enforcement. `Some(true)`
+requires a valid proof. `None` and `Some(false)` do not require DPoP for that
+grant. A missing or invalid proof denies an invocation against a grant that
+requires DPoP.
 
 ## Proof Format
 
-A DPoP proof is a Chio-native structure using Ed25519 and RFC 8785 canonical
-JSON. It is not a JWT.
+The sole Chio DPoP schema is `chio.dpop_proof.v1`. The proof is a Chio-native
+signed structure using RFC 8785 canonical JSON, not a JWT. Its body contains:
 
-### DpopProofBody
+| Field | Meaning |
+|-------|---------|
+| `schema` | Exactly `chio.dpop_proof.v1` |
+| `capability_id` | ID of the capability token being used |
+| `tool_server` | ID of the target tool server |
+| `tool_name` | Name of the tool being called |
+| `action_hash` | SHA-256 hex of canonical JSON of the tool arguments |
+| `nonce` | Caller-generated replay identifier |
+| `issued_at` | Unix seconds when the proof was created |
+| `agent_key` | Public key of the signer |
+| `replay_authority` | Required destination, source generation and freshness policy |
 
-```rust
-pub struct DpopProofBody {
-    pub schema: String,        // "chio.dpop_proof.v1" (compatibility schema alias accepted)
-    pub capability_id: String, // token ID of the capability being used
-    pub tool_server: String,   // server_id of the target tool server
-    pub tool_name: String,     // name of the tool being called
-    pub action_hash: String,   // SHA-256 hex of canonical JSON of tool arguments
-    pub nonce: String,         // caller-chosen random string
-    pub issued_at: u64,        // Unix seconds when the proof was created
-    pub agent_key: PublicKey,  // hex-encoded Ed25519 public key of the signer
-}
-```
+The envelope contains `body` and `signature`. The signature covers the entire
+canonical body, including `replay_authority`. Rust decoding rejects unknown
+body and envelope fields. Missing or null authority is invalid.
 
-### DpopProof
+## Replay Authority
 
-```rust
-pub struct DpopProof {
-    pub body: DpopProofBody,
-    pub signature: Signature,  // Ed25519 over canonical_json_bytes(&body)
-}
-```
+`replay_authority` contains exactly five fields:
 
-The `signature` covers the canonical JSON (RFC 8785) of `body`. The field order in canonical JSON is alphabetical, which matches Rust's default serde serialization.
+| Field | Validation |
+|-------|------------|
+| `destination_store_uuid` | Canonical lowercase, non-nil destination UUID |
+| `dpop_authority_id` | Nonempty, unpadded authority name without control characters, at most 512 UTF-8 bytes |
+| `expectation_id` | Destination-derived source-generation digest, 64 lowercase hexadecimal characters |
+| `proof_ttl_secs` | Inclusive proof lifetime, an integer from 1 to 3,600 seconds |
+| `max_clock_skew_secs` | Future-date tolerance, an integer from 0 to 300 seconds |
 
-## Field Binding
+The signer obtains this descriptor through authenticated configuration. The
+verifier independently selects its expected authority and requires an exact
+match across all five fields. It must not choose the expected authority from
+the proof it is checking. Altering any authority field requires a new signature.
+A descriptor alone does not prove that its authority is activated.
 
-Each proof is bound to a single invocation by four fields:
+## Verification and Admission
 
-- `capability_id` must match the token ID in the request.
-- `tool_server` must match the `server_id` of the target tool server.
-- `tool_name` must match the tool being called.
-- `action_hash` must equal the SHA-256 hex of the canonical JSON of the tool arguments. This prevents an adversary from reusing a proof with different arguments.
+Proof verification checks the schema, complete authority, sender, invocation
+binding, freshness, signature and resource bounds:
 
-## Verification Steps
+- `agent_key` must equal the capability's subject.
+- `capability_id`, `tool_server`, `tool_name` and `action_hash` must match the
+  invocation being evaluated.
+- `issued_at + proof_ttl_secs >= now` and
+  `issued_at <= now + max_clock_skew_secs`, using the independently selected
+  authority's immutable freshness policy and trusted clock.
+- Issue time plus TTL must fit the supported range `0..=9007199254740`.
+- Nonce and capability ID must each fit within 4,096 UTF-8 bytes.
+- The signature must verify over the complete canonical proof body.
 
-`verify_dpop_proof` in `chio-kernel` enforces six steps in order. The first failure returns an error and the invocation is denied.
+Non-consuming cryptographic verification does not reserve a nonce or permit
+execution. Admission also requires current capability and policy checks and
+operation-owned replay custody through the configured authority. A valid proof
+cannot choose or replace that custody. Capacity exhaustion denies new
+reservations without evicting live replay markers.
 
-1. Schema check: `body.schema` must equal the current Chio DPoP schema or a
-   compatibility alias accepted by the verifier.
-2. Sender constraint: `body.agent_key` must equal `capability.subject` (the public key the token was issued to).
-3. Binding fields: `capability_id`, `tool_server`, `tool_name`, and `action_hash` must all match the kernel's expected values.
-4. Freshness: `body.issued_at + proof_ttl_secs >= now` (proof not expired) and `body.issued_at <= now + max_clock_skew_secs` (proof not future-dated beyond tolerance).
-5. Signature: Ed25519 verification of `signature` over canonical JSON of `body` using `agent_key`.
-6. Nonce replay: the `(nonce, capability_id)` pair must not have been seen within the TTL window.
-
-## DpopConfig
-
-```rust
-pub struct DpopConfig {
-    pub proof_ttl_secs: u64,          // default: 300
-    pub max_clock_skew_secs: u64,     // default: 30
-    pub nonce_store_capacity: usize,  // default: 8192
-}
-```
-
-`proof_ttl_secs` is how long a proof remains valid after `issued_at`. The default is 5 minutes. `max_clock_skew_secs` is how far in the future a proof's `issued_at` may be while still passing (to accommodate slight clock differences between client and server). The default is 30 seconds.
-
-`nonce_store_capacity` limits the in-memory nonce replay cache. Nonces are keyed by `(nonce, capability_id)`. Expired entries are reclaimed, but live replay markers are never evicted. When all slots are live, the store denies new reservations fail-closed. Capacity should be set above the expected peak rate of concurrent calls times the full signed validity window, including tolerated future clock skew.
-
-The durable `SqliteExecutionNonceStore` applies the same deny-at-cap policy to
-retained execution-nonce rows. `open` uses
-`DEFAULT_EXECUTION_NONCE_STORE_CAPACITY`; `open_with_capacity` configures a
-different kernel-global limit. Its prune, duplicate check, live-row count, and
-insert execute in one write transaction, so pressure cannot evict a live marker
-or admit a row above the configured bound.
-
-### External payment authorization
-
-DPoP alone does not authorize an external payment rail call. Its built-in nonce
-store is process-scoped, so a fresh proof could be accepted again after a
-kernel restart. Before calling `PaymentAdapter::authorize`, the kernel requires
-a freshly reserved execution nonce or governed approval marker. Deployments
-that need payment replay protection across restart must install the durable
-store for that credential path, such as `SqliteExecutionNonceStore` or
-`SqliteGovernedApprovalReplayStore`.
-
-These capacities are availability boundaries, not tenant quotas. The replay
-store contracts do not carry an authenticated principal or tenant identity, and
-opaque nonce IDs must not be parsed to invent one. Multi-tenant deployments
-that need independent pressure domains must use a dedicated kernel and replay
-store per tenant, or enforce authenticated per-tenant rate limits before calls
-reach a shared kernel. A shared store still preserves replay correctness under
-pressure by denying new reservations, but one tenant can consume the shared
-availability budget.
+DPoP alone does not authorize an external payment rail call. Payment execution
+also requires the kernel's execution-nonce or governed-approval checks and the
+configured durable stores for those credential paths.
 
 ## Generating Proofs (Rust)
+
+Obtain `replay_authority` from authenticated configuration as a
+`chio_kernel::dpop::authority::DpopReplayAuthority`. Include it in the body before
+signing:
 
 ```rust
 use chio_kernel::dpop::{DpopProof, DpopProofBody, DPOP_SCHEMA};
 
 let body = DpopProofBody {
     schema: DPOP_SCHEMA.to_string(),
+    replay_authority,
     capability_id: token.id.clone(),
     tool_server: "filesystem".to_string(),
     tool_name: "read_file".to_string(),
@@ -126,10 +101,29 @@ let body = DpopProofBody {
 let proof = DpopProof::sign(body, &agent_keypair)?;
 ```
 
-Attach `proof` to the `ToolCallRequest.dpop_proof` field before sending.
+Attach `proof` to `ToolCallRequest.dpop_proof` before sending. The application
+supplies the token, arguments, keypair, replay authority, clock and random nonce
+in this example.
 
 ## Generating Proofs (TypeScript SDK)
 
-See `docs/SDK_TYPESCRIPT_REFERENCE.md` for the `signDpopProof` function. The
-TypeScript implementation emits Chio schema identifiers. Verifiers reject legacy
-pre-Chio proof schemas instead of treating them as aliases.
+[`signDpopProof`](SDK_TYPESCRIPT_REFERENCE.md#signdpopproof) requires a
+`replayAuthority` parameter. It emits the same `chio.dpop_proof.v1` body and
+signs it with Ed25519. Missing, null or invalid authority is rejected before
+signing. The SDK copies the validated authority so later changes to the caller's
+configuration object do not change an already signed proof.
+
+## Generating Proofs (C++ SDK)
+
+`chio::sign_dpop_proof(params, authority)` requires a separate
+`DpopReplayAuthority`. `DpopProofBuilder` requires the authority in its
+constructor. Both produce the same signed `chio.dpop_proof.v1` body; neither
+provides an authority-free signing path.
+
+### Runtime authority selection
+
+A serving kernel accepts DPoP only with an independently configured authority that is already active in its durable store. Ordinary startup loads that activation; it does not create or replace one. `DurableAdmissionRuntime::attach` takes the optional configured descriptor and verifies it before startup reconciliation.
+
+Chio policy files select the descriptor with `kernel.dpop_replay_authority`; it is the only configuration path. HushSpec policies and the CLI API-protect runtime carry no descriptor, so their proof-required grants are refused. The selected descriptor must match the attached store, source generation and freshness policy exactly.
+
+Explicit deployment initialization can call `initialize_local_dpop_authority` with its serving store, chosen authority ID, freshness policy and trusted clock. Reopening uses `load_local_dpop_authority`; an absent or inactive record is an error. `finding operator init` provisions its authority once, and `finding operator serve` only loads it.

@@ -10,7 +10,7 @@ use super::runtime_participant::{
     RuntimeParticipantClaimIntentV1, RuntimeParticipantClaimReferenceV1,
 };
 use super::*;
-use crate::dpop::authority::DpopReplayAuthorityV1;
+use crate::dpop::authority::DpopReplayAuthority;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AdmissionBeginResult {
@@ -383,10 +383,10 @@ pub trait AdmissionOperationStore: Send + Sync {
     /// clock. Configuration and imported-inactive history cannot grant claims.
     fn load_dpop_replay_activation(
         &self,
-        _binding: &DpopReplayAuthorityV1,
+        _binding: &DpopReplayAuthority,
         _fence: &StoreMutationFence,
         _trusted_now_unix_ms: u64,
-    ) -> Result<DpopReplayAuthorityV1, AdmissionOperationStoreError> {
+    ) -> Result<DpopReplayAuthority, AdmissionOperationStoreError> {
         Err(AdmissionOperationStoreError::Unavailable(
             "operation-owned DPoP activation is unsupported".into(),
         ))
@@ -496,7 +496,8 @@ pub trait AdmissionOperationStore: Send + Sync {
     }
     /// Require durable activation of this exact runtime source generation in a
     /// fenced, anchored read. An imported-inactive source must reject. Serving
-    /// configuration alone is not evidence that legacy replay authority retired.
+    /// configuration alone is not evidence that the source replay authority
+    /// retired.
     fn load_runtime_participant_activation(
         &self,
         _binding: &RuntimeParticipantAuthorityBindingV1,
@@ -662,8 +663,8 @@ pub trait AdmissionOperationStore: Send + Sync {
     /// Revalidate the retained nonce and prepare capture under the current fence.
     /// This is not a nonce commit or a dispatch permit. The capture authority must
     /// commit the nonce, budget effect and DispatchCommitted state atomically.
-    /// Fresh preparation requires the operation-bound signature profile; decoded
-    /// legacy history is not fresh authority.
+    /// Fresh preparation requires the operation-bound signature profile;
+    /// retained history without that binding is not fresh authority.
     fn begin_execution_nonce_capture(
         &self,
         _command: &AdmissionOperationCommand,
@@ -721,8 +722,8 @@ pub trait AdmissionOperationStore: Send + Sync {
     }
 
     /// Resolve a request ID in one fenced, anchored snapshot. Count all retained
-    /// operations before selecting: another tenant, terminal operation or legacy
-    /// row without request material still makes the selector ambiguous.
+    /// operations before selecting: another tenant, terminal operation or row
+    /// without retained request material still makes the selector ambiguous.
     fn load_unambiguous_retained_tool_request(
         &self,
         _request_id: &AdmissionIdentifier,

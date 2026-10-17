@@ -299,6 +299,7 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
             receipt_db: Some(receipt_db.to_string_lossy().into_owned()),
             allow_ephemeral_receipts: false,
             sidecar_control_token: Some(token.clone()),
+            dpop_replay_authority: None,
             receipt_retention: None,
             signer_seed_file: None,
             signer_seed_hex: None,
@@ -308,7 +309,6 @@ async fn invalid_control_configuration_rejects_before_runtime_io() {
             control_token: None,
             budget_db: None,
             revocation_db: None,
-            require_nonce: false,
             allow_advisory: false,
             upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
         })
@@ -452,6 +452,7 @@ async fn serving_proxy_rejects_control_headers_without_waiting_for_request_body(
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: Some(SECRET.into()),
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -461,7 +462,6 @@ async fn serving_proxy_rejects_control_headers_without_waiting_for_request_body(
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     });

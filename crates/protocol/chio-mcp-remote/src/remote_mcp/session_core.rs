@@ -36,13 +36,12 @@ use chio_kernel::operator_report::{
     CHIO_OAUTH_REQUEST_TIME_TRANSACTION_CONTEXT_CLAIM,
 };
 use chio_kernel::{
-    is_supported_dpop_schema, ChioKernel, ChioOAuthAuthorizationProfile, DpopConfig,
-    DpopNonceStore, DpopProof, GovernedAuthorizationDetail,
+    ChioKernel, ChioOAuthAuthorizationProfile, GovernedAuthorizationDetail,
     GovernedAuthorizationTransactionContext, KernelError, PeerCapabilities, RevocationStore,
     ToolServerConnection, CHIO_OAUTH_AUTHORIZATION_COMMERCE_DETAIL_TYPE,
     CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE, CHIO_OAUTH_AUTHORIZATION_PROFILE_ID,
     CHIO_OAUTH_AUTHORIZATION_PROFILE_SCHEMA, CHIO_OAUTH_AUTHORIZATION_TOOL_DETAIL_TYPE,
-    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT, CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP,
+    CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT,
 };
 use chio_mcp_adapter::adapter::{McpAdapter, McpAdapterConfig};
 use chio_mcp_adapter::edge::ingress::{
@@ -100,7 +99,6 @@ const LOCAL_AUTHORIZATION_PATH: &str = "/oauth/authorize";
 const LOCAL_TOKEN_PATH: &str = "/oauth/token";
 const LOCAL_JWKS_PATH: &str = "/oauth/jwks.json";
 const DPOP_HEADER: &str = "dpop";
-const HTTP_DPOP_ACTION_HASH_EMPTY: &[u8] = b"";
 const CHIO_MTLS_THUMBPRINT_HEADER: &str = "x-chio-mtls-thumbprint-sha256";
 const CHIO_RUNTIME_ATTESTATION_HEADER: &str = "x-chio-runtime-attestation-sha256";
 const CHIO_SENDER_DPOP_PUBLIC_KEY_PARAMETER: &str = "chio_sender_dpop_public_key";
@@ -868,8 +866,6 @@ struct JwtBearerVerifier {
     required_scopes: Vec<String>,
     provider_profile: JwtProviderProfile,
     enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
-    sender_dpop_nonce_store: Arc<DpopNonceStore>,
-    sender_dpop_config: DpopConfig,
 }
 
 #[derive(Clone)]
@@ -884,8 +880,6 @@ struct IntrospectionBearerVerifier {
     required_scopes: Vec<String>,
     provider_profile: JwtProviderProfile,
     enterprise_provider_registry: Option<EnterpriseProviderRegistryFile>,
-    sender_dpop_nonce_store: Arc<DpopNonceStore>,
-    sender_dpop_config: DpopConfig,
     /// Typed HTTP egress contract that gates every introspection-endpoint
     /// dispatch. Production deployments must populate this; without a
     /// contract the verifier substrate will fail closed if introspection is
@@ -923,8 +917,6 @@ struct LocalAuthorizationServer {
     consents: Arc<StdMutex<HashMap<String, PendingConsent>>>,
     /// Registered client ids and the exact redirect URIs each may use.
     clients: Arc<HashMap<String, HashSet<String>>>,
-    sender_dpop_nonce_store: Arc<DpopNonceStore>,
-    sender_dpop_config: DpopConfig,
 }
 
 /// An authorization request whose consent page was rendered and not yet
@@ -1018,8 +1010,6 @@ struct JwtClaims {
     scp: Vec<String>,
     #[serde(default)]
     client_id: Option<String>,
-    #[serde(default)]
-    jti: Option<String>,
     #[serde(default)]
     oid: Option<String>,
     #[serde(default)]

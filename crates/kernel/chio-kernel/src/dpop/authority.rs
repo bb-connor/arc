@@ -1,15 +1,14 @@
 //! The durable proof domain is explicit and signed. It cannot be inferred from
-//! a legacy cache, a caller-selected label, or a decoded migration snapshot.
+//! a local cache, a caller-selected label, or a decoded migration snapshot.
 //! These types describe a profile; constructing them does not activate it.
 
 use chio_core::crypto::sha256_hex;
 use serde::{Deserialize, Serialize};
 
 use super::{canonical_json_bytes, validate_dpop_replay_identity, verify_dpop_bindings_at};
-use super::{CapabilityToken, DpopConfig, DpopProof, KernelError};
+use super::{CapabilityToken, DpopConfig, DpopError, DpopProof, KernelError, DPOP_SCHEMA};
 use crate::admission_operation::{AdmissionDigest, AdmissionIdentifier};
 
-pub const DPOP_AUTHORITY_SCHEMA: &str = "chio.dpop_proof.v2";
 pub const MAX_DURABLE_DPOP_TTL_SECS: u64 = 3600;
 pub const MAX_DURABLE_DPOP_CLOCK_SKEW_SECS: u64 = 300;
 const MAX_UNIX_SECS: u64 = 9_007_199_254_740;
@@ -18,8 +17,8 @@ const MAX_UNIX_SECS: u64 = 9_007_199_254_740;
 /// policy. All fields are included in the agent's proof signature. This bounded
 /// wire value is not an activation credential or a replay-store handle.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields, try_from = "DpopReplayAuthorityInputV1")]
-pub struct DpopReplayAuthorityV1 {
+#[serde(deny_unknown_fields, try_from = "DpopReplayAuthorityInput")]
+pub struct DpopReplayAuthority {
     destination_store_uuid: AdmissionIdentifier,
     dpop_authority_id: AdmissionIdentifier,
     expectation_id: AdmissionDigest,
@@ -29,7 +28,7 @@ pub struct DpopReplayAuthorityV1 {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct DpopReplayAuthorityInputV1 {
+pub struct DpopReplayAuthorityInput {
     pub destination_store_uuid: AdmissionIdentifier,
     pub dpop_authority_id: AdmissionIdentifier,
     pub expectation_id: AdmissionDigest,
@@ -37,15 +36,15 @@ pub struct DpopReplayAuthorityInputV1 {
     pub max_clock_skew_secs: u64,
 }
 
-impl TryFrom<DpopReplayAuthorityInputV1> for DpopReplayAuthorityV1 {
+impl TryFrom<DpopReplayAuthorityInput> for DpopReplayAuthority {
     type Error = KernelError;
-    fn try_from(input: DpopReplayAuthorityInputV1) -> Result<Self, Self::Error> {
+    fn try_from(input: DpopReplayAuthorityInput) -> Result<Self, Self::Error> {
         Self::new(input)
     }
 }
 
-impl DpopReplayAuthorityV1 {
-    pub fn new(input: DpopReplayAuthorityInputV1) -> Result<Self, KernelError> {
+impl DpopReplayAuthority {
+    pub fn new(input: DpopReplayAuthorityInput) -> Result<Self, KernelError> {
         let value = Self {
             destination_store_uuid: input.destination_store_uuid,
             dpop_authority_id: input.dpop_authority_id,
@@ -102,7 +101,7 @@ impl DpopReplayAuthorityV1 {
 /// cloned or used as a dispatch permit. Current configured capability, policy,
 /// revocation and operation-fenced replay custody are still required.
 pub struct VerifiedDpopReplayProof {
-    authority: DpopReplayAuthorityV1,
+    authority: DpopReplayAuthority,
     capability_id: String,
     nonce: String,
     proof_digest: AdmissionDigest,
@@ -112,7 +111,7 @@ pub struct VerifiedDpopReplayProof {
 }
 
 impl VerifiedDpopReplayProof {
-    pub fn authority(&self) -> &DpopReplayAuthorityV1 {
+    pub fn authority(&self) -> &DpopReplayAuthority {
         &self.authority
     }
     pub fn capability_id(&self) -> &str {
@@ -143,33 +142,32 @@ impl std::fmt::Debug for VerifiedDpopReplayProof {
     }
 }
 
-/// Verify only the explicit v2 profile against independently selected durable
+/// Verify the signed proof against independently selected durable
 /// authority and a trusted observed clock. Never select authority from the proof
 /// itself. This operation does not establish activation or reserve a nonce.
-pub fn verify_authority_dpop_proof_stateless(
+pub fn verify_dpop_proof_stateless(
     proof: &DpopProof,
     capability: &CapabilityToken,
     expected_tool_server: &str,
     expected_tool_name: &str,
     expected_action_hash: &str,
-    expected_authority: &DpopReplayAuthorityV1,
+    expected_authority: &DpopReplayAuthority,
     authority_now_unix_secs: u64,
 ) -> Result<VerifiedDpopReplayProof, KernelError> {
     validate_dpop_replay_identity(&proof.body.nonce, &proof.body.capability_id)?;
     expected_authority.validate()?;
-    if proof.body.schema != DPOP_AUTHORITY_SCHEMA
-        || proof.body.replay_authority.as_ref() != Some(expected_authority)
-    {
-        return Err(invalid(
-            "proof does not match the independently pinned durable domain",
-        ));
+    if proof.body.schema != DPOP_SCHEMA {
+        return Err(DpopError::Schema.into());
+    }
+    if &proof.body.replay_authority != expected_authority {
+        return Err(DpopError::AuthorityMismatch.into());
     }
     let valid_through = proof
         .body
         .issued_at
         .checked_add(expected_authority.proof_ttl_secs)
         .filter(|deadline| *deadline <= MAX_UNIX_SECS)
-        .ok_or_else(|| invalid("proof validity exceeds the durable clock range"))?;
+        .ok_or(DpopError::WindowOverflow)?;
     if authority_now_unix_secs > MAX_UNIX_SECS {
         return Err(invalid("authority clock exceeds the durable clock range"));
     }

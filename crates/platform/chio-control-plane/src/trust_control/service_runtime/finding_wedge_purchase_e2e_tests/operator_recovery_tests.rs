@@ -113,8 +113,20 @@ fn production_purchase_executor(
         BUYER_PAYOUT.to_owned(),
     )
     .map_err(std::io::Error::other)?;
+    let dpop_authority = {
+        crate::initialize_local_dpop_authority(
+            &authority,
+            &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "dpop_authority",
+                "operator-recovery-dpop",
+            )?,
+            &chio_kernel::DpopConfig::default(),
+            chio_test_support::clock::clock(),
+        )?
+    };
     FindingOperatorPurchaseExecutor::new(
         FindingOperatorPurchaseStorage {
+            dpop_authority,
             authority,
             operator_db_path,
             receipt_db_path: deployment.receipt_db.clone(),
@@ -1092,6 +1104,7 @@ async fn a_route_stop_reaches_a_purchase_kernel_built_before_it() -> TestResult 
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "req-stop-retained-kernel",
         capability: &lane.purchase.capability,
         buyer: &lane.buyer,

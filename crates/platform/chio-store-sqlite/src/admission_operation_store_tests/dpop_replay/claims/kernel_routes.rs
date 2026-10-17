@@ -78,7 +78,7 @@ fn kernel(fixture: &Fixture, signer: Keypair) -> AnchoredTestResult<ChioKernel> 
 
 struct Route {
     fixture: Fixture,
-    domain: DpopReplayAuthorityV1,
+    domain: DpopReplayAuthority,
     signer: Keypair,
     agent: Keypair,
     kernel: ChioKernel,
@@ -93,21 +93,6 @@ impl Route {
         let signer = Keypair::generate();
         let mut kernel = kernel(&fixture, signer.clone())?;
         kernel.set_operation_owned_dpop_authority(domain.clone())?;
-        // An independently retired legacy cache is deliberately installed
-        // afterwards. Neither its config nor its availability can downgrade v2.
-        kernel
-            .set_dpop_store(
-                DpopNonceStore::new(8, Duration::from_secs(60))
-                    .expect("positive replay store test capacities"),
-                chio_kernel::dpop::DpopConfig::default(),
-            )
-            .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
-        let legacy = kernel.dpop_replay_source()?;
-        let snapshot = legacy.preview_unsealed(&DpopReplaySourceBinding {
-            dpop_authority_id: identifier("unused_legacy", "unused-retired-cache"),
-            destination_authority_id: identifier("destination", &fixture.fence.store_uuid),
-        })?;
-        legacy.seal_exact(&snapshot)?;
         let calls = Arc::new(AtomicUsize::new(0));
         kernel.register_tool_server(Box::new(Server(calls.clone())));
         Ok(Self {
@@ -144,8 +129,8 @@ impl Route {
         let arguments = serde_json::json!({"record": id});
         let proof = DpopProof::sign(
             DpopProofBody {
-                schema: DPOP_AUTHORITY_SCHEMA.into(),
-                replay_authority: Some(self.domain.clone()),
+                schema: DPOP_SCHEMA.into(),
+                replay_authority: self.domain.clone(),
                 capability_id: capability.id.clone(),
                 tool_server: "dpop-server".into(),
                 tool_name: "tool".into(),
@@ -260,8 +245,15 @@ fn configured_v2_dispatch_claims_before_budget_and_never_uses_retired_legacy_cac
 }
 
 #[test]
-fn invalid_missing_and_legacy_proofs_deny_before_any_claim_or_budget() -> AnchoredTestResult {
-    for invalid in ["missing", "signature", "domain", "expired", "legacy"] {
+fn invalid_missing_and_retired_proofs_deny_before_any_claim_or_budget() -> AnchoredTestResult {
+    use chio_kernel::dpop::DpopError;
+    for (invalid, expected) in [
+        ("missing", DpopError::MissingProof),
+        ("signature", DpopError::Signature),
+        ("domain", DpopError::AuthorityMismatch),
+        ("expired", DpopError::Expired),
+        ("retired", DpopError::Schema),
+    ] {
         let route = Route::new()?;
         let mut request = route.request(invalid, &[1])?;
         let mut proof = request.dpop_proof.take().ok_or("proof absent")?;
@@ -275,19 +267,61 @@ fn invalid_missing_and_legacy_proofs_deny_before_any_claim_or_budget() -> Anchor
                 if invalid == "domain" {
                     let mut value = serde_json::to_value(&route.domain)?;
                     value["max_clock_skew_secs"] = 31.into();
-                    proof.body.replay_authority = Some(serde_json::from_value(value)?);
+                    proof.body.replay_authority = serde_json::from_value(value)?;
                 } else if invalid == "expired" {
                     proof.body.issued_at = now_ms() / 1000 - 62;
                 } else {
-                    proof.body.schema = "chio.dpop_proof.v1".into();
-                    proof.body.replay_authority = None;
+                    proof.body.schema = "chio.dpop_proof.v2".into();
                 }
                 request.dpop_proof = Some(DpopProof::sign(proof.body, &route.agent)?);
             }
         }
         let response = route.kernel.evaluate_tool_call_blocking(&request)?;
         assert_eq!(response.verdict, Verdict::Deny, "{invalid}");
+        assert_eq!(response.reason, Some(expected.to_string()), "{invalid}");
+        assert_eq!(
+            response
+                .receipt
+                .metadata
+                .as_ref()
+                .and_then(|value| value.pointer("/chio_kernel/rejection_code"))
+                .and_then(serde_json::Value::as_str),
+            Some(expected.code()),
+            "{invalid}"
+        );
+        assert!(response.output.is_none(), "{invalid}");
         assert_eq!(route.counts()?, (0, 0), "{invalid}");
+        assert_eq!(route.calls.load(Ordering::SeqCst), 0);
+    }
+    Ok(())
+}
+
+#[test]
+fn missing_and_null_authority_proofs_refuse_decoding_before_any_claim_or_budget(
+) -> AnchoredTestResult {
+    for (authority, expected) in [
+        (None, "missing field `replay_authority`"),
+        (
+            Some(serde_json::Value::Null),
+            "invalid type: null, expected struct DpopReplayAuthorityInput",
+        ),
+    ] {
+        let route = Route::new()?;
+        let request = route.request("authority-free-proof", &[1])?;
+        let mut proof = serde_json::to_value(request.dpop_proof.ok_or("proof absent")?)?;
+        let body = proof["body"].as_object_mut().ok_or("proof body absent")?;
+        match authority {
+            None => {
+                body.remove("replay_authority");
+            }
+            Some(value) => {
+                body.insert("replay_authority".into(), value);
+            }
+        }
+        let error = serde_json::from_value::<DpopProof>(proof)
+            .expect_err("authority-free proof must fail decoding");
+        assert_eq!(error.to_string(), expected);
+        assert_eq!(route.counts()?, (0, 0));
         assert_eq!(route.calls.load(Ordering::SeqCst), 0);
     }
     Ok(())

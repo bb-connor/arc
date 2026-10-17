@@ -61,19 +61,11 @@ impl SourceState {
     pub(super) fn observe_creation(&mut self, now: ClockReading) {
         self.created.get_or_insert(now);
     }
-    pub(super) fn require_pristine(&self) -> Result<(), KernelError> {
-        if self.created.is_some() || self.revision != 0 || self.sealed.is_some() {
-            return Err(invalid(
-                "cannot replace the clock of an observed replay source",
-            ));
-        }
-        Ok(())
-    }
 
     pub(super) fn begin_mutation(&mut self) -> Result<(), KernelError> {
         self.ensure_unsealed()?;
-        // Even a failed attempt can update replay-clock state. Advancing before
-        // mutation also detects an insert/rollback cycle between preview/seal.
+        // Even a replay attempt can update replay-clock state. Advancing before
+        // mutation binds every attempt between preview and seal.
         self.revision = self
             .revision
             .checked_add(1)
@@ -97,10 +89,8 @@ impl SourceState {
 }
 
 impl DpopNonceStore {
-    /// Read-only serving check. This neither reserves a nonce nor proves that
-    /// it is unused. An error denies preparation before another participant
-    /// can consume anything on behalf of the retired source.
-    pub(crate) fn ensure_accepting_proofs(&self) -> Result<(), KernelError> {
+    #[cfg(test)]
+    pub(crate) fn ensure_unsealed(&self) -> Result<(), KernelError> {
         self.source_lock()?.source.ensure_unsealed()
     }
 
@@ -129,14 +119,7 @@ impl DpopNonceStore {
         let mut markers = Vec::with_capacity(state.cache.len());
         let mut marker_bytes = 0_usize;
         for ((nonce, capability_id), entry) in state.cache.iter() {
-            for part in [
-                Some(nonce),
-                Some(capability_id),
-                entry.dispatch_reservation_id.as_ref(),
-            ]
-            .into_iter()
-            .flatten()
-            {
+            for part in [nonce, capability_id] {
                 if part.len() > snapshot::MAX_KEY_BYTES {
                     return Err(invalid("marker identity exceeds migration byte bound"));
                 }
@@ -161,7 +144,6 @@ impl DpopNonceStore {
             let marker = DpopReplaySourceMarker {
                 nonce: nonce.clone(),
                 capability_id: capability_id.clone(),
-                dispatch_reservation_id: entry.dispatch_reservation_id.clone(),
                 retention,
             };
             marker_bytes = marker_bytes
@@ -237,8 +219,8 @@ impl DpopReplaySourcePort for DpopNonceStore {
         state
             .replay_clock
             .validate("dpop_nonce", self.clock.read()?)?;
-        // The same mutex protects every insertion, reservation and
-        // rollback. No mutation can cross the exact comparison/seal boundary.
+        // The same mutex protects insertion and pruning. No mutation can cross
+        // the exact comparison/seal boundary.
         state.source.sealed = Some(expected.clone());
         Ok(())
     }

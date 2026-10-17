@@ -62,6 +62,8 @@ class StaticSeedKeyProvider final : public KeyProvider {
 
 class DpopProofBuilder {
  public:
+  explicit DpopProofBuilder(DpopReplayAuthority authority);
+
   DpopProofBuilder& capability_id(std::string value);
   DpopProofBuilder& tool_server(std::string value);
   DpopProofBuilder& tool_name(std::string value);
@@ -74,6 +76,7 @@ class DpopProofBuilder {
 
  private:
   DpopSignParams params_;
+  DpopReplayAuthority authority_;
   KeyProviderPtr key_provider_;
   NonceGeneratorPtr nonce_generator_;
   ClockPtr clock_;

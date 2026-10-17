@@ -144,6 +144,7 @@ impl ApprovalHarness {
             &self.signer,
             super::super::MediationBudget::Durable(durable),
             super::super::MediationPolicy {
+                dpop_replay_authority: None,
                 issuers: &[],
                 hash: Some(&policy_hash),
                 receipt_store: Some(evidence.clone()),

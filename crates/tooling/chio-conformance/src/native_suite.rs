@@ -22,7 +22,8 @@ use chio_core::receipt::{
     governance::GovernedTransactionReceiptMetadata, kinds::BoundaryClass, kinds::ReceiptKind,
     kinds::RedactionMode, kinds::ToolOrigin, metadata::GuardEvidence,
 };
-use chio_kernel::dpop::{verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody};
+use chio_kernel::dpop::authority::DpopReplayAuthority;
+use chio_kernel::dpop::{verify_dpop_proof_stateless, DpopProof, DpopProofBody};
 use chio_kernel::transport::{read_frame, write_frame, TransportError};
 use chio_kernel::{
     ChioKernel, KernelConfig, KernelError, NestedFlowBridge, RevocationStore, RevocationStoreError,
@@ -1089,16 +1090,14 @@ fn evaluate_artifact_assertion(
         }
         NativeAssertionKind::DpopProofValid => {
             let dpop = fixture.dpop_case()?;
-            let nonce_store = DpopNonceStore::new(32, Duration::from_secs(60))
-                .map_err(chio_kernel::KernelError::from)?;
-            let actual = verify_dpop_proof(
+            let actual = verify_dpop_proof_stateless(
                 dpop.proof,
                 dpop.capability,
                 dpop.expected_tool_server,
                 dpop.expected_tool_name,
                 dpop.expected_action_hash,
-                &nonce_store,
-                &DpopConfig::default(),
+                dpop.authority,
+                current_unix_timestamp(),
             )
             .is_ok();
             compare_bool_assertion(assertion, actual)
@@ -1348,6 +1347,7 @@ enum NativeFixture {
         tampered: Box<ChioReceipt>,
     },
     Dpop {
+        authority: DpopReplayAuthority,
         proof: Box<DpopProof>,
         capability: Box<CapabilityToken>,
         expected_tool_server: String,
@@ -1397,12 +1397,14 @@ impl NativeFixture {
     fn dpop_case(&self) -> Result<DpopCase<'_>, NativeSuiteError> {
         match self {
             Self::Dpop {
+                authority,
                 proof,
                 capability,
                 expected_tool_server,
                 expected_tool_name,
                 expected_action_hash,
             } => Ok(DpopCase {
+                authority,
                 proof: proof.as_ref(),
                 capability,
                 expected_tool_server,
@@ -1424,6 +1426,7 @@ impl NativeFixture {
 }
 
 struct DpopCase<'a> {
+    authority: &'a DpopReplayAuthority,
     proof: &'a DpopProof,
     capability: &'a CapabilityToken,
     expected_tool_server: &'a str,
@@ -1460,6 +1463,21 @@ fn build_fixture(id: &str) -> Result<NativeFixture, NativeSuiteError> {
             })
         }
         "valid_dpop" => {
+            use chio_kernel::admission_operation::{AdmissionDigest, AdmissionIdentifier};
+            use chio_kernel::dpop::authority::DpopReplayAuthorityInput;
+            let authority = DpopReplayAuthority::new(DpopReplayAuthorityInput {
+                destination_store_uuid: AdmissionIdentifier::try_new(
+                    "destination",
+                    "018f9878-7047-7abc-8c98-120dc65700ea",
+                )
+                .map_err(KernelError::from)?,
+                dpop_authority_id: AdmissionIdentifier::try_new("authority", "conformance-dpop")
+                    .map_err(KernelError::from)?,
+                expectation_id: AdmissionDigest::try_new("expectation", "a".repeat(64))
+                    .map_err(KernelError::from)?,
+                proof_ttl_secs: 300,
+                max_clock_skew_secs: 30,
+            })?;
             let capability = build_dpop_capability();
             let params = serde_json::json!({"amount": 25, "currency": "USD"});
             let action_hash = chio_core::sha256_hex(
@@ -1468,7 +1486,7 @@ fn build_fixture(id: &str) -> Result<NativeFixture, NativeSuiteError> {
             );
             let proof = DpopProof::sign(
                 DpopProofBody {
-                    replay_authority: None,
+                    replay_authority: authority.clone(),
                     schema: chio_kernel::dpop::DPOP_SCHEMA.to_string(),
                     capability_id: capability.id.clone(),
                     tool_server: "conformance".to_string(),
@@ -1482,6 +1500,7 @@ fn build_fixture(id: &str) -> Result<NativeFixture, NativeSuiteError> {
             )
             .map_err(|error| NativeSuiteError::Http(error.to_string()))?;
             Ok(NativeFixture::Dpop {
+                authority,
                 proof: Box::new(proof),
                 capability: Box::new(capability),
                 expected_tool_server: "conformance".to_string(),

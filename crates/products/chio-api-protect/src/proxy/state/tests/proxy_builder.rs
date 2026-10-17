@@ -376,6 +376,7 @@ fn minimal_config() -> ProtectConfig {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,
@@ -385,7 +386,6 @@ fn minimal_config() -> ProtectConfig {
         control_token: None,
         budget_db: None,
         revocation_db: None,
-        require_nonce: false,
         allow_advisory: false,
         upstream_request_timeout: crate::DEFAULT_UPSTREAM_REQUEST_TIMEOUT,
     }

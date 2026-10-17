@@ -37,6 +37,8 @@ pub enum HostedEdgeError {
     AuthorizationFailed,
     #[error("hosted replay was rejected")]
     ReplayRejected,
+    #[error("hosted DPoP proof names a different replay authority")]
+    DpopAuthorityMismatch,
     #[error("hosted request rate limit was exceeded")]
     RateLimited,
     #[error("hosted resource was not found")]
@@ -64,6 +66,7 @@ impl HostedEdgeError {
             Self::AuthenticationFailed | Self::InvalidCredential(_) => "authentication_failed",
             Self::AuthorizationFailed => "authorization_failed",
             Self::ReplayRejected => "replay_rejected",
+            Self::DpopAuthorityMismatch => "dpop_authority_mismatch",
             Self::RateLimited => "rate_limited",
             Self::NotFound => "not_found",
             Self::Conflict => "conflict",
@@ -106,6 +109,7 @@ impl HostedEdgeError {
                 Self::AuthenticationFailed | Self::InvalidCredential(_) => "Authentication failed.",
                 Self::AuthorizationFailed => "The credential does not authorize this action.",
                 Self::ReplayRejected => "The proof was already used.",
+                Self::DpopAuthorityMismatch => "The proof names a different replay authority.",
                 Self::RateLimited => "The request rate limit was exceeded.",
                 Self::NotFound => "The requested resource was not found.",
                 Self::Conflict => "The request conflicts with durable state.",
@@ -133,7 +137,9 @@ impl HostedEdgeError {
     pub const fn http_status(&self) -> u16 {
         match self {
             Self::InvalidRequest | Self::InvalidInput(_) => 400,
-            Self::AuthenticationFailed | Self::InvalidCredential(_) => 401,
+            Self::AuthenticationFailed
+            | Self::InvalidCredential(_)
+            | Self::DpopAuthorityMismatch => 401,
             Self::AuthorizationFailed => 403,
             Self::ReplayRejected | Self::RateLimited => 429,
             Self::NotFound => 404,

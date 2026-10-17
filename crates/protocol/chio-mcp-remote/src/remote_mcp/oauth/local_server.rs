@@ -113,10 +113,6 @@ impl LocalAuthorizationServer {
             .ok_or_else(|| consent_refusal("unknown or answered consent_nonce"))
     }
 
-    pub(super) fn token_endpoint_url(&self) -> String {
-        format!("{}/token", self.issuer.trim_end_matches('/'))
-    }
-
     pub(super) fn authorization_page(
         &self,
         request: &AuthorizationRequest,
@@ -168,9 +164,6 @@ impl LocalAuthorizationServer {
             || "none".to_string(),
             |constraint| {
                 let mut parts = Vec::new();
-                if constraint.chio_sender_key.is_some() {
-                    parts.push("dpop");
-                }
                 if constraint.mtls_thumbprint_sha256.is_some() {
                     parts.push("mtls");
                 }
@@ -405,6 +398,16 @@ impl LocalAuthorizationServer {
                 "resource parameter mismatch",
             ));
         }
+        sender_constraint::validate_sender_constraint(grant.sender_constraint.as_ref(), headers)
+        .map_err(|error| {
+            let mut response = oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidGrant,
+                &error.to_string(),
+            );
+            response.extensions_mut().insert(Arc::new(error));
+            response
+        })?;
         let response = self.issue_token_response(TokenResponseInput {
             subject: grant.subject.clone(),
             client_id: grant.client_id.clone(),
@@ -414,27 +417,6 @@ impl LocalAuthorizationServer {
             transaction_context: grant.transaction_context.clone(),
             sender_constraint: grant.sender_constraint.clone(),
             grant_type: Some("authorization_code".to_string()),
-        })?;
-        SenderConstraintVerifier::new(
-            &self.clock,
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
-        )
-        .validate(
-            grant.sender_constraint.as_ref(),
-            headers,
-            Some(code),
-            &self.token_endpoint_url(),
-            "POST",
-        )
-        .map_err(|error| {
-            let mut response = oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                OAuthError::InvalidGrant,
-                &error.to_string(),
-            );
-            response.extensions_mut().insert(Arc::new(error));
-            response
         })?;
 
         codes.remove(code);
@@ -505,6 +487,16 @@ impl LocalAuthorizationServer {
             None,
         )?;
 
+        sender_constraint::validate_sender_constraint(claims.cnf.as_ref(), headers)
+        .map_err(|error| {
+            let mut response = oauth_token_error(
+                StatusCode::BAD_REQUEST,
+                OAuthError::InvalidGrant,
+                &error.to_string(),
+            );
+            response.extensions_mut().insert(Arc::new(error));
+            response
+        })?;
         let response = self.issue_token_response(TokenResponseInput {
             subject,
             client_id,
@@ -514,27 +506,6 @@ impl LocalAuthorizationServer {
             transaction_context,
             sender_constraint: claims.cnf.clone(),
             grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
-        })?;
-        SenderConstraintVerifier::new(
-            &self.clock,
-            &self.sender_dpop_nonce_store,
-            &self.sender_dpop_config,
-        )
-        .validate(
-            claims.cnf.as_ref(),
-            headers,
-            claims.jti.as_deref(),
-            &self.token_endpoint_url(),
-            "POST",
-        )
-        .map_err(|error| {
-            let mut response = oauth_token_error(
-                StatusCode::BAD_REQUEST,
-                OAuthError::InvalidGrant,
-                &error.to_string(),
-            );
-            response.extensions_mut().insert(Arc::new(error));
-            response
         })?;
         Ok(response)
     }

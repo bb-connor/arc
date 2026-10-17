@@ -1333,8 +1333,7 @@ mod tests {
                 public_endpoint: "https://market.example".to_owned(),
                 capability_authorities: vec![authority.public_key()],
                 maximum_capability_ttl_secs: 300,
-                dpop_proof_ttl_secs: 30,
-                dpop_clock_skew_secs: 5,
+                dpop_replay_authority: None,
                 dpop_nonce_capacity_per_tenant: 1_000,
                 tenant_policies: vec![HostedTenantAuthPolicy {
                     tenant_id: tenant,

@@ -2,7 +2,7 @@
 // or 'cargo xtask codegen --lang go'.
 //
 // Source: spec/schemas/chio-wire/v1/**/*.schema.json
-// Schema content SHA-256: edd4db223f71003535d91fc1664ea95781f5b12ebc6119553c9dccf3029db407
+// Schema content SHA-256: af6fc93cf432f0584567b458eab97d65c51ed18ad2b1fda2eea8c9cba3563c0c
 // Tool:   oapi-codegen v2.4.1 (see xtask/codegen-tools.lock.toml)
 //
 // The Schema content SHA-256 is computed from the lex-sorted schema bytes
@@ -374,7 +374,6 @@ const (
 // Defines values for KernelDpopProofBodySchema.
 const (
 	KernelDpopProofBodySchemaChioDpopProofV1 KernelDpopProofBodySchema = "chio.dpop_proof.v1"
-	KernelDpopProofBodySchemaChioDpopProofV2 KernelDpopProofBodySchema = "chio.dpop_proof.v2"
 )
 
 // Defines values for KernelExecutionNonceNonceSchema.
@@ -6342,13 +6341,13 @@ type KernelDpopProof struct {
 		CapabilityId    string                                                   `json:"capability_id"`
 		IssuedAt        int64                                                    `json:"issued_at"`
 		Nonce           string                                                   `json:"nonce"`
-		ReplayAuthority *struct {
+		ReplayAuthority struct {
 			DestinationStoreUuid openapi_types.UUID `json:"destination_store_uuid"`
 			DpopAuthorityId      string             `json:"dpop_authority_id"`
 			ExpectationId        string             `json:"expectation_id"`
 			MaxClockSkewSecs     int64              `json:"max_clock_skew_secs"`
 			ProofTtlSecs         int64              `json:"proof_ttl_secs"`
-		} `json:"replay_authority,omitempty"`
+		} `json:"replay_authority"`
 		Schema     KernelDpopProofBodySchema `json:"schema"`
 		ToolName   string                    `json:"tool_name"`
 		ToolServer string                    `json:"tool_server"`

@@ -16,6 +16,13 @@ const BASE_PARAMS = {
   toolName: "read_file",
   actionArgs: { path: "/tmp/test.txt" },
   agentSeedHex: SEED_HEX,
+  replayAuthority: {
+    destination_store_uuid: "018f9878-7047-7abc-8c98-120dc65700ea",
+    dpop_authority_id: "configured-dpop",
+    expectation_id: "a".repeat(64),
+    proof_ttl_secs: 300,
+    max_clock_skew_secs: 30,
+  },
 };
 
 test("signDpopProof returns body and signature with correct DpopProofBody field names", () => {
@@ -32,6 +39,7 @@ test("signDpopProof returns body and signature with correct DpopProofBody field 
   assert.ok("nonce" in proof.body);
   assert.ok("issued_at" in proof.body);
   assert.ok("agent_key" in proof.body);
+  assert.deepEqual(proof.body.replay_authority, BASE_PARAMS.replayAuthority);
 });
 
 test("body.schema equals chio.dpop_proof.v1", () => {

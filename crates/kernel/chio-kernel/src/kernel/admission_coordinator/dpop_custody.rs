@@ -1,5 +1,5 @@
 //! Recover DPoP ownership from exact retained history. Cleanup does not
-//! require an unexpired token, a legacy reservation ID, or a live verifier.
+//! require an unexpired token or a live verifier.
 
 use super::*;
 use crate::admission_operation::dpop_claim::{

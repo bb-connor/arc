@@ -204,7 +204,6 @@ fn tenant_id_falls_back_to_oauth_federated_claims() {
             audience: Some("chio-mcp".to_string()),
             scopes: vec!["mcp:invoke".to_string()],
             federated_claims: OAuthBearerFederatedClaims {
-                sender_public_key: None,
                 tenant_id: Some("tenant-fed".to_string()),
                 ..OAuthBearerFederatedClaims::default()
             },

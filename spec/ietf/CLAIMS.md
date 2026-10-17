@@ -85,6 +85,29 @@ baseline and its frozen line references remain historical evidence.
   both nonce families; historical registry counts and version names
   below do not describe this amended draft.
 
+### 2026-10-16: DPoP replay-authority alignment
+
+This targeted source review covers the invocation proof and hosted
+sender-constraint statements below. It does not requalify other rows.
+
+- **Invocation proof.** The `chio.dpop_proof.v1` body requires
+  `replay_authority`, and the kernel accepts a proof only when that
+  member equals its independently activated durable authority. Freshness
+  comes from that authority. Evidence:
+  `crates/kernel/chio-kernel/src/dpop/authority.rs` (`verify_dpop_proof_stateless`)
+  and `crates/kernel/chio-kernel/src/kernel/admission_coordinator/dpop_acquisition.rs`.
+  This supersedes the default-window and process-local replay wording in
+  the Sender Constraint rows.
+- **serve-http sender constraint.** The MCP `serve-http` edge accepts no
+  DPoP sender proof on any bearer path (static bearer, session credential,
+  JWT or introspection). A token whose `cnf` carries `chioSenderKey` and a
+  request with a `DPoP` header are rejected with 401 and never admitted as
+  a bearer. Evidence:
+  `crates/protocol/chio-mcp-remote/src/remote_mcp/sender_constraint.rs`
+  (`refuse_presented_dpop`, `validate_sender_constraint`). Row H13 is
+  withdrawn. The finding hosted edge still accepts capability DPoP bound
+  to its configured replay authority.
+
 ## Abstract and Sections 1-3
 
 # Final opening-section claim review
@@ -1148,7 +1171,7 @@ Occurrence counts in sections 10-12: MUST=21, SHOULD=2, MAY=6, REQUIRED=36, OPTI
 | 3022 | MUST | N30 | ({{signing-input}}). A party that forwards an artifact MUST preserve that |
 | 3023 | MAY | N30 | projection and its signature. It MAY re-encode the same typed values |
 | 3120 | MUST | H09 | Every request, `initialize` included, MUST carry an `Authorization` |
-| 3146 | MUST | H13 | members of its `cnf` claim. For `chioSenderKey`, the request MUST carry |
+| 3146 | MUST | H13 | This edge refuses Chio DPoP sender binding: it MUST reject |
 | 3155 | MUST | H14 | `chioAttestationSha256`, the request MUST carry the header |
 | 3162 | MUST | H15 | session. Every later request of the session MUST present the same |
 | 3166 | MUST | H15 | a fingerprint of the token, the request MUST carry the same token. The |
@@ -1212,7 +1235,7 @@ REQUIRED/OPTIONAL/CONDITIONAL presence and omission coverage: native request N07
 | H10 | Static/JWT/introspection mutually exclusive admission; no unauthenticated mode | hosted-admission (draft line 3118) | `crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs:443-478`; `crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs:481-581` | FINAL SUPPORTED |
 | H11 | JWT supports the listed signature algorithms, verifies signatures, and applies nbf/exp checks when those optional claims are present | hosted-admission (draft line 3118) | `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs:559-570`; `crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs:365-397` | FINAL SUPPORTED |
 | H12 | Expected issuer and audience/protected-resource checks are conditional on configuration; configured required scopes are checked | hosted-admission (draft line 3118) | `crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs:398-428` | FINAL SUPPORTED |
-| H13 | cnf.chioSenderKey MUST carry base64url(no padding) sender proof with jti/target/method/empty-action-hash binding; signature/time/nonce checks; failure401 | hosted-admission (draft line 3118) | `crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs:1116-1206`; `crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs:466-475` | FINAL SUPPORTED |
+| H13 | serve-http refuses a `cnf.chioSenderKey` token and any request with a `DPoP` header with 401, never as a bearer | hosted-admission | `crates/protocol/chio-mcp-remote/src/remote_mcp/sender_constraint.rs` (`refuse_presented_dpop`, `validate_sender_constraint`) | WITHDRAWN |
 | H14 | x5t#S256/attestation cnf MUST carry matching thumbprint/digest headers; proofs are not forwarded into kernel calls | hosted-admission (draft line 3118) | `crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs:1208-1228`; `crates/kernel/chio-kernel/src/kernel/session_ops.rs:859-874` | FINAL QUALIFIED: Thumbprint and attestation checks compare header strings. Transport identity or attestation trust must come from the configured deployment boundary, as the security section explains. |
 | H15 | Later requests MUST preserve Origin, static credential or OAuth identity context; MUST preserve fingerprinted token, else403 | hosted-admission (draft line 3118) | `crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs:75-152`; `crates/protocol/chio-mcp-remote/src/remote_mcp/session_core.rs:398-445` | FINAL QUALIFIED: Shared-owner mode removes the OAuth token fingerprint from the bound context. The same-token requirement is correctly conditional on a recorded fingerprint. |
 | H16 | Initialize requires id and absolutely no session header; no session registered on failure | hosted-initialization (draft line 3169) | `crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs:340-350`; `crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs:494-546` | FINAL SUPPORTED |

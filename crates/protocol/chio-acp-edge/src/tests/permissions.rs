@@ -1,4 +1,5 @@
 use super::*;
+use crate::dpop_authority::ActivatedDpopAuthority;
 
 // ---- Category inference tests ----
 
@@ -147,8 +148,11 @@ fn permission_with_capability_denies_sender_bound_scope_without_dpop() {
 #[test]
 fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
     let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let config = test_kernel_config();
+    let mut config = test_kernel_config();
+    config.policy_hash = chio_core::sha256_hex(b"acp-dpop-policy");
     let issuer = config.keypair.clone();
+    let mut kernel = ChioKernel::new(config);
+    let authority = ActivatedDpopAuthority::install(&mut kernel, 300, 30).test_unwrap();
     let subject = Keypair::generate();
     let capability = capability_for_tool_with_dpop_requirement(
         &issuer,
@@ -165,6 +169,7 @@ fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
         "write_file",
         &request_arguments,
         "acp-preview-nonce-wrong-tool",
+        &authority.domain,
     );
     let execution = AcpKernelExecutionContext {
         capability,
@@ -184,7 +189,7 @@ fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
     };
 
     assert_eq!(
-        edge.evaluate_permission(&request, &execution),
+        edge.evaluate_permission_with_kernel(&request, &kernel, &execution),
         PermissionDecision::Deny
     );
 }
@@ -192,16 +197,18 @@ fn permission_with_capability_denies_sender_bound_scope_with_mismatched_dpop() {
 #[test]
 fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
     let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let config = test_kernel_config();
+    let mut config = test_kernel_config();
+    config.policy_hash = chio_core::sha256_hex(b"acp-dpop-policy");
     let issuer = config.keypair.clone();
+    let unconfigured_kernel = ChioKernel::new(KernelConfig {
+        keypair: issuer.clone(),
+        ca_public_keys: vec![issuer.public_key()],
+        policy_hash: config.policy_hash.clone(),
+        ..test_kernel_config()
+    });
     let mut kernel = ChioKernel::new(config);
     kernel.register_tool_server(Box::new(test_server()));
-    kernel
-        .set_dpop_store(
-            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)).test_unwrap(),
-            dpop::DpopConfig::default(),
-        )
-        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
+    let authority = ActivatedDpopAuthority::install(&mut kernel, 300, 30).test_unwrap();
     let subject = Keypair::generate();
     let capability = capability_for_tool_with_dpop_requirement(
         &issuer,
@@ -218,6 +225,7 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
         "read_file",
         &request_arguments,
         "acp-preview-valid-invoke-nonce",
+        &authority.domain,
     );
     let execution = AcpKernelExecutionContext {
         capability,
@@ -237,6 +245,10 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
     };
 
     assert_eq!(
+        edge.evaluate_permission_with_kernel(&request, &unconfigured_kernel, &execution),
+        PermissionDecision::Deny
+    );
+    assert_eq!(
         edge.evaluate_permission_with_kernel(&request, &kernel, &execution),
         PermissionDecision::Allow
     );
@@ -249,19 +261,11 @@ fn permission_preview_accepts_valid_dpop_without_consuming_invocation_nonce() {
 #[test]
 fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
     let edge = new_test_edge(AcpEdgeConfig::default(), vec![test_manifest()]).test_unwrap();
-    let config = test_kernel_config();
+    let mut config = test_kernel_config();
+    config.policy_hash = chio_core::sha256_hex(b"acp-dpop-policy");
     let issuer = config.keypair.clone();
     let mut kernel = ChioKernel::new(config);
-    kernel
-        .set_dpop_store(
-            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300)).test_unwrap(),
-            dpop::DpopConfig {
-                proof_ttl_secs: 5,
-                max_clock_skew_secs: 0,
-                nonce_store_capacity: 1024,
-            },
-        )
-        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
+    let authority = ActivatedDpopAuthority::install(&mut kernel, 5, 0).test_unwrap();
     let subject = Keypair::generate();
     let capability = capability_for_tool_with_dpop_requirement(
         &issuer,
@@ -271,15 +275,18 @@ fn jsonrpc_permission_preview_uses_kernel_dpop_config() {
         Some(true),
     );
     let request_arguments = json!({"path": "/tmp"});
-    let stale_under_kernel_config = dpop_proof_for_request_issued_at(
+    let mut stale_body = dpop_proof_for_request(
         &subject,
         &capability,
         "test-srv",
         "read_file",
         &request_arguments,
         "acp-preview-kernel-dpop-config",
-        current_unix_timestamp().saturating_sub(60),
-    );
+        &authority.domain,
+    )
+    .body;
+    stale_body.issued_at = current_unix_timestamp().saturating_sub(60);
+    let stale_under_kernel_config = dpop::DpopProof::sign(stale_body, &subject).test_unwrap();
     let execution = AcpKernelExecutionContext {
         capability,
         agent_id: subject.public_key().to_hex(),

@@ -17,7 +17,7 @@ pub(super) enum Mode {
 pub(in super::super) struct TestDpop(pub(super) Mutex<State>);
 #[derive(Default)]
 pub(super) struct State {
-    pub(super) authority: Option<DpopReplayAuthorityV1>,
+    pub(super) authority: Option<DpopReplayAuthority>,
     pub(super) history: Vec<DpopReplayClaimHistoryV1>,
     pub(super) mode: Mode,
     pub(super) history_panics: usize,
@@ -27,8 +27,8 @@ pub(super) struct State {
 impl TestDpop {
     pub(in super::super) fn activation(
         &self,
-        expected: &DpopReplayAuthorityV1,
-    ) -> Result<DpopReplayAuthorityV1, AdmissionOperationStoreError> {
+        expected: &DpopReplayAuthority,
+    ) -> Result<DpopReplayAuthority, AdmissionOperationStoreError> {
         let state = self.0.lock().expect("DPoP state");
         let authority = state.authority.as_ref().ok_or_else(|| {
             AdmissionOperationStoreError::Unavailable("test DPoP authority unsupported".into())
