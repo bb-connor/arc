@@ -81,7 +81,7 @@ impl SqliteAdmissionOperationStore {
     }
 }
 
-fn current_key(scope: &str) -> String {
+pub(super) fn current_key(scope: &str) -> String {
     format!("{CURRENT_PREFIX}{scope}")
 }
 
@@ -117,7 +117,7 @@ fn current_deployment(
 }
 
 /// Structural and binding checks of one deployment against this authority.
-fn validate_deployment(
+pub(super) fn validate_deployment(
     profile: &RecoveryDeploymentV1,
     fence: &StoreMutationFence,
 ) -> Result<(), AdmissionOperationStoreError> {

@@ -33,6 +33,9 @@ use super::super::recovery_records::{
 };
 use super::*;
 
+mod actor_authentication;
+mod authenticated_read;
+
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 /// One provisioned serving authority with a fixed trusted clock.

@@ -608,6 +608,11 @@ pub struct ChioKernel {
     // async worker (a connection that blocks before its first `.await` cannot then
     // pin the worker).
     pub(super) tool_servers: HashMap<ServerId, Arc<dyn ToolServerConnection>>,
+    /// Recovery-capable connections, each the same allocation as its entry in
+    /// `tool_servers` when registered. Any registration of the server id
+    /// replaces or withdraws it.
+    pub(super) recovery_tool_servers:
+        HashMap<ServerId, Arc<dyn crate::recovery::RecoveryToolServerConnection>>,
     pub(super) resource_providers: Vec<Box<dyn ResourceProvider>>,
     pub(super) prompt_providers: Vec<Box<dyn PromptProvider>>,
     pub(super) sessions: DashMap<SessionId, Arc<Session>>,

@@ -935,7 +935,12 @@ pub trait AdmissionOperationStore: Send + Sync {
 /// exact persisted claim and historical coordinator lease. An implementation
 /// that returns success without those guarantees can authorize an unsafe
 /// recovery transition.
-pub trait QualifiedAdmissionOperationStore: AdmissionOperationStore {}
+pub trait QualifiedAdmissionOperationStore: AdmissionOperationStore {
+    /// The authenticated recovery deployment reader of this authority, or
+    /// `None` when this backend holds no recovery deployments. The kernel
+    /// refuses recovery actor authentication without it.
+    fn recovery_deployment_port(&self) -> Option<&dyn crate::recovery::RecoveryDeploymentPort>;
+}
 
 /// Non-overridable recovery qualification for explicitly trusted stores.
 ///

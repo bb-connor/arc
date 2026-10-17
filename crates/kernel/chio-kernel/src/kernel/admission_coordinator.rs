@@ -57,6 +57,8 @@ mod payment_journal;
 pub use native_output::NativeSecurityOutputJoinAuthority;
 #[path = "admission_coordinator/recovery.rs"]
 mod recovery;
+#[path = "admission_coordinator/recovery_actor.rs"]
+mod recovery_actor;
 #[path = "admission_coordinator/runtime_acquisition.rs"]
 mod runtime_acquisition;
 #[path = "admission_coordinator/runtime_participant.rs"]

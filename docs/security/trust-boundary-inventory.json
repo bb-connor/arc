@@ -23168,6 +23168,9 @@
       "decode_work_join_inputs::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
       "decode_work_request::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode",
       "decode_work_response::shared-reader::crates/kernel/chio-runtime-core/src/work/decode.rs::decode"
+    ],
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_authority.rs": [
+      "deployment::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record"
     ]
   },
   "retired_direct_readers": {
