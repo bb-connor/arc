@@ -131,11 +131,11 @@ fn replaced_signer_defers_until_the_original_authority_returns() -> TestResult {
 
 #[derive(Clone, Copy)]
 enum BackendFault {
-    ReplacedSigner,
+    UnreadableKey,
     PanickingKey,
 }
 
-/// Selects a key other than the retained one, then fails identity selection.
+/// Fails identity selection for a signer other than the retained one.
 struct FaultyBackend {
     inner: Ed25519Backend,
     fault: BackendFault,
@@ -144,7 +144,9 @@ struct FaultyBackend {
 impl SigningBackend for FaultyBackend {
     fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         match self.fault {
-            BackendFault::ReplacedSigner => self.inner.public_key(),
+            BackendFault::UnreadableKey => Err(chio_core::Error::InvalidPublicKey(
+                "signing backend key selection fault".to_string(),
+            )),
             BackendFault::PanickingKey => panic!("signing backend key selection fault"),
         }
     }
@@ -174,10 +176,10 @@ fn backend_fault_stays_global(fault: BackendFault, expected: &str) -> TestResult
 }
 
 #[test]
-fn replaced_backend_signer_stays_global() -> TestResult {
+fn unreadable_backend_key_stays_global() -> TestResult {
     backend_fault_stays_global(
-        BackendFault::ReplacedSigner,
-        "receipt signing identity changed during selection",
+        BackendFault::UnreadableKey,
+        "invalid public key: signing backend key selection fault",
     )
 }
 
