@@ -26,7 +26,7 @@
 //! - [`BrowserClock`] routes `chio_kernel_core::Clock` through
 //!   `js_sys::Date::now()`.
 //! - [`WebCryptoRng`] routes `chio_kernel_core::Rng` through
-//!   `window.crypto.getRandomValues(...)`.
+//!   `globalThis.crypto.getRandomValues(...)`.
 //!
 //! Both adapters are cheap to construct; each wasm entry point
 //! instantiates fresh copies rather than carrying mutable state across
