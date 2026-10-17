@@ -7157,7 +7157,8 @@
       "require_canonical_payload::from_slice"
     ],
     "crates/kernel/chio-runtime-core/src/work/decode.rs": [
-      "decode::from_value"
+      "decode::from_value",
+      "recovery_contract::from_value"
     ],
     "crates/kernel/chio-runtime-core/src/work/ids.rs": [
       "as_str::custom_deserialize"
@@ -12350,10 +12351,20 @@
     },
     "crates/kernel/chio-runtime-core/src/work/decode.rs": {
       "kind": "strict-preflight-reparse",
-      "contract": "Allocation-free preflight bounds bytes, depth, nodes, container entries and safe integers before the duplicate-aware original-JSON reader builds a Value; typed conversion then refuses unknown fields and variants, and validate() enforces work bounds and commitment bindings. Decoding proves no signature, authority or audience.",
+      "contract": "Allocation-free preflight bounds bytes, depth, nodes, container entries and safe integers before the duplicate-aware original-JSON reader builds a Value; each embedded REC-0a contract is charged at the REC-0a inner limits over its canonical bytes and refused when its typed decode discards a field; typed conversion then refuses unknown fields and variants, and validate() enforces work bounds and commitment bindings. Decoding proves no signature, authority or audience.",
       "readers": [
         {
           "reader": "decode",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        },
+        {
+          "reader": "recovery_contract",
           "decoders": [
             "from_value"
           ],
