@@ -63,7 +63,9 @@ impl BrokerIpcHandler for PreparedHandler {
             &authenticated.registration,
             RegisterAttemptAction::Prepare,
             &request.tenant_scope,
-            &authority().public_key()?,
+            &authority()
+                .public_key()
+                .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?,
             now,
             0,
         )?;
