@@ -829,7 +829,7 @@ pub const TRANSPORT_DPOP_SENDER_PROOF_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec
     urn: "urn:chio:error:transport:dpop-sender-proof-unavailable",
     domain: Domain::Transport,
     severity: Severity::Fatal,
-    summary: "Chio DPoP sender binding is unavailable on this transport.",
+    summary: "Chio DPoP sender binding is refused on this transport.",
     help: "Use a TLS-bound sender constraint or present the DPoP proof inside the tool call to an activated replay authority.",
     string_code: "CHIO-TRANSPORT-DPOP-SENDER-PROOF-UNAVAILABLE",
     jsonrpc_code: None,

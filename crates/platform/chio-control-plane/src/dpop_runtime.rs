@@ -6,7 +6,35 @@ use chio_security_types::clock::{Clock, ClockReading};
 use chio_store_sqlite::SqliteAuthorityStore;
 use std::sync::Arc;
 
+use crate::policy::LoadedPolicy;
 use crate::CliError;
+
+/// The single configuration point for the deployment's DPoP replay authority:
+/// a bounded JSON descriptor file.
+pub const DPOP_REPLAY_AUTHORITY_FILE_ENV: &str = "CHIO_DPOP_REPLAY_AUTHORITY_FILE";
+
+/// Exact startup refusal for a proof-required policy without a descriptor.
+pub const DPOP_REPLAY_AUTHORITY_REQUIRED: &str =
+    "a DPoP-required policy needs CHIO_DPOP_REPLAY_AUTHORITY_FILE";
+
+/// Refuse startup when any default grant requires DPoP and no replay authority
+/// is configured.
+pub fn require_configured_dpop_replay_authority(
+    policy: &LoadedPolicy,
+    authority: Option<&DpopReplayAuthority>,
+) -> Result<(), CliError> {
+    let required = policy.default_capabilities.iter().any(|capability| {
+        capability
+            .scope
+            .grants
+            .iter()
+            .any(|grant| grant.dpop_required == Some(true))
+    });
+    if required && authority.is_none() {
+        return Err(failure(DPOP_REPLAY_AUTHORITY_REQUIRED));
+    }
+    Ok(())
+}
 
 /// Read an existing active authority selected by trusted deployment configuration.
 pub fn load_local_dpop_authority(

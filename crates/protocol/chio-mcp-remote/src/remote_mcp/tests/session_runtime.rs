@@ -167,7 +167,7 @@ fn remote_session_factory_rejects_admission_sidecar_aliases() {
 }
 
 #[test]
-fn inbound_authority_factory_refuses_proof_policy_without_a_sender_key() {
+fn serve_http_refuses_a_proof_policy_without_a_replay_authority_file() {
     #[derive(Debug)]
     struct ReadTransport;
 
@@ -206,30 +206,14 @@ fn inbound_authority_factory_refuses_proof_policy_without_a_sender_key() {
     config.receipt_db_path = Some(directory.join("receipts.sqlite3"));
     config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
     configure_signed_manifest(&mut config, &directory);
-    let factory = RemoteSessionFactory::new(config.clone()).unwrap();
-    let static_bearer = SessionAuthContext::streamable_http_static_bearer("unbound", "token", None);
-    let oauth_bearer = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
-        chio_core::OAuthBearerSessionAuthInput {
-            principal: Some("verified-sender".into()),
-            issuer: Some("https://issuer.example".into()),
-            subject: Some("sender".into()),
-            audience: None,
-            scopes: vec![],
-            federated_claims: OAuthBearerFederatedClaims::default(),
-            enterprise_identity: None,
-            token_fingerprint: Some("fingerprint".into()),
-            origin: None,
-        },
+    let error = RemoteSessionFactory::new(config.clone())
+        .err()
+        .expect("a proof-required policy without a replay authority starts");
+    assert!(
+        error
+            .to_string()
+            .contains(chio_control_plane::DPOP_REPLAY_AUTHORITY_REQUIRED),
+        "{error:?}"
     );
-    for auth in [static_bearer, oauth_bearer] {
-        let error = factory.spawn_session(auth).err().unwrap();
-        assert!(
-            error
-                .to_string()
-                .contains("proof-required sessions require an authenticated Chio sender key"),
-            "{error:?}"
-        );
-    }
-    drop(factory);
     std::fs::remove_dir_all(directory).unwrap();
 }

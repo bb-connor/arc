@@ -168,6 +168,9 @@ impl std::str::FromStr for OAuthClientRegistration {
 
 #[derive(Clone)]
 pub struct RemoteServeHttpConfig {
+    /// Activated DPoP replay authority loaded from
+    /// `CHIO_DPOP_REPLAY_AUTHORITY_FILE`; required when the policy requires DPoP.
+    pub dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
     pub clock: RemoteClock,
     pub listen: SocketAddr,
     /// Listener confidentiality and explicit plaintext policy.

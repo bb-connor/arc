@@ -7,7 +7,11 @@ impl RemoteSessionFactory {
             proxy.validate_separation(&config)?;
         }
         let loaded_policy = load_policy(&config.policy_path)?;
-        let dpop_authority = loaded_policy.kernel.dpop_replay_authority.clone();
+        chio_control_plane::require_configured_dpop_replay_authority(
+            &loaded_policy,
+            config.dpop_replay_authority.as_ref(),
+        )?;
+        let dpop_authority = config.dpop_replay_authority.clone();
         let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
             CliError::cli_other_error(
                 "remote MCP requires an existing publisher-signed manifest file".to_string(),
@@ -146,7 +150,7 @@ impl RemoteSessionFactory {
             CliError::cli_other_error("explicit approval authority is required".to_string())
         })?;
         let loaded_policy = load_policy(&self.config.policy_path)?;
-        let dpop_authority = loaded_policy.kernel.dpop_replay_authority.clone();
+        let dpop_authority = self.config.dpop_replay_authority.clone();
         if fingerprint_remote_policy_contract(&loaded_policy)? != session.policy_fingerprint
             || self.runtime_contract_fingerprint != session.runtime_contract_fingerprint
         {
@@ -367,7 +371,7 @@ impl RemoteSessionFactory {
     ) -> Result<Arc<RemoteSession>, CliError> {
         let session_id = Keypair::generate().public_key().to_hex();
         let loaded_policy = load_policy(&self.config.policy_path)?;
-        let dpop_authority = loaded_policy.kernel.dpop_replay_authority.clone();
+        let dpop_authority = self.config.dpop_replay_authority.clone();
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
@@ -571,7 +575,7 @@ impl RemoteSessionFactory {
         }
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
-        let dpop_authority = loaded_policy.kernel.dpop_replay_authority.clone();
+        let dpop_authority = self.config.dpop_replay_authority.clone();
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();

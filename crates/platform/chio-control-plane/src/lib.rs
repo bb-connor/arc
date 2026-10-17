@@ -32,7 +32,11 @@ mod bounded_worker_pool;
 pub mod certify;
 mod dpop_runtime;
 mod durable_admission;
-pub use dpop_runtime::{initialize_local_dpop_authority, load_local_dpop_authority};
+pub use dpop_runtime::{
+    initialize_local_dpop_authority, load_local_dpop_authority,
+    require_configured_dpop_replay_authority, DPOP_REPLAY_AUTHORITY_FILE_ENV,
+    DPOP_REPLAY_AUTHORITY_REQUIRED,
+};
 mod error;
 mod integer;
 mod json_input;

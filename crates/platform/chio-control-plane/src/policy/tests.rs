@@ -1974,12 +1974,9 @@ extensions:
 mod runtime_policy_wire;
 
 #[test]
-fn dpop_replay_authority_requires_durable_admission() {
+fn policy_cannot_carry_a_dpop_replay_authority() {
     let policy = serde_json::json!({
         "kernel": {
-            "durable_admission_mode": "off",
-            "allow_unsafe_durable_admission_off": true,
-            "allow_ephemeral_receipt_log": true,
             "dpop_replay_authority": {
                 "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
                 "dpop_authority_id": "configured-dpop",
@@ -1989,9 +1986,12 @@ fn dpop_replay_authority_requires_durable_admission() {
             }
         }
     });
-    let result = parse_policy(&policy.to_string());
-    assert!(matches!(
-        result,
-        Err(PolicyError::Invalid(message)) if message == "dpop_replay_authority requires durable admission"
-    ));
+    let error = parse_policy(&policy.to_string())
+        .err()
+        .map(|error| error.to_string())
+        .unwrap_or_default();
+    assert!(
+        error.contains("unknown field `dpop_replay_authority`"),
+        "{error}"
+    );
 }

@@ -224,6 +224,7 @@ fn empty_header_map() -> HeaderMap {
 
 fn test_remote_config() -> RemoteServeHttpConfig {
     RemoteServeHttpConfig {
+        dpop_replay_authority: None,
         transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),
@@ -1501,6 +1502,7 @@ fn build_federated_claims_normalizes_enterprise_identity_metadata() {
 #[test]
 fn provider_profile_can_derive_standard_oidc_discovery_url_from_issuer() {
     let config = RemoteServeHttpConfig {
+        dpop_replay_authority: None,
         transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),
@@ -1678,6 +1680,7 @@ fn identity_federation_derives_stable_keypair_per_principal() {
 #[test]
 fn jwt_remote_auth_requires_separate_admin_token() {
     let config = RemoteServeHttpConfig {
+        dpop_replay_authority: None,
         transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),

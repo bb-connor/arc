@@ -792,7 +792,7 @@ codes:
   - urn: "urn:chio:error:transport:dpop-sender-proof-unavailable"
     domain: transport
     severity: fatal
-    summary: "Chio DPoP sender binding is unavailable on this transport."
+    summary: "Chio DPoP sender binding is refused on this transport."
     help: "Use a TLS-bound sender constraint or present the DPoP proof inside the tool call to an activated replay authority."
     string_code: "CHIO-TRANSPORT-DPOP-SENDER-PROOF-UNAVAILABLE"
     since: "0.1.0"

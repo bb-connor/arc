@@ -29,12 +29,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let policy_path = state.path().join("policy.yaml");
     std::fs::write(&policy_path, "{}\n")?;
     let policy = load_policy(&policy_path)?;
-    let dpop_authority = policy.kernel.dpop_replay_authority.clone();
     let admission = DurableAdmissionRuntime::open(
         &state.path().join("admission.sqlite3"),
     )?;
     let mut kernel = build_kernel(policy, &admission.kernel_keypair());
-    admission.attach(&mut kernel, dpop_authority.as_ref())?;
+    admission.attach(&mut kernel, None)?;
     configure_receipt_store(
         &mut kernel,
         Some(&state.path().join("receipts.sqlite3")),

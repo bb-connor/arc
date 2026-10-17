@@ -460,7 +460,7 @@ pub(super) fn kernel_with_clock(
         return Err(error("host policy requires durable_admission_mode: all and persistent receipts and revocations"));
     }
     let swarm_required = loaded.kernel.require_swarm_admission;
-    let dpop_authority = loaded.kernel.dpop_replay_authority.clone();
+    let dpop_authority = crate::runtime_cli::policy_dpop_replay_authority(&loaded)?;
     let root_scope = loaded.default_capabilities[0].scope.clone();
     let issuance = loaded.issuance_policy.clone();
     let assurance = loaded.runtime_assurance_policy.clone();

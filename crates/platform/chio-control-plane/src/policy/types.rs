@@ -196,10 +196,6 @@ pub struct KernelPolicyConfig {
     #[serde(default)]
     pub allow_unsafe_durable_admission_off: bool,
 
-    /// Exact activated DPoP authority selected by the deployment.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
-
     /// Number of receipts between Merkle checkpoint snapshots.
     #[serde(default = "default_checkpoint_batch_size")]
     pub checkpoint_batch_size: u64,
@@ -220,7 +216,6 @@ impl Default for KernelPolicyConfig {
             durable_admission_mode: chio_kernel::admission_operation::DurableAdmissionMode::default(
             ),
             allow_unsafe_durable_admission_off: false,
-            dpop_replay_authority: None,
             checkpoint_batch_size: default_checkpoint_batch_size(),
         }
     }
@@ -230,13 +225,6 @@ impl KernelPolicyConfig {
     pub(super) fn validate(&self) -> Result<(), PolicyError> {
         use chio_kernel::admission_operation::{AdmissionReceiptPersistence, DurableAdmissionMode};
 
-        if self.dpop_replay_authority.is_some()
-            && self.durable_admission_mode == DurableAdmissionMode::Off
-        {
-            return Err(PolicyError::Invalid(
-                "dpop_replay_authority requires durable admission".to_string(),
-            ));
-        }
         let receipts = if self.allow_ephemeral_receipt_log {
             AdmissionReceiptPersistence::Ephemeral
         } else {

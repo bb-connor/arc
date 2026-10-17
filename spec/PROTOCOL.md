@@ -5219,13 +5219,15 @@ requirements are refused until an origin-aware compiled guard is installed.
 
 `chio run` and `chio mcp serve` accept `--agent-public-key`. A policy requiring
 proofs requires this operator binding; the caller retains the private key. Remote HTTP
-sessions carry no Chio sender key while sender DPoP binding is unavailable, so static
+sessions carry no Chio sender key because sender DPoP binding is refused, so static
 bearer, OAuth and TLS-only authentication cannot bootstrap an invocation-proof policy
 and such policies deny over MCP HTTP. `chio check` owns
 its ephemeral test key and signs its own request. Unbound grants retain bearer
 semantics. Unsupported required-proof HTTP projections deny. Invocation-proof
 acceptance requires an independently configured, activated durable replay authority;
-without one, proof-required grants deny.
+without one, proof-required grants deny. The authority descriptor is configured only
+through `CHIO_DPOP_REPLAY_AUTHORITY_FILE`; a policy whose default grants require DPoP
+refuses to start when it is unset.
 
 MCP confirmation profiles are closed: unknown members (including unsupported
 RFC 9449 `jkt`), empty or null profiles, and empty bindings reject authentication.

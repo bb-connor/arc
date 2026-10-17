@@ -1149,7 +1149,7 @@ fn build_request_sender_constraint(
             oauth_token_error(
                 StatusCode::BAD_REQUEST,
                 OAuthError::InvalidRequest,
-                "Chio DPoP sender binding is unavailable",
+                "Chio DPoP sender binding is refused",
             ),
             SenderConstraintError::DpopUnavailable,
         ));
