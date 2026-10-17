@@ -227,20 +227,25 @@ fn native_policy_rejects_other_initialized_authority_before_classification() -> 
 }
 
 #[test]
-fn native_policy_rejects_legacy_evidence_configuration() -> TestResult {
+fn native_policy_rejects_flow_evidence_store_configuration() -> TestResult {
     let fixture = public_fixture()?;
     let config =
         flow_config().with_receipt_evidence(Arc::new(RejectingSecurityReceipts), receipt_policy());
-    assert!(matches!(
-        NativeFlowResolver::new(
-            fixture.binding,
-            flow_registry(),
-            Arc::new(CountingEmptyClassifier::new()),
-            fixture.clock.clone(),
-            config
-        ),
-        Err(NativeFlowError::LegacyEvidenceConfigured)
-    ));
+    let result = NativeFlowResolver::new(
+        fixture.binding,
+        flow_registry(),
+        Arc::new(CountingEmptyClassifier::new()),
+        fixture.clock.clone(),
+        config,
+    );
+    let Err(error) = result else {
+        return Err("native flow authority accepted a receipt evidence store".into());
+    };
+    assert!(matches!(error, NativeFlowError::EvidenceStoresConfigured));
+    assert_eq!(
+        error.to_string(),
+        "flow declassification and receipt evidence stores cannot configure native flow authority"
+    );
     Ok(())
 }
 

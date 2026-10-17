@@ -756,7 +756,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::native_policy_rejects_clock_failure_before_egress_acquisition \
   security::adapters::tests::native_flow::native_policy_rejects_untrusted_declassification_before_classification \
   security::adapters::tests::native_flow::native_policy_rejects_future_clock_before_preparation \
-  security::adapters::tests::native_flow::native_policy_rejects_legacy_evidence_configuration \
+  security::adapters::tests::native_flow::native_policy_rejects_flow_evidence_store_configuration \
   security::adapters::tests::native_flow::native_policy_rejects_other_initialized_authority_before_classification \
   security::adapters::tests::native_flow::native_policy_rejects_public_destination_for_recorded_restricted_input \
   security::adapters::tests::native_flow::native_policy_rejects_regressing_clock_before_egress_acquisition \

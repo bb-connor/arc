@@ -67,7 +67,7 @@ impl NativeFlowResolver {
             label = label.join(floor).unwrap_or(InformationLabel::Top);
         }
         // Current inherited principal/lineage/session restrictions are joined
-        // atomically by the original operation's writer, never a legacy store.
+        // atomically by the original operation's writer, never a flow-state store.
         Ok(label)
     }
 }
