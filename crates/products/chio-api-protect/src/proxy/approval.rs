@@ -364,12 +364,8 @@ pub(super) fn redeem_approval(
     if resolved.outcome != ApprovalOutcome::Approved {
         return Err(ApprovalHandlerError::Rejected("approval was denied".into()));
     }
-    let pending = resolved.request.ok_or_else(|| {
-        ApprovalHandlerError::Rejected("legacy approval has no retained intent".into())
-    })?;
-    let token = resolved.token.ok_or_else(|| {
-        ApprovalHandlerError::Rejected("approval has no retained signed decision".into())
-    })?;
+    let pending = resolved.request;
+    let token = resolved.token;
     if request.request_id != pending.approval_id
         || request.capability.id != pending.capability_id
         || request.server_id != pending.tool_server

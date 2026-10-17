@@ -83,9 +83,8 @@ class ResolvedApproval(BaseModel):
 class Approval(BaseModel):
     """Response shape for ``GET /approvals/{id}``.
 
-    Either ``pending`` or ``resolution`` is populated. Current resolved rows
-    retain their original request and signed token inside ``resolution``;
-    older audit-only rows can omit those artifacts.
+    Either ``pending`` or ``resolution`` is populated. A resolution carries
+    its original request and signed token.
     """
 
     model_config = ConfigDict(extra="allow")

@@ -89,10 +89,10 @@ fn ap23_concurrent_resolution_retains_one_signed_decision_after_reopen() -> Test
     let retained = reopened
         .get_resolution(&request.approval_id)?
         .ok_or("resolution missing")?;
-    assert_eq!(retained.request, Some(request));
-    assert_eq!(retained.token, Some(decision.token.clone()));
+    assert_eq!(retained.request, request);
+    assert_eq!(retained.token, decision.token);
     assert_eq!(retained.approver_hex, decision.approver.to_hex());
-    assert!(retained.token.ok_or("token missing")?.verify_signature()?);
+    assert!(retained.token.verify_signature()?);
     Ok(())
 }
 
@@ -112,5 +112,23 @@ fn ap23_store_rejects_unsigned_outcome_substitution_without_mutating_pending() -
     );
     assert!(store.get_resolution(&request.approval_id)?.is_none());
     assert!(!store.is_consumed(&decision.token.id, &request.parameter_hash)?);
+    Ok(())
+}
+
+#[test]
+fn resolution_without_retained_artifacts_is_refused() -> TestResult {
+    let store = SqliteApprovalStore::open_in_memory()?;
+    let (request, decision) = request_and_decision()?;
+    store.store_pending(&request)?;
+    store.resolve(&request.approval_id, &decision)?;
+    store.pool.get()?.execute(
+        "DELETE FROM chio_hitl_decision_artifacts WHERE approval_id = ?1",
+        params![request.approval_id],
+    )?;
+    let refused = store.get_resolution(&request.approval_id);
+    assert!(
+        matches!(refused, Err(ApprovalStoreError::Serialization(ref reason)) if reason == "resolved approval ap23-persisted has no retained request and signed decision"),
+        "{refused:?}"
+    );
     Ok(())
 }

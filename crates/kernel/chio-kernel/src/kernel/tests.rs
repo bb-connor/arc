@@ -10,11 +10,9 @@ use crate::admission_operation::{
     QualifiedAdmissionOperationStore, StoreMutationFence, UntrustedAdmissionRecoveryClaim,
 };
 use crate::approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalContext, ApprovalDecision, ApprovalGuard,
-    ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalToken, HitlVerdict,
-    InMemoryApprovalStore,
+    compute_parameter_hash, resume_with_decision, ApprovalDecision, ApprovalOutcome,
+    ApprovalRequest, ApprovalStore, ApprovalToken, InMemoryApprovalStore,
 };
-use crate::approval_channels::RecordingChannel;
 use crate::compliance_score::{compliance_score, ComplianceScoreConfig, ComplianceScoreInputs};
 use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use crate::execution_nonce::{

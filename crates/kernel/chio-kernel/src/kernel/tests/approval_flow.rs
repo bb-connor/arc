@@ -445,51 +445,6 @@ fn threshold_approval_set_is_policy_bound_and_order_independent(
 }
 
 // ---------------------------------------------------------------------
-// (a) PendingApproval is returned when constraints require approval.
-// ---------------------------------------------------------------------
-
-#[test]
-fn hitl_force_approval_returns_pending() {
-    let store = StdArc::new(InMemoryApprovalStore::new());
-    let recorder = StdArc::new(RecordingChannel::new());
-    let guard = ApprovalGuard::new(store.clone()).with_channel(recorder.clone());
-
-    let request = hitl_make_request();
-    let approver = CoreKeypair::generate();
-    let ctx = ApprovalContext {
-        request: &request,
-        constraints: &[],
-        policy_id: "policy-hitl",
-        trusted_approvers: &[approver.public_key()],
-        presented_token: None,
-        force_approval: true,
-        approval_id_override: Some("ap-force-1".into()),
-    };
-
-    let verdict = guard.evaluate(ctx, 1_000_000).unwrap();
-    match verdict {
-        HitlVerdict::Pending {
-            request: approval, ..
-        } => {
-            assert_eq!(approval.approval_id, "ap-force-1");
-            assert_eq!(approval.subject_id, request.agent_id);
-            assert_eq!(approval.tool_server, "srv-a");
-            assert_eq!(approval.tool_name, "read_file");
-        }
-        other => panic!("expected Pending, got {other:?}"),
-    }
-
-    // Store now holds the pending request.
-    let pending = store.get_pending("ap-force-1").unwrap().unwrap();
-    assert_eq!(pending.approval_id, "ap-force-1");
-
-    // Channel fired once.
-    assert_eq!(recorder.len(), 1);
-    let captured = recorder.captured();
-    assert_eq!(captured[0].approval_id, "ap-force-1");
-}
-
-// ---------------------------------------------------------------------
 // (b) Approved resume produces an Approved outcome.
 // ---------------------------------------------------------------------
 
@@ -717,60 +672,6 @@ fn hitl_replay_of_consumed_token_rejected() {
 // two-copies-of-chio-kernel dependency cycle (chio-store-sqlite depends
 // on chio-kernel; the kernel's dev-deps cannot include chio-store-sqlite
 // for use in lib tests without duplicating the crate).
-
-// ---------------------------------------------------------------------
-// (f) Webhook / channel fires on pending approval.
-// ---------------------------------------------------------------------
-
-#[test]
-fn hitl_channel_fires_on_pending() {
-    let store = StdArc::new(InMemoryApprovalStore::new());
-    let recorder = StdArc::new(RecordingChannel::new());
-
-    let guard = ApprovalGuard::new(store.clone()).with_channel(recorder.clone());
-    let request = hitl_make_request();
-    let approver = CoreKeypair::generate();
-    let ctx = ApprovalContext {
-        request: &request,
-        constraints: &[],
-        policy_id: "policy-webhook",
-        trusted_approvers: &[approver.public_key()],
-        presented_token: None,
-        force_approval: true,
-        approval_id_override: Some("ap-webhook-1".into()),
-    };
-
-    assert!(recorder.is_empty());
-    let _ = guard.evaluate(ctx, 1_000).unwrap();
-    assert_eq!(recorder.len(), 1);
-    let captured = recorder.captured();
-    assert_eq!(captured[0].approval_id, "ap-webhook-1");
-}
-
-#[test]
-fn hitl_force_approval_denies_without_trusted_approvers() {
-    let store = StdArc::new(InMemoryApprovalStore::new());
-    let guard = ApprovalGuard::new(store.clone());
-    let request = hitl_make_request();
-    let ctx = ApprovalContext {
-        request: &request,
-        constraints: &[],
-        policy_id: "policy-hitl",
-        trusted_approvers: &[],
-        presented_token: None,
-        force_approval: true,
-        approval_id_override: Some("ap-misconfigured".into()),
-    };
-
-    let verdict = guard.evaluate(ctx, 1_000_000).unwrap();
-    match verdict {
-        HitlVerdict::Deny { reason } => {
-            assert!(reason.contains("no trusted approvers"), "{reason}");
-        }
-        other => panic!("expected Deny, got {other:?}"),
-    }
-    assert!(store.get_pending("ap-misconfigured").unwrap().is_none());
-}
 
 // ---------------------------------------------------------------------
 // (g) Batch respond applies multiple decisions at once.

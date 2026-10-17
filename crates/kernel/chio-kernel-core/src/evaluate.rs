@@ -483,9 +483,7 @@ fn finish_verified_evaluation(
 
         match evaluation {
             Ok(_) => {
-                // PendingApproval is reserved for the full kernel orchestration
-                // layer (chio-kernel::approval::ApprovalGuard); if a sync guard
-                // surfaces it here we fail closed.
+                // A sync guard cannot open an approval, so PendingApproval fails closed.
                 let core_err = KernelCoreError::GuardDenied {
                     guard: guard.name().to_string(),
                 };
