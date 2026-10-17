@@ -5,6 +5,23 @@ All notable changes to `chio-temporal` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- fix: activities run through the sidecar's mediated caller-delivery
+  route (`/v1/evaluate` reserve, `/v1/caller/start`, activity,
+  `/v1/caller/report`) instead of `ChioClient.evaluate_tool_call`, which
+  never authorizes an id-only call and denied every activity against a
+  real sidecar. The id-only call is removed with no fallback.
+- feat: `ChioActivityInterceptor` and `build_chio_worker` require an
+  `executor` (`CallerExecutor`) and the sidecar `control_token`;
+  `build_chio_worker` takes the complete signed `token` (or `scope`) and
+  no longer accepts a bare `capability_id`.
+- feat: `WorkflowStepReceipt` records the terminal kernel receipt and
+  the `reservation_receipt_id`; a failed activity is reported so its
+  reservation finalizes. New `SIDECAR_ERROR_TYPE` for lifecycle errors.
+- docs: the `WorkflowReceipt` aggregate is stated as unsigned and
+  in-memory.
+
 ## [0.1.1]
 
 - refactor: the local `_CHIO_DEFAULT_TOOL_POSITIONAL_NAMES` table is

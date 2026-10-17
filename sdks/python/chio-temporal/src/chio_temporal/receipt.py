@@ -5,6 +5,10 @@ aggregates every per-activity :class:`chio_sdk.models.ChioReceipt` the
 interceptor collected during the run. The aggregate is serialised to a
 stable JSON envelope that the Chio receipt store can ingest.
 
+The aggregate itself is unsigned and held in worker memory until
+:meth:`ChioActivityInterceptor.flush_workflow_receipt`; a worker restart
+loses it. Only the per-step kernel receipts it embeds carry signatures.
+
 The envelope layout (version ``chio-temporal/v1``) is intentionally
 minimal and additive:
 
@@ -19,8 +23,9 @@ minimal and additive:
 * ``allow_count`` / ``deny_count`` -- aggregate counts by decision
   verdict, useful for quick audit queries without reading every step.
 * ``steps`` -- ordered list of per-activity entries, each carrying the
-  activity type / id, the underlying Chio receipt (as-is), and the
-  attempt number.
+  activity type / id, the underlying Chio receipt (as-is), the
+  attempt number and, for executed activities, the reservation
+  receipt id.
 * ``metadata`` -- caller-supplied dict merged with the
   :class:`WorkflowGrant` metadata.
 
@@ -58,23 +63,31 @@ class WorkflowStepReceipt:
     attempt:
         Temporal's retry attempt counter. ``1`` for the first execution.
     receipt:
-        The :class:`ChioReceipt` returned by the Chio sidecar for this
-        activity's capability evaluation.
+        The terminal :class:`ChioReceipt` for this activity: the deny or
+        pending-approval receipt when it never ran, otherwise the receipt
+        the kernel issued when finalizing the caller report.
+    reservation_receipt_id:
+        Id of the ``/v1/evaluate`` reservation receipt when the activity
+        ran; ``None`` when it was stopped at reservation.
     """
 
     activity_type: str
     activity_id: str
     attempt: int
     receipt: ChioReceipt
+    reservation_receipt_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable dict of this step receipt."""
-        return {
+        payload: dict[str, Any] = {
             "activity_type": self.activity_type,
             "activity_id": self.activity_id,
             "attempt": int(self.attempt),
             "receipt": self.receipt.model_dump(mode="json", exclude_none=True),
         }
+        if self.reservation_receipt_id is not None:
+            payload["reservation_receipt_id"] = self.reservation_receipt_id
+        return payload
 
 
 @dataclass
@@ -125,13 +138,14 @@ class WorkflowReceipt:
         activity_id: str,
         attempt: int,
         receipt: ChioReceipt,
+        reservation_receipt_id: str | None = None,
     ) -> WorkflowStepReceipt:
         """Append a per-activity receipt to the running workflow receipt.
 
         Returns the newly-appended :class:`WorkflowStepReceipt` so
         callers can mutate metadata on it if needed. Appends happen in
-        call order; the interceptor calls this after each sidecar
-        evaluation, so the final ``steps`` list mirrors the activity
+        call order; the interceptor calls this once per activity attempt
+        with its terminal receipt, so the final ``steps`` list mirrors the activity
         execution sequence.
         """
         if not activity_type:
@@ -143,6 +157,7 @@ class WorkflowReceipt:
             activity_id=activity_id,
             attempt=int(attempt),
             receipt=receipt,
+            reservation_receipt_id=reservation_receipt_id,
         )
         self.steps.append(step)
         return step

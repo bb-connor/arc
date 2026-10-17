@@ -35,6 +35,7 @@ dev = [
     "pytest-asyncio>=1.1,<2",
     "httpx>=0.27,<1",
     "respx>=0.21,<1",
+    "cryptography>=42,<47",
     "mypy>=1.10",
     "ruff>=0.5",
 ]
