@@ -3290,6 +3290,7 @@ name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "http 1.4.0",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
