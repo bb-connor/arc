@@ -449,12 +449,15 @@ impl SignedReceivableIou {
         backend: &B,
     ) -> Result<Self, ReceivableIouError> {
         body.validate()?;
+        let signer_key = backend
+            .public_key()
+            .map_err(|error| ReceivableIouError::Signing(error.to_string()))?;
         let (signature, _) = sign_canonical_with_backend(backend, &body)
             .map_err(|error| ReceivableIouError::Signing(error.to_string()))?;
         Ok(Self {
             body,
-            signer_key: backend.public_key(),
-            algorithm: backend.algorithm(),
+            algorithm: signer_key.algorithm(),
+            signer_key,
             signature,
         })
     }
@@ -649,10 +652,13 @@ pub(crate) fn mint_receivable_iou<B: SigningBackend, S: CreditAdmissionStore>(
     context: &ReceivableIouMintContext<'_>,
 ) -> Result<SignedReceivableIou, ReceivableIouError> {
     verify_receipt(context.receipt, receipt_trust)?;
-    if backend.public_key() == context.receipt.kernel_key {
+    let backend_key = backend
+        .public_key()
+        .map_err(|error| ReceivableIouError::Signing(error.to_string()))?;
+    if backend_key == context.receipt.kernel_key {
         return Err(ReceivableIouError::InvalidField("issuer_key_role"));
     }
-    if &backend.public_key()
+    if &backend_key
         == context
             .credit_facility_bind
             .signed()

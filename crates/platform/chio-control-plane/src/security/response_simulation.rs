@@ -199,7 +199,7 @@ impl ProductionResponseSimulator {
         self.configuration_digest
     }
 
-    pub fn signing_identity(&self) -> chio_core::PublicKey {
+    pub fn signing_identity(&self) -> Result<chio_core::PublicKey, chio_core::Error> {
         self.signer.public_key()
     }
 
@@ -311,7 +311,7 @@ impl ProductionResponseSimulator {
         };
         let receipt = ChioReceipt::sign_with_backend(
             report
-                .receipt_body(self.signer.public_key())
+                .receipt_body(self.signer.public_key()?)
                 .map_err(registered_port_error)?,
             self.signer.as_ref(),
         )

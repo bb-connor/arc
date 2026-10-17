@@ -432,7 +432,7 @@ impl BrokerDaemonHandler {
                 || receipt.body.authorization_digest != operation.authorization_digest()
                 || receipt.body.operation != operation_name
                 || receipt.body.tenant_scope != self.tenant_scope
-                || receipt.signer != self.admin_receipt_signer.public_key()
+                || receipt.signer != self.admin_receipt_signer.public_key()?
             {
                 return Err(BrokerError::Conflict(
                     "durable admin control completion is misbound or untrusted".to_string(),
@@ -469,7 +469,7 @@ impl BrokerDaemonHandler {
         let completion = self
             .admin
             .complete_control_operation(&operation, &receipt, &response)?;
-        if completion.receipt().signer != self.admin_receipt_signer.public_key() {
+        if completion.receipt().signer != self.admin_receipt_signer.public_key()? {
             return Err(BrokerError::Conflict(
                 "durable admin control completion signer is untrusted".to_string(),
             ));

@@ -115,7 +115,7 @@ fn require_completed(pending: &PendingCallers, caller: &RecordedCaller) -> TestR
     assert!(response.receipt.verify_signature()?);
     assert_eq!(
         response.receipt.kernel_key,
-        pending.kernel.receipt_signing_public_key()
+        pending.kernel.receipt_signing_public_key()?
     );
     assert_eq!(response.receipt.capability_id, caller.request.capability.id);
     assert_eq!(caller.effects.load(Ordering::SeqCst), 1);

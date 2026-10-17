@@ -86,7 +86,7 @@ fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observat
             .receipt_signing_identity
             .as_ref()
             .ok_or("frozen signer")?
-            .public_key(),
+            .public_key().unwrap(),
         &fixture.kernel.receipt_signing_public_key()
     );
     assert_eq!(

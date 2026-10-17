@@ -128,7 +128,8 @@ impl HybridBackend {
     /// Construct a hybrid backend from a classical backend and an ML-DSA-65
     /// backend.
     pub fn new(classical: Box<dyn SigningBackend>, pq: MlDsa65Backend) -> Result<Self> {
-        let alg_set = match classical.algorithm() {
+        let classical_public_key = classical.public_key()?;
+        let alg_set = match classical_public_key.algorithm() {
             SigningAlgorithm::Ed25519 => HYBRID_ED25519_MLDSA65,
             SigningAlgorithm::P256 => HYBRID_P256_MLDSA65,
             SigningAlgorithm::P384 => HYBRID_P384_MLDSA65,
@@ -140,7 +141,7 @@ impl HybridBackend {
         };
         let pq_public_key = pq.public_key_bytes();
         let public_key =
-            PublicKey::from_hybrid_parts(classical.public_key(), &pq_public_key, alg_set)?;
+            PublicKey::from_hybrid_parts(classical_public_key, &pq_public_key, alg_set)?;
         Ok(Self {
             classical,
             pq,
@@ -157,12 +158,8 @@ impl HybridBackend {
 }
 
 impl SigningBackend for HybridBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Hybrid
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.public_key.clone()
+    fn public_key(&self) -> crate::Result<PublicKey> {
+        Ok(self.public_key.clone())
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {

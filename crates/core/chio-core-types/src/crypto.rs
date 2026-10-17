@@ -915,26 +915,12 @@ pub struct SigningOutcome {
 /// as appropriate. The trait is deliberately dyn-compatible so it can be
 /// passed as `&dyn SigningBackend` through artifact signing helpers.
 pub trait SigningBackend: Send + Sync {
-    /// Algorithm this backend produces.
+    /// The identity this backend signs with now.
     ///
-    /// Compatibility identity: a rotating backend may report a key it no
-    /// longer signs with. Trust and issuance decisions use
-    /// [`Self::current_public_key`].
-    fn algorithm(&self) -> SigningAlgorithm;
-
-    /// Public half of this backend's signing identity.
-    ///
-    /// Compatibility identity: a rotating backend may report a key it no
-    /// longer signs with. Trust and issuance decisions use
-    /// [`Self::current_public_key`].
-    fn public_key(&self) -> PublicKey;
-
-    /// The identity this backend signs with now. A rotating backend whose
-    /// current selector cannot be read returns an error instead of an older
-    /// key.
-    fn current_public_key(&self) -> Result<PublicKey> {
-        Ok(self.public_key())
-    }
+    /// A backend whose current identity cannot be read returns an error and
+    /// never an older or default key. The algorithm is
+    /// `public_key()?.algorithm()`.
+    fn public_key(&self) -> Result<PublicKey>;
 
     /// Produce a detached signature over `message`.
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;
@@ -944,13 +930,8 @@ pub trait SigningBackend: Send + Sync {
     /// A rotating backend must override this method and retain its selector
     /// lease through signature creation and durable signing evidence.
     fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome> {
-        let public_key = self.public_key();
-        let algorithm = self.algorithm();
-        if public_key.algorithm() != algorithm {
-            return Err(Error::InvalidSignature(
-                "signing backend algorithm does not match public key".to_string(),
-            ));
-        }
+        let public_key = self.public_key()?;
+        let algorithm = public_key.algorithm();
         let signature = self.sign_bytes(message)?;
         if signature.algorithm() != algorithm || !public_key.verify(message, &signature) {
             return Err(Error::InvalidSignature(
@@ -1071,12 +1052,8 @@ impl Ed25519Backend {
 }
 
 impl SigningBackend for Ed25519Backend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Ed25519
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.keypair.public_key()
+    fn public_key(&self) -> Result<PublicKey> {
+        Ok(self.keypair.public_key())
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
@@ -1138,16 +1115,12 @@ mod fips_backends {
     }
 
     impl SigningBackend for P256Backend {
-        fn algorithm(&self) -> SigningAlgorithm {
-            SigningAlgorithm::P256
-        }
-
-        fn public_key(&self) -> PublicKey {
-            PublicKey {
+        fn public_key(&self) -> Result<PublicKey> {
+            Ok(PublicKey {
                 material: PublicKeyMaterial::P256 {
                     encoded_point: self.public_sec1.clone(),
                 },
-            }
+            })
         }
 
         fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
@@ -1204,16 +1177,12 @@ mod fips_backends {
     }
 
     impl SigningBackend for P384Backend {
-        fn algorithm(&self) -> SigningAlgorithm {
-            SigningAlgorithm::P384
-        }
-
-        fn public_key(&self) -> PublicKey {
-            PublicKey {
+        fn public_key(&self) -> Result<PublicKey> {
+            Ok(PublicKey {
                 material: PublicKeyMaterial::P384 {
                     encoded_point: self.public_sec1.clone(),
                 },
-            }
+            })
         }
 
         fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
@@ -1534,7 +1503,7 @@ mod tests {
 
         assert!(SharedCanonicalBytes::ptr_eq(&canonical, signed.canonical()));
         assert!(backend
-            .public_key()
+            .public_key()?
             .verify_shared_canonical(signed.canonical(), signed.signature()));
 
         let (legacy_signature, legacy_bytes) = sign_canonical_with_backend(&backend, &value)?;
@@ -1578,11 +1547,11 @@ mod tests {
     #[test]
     fn ed25519_backend_round_trip() {
         let backend = Ed25519Backend::generate();
-        assert_eq!(backend.algorithm(), SigningAlgorithm::Ed25519);
+        assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::Ed25519);
         let msg = b"hello chio";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::Ed25519);
-        assert!(backend.public_key().verify(msg, &sig));
+        assert!(backend.public_key().unwrap().verify(msg, &sig));
     }
 
     #[test]
@@ -1592,13 +1561,15 @@ mod tests {
             .sign_bytes_with_identity(b"atomic identity")
             .unwrap();
 
-        assert_eq!(outcome.public_key, backend.public_key());
+        assert_eq!(outcome.public_key, backend.public_key().unwrap());
         assert_eq!(outcome.algorithm, SigningAlgorithm::Ed25519);
         assert!(outcome
             .public_key
             .verify(b"atomic identity", &outcome.signature));
 
-        let wrong = Ed25519Backend::new(Keypair::from_seed(&[22_u8; 32])).public_key();
+        let wrong = Ed25519Backend::new(Keypair::from_seed(&[22_u8; 32]))
+            .public_key()
+            .unwrap();
         assert!(backend
             .sign_bytes_for_identity(&wrong, b"wrong identity")
             .is_err());
@@ -1612,11 +1583,7 @@ mod tests {
         }
 
         impl SigningBackend for MismatchedBackend {
-            fn algorithm(&self) -> SigningAlgorithm {
-                SigningAlgorithm::Ed25519
-            }
-
-            fn public_key(&self) -> PublicKey {
+            fn public_key(&self) -> crate::Result<PublicKey> {
                 self.advertised.public_key()
             }
 
@@ -1679,13 +1646,13 @@ mod tests {
     #[test]
     fn p256_backend_round_trip() {
         let backend = P256Backend::generate().unwrap();
-        assert_eq!(backend.algorithm(), SigningAlgorithm::P256);
+        assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::P256);
         let msg = b"hello fips";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::P256);
-        assert!(backend.public_key().verify(msg, &sig));
+        assert!(backend.public_key().unwrap().verify(msg, &sig));
         // Serde round-trips.
-        let json_pk = serde_json::to_string(&backend.public_key()).unwrap();
+        let json_pk = serde_json::to_string(&backend.public_key().unwrap()).unwrap();
         assert!(json_pk.contains("p256:"));
         let restored_pk: PublicKey = serde_json::from_str(&json_pk).unwrap();
         assert_eq!(restored_pk.algorithm(), SigningAlgorithm::P256);
@@ -1699,11 +1666,11 @@ mod tests {
     #[test]
     fn p384_backend_round_trip() {
         let backend = P384Backend::generate().unwrap();
-        assert_eq!(backend.algorithm(), SigningAlgorithm::P384);
+        assert_eq!(backend.public_key().unwrap().algorithm(), SigningAlgorithm::P384);
         let msg = b"hello fips 384";
         let sig = backend.sign_bytes(msg).unwrap();
         assert_eq!(sig.algorithm(), SigningAlgorithm::P384);
-        assert!(backend.public_key().verify(msg, &sig));
+        assert!(backend.public_key().unwrap().verify(msg, &sig));
     }
 
     #[cfg(feature = "fips")]
@@ -1711,6 +1678,6 @@ mod tests {
     fn p256_wrong_message_fails() {
         let backend = P256Backend::generate().unwrap();
         let sig = backend.sign_bytes(b"original").unwrap();
-        assert!(!backend.public_key().verify(b"tampered", &sig));
+        assert!(!backend.public_key().unwrap().verify(b"tampered", &sig));
     }
 }

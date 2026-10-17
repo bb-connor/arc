@@ -623,10 +623,7 @@ struct DiagnosticSigningFailure {
     readiness: bool,
 }
 impl chio_core::SigningBackend for DiagnosticSigningFailure {
-    fn algorithm(&self) -> chio_core::SigningAlgorithm {
-        self.inner.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.inner.public_key()
     }
     fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {

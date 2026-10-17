@@ -280,8 +280,8 @@ fn make_hybrid_token() -> CapabilityToken {
     CapabilityToken::sign_with_backend(
         CapabilityTokenBody {
             id: "cap-wire-hybrid-001".to_string(),
-            issuer: backend.public_key(),
-            subject: backend.public_key(),
+            issuer: backend.public_key().unwrap(),
+            subject: backend.public_key().unwrap(),
             scope: ChioScope {
                 grants: vec![ToolGrant {
                     server_id: "srv".to_string(),

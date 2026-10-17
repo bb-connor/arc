@@ -77,7 +77,7 @@ fn run() -> chio_keyring::Result<()> {
     let expected_auditor_key = policy
         .auditor_public_key(&config.monitor_id)
         .ok_or(KeyringError::InvalidSignature)?;
-    if readiness_backend.public_key() != expected_auditor_key.clone() {
+    if readiness_backend.public_key()? != *expected_auditor_key {
         return Err(KeyringError::InvalidSignature);
     }
     let configured_witnesses = config

@@ -18,7 +18,7 @@ pub(crate) fn ensure_backend_matches_embedded_key(
     artifact: &str,
     field: &str,
 ) -> Result<()> {
-    let actual_key = backend.current_public_key()?;
+    let actual_key = backend.public_key()?;
     ensure_public_key_matches(embedded_key, &actual_key, artifact, field)
 }
 

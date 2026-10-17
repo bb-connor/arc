@@ -50,12 +50,12 @@ fn verifier(trusted: &Ed25519Backend) -> ArtifactTimeVerifier {
     KeyLogPolicy::new(KeyLogPolicyConfig {
         log_id: LogId::new("log.time.test").test_unwrap(),
         authority_id: AuthorityId::new("authority.time.test").test_unwrap(),
-        bootstrap_key: backend(1).public_key(),
-        operator_key: backend(10).public_key(),
+        bootstrap_key: backend(1).public_key().test_unwrap(),
+        operator_key: backend(10).public_key().test_unwrap(),
         witness_roster_id: WitnessRosterId::new("roster.time.v1").test_unwrap(),
         witness_keys: BTreeMap::from([(
             WitnessId::new("witness.time").test_unwrap(),
-            backend(20).public_key(),
+            backend(20).public_key().test_unwrap(),
         )]),
         recovery_policy_id: RecoveryPolicyId::new("recovery.time.v1").test_unwrap(),
         recovery_keys: BTreeMap::new(),
@@ -65,7 +65,7 @@ fn verifier(trusted: &Ed25519Backend) -> ArtifactTimeVerifier {
     .test_unwrap()
     .with_artifact_time_roots(BTreeMap::from([(
         AnchorId::new("timestamp.service.v1").test_unwrap(),
-        trusted.public_key(),
+        trusted.public_key().test_unwrap(),
     )]))
     .test_unwrap()
     .artifact_time_verifier(Arc::new(FixedClock(2_600)), 50)
@@ -123,12 +123,12 @@ fn artifact_time_root_cannot_overlap_any_independent_role() {
     let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
         log_id: LogId::new("log.time.overlap").test_unwrap(),
         authority_id: AuthorityId::new("authority.time.overlap").test_unwrap(),
-        bootstrap_key: backend(1).public_key(),
-        operator_key: backend(10).public_key(),
+        bootstrap_key: backend(1).public_key().test_unwrap(),
+        operator_key: backend(10).public_key().test_unwrap(),
         witness_roster_id: WitnessRosterId::new("roster.time.overlap").test_unwrap(),
         witness_keys: BTreeMap::from([(
             WitnessId::new("witness.shared").test_unwrap(),
-            shared.public_key(),
+            shared.public_key().test_unwrap(),
         )]),
         recovery_policy_id: RecoveryPolicyId::new("recovery.time.overlap").test_unwrap(),
         recovery_keys: BTreeMap::new(),
@@ -139,7 +139,7 @@ fn artifact_time_root_cannot_overlap_any_independent_role() {
     assert!(policy
         .with_artifact_time_roots(BTreeMap::from([(
             AnchorId::new("timestamp.shared").test_unwrap(),
-            shared.public_key(),
+            shared.public_key().test_unwrap(),
         )]))
         .is_err());
 }

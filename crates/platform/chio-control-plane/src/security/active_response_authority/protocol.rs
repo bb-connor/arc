@@ -208,7 +208,7 @@ impl ActiveResponseAuthorityProtocolServer {
         authority_signer: &Arc<dyn SigningBackend>,
     ) -> Result<PublicKey, String> {
         let authority_identity = authority_signer.public_key();
-        if authority_identity.algorithm() != authority_signer.algorithm() {
+        if authority_identity?.algorithm() != authority_signer.algorithm() {
             return Err(
                 "active-response authority signer algorithm does not match its public key"
                     .to_string(),
@@ -220,7 +220,7 @@ impl ActiveResponseAuthorityProtocolServer {
                     .to_string(),
             );
         }
-        Ok(authority_identity)
+        Ok(authority_identity?)
     }
 
     #[cfg(target_os = "linux")]

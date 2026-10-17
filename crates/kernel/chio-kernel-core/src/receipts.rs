@@ -132,7 +132,15 @@ pub fn sign_receipt_relaying_trusted_body(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, ReceiptSigningError> {
-    let backend_key = backend.public_key();
+    let backend_key = match backend.public_key() {
+        Ok(key) => key,
+        Err(error) => {
+            #[cfg(kani)]
+            core::mem::forget(body);
+
+            return Err(ReceiptSigningError::SigningFailed(error.to_string()));
+        }
+    };
     let key_mismatch =
         body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key;
     // The proof models authorization and signing, not heap reclamation. Keep
@@ -157,6 +165,7 @@ pub fn sign_receipt_relaying_trusted_body(
         let signature = backend
             .sign_bytes(b"kani-receipt-signing-model")
             .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))?;
+        let algorithm = body.kernel_key.algorithm();
         return Ok(ChioReceipt {
             id: body.id,
             timestamp: body.timestamp,
@@ -180,7 +189,7 @@ pub fn sign_receipt_relaying_trusted_body(
             bbs_projection_version: body.bbs_projection_version,
             kernel_key: body.kernel_key,
             bbs_signature: None,
-            algorithm: Some(backend.algorithm()),
+            algorithm: Some(algorithm),
             signature,
         });
     }

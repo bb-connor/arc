@@ -29,7 +29,7 @@ fn conflict_preserves_wait(entry: EntryPoint) -> TestResult {
         .is_none());
     assert_eq!(
         response.receipt.kernel_key,
-        fixture.kernel.receipt_signing_public_key()
+        fixture.kernel.receipt_signing_public_key()?
     );
     assert!(response.receipt.verify_signature()?);
     assert_pending_session(&fixture, &context)?;

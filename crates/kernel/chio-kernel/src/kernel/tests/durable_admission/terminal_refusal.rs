@@ -363,7 +363,7 @@ fn unknown_projection_refuses_a_replacement_signer() -> TestResult {
         compensation_response(),
     )?;
     assert_eq!(recovered.verdict, Verdict::Deny);
-    assert_eq!(recovered.receipt.kernel_key, original_key);
+    assert_eq!(recovered.receipt.kernel_key, original_key?);
     assert!(recovered.receipt.verify_signature()?);
     assert_eq!(
         store.operation().state(),

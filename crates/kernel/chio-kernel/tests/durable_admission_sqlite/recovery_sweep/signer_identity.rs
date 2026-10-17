@@ -20,7 +20,7 @@ pub(super) fn signing_kernel(
     invocations: &Arc<AtomicU64>,
 ) -> TestResult<ChioKernel> {
     let mut kernel = serving.kernel(signer.clone(), clock)?;
-    assert_eq!(kernel.receipt_signing_public_key(), signer.public_key());
+    assert_eq!(kernel.receipt_signing_public_key(), signer.public_key().unwrap());
     kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
         calls: Some(calls.clone()),
     }));

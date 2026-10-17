@@ -187,14 +187,12 @@ storage. Private keys should never be extractable in plaintext.
 1. Define a `SigningBackend` trait in `chio-core`:
 
 ```rust
-#[async_trait]
 pub trait SigningBackend: Send + Sync {
+    /// The identity this backend signs with now. An unreadable identity is an
+    /// error; the algorithm is `public_key()?.algorithm()`.
+    fn public_key(&self) -> Result<PublicKey>;
     /// Sign the given bytes and return the signature.
-    async fn sign(&self, data: &[u8]) -> Result<Signature>;
-    /// Return the public key for this backend.
-    fn public_key(&self) -> &PublicKey;
-    /// Return the signing algorithm.
-    fn algorithm(&self) -> SigningAlgorithm;
+    fn sign_bytes(&self, message: &[u8]) -> Result<Signature>;
 }
 ```
 

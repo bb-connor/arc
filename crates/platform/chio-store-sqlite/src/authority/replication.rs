@@ -92,7 +92,6 @@ impl SqliteCapabilityAuthority {
         insert_anchor(&transaction, anchor, now)?;
         let status = Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
-        self.update_cached_public_key(status.public_key);
         Ok(true)
     }
 
@@ -185,7 +184,6 @@ impl SqliteCapabilityAuthority {
         write_replication(&transaction, &replication)?;
         let status = Self::read_status_from_connection(&transaction)?;
         transaction.commit()?;
-        self.update_cached_public_key(status.public_key);
         Ok(changed)
     }
 }

@@ -91,10 +91,10 @@ fn checkpoint_operator_signature_and_identity_are_canonical() {
 
     assert_eq!(restored_body, checkpoint.body);
     checkpoint
-        .verify_operator(&operator.public_key())
+        .verify_operator(&operator.public_key().test_unwrap())
         .test_unwrap();
     assert!(checkpoint
-        .verify_operator(&backend(11).public_key())
+        .verify_operator(&backend(11).public_key().test_unwrap())
         .is_err());
 }
 
@@ -123,15 +123,15 @@ fn witness_signatures_bind_checkpoint_hash_and_require_distinct_known_quorum() {
     let keys = BTreeMap::from([
         (
             WitnessId::new("witness.a").test_unwrap(),
-            witness_a.public_key(),
+            witness_a.public_key().test_unwrap(),
         ),
         (
             WitnessId::new("witness.b").test_unwrap(),
-            witness_b.public_key(),
+            witness_b.public_key().test_unwrap(),
         ),
         (
             WitnessId::new("witness.c").test_unwrap(),
-            witness_c.public_key(),
+            witness_c.public_key().test_unwrap(),
         ),
     ]);
 

@@ -87,21 +87,21 @@ impl Fixture {
         KeyLogPolicy::new(KeyLogPolicyConfig {
             log_id: LogId::new("log.enterprise.test").test_unwrap(),
             authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-            bootstrap_key: self.bootstrap.public_key(),
-            operator_key: self.operator.public_key(),
+            bootstrap_key: self.bootstrap.public_key().test_unwrap(),
+            operator_key: self.operator.public_key().test_unwrap(),
             witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
             witness_keys: BTreeMap::from([
                 (
                     WitnessId::new("witness.a").test_unwrap(),
-                    self.witness_a.public_key(),
+                    self.witness_a.public_key().test_unwrap(),
                 ),
                 (
                     WitnessId::new("witness.b").test_unwrap(),
-                    self.witness_b.public_key(),
+                    self.witness_b.public_key().test_unwrap(),
                 ),
                 (
                     WitnessId::new("witness.c").test_unwrap(),
-                    self.witness_c.public_key(),
+                    self.witness_c.public_key().test_unwrap(),
                 ),
             ]),
             recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.v1").test_unwrap(),
@@ -115,8 +115,8 @@ impl Fixture {
     fn policy(&self) -> KeyLogPolicy {
         self.policy_without_auditors()
             .with_auditor_roots(BTreeMap::from([
-                ("audit.a".to_string(), backend(80).public_key()),
-                ("audit.b".to_string(), backend(81).public_key()),
+                ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
+                ("audit.b".to_string(), backend(81).public_key().test_unwrap()),
             ]))
             .test_unwrap()
     }
@@ -129,9 +129,9 @@ impl Fixture {
             event_id: EventId::new("event.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-            key_id: derive_key_id(self.old.algorithm(), &self.old.public_key()).test_unwrap(),
-            algorithm: self.old.algorithm(),
-            public_key: self.old.public_key(),
+            key_id: derive_key_id(self.old.public_key().test_unwrap().algorithm(), &self.old.public_key().test_unwrap()).test_unwrap(),
+            algorithm: self.old.public_key().test_unwrap().algorithm(),
+            public_key: self.old.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
             effective_at: 1_000,
             verify_until: None,
@@ -159,9 +159,9 @@ impl Fixture {
             event_id: EventId::new(event_id).test_unwrap(),
             previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
             authority_id: genesis.body.authority_id.clone(),
-            key_id: derive_key_id(new.algorithm(), &new.public_key()).test_unwrap(),
-            algorithm: new.algorithm(),
-            public_key: new.public_key(),
+            key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+            algorithm: new.public_key().test_unwrap().algorithm(),
+            public_key: new.public_key().test_unwrap(),
             operation: KeyLogOperation::Rotate {
                 previous_key_id: genesis.body.key_id,
                 witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
@@ -194,21 +194,21 @@ fn durable_store_rejects_changed_security_configuration() {
     let changed_policy = KeyLogPolicy::new(KeyLogPolicyConfig {
         log_id: LogId::new("log.enterprise.test").test_unwrap(),
         authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-        bootstrap_key: fixture.bootstrap.public_key(),
-        operator_key: fixture.operator.public_key(),
+        bootstrap_key: fixture.bootstrap.public_key().test_unwrap(),
+        operator_key: fixture.operator.public_key().test_unwrap(),
         witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
         witness_keys: BTreeMap::from([
             (
                 WitnessId::new("witness.a").test_unwrap(),
-                backend(90).public_key(),
+                backend(90).public_key().test_unwrap(),
             ),
             (
                 WitnessId::new("witness.b").test_unwrap(),
-                fixture.witness_b.public_key(),
+                fixture.witness_b.public_key().test_unwrap(),
             ),
             (
                 WitnessId::new("witness.c").test_unwrap(),
-                fixture.witness_c.public_key(),
+                fixture.witness_c.public_key().test_unwrap(),
             ),
         ]),
         recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.v1").test_unwrap(),
@@ -223,7 +223,7 @@ fn durable_store_rejects_changed_security_configuration() {
         .policy()
         .with_artifact_time_roots(BTreeMap::from([(
             AnchorId::new("timestamp.enterprise.v1").test_unwrap(),
-            backend(91).public_key(),
+            backend(91).public_key().test_unwrap(),
         )]))
         .test_unwrap();
     assert!(SqliteKeyLogStore::open(&path, changed_artifact_time_policy).is_err());
@@ -231,8 +231,8 @@ fn durable_store_rejects_changed_security_configuration() {
     let changed_auditor_policy = fixture
         .policy_without_auditors()
         .with_auditor_roots(BTreeMap::from([
-            ("audit.a".to_string(), backend(80).public_key()),
-            ("audit.b".to_string(), backend(82).public_key()),
+            ("audit.a".to_string(), backend(80).public_key().test_unwrap()),
+            ("audit.b".to_string(), backend(82).public_key().test_unwrap()),
         ]))
         .test_unwrap();
     assert!(SqliteKeyLogStore::open(&path, changed_auditor_policy).is_err());
@@ -240,21 +240,21 @@ fn durable_store_rejects_changed_security_configuration() {
     let changed_skew_policy = KeyLogPolicy::new(KeyLogPolicyConfig {
         log_id: LogId::new("log.enterprise.test").test_unwrap(),
         authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-        bootstrap_key: fixture.bootstrap.public_key(),
-        operator_key: fixture.operator.public_key(),
+        bootstrap_key: fixture.bootstrap.public_key().test_unwrap(),
+        operator_key: fixture.operator.public_key().test_unwrap(),
         witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
         witness_keys: BTreeMap::from([
             (
                 WitnessId::new("witness.a").test_unwrap(),
-                fixture.witness_a.public_key(),
+                fixture.witness_a.public_key().test_unwrap(),
             ),
             (
                 WitnessId::new("witness.b").test_unwrap(),
-                fixture.witness_b.public_key(),
+                fixture.witness_b.public_key().test_unwrap(),
             ),
             (
                 WitnessId::new("witness.c").test_unwrap(),
-                fixture.witness_c.public_key(),
+                fixture.witness_c.public_key().test_unwrap(),
             ),
         ]),
         recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.v1").test_unwrap(),
@@ -454,7 +454,7 @@ fn write_and_signing_failures_leave_no_partial_event_checkpoint_or_state() {
         .test_unwrap();
     let store = SqliteKeyLogStore::open(&path, policy).test_unwrap();
     let failing = FailingBackend {
-        public: fixture.operator.public_key(),
+        public: fixture.operator.public_key().test_unwrap(),
     };
     assert!(store.append_event(&genesis, &failing).is_err());
     assert!(store.load_events().test_unwrap().is_empty());
@@ -681,12 +681,8 @@ struct FailingBackend {
 }
 
 impl SigningBackend for FailingBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.public.algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.public.clone()
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+        Ok(self.public.clone())
     }
 
     fn sign_bytes(&self, _message: &[u8]) -> CoreResult<Signature> {

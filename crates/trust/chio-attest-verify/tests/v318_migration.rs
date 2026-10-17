@@ -244,7 +244,7 @@ fn rolled_hybrid_bundle_round_trips_under_pq_required() {
     let pq = MlDsa65Backend::from_seed(&fixture_pq_seed());
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
 
-    let body = classical_body(hybrid.public_key());
+    let body = classical_body(hybrid.public_key().unwrap());
     let rolled = ChioReceipt::sign_with_backend(body.clone(), &hybrid).unwrap();
     assert_eq!(rolled.signature.algorithm(), SigningAlgorithm::Hybrid);
 
@@ -289,7 +289,7 @@ fn rolled_hybrid_bundle_rejected_under_allow_classical() {
     let classical_backend = Ed25519Backend::new(classical_kp);
     let pq = MlDsa65Backend::from_seed(&fixture_pq_seed());
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
-    let body = classical_body(hybrid.public_key());
+    let body = classical_body(hybrid.public_key().unwrap());
     let rolled = ChioReceipt::sign_with_backend(body, &hybrid).unwrap();
 
     // allow_classical permits ONLY classical envelopes; hybrid is

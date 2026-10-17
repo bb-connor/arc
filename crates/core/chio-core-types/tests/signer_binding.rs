@@ -215,7 +215,7 @@ fn capability_backend_sign_rejects_embedded_issuer_mismatch() {
         &backend
     )
     .is_err());
-    assert_ne!(embedded_issuer.public_key(), backend.public_key());
+    assert_ne!(embedded_issuer.public_key(), backend.public_key().unwrap());
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn approval_signers_reject_embedded_approver_mismatches() {
         &backend,
     )
     .is_err());
-    assert_ne!(embedded_approver.public_key(), backend.public_key());
+    assert_ne!(embedded_approver.public_key(), backend.public_key().unwrap());
 }
 
 #[test]
@@ -306,7 +306,7 @@ fn child_receipt_signers_reject_embedded_kernel_key_mismatches() {
         &backend,
     )
     .is_err());
-    assert_ne!(embedded_kernel.public_key(), backend.public_key());
+    assert_ne!(embedded_kernel.public_key(), backend.public_key().unwrap());
 }
 
 #[test]

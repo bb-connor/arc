@@ -90,19 +90,19 @@ impl ProductionActiveResponseAuthorityClient {
         client_signer: &Arc<dyn SigningBackend>,
     ) -> Result<PublicKey, String> {
         let signer_key = client_signer.public_key();
-        if signer_key.algorithm() != client_signer.algorithm() {
+        if signer_key?.algorithm() != client_signer.algorithm() {
             return Err(
                 "active-response authority client signer algorithm does not match its public key"
                     .to_string(),
             );
         }
-        if config.trusted_authority == signer_key {
+        if config.trusted_authority == signer_key? {
             return Err(
                 "active-response authority client and response authority signing roles must use distinct keys"
                     .to_string(),
             );
         }
-        Ok(signer_key)
+        Ok(signer_key?)
     }
 
     pub(super) fn call(

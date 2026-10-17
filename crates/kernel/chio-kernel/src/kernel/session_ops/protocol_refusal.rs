@@ -215,11 +215,12 @@ impl ChioKernel {
         })?;
         self.ensure_receipt_persistence_ready()?;
         let authority = self.signing_authority.backend.as_ref();
+        let authority_key = self.receipt_signing_public_key()?;
         if !self
             .signing_authority
             .floor
             .allowed_signing_algorithms()
-            .contains(&authority.algorithm())
+            .contains(&authority_key.algorithm())
         {
             return Err(KernelError::ReceiptSigningFailed(
                 "receipt authority does not satisfy the boot signing floor".into(),
@@ -265,7 +266,7 @@ impl ChioKernel {
             metadata: Some(serde_json::json!({"protocol_refusal": event})),
             trust_level: TrustLevel::Verified,
             tenant_id: extract_tenant_id_from_auth_context(&snapshot.auth_context),
-            kernel_key: authority.public_key(),
+            kernel_key: authority_key,
             bbs_projection_version: None,
         };
         let receipt = chio_kernel_core::sign_receipt_with_handle(

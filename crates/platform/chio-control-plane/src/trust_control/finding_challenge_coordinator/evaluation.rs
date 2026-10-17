@@ -200,7 +200,7 @@ impl FindingChallengeCoordinator {
             penalty_calculation,
             retry_deadline,
             evaluator_authority_id: self.evaluator_pin.authority_id.clone(),
-            evaluator_key: self.evaluator_authority.public_key(),
+            evaluator_key: self.evaluator_authority.public_key()?,
             // The epoch the outcome carries is the pinned one, which the
             // request has just been held to, so the signed artifact states
             // the deployment's epoch rather than the caller's claim.

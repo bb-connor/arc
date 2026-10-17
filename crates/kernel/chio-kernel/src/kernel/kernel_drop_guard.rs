@@ -328,12 +328,13 @@ impl<'a> PostAdmissionDropGuard<'a> {
         if let Err(error) = self.kernel.trusted_now_millis().and_then(|now| {
             self.kernel.ensure_receipt_persistence_ready()?;
             let authority = self.kernel.signing_authority.backend.as_ref();
+            let authority_key = self.kernel.receipt_signing_public_key()?;
             if !self
                 .kernel
                 .signing_authority
                 .floor
                 .allowed_signing_algorithms()
-                .contains(&authority.algorithm())
+                .contains(&authority_key.algorithm())
             {
                 return Err(super::KernelError::ReceiptSigningFailed(
                     "cleanup observation authority does not satisfy the boot signing floor".into(),
@@ -430,7 +431,7 @@ impl<'a> PostAdmissionDropGuard<'a> {
                 metadata,
                 trust_level: TrustLevel::Verified,
                 tenant_id,
-                kernel_key: authority.public_key(),
+                kernel_key: authority_key,
                 bbs_projection_version: None,
             };
             let receipt = chio_kernel_core::sign_receipt_with_handle(

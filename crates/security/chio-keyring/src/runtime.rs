@@ -113,9 +113,7 @@ impl WitnessedRotationRuntime {
             ));
         }
         let policy = store.policy_clone();
-        if operator.public_key() != *policy.operator_public_key()
-            || operator.algorithm() != policy.operator_public_key().algorithm()
-        {
+        if operator.public_key()? != *policy.operator_public_key() {
             return Err(KeyringError::StateInvariant(
                 "rotation runtime operator backend does not match the durable policy",
             ));

@@ -1710,7 +1710,7 @@ fn capability_token_backend_signing_with_ed25519_verifies() {
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
         id: "cap-backend".to_string(),
-        issuer: backend.public_key(),
+        issuer: backend.public_key().unwrap(),
         subject: subject.public_key(),
         scope: ChioScope::default(),
         issued_at: 1000,
@@ -1736,7 +1736,7 @@ fn capability_token_p256_round_trip() {
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
         id: "cap-p256".to_string(),
-        issuer: backend.public_key(),
+        issuer: backend.public_key().unwrap(),
         subject: subject.public_key(),
         scope: ChioScope::default(),
         issued_at: 1000,
@@ -1763,7 +1763,7 @@ fn capability_token_p384_round_trip() {
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
         id: "cap-p384".to_string(),
-        issuer: backend.public_key(),
+        issuer: backend.public_key().unwrap(),
         subject: subject.public_key(),
         scope: ChioScope::default(),
         issued_at: 1000,
@@ -1783,7 +1783,7 @@ fn capability_token_p256_tampered_body_fails() {
     let subject = Keypair::generate();
     let body = CapabilityTokenBody {
         id: "cap-tamper".to_string(),
-        issuer: backend.public_key(),
+        issuer: backend.public_key().unwrap(),
         subject: subject.public_key(),
         scope: ChioScope::default(),
         issued_at: 1000,
@@ -1803,7 +1803,7 @@ fn governed_approval_token_p256_verifies() {
     let subject = Keypair::generate();
     let body = GovernedApprovalTokenBody {
         id: "approval-p256".to_string(),
-        approver: backend.public_key(),
+        approver: backend.public_key().unwrap(),
         subject: subject.public_key(),
         governed_intent_hash: "hash-xyz".to_string(),
         request_id: "req-1".to_string(),

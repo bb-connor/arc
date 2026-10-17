@@ -22,11 +22,8 @@ struct CountingBackend {
     signs: AtomicUsize,
 }
 impl SigningBackend for CountingBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.key.public_key().algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
-        self.key.public_key()
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Ok(self.key.public_key())
     }
     fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<Signature> {
         self.signs.fetch_add(1, Ordering::SeqCst);

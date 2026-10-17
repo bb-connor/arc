@@ -203,7 +203,12 @@ impl CageReceiptPersistence {
                     .to_string(),
             ));
         }
-        if signer.public_key() != trusted_signer {
+        let signer_key = signer.public_key().map_err(|error| {
+            AdapterError::ConnectionFailed(format!(
+                "cage receipt signer identity is unreadable: {error}"
+            ))
+        })?;
+        if signer_key != trusted_signer {
             return Err(AdapterError::ConnectionFailed(
                 "cage receipt signer does not match the configured trusted kernel key".to_string(),
             ));

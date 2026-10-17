@@ -171,11 +171,10 @@ impl HostedApiKeyManager {
         pepper: Arc<dyn ApiKeyPepper>,
         signer: Arc<dyn SigningBackend>,
     ) -> Result<Self, HostedEdgeError> {
-        let public_key = signer.public_key();
-        if signer.algorithm() != SigningAlgorithm::Ed25519
-            || public_key.algorithm() != SigningAlgorithm::Ed25519
-            || public_key.is_weak_ed25519()
-        {
+        let public_key = signer
+            .public_key()
+            .map_err(|_| HostedEdgeError::Configuration)?;
+        if public_key.algorithm() != SigningAlgorithm::Ed25519 || public_key.is_weak_ed25519() {
             return Err(HostedEdgeError::Configuration);
         }
         Ok(Self {

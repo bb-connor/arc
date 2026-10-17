@@ -330,12 +330,8 @@ const BACKEND_KEY_SEED: u8 = 12;
 struct DeterministicBackend;
 
 impl SigningBackend for DeterministicBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Ed25519
-    }
-
-    fn public_key(&self) -> PublicKey {
-        public_key(BACKEND_KEY_SEED)
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+        Ok(public_key(BACKEND_KEY_SEED))
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
@@ -405,7 +401,7 @@ pub fn public_sign_receipt_accepts_matching_kernel_key() {
     let receipt = sign_receipt_relaying_trusted_body(body, &backend)
         .unwrap_or_else(|_| unreachable!("matching key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Ed25519));
+    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
     let expected_signature = Signature::from_bytes(&[0; 64]);
     assert_eq!(receipt.signature, expected_signature);
     core::mem::forget(expected_signature);
@@ -456,7 +452,7 @@ pub fn public_sign_receipt_accepts_matching_content_hash() {
     let receipt = sign_receipt(body, &backend, canonical_content)
         .unwrap_or_else(|_| unreachable!("matching content hash and key signs"));
     assert_eq!(receipt.id, "rcpt-public-kani");
-    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Ed25519));
+    assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
     let expected_signature = Signature::from_bytes(&[0; 64]);
     assert_eq!(receipt.signature, expected_signature);
     core::mem::forget(expected_signature);

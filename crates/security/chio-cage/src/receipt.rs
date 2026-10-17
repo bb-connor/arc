@@ -361,7 +361,7 @@ pub fn sign_cage_receipt(
     context: &CageReceiptSigningContext,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, CageReceiptError> {
-    prepare_cage_receipt(cage_receipt, context, backend.public_key())?.sign(backend)
+    prepare_cage_receipt(cage_receipt, context, backend.public_key()?)?.sign(backend)
 }
 
 pub fn verify_signed_cage_receipt(

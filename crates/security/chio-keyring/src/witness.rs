@@ -145,7 +145,7 @@ impl SqliteKeyLogWitness {
             .witness_keys
             .get(&witness_id)
             .ok_or(KeyringError::InvalidSignature)?;
-        if backend.public_key() != *configured || backend.algorithm() != configured.algorithm() {
+        if backend.public_key()? != *configured {
             return Err(KeyringError::InvalidSignature);
         }
         let path = path.as_ref();
@@ -230,7 +230,7 @@ impl SqliteKeyLogWitness {
         {
             let (checkpoint, signature) = existing;
             if checkpoint.checkpoint_hash()? == candidate.checkpoint_hash()? {
-                signature.verify(candidate, &self.backend.public_key())?;
+                signature.verify(candidate, &self.backend.public_key()?)?;
                 let response_replays_candidate = response.activation_commits.is_empty()
                     && response
                         .checkpoints
@@ -513,7 +513,7 @@ impl SqliteKeyLogWitness {
                     "witness decision conflicts with retained checkpoint",
                 ));
             }
-            signature.verify(&checkpoint, &self.backend.public_key())?;
+            signature.verify(&checkpoint, &self.backend.public_key()?)?;
         }
         Ok(())
     }

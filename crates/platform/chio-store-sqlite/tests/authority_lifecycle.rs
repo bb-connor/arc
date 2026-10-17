@@ -92,7 +92,7 @@ fn kg2_lifecycle_deadlines_retirement_and_replay_survive_restart() -> TestResult
     clock.0.store(109, Ordering::SeqCst);
     assert_eq!(
         follower.trusted_public_keys(),
-        vec![old.clone(), new.clone()]
+        vec![old?.clone(), new.clone()]
     );
     follower.check_issuer_lifecycle(&old, 101, 109)?;
     assert!(matches!(
@@ -152,7 +152,7 @@ fn kg2_independent_recovery_revokes_all_prior_issuers_without_seed_replication()
     let current = source.recover_authority(&recovery)?.public_key;
     follower.apply_signed_snapshot(&source.signed_snapshot()?)?;
     assert_eq!(follower.trusted_public_keys(), vec![current.clone()]);
-    assert_ne!(current, old);
+    assert_ne!(current, old)?;
     assert_eq!(follower.local_keypair()?.seed_hex(), follower_seed);
     assert!(
         matches!(follower.current_keypair(), Err(chio_kernel::AuthorityStoreError::Fence(message)) if message.contains("local signing seed public key"))
@@ -213,10 +213,10 @@ fn kg2_competing_lifecycle_imports_commit_one_complete_history() -> TestResult {
     let mut workers = Vec::new();
     for change in [
         AuthorityLifecycleChange::Retire {
-            public_key_hex: old.to_hex(),
+            public_key_hex: old?.to_hex(),
         },
         AuthorityLifecycleChange::Revoke {
-            public_key_hex: old.to_hex(),
+            public_key_hex: old?.to_hex(),
         },
     ] {
         let transition = SignedAuthorityTransition::sign_change(

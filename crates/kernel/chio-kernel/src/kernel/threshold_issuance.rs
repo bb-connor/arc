@@ -11,8 +11,8 @@ impl ChioKernel {
         self.threshold_approval_requirement_resolver = Some(resolver);
     }
 
-    pub(super) fn threshold_proposal_signing_key(&self) -> chio_core::PublicKey {
-        self.signing_authority.backend.public_key()
+    pub(super) fn threshold_proposal_signing_key(&self) -> Result<chio_core::PublicKey, KernelError> {
+        self.receipt_signing_public_key()
     }
 
     /// Reject incompatible retained authority before resuming acquisition or
@@ -39,7 +39,10 @@ impl ChioKernel {
     pub(super) fn ensure_threshold_proposal_signer_ready(
         &self,
     ) -> Result<SigningAlgorithm, KernelError> {
-        let algorithm = self.signing_authority.backend.algorithm();
+        let algorithm = self
+            .threshold_proposal_signing_key()
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?
+            .algorithm();
         if !self
             .capability_crypto_floor
             .allowed_signing_algorithms()

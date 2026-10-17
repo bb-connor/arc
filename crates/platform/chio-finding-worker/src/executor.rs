@@ -283,8 +283,11 @@ impl FirecrackerExecutor {
         signer: Arc<dyn SigningBackend>,
     ) -> Result<Self, WorkerExecutionError> {
         config.validate()?;
-        if signer.algorithm() != chio_core_types::SigningAlgorithm::Ed25519
-            || signer.public_key().is_weak_ed25519()
+        let signer_key = signer
+            .public_key()
+            .map_err(|_| WorkerExecutionError::Configuration)?;
+        if signer_key.algorithm() != chio_core_types::SigningAlgorithm::Ed25519
+            || signer_key.is_weak_ed25519()
         {
             return Err(WorkerExecutionError::Configuration);
         }
@@ -466,7 +469,12 @@ impl FirecrackerExecutor {
                 .await
                 .map_err(|_| WorkerExecutionError::Process)?
                 .map_err(|_| WorkerExecutionError::Process)?;
-        verify_attested_result(&envelope, &request, &self.inner.signer.public_key())
+        let signer_key = self
+            .inner
+            .signer
+            .public_key()
+            .map_err(|_| WorkerExecutionError::Protocol)?;
+        verify_attested_result(&envelope, &request, &signer_key)
             .map_err(|_| WorkerExecutionError::Protocol)?;
         let envelope_json =
             canonical_json_bytes(&envelope).map_err(|_| WorkerExecutionError::Protocol)?;
@@ -1706,7 +1714,7 @@ mod tests {
             max_file_size_bytes: 16 * 1024 * 1024,
             max_open_files: 128,
             guest_vsock_port: 7000,
-            capability_authority: chio_core_types::Ed25519Backend::generate().public_key(),
+            capability_authority: chio_core_types::Keypair::generate().public_key(),
         }
     }
 

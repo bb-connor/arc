@@ -52,7 +52,7 @@ fn review_rotation_rejects_identity_key_and_universal_proof() {
         &previous.body.authority_id,
         Some(1_000),
     );
-    let possession = event.verify_rotation(&old.public_key());
+    let possession = event.verify_rotation(&old.public_key().test_unwrap());
     assert!(
         matches!(common, Err(chio_keyring::KeyringError::WeakKey)),
         "weak lifecycle key passed common validation"
@@ -176,9 +176,9 @@ fn genesis(bootstrap: &Ed25519Backend, authority: &Ed25519Backend) -> SignedKeyL
         event_id: EventId::new("event.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: AuthorityId::new("authority.enterprise.test").test_unwrap(),
-        key_id: derive_key_id(authority.algorithm(), &authority.public_key()).test_unwrap(),
-        algorithm: authority.algorithm(),
-        public_key: authority.public_key(),
+        key_id: derive_key_id(authority.public_key().test_unwrap().algorithm(), &authority.public_key().test_unwrap()).test_unwrap(),
+        algorithm: authority.public_key().test_unwrap().algorithm(),
+        public_key: authority.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
         effective_at: 1_000,
         verify_until: None,
@@ -204,9 +204,9 @@ fn rotation(
         event_id: EventId::new("event.rotation.1").test_unwrap(),
         previous_event_hash: Some(previous.envelope_hash().test_unwrap()),
         authority_id: previous.body.authority_id.clone(),
-        key_id: derive_key_id(new.algorithm(), &new.public_key()).test_unwrap(),
-        algorithm: new.algorithm(),
-        public_key: new.public_key(),
+        key_id: derive_key_id(new.public_key().test_unwrap().algorithm(), &new.public_key().test_unwrap()).test_unwrap(),
+        algorithm: new.public_key().test_unwrap().algorithm(),
+        public_key: new.public_key().test_unwrap(),
         operation: KeyLogOperation::Rotate {
             previous_key_id: previous.body.key_id,
             witness_roster_id: WitnessRosterId::new("roster.enterprise.v1").test_unwrap(),
@@ -293,14 +293,14 @@ fn complete_envelope_hash_and_merkle_leaf_cover_every_signature_byte() {
 #[test]
 fn key_id_binds_algorithm_and_complete_self_describing_public_key() {
     let authority = backend(2);
-    let key = authority.public_key();
+    let key = authority.public_key().test_unwrap();
     let ed25519 = derive_key_id(SigningAlgorithm::Ed25519, &key).test_unwrap();
 
     assert!(derive_key_id(SigningAlgorithm::P256, &key).is_err());
     assert_eq!(ed25519, derive_key_id(key.algorithm(), &key).test_unwrap());
     assert_ne!(
         ed25519,
-        derive_key_id(backend(3).algorithm(), &backend(3).public_key()).test_unwrap()
+        derive_key_id(backend(3).public_key().test_unwrap().algorithm(), &backend(3).public_key().test_unwrap()).test_unwrap()
     );
 }
 
@@ -311,25 +311,25 @@ fn genesis_and_rotation_require_exact_authorization_sets() {
     let new = backend(3);
     let genesis = genesis(&bootstrap, &old);
     genesis
-        .verify_genesis(&bootstrap.public_key())
+        .verify_genesis(&bootstrap.public_key().test_unwrap())
         .test_unwrap();
 
     let rotation = rotation(&genesis, &old, &new);
-    rotation.verify_rotation(&old.public_key()).test_unwrap();
+    rotation.verify_rotation(&old.public_key().test_unwrap()).test_unwrap();
 
     let mut bad_old = rotation.clone();
     bad_old.authorizations.old_key =
         Some(OldKeyAuthorization::sign(&bad_old.body, &backend(8)).test_unwrap());
-    assert!(bad_old.verify_rotation(&old.public_key()).is_err());
+    assert!(bad_old.verify_rotation(&old.public_key().test_unwrap()).is_err());
 
     let mut bad_new = rotation.clone();
     bad_new.authorizations.new_key =
         Some(NewKeyProofOfPossession::sign(&bad_new.body, &backend(8)).test_unwrap());
-    assert!(bad_new.verify_rotation(&old.public_key()).is_err());
+    assert!(bad_new.verify_rotation(&old.public_key().test_unwrap()).is_err());
 
     let mut missing = rotation;
     missing.authorizations.new_key = None;
-    assert!(missing.verify_rotation(&old.public_key()).is_err());
+    assert!(missing.verify_rotation(&old.public_key().test_unwrap()).is_err());
 }
 
 #[test]
@@ -405,7 +405,7 @@ fn rotation_to_the_identity_point_fails_proof_of_possession() {
     let genesis = genesis(&backend(1), &old);
     let rotation = identity_point_rotation(&genesis, &old);
     assert!(matches!(
-        rotation.verify_rotation(&old.public_key()),
+        rotation.verify_rotation(&old.public_key().test_unwrap()),
         Err(chio_keyring::KeyringError::InvalidSignature)
     ));
 }

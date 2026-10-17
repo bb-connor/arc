@@ -41,7 +41,10 @@ fn assertion() -> VerifiedAssertion {
 
 fn mint_signed(audience: &str) -> (PasskeyCapability, chio_core_types::crypto::PublicKey) {
     let backend = Ed25519Backend::new(Keypair::from_seed(&[31u8; 32]));
-    let public = backend.public_key();
+    let public = match backend.public_key() {
+        Ok(key) => key,
+        Err(e) => panic!("backend public key must read: {e}"),
+    };
     let backend_arc: Arc<dyn SigningBackend> = Arc::new(backend);
     let svc = IssuerService::with_signer(audience, backend_arc);
     let req = MintRequest {
