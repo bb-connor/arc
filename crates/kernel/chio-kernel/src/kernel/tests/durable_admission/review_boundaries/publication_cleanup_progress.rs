@@ -148,7 +148,7 @@ impl AdmissionOperationStore for DurableOperations {
 }
 
 struct DurableApprovals {
-    legacy: InMemoryApprovalStore,
+    inner: InMemoryApprovalStore,
     reservations: std::sync::Mutex<BTreeMap<String, ApprovalReservation>>,
 }
 
@@ -196,31 +196,28 @@ impl ApprovalStore for DurableApprovals {
         ApprovalStoreProfile::SingleNodeDurable
     }
     fn store_pending(&self, request: &ApprovalRequest) -> Result<(), ApprovalStoreError> {
-        self.legacy.store_pending(request)
+        self.inner.store_pending(request)
     }
     fn get_pending(&self, id: &str) -> Result<Option<ApprovalRequest>, ApprovalStoreError> {
-        self.legacy.get_pending(id)
+        self.inner.get_pending(id)
     }
     fn list_pending(
         &self,
         filter: &ApprovalFilter,
     ) -> Result<Vec<ApprovalRequest>, ApprovalStoreError> {
-        self.legacy.list_pending(filter)
+        self.inner.list_pending(filter)
     }
     fn resolve(&self, id: &str, decision: &ApprovalDecision) -> Result<(), ApprovalStoreError> {
-        self.legacy.resolve(id, decision)
+        self.inner.resolve(id, decision)
     }
     fn count_approved(&self, subject: &str, policy: &str) -> Result<u64, ApprovalStoreError> {
-        self.legacy.count_approved(subject, policy)
-    }
-    fn record_consumed(&self, token: &str, hash: &str, now: u64) -> Result<(), ApprovalStoreError> {
-        self.legacy.record_consumed(token, hash, now)
+        self.inner.count_approved(subject, policy)
     }
     fn is_consumed(&self, token: &str, hash: &str) -> Result<bool, ApprovalStoreError> {
-        self.legacy.is_consumed(token, hash)
+        self.inner.is_consumed(token, hash)
     }
     fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError> {
-        self.legacy.get_resolution(id)
+        self.inner.get_resolution(id)
     }
     fn reserve_approval_set(
         &self,
@@ -356,7 +353,7 @@ impl Harness {
             candidate_pages: AtomicUsize::new(0),
         });
         let approvals = Arc::new(DurableApprovals {
-            legacy: InMemoryApprovalStore::new(),
+            inner: InMemoryApprovalStore::new(),
             reservations: std::sync::Mutex::new(BTreeMap::new()),
         });
         kernel.admission_operation_store = Some(operations.clone());

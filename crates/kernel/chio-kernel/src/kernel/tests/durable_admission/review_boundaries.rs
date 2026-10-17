@@ -4,7 +4,7 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct CommittedApproval {
-    legacy: crate::approval::InMemoryApprovalStore,
+    inner: crate::approval::InMemoryApprovalStore,
     original: crate::approval::ApprovalReservation,
 }
 
@@ -14,7 +14,7 @@ impl CommittedApproval {
         approval_set: crate::approval::ApprovalSetReservationInput,
     ) -> TestResult<Self> {
         Ok(Self {
-            legacy: crate::approval::InMemoryApprovalStore::new(),
+            inner: crate::approval::InMemoryApprovalStore::new(),
             original: crate::approval::ApprovalReservation::from_persisted_parts(
                 operation_id.into(),
                 approval_set,
@@ -29,55 +29,47 @@ impl crate::approval::ApprovalStore for CommittedApproval {
         &self,
         request: &crate::approval::ApprovalRequest,
     ) -> Result<(), crate::approval::ApprovalStoreError> {
-        self.legacy.store_pending(request)
+        self.inner.store_pending(request)
     }
     fn get_pending(
         &self,
         id: &str,
     ) -> Result<Option<crate::approval::ApprovalRequest>, crate::approval::ApprovalStoreError> {
-        self.legacy.get_pending(id)
+        self.inner.get_pending(id)
     }
     fn list_pending(
         &self,
         filter: &crate::approval::ApprovalFilter,
     ) -> Result<Vec<crate::approval::ApprovalRequest>, crate::approval::ApprovalStoreError> {
-        self.legacy.list_pending(filter)
+        self.inner.list_pending(filter)
     }
     fn resolve(
         &self,
         id: &str,
         decision: &crate::approval::ApprovalDecision,
     ) -> Result<(), crate::approval::ApprovalStoreError> {
-        self.legacy.resolve(id, decision)
+        self.inner.resolve(id, decision)
     }
     fn count_approved(
         &self,
         subject: &str,
         policy: &str,
     ) -> Result<u64, crate::approval::ApprovalStoreError> {
-        self.legacy.count_approved(subject, policy)
-    }
-    fn record_consumed(
-        &self,
-        token: &str,
-        parameters: &str,
-        now: u64,
-    ) -> Result<(), crate::approval::ApprovalStoreError> {
-        self.legacy.record_consumed(token, parameters, now)
+        self.inner.count_approved(subject, policy)
     }
     fn is_consumed(
         &self,
         token: &str,
         parameters: &str,
     ) -> Result<bool, crate::approval::ApprovalStoreError> {
-        self.legacy.is_consumed(token, parameters)
+        self.inner.is_consumed(token, parameters)
     }
     fn get_resolution(
         &self,
         id: &str,
     ) -> Result<Option<crate::approval::ResolvedApproval>, crate::approval::ApprovalStoreError>
     {
-        self.legacy.get_resolution(id)
+        self.inner.get_resolution(id)
     }
     fn get_approval_reservation(
         &self,

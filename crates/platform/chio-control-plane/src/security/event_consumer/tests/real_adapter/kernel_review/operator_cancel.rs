@@ -414,9 +414,6 @@ impl ApprovalStore for SubstitutedApprovalBinding {
     fn count_approved(&self, subject: &str, policy: &str) -> Result<u64, ApprovalStoreError> {
         self.inner.count_approved(subject, policy)
     }
-    fn record_consumed(&self, token: &str, hash: &str, now: u64) -> Result<(), ApprovalStoreError> {
-        self.inner.record_consumed(token, hash, now)
-    }
     fn is_consumed(&self, token: &str, hash: &str) -> Result<bool, ApprovalStoreError> {
         self.inner.is_consumed(token, hash)
     }

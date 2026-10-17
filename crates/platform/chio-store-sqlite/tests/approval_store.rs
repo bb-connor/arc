@@ -11,6 +11,7 @@ use chio_core::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
 };
 use chio_core::crypto::Keypair;
+use chio_kernel::approval::{ApprovalReservationMember, ApprovalSetReservationInput};
 use chio_kernel::{
     resume_with_decision, ApprovalDecision, ApprovalFilter, ApprovalOutcome, ApprovalRequest,
     ApprovalStore, ApprovalStoreError,
@@ -239,18 +240,151 @@ fn persistence_survives_restart() {
     let _ = std::fs::remove_file(&path);
 }
 
-#[test]
-fn record_consumed_is_idempotent_on_first_write_only() {
+struct ResolutionFixture {
+    store: SqliteApprovalStore,
+    decision: ApprovalDecision,
+    token_digest: String,
+    _clock: chio_test_support::clock::ClockScope,
+}
+
+fn resolution_fixture() -> ResolutionFixture {
+    let clock = chio_test_support::clock::scope_unix_secs(1_000);
     let store = SqliteApprovalStore::open_in_memory().test_unwrap();
-    store.record_consumed("tok-A", "hash-A", 1).test_unwrap();
-    let err = store
-        .record_consumed("tok-A", "hash-A", 2)
-        .test_unwrap_err();
-    match err {
-        ApprovalStoreError::Replay(_) => {}
-        other => panic!("expected Replay on second call, got {other:?}"),
+    let approver = Keypair::generate();
+    let subject = Keypair::generate();
+    let mut request = sample_request("a-1", "h-1");
+    request.subject_public_key = Some(subject.public_key());
+    request.trusted_approvers = vec![approver.public_key()];
+    store.store_pending(&request).test_unwrap();
+    let token = sign_token(
+        &approver,
+        &subject,
+        "a-1",
+        "h-1",
+        GovernedApprovalDecision::Approved,
+    );
+    let token_digest = token.artifact_digest().test_unwrap();
+    let decision = ApprovalDecision {
+        approval_id: "a-1".into(),
+        outcome: ApprovalOutcome::Approved,
+        reason: None,
+        approver: approver.public_key(),
+        token,
+        received_at: 1_000,
+    };
+    ResolutionFixture {
+        store,
+        decision,
+        token_digest,
+        _clock: clock,
     }
-    assert!(store.is_consumed("tok-A", "hash-A").test_unwrap());
+}
+
+fn operation_reservation(token_id: &str, token_digest: &str) -> ApprovalSetReservationInput {
+    ApprovalSetReservationInput::new(
+        "ee".repeat(32),
+        vec![
+            ApprovalReservationMember::new(token_id.to_string(), token_digest.to_string())
+                .test_unwrap(),
+        ],
+        2_000,
+    )
+    .test_unwrap()
+}
+
+#[test]
+fn resolution_excludes_reservation_of_the_same_token_id() {
+    let fixture = resolution_fixture();
+    fixture
+        .store
+        .resolve("a-1", &fixture.decision)
+        .test_unwrap();
+
+    let err = fixture
+        .store
+        .reserve_approval_set(
+            &"11".repeat(32),
+            &operation_reservation("tok-a-1", &"dd".repeat(32)),
+        )
+        .test_unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "approval token already consumed (replay detected): approval token `tok-a-1` was already consumed"
+    );
+}
+
+#[test]
+fn resolution_excludes_reservation_of_the_same_token_digest() {
+    let fixture = resolution_fixture();
+    fixture
+        .store
+        .resolve("a-1", &fixture.decision)
+        .test_unwrap();
+
+    let err = fixture
+        .store
+        .reserve_approval_set(
+            &"11".repeat(32),
+            &operation_reservation("operation-token", &fixture.token_digest),
+        )
+        .test_unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "approval token already consumed (replay detected): approval token `operation-token` was already consumed"
+    );
+    assert_eq!(
+        fixture
+            .store
+            .get_approval_reservation(&"11".repeat(32))
+            .test_unwrap(),
+        None
+    );
+}
+
+#[test]
+fn reservation_of_the_same_token_id_excludes_resolution() {
+    let fixture = resolution_fixture();
+    fixture
+        .store
+        .reserve_approval_set(
+            &"11".repeat(32),
+            &operation_reservation("tok-a-1", &"dd".repeat(32)),
+        )
+        .test_unwrap();
+
+    let err = fixture
+        .store
+        .resolve("a-1", &fixture.decision)
+        .test_unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "storage backend error: insert consumed: approval token is operation-owned"
+    );
+    assert!(fixture.store.get_pending("a-1").test_unwrap().is_some());
+    assert!(!fixture.store.is_consumed("tok-a-1", "h-1").test_unwrap());
+}
+
+#[test]
+fn reservation_of_the_same_token_digest_excludes_resolution() {
+    let fixture = resolution_fixture();
+    fixture
+        .store
+        .reserve_approval_set(
+            &"11".repeat(32),
+            &operation_reservation("operation-token", &fixture.token_digest),
+        )
+        .test_unwrap();
+
+    let err = fixture
+        .store
+        .resolve("a-1", &fixture.decision)
+        .test_unwrap_err();
+    assert_eq!(
+        err.to_string(),
+        "storage backend error: insert consumed: approval token is operation-owned"
+    );
+    assert!(fixture.store.get_pending("a-1").test_unwrap().is_some());
+    assert!(!fixture.store.is_consumed("tok-a-1", "h-1").test_unwrap());
 }
 
 #[test]
