@@ -23,7 +23,7 @@ use super::recovery_resources::{require_recovery_floor_before_transaction, Recov
 use super::{invariant, sqlite_error, SqliteAdmissionOperationStore};
 
 mod history;
-mod planning;
+pub(super) mod planning;
 #[cfg(all(test, unix))]
 mod tests;
 
@@ -68,7 +68,6 @@ impl SqliteAdmissionOperationStore {
         planning::save_planned(
             &tx,
             &self.serving_owner,
-            deployment,
             &ProtectedWrite {
                 key: &key,
                 scope: &scope,

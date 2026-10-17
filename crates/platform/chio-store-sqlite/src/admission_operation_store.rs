@@ -94,6 +94,8 @@ mod projection;
 mod recovery;
 mod recovery_authority;
 mod recovery_deployment;
+mod semantic_deployment;
+pub use semantic_deployment::NativeSemanticInstallation;
 mod recovery_resources;
 pub(crate) use recovery::verify_outcome_recovery_status;
 mod recovery_records;

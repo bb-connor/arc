@@ -1866,6 +1866,7 @@ name = "chio-egress-contract"
 version = "0.1.0"
 dependencies = [
  "chio-core-types",
+ "http",
  "reqwest",
  "serde",
  "serde_json",
@@ -2647,6 +2648,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "chio-semantic-contracts"
+version = "0.1.0"
+dependencies = [
+ "chio-core-types",
+ "chio-security-types",
+ "serde",
+]
+
+[[package]]
 name = "chio-settle"
 version = "0.1.0"
 dependencies = [
@@ -2735,6 +2745,7 @@ dependencies = [
  "chio-kernel",
  "chio-kernel-core",
  "chio-security-types",
+ "chio-semantic-contracts",
  "chio-settle",
  "chio-sqlite-file-identity",
  "chio-supervisor",

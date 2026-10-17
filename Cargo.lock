@@ -5297,6 +5297,7 @@ dependencies = [
  "chio-open-market",
  "chio-quarantine",
  "chio-security-types",
+ "chio-semantic-contracts",
  "chio-settle",
  "chio-sqlite-file-identity",
  "chio-store-sqlite",

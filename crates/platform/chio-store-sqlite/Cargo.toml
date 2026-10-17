@@ -49,6 +49,7 @@ chio-fiscal = { workspace = true }
 chio-kernel = { workspace = true, features = ["finding-market"] }
 chio-kernel-core = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
+chio-semantic-contracts = { workspace = true }
 chio-settle = { workspace = true }
 chio-sqlite-file-identity = { version = "=0.1.0", path = "../chio-sqlite-file-identity" }
 chio-supervisor = { workspace = true }
