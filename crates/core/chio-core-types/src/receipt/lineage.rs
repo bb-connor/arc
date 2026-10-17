@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::capability::governance::ProvenanceEvidenceClass;
 use crate::crypto::{
-    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, sign_canonical_with_backend,
-    Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, is_default_optional_algorithm, sha256_hex, Keypair, PublicKey, Signature,
+    SigningAlgorithm, SigningBackend,
 };
 use crate::error::Result;
 use crate::schema_binding::ensure_schema_matches;
@@ -15,6 +15,7 @@ use crate::session::{
 };
 use crate::signer_binding::{
     ensure_backend_matches_embedded_key, ensure_keypair_matches_embedded_key,
+    sign_bytes_for_embedded_key,
 };
 
 use super::crypto_floor::{
@@ -154,7 +155,8 @@ impl ChildRequestReceipt {
             "child request receipt",
             "kernel_key",
         )?;
-        let (signature, _bytes) = sign_canonical_with_backend(backend, &body)?;
+        let outcome =
+            sign_bytes_for_embedded_key(&body.kernel_key, backend, &canonical_json_bytes(&body)?)?;
         Ok(Self {
             id: body.id,
             timestamp: body.timestamp,
@@ -167,8 +169,8 @@ impl ChildRequestReceipt {
             policy_hash: body.policy_hash,
             metadata: body.metadata,
             kernel_key: body.kernel_key,
-            algorithm: Some(backend.algorithm()),
-            signature,
+            algorithm: Some(outcome.algorithm),
+            signature: outcome.signature,
         })
     }
 
@@ -434,11 +436,11 @@ where
 
     /// Sign an export payload through an external or platform signing backend.
     pub fn sign_with_backend(body: T, backend: &dyn SigningBackend) -> Result<Self> {
-        let (signature, _) = sign_canonical_with_backend(backend, &body)?;
+        let outcome = backend.sign_bytes_with_identity(&canonical_json_bytes(&body)?)?;
         Ok(Self {
             body,
-            signer_key: backend.public_key(),
-            signature,
+            signer_key: outcome.public_key,
+            signature: outcome.signature,
         })
     }
 
