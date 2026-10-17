@@ -1290,7 +1290,6 @@
     "crates/platform/chio-control-plane/src/json_input.rs::read::from_wire",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_authority_seed_handoff::from_wire",
     "crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy::from_wire",
-    "crates/platform/chio-control-plane/src/revocation_partner.rs::from_json::from_wire",
     "crates/platform/chio-control-plane/src/scim_lifecycle.rs::load::from_wire",
     "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::call::from_wire",
     "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs::decode_authority_request::from_wire",
@@ -18045,7 +18044,6 @@
     "crates/platform/chio-control-plane/src/json_input.rs::read::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/keyring_runtime.rs::load_authority_seed_handoff::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/reputation.rs::load_passport_verifier_policy::from_wire#1::decode_signed",
-    "crates/platform/chio-control-plane/src/revocation_partner.rs::from_json::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/scim_lifecycle.rs::load::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/security/active_response_authority/client.rs::call::from_wire#1::decode_canonical",
     "crates/platform/chio-control-plane/src/security/active_response_authority/validation.rs::decode_authority_request::from_wire#1::decode_canonical",
@@ -19420,7 +19418,7 @@
       "load_passport_verifier_policy::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-control-plane/src/revocation_partner.rs": [
-      "from_json::original-json-reader::UntrustedJsonText"
+      "from_json::shared-reader::crates/platform/chio-control-plane/src/signed_input.rs::decode"
     ],
     "crates/platform/chio-control-plane/src/scim_lifecycle.rs": [
       "load::original-json-reader::UntrustedJsonText"

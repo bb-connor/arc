@@ -171,9 +171,40 @@ fn a_missing_registry_file_is_refused() -> TestResult {
 }
 
 #[test]
+fn a_partner_resolves_by_the_did_of_its_authority_key() -> TestResult {
+    let loaded = RevocationPartnerRegistry::from_json(&single(json!(60)))?;
+    let did =
+        chio_did::DidChio::from_public_key(Keypair::from_seed(&[7; 32]).public_key())?.to_string();
+    let other =
+        chio_did::DidChio::from_public_key(Keypair::from_seed(&[8; 32]).public_key())?.to_string();
+    let found = loaded.by_issuer_dids(&[other.clone(), did]);
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].partner_id, "acme");
+    assert!(loaded.by_issuer_dids(&[other]).is_empty());
+    Ok(())
+}
+
+#[test]
 fn the_registry_schema_identifier_is_v1() {
     assert_eq!(
         REVOCATION_PARTNER_REGISTRY_SCHEMA,
         "chio.revocation-partner-registry.v1"
     );
+}
+
+#[test]
+fn a_registry_past_the_shared_read_bound_is_refused() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("revocation-partners.json");
+    std::fs::write(
+        &path,
+        vec![b' '; crate::signed_input::MAX_SIGNED_FILE_BYTES + 1],
+    )?;
+    assert_eq!(
+        RevocationPartnerRegistry::load(&path),
+        Err(RevocationPartnerError::Malformed(
+            "urn:chio:error:attest:signed-json-too-large".to_owned()
+        ))
+    );
+    Ok(())
 }
