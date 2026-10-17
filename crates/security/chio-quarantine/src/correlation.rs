@@ -394,11 +394,19 @@ impl<S: SecurityEventStore + ?Sized> TemporalCorrelator<S> {
                 }
             };
             last_group_watermark = group_watermark;
-            let watermark_unix_ms = group_watermark.as_legacy_unix_ms();
             if initial_state
                 .as_ref()
                 .is_some_and(|state| event.event_time_unix_ms <= state.watermark_unix_ms)
             {
+                let Some(watermark_unix_ms) = group_watermark.known_unix_ms() else {
+                    return self.known_health_outcome(
+                        rule,
+                        event,
+                        group_hash,
+                        DetectorHealthKind::CorruptState,
+                        group_watermark,
+                    );
+                };
                 let append = match self.store.append_verified(event) {
                     Ok(append) => append,
                     Err(error) => {
@@ -1040,10 +1048,10 @@ impl GroupWatermarkKnowledge {
         }
     }
 
-    const fn as_legacy_unix_ms(self) -> u64 {
+    const fn known_unix_ms(self) -> Option<u64> {
         match self {
-            Self::Committed { unix_ms } | Self::Contradictory { unix_ms } => unix_ms,
-            Self::Unknown => 0,
+            Self::Committed { unix_ms } | Self::Contradictory { unix_ms } => Some(unix_ms),
+            Self::Unknown => None,
         }
     }
 }
