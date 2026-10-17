@@ -319,14 +319,15 @@ fn three_witness_processes_prove_distinct_durable_identity_and_restart_recovery(
         None,
     )
     .test_unwrap_err();
-    assert!(proofs[0]
-        .verify(
+    assert!(matches!(
+        proofs[0].verify(
             &chio_keyring::WitnessId::new(fixture.witness_ids[0]).test_unwrap(),
             &fixture.witness_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "different-challenge",
-        )
-        .is_err());
+        ),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
     let rebound_client = UnixKeyLogWitnessClient::new(
         fixture.path("witness-0.sock"),
         chio_keyring::WitnessId::new(fixture.witness_ids[1]).test_unwrap(),
@@ -584,32 +585,35 @@ fn two_autonomous_auditors_rebuild_and_retain_the_same_witnessed_view() {
             "audit-ready-0",
         )
         .test_unwrap();
-    assert!(audit_proofs[0]
-        .verify(
+    assert!(matches!(
+        audit_proofs[0].verify(
             "audit.a",
             &fixture.audit_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "replayed-challenge",
-        )
-        .is_err());
-    assert!(audit_proofs[0]
-        .verify(
+        ),
+        Err(chio_keyring::KeyringError::StateInvariant(_))
+    ));
+    assert!(matches!(
+        audit_proofs[0].verify(
             "audit.a",
             &fixture.audit_backends[1].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "audit-ready-0",
-        )
-        .is_err());
+        ),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
     let mut forged = audit_proofs[0].clone();
     forged.body.pin = None;
-    assert!(forged
-        .verify(
+    assert!(matches!(
+        forged.verify(
             "audit.a",
             &fixture.audit_backends[0].public_key().test_unwrap(),
             policy.configuration_binding().test_unwrap(),
             "audit-ready-0",
-        )
-        .is_err());
+        ),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
 
     drop(UnixStream::connect(audit_clients[1].socket_path()).test_unwrap());
     let mut truncated = UnixStream::connect(audit_clients[1].socket_path()).test_unwrap();

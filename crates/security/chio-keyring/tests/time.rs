@@ -136,10 +136,11 @@ fn artifact_time_root_cannot_overlap_any_independent_role() {
         max_checkpoint_future_skew: 100,
     })
     .test_unwrap();
-    assert!(policy
-        .with_artifact_time_roots(BTreeMap::from([(
+    assert!(matches!(
+        policy.with_artifact_time_roots(BTreeMap::from([(
             AnchorId::new("timestamp.shared").test_unwrap(),
             shared.public_key().test_unwrap(),
-        )]))
-        .is_err());
+        )])),
+        Err(chio_keyring::KeyringError::DuplicateIdentifier)
+    ));
 }

@@ -364,16 +364,15 @@ fn auditor_policy_requires_exactly_two_unique_identifiers_and_role_keys() {
     let base = fixture.policy_without_auditors();
 
     assert!(base.clone().with_auditor_roots(BTreeMap::new()).is_err());
-    assert!(base
-        .clone()
-        .with_auditor_roots(BTreeMap::from([(
+    assert!(matches!(
+        base.clone().with_auditor_roots(BTreeMap::from([(
             "audit.a".to_string(),
             backend(80).public_key().test_unwrap(),
-        )]))
-        .is_err());
-    assert!(base
-        .clone()
-        .with_auditor_roots(BTreeMap::from([
+        )])),
+        Err(chio_keyring::KeyringError::StateInvariant(_))
+    ));
+    assert!(matches!(
+        base.clone().with_auditor_roots(BTreeMap::from([
             (
                 "audit.a".to_string(),
                 backend(80).public_key().test_unwrap()
@@ -386,11 +385,11 @@ fn auditor_policy_requires_exactly_two_unique_identifiers_and_role_keys() {
                 "audit.c".to_string(),
                 backend(82).public_key().test_unwrap()
             ),
-        ]))
-        .is_err());
-    assert!(base
-        .clone()
-        .with_auditor_roots(BTreeMap::from([
+        ])),
+        Err(chio_keyring::KeyringError::StateInvariant(_))
+    ));
+    assert!(matches!(
+        base.clone().with_auditor_roots(BTreeMap::from([
             (
                 "audit.a".to_string(),
                 backend(80).public_key().test_unwrap()
@@ -399,11 +398,11 @@ fn auditor_policy_requires_exactly_two_unique_identifiers_and_role_keys() {
                 "audit.b".to_string(),
                 backend(80).public_key().test_unwrap()
             ),
-        ]))
-        .is_err());
-    assert!(base
-        .clone()
-        .with_auditor_roots(BTreeMap::from([
+        ])),
+        Err(chio_keyring::KeyringError::DuplicateIdentifier)
+    ));
+    assert!(matches!(
+        base.clone().with_auditor_roots(BTreeMap::from([
             (
                 "audit valid".to_string(),
                 backend(80).public_key().test_unwrap()
@@ -412,8 +411,9 @@ fn auditor_policy_requires_exactly_two_unique_identifiers_and_role_keys() {
                 "audit.b".to_string(),
                 backend(81).public_key().test_unwrap()
             ),
-        ]))
-        .is_err());
+        ])),
+        Err(chio_keyring::KeyringError::InvalidIdentifier { .. })
+    ));
 
     let policy = base
         .with_auditor_roots(fixture.auditor_public_keys())
@@ -431,16 +431,18 @@ fn auditor_keys_cannot_overlap_any_fixed_or_lifecycle_authority_role() {
         fixture.recovery_a.public_key().test_unwrap(),
         backend(70).public_key().test_unwrap(),
     ] {
-        assert!(fixture
-            .policy_without_auditors()
-            .with_auditor_roots(BTreeMap::from([
-                ("audit.a".to_string(), overlapping_key),
-                (
-                    "audit.b".to_string(),
-                    backend(81).public_key().test_unwrap()
-                ),
-            ]))
-            .is_err());
+        assert!(matches!(
+            fixture
+                .policy_without_auditors()
+                .with_auditor_roots(BTreeMap::from([
+                    ("audit.a".to_string(), overlapping_key),
+                    (
+                        "audit.b".to_string(),
+                        backend(81).public_key().test_unwrap()
+                    ),
+                ])),
+            Err(chio_keyring::KeyringError::DuplicateIdentifier)
+        ));
     }
 
     let policy = fixture.policy();
@@ -1137,15 +1139,16 @@ fn complete_history_and_replay_reject_malformed_sequences_and_role_key_overlap()
     let first = KeyLogState::replay([&genesis], &history, &policy).test_unwrap();
     let second = KeyLogState::replay([&genesis], &history, &policy).test_unwrap();
     assert_eq!(first, second);
-    assert!(first
-        .key(
+    assert!(matches!(
+        first.key(
             &derive_key_id(
                 backend(99).public_key().test_unwrap().algorithm(),
                 &backend(99).public_key().test_unwrap()
             )
             .test_unwrap()
-        )
-        .is_err());
+        ),
+        Err(chio_keyring::KeyringError::UnknownKey)
+    ));
 }
 
 #[test]

@@ -334,22 +334,25 @@ fn genesis_and_rotation_require_exact_authorization_sets() {
     let mut bad_old = rotation.clone();
     bad_old.authorizations.old_key =
         Some(OldKeyAuthorization::sign(&bad_old.body, &backend(8)).test_unwrap());
-    assert!(bad_old
-        .verify_rotation(&old.public_key().test_unwrap())
-        .is_err());
+    assert!(matches!(
+        bad_old.verify_rotation(&old.public_key().test_unwrap()),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
 
     let mut bad_new = rotation.clone();
     bad_new.authorizations.new_key =
         Some(NewKeyProofOfPossession::sign(&bad_new.body, &backend(8)).test_unwrap());
-    assert!(bad_new
-        .verify_rotation(&old.public_key().test_unwrap())
-        .is_err());
+    assert!(matches!(
+        bad_new.verify_rotation(&old.public_key().test_unwrap()),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
 
     let mut missing = rotation;
     missing.authorizations.new_key = None;
-    assert!(missing
-        .verify_rotation(&old.public_key().test_unwrap())
-        .is_err());
+    assert!(matches!(
+        missing.verify_rotation(&old.public_key().test_unwrap()),
+        Err(chio_keyring::KeyringError::InvalidAuthorizationSet)
+    ));
 }
 
 #[test]

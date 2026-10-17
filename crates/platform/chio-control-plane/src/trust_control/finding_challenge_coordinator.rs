@@ -948,6 +948,13 @@ pub struct FindingChallengeCoordinator {
     failed_challenge_disposition: FindingDisputeLockDisposition,
 }
 
+/// The key a coordinator role signs with now; an unreadable identity refuses.
+fn role_key(authority: &dyn SigningBackend) -> Result<PublicKey, ChallengeCoordinatorError> {
+    authority
+        .public_key()
+        .map_err(|_| ChallengeCoordinatorError::Signing)
+}
+
 impl FindingChallengeCoordinator {
     fn status_commit_now(&self) -> Result<u64, chio_security_types::clock::ClockError> {
         let mut fence = self
@@ -994,27 +1001,18 @@ impl FindingChallengeCoordinator {
             pin.key()
                 .map_err(|_| ChallengeCoordinatorError::AuthorityPinMismatch(label))
         };
-        if evaluator_authority
-            .public_key()
-            .map_err(|_| ChallengeCoordinatorError::Signing)?
-            != pin(&config.challenge_evaluator, "evaluator")?
-        {
+        let evaluator_key = role_key(evaluator_authority.as_ref())?;
+        let finalization_key = role_key(finalization_authority.as_ref())?;
+        let penalty_key = role_key(penalty_authority.as_ref())?;
+        if evaluator_key != pin(&config.challenge_evaluator, "evaluator")? {
             return Err(ChallengeCoordinatorError::AuthorityPinMismatch("evaluator"));
         }
-        if finalization_authority
-            .public_key()
-            .map_err(|_| ChallengeCoordinatorError::Signing)?
-            != pin(&config.venue_finalization, "finalization")?
-        {
+        if finalization_key != pin(&config.venue_finalization, "finalization")? {
             return Err(ChallengeCoordinatorError::AuthorityPinMismatch(
                 "finalization",
             ));
         }
-        if penalty_authority
-            .public_key()
-            .map_err(|_| ChallengeCoordinatorError::Signing)?
-            != pin(&config.market_penalty, "penalty")?
-        {
+        if penalty_key != pin(&config.market_penalty, "penalty")? {
             return Err(ChallengeCoordinatorError::AuthorityPinMismatch("penalty"));
         }
         let fee_schedule_operators = config
@@ -1024,18 +1022,9 @@ impl FindingChallengeCoordinator {
         // the roster that may sign one must not contain a key this lane
         // signs with: such a key would authorize its own inputs.
         for operator in &fee_schedule_operators {
-            if operator
-                == &evaluator_authority
-                    .public_key()
-                    .map_err(|_| ChallengeCoordinatorError::Signing)?
-                || operator
-                    == &finalization_authority
-                        .public_key()
-                        .map_err(|_| ChallengeCoordinatorError::Signing)?
-                || operator
-                    == &penalty_authority
-                        .public_key()
-                        .map_err(|_| ChallengeCoordinatorError::Signing)?
+            if operator == &evaluator_key
+                || operator == &finalization_key
+                || operator == &penalty_key
             {
                 return Err(ChallengeCoordinatorError::AuthorityPinMismatch(
                     "fee schedule operator",
