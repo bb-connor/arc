@@ -26,7 +26,7 @@ use crate::encrypted_blob::{decrypt_blob_with_aad, try_encrypt_blob_with_aad, En
 mod custody_output;
 mod inbox;
 
-const CUSTODY_AAD_FORMAT: &str = "chio.frost.ceremony-custody-aad.v2";
+const CUSTODY_AAD_FORMAT: &str = "chio.frost.ceremony-custody-aad.v1";
 const RECORD_DIGEST_PREFIX: &[u8] = b"chio.frost.ceremony-record.digest.v1\0";
 
 #[derive(Debug)]
@@ -1191,4 +1191,33 @@ pub(super) fn require_completed_ceremony(
         return Err(FrostStoreError::Conflict("signer ceremony is not complete"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn custody_aad_pins_the_v1_format_and_binding_fields() -> Result<(), FrostStoreError> {
+        let fence = StoreMutationFence {
+            store_uuid: "store-1".into(),
+            lease_id: "lease-1".into(),
+            owner_epoch: 7,
+        };
+        let binding = CustodyBinding {
+            ceremony_id: "ceremony-1",
+            config_digest: "config-1",
+            state: FrostCeremonyState::Round2Ready,
+            state_version: 3,
+            custody_generation: "generation-1",
+            fence: &fence,
+            updated_at_unix_ms: 2000,
+        };
+        let aad = custody_aad("secret", &binding)?;
+        assert_eq!(
+            String::from_utf8_lossy(&aad),
+            r#"{"ceremonyId":"ceremony-1","configDigest":"config-1","custodyGeneration":"generation-1","format":"chio.frost.ceremony-custody-aad.v1","purpose":"secret","state":"round2_ready","stateVersion":3,"storeLeaseId":"lease-1","storeOwnerEpoch":7,"storeUuid":"store-1","updatedAtUnixMs":2000}"#
+        );
+        Ok(())
+    }
 }
