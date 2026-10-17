@@ -6,20 +6,24 @@ alerts, and audit-log exports.
 
 ## Guard Configuration
 
-The pilot enables `ResponseSanitizationGuard` in both pre-invocation and
-post-invocation paths.
+The pilot relies on the post-invocation `SanitizerHook` (see
+`spec/GUARDS.md` section 4.2), which the default runtime profile installs.
+Its built-in PII detectors cover SSN, card numbers (Luhn validated), email
+and medical record numbers (`MRN` followed by 6 to 12 digits).
 
 Required deployment settings:
 
-- `min_level: High` for zero-PHI shadow traffic.
-- `action: Redact` for production cutover only after BAA chain sign-off.
-- `action: Block` for any field that cannot be safely redacted.
-- Custom patterns for design-partner identifiers, if supplied by the partner
-  SOC team.
+- Keep the `pii` and `secrets` categories enabled.
+- `denylist.patterns` for design-partner identifiers, if supplied by the
+  partner SOC team. Denylist matches are always redacted.
+- Outbound messages to external APIs go through `ContentReviewGuard` with
+  `detect_pii` enabled.
 
-`High` is the safe default for this pilot because `spec/GUARDS.md` defines High as
-definite PII/PHI, including SSN, credit card, and MRN. `Medium` may be enabled
-after P3 schema negotiation for ICD-10 and email coverage.
+`SanitizerHook` redacts and does not block. A tool whose responses cannot be
+safely redacted must stay out of the pilot capability scope. Dates of birth,
+phone numbers in responses, and ICD-10 codes have no built-in detector; add
+denylist patterns for them after P3 schema negotiation if the pilot needs
+them.
 
 ## Receipt Fields
 
@@ -95,7 +99,8 @@ to its HIPAA evidence chain.
 Production cutover requires:
 
 1. Business Associate Agreement chain sign-off.
-2. `ResponseSanitizationGuard` loaded at High or stricter.
+2. `SanitizerHook` installed with the `pii` category enabled and the partner
+   denylist loaded.
 3. Synthetic PHI input blocked or redacted as configured.
 4. Synthetic deny receipt persisted with `redaction_status`.
 5. OCSF export row accepted by the SOC sink.

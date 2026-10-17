@@ -1,226 +1,47 @@
-use super::simple::default_patterns;
+use super::detectors::build_compiled_patterns;
 use super::validators::{is_luhn_valid_card_number, is_valid_ssn_fragments, shannon_entropy_ascii};
 use super::*;
-use chio_kernel::{Guard, Verdict};
 
 #[test]
-fn default_patterns_compile_to_full_set() {
-    // Every built-in constant pattern must compile; a regression that
-    // breaks one must fail CI here rather than silently shrink the
-    // detector set at runtime.
-    assert_eq!(default_patterns().len(), 7);
-}
-
-// ---- Simple (backwards-compatible) API tests ----
-
-#[test]
-fn guard_name() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
-    assert_eq!(guard.name(), "response-sanitization");
-}
-
-#[test]
-fn detects_ssn() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
-    let findings = guard.scan("My SSN is 123-45-6789");
-    assert!(!findings.is_empty());
-    assert!(findings.iter().any(|(name, _)| name == "SSN"));
-}
-
-#[test]
-fn detects_email() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
-    let findings = guard.scan("Contact john@example.com for info");
-    assert!(findings.iter().any(|(name, _)| name == "email"));
-}
-
-#[test]
-fn detects_mrn() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Block);
-    let findings = guard.scan("Patient MRN: 123456789");
-    assert!(findings.iter().any(|(name, _)| name == "MRN"));
-}
-
-#[test]
-fn no_findings_on_clean_text() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
-    let findings = guard.scan("This is perfectly clean text with no PII.");
-    assert!(findings.is_empty());
-}
-
-#[test]
-fn respects_minimum_sensitivity() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
-    let findings = guard.scan("Contact john@example.com");
-    assert!(!findings.iter().any(|(name, _)| name == "email"));
-    let findings2 = guard.scan("SSN 123-45-6789");
-    assert!(findings2.iter().any(|(name, _)| name == "SSN"));
-}
-
-#[test]
-fn redacts_ssn() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Redact);
-    let (redacted, count) = guard.redact("SSN is 123-45-6789 please");
-    assert!(redacted.contains("[SSN REDACTED]"));
-    assert!(!redacted.contains("123-45-6789"));
-    assert!(count > 0);
-}
-
-#[test]
-fn redacts_email() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::Low, SanitizationAction::Redact);
-    let (redacted, _) = guard.redact("Email: jane@example.com");
-    assert!(redacted.contains("[EMAIL REDACTED]"));
-    assert!(!redacted.contains("jane@example.com"));
-}
-
-#[test]
-fn scan_response_clean() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
-    let response = serde_json::json!({"status": "ok", "data": "nothing sensitive"});
-    let result = guard.scan_response(&response);
-    assert!(matches!(result, ScanResult::Clean));
-}
-
-#[test]
-fn scan_response_blocked() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
-    let response = serde_json::json!({"patient": "SSN: 123-45-6789"});
-    let result = guard.scan_response(&response);
-    assert!(matches!(result, ScanResult::Blocked(_)));
-}
-
-#[test]
-fn scan_response_redacted() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Redact);
-    let response = serde_json::json!({"patient": "SSN: 123-45-6789"});
-    let result = guard.scan_response(&response);
-    match result {
-        ScanResult::Redacted { redacted_text, .. } => {
-            assert!(redacted_text.contains("[SSN REDACTED]"));
-        }
-        _ => panic!("expected Redacted result"),
+fn built_in_detectors_compile_to_full_set() {
+    let patterns = build_compiled_patterns().unwrap();
+    assert_eq!(patterns.len(), 16);
+    for id in ["pii_ssn", "pii_credit_card", "pii_email", "pii_mrn"] {
+        assert!(patterns.iter().any(|pattern| pattern.id == id), "{id}");
     }
 }
 
 #[test]
-fn guard_evaluate_denies_args_with_pii() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
-
-    let kp = chio_core::crypto::Keypair::generate();
-    let scope = chio_core::capability::scope::ChioScope::default();
-    let agent_id = kp.public_key().to_hex();
-    let server_id = "srv".to_string();
-
-    let cap_body = chio_core::capability::token::CapabilityTokenBody {
-        id: "cap-test".to_string(),
-        issuer: kp.public_key(),
-        subject: kp.public_key(),
-        scope: scope.clone(),
-        issued_at: 0,
-        expires_at: u64::MAX,
-        delegation_chain: vec![],
-        aggregate_invocation_budget: None,
-    };
-    let cap = chio_core::capability::token::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
-
-    let request = chio_kernel::ToolCallRequest {
-        request_id: "req-test".to_string(),
-        capability: cap,
-        tool_name: "write_file".to_string(),
-        server_id: server_id.clone(),
-        agent_id: agent_id.clone(),
-        arguments: serde_json::json!({"content": "SSN is 123-45-6789"}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        supplemental_authorization: None,
-        model_metadata: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
-
-    let ctx = {
-        let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
-        constructed_guard_context.agent_id = &agent_id;
-        constructed_guard_context.server_id = &server_id;
-        constructed_guard_context
-    };
-
-    assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Deny);
+fn redacts_medical_record_number() {
+    let sanitizer = OutputSanitizer::new();
+    for input in ["MRN: 123456789", "mrn #0012345", "Patient MRN 987654321012"] {
+        let result = sanitizer.sanitize_text(input);
+        assert!(result.was_redacted, "{input}");
+        assert!(
+            result
+                .findings
+                .iter()
+                .any(|finding| finding.id == "pii_mrn"),
+            "{input}"
+        );
+        let digits: String = input.chars().filter(char::is_ascii_digit).collect();
+        assert!(!result.sanitized.contains(&digits), "{input}");
+    }
 }
 
 #[test]
-fn guard_evaluate_allows_clean_args() {
-    let guard = ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
-
-    let kp = chio_core::crypto::Keypair::generate();
-    let scope = chio_core::capability::scope::ChioScope::default();
-    let agent_id = kp.public_key().to_hex();
-    let server_id = "srv".to_string();
-
-    let cap_body = chio_core::capability::token::CapabilityTokenBody {
-        id: "cap-test".to_string(),
-        issuer: kp.public_key(),
-        subject: kp.public_key(),
-        scope: scope.clone(),
-        issued_at: 0,
-        expires_at: u64::MAX,
-        delegation_chain: vec![],
-        aggregate_invocation_budget: None,
-    };
-    let cap = chio_core::capability::token::CapabilityToken::sign(cap_body, &kp).expect("sign cap");
-
-    let request = chio_kernel::ToolCallRequest {
-        request_id: "req-test".to_string(),
-        capability: cap,
-        tool_name: "read_file".to_string(),
-        server_id: server_id.clone(),
-        agent_id: agent_id.clone(),
-        arguments: serde_json::json!({"path": "/app/src/main.rs"}),
-        dpop_proof: None,
-        execution_nonce: None,
-        governed_intent: None,
-        approval_token: None,
-        approval_tokens: Vec::new(),
-        threshold_approval_proposal: None,
-        supplemental_authorization: None,
-        model_metadata: None,
-        federated_origin_kernel_id: None,
-        declassification_grant: None,
-    };
-
-    let ctx = {
-        let mut constructed_guard_context = chio_kernel::GuardContext::new(&request, &scope);
-        constructed_guard_context.agent_id = &agent_id;
-        constructed_guard_context.server_id = &server_id;
-        constructed_guard_context
-    };
-
-    assert_eq!(guard.evaluate(&ctx).expect("ok"), Verdict::Allow);
-}
-
-#[test]
-fn custom_pattern() {
-    let pattern = build_pattern(
-        "custom-id",
-        r"\bCUST-\d{8}\b",
-        SensitivityLevel::High,
-        "[CUST-ID REDACTED]",
-    );
-    assert!(pattern.is_some());
-
-    let guard = ResponseSanitizationGuard::with_patterns(
-        vec![pattern.unwrap()],
-        SensitivityLevel::High,
-        SanitizationAction::Block,
-    );
-    let findings = guard.scan("Customer CUST-12345678 record");
-    assert!(!findings.is_empty());
-    assert!(findings.iter().any(|(name, _)| name == "custom-id"));
+fn medical_record_number_requires_marker_and_digit_count() {
+    let sanitizer = OutputSanitizer::new();
+    for input in ["MRN 12345", "SMRN 1234567", "MRN 1234567890123"] {
+        let result = sanitizer.sanitize_text(input);
+        assert!(
+            !result
+                .findings
+                .iter()
+                .any(|finding| finding.id == "pii_mrn"),
+            "{input}"
+        );
+    }
 }
 
 // ---- OutputSanitizer unit tests ----

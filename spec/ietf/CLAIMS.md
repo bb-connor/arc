@@ -26,6 +26,17 @@ Lifting the limit needs per-hop child-scope witnesses, a partner-key set separat
 - Added 2026-10-09 (cross-vendor review). Section Signature Suites and receipt verification step 3 now require every verifier to reject a present `algorithm` hint that disagrees with the signature encoding, with or without a floor, as `spec/PROTOCOL.md` requires for capabilities and receipts. This replaces the floor-aware-only qualification in ledger row 5 and receipt row R41. `ChioReceipt::verify_signature` (`crates/core/chio-core-types/src/receipt/body.rs:479-494`) does not check the hint; `verify_signature_with_floor` (lines 521-528) does. Section Implementation Status records that gap (work item RCPT-ALG-HINT).
 - Added 2026-10-09 (cross-vendor review). Section Privacy Considerations gains two paragraphs on unsalted output digests: `content_hash`, stream chunk digests, and a child `outcome_hash` let a receipt reader confirm an enumerable output (`crates/kernel/chio-kernel/src/receipt_support/receipt_content.rs:3-60`), and the signing nonce does not enter them. Mitigations are stated as considerations; no implementation change is claimed.
 
+### 2026-10-17: regulated-data guard evidence
+
+Rows 8 and 39 of the September 30 baseline cite
+`crates/guards/chio-guards/src/response_sanitization/simple.rs`. That file
+is removed: no runtime profile, policy compiler or CLI ever constructed it.
+Pre-call PII detection on outbound message content is
+`ContentReviewGuard` (`crates/guards/chio-guards/src/content_review.rs`),
+secrets in file writes are `SecretLeakGuard`, and response redaction is
+`SanitizerHook`. No guard scans every tool argument for PII. Both rows stay
+QUALIFIED: the draft's regulated-data SHOULD remains operator guidance.
+
 ### 2026-10-15: process-family source alignment
 
 This targeted source review uses implementation candidate

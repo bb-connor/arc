@@ -221,6 +221,15 @@ pub(super) fn build_compiled_patterns() -> Result<Vec<CompiledPattern>, regex::E
             regex: compile_required_pattern(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")?,
             validator: None,
         },
+        CompiledPattern {
+            id: "pii_mrn",
+            category: SensitiveCategory::Pii,
+            data_type: "medical_record_number",
+            confidence: 0.9,
+            recommended: RedactionStrategy::Mask,
+            regex: compile_required_pattern(r"(?i)\bMRN[:\s#]*\d{6,12}\b")?,
+            validator: None,
+        },
         // ---- Internal ----
         CompiledPattern {
             id: "internal_private_ip",
