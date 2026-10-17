@@ -7,6 +7,8 @@ use chio_runtime_core::{
     CHIO_TREATY_SCOPE_SCHEMA,
 };
 
+#[path = "runtime_store/evidence_artifacts_schema.rs"]
+mod evidence_artifacts_schema;
 #[path = "runtime_store/json_store_bounds.rs"]
 mod json_store_bounds;
 #[cfg(unix)]
