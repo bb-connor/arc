@@ -1039,6 +1039,43 @@ test -f target/formal/failing-proof-report.json
 grep -Fq 'gate failed: cargo xtask gen proof-coverage --check' \
   "${tmp_dir}/coverage-fail.out"
 
+rm -rf target/formal/aeneas-production target/formal/receipt-trace
+rm -f target/formal/coverage.json target/formal/trace-validation.json
+: >"${MOCK_CARGO_LOG}"
+if MOCK_COVERAGE_FAIL=1 \
+  CHIO_PROOF_REPORT_PATH=target/formal/failing-proof-report.json \
+  bash scripts/generate-proof-report.sh >"${tmp_dir}/strict-gate-fail.out" 2>&1; then
+  echo "strict proof-report generator exited zero after a failed gate" >&2
+  exit 1
+fi
+if ! grep -Fq 'gate failed: cargo xtask gen proof-coverage --check' \
+  "${tmp_dir}/strict-gate-fail.out" ||
+  grep -Fq 'generated proof artifact is missing' "${tmp_dir}/strict-gate-fail.out"; then
+  cat "${tmp_dir}/strict-gate-fail.out" >&2
+  exit 1
+fi
+test "$(grep -Fvx -e '--version' -e 'kani --version' -e 'creusot version' \
+  "${MOCK_CARGO_LOG}")" = "xtask gen proof-coverage --check"
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+report = json.loads(
+    Path("target/formal/failing-proof-report.json").read_text(encoding="utf-8")
+)
+results = report["gateResults"]
+if results[0]["command"] != "cargo xtask gen proof-coverage --check":
+    raise SystemExit("strict failure report does not lead with the coverage gate")
+if results[0]["status"] != "failed" or results[0]["exitCode"] != 9:
+    raise SystemExit("strict failure report does not record the failed gate")
+if len(results) < 2 or any(result["status"] != "not_run" for result in results[1:]):
+    raise SystemExit("strict failure report ran gates after the first failure")
+if report["traceValidation"] != {"result": "not_run"}:
+    raise SystemExit("strict failure report validated traces after a failed gate")
+if report["artifactHashes"]["generated"]:
+    raise SystemExit("strict failure report hashed generated artifacts after a failed gate")
+PY
+
 if bash scripts/generate-proof-report.sh --no-run-gates extra >/dev/null 2>&1; then
   echo "proof-report generator accepted extra arguments" >&2
   exit 1
