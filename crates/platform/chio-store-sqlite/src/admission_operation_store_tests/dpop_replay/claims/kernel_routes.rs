@@ -93,18 +93,6 @@ impl Route {
         let signer = Keypair::generate();
         let mut kernel = kernel(&fixture, signer.clone())?;
         kernel.set_operation_owned_dpop_authority(domain.clone())?;
-        kernel
-            .set_dpop_replay_source(
-                DpopNonceStore::new(8, Duration::from_secs(60))
-                    .expect("positive replay store test capacities"),
-            )
-            .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
-        let legacy = kernel.dpop_replay_source()?;
-        let snapshot = legacy.preview_unsealed(&DpopReplaySourceBinding {
-            dpop_authority_id: identifier("unused_legacy", "unused-retired-cache"),
-            destination_authority_id: identifier("destination", &fixture.fence.store_uuid),
-        })?;
-        legacy.seal_exact(&snapshot)?;
         let calls = Arc::new(AtomicUsize::new(0));
         kernel.register_tool_server(Box::new(Server(calls.clone())));
         Ok(Self {

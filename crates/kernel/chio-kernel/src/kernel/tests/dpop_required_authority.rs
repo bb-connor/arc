@@ -4,9 +4,8 @@ use crate::dpop::DpopError;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
-fn signed_authority_and_local_source_cannot_select_runtime_authority() -> TestResult {
+fn signed_authority_cannot_select_runtime_authority() -> TestResult {
     let mut kernel = make_kernel(make_config());
-    kernel.set_dpop_replay_source(DpopNonceStore::new(8, Duration::from_secs(300))?)?;
     kernel.register_tool_server(Box::new(EchoServer::new("authority-server", vec!["read"])));
     let agent = make_keypair();
     let mut grant = make_grant("authority-server", "read");
@@ -60,46 +59,6 @@ fn signed_authority_and_local_source_cannot_select_runtime_authority() -> TestRe
             .and_then(serde_json::Value::as_str),
         Some(DpopError::MissingAuthority.code())
     );
-    assert_eq!(
-        kernel
-            .dpop_nonce_store
-            .as_ref()
-            .ok_or("source")?
-            .utilization()?
-            .0,
-        0
-    );
-    assert!(kernel.operation_owned_dpop_authority().is_none());
-    Ok(())
-}
-
-#[test]
-fn source_retirement_remains_explicit_without_enabling_dpop() -> TestResult {
-    use crate::admission_operation::AdmissionIdentifier;
-    use crate::dpop::replay_source::DpopReplaySourceBinding;
-    let mut kernel = make_kernel(make_config());
-    kernel.set_dpop_replay_source(DpopNonceStore::new(8, Duration::from_secs(300))?)?;
-    let source = kernel.dpop_replay_source()?;
-    let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {
-        dpop_authority_id: AdmissionIdentifier::try_new("authority", "source-retirement")?,
-        destination_authority_id: AdmissionIdentifier::try_new(
-            "destination",
-            "configured-destination",
-        )?,
-    })?;
-    source.seal_exact(&snapshot)?;
-    source.verify_exact(&snapshot)?;
-    assert!(matches!(
-        source.preview_unsealed(&DpopReplaySourceBinding {
-            dpop_authority_id: AdmissionIdentifier::try_new("authority", "source-retirement")?,
-            destination_authority_id: AdmissionIdentifier::try_new(
-                "destination",
-                "configured-destination"
-            )?,
-        }),
-        Err(KernelError::DpopVerificationFailed(reason))
-            if reason == "DPoP replay source: source is retired; replay mutations are forbidden"
-    ));
     assert!(kernel.operation_owned_dpop_authority().is_none());
     Ok(())
 }

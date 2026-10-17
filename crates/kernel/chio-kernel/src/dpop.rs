@@ -334,13 +334,6 @@ impl DpopNonceStore {
         }
     }
 
-    pub(crate) fn bind_clock(&mut self, clock: Arc<dyn Clock>) -> Result<(), KernelError> {
-        let state = self.inner.get_mut().map_err(|_| DpopError::Unavailable)?;
-        state.source.require_pristine()?;
-        self.clock = clock;
-        Ok(())
-    }
-
     /// Return `(occupied_entries, capacity)` for local utilization monitoring.
     pub fn utilization(&self) -> Result<(usize, usize), KernelError> {
         let state = self
