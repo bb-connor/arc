@@ -15,17 +15,14 @@ use chio_core::{
         scope::{ChioScope, Constraint, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     },
-    receipt::body::chio_receipt_id,
     receipt::body::ChioReceipt,
     receipt::body::ChioReceiptBody,
     receipt::decision::Decision,
     receipt::decision::ToolCallAction,
     receipt::kinds::BoundaryClass,
-    receipt::kinds::ObservationOutcome,
     receipt::kinds::ReceiptKind,
     receipt::kinds::RedactionMode,
     receipt::kinds::ToolOrigin,
-    receipt::kinds::TrustLevel,
     receipt::metadata::GuardEvidence,
     sha256_hex, Keypair,
 };
@@ -170,470 +167,6 @@ fn base_receipt_body(
         kernel_key: keypair.public_key(),
         bbs_projection_version: None,
     }
-}
-
-fn observation_receipt_body(
-    id: &str,
-    action: ToolCallAction,
-    receipt_kind: ReceiptKind,
-    boundary_class: BoundaryClass,
-    observation_outcome: ObservationOutcome,
-    trust_level: TrustLevel,
-    keypair: &Keypair,
-) -> ChioReceiptBody {
-    ChioReceiptBody {
-        id: id.to_string(),
-        timestamp: 1710000200,
-        capability_id: "cap-bindings-001".to_string(),
-        tool_server: "srv-files".to_string(),
-        tool_name: "file_read".to_string(),
-        action,
-        decision: None,
-        receipt_kind,
-        boundary_class,
-        observation_outcome: Some(observation_outcome),
-        tool_origin: ToolOrigin::CallerExecuted,
-        redaction_mode: RedactionMode::None,
-        actor_chain: Vec::new(),
-        content_hash: sha256_hex(br#"{"ok":true}"#),
-        policy_hash: "policy-bindings-v1".to_string(),
-        evidence: vec![GuardEvidence {
-            guard_name: "ObservationRecorder".to_string(),
-            verdict: true,
-            details: Some("recorded without mediated authorization".to_string()),
-        }],
-        metadata: Some(json!({
-            "surface": "bindings-vectors",
-            "version": 1
-        })),
-        trust_level,
-        tenant_id: None,
-        kernel_key: keypair.public_key(),
-        bbs_projection_version: None,
-    }
-}
-
-fn forged_semantically_invalid_receipt(
-    mut body: ChioReceiptBody,
-    keypair: &Keypair,
-    context: &str,
-) -> ChioReceipt {
-    body.id = chio_receipt_id(&body).test_unwrap(context);
-    let (signature, _bytes) = keypair
-        .sign_canonical(&body)
-        .test_unwrap("sign invalid semantic receipt fixture");
-    ChioReceipt {
-        id: body.id,
-        timestamp: body.timestamp,
-        capability_id: body.capability_id,
-        tool_server: body.tool_server,
-        tool_name: body.tool_name,
-        action: body.action,
-        decision: body.decision,
-        receipt_kind: body.receipt_kind,
-        boundary_class: body.boundary_class,
-        observation_outcome: body.observation_outcome,
-        tool_origin: body.tool_origin,
-        redaction_mode: body.redaction_mode,
-        actor_chain: body.actor_chain,
-        content_hash: body.content_hash,
-        policy_hash: body.policy_hash,
-        evidence: body.evidence,
-        metadata: body.metadata,
-        trust_level: body.trust_level,
-        tenant_id: body.tenant_id,
-        bbs_projection_version: None,
-        kernel_key: body.kernel_key,
-        bbs_signature: None,
-        algorithm: None,
-        signature,
-    }
-}
-
-fn receipt_cases() -> Vec<Value> {
-    let seed = [7u8; 32];
-    let keypair = Keypair::from_seed(&seed);
-
-    let allow_action = ToolCallAction::from_parameters(json!({
-        "path": "/workspace/docs/roadmap.md",
-        "mode": "read"
-    }))
-    .test_unwrap("allow action");
-    let allow_receipt = ChioReceipt::sign(
-        base_receipt_body(
-            "rcpt-bindings-allow",
-            allow_action,
-            Decision::Allow,
-            &keypair,
-        ),
-        &keypair,
-    )
-    .test_unwrap("allow receipt");
-    let allow_verification = verify_receipt(&allow_receipt).test_unwrap("allow verification");
-
-    let deny_action = ToolCallAction::from_parameters(json!({
-        "path": "/etc/shadow",
-        "mode": "read"
-    }))
-    .test_unwrap("deny action");
-    let deny_receipt = ChioReceipt::sign(
-        base_receipt_body(
-            "rcpt-bindings-deny",
-            deny_action,
-            Decision::Deny {
-                reason: "path is forbidden".to_string(),
-                guard: "ForbiddenPathGuard".to_string(),
-            },
-            &keypair,
-        ),
-        &keypair,
-    )
-    .test_unwrap("deny receipt");
-    let deny_verification = verify_receipt(&deny_receipt).test_unwrap("deny verification");
-
-    let mut invalid_hash_action = ToolCallAction::from_parameters(json!({
-        "path": "/workspace/docs/private.md",
-        "mode": "read"
-    }))
-    .test_unwrap("invalid hash action");
-    invalid_hash_action.parameter_hash =
-        "0000000000000000000000000000000000000000000000000000000000000000".to_string();
-    let invalid_hash_receipt = ChioReceipt::sign(
-        base_receipt_body(
-            "rcpt-bindings-invalid-hash",
-            invalid_hash_action,
-            Decision::Allow,
-            &keypair,
-        ),
-        &keypair,
-    )
-    .test_unwrap("invalid hash receipt");
-    let invalid_hash_verification =
-        verify_receipt(&invalid_hash_receipt).test_unwrap("invalid hash verification");
-
-    let mut invalid_signature_receipt = ChioReceipt::sign(
-        base_receipt_body(
-            "rcpt-bindings-invalid-signature",
-            ToolCallAction::from_parameters(json!({
-                "path": "/workspace/docs/roadmap.md",
-                "mode": "read"
-            }))
-            .test_unwrap("invalid signature action"),
-            Decision::Allow,
-            &keypair,
-        ),
-        &keypair,
-    )
-    .test_unwrap("invalid signature receipt");
-    invalid_signature_receipt.policy_hash = "policy-bindings-v1-tampered".to_string();
-    let invalid_signature_verification =
-        verify_receipt(&invalid_signature_receipt).test_unwrap("invalid signature verification");
-
-    let trace_receipt = ChioReceipt::sign(
-        observation_receipt_body(
-            "rcpt-bindings-trace",
-            ToolCallAction::from_parameters(json!({
-                "path": "/workspace/docs/roadmap.md",
-                "mode": "read"
-            }))
-            .test_unwrap("trace action"),
-            ReceiptKind::TraceObservation,
-            BoundaryClass::DetectOnly,
-            ObservationOutcome::Observed,
-            TrustLevel::Verified,
-            &keypair,
-        ),
-        &keypair,
-    )
-    .test_unwrap("trace observation receipt");
-    let trace_verification = verify_receipt(&trace_receipt).test_unwrap("trace verification");
-
-    let advisory_receipt = ChioReceipt::sign(
-        observation_receipt_body(
-            "rcpt-bindings-advisory",
-            ToolCallAction::from_parameters(json!({
-                "path": "/workspace/docs/private.md",
-                "mode": "read"
-            }))
-            .test_unwrap("advisory action"),
-            ReceiptKind::AdvisoryEvaluation,
-            BoundaryClass::AdvisoryOnly,
-            ObservationOutcome::Evaluated,
-            TrustLevel::Advisory,
-            &keypair,
-        ),
-        &keypair,
-    )
-    .test_unwrap("advisory evaluation receipt");
-    let advisory_verification =
-        verify_receipt(&advisory_receipt).test_unwrap("advisory verification");
-
-    let mut trace_with_decision_receipt = trace_receipt.clone();
-    trace_with_decision_receipt.decision = Some(Decision::Allow);
-    let trace_with_decision_verification = verify_receipt(&trace_with_decision_receipt)
-        .test_unwrap("trace with decision verification");
-
-    let mut mediated_missing_decision_receipt = allow_receipt.clone();
-    mediated_missing_decision_receipt.decision = None;
-    let mediated_missing_decision_verification = verify_receipt(&mediated_missing_decision_receipt)
-        .test_unwrap("mediated missing decision verification");
-
-    let advisory_with_decision_receipt = forged_semantically_invalid_receipt(
-        ChioReceiptBody {
-            decision: Some(Decision::Allow),
-            ..observation_receipt_body(
-                "rcpt-bindings-advisory-with-decision",
-                ToolCallAction::from_parameters(json!({
-                    "path": "/workspace/docs/private.md",
-                    "mode": "read"
-                }))
-                .test_unwrap("advisory with decision action"),
-                ReceiptKind::AdvisoryEvaluation,
-                BoundaryClass::AdvisoryOnly,
-                ObservationOutcome::Evaluated,
-                TrustLevel::Advisory,
-                &keypair,
-            )
-        },
-        &keypair,
-        "advisory with decision id",
-    );
-    let advisory_with_decision_verification = verify_receipt(&advisory_with_decision_receipt)
-        .test_unwrap("advisory with decision verification");
-
-    let trace_missing_observation_receipt = forged_semantically_invalid_receipt(
-        ChioReceiptBody {
-            observation_outcome: None,
-            ..observation_receipt_body(
-                "rcpt-bindings-trace-missing-observation",
-                ToolCallAction::from_parameters(json!({
-                    "path": "/workspace/docs/roadmap.md",
-                    "mode": "read"
-                }))
-                .test_unwrap("trace missing observation action"),
-                ReceiptKind::TraceObservation,
-                BoundaryClass::DetectOnly,
-                ObservationOutcome::Observed,
-                TrustLevel::Verified,
-                &keypair,
-            )
-        },
-        &keypair,
-        "trace missing observation id",
-    );
-    let trace_missing_observation_verification = verify_receipt(&trace_missing_observation_receipt)
-        .test_unwrap("trace missing observation verification");
-
-    let advisory_missing_observation_receipt = forged_semantically_invalid_receipt(
-        ChioReceiptBody {
-            observation_outcome: None,
-            ..observation_receipt_body(
-                "rcpt-bindings-advisory-missing-observation",
-                ToolCallAction::from_parameters(json!({
-                    "path": "/workspace/docs/private.md",
-                    "mode": "read"
-                }))
-                .test_unwrap("advisory missing observation action"),
-                ReceiptKind::AdvisoryEvaluation,
-                BoundaryClass::AdvisoryOnly,
-                ObservationOutcome::Evaluated,
-                TrustLevel::Advisory,
-                &keypair,
-            )
-        },
-        &keypair,
-        "advisory missing observation id",
-    );
-    let advisory_missing_observation_verification =
-        verify_receipt(&advisory_missing_observation_receipt)
-            .test_unwrap("advisory missing observation verification");
-
-    let mediated_with_observation_receipt = forged_semantically_invalid_receipt(
-        ChioReceiptBody {
-            observation_outcome: Some(ObservationOutcome::Observed),
-            ..base_receipt_body(
-                "rcpt-bindings-mediated-with-observation",
-                ToolCallAction::from_parameters(json!({
-                    "path": "/workspace/docs/roadmap.md",
-                    "mode": "read"
-                }))
-                .test_unwrap("mediated with observation action"),
-                Decision::Allow,
-                &keypair,
-            )
-        },
-        &keypair,
-        "mediated with observation id",
-    );
-    let mediated_with_observation_verification = verify_receipt(&mediated_with_observation_receipt)
-        .test_unwrap("mediated with observation verification");
-
-    let trace_wrong_trust_receipt = forged_semantically_invalid_receipt(
-        observation_receipt_body(
-            "rcpt-bindings-trace-wrong-trust",
-            ToolCallAction::from_parameters(json!({
-                "path": "/workspace/docs/roadmap.md",
-                "mode": "read"
-            }))
-            .test_unwrap("trace wrong trust action"),
-            ReceiptKind::TraceObservation,
-            BoundaryClass::DetectOnly,
-            ObservationOutcome::Observed,
-            TrustLevel::Mediated,
-            &keypair,
-        ),
-        &keypair,
-        "trace wrong trust id",
-    );
-    let trace_wrong_trust_verification =
-        verify_receipt(&trace_wrong_trust_receipt).test_unwrap("trace wrong trust verification");
-
-    let cannot_see_runtime_receipt = forged_semantically_invalid_receipt(
-        observation_receipt_body(
-            "rcpt-bindings-cannot-see",
-            ToolCallAction::from_parameters(json!({
-                "path": "/workspace/docs/roadmap.md",
-                "mode": "read"
-            }))
-            .test_unwrap("cannot see action"),
-            ReceiptKind::TraceObservation,
-            BoundaryClass::CannotSee,
-            ObservationOutcome::Observed,
-            TrustLevel::Verified,
-            &keypair,
-        ),
-        &keypair,
-        "cannot see id",
-    );
-    let cannot_see_runtime_verification =
-        verify_receipt(&cannot_see_runtime_receipt).test_unwrap("cannot see verification");
-
-    vec![
-        receipt_case_value(
-            "allow_receipt",
-            "Valid allow receipt with matching signature and parameter hash.",
-            &allow_receipt,
-            allow_verification,
-        ),
-        receipt_case_value(
-            "deny_receipt",
-            "Valid deny receipt with matching signature and parameter hash.",
-            &deny_receipt,
-            deny_verification,
-        ),
-        receipt_case_value(
-            "signed_receipt_with_invalid_parameter_hash",
-            "Receipt is signed correctly but carries a bad action parameter hash.",
-            &invalid_hash_receipt,
-            invalid_hash_verification,
-        ),
-        receipt_case_value(
-            "tampered_receipt_signature",
-            "Receipt payload was modified after signing, so signature verification fails.",
-            &invalid_signature_receipt,
-            invalid_signature_verification,
-        ),
-        receipt_case_value(
-            "trace_observation_receipt",
-            "Valid trace observation has no decision and is never authorizing.",
-            &trace_receipt,
-            trace_verification,
-        ),
-        receipt_case_value(
-            "advisory_evaluation_receipt",
-            "Valid advisory evaluation has no decision and is never authorizing.",
-            &advisory_receipt,
-            advisory_verification,
-        ),
-        receipt_case_value(
-            "trace_observation_with_decision",
-            "A trace observation carrying an allow-shaped decision is not signable or authoritative.",
-            &trace_with_decision_receipt,
-            trace_with_decision_verification,
-        ),
-        receipt_case_value(
-            "mediated_receipt_missing_decision",
-            "A mediated receipt without a decision is not signable or authoritative.",
-            &mediated_missing_decision_receipt,
-            mediated_missing_decision_verification,
-        ),
-        receipt_case_value(
-            "advisory_evaluation_with_decision",
-            "An advisory evaluation carrying an allow-shaped decision has a valid id but is not signable.",
-            &advisory_with_decision_receipt,
-            advisory_with_decision_verification,
-        ),
-        receipt_case_value(
-            "trace_observation_missing_observation_outcome",
-            "A trace observation without an observation outcome has a valid id but is not signable.",
-            &trace_missing_observation_receipt,
-            trace_missing_observation_verification,
-        ),
-        receipt_case_value(
-            "advisory_evaluation_missing_observation_outcome",
-            "An advisory evaluation without an observation outcome has a valid id but is not signable.",
-            &advisory_missing_observation_receipt,
-            advisory_missing_observation_verification,
-        ),
-        receipt_case_value(
-            "mediated_decision_with_observation_outcome",
-            "A mediated decision carrying an observation outcome has a valid id but is not signable.",
-            &mediated_with_observation_receipt,
-            mediated_with_observation_verification,
-        ),
-        receipt_case_value(
-            "trace_observation_wrong_trust_level",
-            "A trace observation using mediated trust has a valid id but is not signable.",
-            &trace_wrong_trust_receipt,
-            trace_wrong_trust_verification,
-        ),
-        receipt_case_value(
-            "cannot_see_runtime_receipt",
-            "The cannot_see planning boundary is not a valid signed runtime receipt boundary.",
-            &cannot_see_runtime_receipt,
-            cannot_see_runtime_verification,
-        ),
-    ]
-}
-
-fn receipt_case_value(
-    id: &str,
-    description: &str,
-    receipt: &ChioReceipt,
-    verification: ReceiptVerification,
-) -> Value {
-    json!({
-        "id": id,
-        "description": description,
-        "receipt": receipt,
-        "receipt_body_canonical_json": receipt_body_canonical_json(receipt).test_unwrap("canonical receipt body"),
-        "expected": {
-            "signature_valid": verification.signature_valid,
-            "parameter_hash_valid": verification.parameter_hash_valid,
-            "receipt_id_valid": verification.receipt_id_valid,
-            "decision": verification.decision,
-            "receipt_kind": verification.receipt_kind,
-            "boundary_class": verification.boundary_class,
-            "trust_level": receipt.trust_level.as_str(),
-            "result": verification.result,
-            "authorized": verification.authorized,
-            "signer_key_hex": verification.signer_key_hex,
-            "signer_trusted": verification.signer_trusted,
-            "ok": verification.ok,
-        }
-    })
-}
-
-fn receipt_vector_fixture() -> Value {
-    let seed = [7u8; 32];
-    let keypair = Keypair::from_seed(&seed);
-
-    json!({
-        "version": 1,
-        "generated_by": "chio-binding-helpers",
-        "signing_key_seed_hex": keypair.seed_hex(),
-        "cases": receipt_cases(),
-    })
 }
 
 fn hashing_vector_fixture() -> Value {
@@ -1181,10 +714,97 @@ fn hashing_vector_fixture_matches_checked_in_json() {
     assert_fixture_matches(&hashing_fixture_path(), &hashing_vector_fixture());
 }
 
+fn receipt_expectation(receipt: &ChioReceipt) -> Value {
+    serde_json::to_value(verify_receipt(receipt).test_unwrap("verify receipt case"))
+        .test_unwrap("serialize receipt verification")
+}
+
+fn indented_pretty_json(value: &Value, indent: &str) -> String {
+    serde_json::to_string_pretty(value)
+        .test_unwrap("render receipt fixture fragment")
+        .replace('\n', &format!("\n{indent}"))
+}
+
+fn null_observation_outcome_case(keypair: &Keypair) -> Value {
+    let action = ToolCallAction::from_parameters(json!({
+        "path": "/workspace/docs/roadmap.md",
+        "mode": "read"
+    }))
+    .test_unwrap("null observation action");
+    let receipt = ChioReceipt::sign(
+        base_receipt_body(
+            "rcpt-bindings-null-observation",
+            action,
+            Decision::Allow,
+            keypair,
+        ),
+        keypair,
+    )
+    .test_unwrap("sign null observation receipt");
+    let mut receipt_json =
+        serde_json::to_value(&receipt).test_unwrap("serialize null observation receipt");
+    receipt_json["observation_outcome"] = Value::Null;
+    let decoded: ChioReceipt =
+        serde_json::from_value(receipt_json.clone()).test_unwrap("decode null observation receipt");
+    json!({
+        "id": "mediated_decision_with_null_observation_outcome",
+        "description": "An explicit null observation outcome is absent, so a signed mediated allow keeps its authorization label.",
+        "receipt": receipt_json,
+        "receipt_body_canonical_json": receipt_body_canonical_json(&decoded).test_unwrap("canonical null observation body"),
+        "expected": receipt_expectation(&decoded),
+    })
+}
+
 #[test]
-#[ignore = "on-disk JSON is the source of truth; the in-Rust generator is a regenerator helper"]
-fn receipt_vector_fixture_matches_checked_in_json() {
-    assert_fixture_matches(&receipt_fixture_path(), &receipt_vector_fixture());
+#[ignore = "regenerator: rewrite each expected block of the checked-in receipt corpus in place from verify_receipt and append missing cases; run with --ignored, then `cargo xtask freeze-vectors`"]
+fn refresh_receipt_vector_fixture() {
+    let path = receipt_fixture_path();
+    let mut raw = fs::read_to_string(&path).test_unwrap("read receipt fixture");
+    let mut fixture: Value = serde_json::from_str(&raw).test_unwrap("parse receipt fixture");
+    let keypair = Keypair::from_seed(&[7u8; 32]);
+    assert_eq!(fixture["signing_key_seed_hex"], keypair.seed_hex());
+
+    let cases = fixture["cases"]
+        .as_array_mut()
+        .test_unwrap("receipt cases array");
+    let mut cursor = 0;
+    for case in cases.iter_mut() {
+        let receipt: ChioReceipt =
+            serde_json::from_value(case["receipt"].clone()).test_unwrap("parse receipt case");
+        let expected = receipt_expectation(&receipt);
+        let old_block = format!(
+            "\"expected\": {}",
+            indented_pretty_json(&case["expected"], "      ")
+        );
+        let new_block = format!(
+            "\"expected\": {}",
+            indented_pretty_json(&expected, "      ")
+        );
+        let start = cursor
+            + raw[cursor..]
+                .find(&old_block)
+                .test_unwrap("locate expected block");
+        raw.replace_range(start..start + old_block.len(), &new_block);
+        cursor = start + new_block.len();
+        case["expected"] = expected;
+    }
+
+    let null_case = null_observation_outcome_case(&keypair);
+    if !cases.iter().any(|case| case["id"] == null_case["id"]) {
+        let close = raw.find("\n  ]").test_unwrap("locate end of receipt cases");
+        raw.insert_str(
+            close,
+            &format!(",\n    {}", indented_pretty_json(&null_case, "    ")),
+        );
+        cases.push(null_case);
+    }
+
+    let rewritten: Value = serde_json::from_str(&raw).test_unwrap("parse rewritten fixture");
+    assert_eq!(
+        rewritten, fixture,
+        "in-place rewrite must equal the refreshed corpus"
+    );
+    fs::write(&path, raw).test_unwrap("write receipt fixture");
 }
 
 #[test]
@@ -1783,8 +1403,6 @@ fn print_vector_fixtures_for_bootstrap() {
     println!("{}", pretty_json(&canonical_vector_fixture()));
     println!("--- hashing fixture ---");
     println!("{}", pretty_json(&hashing_vector_fixture()));
-    println!("--- receipt fixture ---");
-    println!("{}", pretty_json(&receipt_vector_fixture()));
     println!("--- signing fixture ---");
     println!("{}", pretty_json(&signing_vector_fixture()));
     println!("--- capability fixture ---");

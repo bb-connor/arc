@@ -1266,6 +1266,7 @@ fn verify_receipt_pure_matches_receipt_binding_vectors_natively() {
                 "decision",
                 "receipt_kind",
                 "boundary_class",
+                "result",
                 "authorized",
                 "signer_key_hex",
                 "signer_trusted",

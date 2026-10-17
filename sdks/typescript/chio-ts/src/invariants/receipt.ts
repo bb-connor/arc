@@ -40,7 +40,7 @@ export interface ChioReceipt {
   };
   receipt_kind: string;
   boundary_class: string;
-  observation_outcome?: string;
+  observation_outcome?: string | null;
   tool_origin: string;
   redaction_mode: string;
   actor_chain?: Array<{
@@ -84,7 +84,10 @@ export function parseReceiptJson(input: string): ChioReceipt {
 
 export function receiptBody(receipt: ChioReceipt): Omit<ChioReceipt, "algorithm" | "signature"> {
   const { signature: _signature, algorithm: _algorithm, ...body } = receipt;
-  return body;
+  return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== null)) as Omit<
+    ChioReceipt,
+    "algorithm" | "signature"
+  >;
 }
 
 export function receiptBodyCanonicalJson(receipt: ChioReceipt): string {
@@ -112,7 +115,7 @@ function receiptIdInput(receipt: ChioReceipt): Record<string, unknown> {
   if (receipt.decision !== undefined) {
     input.decision = receipt.decision;
   }
-  if (receipt.observation_outcome !== undefined) {
+  if (receipt.observation_outcome != null) {
     input.observation_outcome = receipt.observation_outcome;
   }
   if (receipt.actor_chain !== undefined && receipt.actor_chain.length > 0) {
@@ -143,8 +146,8 @@ function receiptSemantics(receipt: ChioReceipt): { receipt_kind: string; boundar
   return { receipt_kind: receipt.receipt_kind, boundary_class: receipt.boundary_class };
 }
 
-function resultLabel(receiptKind: string, boundaryClass: string, decision: ReceiptDecisionKind): string {
-  if (receiptKind === "mediated_decision" && boundaryClass === "prevent" && decision === "allow") {
+function resultLabel(semanticAuthorized: boolean, receiptKind: string, decision: ReceiptDecisionKind): string {
+  if (semanticAuthorized) {
     return "Authorized";
   }
   if (receiptKind === "trace_observation") {
@@ -167,7 +170,7 @@ function resultLabel(receiptKind: string, boundaryClass: string, decision: Recei
   }
 }
 
-function validObservationOutcome(value: string | undefined): boolean {
+function validObservationOutcome(value: string | null | undefined): boolean {
   return value === "observed" || value === "evaluated" || value === "dropped";
 }
 
@@ -177,7 +180,7 @@ function semanticallySignable(receipt: ChioReceipt, decision: ReceiptDecisionKin
       receipt.boundary_class === "prevent" &&
       receipt.trust_level === "mediated" &&
       decision !== "none" &&
-      receipt.observation_outcome === undefined
+      receipt.observation_outcome == null
     );
   }
   if (receipt.receipt_kind === "trace_observation") {
@@ -205,7 +208,10 @@ export function verifyReceipt(receipt: ChioReceipt, trustedSigners: string[] = [
   const decision = receipt.decision?.verdict ?? "none";
   const semantics = receiptSemantics(receipt);
   const semanticAuthorized =
-    semantics.receipt_kind === "mediated_decision" && semantics.boundary_class === "prevent" && decision === "allow";
+    semantics.receipt_kind === "mediated_decision" &&
+    semantics.boundary_class === "prevent" &&
+    receipt.observation_outcome == null &&
+    decision === "allow";
   const signerTrusted =
     trustedSigners.length > 0 && trustedSigners.some((signer) => publicKeyHexMatches(signer, receipt.kernel_key));
   const receiptIdValid = receipt.id === contentAddressedReceiptId(receipt);
@@ -224,7 +230,7 @@ export function verifyReceipt(receipt: ChioReceipt, trustedSigners: string[] = [
     receipt_kind: semantics.receipt_kind,
     boundary_class: semantics.boundary_class,
     trust_level: receipt.trust_level,
-    result: resultLabel(semantics.receipt_kind, semantics.boundary_class, decision),
+    result: resultLabel(semanticAuthorized, semantics.receipt_kind, decision),
     authorized,
     signer_key_hex: receipt.kernel_key,
     signer_trusted: signerTrusted,

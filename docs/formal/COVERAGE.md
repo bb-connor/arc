@@ -1295,7 +1295,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `a4a1ed7da409027c8ec15ee4ffddc677fce67823582b86dd7e3acb89c4825d43`
+- Input digest: `3a700c7732a74c515990b0662302e4091bf5dbc1fe1e4b5cd6573705d0dd8ade`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1552,7 +1552,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `formal/diff-tests/tests/anchored_root_tamper.rs`: `0ca70da5f3b57c4c4f92871c4614c4de7987e9d8186ce9e7d55213341a57c7c5`
 - `formal/diff-tests/tests/browser_canonical_json_diff.rs`: `f7dc5b5cd3e0f74bd1e3e449c0e7c447e3c9b0bdcf0ea5f747c0e2eb332569b0`
 - `formal/diff-tests/tests/canonical_json_diff.rs`: `95d55237b29ea4a8e8086b2388caa11b73e89f126f8bd35fc64bf6b8e82d60c8`
-- `formal/diff-tests/tests/receipt_encoding_diff.rs`: `8d479e72a2a2ec7abdf03e827e0e9da0ac2c244062a9cd8f8b576c648c99a258`
+- `formal/diff-tests/tests/receipt_encoding_diff.rs`: `205aa89c70252ea1f8564828713881e20b35c3a88869ff28853e25f49c3ae423`
 - `formal/diff-tests/tests/regression_formal_receipt_before_allow_c01406cfbbeb.rs`: `50ee14b6a785532e22e6cd9c4f8b41078556a4c75e18e7dfeea46597a1399deb`
 - `formal/diff-tests/tests/scope_diff.rs`: `c21aaa2cb891fd1fc19482ec6f8dc9c81930b5890af74f86c6fb5dd3104489ab`
 - `formal/diff-tests/tests/treaty_predicate_diff.rs`: `2b684aded85659663c102fa16d4499d10b981c852d18f5b5a64df301169dc3de`

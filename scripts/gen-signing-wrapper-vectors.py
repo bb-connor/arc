@@ -612,7 +612,11 @@ def stream_preimage(chunks: list[object]) -> bytes:
 
 
 def receipt_id_input(receipt: dict) -> dict:
-    return {key: value for key, value in receipt.items() if key not in ("id", "signature", "bbs_signature", "algorithm")}
+    return {
+        key: value
+        for key, value in receipt.items()
+        if key not in ("id", "signature", "bbs_signature", "algorithm") and value is not None
+    }
 
 
 def receipt_id(receipt: dict) -> str:
