@@ -11,11 +11,16 @@ use chio_core::capability::scope::{ChioScope, Operation};
 use chio_core::capability::token::{
     CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTokenBody,
 };
+use chio_security_types::clock::FixedClock;
 use chio_security_types::recovery::{
     AuthorityDomainId, ProcessId, RecoveryScopeV1, RecoveryTenantId,
 };
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+/// The single authority time for every token, delegation and verification
+/// built by `recovery_kernel` fixtures.
+const FIXTURE_NOW: u64 = 1_700_000_000;
 
 fn recovery_scope(fence: &StoreMutationFence) -> RecoveryScopeV1 {
     RecoveryScopeV1 {
@@ -27,11 +32,13 @@ fn recovery_scope(fence: &StoreMutationFence) -> RecoveryScopeV1 {
 
 /// A kernel trusting `issuer` whose durable store holds no recovery
 /// deployments, so a capability that passes every actor gate reaches the
-/// unsupported deployment refusal.
+/// unsupported deployment refusal. Its authority clock reads `FIXTURE_NOW`.
 fn recovery_kernel(issuer: &Keypair) -> ChioKernel {
     let mut config = make_config();
     config.keypair = issuer.clone();
-    let mut kernel = make_kernel(config);
+    let mut kernel =
+        ChioKernel::new_with_clock(config, std::sync::Arc::new(FixedClock::new(FIXTURE_NOW)));
+    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
     let fence = admission_test_fence();
     let store = std::sync::Arc::new(TestAdmissionOperationStore::new(fence.clone()));
     kernel
@@ -50,7 +57,7 @@ fn token_body(
     id: &str,
     scope: ChioScope,
 ) -> CapabilityTokenBody {
-    let now = current_unix_timestamp();
+    let now = FIXTURE_NOW;
     CapabilityTokenBody {
         id: id.into(),
         issuer: issuer.public_key(),
@@ -77,7 +84,7 @@ fn authenticate(
 /// The full capability verifier accepts `token`.
 fn verified(kernel: &ChioKernel, token: &CapabilityToken) -> TestResult {
     kernel
-        .verify_capability_full_pre_admit_typed(token, None, current_unix_timestamp())
+        .verify_capability_full_pre_admit_typed(token, None, FIXTURE_NOW)
         .map_err(|error| format!("verifier refused the fixture: {}", error.deny_reason()))?;
     Ok(())
 }
@@ -220,7 +227,7 @@ fn delegated_capability_passes_verification_and_is_denied() -> TestResult {
     snapshots.record_capability_snapshot(&root, None)?;
     drop(snapshots);
     kernel.set_receipt_store(Box::new(SqliteReceiptStore::open(&path)?))?;
-    let now = current_unix_timestamp();
+    let now = FIXTURE_NOW;
     let receipt = chio_core::capability::attenuation::delegate(
         &root,
         &inspect_scope(),
@@ -341,7 +348,7 @@ fn unsupported_scope_constraints_are_policy_refusals() -> TestResult {
         &issuer,
     )?;
     assert_eq!(
-        kernel.verify_capability_full_pre_admit(&token, None, current_unix_timestamp()),
+        kernel.verify_capability_full_pre_admit(&token, None, FIXTURE_NOW),
         Err(
             "invalid capability constraint: unsupported capability constraint: TableAllowlist; grant-specific enforcement is unavailable"
                 .into()
