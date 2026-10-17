@@ -15,6 +15,7 @@
 - Preconditions (D17): no M0 PR opens before #1496 and #1489 are merged on `main`. Rebase every M0 branch onto `main` after both land. PR 1 also avoids files owned by in-flight lanes kn2 (#1489), w12 and coop2c; if one of those is still open when PR 1 is ready, rebase after it merges instead of editing its files.
 - Founder correction (2026-10-17): the `--auth-token` static bearer mode and generic Entra (AzureAd profile) intake are KEPT. Static bearer maps to an operator-issued root naming an explicitly configured principal. Generic Entra maps to an anchored root under the one-root-per-token `(issuer, uti)` rule. Entra Agent ID is added in M2 alongside generic Entra. No M0 artifact (ADR, PROTOCOL, schema, scenario, inventory) may describe deleting either path. Take the exact anchor-kind names for these two from the spec fix PR; until it merges, use `operator_static_bearer` and `entra_jwt` and replace them if the fix PR chooses other names. Tasks 3, 5, 6 and 7 do not open their PRs until the spec fix PR has merged.
 - No legacy, compat or dual paths. Everything is v1. No deprecated aliases, no infallible twin of a fallible accessor, no "compatibility identity" wording.
+- Strict decoding (spec 2.5 G18, G19): new tagged-enum Rust types use `chio_security_types::strict_serde` (`lossless_serde!`, from #1551) for padding refusal, never a local helper. Every new signed type rejects unknown fields at every level. The algorithm is derived only from the pinned key, never from an artifact member.
 - Fail-closed: an identity read error denies, refuses issuance or refuses signing. Never substitute a stale or default key. The only allowed error-to-value mapping is an empty trust set.
 - No em dashes (U+2014) in any file. Check: `grep -rn $'\xe2\x80\x94' <changed files>` prints nothing.
 - No narrative or meta comments. Comments state invariants and contracts only.
@@ -46,7 +47,7 @@
 | `crates/core/chio-core-types/tests/signing_backend_identity.rs` (new) | 1 | Fallible-identity contract tests |
 | 26 further crates per the trait-plan census | 1 | Callers and impls of the collapsed trait |
 | `docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md` (new) | 2 | Receipt producers, `RedactionMode` mapping, wrapper schema-id table |
-| `docs/superpowers/specs/relying-party-wedge/verdict-matrix/{anchored_root,receipt_disclosure,revocation_local}/*.json` (new, 40 files: 16, 12, 12) | 2 | Staged M1 scenarios |
+| `docs/superpowers/specs/relying-party-wedge/verdict-matrix/{anchored_root,receipt_disclosure,revocation_local}/*.json` (new, 48 files: 24, 12, 12) | 2 | Staged M1 scenarios |
 | `docs/superpowers/specs/relying-party-wedge/verdict-matrix/README.md` (new) | 2 | Script vocabulary, proposed reason URNs, move-in instructions |
 | `docs/adr/ADR-0039-customer-hosted-root-exchange.md` (new), `docs/adr/README.md` | 3 | ADR (D12) |
 | `spec/PROTOCOL.md`, `spec/WIRE_PROTOCOL.md` | 3 | Contract text with status lines |
@@ -261,7 +262,7 @@ Spec 11.3, 12 M0 exit "scenario files written (expected to fail)". The live corp
 
 **Files:**
 - Create: `docs/superpowers/specs/relying-party-wedge/verdict-matrix/README.md`
-- Create: 16 files under `.../verdict-matrix/anchored_root/` and 12 each under `.../receipt_disclosure/` and `.../revocation_local/` (anchored_root 013 to 016 added by the gap PR, spec 2.5 "Count")
+- Create: 24 files under `.../verdict-matrix/anchored_root/` and 12 each under `.../receipt_disclosure/` and `.../revocation_local/` (anchored_root 013 to 016 added by the gap PR and 017 to 024 by the registry and strict-decoding PR, spec 2.5 "Count")
 
 **Interfaces:**
 - Consumes: anchor-kind names from the spec fix PR (Global Constraints).
@@ -287,6 +288,14 @@ Scenario ids and expected verdicts (reason URNs use existing error domains per s
 | | 014-entra-uti-reuse-after-root-expiry-deny | deny | `urn:chio:error:transport:exchange-replay` |
 | | 015-entra-issuer-on-oidc-jwt-rule-rejected-at-load | deny | `urn:chio:error:policy:root-policy-entra-issuer-on-oidc-rule` |
 | | 016-root-signed-by-unlisted-exchange-key-deny | deny | `urn:chio:error:capability:root-exchange-key-untrusted` |
+| | 017-provider-disabled-after-root-issued-deny | deny | `urn:chio:error:capability:root-provider-unavailable` |
+| | 018-provider-removed-before-exchange-deny | deny | `urn:chio:error:transport:exchange-provider-unavailable` |
+| | 019-provider-registry-unreadable-at-exchange-deny | deny | `urn:chio:error:transport:exchange-provider-registry-unreadable` |
+| | 020-provider-identity-changed-without-policy-deny | deny | `urn:chio:error:transport:exchange-provider-identity-mismatch` |
+| | 021-provider-registry-unreadable-at-admission-deny | deny | `urn:chio:error:capability:root-provider-unavailable` |
+| | 022-root-anchor-unknown-member-deny | deny | `urn:chio:error:capability:strict-decode-rejected` |
+| | 023-capability-algorithm-member-deny | deny | `urn:chio:error:capability:strict-decode-rejected` |
+| | 024-root-policy-unknown-member-rejected-at-load | deny | `urn:chio:error:policy:root-policy-strict-decode-rejected` |
 | receipt_disclosure | 001-allow-receipt-fully-committed | allow | allow code |
 | | 002-deny-receipt-fully-committed | deny | existing scope-deny code |
 | | 003-undeclared-guard-evidence-field-dropped | allow | allow code |
@@ -315,7 +324,7 @@ Scenario ids and expected verdicts (reason URNs use existing error domains per s
 Scenarios 011 and 012 of `receipt_disclosure` flip to allow when inline disclosure lands (README states this). Fixture timestamps are fixed (`issued_at = 1792234800`).
 
 - [ ] **Step 1: Write README.md** defining the fixture names (IdP stub JWKS, ID-JAG minter, confidential client key, static bearer token plus configured principal, generic Entra token with `uti`, root policy fixture), the mutation names, the URN proposals above, and the move-in checklist for M1.
-- [ ] **Step 2: Write the 40 files.** Copy existing `reason_code` values for allow and revocation denies from `verdict_matrix/scenarios/capability_subset/` and `revocation_propagation/`.
+- [ ] **Step 2: Write the 48 files.** Copy existing `reason_code` values for allow and revocation denies from `verdict_matrix/scenarios/capability_subset/` and `revocation_propagation/`.
 - [ ] **Step 3: Validate** with the PR 2 JSON-parse command plus: every file has `schema == "chio.verdict-matrix.scenario.v1"`, a unique `id`, and the category of its directory (one `python3 -I -c` loop; expected: no output).
 - [ ] **Step 4: Commit** (`docs(superpowers): stage root-authority verdict-matrix scenarios`), then open PR 2. No REVIEW? needed (not a shared surface).
 
@@ -383,7 +392,7 @@ Existing text that describes current behavior (section 6 field table, WYSIWYS ex
 - Consumes: Task 5 text (field names and rules); Global Constraints kind names.
 - Produces:
   - `$id` = `https://chio-protocol.dev/schemas/chio-wire/v1/<dir>/<file>` (sibling convention of `capability/token.schema.json`).
-  - Every object `additionalProperties: false`; `schema` member `const` to its id; closed enums for `kind`, `holder` (`edge_session`, `caller`), `disclosure.default` (`committed` only), `recorded_claims` values (`plain`, `committed`), settlement `state` and `rail_refs[].kind`; digests `^sha256:[0-9a-f]{64}$`; salts `^b64u:[A-Za-z0-9_-]{43}$` (32 bytes, unpadded); amounts `^(0|[1-9][0-9]*)$`; timestamps non-negative integers; `max_clock_skew_secs` maximum 60; `jwks_uri` pattern `^https://`; `allowed_algs` items exclude `none` and `HS*`; public keys reuse the issuer-key pattern from `capability/token.schema.json`.
+  - Every object `additionalProperties: false`; `schema` member `const` to its id; closed enums for `kind`, `holder` (`edge_session`, `caller`), `disclosure.default` (`committed` only), `recorded_claims` values (`plain`, `committed`), settlement `state` and `rail_refs[].kind`; digests `^sha256:[0-9a-f]{64}$`; salts `^b64u:[A-Za-z0-9_-]{43}$` (32 bytes, unpadded); amounts `^(0|[1-9][0-9]*)$`; timestamps non-negative integers; `max_clock_skew_secs` maximum 60; no provider identity member (issuer, `jwks_url`, inline `jwks`, introspection endpoint) in any schema except `chio.enterprise-provider-identity.v1`, because that identity lives in the enterprise provider registry record and rules reference `provider_record_id` plus `provider_identity_digest` (digest pattern as above); `allowed_algs` items exclude `none` and `HS*`; public keys reuse the issuer-key pattern from `capability/token.schema.json`.
   - Optional ID-JAG retention slot present (D7): `retain_idp_artifact` on rules, `artifact_retained` in the context anchor.
   - Registry rows (signed artifacts only), `introducedBy: "root-authority-v1"`: `chio.root-policy.v1` (`root_policy`), `chio.idp-key-snapshot.v1` (`idp_key_snapshot`), `chio.revocation-request.v1` (`revocation_request`), `chio.settlement-closure.v1` (`settlement_closure`). `KNOWN_SIGNED_ARTIFACT_SCHEMAS` is not touched (Rust lands with the types; the parity tests only check Rust-to-registry).
   - Registry removal (spec 2.5 G8): delete the `chio.security-event-body.v1` row. The body schema file stays; it is already the `payloadSchemaFile` of `chio.signed-security-event.v1`, and no Rust constant names the body id. The `chio.dpop_proof.v2` row is not touched here; its removal follows #1489 in the parallel lead's lane (spec 2.5 G10).
@@ -391,7 +400,7 @@ Existing text that describes current behavior (section 6 field table, WYSIWYS ex
   - No error-domain change (spec 2.5 G12).
   - `check-root-authority-schema-examples.py`: validates every `examples/valid/*.json` against the schema named by its `schema` member (Draft 2020-12, local `referencing` registry over `spec/schemas/chio-wire/v1`) and requires every `examples/invalid/*.json` to fail; exits non-zero otherwise.
 
-- [ ] **Step 1: Write the invalid examples first** (one file per rule): root policy with `default: "inline"`; rule with `allowed_algs: ["HS256"]`; `max_clock_skew_secs: 61`; `jwks_uri` over `http`; unknown anchor kind; delegation context with an extra member; salt with `=` padding; salt of 31 bytes; digest in uppercase hex; settlement closure with `state: "refunded"`; presentation missing `leaf`; verifier trust with unknown member.
+- [ ] **Step 1: Write the invalid examples first** (one file per rule): root policy with `default: "inline"`; rule with `allowed_algs: ["HS256"]`; `max_clock_skew_secs: 61`; a rule that carries a provider endpoint member instead of `provider_record_id` and `provider_identity_digest`; unknown anchor kind; delegation context with an extra member; salt with `=` padding; salt of 31 bytes; digest in uppercase hex; settlement closure with `state: "refunded"`; presentation missing `leaf`; verifier trust with unknown member.
 - [ ] **Step 2: Write the check script and run it.** `uv run --with jsonschema==4.26.0 --with referencing==0.37.0 python3 -I scripts/check-root-authority-schema-examples.py`. Expected: FAIL (schemas missing).
 - [ ] **Step 3: Write the schemas and the valid examples** (one per schema, using the spec section 7 examples with corrected key encoding and fixed timestamps). Run the check. Expected: PASS.
 - [ ] **Step 4: Register and hash.** Add the four registry rows and remove the `chio.security-event-body.v1` row (keep the file's ordering), regenerate `MANIFEST.sha256` deterministically (the format `check-chio-schema-registry.sh` recomputes), update the v1 README index.
@@ -486,4 +495,4 @@ These existing v1 schemas change in place, and `crates/core/chio-core-types/test
 6. Spec examples write keys as `ed25519:<hex>`; Chio's encoding is bare 64-hex for Ed25519. Schemas and vectors use `PublicKey::to_hex`.
 7. New `chio-wire/v1` schemas regenerate code in four languages. Generated output only; no hand-written code.
 8. Founder correction: static bearer and generic Entra stay and gain anchor kinds. All M0 artifacts follow the correction; kind names come from the spec fix PR.
-9. The twelve inventory gaps (G1 to G12) and the `anchored_root` count are decided in spec section 2.5. Effect on this plan: Task 3 stages 40 scenarios with reason codes in existing error domains; Task 6 removes the `chio.security-event-body.v1` registry row and registers no existing wrapper id (M1 item 1 does, with the Rust types); Task 8 takes its ids from the reconciled staged 4.5 table. M0 size is unchanged; M1 grows to 100-141 engineer-days.
+9. The twelve inventory gaps (G1 to G12) and the `anchored_root` count are decided in spec section 2.5. Effect on this plan: Task 3 stages 48 scenarios with reason codes in existing error domains; Task 6 removes the `chio.security-event-body.v1` registry row and registers no existing wrapper id (M1 item 1 does, with the Rust types); Task 8 takes its ids from the reconciled staged 4.5 table. M0 size is unchanged; M1 grows to 100-141 engineer-days.
