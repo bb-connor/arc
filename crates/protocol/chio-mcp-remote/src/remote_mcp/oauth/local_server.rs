@@ -398,16 +398,6 @@ impl LocalAuthorizationServer {
                 "resource parameter mismatch",
             ));
         }
-        let response = self.issue_token_response(TokenResponseInput {
-            subject: grant.subject.clone(),
-            client_id: grant.client_id.clone(),
-            resource,
-            scopes: grant.scopes.clone(),
-            authorization_details: grant.authorization_details.clone(),
-            transaction_context: grant.transaction_context.clone(),
-            sender_constraint: grant.sender_constraint.clone(),
-            grant_type: Some("authorization_code".to_string()),
-        })?;
         sender_constraint::validate_sender_constraint(grant.sender_constraint.as_ref(), headers)
         .map_err(|error| {
             let mut response = oauth_token_error(
@@ -417,6 +407,16 @@ impl LocalAuthorizationServer {
             );
             response.extensions_mut().insert(Arc::new(error));
             response
+        })?;
+        let response = self.issue_token_response(TokenResponseInput {
+            subject: grant.subject.clone(),
+            client_id: grant.client_id.clone(),
+            resource,
+            scopes: grant.scopes.clone(),
+            authorization_details: grant.authorization_details.clone(),
+            transaction_context: grant.transaction_context.clone(),
+            sender_constraint: grant.sender_constraint.clone(),
+            grant_type: Some("authorization_code".to_string()),
         })?;
 
         codes.remove(code);
@@ -487,16 +487,6 @@ impl LocalAuthorizationServer {
             None,
         )?;
 
-        let response = self.issue_token_response(TokenResponseInput {
-            subject,
-            client_id,
-            resource,
-            scopes,
-            authorization_details,
-            transaction_context,
-            sender_constraint: claims.cnf.clone(),
-            grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
-        })?;
         sender_constraint::validate_sender_constraint(claims.cnf.as_ref(), headers)
         .map_err(|error| {
             let mut response = oauth_token_error(
@@ -506,6 +496,16 @@ impl LocalAuthorizationServer {
             );
             response.extensions_mut().insert(Arc::new(error));
             response
+        })?;
+        let response = self.issue_token_response(TokenResponseInput {
+            subject,
+            client_id,
+            resource,
+            scopes,
+            authorization_details,
+            transaction_context,
+            sender_constraint: claims.cnf.clone(),
+            grant_type: Some("urn:ietf:params:oauth:grant-type:token-exchange".to_string()),
         })?;
         Ok(response)
     }
