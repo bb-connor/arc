@@ -39,12 +39,12 @@ pub enum RevocationPartnerError {
     InvalidPartnerId(String),
     #[error("partner `{partner_id}` issuer is invalid: {reason}")]
     InvalidIssuer { partner_id: String, reason: String },
+    #[error("presented issuer `{issuer}` is malformed: {reason}")]
+    MalformedPresentedIssuer { issuer: String, reason: String },
     #[error("partners `{first}` and `{second}` share one issuer")]
     DuplicateIssuer { first: String, second: String },
     #[error("partner `{0}` authorityPublicKey is not an Ed25519 key")]
     UnsupportedAuthorityKey(String),
-    #[error("partner `{0}` has no revocationFreshnessTtlSeconds")]
-    MissingRevocationFreshnessTtl(String),
     #[error(
         "partner `{partner_id}` revocationFreshnessTtlSeconds must be between 1 and {MAX_REVOCATION_FRESHNESS_TTL_SECONDS}, got {ttl}"
     )]
@@ -63,19 +63,14 @@ pub struct RevocationPartner {
     /// revocation roots.
     pub authority_public_key: PublicKey,
     /// Longest age of the partner's signed revocation root this operator
-    /// accepts at its door. Required: an entry without it is refused at load.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub revocation_freshness_ttl_seconds: Option<u64>,
+    /// accepts at its door.
+    pub revocation_freshness_ttl_seconds: u64,
 }
 
 impl RevocationPartner {
-    /// The revocation freshness TTL in milliseconds. A partner without a TTL
-    /// never loads; one built in memory without it accepts no root age.
     #[must_use]
     pub fn revocation_freshness_ttl_ms(&self) -> u64 {
-        self.revocation_freshness_ttl_seconds
-            .unwrap_or(0)
-            .saturating_mul(1_000)
+        self.revocation_freshness_ttl_seconds.saturating_mul(1_000)
     }
 
     /// The `did:chio` of the authority key: the issuer DID of the native
@@ -90,9 +85,7 @@ impl RevocationPartner {
         validate_partner_id(&self.partner_id)?;
         validate_issuer(&self.partner_id, &self.issuer)?;
         self.issuer_did()?;
-        let ttl = self.revocation_freshness_ttl_seconds.ok_or_else(|| {
-            RevocationPartnerError::MissingRevocationFreshnessTtl(self.partner_id.clone())
-        })?;
+        let ttl = self.revocation_freshness_ttl_seconds;
         if ttl == 0 || ttl > MAX_REVOCATION_FRESHNESS_TTL_SECONDS {
             return Err(RevocationPartnerError::InvalidRevocationFreshnessTtl {
                 partner_id: self.partner_id.clone(),
@@ -141,7 +134,13 @@ impl RevocationPartnerRegistry {
                 });
             }
             partner.validate()?;
-            if let Some(first) = urls.insert(partner.issuer.as_str(), key.as_str()) {
+            let canonical = canonical_issuer(&partner.issuer).map_err(|reason| {
+                RevocationPartnerError::InvalidIssuer {
+                    partner_id: partner.partner_id.clone(),
+                    reason: reason.to_owned(),
+                }
+            })?;
+            if let Some(first) = urls.insert(canonical, key.as_str()) {
                 return Err(RevocationPartnerError::DuplicateIssuer {
                     first: first.to_owned(),
                     second: key.clone(),
@@ -156,10 +155,23 @@ impl RevocationPartnerRegistry {
         self.partners.get(partner_id)
     }
 
-    /// The partner whose trust-control URL is exactly `url`.
-    #[must_use]
-    pub fn by_issuer(&self, url: &str) -> Option<&RevocationPartner> {
-        self.partners.values().find(|partner| partner.issuer == url)
+    /// The partner whose issuer equals the presented issuer `url` under the
+    /// RFC 3986 equivalences: case-insensitive scheme and host, default port
+    /// elision and trailing slashes on the path. A presented issuer that does
+    /// not parse, or carries userinfo, a query or a fragment, is refused.
+    pub fn by_issuer(
+        &self,
+        url: &str,
+    ) -> Result<Option<&RevocationPartner>, RevocationPartnerError> {
+        let wanted = canonical_issuer(url).map_err(|reason| {
+            RevocationPartnerError::MalformedPresentedIssuer {
+                issuer: url.to_owned(),
+                reason: reason.to_owned(),
+            }
+        })?;
+        Ok(self.partners.values().find(|partner| {
+            canonical_issuer(&partner.issuer).is_ok_and(|canonical| canonical == wanted)
+        }))
     }
 
     /// Every partner whose authority key issued one of `dids`.
@@ -174,6 +186,31 @@ impl RevocationPartnerRegistry {
             })
             .collect()
     }
+}
+
+/// The canonical form two issuer URLs are compared in.
+fn canonical_issuer(url: &str) -> Result<String, &'static str> {
+    let parsed = Url::parse(url).map_err(|_| "not a URL")?;
+    if !parsed.username().is_empty() || parsed.password().is_some() {
+        return Err("userinfo is not allowed");
+    }
+    if parsed.query().is_some() {
+        return Err("a query is not allowed");
+    }
+    if parsed.fragment().is_some() {
+        return Err("a fragment is not allowed");
+    }
+    let host = parsed.host_str().ok_or("a host is required")?;
+    let port = parsed
+        .port_or_known_default()
+        .ok_or("the scheme has no default port")?;
+    Ok(format!(
+        "{}://{}:{}{}",
+        parsed.scheme(),
+        host,
+        port,
+        parsed.path().trim_end_matches('/')
+    ))
 }
 
 fn validate_partner_id(partner_id: &str) -> Result<(), RevocationPartnerError> {

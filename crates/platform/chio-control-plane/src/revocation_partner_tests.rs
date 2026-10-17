@@ -32,10 +32,9 @@ fn a_valid_partner_loads_and_resolves_by_id_and_issuer() -> TestResult {
     let partner = loaded.get("acme").ok_or("partner missing")?;
     assert_eq!(partner.revocation_freshness_ttl_ms(), 300_000);
     assert_eq!(
-        loaded.by_issuer("https://trust.acme.example"),
+        loaded.by_issuer("https://trust.acme.example")?,
         Some(partner)
     );
-    assert_eq!(loaded.by_issuer("https://trust.acme.example/"), None);
     Ok(())
 }
 
@@ -48,8 +47,8 @@ fn a_missing_freshness_ttl_refuses_the_registry() -> TestResult {
         .remove("revocationFreshnessTtlSeconds");
     assert_eq!(
         RevocationPartnerRegistry::from_json(&registry(json!({ "acme": value }))),
-        Err(RevocationPartnerError::MissingRevocationFreshnessTtl(
-            "acme".to_owned()
+        Err(RevocationPartnerError::Malformed(
+            "urn:chio:error:attest:signed-json-invalid-shape".to_owned()
         ))
     );
     Ok(())
@@ -207,4 +206,69 @@ fn a_registry_past_the_shared_read_bound_is_refused() -> TestResult {
         ))
     );
     Ok(())
+}
+
+#[test]
+fn an_issuer_matches_its_partner_under_rfc3986_equivalence() -> TestResult {
+    let loaded = RevocationPartnerRegistry::from_json(&single(json!(60)))?;
+    for presented in [
+        "https://trust.acme.example",
+        "https://trust.acme.example/",
+        "HTTPS://TRUST.Acme.Example",
+        "https://trust.acme.example:443",
+        "https://trust.acme.example//",
+    ] {
+        assert_eq!(
+            loaded
+                .by_issuer(presented)?
+                .map(|partner| partner.partner_id.as_str()),
+            Some("acme"),
+            "{presented}"
+        );
+    }
+    for other in [
+        "https://trust.acme.example:8443",
+        "https://trust.acme.example/base",
+        "http://trust.acme.example",
+    ] {
+        assert_eq!(loaded.by_issuer(other)?, None, "{other}");
+    }
+    Ok(())
+}
+
+#[test]
+fn a_presented_issuer_with_userinfo_a_query_or_a_fragment_is_refused() -> TestResult {
+    let loaded = RevocationPartnerRegistry::from_json(&single(json!(60)))?;
+    for (presented, reason) in [
+        ("https://x@trust.acme.example", "userinfo is not allowed"),
+        ("https://x:y@trust.acme.example", "userinfo is not allowed"),
+        ("https://trust.acme.example/?a=1", "a query is not allowed"),
+        ("https://trust.acme.example/#b", "a fragment is not allowed"),
+        ("not a url", "not a URL"),
+    ] {
+        assert_eq!(
+            loaded.by_issuer(presented),
+            Err(RevocationPartnerError::MalformedPresentedIssuer {
+                issuer: presented.to_owned(),
+                reason: reason.to_owned(),
+            }),
+            "{presented}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn two_partners_whose_issuers_differ_only_in_form_are_refused() {
+    let bytes = registry(json!({
+        "acme": partner("acme", "https://trust.acme.example", json!(60)),
+        "bravo": partner("bravo", "https://TRUST.acme.example:443", json!(60)),
+    }));
+    assert_eq!(
+        RevocationPartnerRegistry::from_json(&bytes),
+        Err(RevocationPartnerError::DuplicateIssuer {
+            first: "acme".to_owned(),
+            second: "bravo".to_owned(),
+        })
+    );
 }

@@ -752,6 +752,14 @@ fn verify_passport_challenge_payload(
         }
         Err(error) => return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string())),
     }
+    if let Err(error) = check_partner_passport_revocation(
+        &state.config,
+        VerifiedPassportIssuer::Dids(&native_passport_issuers(&payload.presentation.passport)),
+        &verification.passport_id,
+        &state.finding_challenge_clock,
+    ) {
+        return Err(plain_http_error(StatusCode::FORBIDDEN, &error.to_string()));
+    }
     if consume {
         match consume_challenge_if_configured(&state.config, challenge, now) {
             Ok(replay_state) => verification.replay_state = replay_state,
@@ -774,14 +782,22 @@ pub(crate) async fn handle_verify_passport_challenge(
         Ok(None) => {}
         Err(response) => return response,
     }
-    match verify_passport_challenge_payload(
-        &state,
-        &payload,
-        payload.expected_challenge.as_ref(),
-        true,
-    ) {
-        Ok(verification) => Json(verification).into_response(),
-        Err(response) => response,
+    let verified = tokio::task::spawn_blocking(move || {
+        verify_passport_challenge_payload(
+            &state,
+            &payload,
+            payload.expected_challenge.as_ref(),
+            true,
+        )
+    })
+    .await;
+    match verified {
+        Ok(Ok(verification)) => Json(verification).into_response(),
+        Ok(Err(response)) => response,
+        Err(_) => plain_http_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "passport challenge verification did not complete",
+        ),
     }
 }
 
@@ -1446,13 +1462,7 @@ pub(crate) async fn handle_federated_issue(
     let partner_check = {
         let config = state.config.clone();
         let clock = Arc::clone(&state.finding_challenge_clock);
-        let issuers = payload
-            .presentation
-            .passport
-            .credentials
-            .iter()
-            .map(|credential| credential.unsigned.issuer.clone())
-            .collect::<Vec<_>>();
+        let issuers = native_passport_issuers(&payload.presentation.passport);
         let passport_id = verification.passport_id.clone();
         run_portable_issuer_fetch(move || {
             check_partner_passport_revocation(
@@ -1791,6 +1801,10 @@ pub(crate) async fn handle_federated_issue(
 #[cfg(test)]
 #[path = "passport_handlers/oid4vp_issuer_fetch_tests.rs"]
 mod oid4vp_issuer_fetch_tests;
+
+#[cfg(test)]
+#[path = "passport_handlers/partner_revocation_door_tests.rs"]
+mod partner_revocation_door_tests;
 
 #[path = "passport_handlers/issuer_authority.rs"]
 mod issuer_authority;

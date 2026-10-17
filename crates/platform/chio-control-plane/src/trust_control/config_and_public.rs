@@ -1325,7 +1325,7 @@ pub use partner_revocation_sync::sync_partner_revocation_mirror;
 #[cfg(test)]
 pub(crate) use partner_revocation_sync::PartnerRevocationFeed;
 pub(crate) use partner_revocation_sync::{
-    check_partner_passport_revocation, VerifiedPassportIssuer,
+    check_partner_passport_revocation, native_passport_issuers, VerifiedPassportIssuer,
 };
 pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,

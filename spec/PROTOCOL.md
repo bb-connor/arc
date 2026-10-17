@@ -4713,10 +4713,17 @@ partners:
 - a mirror whose accepted root is older than the TTL, or that holds no
   verified root, is stale and denies fail closed
 - the verifier binds a presented passport to a partner by its verified issuer:
-  the signed `iss` of an OID4VP credential, or a native credential issuer DID
-  equal to the `did:chio` of the partner's authority key; it reads the partner
-  registry on every check, syncs a stale mirror on demand, and refuses the
-  passport when the mirror stays stale, cannot be verified, or holds it
+  the signed `iss` of an OID4VP credential, compared to the registered issuer
+  under case-insensitive scheme and host, default port elision and trailing
+  path slashes, or a native credential issuer DID equal to the `did:chio` of
+  the partner's authority key; an `iss` that carries userinfo, a query or a
+  fragment is refused
+- every passport door applies the check: OID4VP direct post, federated issue,
+  and the service and public challenge verification routes; each reads the
+  partner registry on every check, syncs a stale mirror on demand, and refuses
+  the passport when the mirror stays stale, cannot be verified, or holds it
+- a mirror records each distinct conflicting root once, up to 256, and refuses
+  any further conflicting root once that bound is reached
 
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:

@@ -32,7 +32,7 @@ fn partner_for(key: &Keypair) -> RevocationPartner {
         partner_id: PARTNER.to_owned(),
         issuer: "https://trust.acme.example".to_owned(),
         authority_public_key: key.public_key(),
-        revocation_freshness_ttl_seconds: Some(TTL_SECONDS),
+        revocation_freshness_ttl_seconds: TTL_SECONDS,
     }
 }
 
@@ -578,5 +578,102 @@ fn a_mirror_stamped_for_another_partner_is_refused() -> TestResult {
         Err(PartnerRevocationError::PartnerMismatch { expected, found })
             if expected == "bravo" && found == PARTNER
     ));
+    Ok(())
+}
+
+#[test]
+fn a_repeated_conflicting_root_is_recorded_once_and_the_log_is_bounded() -> TestResult {
+    let a = Publisher::new()?;
+    let dir = tempfile::tempdir()?;
+    let b = mirror(dir.path())?;
+    a.revoke("passport-a", 1_000)?;
+    b.sync(
+        &partner(),
+        &mut a.source(10_000),
+        &FixedClock::from_millis(10_000),
+    )?;
+    let accepted = b.accepted()?.ok_or("no accepted root")?.signed_root;
+    let equivocate = |hash: [u8; 32]| -> Result<SignedEpochRoot, Box<dyn std::error::Error>> {
+        let mut other = accepted.root.clone();
+        other.root_hash = hash;
+        other.issued_at_unix_ms = 11_000;
+        sign(other, &authority())
+    };
+    let equivocation = PartnerRevocationError::Equivocation {
+        partner_id: PARTNER.to_owned(),
+        epoch: 1,
+    };
+    let repeated = equivocate([7; 32])?;
+    for _ in 0..3 {
+        assert_eq!(
+            b.apply(&partner(), &repeated, &[], 11_000),
+            Err(equivocation.clone())
+        );
+    }
+    assert_eq!(b.conflicts()?.len(), 1);
+
+    let bound = usize::try_from(super::MAX_RECORDED_PARTNER_CONFLICTS)?;
+    for index in 1..bound {
+        let mut hash = [0_u8; 32];
+        hash[..8].copy_from_slice(&u64::try_from(index)?.to_be_bytes());
+        assert_eq!(
+            b.apply(&partner(), &equivocate(hash)?, &[], 11_000),
+            Err(equivocation.clone())
+        );
+    }
+    assert_eq!(b.conflicts()?.len(), bound);
+    assert_eq!(
+        b.apply(&partner(), &equivocate([9; 32])?, &[], 11_000),
+        Err(PartnerRevocationError::ConflictLogFull(PARTNER.to_owned()))
+    );
+    assert_eq!(
+        b.apply(&partner(), &repeated, &[], 11_000),
+        Err(equivocation)
+    );
+    assert_eq!(b.conflicts()?.len(), bound);
+    Ok(())
+}
+
+#[test]
+fn a_mirror_tree_that_diverges_from_its_accepted_root_is_unavailable() -> TestResult {
+    let a = Publisher::new()?;
+    let dir = tempfile::tempdir()?;
+    let b = mirror(dir.path())?;
+    b.sync(
+        &partner(),
+        &mut a.source(10_000),
+        &FixedClock::from_millis(10_000),
+    )?;
+    SqliteRevocationOracle::open(&partner_revocation_mirror_path(
+        &dir.path().join("b-revocation-partners.json"),
+        PARTNER,
+    )?)?
+    .revoke(passport_revocation_key("passport-planted"), 10_000)?;
+    assert_eq!(
+        b.check_passport(&partner(), "passport-held", 10_000),
+        Err(PartnerRevocationError::MirrorUnavailable(
+            PARTNER.to_owned(),
+            "mirror tree does not match its accepted root".to_owned()
+        ))
+    );
+    Ok(())
+}
+
+#[test]
+fn a_failing_clock_refuses_the_sync_after_the_fetch() -> TestResult {
+    let a = Publisher::new()?;
+    let dir = tempfile::tempdir()?;
+    let b = mirror(dir.path())?;
+    assert_eq!(
+        b.sync(
+            &partner(),
+            &mut a.source(10_000),
+            &FixedClock::new(u64::MAX)
+        ),
+        Err(PartnerRevocationError::Clock(
+            chio_security_types::clock::ClockError::Overflow.to_string()
+        ))
+    );
+    assert_eq!(b.accepted()?, None);
     Ok(())
 }

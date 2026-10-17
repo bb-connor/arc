@@ -153,6 +153,16 @@ pub(crate) enum VerifiedPassportIssuer<'a> {
     Dids(&'a [String]),
 }
 
+/// The issuer DIDs of a native passport's credentials. Callers pass them only
+/// after the passport's credential signatures have verified.
+pub(crate) fn native_passport_issuers(passport: &chio_credentials::AgentPassport) -> Vec<String> {
+    passport
+        .credentials
+        .iter()
+        .map(|credential| credential.unsigned.issuer.clone())
+        .collect()
+}
+
 /// Refuses `passport_id` when its verified issuer is a registered revocation
 /// partner whose mirror, synced on demand when stale, is not fresh or holds
 /// the passport. The registry is read on every call under its size bound, and
@@ -185,7 +195,11 @@ pub(crate) fn check_partner_passport_revocation_with(
     let registry = RevocationPartnerRegistry::load(registry_path)
         .map_err(|error| refused(error.to_string()))?;
     let partners = match issuer {
-        VerifiedPassportIssuer::Url(url) => registry.by_issuer(url).into_iter().collect(),
+        VerifiedPassportIssuer::Url(url) => registry
+            .by_issuer(url)
+            .map_err(|error| refused(error.to_string()))?
+            .into_iter()
+            .collect(),
         VerifiedPassportIssuer::Dids(dids) => registry.by_issuer_dids(dids),
     };
     for partner in partners {

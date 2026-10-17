@@ -90,7 +90,7 @@ fn revocation_partner(authority: &Keypair) -> RevocationPartner {
         partner_id: "acme".to_owned(),
         issuer: "https://trust.acme.example".to_owned(),
         authority_public_key: authority.public_key(),
-        revocation_freshness_ttl_seconds: Some(60),
+        revocation_freshness_ttl_seconds: 60,
     }
 }
 
@@ -596,6 +596,56 @@ async fn the_production_door_syncs_only_over_the_strict_transport() -> TestResul
     assert!(
         refused.to_string().to_lowercase().contains("loopback"),
         "{refused}"
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_root_document_of_another_schema_is_refused_by_the_transport() -> TestResult {
+    let authority = Keypair::from_seed(&[31; 32]);
+    let dir = tempfile::tempdir()?;
+    let signed = crate::passport_revocation_feed::sign_passport_revocation_root(
+        &dir.path().join("passport-statuses.json"),
+        authority.clone(),
+        NOW_MS,
+    )?;
+    let body = serde_json::to_string(&serde_json::json!({
+        "schema": "chio.trust.passport-revocation-root.v2",
+        "signedRoot": signed,
+    }))?;
+    let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+    let addr = listener.local_addr()?;
+    let server = std::thread::spawn(move || -> std::io::Result<()> {
+        use std::io::Read as _;
+        let (mut stream, _) = listener.accept()?;
+        let mut request = [0_u8; 2048];
+        let _read = stream.read(&mut request)?;
+        stream.write_all(
+            format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .as_bytes(),
+        )
+    });
+    let mirror_path =
+        partner_revocation_mirror_path(&dir.path().join("b-revocation-partners.json"), "acme")?;
+    let partner = revocation_partner(&authority);
+    let refused = tokio::task::spawn_blocking(move || {
+        let mirror = PartnerRevocationMirror::open(&mirror_path, "acme")?;
+        loopback_sync(addr, &mirror, &partner)
+    })
+    .await?;
+    let _served = server.join();
+    assert_eq!(
+        refused,
+        Err(PartnerRevocationError::MalformedRoot(
+            "acme".to_owned(),
+            crate::passport_revocation_feed::PassportRevocationFeedError::UnsupportedRootSchema(
+                "chio.trust.passport-revocation-root.v2".to_owned()
+            )
+            .to_string()
+        ))
     );
     Ok(())
 }

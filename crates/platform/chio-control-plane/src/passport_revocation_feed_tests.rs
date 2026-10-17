@@ -274,3 +274,19 @@ fn a_root_document_of_another_schema_is_refused() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn an_unreadable_oracle_refuses_the_root_and_the_leaves() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let registry = dir.path().join("passport-statuses.json");
+    std::fs::create_dir(passport_revocation_oracle_path(&registry)?)?;
+    assert!(matches!(
+        sign_passport_revocation_root(&registry, authority(), 5_000),
+        Err(PassportRevocationFeedError::OracleUnavailable(_))
+    ));
+    assert!(matches!(
+        passport_revocation_leaves_page(&registry, 0),
+        Err(PassportRevocationFeedError::OracleUnavailable(_))
+    ));
+    Ok(())
+}

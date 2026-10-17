@@ -39,6 +39,11 @@ pub const MAX_PARTNER_SYNC_LEAVES: u64 = 65_536;
 /// clock.
 pub const MAX_PARTNER_ROOT_FUTURE_SKEW_MS: u64 = 5_000;
 
+/// Most distinct conflicting roots one mirror records. A mirror at the bound
+/// refuses every further conflicting root with
+/// [`PartnerRevocationError::ConflictLogFull`].
+pub const MAX_RECORDED_PARTNER_CONFLICTS: i64 = 256;
+
 /// Largest stored signed root, in bytes.
 const MAX_STORED_ROOT_BYTES: usize = 16 * 1024;
 
@@ -54,7 +59,10 @@ CREATE TABLE IF NOT EXISTS chio_partner_revocation_conflicts (
     observed_at_unix_ms INTEGER NOT NULL,
     reason TEXT NOT NULL,
     accepted_root TEXT,
-    offered_root TEXT NOT NULL
+    offered_root TEXT NOT NULL,
+    offered_epoch INTEGER NOT NULL CHECK (offered_epoch >= 0),
+    offered_root_hash BLOB NOT NULL CHECK (length(offered_root_hash) = 32),
+    UNIQUE (offered_epoch, offered_root_hash)
 ) STRICT;
 ";
 
@@ -113,6 +121,8 @@ pub enum PartnerRevocationError {
     Fetch(String, String),
     #[error("revocation clock unavailable: {0}")]
     Clock(String),
+    #[error("partner `{0}` revocation mirror already records {MAX_RECORDED_PARTNER_CONFLICTS} conflicting roots")]
+    ConflictLogFull(String),
     #[error("passport `{passport_id}` is revoked by partner `{partner_id}`")]
     Revoked {
         partner_id: String,
@@ -412,7 +422,7 @@ impl PartnerRevocationMirror {
                     PartnerRevocationError::Equivocation { .. }
                         | PartnerRevocationError::RootMismatch { .. }
                 ) {
-                    self.record_conflict(&refusal, &offered_json, now_unix_ms);
+                    self.record_conflict(&refusal, offered, &offered_json, now_unix_ms)?;
                 }
                 Err(refusal)
             }
@@ -420,19 +430,48 @@ impl PartnerRevocationMirror {
         }
     }
 
+    /// Records a conflicting root once per (epoch, root hash), refusing a new
+    /// one when the mirror already holds the bound.
     fn record_conflict(
         &self,
         refusal: &PartnerRevocationError,
+        offered: &SignedEpochRoot,
         offered_json: &str,
         now_unix_ms: u64,
-    ) {
-        let Ok(observed) = i64::try_from(now_unix_ms) else {
-            return;
-        };
+    ) -> Result<(), PartnerRevocationError> {
+        let observed = i64::try_from(now_unix_ms).map_err(|_| {
+            PartnerRevocationError::Clock(format!("{now_unix_ms} exceeds the stored time range"))
+        })?;
+        let epoch = i64::try_from(offered.root.epoch).map_err(|_| {
+            PartnerRevocationError::MirrorUnavailable(
+                self.partner_id.clone(),
+                "conflicting root epoch exceeds the stored range".to_owned(),
+            )
+        })?;
         let reason = refusal.to_string();
-        let _recorded = self.oracle.transact(now_unix_ms, |txn| {
-            let connection = txn.connection();
-            let accepted: Option<String> = connection
+        let mut full = false;
+        self.oracle
+            .transact(now_unix_ms, |txn| {
+                let connection = txn.connection();
+                let recorded: bool = connection.query_row(
+                    "SELECT EXISTS(SELECT 1 FROM chio_partner_revocation_conflicts
+                 WHERE offered_epoch = ?1 AND offered_root_hash = ?2)",
+                    params![epoch, offered.root.root_hash.as_slice()],
+                    |row| row.get(0),
+                )?;
+                if recorded {
+                    return Ok(());
+                }
+                let count: i64 = connection.query_row(
+                    "SELECT count(*) FROM chio_partner_revocation_conflicts",
+                    [],
+                    |row| row.get(0),
+                )?;
+                if count >= MAX_RECORDED_PARTNER_CONFLICTS {
+                    full = true;
+                    return Ok(());
+                }
+                let accepted: Option<String> = connection
                 .query_row(
                     "SELECT signed_root FROM chio_partner_revocation_mirror WHERE singleton = 1",
                     [],
@@ -440,14 +479,29 @@ impl PartnerRevocationMirror {
                 )
                 .optional()?
                 .flatten();
-            connection.execute(
-                "INSERT INTO chio_partner_revocation_conflicts
-                    (observed_at_unix_ms, reason, accepted_root, offered_root)
-                 VALUES (?1, ?2, ?3, ?4)",
-                params![observed, reason, accepted, offered_json],
-            )?;
-            Ok(())
-        });
+                connection.execute(
+                    "INSERT INTO chio_partner_revocation_conflicts
+                    (observed_at_unix_ms, reason, accepted_root, offered_root,
+                     offered_epoch, offered_root_hash)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        observed,
+                        reason,
+                        accepted,
+                        offered_json,
+                        epoch,
+                        offered.root.root_hash.as_slice()
+                    ],
+                )?;
+                Ok(())
+            })
+            .map_err(mirror_unavailable(&self.partner_id))?;
+        if full {
+            return Err(PartnerRevocationError::ConflictLogFull(
+                self.partner_id.clone(),
+            ));
+        }
+        Ok(())
     }
 }
 
