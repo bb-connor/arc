@@ -109,19 +109,21 @@ pub(crate) fn configured_kernel(
         },
         chio_test_support::clock::clock(),
     );
-    let authority = runtime
+    let domain = runtime
         .local_authority_store()
-        .ok_or_else(|| CliError::cli_other_error("missing local DPoP authority store"))?;
-    let domain = crate::initialize_local_dpop_authority(
-        &authority,
-        &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
-            "dpop_authority",
-            "payload-maintenance-dpop",
-        )?,
-        &chio_kernel::DpopConfig::default(),
-        kernel.authority_clock(),
-    )?;
-    runtime.attach(&mut kernel, Some(&domain))?;
+        .map(|authority| {
+            crate::initialize_local_dpop_authority(
+                &authority,
+                &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                    "dpop_authority",
+                    "payload-maintenance-dpop",
+                )?,
+                &chio_kernel::DpopConfig::default(),
+                kernel.authority_clock(),
+            )
+        })
+        .transpose()?;
+    runtime.attach(&mut kernel, domain.as_ref())?;
     kernel.set_governed_approval_policy(
         "payload-maintenance-test-tenant".into(),
         vec![runtime.kernel_keypair().public_key()],
