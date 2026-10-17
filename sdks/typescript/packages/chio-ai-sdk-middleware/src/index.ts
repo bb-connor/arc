@@ -17,6 +17,5 @@ export {
 export { isAsyncIterable, isReadableStreamLike } from "./streaming.js";
 export {
   evaluateWithChio,
-  type ChioRuntime,
   type RuntimeEvaluationOptions,
 } from "./runtime.js";

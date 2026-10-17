@@ -1,5 +1,5 @@
 import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
-import { evaluateWithChio, type ChioRuntime } from "./runtime.js";
+import { evaluateWithChio } from "./runtime.js";
 
 /** Call options the AI SDK passes to a language-model middleware hook. */
 export type LanguageModelInvocation =
@@ -69,7 +69,6 @@ export type ChioReceiptVerifier =
     | Promise<ChioReceiptAuthority>;
 
 export type ChioEvaluator = (input: {
-  runtime: ChioRuntime;
   request?: LanguageModelInvocation | undefined;
   toolUse?: ToolUseCandidate | undefined;
 }) => Promise<ChioEvaluation> | ChioEvaluation;
@@ -77,7 +76,6 @@ export type ChioEvaluator = (input: {
 export interface ChioMiddlewareOptions {
   provider?: string | undefined;
   modelId?: string | undefined;
-  runtime?: ChioRuntime | "auto" | undefined;
   sidecarUrl?: string | undefined;
   fetch?: typeof fetch | undefined;
   evaluate?: ChioEvaluator | undefined;
@@ -191,7 +189,6 @@ async function evaluateToolBoundary(
   }
   for (const toolUse of toolUses) {
     const evaluation = await evaluateWithChio(options, {
-      runtime: options.runtime,
       request,
       toolUse,
     });
