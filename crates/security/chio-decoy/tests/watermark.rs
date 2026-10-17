@@ -17,7 +17,8 @@ use chio_decoy::{
     WatermarkVerifier, WatermarkVerifierDependencies, MAX_IJSON_INTEGER,
 };
 use chio_security_types::ports::{
-    ArtifactId, Digest32, PortError, PortResult, RecordId, TenantId, WatermarkObservationStore,
+    ArtifactId, Digest32, PortError, PortErrorKind, PortResult, RecordId, TenantId,
+    WatermarkObservationStore,
 };
 use chio_security_types::{
     DecoyOperationAttempt, DecoyOperationKind, DecoySurface, DecoyVersion, WatermarkObservation,
@@ -599,10 +600,7 @@ fn future_issued_watermarks_are_invalid_until_their_issuance_time() {
     assert_eq!(current.verdict, WatermarkScanVerdict::ActiveHit);
 }
 
-#[test]
-fn retired_and_expired_entries_are_verified_inactive_advisories() {
-    let fixture = Fixture::new(true, 10_000);
-    let token = fixture.issue();
+fn retire_issued_marker(fixture: &Fixture) {
     apply(
         &fixture.registry,
         "watermark-a-v1",
@@ -633,6 +631,13 @@ fn retired_and_expired_entries_are_verified_inactive_advisories() {
         DecoyOperationKind::Retire,
         Some("watermark-a-v2"),
     );
+}
+
+#[test]
+fn retired_and_expired_entries_are_verified_inactive_advisories() {
+    let fixture = Fixture::new(true, 10_000);
+    let token = fixture.issue();
+    retire_issued_marker(&fixture);
     let report = fixture
         .verifier()
         .scan_text(
@@ -665,6 +670,48 @@ fn a_verified_active_hit_survives_observation_store_failure_and_cross_tenant_rep
     assert_eq!(
         *report.active_hits[0].observation(),
         WatermarkObservationPersistence::Failed
+    );
+}
+
+#[test]
+fn an_inactive_hit_whose_observation_store_fails_is_a_typed_scan_error() {
+    let fixture = Fixture::new(true, 10_000);
+    let token = fixture.issue();
+    retire_issued_marker(&fixture);
+    fixture.observations.fail.store(true, Ordering::SeqCst);
+    assert_eq!(
+        fixture.verifier().scan_text(
+            &token,
+            &fixture.observation("observation-retired", "evidence-retired", OBSERVED_AT),
+        ),
+        Err(WatermarkScanError::ObservationUnrecorded(
+            PortErrorKind::Unavailable
+        ))
+    );
+}
+
+#[test]
+fn an_inactive_hit_whose_observation_conflicts_is_a_typed_scan_error() {
+    let fixture = Fixture::new(true, 10_000);
+    let token = fixture.issue();
+    retire_issued_marker(&fixture);
+    let first = fixture
+        .verifier()
+        .scan_text(
+            &token,
+            &fixture.observation("observation-retired", "evidence-first", OBSERVED_AT),
+        )
+        .test_expect("first inactive scan");
+    assert_eq!(first.verdict, WatermarkScanVerdict::Advisory);
+    assert_eq!(first.detector_failures, 0);
+    assert_eq!(
+        fixture.verifier().scan_text(
+            &token,
+            &fixture.observation("observation-retired", "evidence-changed", OBSERVED_AT),
+        ),
+        Err(WatermarkScanError::ObservationUnrecorded(
+            PortErrorKind::Conflict
+        ))
     );
 }
 

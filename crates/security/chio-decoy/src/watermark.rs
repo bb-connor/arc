@@ -520,6 +520,7 @@ impl WatermarkVerifier {
         };
         let mut seen = BTreeSet::new();
         let mut unresolved_infrastructure_failure = false;
+        let mut unrecorded_observation = None;
         for token in candidates.tokens {
             let token_digest = digest(TOKEN_DIGEST_DOMAIN, token.as_bytes());
             if !seen.insert(token_digest) {
@@ -527,16 +528,17 @@ impl WatermarkVerifier {
                 continue;
             }
             match self.verify_candidate(token, token_digest, context) {
-                CandidateResult::Active(hit, persistence_failed) => {
+                CandidateResult::Active(hit, persistence_failure) => {
                     report.active_hits.push(hit);
-                    if persistence_failed {
+                    if persistence_failure.is_some() {
                         report.detector_failures = report.detector_failures.saturating_add(1);
                     }
                 }
-                CandidateResult::Inactive(hit, persistence_failed) => {
+                CandidateResult::Inactive(hit, persistence_failure) => {
                     report.inactive_hits.push(hit);
-                    if persistence_failed {
+                    if let Some(kind) = persistence_failure {
                         report.detector_failures = report.detector_failures.saturating_add(1);
+                        unrecorded_observation.get_or_insert(kind);
                     }
                 }
                 CandidateResult::Invalid => {
@@ -554,6 +556,9 @@ impl WatermarkVerifier {
         }
         if unresolved_infrastructure_failure {
             return Err(WatermarkScanError::DetectorUnavailable);
+        }
+        if let Some(kind) = unrecorded_observation {
+            return Err(WatermarkScanError::ObservationUnrecorded(kind));
         }
         if !report.inactive_hits.is_empty()
             || report.malformed_candidates > 0
@@ -640,12 +645,16 @@ impl WatermarkVerifier {
             evidence_ref: observation_context.evidence_ref.clone(),
             observed_at_unix_ms: observation_context.observed_at_unix_ms,
         };
-        let (persistence, persistence_failed) =
+        let (persistence, persistence_failure) =
             match self.dependencies.observations.record_first(&observation) {
                 Ok(result) if observation_result_matches(&result, payload_digest, token_digest) => {
-                    (WatermarkObservationPersistence::Persisted(result), false)
+                    (WatermarkObservationPersistence::Persisted(result), None)
                 }
-                Ok(_) | Err(_) => (WatermarkObservationPersistence::Failed, true),
+                Ok(_) => (
+                    WatermarkObservationPersistence::Failed,
+                    Some(PortErrorKind::IntegrityFailure),
+                ),
+                Err(error) => (WatermarkObservationPersistence::Failed, Some(error.kind())),
             };
         let cross_tenant = envelope.payload.tenant_id != observation_context.observing_tenant_id;
         if matches!(
@@ -663,7 +672,7 @@ impl WatermarkVerifier {
                     cross_tenant,
                     observation: persistence,
                 },
-                persistence_failed,
+                persistence_failure,
             )
         } else {
             CandidateResult::Inactive(
@@ -675,7 +684,7 @@ impl WatermarkVerifier {
                     cross_tenant,
                     observation: persistence,
                 },
-                persistence_failed,
+                persistence_failure,
             )
         }
     }
@@ -737,6 +746,10 @@ pub enum WatermarkScanError {
     TextTooLarge,
     #[error("watermark detector is unavailable")]
     DetectorUnavailable,
+    /// The scan has no active hit and the observation of a verified inactive
+    /// watermark was not recorded. Carries the observation store failure kind.
+    #[error("watermark observation was not recorded: {0:?}")]
+    ObservationUnrecorded(PortErrorKind),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
@@ -754,8 +767,8 @@ pub enum WatermarkCandidateError {
 }
 
 enum CandidateResult {
-    Active(VerifiedWatermark, bool),
-    Inactive(InactiveWatermark, bool),
+    Active(VerifiedWatermark, Option<PortErrorKind>),
+    Inactive(InactiveWatermark, Option<PortErrorKind>),
     Invalid,
     InfrastructureFailure,
 }

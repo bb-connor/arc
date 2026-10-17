@@ -76,6 +76,8 @@ run_exact_target --label "decoy registry key rotation" --expected \
 run_exact_target --label "signed watermark lifecycle" --expected \
   a_verified_active_hit_survives_observation_store_failure_and_cross_tenant_replay \
   active_and_overlap_keys_verify_only_inside_receipt_anchored_windows \
+  an_inactive_hit_whose_observation_conflicts_is_a_typed_scan_error \
+  an_inactive_hit_whose_observation_store_fails_is_a_typed_scan_error \
   canonical_payload_signature_and_safe_integer_tampering_are_advisory_not_clear \
   clean_output_is_clear_and_malformed_or_duplicate_candidates_cannot_mask_a_valid_hit \
   detector_dependency_failure_is_never_reported_as_clear \
