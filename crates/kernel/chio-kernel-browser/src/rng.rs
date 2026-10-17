@@ -6,9 +6,8 @@
 //! seed per `sign_receipt` call when the caller does not already have a
 //! long-lived kernel key, and to mint receipt identifiers.
 //!
-//! The adapter fails closed: if the runtime has no `window.crypto`
-//! global (e.g. a non-browser wasm32 host that does not polyfill the Web
-//! Crypto API), the [`WebCryptoRng::try_new`] constructor returns
+//! The adapter fails closed: if the runtime has no `globalThis.crypto`
+//! global (e.g. a wasm32 host that does not provide the Web Crypto API), the [`WebCryptoRng::try_new`] constructor returns
 //! [`WebCryptoRngError::Unavailable`]. The kernel-core `Rng` trait's
 //! `fill_bytes` has no error channel, so once the adapter is constructed
 //! a later `fill_bytes` call that fails for any reason falls back to
@@ -30,9 +29,8 @@ use chio_kernel_core::Rng;
 /// silently-zeroed seed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum WebCryptoRngError {
-    /// The host environment does not expose `window.crypto` -- either
-    /// there is no `window` global (non-browser wasm host) or the
-    /// browser build refused to hand one out. Fail-closed: the wasm
+    /// The host environment does not expose `globalThis.crypto` with a
+    /// `getRandomValues` function. Fail-closed: the wasm
     /// binding refuses to mint receipts without CSPRNG-grade entropy.
     Unavailable(String),
 }
@@ -47,12 +45,11 @@ impl core::fmt::Display for WebCryptoRngError {
     }
 }
 
-/// CSPRNG adapter backed by `window.crypto.getRandomValues(...)`.
+/// CSPRNG adapter backed by `globalThis.crypto.getRandomValues(...)`.
 ///
 /// Constructing the adapter caches a handle to the browser `Crypto`
 /// object so `fill_bytes` is a straight FFI call. The adapter is
-/// cheap to construct -- one `window()` lookup plus a `crypto()` call
-/// -- but the caller should still hold one per wasm entry-point call
+/// cheap to construct -- two global property lookups -- but the caller should still hold one per wasm entry-point call
 /// instead of per-receipt to avoid redundant globals lookups.
 #[cfg(target_arch = "wasm32")]
 pub struct WebCryptoRng {
@@ -61,19 +58,26 @@ pub struct WebCryptoRng {
 
 #[cfg(target_arch = "wasm32")]
 impl WebCryptoRng {
-    /// Probe for `window.crypto` and cache the handle.
+    /// Probe for `globalThis.crypto` and cache the handle.
     ///
-    /// Returns [`WebCryptoRngError::Unavailable`] if the runtime does
-    /// not expose a `Window` global or the window does not expose a
-    /// `Crypto` handle (e.g. an off-main-thread wasm worker that has
-    /// not been granted one).
+    /// Returns [`WebCryptoRngError::Unavailable`] if `globalThis.crypto`
+    /// is missing or has no `getRandomValues` function. Works in
+    /// browsers, Workers, Durable Objects, Deno and Node 20+.
     pub fn try_new() -> Result<Self, WebCryptoRngError> {
-        let window = web_sys::window().ok_or_else(|| {
-            WebCryptoRngError::Unavailable("no Window global is available".to_string())
-        })?;
-        let crypto = window
-            .crypto()
-            .map_err(|_| WebCryptoRngError::Unavailable("window.crypto threw".to_string()))?;
+        use wasm_bindgen::JsCast;
+        let unavailable = |reason: &str| WebCryptoRngError::Unavailable(reason.to_string());
+        let global = js_sys::global();
+        let value = js_sys::Reflect::get(&global, &"crypto".into())
+            .map_err(|_| unavailable("globalThis.crypto threw"))?;
+        if !value.is_object() {
+            return Err(unavailable("globalThis.crypto is not defined"));
+        }
+        let method = js_sys::Reflect::get(&value, &"getRandomValues".into())
+            .map_err(|_| unavailable("crypto.getRandomValues threw"))?;
+        if !method.is_function() {
+            return Err(unavailable("crypto.getRandomValues is not a function"));
+        }
+        let crypto: web_sys::Crypto = value.unchecked_into();
         Ok(Self { crypto })
     }
 }
