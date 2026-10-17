@@ -1,4 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
+import { generateText, jsonSchema, simulateReadableStream, streamText, tool } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
 import {
   ChioMiddlewareDeniedError,
   createChioMiddleware,
@@ -6,7 +8,6 @@ import {
   isReadableStreamLike,
   wrapWithChio,
   type ChioReceiptAuthority,
-  type LanguageModelInvocation,
 } from "../src/index.js";
 
 function authorizedAllow() {
@@ -26,59 +27,122 @@ function authorizedAllow() {
   };
 }
 
+const USAGE = {
+  inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: 1, text: 1, reasoning: undefined },
+};
+
+const GENERATE_RESULT = {
+  content: [{ type: "text" as const, text: "ok" }],
+  finishReason: { unified: "stop" as const, raw: undefined },
+  usage: USAGE,
+  warnings: [],
+};
+
+/// Mock V4 model whose doGenerate/doStream report each invocation.
+function mockModel(onCall: () => void = () => {}) {
+  return new MockLanguageModelV4({
+    doGenerate: async () => {
+      onCall();
+      return GENERATE_RESULT;
+    },
+    doStream: async () => {
+      onCall();
+      return {
+        stream: simulateReadableStream({
+          chunks: [
+            { type: "text-start" as const, id: "t1" },
+            { type: "text-delta" as const, id: "t1", delta: "ok" },
+            { type: "text-end" as const, id: "t1" },
+            { type: "finish" as const, finishReason: { unified: "stop" as const, raw: undefined }, usage: USAGE },
+          ],
+        }),
+      };
+    },
+  });
+}
+
+/// V4 call options declaring the named function tools.
+function callOptions(...names: string[]) {
+  return {
+    prompt: [{ role: "user" as const, content: [{ type: "text" as const, text: "hi" }] }],
+    tools: names.map(name => ({
+      type: "function" as const,
+      name,
+      inputSchema: { type: "object" as const, properties: {} },
+    })),
+  };
+}
+
+/// AI SDK tool set declaring one executable function tool.
+function sdkTools(name: string) {
+  return {
+    [name]: tool({
+      description: name,
+      inputSchema: jsonSchema({ type: "object", properties: {} }),
+      execute: async () => "unused",
+    }),
+  };
+}
+
 describe("wrapWithChio", () => {
   it("runs verdict evaluation before generation when tools are present", async () => {
     const calls: string[] = [];
-    const model = {
-      async doGenerate(_request: LanguageModelInvocation) {
-        calls.push("model");
-        return { text: "ok" };
-      },
-    };
-    const wrapped = wrapWithChio(model, {
+    const wrapped = wrapWithChio(mockModel(() => calls.push("model")), {
       evaluate: ({ toolUse }) => {
         calls.push(`verdict:${toolUse?.name}`);
         return authorizedAllow();
       },
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
+    const result = await wrapped.doGenerate(callOptions("search"));
 
-    expect(result).toEqual({ text: "ok" });
+    expect(result).toEqual(GENERATE_RESULT);
     expect(calls).toEqual(["verdict:search", "model"]);
+  });
+
+  it("keeps the wrapped model's identity", () => {
+    const base = mockModel();
+    const wrapped = wrapWithChio(base, { evaluate: () => authorizedAllow() });
+
+    expect(wrapped.specificationVersion).toBe("v4");
+    expect(wrapped.provider).toBe(base.provider);
+    expect(wrapped.modelId).toBe(base.modelId);
   });
 
   it("denies before invoking the underlying model", async () => {
     let invoked = false;
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        invoked = true;
-        return {};
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(() => { invoked = true; }), {
       evaluate: () => ({ verdict: "deny", reason: "blocked", receiptId: "r-deny" }),
     });
 
-    await expect(wrapped.doGenerate({ toolCalls: [{ toolName: "search" }] }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(invoked).toBe(false);
   });
 
-  it("passes stream results through without buffering", async () => {
-    const stream = new ReadableStream();
-    const wrapped = wrapWithChio({
-      async doStream() {
-        return stream;
-      },
-    }, {
-      evaluate: () => authorizedAllow(),
+  it("denies a streaming call before invoking the underlying model", async () => {
+    let invoked = false;
+    const wrapped = wrapWithChio(mockModel(() => { invoked = true; }), {
+      evaluate: () => ({ verdict: "deny", reason: "blocked", receiptId: "r-deny" }),
     });
 
-    const result = await wrapped.doStream({ tools: { search: {} } });
+    await expect(wrapped.doStream(callOptions("search")))
+      .rejects
+      .toThrow(ChioMiddlewareDeniedError);
+    expect(invoked).toBe(false);
+  });
 
-    expect(result).toBe(stream);
-    expect(isReadableStreamLike(result)).toBe(true);
+  it("passes the stream result through without buffering", async () => {
+    const stream = new ReadableStream();
+    const base = new MockLanguageModelV4({ doStream: async () => ({ stream }) });
+    const wrapped = wrapWithChio(base, { evaluate: () => authorizedAllow() });
+
+    const result = await wrapped.doStream(callOptions("search"));
+
+    expect(result.stream).toBe(stream);
+    expect(isReadableStreamLike(result.stream)).toBe(true);
     expect(isAsyncIterable({
       async *[Symbol.asyncIterator]() {
         yield "chunk";
@@ -86,59 +150,41 @@ describe("wrapWithChio", () => {
     })).toBe(true);
   });
 
-  it("skips evaluation when the request carries no tool-use surface", async () => {
+  it("skips evaluation when the request declares no tools", async () => {
     let evaluations = 0;
     let modelCalls = 0;
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        modelCalls += 1;
-        return { text: "no-tools" };
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(() => { modelCalls += 1; }), {
       evaluate: () => {
         evaluations += 1;
         return authorizedAllow();
       },
     });
 
-    const result = await wrapped.doGenerate({ prompt: "hello" });
+    const result = await wrapped.doGenerate(callOptions());
 
-    expect(result).toEqual({ text: "no-tools" });
+    expect(result).toEqual(GENERATE_RESULT);
     expect(evaluations).toBe(0);
     expect(modelCalls).toBe(1);
   });
 
-  it("evaluates each named tool once when multiple tools are present", async () => {
+  it("evaluates each declared tool once, sorted by name", async () => {
     const seen: string[] = [];
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        return { text: "ok" };
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(), {
       evaluate: ({ toolUse }) => {
         seen.push(toolUse?.name ?? "<missing>");
         return authorizedAllow();
       },
     });
 
-    await wrapped.doGenerate({
-      tools: {
-        search: {},
-        fetch_url: {},
-      },
-    });
+    await wrapped.doGenerate(callOptions("search", "fetch_url"));
 
     // Names are sorted to stabilize evaluation order across runtimes.
     expect(seen).toEqual(["fetch_url", "search"]);
   });
 
-  it("falls back to declared tools when explicit toolCalls is empty", async () => {
+  it("evaluates provider-defined tools by name", async () => {
     const seen: string[] = [];
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        return { text: "ok" };
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(), {
       evaluate: ({ toolUse }) => {
         seen.push(toolUse?.name ?? "<missing>");
         return authorizedAllow();
@@ -146,59 +192,17 @@ describe("wrapWithChio", () => {
     });
 
     await wrapped.doGenerate({
-      tools: { search: {} },
-      toolCalls: [],
+      ...callOptions(),
+      tools: [{ type: "provider", id: "openai.web_search", name: "web_search", args: {} }],
     });
 
-    expect(seen).toEqual(["search"]);
-  });
-
-  it("createChioMiddleware exposes AI SDK wrapGenerate/wrapStream hooks", async () => {
-    // The Vercel AI SDK invokes `wrapGenerate({ doGenerate, params })` and
-    // `wrapStream({ doStream, params })` once per call. Without these
-    // hooks, passing the result to `wrapLanguageModel({ middleware })`
-    // would silently no-op and bypass Chio. The test asserts they exist
-    // and that the gate runs before the underlying call.
-    const middleware = createChioMiddleware({
-      evaluate: ({ toolUse }) =>
-        toolUse?.name === "blocked"
-          ? { verdict: "deny", reason: "blocked tool" }
-          : authorizedAllow(),
-    });
-
-    expect(typeof middleware.wrapGenerate).toBe("function");
-    expect(typeof middleware.wrapStream).toBe("function");
-
-    // Allow path runs the inner doGenerate with the original params.
-    const allowResult = await middleware.wrapGenerate<LanguageModelInvocation, { ok: boolean }>({
-      doGenerate: async (p) => ({ ok: p.tools != null }),
-      params: { tools: { search: {} } } as LanguageModelInvocation,
-    });
-    expect(allowResult).toEqual({ ok: true });
-
-    // Deny path throws ChioMiddlewareDeniedError before the inner call.
-    let invoked = false;
-    await expect(
-      middleware.wrapStream<LanguageModelInvocation, unknown>({
-        doStream: async () => {
-          invoked = true;
-          return null;
-        },
-        params: { toolCalls: [{ toolName: "blocked" }] } as LanguageModelInvocation,
-      }),
-    ).rejects.toThrow(ChioMiddlewareDeniedError);
-    expect(invoked).toBe(false);
+    expect(seen).toEqual(["web_search"]);
   });
 
   it("denies on the first denying tool and stops invoking the model", async () => {
     let modelCalls = 0;
     const seen: string[] = [];
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(() => { modelCalls += 1; }), {
       evaluate: ({ toolUse }) => {
         seen.push(toolUse?.name ?? "<missing>");
         if (toolUse?.name === "fetch_url") {
@@ -208,30 +212,21 @@ describe("wrapWithChio", () => {
       },
     });
 
-    await expect(wrapped.doGenerate({
-      toolCalls: [
-        { toolName: "search" },
-        { toolName: "fetch_url" },
-        { toolName: "execute" },
-      ],
-    })).rejects.toThrow(ChioMiddlewareDeniedError);
+    await expect(wrapped.doGenerate(callOptions("search", "fetch_url", "execute")))
+      .rejects
+      .toThrow(ChioMiddlewareDeniedError);
 
-    expect(seen).toEqual(["search", "fetch_url"]);
+    expect(seen).toEqual(["execute", "fetch_url"]);
     expect(modelCalls).toBe(0);
   });
 
   it("rejects bare allow responses without verified receipt authority", async () => {
     let invoked = false;
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        invoked = true;
-        return { text: "should not run" };
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(() => { invoked = true; }), {
       evaluate: () => ({ verdict: "allow" }),
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(invoked).toBe(false);
@@ -239,19 +234,61 @@ describe("wrapWithChio", () => {
 
   it("denies non-canonical authorized result strings", async () => {
     let invoked = false;
-    const wrapped = wrapWithChio({
-      async doGenerate() {
-        invoked = true;
-        return { text: "should not run" };
-      },
-    }, {
+    const wrapped = wrapWithChio(mockModel(() => { invoked = true; }), {
       evaluate: () => ({ ...authorizedAllow(), result: "authorized" }),
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(invoked).toBe(false);
+  });
+});
+
+describe("createChioMiddleware", () => {
+  it("declares the v4 middleware specification with generate and stream hooks", () => {
+    const middleware = createChioMiddleware({ evaluate: () => authorizedAllow() });
+
+    expect(middleware.specificationVersion).toBe("v4");
+    expect(typeof middleware.wrapGenerate).toBe("function");
+    expect(typeof middleware.wrapStream).toBe("function");
+  });
+
+  it("gates generateText through the AI SDK before the model runs", async () => {
+    let modelCalls = 0;
+    const model = wrapWithChio(mockModel(() => { modelCalls += 1; }), {
+      evaluate: ({ toolUse }) =>
+        toolUse?.name === "blocked"
+          ? { verdict: "deny", reason: "blocked tool" }
+          : authorizedAllow(),
+    });
+    const allowed = await generateText({ model, prompt: "hi", tools: sdkTools("search") });
+    expect(allowed.text).toBe("ok");
+    expect(modelCalls).toBe(1);
+
+    await expect(generateText({ model, prompt: "hi", tools: sdkTools("blocked") }))
+      .rejects
+      .toThrow(ChioMiddlewareDeniedError);
+    expect(modelCalls).toBe(1);
+  });
+
+  it("gates streamText through the AI SDK before the model runs", async () => {
+    let modelCalls = 0;
+    const model = wrapWithChio(mockModel(() => { modelCalls += 1; }), {
+      evaluate: () => ({ verdict: "deny", reason: "blocked tool" }),
+    });
+
+    const errors: unknown[] = [];
+    const result = streamText({
+      model,
+      prompt: "hi",
+      tools: sdkTools("search"),
+      onError: ({ error }) => { errors.push(error); },
+    });
+    await result.consumeStream();
+
+    expect(errors.some(error => error instanceof ChioMiddlewareDeniedError)).toBe(true);
+    expect(modelCalls).toBe(0);
   });
 });
 
@@ -331,12 +368,9 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in explicit-verifier test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
@@ -346,9 +380,9 @@ describe("receipt authority verification", () => {
       },
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
+    const result = await wrapped.doGenerate(callOptions("search"));
 
-    expect(result).toEqual({ text: "ok" });
+    expect(result).toEqual(GENERATE_RESULT);
     expect(evaluateCalls).toBe(1);
     expect(modelCalls).toBe(1);
     expect(seenReceipts).toHaveLength(1);
@@ -376,20 +410,17 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in default-verify test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
+    const result = await wrapped.doGenerate(callOptions("search"));
 
-    expect(result).toEqual({ text: "ok" });
+    expect(result).toEqual(GENERATE_RESULT);
     expect(modelCalls).toBe(1);
     expect(seenPaths.some(path => path.endsWith("/chio/evaluate"))).toBe(true);
     expect(seenPaths.some(path => path.endsWith("/chio/verify"))).toBe(true);
@@ -428,20 +459,17 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in default-host-verify test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       runtime: "node",
       // sidecarUrl deliberately omitted to exercise the documented default.
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
+    const result = await wrapped.doGenerate(callOptions("search"));
 
-    expect(result).toEqual({ text: "ok" });
+    expect(result).toEqual(GENERATE_RESULT);
     expect(modelCalls).toBe(1);
     expect(seenPaths).toEqual([
       "http://127.0.0.1:9090/chio/evaluate",
@@ -466,19 +494,16 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in result-allow test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
-    expect(result).toEqual({ text: "ok" });
+    const result = await wrapped.doGenerate(callOptions("search"));
+    expect(result).toEqual(GENERATE_RESULT);
     expect(modelCalls).toBe(1);
   });
 
@@ -497,12 +522,9 @@ describe("receipt authority verification", () => {
     };
 
     let modelCalls = 0;
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       // Neither `sidecarUrl` nor `verifyReceipt` is configured. The
       // middleware must still authorize because both default to the
       // local sidecar and the authority response says allow.
@@ -510,8 +532,8 @@ describe("receipt authority verification", () => {
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
-    expect(result).toEqual({ text: "ok" });
+    const result = await wrapped.doGenerate(callOptions("search"));
+    expect(result).toEqual(GENERATE_RESULT);
     expect(modelCalls).toBe(1);
   });
 
@@ -528,18 +550,15 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in unreachable-verify test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(modelCalls).toBe(0);
@@ -555,12 +574,9 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in partial-authority test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
@@ -579,7 +595,7 @@ describe("receipt authority verification", () => {
       }),
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(modelCalls).toBe(0);
@@ -615,18 +631,15 @@ describe("receipt authority verification", () => {
       );
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "edge",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(modelCalls).toBe(0);
@@ -651,19 +664,16 @@ describe("receipt authority verification", () => {
       throw new Error("edge runtime with verifyReceipt must not hit fetch");
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       runtime: "edge",
       fetch: fetchMock as typeof fetch,
       verifyReceipt: () => authorityAllow(),
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
-    expect(result).toEqual({ text: "ok" });
+    const result = await wrapped.doGenerate(callOptions("search"));
+    expect(result).toEqual(GENERATE_RESULT);
     expect(modelCalls).toBe(1);
     expect(fetchCalls).toBe(0);
   });
@@ -692,18 +702,15 @@ describe("receipt authority verification", () => {
       throw new Error(`unexpected fetch in omit-authority test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(modelCalls).toBe(0);
@@ -759,19 +766,16 @@ describe("receipt verdict lifting", () => {
       throw new Error(`unexpected fetch in nested-verdict test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "ok" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    const result = await wrapped.doGenerate({ tools: { search: {} } });
-    expect(result).toEqual({ text: "ok" });
+    const result = await wrapped.doGenerate(callOptions("search"));
+    expect(result).toEqual(GENERATE_RESULT);
     expect(modelCalls).toBe(1);
   });
 
@@ -802,18 +806,15 @@ describe("receipt verdict lifting", () => {
       throw new Error(`unexpected fetch in missing-tag test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } })).rejects.toThrow();
+    await expect(wrapped.doGenerate(callOptions("search"))).rejects.toThrow();
     expect(modelCalls).toBe(0);
   });
 
@@ -837,18 +838,15 @@ describe("receipt verdict lifting", () => {
       throw new Error(`unexpected fetch in plain-string-verdict test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } })).rejects.toThrow(
+    await expect(wrapped.doGenerate(callOptions("search"))).rejects.toThrow(
       "did not include an allow or deny verdict",
     );
     expect(modelCalls).toBe(0);
@@ -888,18 +886,15 @@ describe("receipt verdict lifting", () => {
       throw new Error(`unexpected fetch in tagged-deny test: ${url}`);
     };
 
-    const wrapped = wrapWithChio({
-      async doGenerate() {
+    const wrapped = wrapWithChio(mockModel(() => {
         modelCalls += 1;
-        return { text: "should not run" };
-      },
-    }, {
+      }), {
       runtime: "node",
       sidecarUrl: "http://sidecar.test",
       fetch: fetchMock as typeof fetch,
     });
 
-    await expect(wrapped.doGenerate({ tools: { search: {} } }))
+    await expect(wrapped.doGenerate(callOptions("search")))
       .rejects
       .toThrow(ChioMiddlewareDeniedError);
     expect(modelCalls).toBe(0);

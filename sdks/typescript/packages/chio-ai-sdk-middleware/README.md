@@ -1,6 +1,7 @@
 # @chio-protocol/ai-sdk-middleware
 
-Structural Vercel AI SDK language-model middleware for Chio verdict gating.
+Vercel AI SDK 7 language-model middleware for Chio verdict gating. Supports
+AI SDK 7 only (`ai@>=7 <8`).
 
 ```ts
 import { wrapWithChio } from "@chio-protocol/ai-sdk-middleware";
@@ -11,18 +12,43 @@ const model = wrapWithChio(baseModel, {
 });
 ```
 
-The wrapper evaluates at the tool-use boundary before `doGenerate` or
-`doStream` delegates to the underlying model. Allowed streams are returned
-untouched. Denials throw `ChioMiddlewareDeniedError` with the denial reason
-and optional receipt id.
+`wrapWithChio` calls the AI SDK's `wrapLanguageModel` with the middleware from
+`createChioMiddleware`, so the wrapped model keeps its provider, model id and
+supported URLs. To compose with other middleware, pass the middleware
+yourself:
+
+```ts
+import { wrapLanguageModel } from "ai";
+import { createChioMiddleware } from "@chio-protocol/ai-sdk-middleware";
+
+const model = wrapLanguageModel({
+  model: baseModel,
+  middleware: [createChioMiddleware({ provider: "openai", modelId: "gpt-4.1" })],
+});
+```
+
+## What is evaluated
+
+The middleware runs in `wrapGenerate` (used by `generateText`) and
+`wrapStream` (used by `streamText`). Before delegating to the model it
+evaluates every tool declared in the call's `tools` option, function and
+provider tools alike, in name order. This gates whether the model may be
+called with those tools offered. It does not inspect the arguments of the
+tool calls the model later emits, and it does not wrap tool execution. Use
+`@chio-protocol/ai-sdk` (`chioTool`) to evaluate each tool invocation with
+its arguments.
+
+A call that declares no tools is not evaluated. Denials throw
+`ChioMiddlewareDeniedError` with the denial reason and optional receipt id,
+and the underlying model is never invoked. Allowed streams are returned
+untouched.
 
 The default Edge path consumes `@chio-protocol/edge` dynamically. Node uses
 `fetch` against `/chio/evaluate`. Tests can inject `evaluate` directly.
 
 ## Runtime selection
 
-`wrapWithChio` runs the verdict at the tool-use boundary, not per stream
-delta. The runtime path is selected as follows:
+The runtime path is selected as follows:
 
 - `runtime: "edge"` (or detected `EdgeRuntime` global) - dynamic `import`
   of `@chio-protocol/edge` evaluates the wasm artifact in-process.
@@ -34,10 +60,10 @@ delta. The runtime path is selected as follows:
 A custom `evaluate` callback short-circuits both paths and is the
 recommended seam for unit tests.
 
-## Allow / deny shape
+## Receipt verification
 
-On `allow`, the wrapped model's `doGenerate` or `doStream` is invoked with
-the original arguments and the underlying response is returned untouched
-(streams are passed by reference). On `deny`, `ChioMiddlewareDeniedError`
-is thrown with the receipt id and reason; the underlying model is never
-invoked.
+An allow verdict authorizes the call only after the receipt passes
+verification. The middleware uses `verifyReceipt` when supplied and otherwise
+POSTs the receipt to the sidecar's `/chio/verify` route. On the Edge runtime
+there is no fetch fallback, so a `verifyReceipt` is required; without one the
+call is denied.

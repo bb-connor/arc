@@ -1,4 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
+import { generateText } from "ai";
+import { MockLanguageModelV4 } from "ai/test";
 import { z } from "zod";
 import {
   ChioClient,
@@ -8,6 +10,14 @@ import {
 } from "../src/index.js";
 
 // -- Helpers ---------------------------------------------------------------
+
+const EXECUTE_OPTIONS = { toolCallId: "call-0", messages: [], context: {} };
+
+/** Invoke a wrapped tool the way the AI SDK does: input plus execution options. */
+function run(tool: { execute?: unknown }, input: unknown): Promise<unknown> {
+  const execute = tool.execute as (input: unknown, options: typeof EXECUTE_OPTIONS) => unknown;
+  return Promise.resolve(execute(input, EXECUTE_OPTIONS));
+}
 
 interface FetchCall {
   url: string;
@@ -234,32 +244,19 @@ describe("chioTool: shape and type preservation", () => {
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
       description: "Search",
-      parameters: params,
+      inputSchema: params,
       execute: async ({ q }: { q: string }) => ({ q }),
       scope: { toolServer: "srv", toolName: "search" },
       clientOptions: { sidecarUrl: "http://127.0.0.1:9090", fetch },
     });
 
     expect(wrapped.description).toBe("Search");
-    expect(wrapped.parameters).toBe(params);
+    expect(wrapped.inputSchema).toBe(params);
     expect(typeof wrapped.execute).toBe("function");
   });
 
-  it("preserves zod parameter schema reference (no re-wrapping)", () => {
+  it("preserves the zod input schema reference (no re-wrapping)", () => {
     const schema = z.object({ q: z.string().min(1) });
-    const { fetch } = fakeFetch([]);
-    const wrapped = chioTool({
-      verifyReceipt: trustedReceiptVerifier,
-      parameters: schema,
-      execute: async ({ q }: { q: string }) => q,
-      scope: { toolServer: "s", toolName: "t" },
-      clientOptions: { fetch },
-    });
-    expect(wrapped.parameters).toBe(schema);
-  });
-
-  it("preserves the `inputSchema` field used by Vercel AI SDK v5", () => {
-    const schema = z.object({ q: z.string() });
     const { fetch } = fakeFetch([]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
@@ -276,7 +273,7 @@ describe("chioTool: shape and type preservation", () => {
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
       description: "d",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => "ok",
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
@@ -300,13 +297,13 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const execute = vi.fn(async () => "ok");
     const wrapped = chioTool({
       verifyReceipt,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute,
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({})).resolves.toBe("ok");
+    await expect(run(wrapped, {})).resolves.toBe("ok");
     expect(verifyReceipt).toHaveBeenCalledOnce();
     expect(execute).toHaveBeenCalledOnce();
     expect(verifyReceipt.mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[0]!);
@@ -318,13 +315,13 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const execute = vi.fn(async () => "forbidden");
     const wrapped = chioTool({
       verifyReceipt,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute,
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({})).rejects.toBeInstanceOf(ChioToolError);
+    await expect(run(wrapped, {})).rejects.toBeInstanceOf(ChioToolError);
     expect(verifyReceipt).not.toHaveBeenCalled();
     expect(execute).not.toHaveBeenCalled();
   });
@@ -335,13 +332,13 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const verifyReceipt = vi.fn(() => ({ ...trustedReceiptVerifier(), signer_trusted: false }));
     const wrapped = chioTool({
       verifyReceipt,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute,
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({})).rejects.toMatchObject({ verdict: "incomplete" });
+    await expect(run(wrapped, {})).rejects.toMatchObject({ verdict: "incomplete" });
     expect(verifyReceipt).toHaveBeenCalledOnce();
     expect(execute).not.toHaveBeenCalled();
   });
@@ -350,7 +347,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -361,7 +358,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.url).toBe("http://127.0.0.1:9090/chio/evaluate");
@@ -429,7 +426,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     }) as typeof fetch;
 
     const wrapped = chioTool({
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -440,7 +437,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch: fetchImpl, sidecarUrl: "http://sidecar.test" },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
     expect(verifyBodies).toHaveLength(1);
     // The Rust /chio/verify handler deserializes the request body
@@ -477,7 +474,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     });
     const wrapped = chioTool({
       client,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -487,7 +484,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).resolves.toEqual({ doubled: 42 });
+    await expect(run(wrapped, { n: 21 })).resolves.toEqual({ doubled: 42 });
     expect(calls).toEqual([
       "http://custom-sidecar.test/chio/evaluate",
       "http://custom-sidecar.test/chio/verify",
@@ -518,7 +515,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
         sidecarUrl: "http://sidecar.test",
         timeoutMs: 1,
       },
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -528,7 +525,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       verdict: "sidecar_unreachable",
       receiptId: "r-verify-timeout",
     });
@@ -566,7 +563,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       throw new Error(`unexpected fetch in partial-authority test: ${url}`);
     }) as typeof fetch;
     const wrapped = chioTool({
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -577,7 +574,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch: fetchImpl, sidecarUrl: "http://sidecar.test" },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       verdict: "incomplete",
       receiptId: "r-partial-auth",
     });
@@ -598,7 +595,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       throw new Error(`unexpected fetch in unreachable-verify test: ${url}`);
     }) as typeof fetch;
     const wrapped = chioTool({
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -609,7 +606,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch: fetchImpl, sidecarUrl: "http://sidecar.test" },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       verdict: "sidecar_unreachable",
       receiptId: "r-verify-unreachable",
     });
@@ -626,7 +623,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
         receipt_id_valid: true,
         parameter_hash_valid: true,
       }),
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -637,7 +634,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       verdict: "incomplete",
       receiptId: "r-allow",
     });
@@ -647,7 +644,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => "ok",
       scope: {
         toolServer: "s",
@@ -657,7 +654,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    await wrapped.execute!({});
+    await run(wrapped, {});
     expect(calls[0]!.headers["x-chio-capability"]).toBe('{"id":"cap-xyz"}');
     expect(calls[0]!.body).toMatchObject({
       capability_id: "cap-xyz",
@@ -670,7 +667,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => "ok",
       scope: {
         toolServer: "s",
@@ -680,7 +677,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    await wrapped.execute!({});
+    await run(wrapped, {});
     expect(calls[0]!.body).toMatchObject({
       metadata: { trace_id: "trace-1" },
     });
@@ -690,7 +687,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch } = fakeFetch([lambdaAllowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -701,7 +698,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       reason: expect.stringContaining("sidecar response missing a recognizable receipt id"),
     });
   });
@@ -710,7 +707,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch } = fakeFetch([sidecarAllowEvaluateResponse()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -721,7 +718,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
   });
 
@@ -796,7 +793,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch } = fakeFetch([sidecarVerdictOnlyAllowResponse()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -807,16 +804,16 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
   });
 
-  it("forwards ToolExecuteOptions (abortSignal, toolCallId) to underlying execute", async () => {
+  it("forwards the execution options (abortSignal, toolCallId, context) to underlying execute", async () => {
     const { fetch } = fakeFetch([allowReceipt()]);
     let capturedOpts: unknown;
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async (_params: unknown, options) => {
         capturedOpts = options;
         return "ok";
@@ -830,6 +827,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       toolCallId: "call-1",
       abortSignal: controller.signal,
       messages: [],
+      context: {},
     });
     expect(capturedOpts).toMatchObject({ toolCallId: "call-1" });
     expect((capturedOpts as { abortSignal?: AbortSignal }).abortSignal).toBe(controller.signal);
@@ -839,7 +837,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
       resolveCapabilityToken: async (capabilityId) =>
@@ -847,7 +845,7 @@ describe("chioTool: allow path invokes underlying execute", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
     expect(calls[0]!.headers["x-chio-capability"]).toBe(CAPABILITY_TOKEN);
   });
@@ -856,13 +854,13 @@ describe("chioTool: allow path invokes underlying execute", () => {
     const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: { toolServer: "math", toolName: "double", capabilityId: "cap-1" },
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       name: "ChioToolError",
       verdict: "incomplete",
     });
@@ -875,13 +873,13 @@ describe("chioTool: deny path throws ChioToolError", () => {
     const { fetch } = fakeFetch([denyReceipt("not allowed", "FsDenylist", "r-42")]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ path: z.string() }),
+      inputSchema: z.object({ path: z.string() }),
       execute: async () => "should not run",
       scope: { toolServer: "fs", toolName: "read" },
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({ path: "/etc/passwd" })).rejects.toMatchObject({
+    await expect(run(wrapped, { path: "/etc/passwd" })).rejects.toMatchObject({
       name: "ChioToolError",
       verdict: "deny",
       guard: "FsDenylist",
@@ -901,7 +899,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
     let called = false;
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ path: z.string() }),
+      inputSchema: z.object({ path: z.string() }),
       execute: async () => {
         called = true;
         return "should not run";
@@ -910,7 +908,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({ path: "/etc/passwd" })).rejects.toMatchObject({
+    await expect(run(wrapped, { path: "/etc/passwd" })).rejects.toMatchObject({
       name: "ChioToolError",
       verdict: "deny",
       guard: "FsDenylist",
@@ -925,7 +923,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
     let called = false;
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         called = true;
         return "ran";
@@ -934,7 +932,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({})).rejects.toBeInstanceOf(ChioToolError);
+    await expect(run(wrapped, {})).rejects.toBeInstanceOf(ChioToolError);
     expect(called).toBe(false);
   });
 
@@ -942,13 +940,13 @@ describe("chioTool: deny path throws ChioToolError", () => {
     const { fetch } = fakeFetch([{ error: "boom", status: 500 }]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => "ran",
       scope: { toolServer: "s", toolName: "t" },
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({})).rejects.toMatchObject({
+    await expect(run(wrapped, {})).rejects.toMatchObject({
       name: "ChioToolError",
       verdict: "sidecar_unreachable",
     });
@@ -959,7 +957,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
     let called = false;
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         called = true;
         return "ran";
@@ -968,7 +966,7 @@ describe("chioTool: deny path throws ChioToolError", () => {
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({})).rejects.toMatchObject({
+    await expect(run(wrapped, {})).rejects.toMatchObject({
       name: "ChioToolError",
       verdict: "sidecar_unreachable",
     });
@@ -976,91 +974,217 @@ describe("chioTool: deny path throws ChioToolError", () => {
   });
 });
 
-// -- Streaming preservation ------------------------------------------------
+// -- Streaming (AI SDK 7 execute contract) ----------------------------------
 
-describe("chioTool: streaming preservation", () => {
-  it("passes ReadableStream return value through unchanged (no buffering)", async () => {
-    const stream = new ReadableStream<string>({
-      start(controller) {
-        controller.enqueue("a");
-        controller.enqueue("b");
-        controller.enqueue("c");
-        controller.close();
-      },
-    });
-
-    const { fetch } = fakeFetch([allowReceipt()]);
-    const wrapped = chioTool({
-      verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
-      execute: async () => stream,
-      scope: { toolServer: "s", toolName: "stream" },
-      clientOptions: { fetch },
-    });
-
-    const returned = await wrapped.execute!({});
-    // Critical: the wrapper must return the exact same ReadableStream
-    // instance -- no tee, no clone, no buffering.
-    expect(returned).toBe(stream);
-    expect(returned instanceof ReadableStream).toBe(true);
-
-    // The stream must still be uncollected and readable end-to-end.
-    const reader = (returned as ReadableStream<string>).getReader();
-    const chunks: string[] = [];
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-    expect(chunks).toEqual(["a", "b", "c"]);
-  });
-
-  it("preserves async generator return type (lazy iteration)", async () => {
+describe("chioTool: streaming", () => {
+  it("returns an async iterable synchronously for async generator tools", async () => {
     let yielded = 0;
-    async function* gen(): AsyncGenerator<number> {
+    const execute = vi.fn(async function* (): AsyncGenerator<number> {
       for (let i = 0; i < 3; i++) {
         yielded++;
         yield i;
       }
-    }
+    });
 
-    const { fetch } = fakeFetch([allowReceipt()]);
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
-      execute: async () => gen(),
+      inputSchema: z.object({}),
+      execute: Object.assign(async function* (): AsyncGenerator<number> {
+        yield* execute();
+      }),
       scope: { toolServer: "s", toolName: "gen" },
       clientOptions: { fetch },
     });
 
-    const returned = await wrapped.execute!({});
-    // Wrapper must not have iterated the generator -- `yielded` stays 0
-    // until the caller drives the iterator.
+    // The AI SDK checks Symbol.asyncIterator on the synchronous return value.
+    const returned = (wrapped.execute as (i: unknown, o: unknown) => unknown)({}, EXECUTE_OPTIONS);
+    expect(typeof (returned as AsyncIterable<number>)[Symbol.asyncIterator]).toBe("function");
+    expect(calls).toHaveLength(0);
     expect(yielded).toBe(0);
-    expect(typeof (returned as AsyncGenerator<number>)[Symbol.asyncIterator]).toBe("function");
 
     const collected: number[] = [];
-    for await (const n of returned as AsyncGenerator<number>) {
+    for await (const n of returned as AsyncIterable<number>) {
       collected.push(n);
     }
     expect(collected).toEqual([0, 1, 2]);
-    expect(yielded).toBe(3);
+    expect(calls).toHaveLength(1);
   });
 
-  it("returns the same reference identity for ReadableStream (object identity check)", async () => {
-    const stream = new ReadableStream<Uint8Array>();
+  it("does not run an async generator tool when Chio denies", async () => {
+    let started = false;
+    const { fetch } = fakeFetch([denyReceipt()]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({}),
+      execute: async function* (): AsyncGenerator<number> {
+        started = true;
+        yield 1;
+      },
+      scope: { toolServer: "s", toolName: "gen" },
+      clientOptions: { fetch },
+    });
+
+    const returned = (wrapped.execute as (i: unknown, o: unknown) => AsyncIterable<number>)({}, EXECUTE_OPTIONS);
+    await expect((async () => {
+      for await (const _ of returned) {
+        // drain
+      }
+    })()).rejects.toBeInstanceOf(ChioToolError);
+    expect(started).toBe(false);
+  });
+
+  it("passes a ReadableStream resolved by an async function through by reference", async () => {
+    const stream = new ReadableStream<string>();
     const { fetch } = fakeFetch([allowReceipt()]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => stream,
       scope: { toolServer: "s", toolName: "stream" },
       clientOptions: { fetch },
     });
 
-    const a = await wrapped.execute!({});
-    expect(Object.is(a, stream)).toBe(true);
+    expect(await run(wrapped, {})).toBe(stream);
+  });
+
+  it("rejects a non-generator function that synchronously returns an async iterable", async () => {
+    const { fetch } = fakeFetch([allowReceipt()]);
+    const wrapped = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({}),
+      execute: () => new ReadableStream<string>(),
+      scope: { toolServer: "s", toolName: "stream" },
+      clientOptions: { fetch },
+    });
+
+    await expect(run(wrapped, {})).rejects.toMatchObject({
+      name: "ChioToolError",
+      verdict: "incomplete",
+    });
+  });
+});
+
+// -- Tools Chio cannot mediate ----------------------------------------------
+
+describe("chioTool: tools without execute", () => {
+  it("refuses to wrap a client-side tool at construction", () => {
+    expect(() => chioTool({
+      inputSchema: z.object({}),
+      outputSchema: z.string(),
+      scope: { toolServer: "s", toolName: "t" },
+    })).toThrow(ChioToolError);
+  });
+});
+
+// -- AI SDK 7 integration ---------------------------------------------------
+
+const USAGE = {
+  inputTokens: { total: 1, noCache: 1, cacheRead: undefined, cacheWrite: undefined },
+  outputTokens: { total: 1, text: 1, reasoning: undefined },
+};
+
+function toolCallingModel() {
+  return new MockLanguageModelV4({
+    doGenerate: async () => ({
+      content: [{
+        type: "tool-call" as const,
+        toolCallId: "call-1",
+        toolName: "search",
+        input: JSON.stringify({ q: "x" }),
+      }],
+      finishReason: { unified: "tool-calls" as const, raw: undefined },
+      usage: USAGE,
+      warnings: [],
+    }),
+  });
+}
+
+function toolPartTypes(content: Array<{ type: string }>): string[] {
+  return content.map(part => part.type).filter(type => type.startsWith("tool-"));
+}
+
+describe("chioTool: generateText with AI SDK 7", () => {
+  it("executes the tool after Chio allows it", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const execute = vi.fn(async ({ q }: { q: string }) => `result:${q}`);
+    const search = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({ q: z.string() }),
+      execute,
+      scope: { toolServer: "web", toolName: "search" },
+      clientOptions: { fetch },
+    });
+
+    const result = await generateText({ model: toolCallingModel(), tools: { search }, prompt: "go" });
+
+    expect(toolPartTypes(result.content)).toEqual(["tool-call", "tool-result"]);
+    expect(execute).toHaveBeenCalledOnce();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.body).toMatchObject({ tool_server: "web", tool_name: "search" });
+  });
+
+  it("surfaces a Chio deny as a tool error without running the tool", async () => {
+    const { fetch } = fakeFetch([denyReceipt()]);
+    const execute = vi.fn(async () => "forbidden");
+    const search = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({ q: z.string() }),
+      execute,
+      scope: { toolServer: "web", toolName: "search" },
+      clientOptions: { fetch },
+    });
+
+    const result = await generateText({ model: toolCallingModel(), tools: { search }, prompt: "go" });
+
+    expect(toolPartTypes(result.content)).toEqual(["tool-call", "tool-error"]);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("still consults Chio when toolApproval auto-approves the call", async () => {
+    const { fetch, calls } = fakeFetch([denyReceipt()]);
+    const execute = vi.fn(async () => "forbidden");
+    const search = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({ q: z.string() }),
+      execute,
+      scope: { toolServer: "web", toolName: "search" },
+      clientOptions: { fetch },
+    });
+
+    const result = await generateText({
+      model: toolCallingModel(),
+      tools: { search },
+      toolApproval: { search: "approved" },
+      prompt: "go",
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(execute).not.toHaveBeenCalled();
+    expect(toolPartTypes(result.content)).toContain("tool-error");
+  });
+
+  it("does not contact Chio or run the tool while a call awaits user approval", async () => {
+    const { fetch, calls } = fakeFetch([allowReceipt()]);
+    const execute = vi.fn(async () => "pending");
+    const search = chioTool({
+      verifyReceipt: trustedReceiptVerifier,
+      inputSchema: z.object({ q: z.string() }),
+      execute,
+      scope: { toolServer: "web", toolName: "search" },
+      clientOptions: { fetch },
+    });
+
+    const result = await generateText({
+      model: toolCallingModel(),
+      tools: { search },
+      toolApproval: { search: "user-approval" },
+      prompt: "go",
+    });
+
+    expect(toolPartTypes(result.content)).toContain("tool-approval-request");
+    expect(execute).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
   });
 });
 
@@ -1072,14 +1196,14 @@ describe("chioTool: client reuse", () => {
     const client = new ChioClient({ fetch });
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => "ok",
       scope: { toolServer: "s", toolName: "t" },
       client,
     });
 
-    await wrapped.execute!({});
-    await wrapped.execute!({});
+    await run(wrapped, {});
+    await run(wrapped, {});
     expect(calls).toHaveLength(2);
     expect(calls[0]!.url).toBe(calls[1]!.url);
   });
@@ -1098,7 +1222,7 @@ describe("chioTool: verdict lifting across wire shapes", () => {
     const { fetch } = fakeFetch([sidecarVerdictOnlyAllowResponse("r-tagged-allow")]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -1109,7 +1233,7 @@ describe("chioTool: verdict lifting across wire shapes", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
   });
 
@@ -1140,7 +1264,7 @@ describe("chioTool: verdict lifting across wire shapes", () => {
     const { fetch } = fakeFetch([malformedResponse]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -1151,7 +1275,7 @@ describe("chioTool: verdict lifting across wire shapes", () => {
       clientOptions: { fetch },
     });
 
-    const result = await wrapped.execute!({ n: 21 });
+    const result = await run(wrapped, { n: 21 });
     expect(result).toEqual({ doubled: 42 });
   });
 
@@ -1174,7 +1298,7 @@ describe("chioTool: verdict lifting across wire shapes", () => {
     const { fetch } = fakeFetch([plainStringShape]);
     const wrapped = chioTool({
       verifyReceipt: trustedReceiptVerifier,
-      parameters: z.object({ n: z.number() }),
+      inputSchema: z.object({ n: z.number() }),
       execute: async ({ n }: { n: number }) => ({ doubled: n * 2 }),
       scope: {
         toolServer: "math",
@@ -1185,7 +1309,7 @@ describe("chioTool: verdict lifting across wire shapes", () => {
       clientOptions: { fetch },
     });
 
-    await expect(wrapped.execute!({ n: 21 })).rejects.toMatchObject({
+    await expect(run(wrapped, { n: 21 })).rejects.toMatchObject({
       name: "ChioToolError",
     });
   });

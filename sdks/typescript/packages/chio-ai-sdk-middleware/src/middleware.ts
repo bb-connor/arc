@@ -1,23 +1,15 @@
+import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
 import { evaluateWithChio, type ChioRuntime } from "./runtime.js";
 
-export interface LanguageModelInvocation {
-  tools?: unknown;
-  toolCalls?: unknown;
-  experimental_toolCalls?: unknown;
-  prompt?: unknown;
-  messages?: unknown;
-  [key: string]: unknown;
-}
+/** Call options the AI SDK passes to a language-model middleware hook. */
+export type LanguageModelInvocation =
+  Parameters<NonNullable<LanguageModelMiddleware["transformParams"]>>[0]["params"];
 
-export interface LanguageModelLike {
-  doGenerate?: (options: LanguageModelInvocation) => Promise<unknown>;
-  doStream?: (options: LanguageModelInvocation) => Promise<unknown>;
-  [key: string]: unknown;
-}
+/** Any model accepted by the AI SDK's `wrapLanguageModel`. */
+export type ChioWrappableModel = Parameters<typeof wrapLanguageModel>[0]["model"];
 
 export interface ToolUseCandidate {
   name: string;
-  arguments?: unknown;
 }
 
 export interface ChioEvaluation {
@@ -154,62 +146,34 @@ export class ChioMiddlewareDeniedError extends Error {
   }
 }
 
-/// AI SDK language-model middleware bundle. Consumers pass this object
-/// into the AI SDK's `wrapLanguageModel({ model, middleware })` and the
-/// SDK invokes `wrapGenerate`/`wrapStream` for every doGenerate/doStream
-/// call. The `wrapLanguageModel` method on the returned object is a
-/// convenience for callers that want to wrap a model directly without
-/// going through the AI SDK helper.
-export interface ChioAiSdkMiddleware {
-  /// AI SDK middleware hook invoked once per `doGenerate` call.
-  wrapGenerate: <Args extends LanguageModelInvocation, Result>(input: {
-    doGenerate: (args: Args) => Promise<Result>;
-    params: Args;
-  }) => Promise<Result>;
-  /// AI SDK middleware hook invoked once per `doStream` call.
-  wrapStream: <Args extends LanguageModelInvocation, Result>(input: {
-    doStream: (args: Args) => Promise<Result>;
-    params: Args;
-  }) => Promise<Result>;
-  /// Convenience helper that wraps a model directly with the same
-  /// verdict-evaluation pipeline. Equivalent to `wrapWithChio(model, opts)`.
-  wrapLanguageModel: <Model extends LanguageModelLike>(model: Model) => Model;
-}
+/// AI SDK 7 language-model middleware. `wrapLanguageModel` calls
+/// `wrapGenerate` for `generateText` and `wrapStream` for `streamText`; each
+/// evaluates every tool declared on the call before delegating to the model.
+export type ChioAiSdkMiddleware = LanguageModelMiddleware & {
+  readonly specificationVersion: "v4";
+};
 
 export function createChioMiddleware(options: ChioMiddlewareOptions = {}): ChioAiSdkMiddleware {
   return {
+    specificationVersion: "v4",
     async wrapGenerate({ doGenerate, params }) {
       await evaluateToolBoundary(params, options);
-      return doGenerate(params);
+      return doGenerate();
     },
     async wrapStream({ doStream, params }) {
       await evaluateToolBoundary(params, options);
-      return doStream(params);
-    },
-    wrapLanguageModel<Model extends LanguageModelLike>(model: Model): Model {
-      return wrapWithChio(model, options);
+      return doStream();
     },
   };
 }
 
-export function wrapWithChio<Model extends LanguageModelLike>(
-  model: Model,
+/// Wrap a model with the Chio middleware via the AI SDK's own
+/// `wrapLanguageModel`, so provider, model id and supported URLs carry over.
+export function wrapWithChio(
+  model: ChioWrappableModel,
   options: ChioMiddlewareOptions = {},
-): Model {
-  const wrapped: LanguageModelLike = { ...model };
-  if (typeof model.doGenerate === "function") {
-    wrapped.doGenerate = async (request: LanguageModelInvocation) => {
-      await evaluateToolBoundary(request, options);
-      return model.doGenerate!(request);
-    };
-  }
-  if (typeof model.doStream === "function") {
-    wrapped.doStream = async (request: LanguageModelInvocation) => {
-      await evaluateToolBoundary(request, options);
-      return model.doStream!(request);
-    };
-  }
-  return wrapped as Model;
+): ReturnType<typeof wrapLanguageModel> {
+  return wrapLanguageModel({ model, middleware: createChioMiddleware(options) });
 }
 
 async function evaluateToolBoundary(
@@ -264,36 +228,8 @@ function nonAuthorizingEvaluation(evaluation: ChioEvaluation): ChioEvaluation {
 }
 
 function collectToolUses(request: LanguageModelInvocation): ToolUseCandidate[] {
-  const explicitCalls = request.toolCalls ?? request.experimental_toolCalls;
-  if (Array.isArray(explicitCalls)) {
-    const candidates = explicitCalls
-      .map(candidateFromCall)
-      .filter((candidate): candidate is ToolUseCandidate => candidate != null);
-    if (candidates.length > 0) {
-      return candidates;
-    }
-  }
-
-  if (request.tools != null && typeof request.tools === "object") {
-    return Object.keys(request.tools as Record<string, unknown>)
-      .sort()
-      .map(name => ({ name }));
-  }
-
-  return [];
-}
-
-function candidateFromCall(call: unknown): ToolUseCandidate | undefined {
-  if (call == null || typeof call !== "object") {
-    return undefined;
-  }
-  const record = call as Record<string, unknown>;
-  const name = record["toolName"] ?? record["tool_name"] ?? record["name"];
-  if (typeof name !== "string" || name.length === 0) {
-    return undefined;
-  }
-  return {
-    name,
-    arguments: record["args"] ?? record["arguments"] ?? record["input"],
-  };
+  return (request.tools ?? [])
+    .map(tool => tool.name)
+    .sort()
+    .map(name => ({ name }));
 }

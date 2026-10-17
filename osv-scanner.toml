@@ -2,6 +2,5 @@
 # OSV 2.3.6 directory-local configs do not propagate to child directories.
 # Do not pass this file with --config: that overrides every directory's config.
 #
-# The root Bun lock has no accepted advisories. The standalone ai-sdk peer-test
-# disposition lives beside its package-lock.json.
+# The root Bun lock has no accepted advisories.
 # The Rust cargo-audit and cargo-deny gates are unchanged.
