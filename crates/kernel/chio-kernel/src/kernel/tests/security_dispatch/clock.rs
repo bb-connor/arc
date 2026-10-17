@@ -142,35 +142,21 @@ fn dpop_rule_codes_survive_root_and_nested_signed_denials() -> TestResult {
 }
 
 #[test]
-fn installed_replay_source_and_default_approval_follow_the_kernel_clock() -> TestResult {
+fn default_approval_store_follows_the_kernel_clock() -> TestResult {
     use crate::replay_retention::tests::TestClock;
     let clock = Arc::new(TestClock::new(100));
-    let mut kernel = ChioKernel::new_with_clock(make_config(), clock.clone());
-    kernel.set_dpop_replay_source(
-        DpopNonceStore::new(2, Duration::from_secs(60))
-            .expect("positive replay store test capacities"),
-    )?;
-    let dpop = kernel.dpop_nonce_store.as_ref().ok_or("DPoP store")?;
+    let kernel = ChioKernel::new_with_clock(make_config(), clock.clone());
     let approval = kernel
         .approval_replay_store
         .as_ref()
         .ok_or("approval store")?;
-    assert!(dpop.check_and_insert_until("nonce", "cap", 110)?);
     assert!(approval.reserve_for_dispatch("subject", "request", "intent", 110, "owner")?);
     clock.fail();
-    assert!(matches!(
-        dpop.check_and_insert_until("next", "cap", 110),
-        Err(KernelError::Clock(ClockError::Unavailable))
-    ));
     assert!(matches!(
         approval.reserve_for_dispatch("subject", "next", "intent", 110, "owner"),
         Err(KernelError::Clock(ClockError::Unavailable))
     ));
     clock.set(110, 10);
-    assert!(matches!(
-        dpop.check_and_insert_until("next", "cap", 110),
-        Err(KernelError::Dpop(crate::dpop::DpopError::Expired))
-    ));
     assert!(matches!(
         approval.reserve_for_dispatch("subject", "next", "intent", 110, "owner"),
         Err(KernelError::ApprovalReplay(

@@ -692,22 +692,6 @@ fn dispatch_credential_drop_contains_rollback_panic_during_unwind(
 }
 
 #[test]
-fn replay_source_retains_marker_under_capacity_pressure() -> Result<(), Box<dyn std::error::Error>>
-{
-    let mut kernel = make_kernel(make_config());
-    kernel.set_dpop_replay_source(dpop::DpopNonceStore::new(1, Duration::from_secs(60))?)?;
-    let source = kernel.dpop_nonce_store.as_ref().ok_or("replay source")?;
-    let expiry = current_unix_timestamp() + 60;
-    assert!(source.check_and_insert_through("nonce-a", "cap", expiry)?);
-    assert!(matches!(
-        source.check_and_insert_through("nonce-b", "cap", expiry),
-        Err(KernelError::Dpop(dpop::DpopError::Capacity))
-    ));
-    assert!(!source.check_and_insert_through("nonce-a", "cap", expiry)?);
-    Ok(())
-}
-
-#[test]
 fn committed_operation_owned_dpop_survives_reservation_drop(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let agent = make_keypair();

@@ -3444,19 +3444,6 @@ pub const KERNEL_DPOP_MISSING_PROOF: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-kernel"],
 };
 
-pub const KERNEL_DPOP_MISSING_STORE: ErrorCodeSpec = ErrorCodeSpec {
-    urn: "urn:chio:error:kernel:dpop-missing-store",
-    domain: Domain::Kernel,
-    severity: Severity::Error,
-    summary: "Security boundary refused: dpop-missing-store.",
-    help: "Restore the named invariant and present fresh evidence for the exact request.",
-    string_code: "CHIO-KERNEL-DPOP-MISSING-STORE",
-    jsonrpc_code: None,
-    since: "0.1.0",
-    stability: "stable",
-    consumed_by: &["chio-kernel"],
-};
-
 pub const KERNEL_DPOP_NOT_YET_VALID: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:dpop-not-yet-valid",
     domain: Domain::Kernel,
@@ -3961,7 +3948,6 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_DPOP_IDENTITY_OVERFLOW,
     KERNEL_DPOP_MISSING_CONFIGURATION,
     KERNEL_DPOP_MISSING_PROOF,
-    KERNEL_DPOP_MISSING_STORE,
     KERNEL_DPOP_NOT_YET_VALID,
     KERNEL_DPOP_REPLAYED,
     KERNEL_DPOP_SCHEMA,

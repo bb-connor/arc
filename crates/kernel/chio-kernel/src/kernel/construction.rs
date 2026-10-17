@@ -347,7 +347,6 @@ impl ChioKernel {
             checkpoint_batch_size,
             checkpoint_seq_counter: AtomicU64::new(0),
             last_checkpoint_seq: AtomicU64::new(0),
-            dpop_nonce_store: None,
             dpop_authority: None,
             execution_nonce_config: None,
             execution_nonce_store: None,
@@ -1694,31 +1693,6 @@ impl ChioKernel {
     #[must_use]
     pub fn emergency_stop_reason(&self) -> Option<String> {
         self.stop_control.heads().host_reason()
-    }
-
-    /// Install a pristine volatile source for explicit replay-history retirement.
-    /// This does not configure authority or enable DPoP invocation.
-    pub fn set_dpop_replay_source(
-        &mut self,
-        mut nonce_store: dpop::DpopNonceStore,
-    ) -> Result<(), KernelError> {
-        nonce_store.bind_clock(self.clock.clone())?;
-        self.dpop_nonce_store = Some(nonce_store);
-        Ok(())
-    }
-
-    /// Access the actual configured volatile source for explicit retirement.
-    /// A preview is data only. Operators must pin its instance and quiesce
-    /// source consumers before sealing. This neither imports history nor
-    /// enables a restart-safe authority; replacing the store cannot verify
-    /// a previously pinned seal.
-    pub fn dpop_replay_source(
-        &self,
-    ) -> Result<&dyn dpop::replay_source::DpopReplaySourcePort, KernelError> {
-        self.dpop_nonce_store
-            .as_ref()
-            .map(|store| -> &dyn dpop::replay_source::DpopReplaySourcePort { store })
-            .ok_or_else(|| KernelError::Dpop(crate::dpop::DpopError::MissingStore))
     }
 
     pub fn requires_web3_evidence(&self) -> bool {

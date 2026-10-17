@@ -61,14 +61,6 @@ impl SourceState {
     pub(super) fn observe_creation(&mut self, now: ClockReading) {
         self.created.get_or_insert(now);
     }
-    pub(super) fn require_pristine(&self) -> Result<(), KernelError> {
-        if self.created.is_some() || self.revision != 0 || self.sealed.is_some() {
-            return Err(invalid(
-                "cannot replace the clock of an observed replay source",
-            ));
-        }
-        Ok(())
-    }
 
     pub(super) fn begin_mutation(&mut self) -> Result<(), KernelError> {
         self.ensure_unsealed()?;
