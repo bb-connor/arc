@@ -77,6 +77,7 @@ impl BearerRoleProbe {
         Self { values }
     }
 
+    #[cfg(test)]
     pub fn with_values(values: BTreeMap<&'static str, String>) -> Self {
         Self { values }
     }

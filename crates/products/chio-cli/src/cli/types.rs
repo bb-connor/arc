@@ -895,7 +895,7 @@ pub(crate) enum Commands {
     /// 6. `chio.yaml` schema validity.
     ///
     /// Exit codes follow the worst observed severity: 0 for ok / info /
-    /// warning, 1 for error, 2 for fatal. The optional `--fix` flag
+    /// warning, 1 for error. The optional `--fix` flag
     /// runs idempotent repairs only; destructive operations are rejected.
     Doctor(DoctorArgs),
 

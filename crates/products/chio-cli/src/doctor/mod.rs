@@ -17,13 +17,6 @@
 //!   `chio_kernel_dispatch_inflight` gauge.
 //! - `chio_yaml`: `spec/schemas/chio-wire/v1/` schemas anchor the schema
 //!   check.
-//!
-//! Test-injection helpers (`with_root`, `with_endpoint`, ...) are
-//! exercised by the per-probe integration tests under
-//! `crates/products/chio-cli/tests/doctor_*`. The binary path itself drives the
-//! public `Probe` trait, so the helpers are unused under `--bin chio`; each
-//! module carries a scoped dead-code allow for that reason.
-#![allow(dead_code)]
 
 pub mod chio_yaml;
 pub mod cosign;
@@ -58,13 +51,11 @@ impl DoctorRun {
     /// - `Ok` / `Info`: 0
     /// - `Warning`: 0 (non-blocking)
     /// - `Error`: 1
-    /// - `Fatal`: 2
     #[must_use]
     pub const fn exit_code(&self) -> i32 {
         match self.worst {
             ProbeSeverity::Ok | ProbeSeverity::Info | ProbeSeverity::Warning => 0,
             ProbeSeverity::Error => 1,
-            ProbeSeverity::Fatal => 2,
         }
     }
 }

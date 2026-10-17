@@ -17,6 +17,7 @@ pub struct OtelProbe {
 }
 
 impl OtelProbe {
+    #[cfg(test)]
     #[must_use]
     pub fn with_endpoint(mut self, endpoint: impl Into<String>) -> Self {
         self.endpoint_override = Some(endpoint.into());

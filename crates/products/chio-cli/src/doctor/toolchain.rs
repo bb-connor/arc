@@ -22,6 +22,7 @@ pub struct ToolchainProbe {
 }
 
 impl ToolchainProbe {
+    #[cfg(test)]
     #[must_use]
     pub fn with_root(mut self, root: PathBuf) -> Self {
         self.root_override = Some(root);
@@ -29,6 +30,7 @@ impl ToolchainProbe {
     }
 
     /// Inject a fake `cargo --version` string. Test-only.
+    #[cfg(test)]
     #[must_use]
     pub fn with_cargo_version(mut self, version: impl Into<String>) -> Self {
         self.cargo_version_override = Some(version.into());

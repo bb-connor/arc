@@ -13,7 +13,7 @@ pub enum PolicyRef {
     WorkspacePath(PathBuf),
 }
 
-/// Errors surfaced by [`PolicyRef::parse`] and [`PolicyRef::resolve`].
+/// Errors surfaced by [`PolicyRef::parse`] and [`PolicyRef::load_workspace_policy`].
 #[derive(Debug, thiserror::Error)]
 pub enum PolicyRefError {
     /// The supplied string requested an unsupported policy-ref shape.
@@ -24,20 +24,6 @@ pub enum PolicyRefError {
     /// loaded by the underlying [`load_policy`] flow.
     #[error("workspace policy path failed to load: {0}")]
     Load(String),
-}
-
-/// Resolved-policy summary used by reports. For the full materialized
-/// [`policy::LoadedPolicy`] use [`PolicyRef::load_workspace_policy`].
-#[derive(Debug, Clone)]
-pub struct ResolvedPolicy {
-    /// Path on disk the policy was loaded from.
-    pub source_path: Option<PathBuf>,
-    /// Stable identity (source_hash + runtime_hash) of the loaded
-    /// policy.
-    pub identity: policy::PolicyIdentity,
-    /// Display label used in human reports; matches the original input
-    /// to `--against` so logs round-trip cleanly.
-    pub label: String,
 }
 
 impl PolicyRef {
@@ -69,25 +55,6 @@ impl PolicyRef {
     pub fn label(&self) -> String {
         match self {
             Self::WorkspacePath(path) => path.display().to_string(),
-        }
-    }
-
-    /// Resolve the policy reference into a [`ResolvedPolicy`] summary.
-    pub fn resolve(&self) -> Result<ResolvedPolicy, PolicyRefError> {
-        match self {
-            Self::WorkspacePath(path) => {
-                let loaded = load_policy(path).map_err(|e| {
-                    PolicyRefError::Load(format!(
-                        "failed to load policy from {}: {e}",
-                        path.display()
-                    ))
-                })?;
-                Ok(ResolvedPolicy {
-                    source_path: Some(path.clone()),
-                    identity: loaded.identity.clone(),
-                    label: self.label(),
-                })
-            }
         }
     }
 
@@ -226,7 +193,7 @@ mod replay_policy_ref_tests {
         // a parse error, so callers can distinguish unsupported ref
         // shapes from "your file is missing".
         let parsed = PolicyRef::parse("path:/definitely/does/not/exist.yaml").unwrap();
-        let err = parsed.resolve().unwrap_err();
+        let err = parsed.load_workspace_policy().map(|_| ()).unwrap_err();
         assert!(matches!(err, PolicyRefError::Load(_)), "got {err:?}");
     }
 

@@ -266,41 +266,6 @@ pub fn validate_redaction_pass(frame: &chio_tee_frame::Frame) -> Result<(), Vali
     )))
 }
 
-/// Per-frame validation report suitable for human and `--json` rendering.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FrameValidation {
-    /// 1-based source line.
-    pub line: u64,
-    /// Whether all enabled validators passed.
-    pub ok: bool,
-    /// Human-readable failure detail, when `!ok`.
-    pub error: Option<String>,
-    /// Canonical exit code corresponding to `error`, when `!ok`.
-    pub exit_code: Option<i32>,
-}
-
-impl FrameValidation {
-    /// Build a passing report.
-    pub fn pass(line: u64) -> Self {
-        Self {
-            line,
-            ok: true,
-            error: None,
-            exit_code: None,
-        }
-    }
-
-    /// Build a failing report from a `ValidateError`.
-    pub fn fail(line: u64, err: &ValidateError) -> Self {
-        Self {
-            line,
-            ok: false,
-            error: Some(err.to_string()),
-            exit_code: Some(err.exit_code()),
-        }
-    }
-}
-
 /// Run the full validation pipeline against a single frame.
 /// Skips tenant-sig verification when `tenant_pubkey` is `None`.
 pub fn validate_frame(
@@ -525,22 +490,6 @@ mod replay_validate_tests {
         // An unsigned placeholder tenant_sig is accepted when pubkey verification is skipped.
         let frame = good_frame_with_invocation(canonical_invocation());
         validate_frame(&frame, "chio-tee-frame.v1", None).unwrap();
-    }
-
-    #[test]
-    fn frame_validation_pass_and_fail_constructors() {
-        let pass = FrameValidation::pass(7);
-        assert_eq!(pass.line, 7);
-        assert!(pass.ok);
-        assert!(pass.error.is_none());
-        assert!(pass.exit_code.is_none());
-
-        let err = ValidateError::SchemaVersion("nope".to_string());
-        let fail = FrameValidation::fail(9, &err);
-        assert_eq!(fail.line, 9);
-        assert!(!fail.ok);
-        assert_eq!(fail.exit_code, Some(EXIT_SCHEMA_MISMATCH));
-        assert!(fail.error.unwrap().contains("nope"));
     }
 
     #[test]

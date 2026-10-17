@@ -20,7 +20,7 @@ fn doctor_emits_toolchain_probe_and_attaches_msrv_context() {
         .expect("toolchain report present");
     // Severity must be one of the registry-anchored tiers.
     let severity = toolchain["severity"].as_str().unwrap();
-    assert!(["ok", "info", "warning", "error", "fatal"].contains(&severity));
+    assert!(["ok", "info", "warning", "error"].contains(&severity));
     // Toolchain probe always attaches a cargo_version context line on
     // success; on failure it still emits the same key.
     let context = toolchain["context"].as_array().unwrap();

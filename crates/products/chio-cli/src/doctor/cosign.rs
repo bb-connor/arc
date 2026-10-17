@@ -32,12 +32,14 @@ impl Default for CosignProbe {
 }
 
 impl CosignProbe {
+    #[cfg(test)]
     #[must_use]
     pub fn with_bundle(mut self, bundle: PathBuf) -> Self {
         self.bundle_override = Some(bundle);
         self
     }
 
+    #[cfg(test)]
     #[must_use]
     pub fn with_max_age_days(mut self, days: u64) -> Self {
         self.max_age_days = days;

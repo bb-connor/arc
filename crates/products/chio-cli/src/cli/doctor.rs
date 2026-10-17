@@ -34,10 +34,8 @@ pub struct DoctorArgs {
 /// `cmd_doctor` short-circuits the generic `dispatch.rs` `exit(1)` path
 /// so the process exit code matches the contract documented on
 /// `Commands::Doctor` and on `DoctorRun::exit_code()`: 0 for ok / info /
-/// warning, 1 for error, 2 for fatal. The doctor JSON envelope reports
-/// the same numeric code via the `exit_code` field, so downstream CI
-/// gates that branch on Fatal vs Error stay consistent with both
-/// channels.
+/// warning, 1 for error. The doctor JSON envelope reports the same
+/// numeric code via the `exit_code` field.
 pub fn cmd_doctor(args: &DoctorArgs, json_output: bool) -> Result<(), CliError> {
     let config = ProbeConfig {
         skip_network: args.skip_network || std::env::var("CHIO_DOCTOR_SKIP_NETWORK").is_ok(),
@@ -65,10 +63,8 @@ pub fn cmd_doctor(args: &DoctorArgs, json_output: bool) -> Result<(), CliError> 
     if code == 0 {
         Ok(())
     } else {
-        // Bypass the generic `dispatch.rs` error renderer + exit(1) so
-        // the worst-severity exit code (1 for Error, 2 for Fatal)
-        // reaches the process and stays in lockstep with the
-        // `exit_code` field already serialized in the JSON envelope.
+        // The process exit code stays in lockstep with the `exit_code`
+        // field already serialized in the JSON envelope.
         std::process::exit(code);
     }
 }
@@ -116,7 +112,6 @@ pub(crate) fn write_doctor_report(
         ProbeSeverity::Info => "[info]",
         ProbeSeverity::Warning => "[warn]",
         ProbeSeverity::Error => "[error]",
-        ProbeSeverity::Fatal => "[fatal]",
     };
     writeln!(
         writer,

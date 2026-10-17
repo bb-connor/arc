@@ -99,16 +99,6 @@ impl StorePartition {
             }),
         }
     }
-
-    /// Return the `run_id` of a replay partition, or `None` for
-    /// production. Used by the dispatcher to mint the receipt-id
-    /// prefix.
-    pub fn run_id(&self) -> Option<&str> {
-        match self {
-            Self::Production => None,
-            Self::Replay { run_id } => Some(run_id),
-        }
-    }
 }
 
 /// Replay-receipt minting helper. The wrapper exists so callers cannot
@@ -156,11 +146,6 @@ impl ReplayPartition {
         }
         Ok(format!("replay:{}:{}", self.run_id, frame_id))
     }
-}
-
-/// Namespace an extracted run_id as `(run_id, frame_id) -> id`.
-pub fn replay_receipt_id(run_id: &str, frame_id: &str) -> String {
-    format!("replay:{run_id}:{frame_id}")
 }
 
 #[cfg(test)]
@@ -268,17 +253,6 @@ mod replay_receipt_partition_tests {
     }
 
     #[test]
-    fn replay_partition_run_id_returns_some() {
-        let p = StorePartition::replay_with_run_id("run-7").unwrap();
-        assert_eq!(p.run_id(), Some("run-7"));
-    }
-
-    #[test]
-    fn production_partition_run_id_returns_none() {
-        assert_eq!(StorePartition::Production.run_id(), None);
-    }
-
-    #[test]
     fn replay_partition_constructor_rejects_production() {
         let err = ReplayPartition::new(&StorePartition::Production).unwrap_err();
         assert!(matches!(err, PartitionError::NamespaceMismatch(_)));
@@ -308,19 +282,13 @@ mod replay_receipt_partition_tests {
     }
 
     #[test]
-    fn replay_receipt_id_function_matches_method() {
-        let store = StorePartition::replay_with_run_id("run-42").unwrap();
-        let rp = ReplayPartition::new(&store).unwrap();
-        let method_form = rp.replay_receipt_id("frame-7").unwrap();
-        let function_form = replay_receipt_id("run-42", "frame-7");
-        assert_eq!(method_form, function_form);
-        assert_eq!(method_form, "replay:run-42:frame-7");
-    }
-
-    #[test]
     fn replay_receipt_id_uses_run_frame_format() {
         // Pinned literal: "replay:<run_id>:<frame_id>".
-        let id = replay_receipt_id("run-x", "frame-y");
+        let store = StorePartition::replay_with_run_id("run-x").unwrap();
+        let id = ReplayPartition::new(&store)
+            .unwrap()
+            .replay_receipt_id("frame-y")
+            .unwrap();
         assert_eq!(id, "replay:run-x:frame-y");
         assert!(id.starts_with("replay:"));
         let parts: Vec<&str> = id.split(':').collect();

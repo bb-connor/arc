@@ -337,7 +337,6 @@ pub(super) struct ProvisionedCeilings {
     pub(super) forbidden_paths: BTreeSet<PathBuf>,
 }
 
-#[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyInput {
     pub(super) max_artifact_bytes: u64,
     pub(super) receipt_rollback_anchor_root: PathBuf,
@@ -367,13 +366,11 @@ pub(super) struct ProvisionedCagePolicyInput {
 /// Constructs and signs the exact private policy types consumed by native MCP
 /// launch. Runtime launch admission requires the durable migration
 /// registration the policy pins.
-#[allow(dead_code)]
 pub(super) struct ProvisionedCagePolicyFactory {
     input: ProvisionedCagePolicyInput,
     migration_key: chio_security_types::EnterpriseMigrationKey,
 }
 
-#[allow(dead_code)]
 impl ProvisionedCagePolicyFactory {
     pub(super) fn new(input: ProvisionedCagePolicyInput) -> Result<Self, CliError> {
         if !(1..=256 * 1024 * 1024).contains(&input.max_artifact_bytes) {
@@ -586,7 +583,6 @@ impl ProvisionedCagePolicyFactory {
     }
 }
 
-#[allow(dead_code)]
 fn declared_paths(paths: Option<&[String]>) -> BTreeSet<PathBuf> {
     paths
         .unwrap_or_default()
@@ -595,7 +591,6 @@ fn declared_paths(paths: Option<&[String]>) -> BTreeSet<PathBuf> {
         .collect()
 }
 
-#[allow(dead_code)]
 fn is_sha256_hex(value: &str) -> bool {
     value.len() == 64
         && value
@@ -738,7 +733,6 @@ pub(crate) fn load_native_mcp_launch(
 /// signature, the bound server, the launch contract and the migration ledger
 /// registration it pins. Composing the launch retains the cage helper and the
 /// target on the enforcing host, which is the edge's and the preflight's job.
-#[allow(dead_code)]
 pub(super) fn validate_provisioned_policy(
     path: &Path,
     trusted_policy_signer: &chio_core::PublicKey,
