@@ -1104,6 +1104,7 @@ async fn a_route_stop_reaches_a_purchase_kernel_built_before_it() -> TestResult 
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let request = reveal_request(&RevealRequestInputs {
+        authority: &lane.authority,
         request_id: "req-stop-retained-kernel",
         capability: &lane.purchase.capability,
         buyer: &lane.buyer,
