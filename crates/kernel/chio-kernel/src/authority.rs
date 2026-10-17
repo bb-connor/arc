@@ -1227,6 +1227,10 @@ pub(crate) mod tests {
         };
 
         assert!(authority.trusted_public_keys().is_empty());
+        assert!(matches!(
+            authority.authority_public_key(),
+            Err(KernelError::CapabilityIssuanceFailed(_))
+        ));
         assert!(refused(authority.issue_capability(
             &subject,
             ChioScope::default(),

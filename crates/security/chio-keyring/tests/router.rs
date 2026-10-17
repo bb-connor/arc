@@ -301,6 +301,57 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     KeyringSigningRouter::open(reopened_store, Box::new(ready.new)).test_unwrap();
 }
 
+/// Panics on an identity read once armed, while the selector write lock is held.
+struct PanicOnArmedIdentityBackend {
+    inner: Ed25519Backend,
+    armed: Arc<AtomicBool>,
+}
+
+impl SigningBackend for PanicOnArmedIdentityBackend {
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+        if self.armed.load(Ordering::SeqCst) {
+            panic!("staged identity read panicked");
+        }
+        self.inner.public_key()
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
+        self.inner.sign_bytes(message)
+    }
+}
+
+#[test]
+fn keyring_public_key_errors_when_selector_lock_is_poisoned() {
+    let directory = private_tempdir().test_unwrap();
+    let path = trusted_temp_path(&directory, "router.sqlite");
+    let ready = ready_log(&path);
+    let router = KeyringSigningRouter::open(Arc::clone(&ready.store), Box::new(ready.old.clone()))
+        .test_unwrap();
+    let armed = Arc::new(AtomicBool::new(false));
+    let mut staged = router
+        .stage_pending(
+            ready.rotation.body.event_id.clone(),
+            Box::new(PanicOnArmedIdentityBackend {
+                inner: ready.new.clone(),
+                armed: Arc::clone(&armed),
+            }),
+        )
+        .test_unwrap();
+    armed.store(true, Ordering::SeqCst);
+
+    let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        router.activate_rotation(&mut staged, &ready.checkpoint_hash, &ready.operator)
+    }));
+    assert!(matches!(panicked, Err(payload)
+        if payload.downcast_ref::<&str>().copied() == Some("staged identity read panicked")));
+
+    assert!(matches!(
+        router.active_public_key(),
+        Err(chio_keyring::KeyringError::Synchronization)
+    ));
+    assert!(router.sign_bytes_with_identity(b"m").is_err());
+}
+
 struct PanicOnDropBackend(Ed25519Backend);
 
 impl SigningBackend for PanicOnDropBackend {
