@@ -7,7 +7,8 @@ mod explanation;
 mod preflight;
 
 pub use decode::{
-    decode_contract, decode_contract_with_limits, decode_recovery_capability, RecoveryDecodeLimits,
+    check_contract_limits, decode_contract, decode_contract_with_limits,
+    decode_recovery_capability, RecoveryDecodeLimits,
 };
 pub use domains::{RecoveryDigestDomain, RECOVERY_DIGEST_DOMAINS};
 pub use explanation::*;

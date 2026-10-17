@@ -3,6 +3,8 @@
 
 #[path = "work_contracts/positives.rs"]
 mod positives;
+#[path = "work_contracts/rec0a.rs"]
+mod rec0a;
 
 use chio_runtime_core::work::{
     decode_work_join_inputs, decode_work_request, decode_work_response, WorkContractError,
@@ -619,6 +621,9 @@ fn corpus() -> TestResult<Corpus> {
         false,
         Some("work.bounds"),
     )?);
+    for (name, contract, value, error) in rec0a::vectors()? {
+        vectors.push(vector(&name, contract, &value, false, Some(error))?);
+    }
     Ok(Corpus {
         format_version: 1,
         vectors,

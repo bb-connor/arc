@@ -1,7 +1,8 @@
 use chio_core_types::{
     canonical::CanonicalBytes,
     recovery::{
-        decode_contract, decode_contract_with_limits, RecoveryDecodeLimits, RECOVERY_DIGEST_DOMAINS,
+        check_contract_limits, decode_contract, decode_contract_with_limits, RecoveryDecodeLimits,
+        RECOVERY_DIGEST_DOMAINS,
     },
 };
 use chio_security_types::recovery::{
@@ -140,6 +141,37 @@ fn nested_allocation_and_aggregate_budgets_refuse_before_typed_decode() -> Resul
     );
     assert!(RecoveryDecodeLimits::new(65537, 16, 4096, 32768, 256).is_err());
     assert!(RecoveryDecodeLimits::new(4096, 0, 12, 16, 4).is_err());
+    Ok(())
+}
+
+#[test]
+fn embedded_contract_limits_match_standalone_decode() -> Result {
+    let deep = |depth: usize| (0..depth).fold(Value::from(0), |inner, _| Value::Array(vec![inner]));
+    let chunks = |last: usize| {
+        let mut chunks = vec![Value::Array(vec![Value::from(0); 255]); 15];
+        chunks.push(Value::Array(vec![Value::from(0); last]));
+        Value::Array(chunks)
+    };
+    for (value, refused) in [
+        (deep(16), false),
+        (deep(17), true),
+        (chunks(254), false),
+        (chunks(255), true),
+        (Value::Array(vec![Value::from(0); 256]), false),
+        (Value::Array(vec![Value::from(0); 257]), true),
+        (Value::from("a".repeat(32 * 1024)), false),
+        (Value::from("a".repeat(32 * 1024 + 1)), true),
+    ] {
+        let canonical = chio_core_types::canonical::canonicalize(&value)?;
+        let standalone = decode_contract::<Value>(canonical.as_bytes()).map(|_| ());
+        let expected = if refused {
+            Err(ContractError::LimitExceeded)
+        } else {
+            Ok(())
+        };
+        assert_eq!(standalone, expected);
+        assert_eq!(check_contract_limits(&value), expected);
+    }
     Ok(())
 }
 
