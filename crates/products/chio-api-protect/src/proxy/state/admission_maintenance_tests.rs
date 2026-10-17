@@ -19,6 +19,8 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[path = "admission_maintenance_tests/lifecycle.rs"]
 mod lifecycle;
+#[path = "admission_maintenance_tests/policy_domain.rs"]
+mod policy_domain;
 
 struct ControlledClock {
     initial_ms: u64,
@@ -208,13 +210,16 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        Self::provisioned(None)
+    }
+
+    fn provisioned(policy_hash: Option<&str>) -> Result<Self, Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(directory.path(), fs::Permissions::from_mode(0o700))?;
         }
-        let database = directory.path().join("authority.db");
         let locks = directory.path().join("locks");
         fs::create_dir(&locks)?;
         #[cfg(unix)]
@@ -222,13 +227,27 @@ impl Fixture {
             use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&locks, fs::Permissions::from_mode(0o700))?;
         }
+        chio_store_sqlite::SqliteAuthorityStore::provision(
+            directory.path().join("authority.db"),
+            &locks,
+        )?;
+        Self::serve(directory, policy_hash)
+    }
+
+    /// Serve the authority provisioned in `directory`; `None` selects the
+    /// mediation kernel's default policy digest.
+    fn serve(
+        directory: tempfile::TempDir,
+        policy_hash: Option<&str>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let database = directory.path().join("authority.db");
+        let locks = directory.path().join("locks");
         let source = Arc::new(ControlledClock {
             initial_ms: chio_test_support::clock::clock().unix_millis()?.get(),
             elapsed_ms: AtomicU64::new(0),
             rejected: AtomicBool::new(false),
         });
         let clock = clock::ProxyClock::new(source.clone());
-        chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks)?;
         let authority = Arc::new(
             chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
                 &database,
@@ -246,7 +265,7 @@ impl Fixture {
             super::super::MediationBudget::Durable(durable),
             super::super::mediated::MediationPolicy {
                 issuers: &[],
-                hash: None,
+                hash: policy_hash,
                 receipt_store: Some(Arc::new(authority.admission_operation_store())),
             },
             vec![Box::new(PaidOutput(trace.clone()))],
@@ -326,6 +345,22 @@ impl Fixture {
             trace,
             request,
         })
+    }
+
+    /// Restart over the same authority, retaining the original request.
+    fn reopen(self, policy_hash: Option<&str>) -> Result<Self, Box<dyn std::error::Error>> {
+        let Self {
+            _directory: directory,
+            authority,
+            state,
+            request,
+            ..
+        } = self;
+        drop(state);
+        drop(authority);
+        let mut reopened = Self::serve(directory, policy_hash)?;
+        reopened.request = request;
+        Ok(reopened)
     }
 
     fn finalizing_operation(&self) -> Result<AdmissionOperationId, Box<dyn std::error::Error>> {

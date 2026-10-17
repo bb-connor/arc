@@ -131,7 +131,7 @@ pub(crate) fn build_mediation_kernel(
         Some(hash) => hash.to_owned(),
         None => {
             let material = chio_core_types::canonical::canonical_json_bytes(&(
-                "chio-api-protect-mediation-v2",
+                "chio-api-protect-mediation-v1",
                 chio_guards::default_runtime_guard_profile_identity()?,
             ))?;
             chio_core_types::sha256_hex(&material)
