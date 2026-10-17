@@ -13,6 +13,22 @@ pub(super) fn decode_sender_key(raw: &str) -> Result<PublicKey, chio_core::error
     Ok(key)
 }
 
+/// Refuse a presented DPoP header on every bearer path, before any token
+/// family is selected.
+pub(super) fn refuse_presented_dpop(
+    headers: &SenderRequest<'_>,
+    protected_resource_metadata: Option<&ProtectedResourceMetadata>,
+) -> Result<(), Response> {
+    if headers.get(DPOP_HEADER).is_none() {
+        return Ok(());
+    }
+    let error = SenderConstraintError::DpopUnavailable;
+    let mut response =
+        unauthorized_bearer_response(&error.to_string(), protected_resource_metadata);
+    response.extensions_mut().insert(Arc::new(error));
+    Err(response)
+}
+
 /// Validate transport sender bindings. A Chio sender-key confirmation or a
 /// presented DPoP proof is refused: this transport holds no durable replay
 /// custody for authentication proofs, so neither may degrade to a bearer.
