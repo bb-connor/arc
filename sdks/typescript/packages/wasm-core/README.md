@@ -10,9 +10,9 @@ browser.
 
 ## API
 
-### `receiptHexToBytes(hex: string): Uint8Array`
+### `receiptHexToJson(hex: string): string`
 
-Normalizes and validates a receipt envelope hex string, returning the decoded
-bytes. Accepts an optional `0x` prefix, and rejects odd-length input and any non
-hexadecimal characters so malformed receipts fail fast before they reach the wasm
-`verify_receipt` boundary.
+Decodes a hex-encoded receipt envelope to its canonical JSON text. Accepts an
+optional `0x` prefix, and rejects odd-length input, any non hexadecimal
+characters and invalid UTF-8 so malformed receipts fail fast before they reach
+the wasm `verify_receipt` boundary.

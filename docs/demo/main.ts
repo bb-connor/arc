@@ -24,7 +24,7 @@ interface VerifyReceiptResult {
 }
 
 interface BrowserSdk {
-  verify_receipt: (envelope: Uint8Array, trustedIssuers?: unknown) => unknown;
+  verify_receipt: (receiptJson: string, trustedIssuers?: unknown) => unknown;
 }
 
 const FIXTURE_LABEL = `${fixture.source}#${fixture.source_case_id}`;
@@ -77,9 +77,8 @@ async function loadBrowserSdk(): Promise<BrowserSdk | { error: string }> {
   }
 }
 
-function encodeReceipt(receipt: unknown): Uint8Array {
-  const json = JSON.stringify(receipt);
-  return new TextEncoder().encode(json);
+function encodeReceipt(receipt: unknown): string {
+  return JSON.stringify(receipt);
 }
 
 function renderResult(result: VerifyReceiptResult, elapsedMs: number): void {

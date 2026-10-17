@@ -22,18 +22,35 @@ try {
   const res = await mf.dispatchFetch('https://workers.test/__chio_workers_roundtrip');
   const out = await res.json();
   assert.ok(res.ok, JSON.stringify(out));
+
   assert.match(out.seedA, /^[0-9a-f]{64}$/);
   assert.notEqual(out.seedA, '0'.repeat(64));
   assert.notEqual(out.seedA, out.seedB);
   assert.match(out.kernelKey, /^[0-9a-f]{64}$/);
-  assert.deepEqual(out.parameters, { mode: 'read', path: '/workspace/docs/roadmap.md' });
+
+  // The stored canonical text carries every signed byte, including values a
+  // plain object cannot hold.
+  assert.ok(out.stored.includes('"big":18446744073709551615'));
+  assert.ok(out.stored.includes('"__proto__":{"polluted":"yes"}'));
+  assert.ok(out.stored.includes('"n":null'));
   assert.equal(out.trusted.signature_valid, true);
+  assert.equal(out.trusted.parameter_hash_valid, true);
   assert.equal(out.trusted.signer_trusted, true);
   assert.equal(out.trusted.ok, true);
   assert.equal(out.trusted.signer_key_hex, out.kernelKey);
   assert.equal(out.untrusted.signature_valid, true);
   assert.equal(out.untrusted.signer_trusted, false);
   assert.equal(out.untrusted.ok, false);
+  assert.equal(out.tampered.ok, false);
+
+  // The object view keeps `__proto__` as an own property and never as an
+  // inherited value; its integers above 2^53 are not authoritative.
+  assert.equal(out.view.metadataProtoIsObjectPrototype, true);
+  assert.equal(out.view.metadataOwnProto, true);
+  assert.equal(out.view.parametersOwnProto, true);
+  assert.equal(out.view.inheritedPollution, null);
+  assert.equal(out.view.nestedNull, null);
+  assert.equal(out.view.bigIsExact, false);
   console.log('miniflare workers: 2 passed');
 } finally {
   await mf.dispose();

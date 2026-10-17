@@ -1,4 +1,4 @@
-import { receiptHexToBytes } from '@chio-protocol/wasm-core';
+import { receiptHexToJson } from '@chio-protocol/wasm-core';
 import init, {
   evaluate as wasmEvaluate,
   mint_signing_seed_hex as wasmMintSigningSeedHex,
@@ -46,8 +46,16 @@ export async function mint_signing_seed_hex(): Promise<string> {
   return (await loadEdgeWasm()).mint_signing_seed_hex();
 }
 
-export async function sign_receipt(bodyJson: string, signingSeedHex: string): Promise<unknown> {
-  return (await loadEdgeWasm()).sign_receipt(bodyJson, signingSeedHex);
+export type SignedReceipt = {
+  receipt: unknown;
+  receipt_json: string;
+};
+
+export async function sign_receipt(
+  bodyJson: string,
+  signingSeedHex: string,
+): Promise<SignedReceipt> {
+  return (await loadEdgeWasm()).sign_receipt(bodyJson, signingSeedHex) as SignedReceipt;
 }
 
 export async function verify_capability(tokenJson: string, authorityPubHex: string): Promise<unknown> {
@@ -55,17 +63,17 @@ export async function verify_capability(tokenJson: string, authorityPubHex: stri
 }
 
 export async function verify_receipt(
-  envelope: Uint8Array,
+  receiptJson: string,
   trustedIssuers?: string | string[],
 ): Promise<unknown> {
-  return (await loadEdgeWasm()).verify_receipt(envelope, trustedIssuers);
+  return (await loadEdgeWasm()).verify_receipt(receiptJson, trustedIssuers);
 }
 
 export async function verifyReceiptHex(
   envelopeHex: string,
   trustedIssuers?: string | string[],
 ): Promise<unknown> {
-  return verify_receipt(receiptHexToBytes(envelopeHex), trustedIssuers);
+  return verify_receipt(receiptHexToJson(envelopeHex), trustedIssuers);
 }
 
 export default async function handler(request: Request): Promise<Response> {
