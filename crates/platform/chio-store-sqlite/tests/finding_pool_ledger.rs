@@ -1071,21 +1071,20 @@ fn cognition_market_pool_refuses_outbox_receipts_without_bound_authority() {
     let directory = tempfile::tempdir().test_expect("create ledger directory");
     let database = directory.path().join("finding-pool.sqlite3");
     let ledger = open_qualified(&database, ledger_domain()).test_expect("open qualified ledger");
-    let fixture = fixture_for_pool(100, 10_000, "receipt-authority-unauthored", 71, 72, &ledger);
-    debit(
-        &ledger,
-        &fixture,
-        "purchase:receipt-authority-unauthored",
-        10,
-    )
-    .test_expect("record an outbox receipt under the bound authority");
+    let fixture = fixture_for_pool(100, 10_000, "unauthored", 71, 72, &ledger);
+    debit(&ledger, &fixture, "purchase:unauthored", 10)
+        .test_expect("record an outbox receipt under the bound authority");
 
     let connection = rusqlite::Connection::open(&database).test_expect("open ledger metadata");
-    connection
-        .execute(
-            "UPDATE finding_pool_ledger_metadata SET receipt_authority_json = NULL",
+    let receipt_sink_id = connection
+        .query_row(
+            "SELECT receipt_sink_id FROM finding_pool_ledger_metadata WHERE singleton = 1",
             [],
+            |row| row.get::<_, String>(0),
         )
+        .test_expect("read the bound receipt sink");
+    connection
+        .execute_batch("UPDATE finding_pool_ledger_metadata SET receipt_authority_json = NULL")
         .test_expect("clear the bound receipt authority");
     drop(connection);
 
@@ -1095,7 +1094,7 @@ fn cognition_market_pool_refuses_outbox_receipts_without_bound_authority() {
         Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
     );
     assert_eq!(
-        ledger.bind_receipt_configuration(&authority, "receipt-sink:unauthored"),
+        ledger.bind_receipt_configuration(&authority, &receipt_sink_id),
         Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
     );
     assert!(matches!(
