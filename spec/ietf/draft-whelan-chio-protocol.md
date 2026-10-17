@@ -3143,7 +3143,7 @@ examines.
 | `MCP-Session-Id` | every request after `initialize` | The session identifier |
 | `MCP-Protocol-Version` | any request in a session | If present, equals the session's version |
 | `Last-Event-ID` | GET | Replay cursor ({{hosted-replay}}) |
-| `DPoP` | any request | Sender proof, when the access token requires one ({{hosted-admission}}) |
+| `DPoP` | any request | Refused with 401 ({{hosted-admission}}) |
 {: #tab-hosted-headers title="Hosted Request Headers"}
 
 The edge limits the request rate of each client address and answers a
@@ -3228,7 +3228,7 @@ members of its `cnf` claim. For `x5t#S256` and
 `chioAttestationSha256`, the request MUST carry the header
 `x-chio-mtls-thumbprint-sha256` or `x-chio-runtime-attestation-sha256`,
 respectively, with a value equal to the claim. A failed check is 401.
-Chio DPoP sender binding is unavailable on this edge: it MUST reject
+This edge refuses Chio DPoP sender binding: it MUST reject
 with 401 a token whose `cnf` carries `chioSenderKey` and any request
 that carries a `DPoP` header, and MUST NOT admit either as a bearer.
 
