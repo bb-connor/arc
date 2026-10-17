@@ -602,20 +602,6 @@ pub trait ApprovalStore: Send + Sync {
     /// `Constraint::RequireApprovalAbove` threshold accounting.
     fn count_approved(&self, subject_id: &str, policy_id: &str) -> Result<u64, ApprovalStoreError>;
 
-    /// Record that a token (by `token_id` and `parameter_hash`) has
-    /// been consumed. Used to reject replays of the same approval
-    /// token across a restart. Implementations may also call this from
-    /// [`resolve`]; exposing it on the trait lets the kernel do the
-    /// replay check before persisting the resolution, which matters
-    /// when the store is backed by SQLite and wants to run the check
-    /// inside the transaction.
-    fn record_consumed(
-        &self,
-        token_id: &str,
-        parameter_hash: &str,
-        now: u64,
-    ) -> Result<(), ApprovalStoreError>;
-
     /// Returns `true` if the token has already been consumed.
     fn is_consumed(&self, token_id: &str, parameter_hash: &str)
         -> Result<bool, ApprovalStoreError>;
@@ -624,7 +610,7 @@ pub trait ApprovalStore: Send + Sync {
     fn get_resolution(&self, id: &str) -> Result<Option<ResolvedApproval>, ApprovalStoreError>;
     /// Atomically bind a normalized approval-token digest set to an operation.
     /// The default fails closed so operation-owned callers never fall back to
-    /// the legacy immediate-consumption registry.
+    /// the pending-request resolution ledger.
     fn reserve_approval_set(
         &self,
         _operation_id: &str,
@@ -1270,26 +1256,6 @@ impl ApprovalStore for InMemoryApprovalStore {
             .get(&format!("{subject_id}:{policy_id}"))
             .copied()
             .unwrap_or(0))
-    }
-
-    fn record_consumed(
-        &self,
-        token_id: &str,
-        parameter_hash: &str,
-        now: u64,
-    ) -> Result<(), ApprovalStoreError> {
-        let mut consumed = self
-            .consumed
-            .lock()
-            .map_err(|_| ApprovalStoreError::Backend("consumed map poisoned".into()))?;
-        let key = Self::consumed_key(token_id, parameter_hash);
-        if consumed.contains_key(&key) {
-            return Err(ApprovalStoreError::Replay(format!(
-                "token {token_id} already consumed"
-            )));
-        }
-        consumed.insert(key, now);
-        Ok(())
     }
 
     fn is_consumed(

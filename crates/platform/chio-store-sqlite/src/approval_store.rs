@@ -197,8 +197,8 @@ impl SqliteApprovalStore {
             CREATE TABLE IF NOT EXISTS chio_hitl_consumed_tokens (
                 token_id TEXT NOT NULL,
                 parameter_hash TEXT NOT NULL,
-                token_digest TEXT
-                    CHECK (token_digest IS NULL OR (length(token_digest) = 64 AND instr(token_digest, char(0)) = 0 AND octet_length(token_digest) <= 256 AND token_digest NOT GLOB '*[^0-9a-f]*')),
+                token_digest TEXT NOT NULL
+                    CHECK (typeof(token_digest) = 'text' AND length(token_digest) = 64 AND instr(token_digest, char(0)) = 0 AND octet_length(token_digest) <= 256 AND token_digest NOT GLOB '*[^0-9a-f]*'),
                 consumed_at INTEGER NOT NULL,
                 PRIMARY KEY (token_id, parameter_hash)
             );
@@ -228,21 +228,20 @@ impl SqliteApprovalStore {
             BEFORE INSERT ON chio_hitl_consumed_tokens
             WHEN EXISTS (
                 SELECT 1 FROM chio_hitl_operation_reservation_tokens
-                WHERE token_id = NEW.token_id
-                   OR (NEW.token_digest IS NOT NULL AND token_digest = NEW.token_digest)
+                WHERE token_id = NEW.token_id OR token_digest = NEW.token_digest
             )
             BEGIN
                 SELECT RAISE(ABORT, 'approval token is operation-owned');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_token_legacy_exclusion
+            CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_token_resolution_exclusion
             BEFORE INSERT ON chio_hitl_operation_reservation_tokens
             WHEN EXISTS (
                 SELECT 1 FROM chio_hitl_consumed_tokens
                 WHERE token_id = NEW.token_id OR token_digest = NEW.token_digest
             )
             BEGIN
-                SELECT RAISE(ABORT, 'approval token was consumed by the legacy registry');
+                SELECT RAISE(ABORT, 'approval token was consumed by a pending-request resolution');
             END;
 
             CREATE TRIGGER IF NOT EXISTS chio_hitl_operation_reservation_identity_immutable
@@ -510,6 +509,10 @@ impl ApprovalStore for SqliteApprovalStore {
             .map_err(|error| ApprovalStoreError::Serialization(error.to_string()))?;
         let token_json = String::from_utf8(token_json)
             .map_err(|error| ApprovalStoreError::Serialization(error.to_string()))?;
+        let token_digest = decision
+            .token
+            .artifact_digest()
+            .map_err(|error| ApprovalStoreError::Serialization(error.to_string()))?;
 
         // Replay guard: the bound token must not already be consumed.
         let already: Option<i64> = tx
@@ -559,8 +562,8 @@ impl ApprovalStore for SqliteApprovalStore {
         .map_err(|e| ApprovalStoreError::Backend(format!("insert resolved: {e}")))?;
 
         tx.execute(
-            "INSERT INTO chio_hitl_consumed_tokens (token_id, parameter_hash, consumed_at) VALUES (?1, ?2, ?3)",
-            params![decision.token.id, parameter_hash, crate::integer::checked::<_, i64>(decision.received_at)?],
+            "INSERT INTO chio_hitl_consumed_tokens (token_id, parameter_hash, token_digest, consumed_at) VALUES (?1, ?2, ?3, ?4)",
+            params![decision.token.id, parameter_hash, token_digest, crate::integer::checked::<_, i64>(decision.received_at)?],
         )
         .map_err(|e| ApprovalStoreError::Backend(format!("insert consumed: {e}")))?;
 
@@ -596,29 +599,6 @@ impl ApprovalStore for SqliteApprovalStore {
             )
             .map_err(|e| ApprovalStoreError::Backend(format!("count: {e}")))?;
         Ok(u64::try_from(count.max(0)).unwrap_or_default())
-    }
-
-    fn record_consumed(
-        &self,
-        token_id: &str,
-        parameter_hash: &str,
-        now: u64,
-    ) -> Result<(), ApprovalStoreError> {
-        let conn = self
-            .pool
-            .get()
-            .map_err(|e| ApprovalStoreError::Backend(format!("pool get: {e}")))?;
-        let rows = conn.execute(
-            "INSERT OR IGNORE INTO chio_hitl_consumed_tokens (token_id, parameter_hash, consumed_at) VALUES (?1, ?2, ?3)",
-            params![token_id, parameter_hash, crate::integer::checked::<_, i64>(now)?],
-        )
-        .map_err(|e| ApprovalStoreError::Backend(format!("insert consumed: {e}")))?;
-        if rows == 0 {
-            return Err(ApprovalStoreError::Replay(format!(
-                "token {token_id} already consumed"
-            )));
-        }
-        Ok(())
     }
 
     fn is_consumed(
@@ -734,7 +714,7 @@ impl ApprovalStore for SqliteApprovalStore {
         }
 
         for member in requested.approval_set().members() {
-            let legacy_consumed = tx
+            let resolution_consumed = tx
                 .query_row(
                     r#"
                     SELECT 1 FROM chio_hitl_consumed_tokens
@@ -746,9 +726,9 @@ impl ApprovalStore for SqliteApprovalStore {
                 )
                 .optional()
                 .map_err(|e| {
-                    ApprovalStoreError::Backend(format!("query legacy token replay: {e}"))
+                    ApprovalStoreError::Backend(format!("query resolution token replay: {e}"))
                 })?;
-            if legacy_consumed.is_some() {
+            if resolution_consumed.is_some() {
                 return Err(ApprovalStoreError::Replay(format!(
                     "approval token `{}` was already consumed",
                     member.token_id()
@@ -1141,9 +1121,6 @@ mod tests {
             store.reserve_approval_set(&conflicting_operation_id, &approval_set),
             Err(ApprovalStoreError::Replay(_))
         ));
-        assert!(store
-            .record_consumed("approval-token-a", &"dd".repeat(32), 100)
-            .is_err());
 
         let committed = store.commit_approval_reservation(&operation_id).unwrap();
         assert_eq!(committed.state(), ReplayReservationState::Committed);
