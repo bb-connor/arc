@@ -1357,9 +1357,31 @@ fn authority_current_selector_refuses_after_router_poison() {
 
     assert_eq!(authority.public_key(), rotated.public_key());
     assert_ne!(authority.public_key(), original);
+    assert_eq!(authority.algorithm(), rotated.algorithm());
     assert!(matches!(
         authority.current_public_key(),
         Err(chio_core_types::Error::InvalidPublicKey(message))
             if message == chio_keyring::KeyringError::Synchronization.to_string()
+    ));
+    let refused = |result: chio_core_types::Result<()>| {
+        matches!(
+            result,
+            Err(chio_core_types::Error::InvalidSignature(message))
+                if message == chio_keyring::KeyringError::Synchronization.to_string()
+        )
+    };
+    let message = b"poisoned selector artifact";
+    assert!(refused(authority.sign_bytes(message).map(drop)));
+    assert!(refused(
+        authority.sign_bytes_with_identity(message).map(drop)
+    ));
+    assert!(refused(
+        authority
+            .sign_bytes_for_identity(&rotated.public_key(), message)
+            .map(drop)
+    ));
+    let canonical = chio_core_types::CanonicalBytes::from_serializable(&"poisoned").test_unwrap();
+    assert!(refused(
+        authority.sign_canonical_bytes(&canonical).map(drop)
     ));
 }
