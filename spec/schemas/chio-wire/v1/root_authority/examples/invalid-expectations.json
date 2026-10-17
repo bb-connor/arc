@@ -43,6 +43,10 @@
     "keyword": "maxLength",
     "path": "/anchor/issuer"
   },
+  "delegation-context.oidc-jwt-without-kid.json": {
+    "keyword": "required",
+    "path": "/anchor"
+  },
   "delegation-context.padding.json": {
     "keyword": "additionalProperties",
     "path": ""
@@ -147,6 +151,10 @@
     "keyword": "additionalProperties",
     "path": "/subject_mapping"
   },
+  "idp-key-snapshot.ec-with-ed25519-curve.json": {
+    "keyword": "enum",
+    "path": "/keys/1/crv"
+  },
   "idp-key-snapshot.ec-without-y.json": {
     "keyword": "required",
     "path": "/keys/1"
@@ -158,6 +166,10 @@
   "idp-key-snapshot.modulus-oversized.json": {
     "keyword": "maxLength",
     "path": "/keys/0/n"
+  },
+  "idp-key-snapshot.okp-with-p256-curve.json": {
+    "keyword": "const",
+    "path": "/keys/0/crv"
   },
   "idp-key-snapshot.padding.json": {
     "keyword": "additionalProperties",
@@ -263,9 +275,17 @@
     "keyword": "additionalProperties",
     "path": "/disclosure/tools/crm/search/parameters"
   },
+  "root-policy.introspection-with-allowed-algs.json": {
+    "keyword": "not",
+    "path": "/rules/2/match"
+  },
   "root-policy.local-as-with-allowed-algs.json": {
     "keyword": "not",
     "path": "/rules/4/match"
+  },
+  "root-policy.match-audience-claim.json": {
+    "keyword": "additionalProperties",
+    "path": "/rules/0/match/claims"
   },
   "root-policy.match-issuer.json": {
     "keyword": "additionalProperties",

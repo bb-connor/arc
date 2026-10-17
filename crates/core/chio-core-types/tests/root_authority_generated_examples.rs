@@ -3,9 +3,10 @@
 //! Every valid example decodes through the generated type. The generated
 //! types enforce unknown-member rejection, closed enums, required members,
 //! string patterns and string lengths, but not `const`, `maximum`, `minItems`,
-//! `maxItems` or the `if`/`then`/`else`, `not` and conditional `oneOf` rules. The invalid examples that the generated types accept are
-//! pinned below: each is a schema-only rejection that the hand-written decoder
-//! of the type must enforce.
+//! `maxItems` or the `if`/`then`/`else`, `not` and conditional `oneOf` rules.
+//! The invalid examples that the generated types accept are pinned below:
+//! each is a schema-only rejection that the hand-written decoder of the type
+//! must enforce.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 #[allow(
@@ -31,6 +32,7 @@ const SCHEMA_ONLY_REJECTIONS: &[&str] = &[
     "delegation-context.id-jag-without-identity-digest.json",
     "delegation-context.id-jag-without-kid.json",
     "delegation-context.id-jag-without-provider-record.json",
+    "delegation-context.oidc-jwt-without-kid.json",
     "delegation-context.retained-on-static-bearer.json",
     "delegation-context.static-bearer-claims.json",
     "delegation-context.static-bearer-issuer.json",
@@ -40,7 +42,9 @@ const SCHEMA_ONLY_REJECTIONS: &[&str] = &[
     "enterprise-provider-identity.both-key-sources.json",
     "enterprise-provider-identity.introspection-with-jwks-url.json",
     "enterprise-provider-identity.no-key-source.json",
+    "idp-key-snapshot.ec-with-ed25519-curve.json",
     "idp-key-snapshot.ec-without-y.json",
+    "idp-key-snapshot.okp-with-p256-curve.json",
     "idp-key-snapshot.rsa-without-modulus.json",
     "presentation.too-many-ancestors.json",
     "root-policy.clock-skew-61.json",
@@ -50,6 +54,7 @@ const SCHEMA_ONLY_REJECTIONS: &[&str] = &[
     "root-policy.id-jag-without-allowed-algs.json",
     "root-policy.id-jag-without-identity-digest.json",
     "root-policy.id-jag-without-provider-record.json",
+    "root-policy.introspection-with-allowed-algs.json",
     "root-policy.local-as-with-allowed-algs.json",
     "root-policy.principal-on-entra.json",
     "root-policy.retain-artifact-on-entra.json",
@@ -132,6 +137,6 @@ fn generated_bindings_accept_exactly_the_pinned_schema_only_rejections() {
         .collect();
     assert_eq!(
         accepted, pinned,
-        "invalid examples the generated bindings accept must equal the pinned schema-only rejections"
+        "generated bindings must accept exactly SCHEMA_ONLY_REJECTIONS"
     );
 }

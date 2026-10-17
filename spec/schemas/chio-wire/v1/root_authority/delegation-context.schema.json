@@ -197,7 +197,8 @@
                 "enum": [
                   "oauth_id_jag",
                   "entra_jwt",
-                  "entra_agent_id"
+                  "entra_agent_id",
+                  "oidc_jwt"
                 ]
               }
             },

@@ -411,6 +411,36 @@
               ]
             }
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "match": {
+                "properties": {
+                  "anchor_kind": {
+                    "const": "oauth_introspection"
+                  }
+                },
+                "required": [
+                  "anchor_kind"
+                ]
+              }
+            },
+            "required": [
+              "match"
+            ]
+          },
+          "then": {
+            "properties": {
+              "match": {
+                "not": {
+                  "required": [
+                    "allowed_algs"
+                  ]
+                }
+              }
+            }
+          }
         }
       ]
     },
@@ -511,7 +541,7 @@
     "MatchClaims": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Claim name to the values it must take for the rule to match. The claim set is the closed set of recordable claims.",
+      "description": "Claim name to the values it must take for the rule to match. Audience is never matched here; it comes from the provider record.",
       "properties": {
         "client_id": {
           "type": "array",
@@ -530,14 +560,6 @@
           }
         },
         "sub": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 64,
-          "items": {
-            "$ref": "root-anchor.schema.json#/$defs/Text"
-          }
-        },
-        "aud": {
           "type": "array",
           "minItems": 1,
           "maxItems": 64,
