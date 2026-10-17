@@ -593,6 +593,62 @@ pub(crate) fn unsigned_prepared_effect_batch(
 }
 
 #[test]
+fn signed_batch_refuses_a_padded_direct_authorization() -> Result<(), Box<dyn core::error::Error>> {
+    let (mut batch, _) = unsigned_prepared_effect_batch()?;
+    let keypair = Keypair::from_seed(&[9; 32]);
+    batch.seal(&keypair)?;
+    let mut value = serde_json::to_value(&batch)?;
+    let authorization = value["transitions"]
+        .as_array_mut()
+        .and_then(|transitions| {
+            transitions
+                .iter_mut()
+                .find_map(|transition| transition.get_mut("preparedEffect"))
+        })
+        .and_then(|effect| effect.get_mut("authorization"))
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("prepared effect authorization")?;
+    authorization.insert("pad".to_string(), json!(0));
+    let refused =
+        serde_json::from_value::<EconomicStateBatchV1>(value).map_err(|error| error.to_string());
+    assert_eq!(
+        refused.err().as_deref(),
+        Some(chio_security_types::strict_serde::DROPPED_INPUT)
+    );
+    Ok(())
+}
+
+#[test]
+fn authorization_modes_round_trip_and_refuse_padding() -> Result<(), Box<dyn core::error::Error>> {
+    let frost = EconomicActionAuthorizationV1::NOfM {
+        frost: EconomicFrostBindingV1 {
+            authorization_slot_id: digest("slot"),
+            authorization_id: digest("authorization"),
+            action_digest: digest("action"),
+            signed_envelope_digest: digest("envelope"),
+        },
+    };
+    for (authorization, refusal) in [
+        (
+            EconomicActionAuthorizationV1::Direct,
+            chio_security_types::strict_serde::DROPPED_INPUT,
+        ),
+        (frost, "unknown field `pad`, expected `frost`"),
+    ] {
+        let mut value = serde_json::to_value(&authorization)?;
+        assert_eq!(
+            serde_json::from_value::<EconomicActionAuthorizationV1>(value.clone())?,
+            authorization
+        );
+        value["pad"] = json!(0);
+        let refused = serde_json::from_value::<EconomicActionAuthorizationV1>(value)
+            .map_err(|error| error.to_string());
+        assert_eq!(refused.err().as_deref(), Some(refusal));
+    }
+    Ok(())
+}
+
+#[test]
 fn unknown_fields_and_unknown_versions_fail_closed() -> Result<(), Box<dyn core::error::Error>> {
     let next = head(resource_key("round-1"), 1, 1, None)?;
     let (batch, _) = signed_batch(vec![transition(next, None)])?;
