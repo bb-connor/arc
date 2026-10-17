@@ -60,13 +60,19 @@ pub struct EffectResultQuery {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case", tag = "status", deny_unknown_fields)]
+#[serde(
+    rename_all = "snake_case",
+    tag = "status",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum EffectExecutionStatus {
     NotExecuted,
     Completed { result: EffectResult },
     Failed { error_code: ErrorCode },
     Unknown,
 }
+crate::lossless_serde!(EffectExecutionStatus);
 
 #[cfg(feature = "std")]
 pub trait EffectPort: Send + Sync {

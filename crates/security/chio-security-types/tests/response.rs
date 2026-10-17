@@ -111,6 +111,24 @@ fn response_targets_and_mutation_records_reject_unknown_fields() {
     assert!(serde_json::from_value::<ResponseMutationRecord>(mutation_value).is_err());
 }
 
+#[test]
+fn response_plan_refuses_padded_automatic_approval() {
+    let mut encoded = serde_json::to_value(valid_response_plan())
+        .unwrap_or_else(|error| panic!("plan encoding failed: {error}"));
+    encoded["approval_requirement"] = serde_json::json!({
+        "approval_type": "automatic",
+        "pad": 0,
+    });
+    let error = match serde_json::from_value::<ResponsePlan>(encoded) {
+        Ok(plan) => panic!("plan with padded automatic approval decoded: {plan:?}"),
+        Err(error) => error,
+    };
+    assert_eq!(
+        error.to_string(),
+        chio_security_types::strict_serde::DROPPED_INPUT
+    );
+}
+
 fn valid_response_plan() -> ResponsePlan {
     serde_json::from_str(include_str!(
         "../../../../tests/bindings/vectors/security/active-defense/positive/response-plan-v1.json"
