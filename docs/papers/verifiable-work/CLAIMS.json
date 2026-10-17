@@ -614,7 +614,8 @@
       "adversary": "Concurrent stale proposals and corrupted archived payload/hash/index bindings",
       "counterexample": "Two contenders install from the same expected head, a rejected update changes state, or corrupt history is accepted.",
       "evidence_paths": [
-        "crates/kernel/chio-runtime-core/src/store/sqlite/swarm_authority_bundles.rs",
+        "crates/platform/chio-store-sqlite/src/work_graph_store.rs",
+        "crates/platform/chio-store-sqlite/tests/work_graph_authority.rs",
         "crates/kernel/chio-runtime-core/tests/runtime_admission/swarm_evolution.rs",
         "docs/research/swarm-evolution/PROTOCOL.md"
       ]
