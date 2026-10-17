@@ -1,6 +1,6 @@
 use alloc::format;
 
-use crate::crypto::{Keypair, PublicKey, Signature, SigningBackend};
+use crate::crypto::{Keypair, PublicKey, SigningBackend, SigningOutcome};
 use crate::error::{Error, Result};
 
 pub(crate) fn ensure_keypair_matches_embedded_key(
@@ -18,7 +18,7 @@ pub(crate) fn ensure_backend_matches_embedded_key(
     artifact: &str,
     field: &str,
 ) -> Result<()> {
-    let actual_key = backend.public_key();
+    let actual_key = backend.current_public_key()?;
     ensure_public_key_matches(embedded_key, &actual_key, artifact, field)
 }
 
@@ -28,7 +28,7 @@ pub(crate) fn sign_bytes_for_embedded_key(
     embedded_key: &PublicKey,
     backend: &dyn SigningBackend,
     message: &[u8],
-) -> Result<Signature> {
+) -> Result<SigningOutcome> {
     let outcome = backend.sign_bytes_for_identity(embedded_key, message)?;
     let algorithm = embedded_key.algorithm();
     if outcome.public_key != *embedded_key
@@ -40,7 +40,7 @@ pub(crate) fn sign_bytes_for_embedded_key(
             "signing backend returned an artifact from a different identity".into(),
         ));
     }
-    Ok(outcome.signature)
+    Ok(outcome)
 }
 
 fn ensure_public_key_matches(
@@ -57,3 +57,7 @@ fn ensure_public_key_matches(
         "{artifact} {field} does not match signing key"
     )))
 }
+
+#[cfg(test)]
+#[path = "signer_binding_tests.rs"]
+mod tests;
