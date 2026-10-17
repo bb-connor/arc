@@ -48,6 +48,7 @@ impl RunningService {
             _directory: directory,
             policies,
             base: format!("http://127.0.0.1:{}", address.port()),
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
             client: reqwest::Client::builder().no_proxy().build()?,
             server,
         };
@@ -57,6 +58,7 @@ impl RunningService {
                     .client
                     .get(service.url(PASSPORT_VERIFIER_POLICIES_PATH))
                     .bearer_auth(TOKEN)
+                    // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
                     .send()
                     .await
                 {
@@ -85,6 +87,7 @@ impl RunningService {
             .put(self.policy_url(&document.body.policy_id))
             .bearer_auth(TOKEN)
             .json(document)
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
             .send()
             .await?;
         assert_eq!(response.status(), reqwest::StatusCode::OK);
@@ -103,6 +106,7 @@ impl RunningService {
                 policy_id: Some(POLICY_ID.to_string()),
                 policy: None,
             })
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
             .send()
             .await
     }
@@ -137,6 +141,7 @@ impl RunningService {
                 presentation,
                 expected_challenge: None,
             })
+            // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
             .send()
             .await?)
     }
@@ -267,6 +272,7 @@ async fn a_policy_deleted_after_startup_refuses_the_next_challenge() -> TestResu
         .client
         .delete(service.policy_url(POLICY_ID))
         .bearer_auth(TOKEN)
+        // CHIO_EGRESS_LINT_ALLOW_DIRECT_REQWEST: loopback harness for the spawned service.
         .send()
         .await?;
     assert_eq!(deleted.status(), reqwest::StatusCode::OK);
