@@ -105,7 +105,10 @@ At runtime:
 * `POST /v1/caller/start` commits the reservation. The interceptor
   checks the returned dispatch authorization against the pinned kernel
   key, its own executor identity, the activity's tool and capability,
-  and the authorization's time window before the body runs.
+  and the authorization's time window before the body runs. The
+  authorization's expiry is checked once, before the activity runs, against
+  the worker clock; it is not re-checked while the body executes. The
+  kernel rechecks the report against its own trusted time.
 * After the body returns or raises, `POST /v1/caller/report` delivers an
   executor-signed report so the reservation finalizes. The report output
   is `{"outcome": "completed", "result_sha256": ...}` (SHA-256 of the

@@ -57,7 +57,10 @@ For each activity attempt, `ChioActivityInterceptor`:
    arguments. The returned dispatch authorization must be signed by the
    pinned kernel key and must bind this executor, request id, capability,
    tool server and activity type. The current time must also fall inside
-   its execution window. If any check fails, the activity does not run.
+   its execution window. If any check fails, the activity does not run. The
+   authorization's expiry is checked here, before the activity runs, against
+   the worker clock. It is not re-checked while the activity executes, and the
+   kernel rechecks the report against its own trusted time (step 4).
 3. **Runs** the activity.
 4. **Reports.** `POST /v1/caller/report` with an executor-signed report. The
    report output is `{"outcome": "completed", "result_sha256": ...}` (SHA-256
