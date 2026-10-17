@@ -22,7 +22,6 @@ use chio_settle::{
 /// Schema string emitted on the wire for settlement-observer status frames.
 /// Public so external observers can pin against the same identifier the
 /// kernel records.
-#[allow(dead_code)]
 pub const SETTLEMENT_OBSERVER_STATUS_SCHEMA: &str = "chio.settle.observer-status.v1";
 
 /// Status the kernel records for each settlement observer invocation.
