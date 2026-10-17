@@ -80,38 +80,13 @@ struct SidecarConfig {
 /// `deny_unknown_fields` catches typos in the operator-supplied config
 /// (e.g. `Mode = "enforce"` instead of `mode = "enforce"`) at load time
 /// rather than silently treating the table as empty and defaulting to
-/// `verdict-only`. The non-`mode` deployment-shape fields below are part
-/// of the sidecar config surface but are resolved by the binary from
-/// environment variables (see `src/main.rs`), not by the mode resolver;
-/// they are pinned here so the example sidecar TOML in
-/// `examples/tee-sidecar/chio-tee.toml` loads under `deny_unknown_fields`.
+/// `verdict-only`. Deployment-shape settings such as the runtime directory
+/// come from environment variables (see `src/main.rs`) and are refused here.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct SidecarTeeSection {
     #[serde(default)]
     mode: Option<String>,
-    /// Runtime working directory. The binary takes this from
-    /// `CHIO_TEE_RUNTIME_DIR`; the TOML mirror is accepted for documentation
-    /// parity and kept loadable under `deny_unknown_fields`.
-    #[serde(default)]
-    #[allow(dead_code)]
-    runtime_dir: Option<String>,
-    /// Reserved: persistent spool directory.
-    #[serde(default)]
-    #[allow(dead_code)]
-    spool_dir: Option<String>,
-    /// Reserved: spool size cap in bytes.
-    #[serde(default)]
-    #[allow(dead_code)]
-    max_spool_bytes: Option<u64>,
-    /// Reserved: pinned wire format identifier.
-    #[serde(default)]
-    #[allow(dead_code)]
-    frame_format: Option<String>,
-    /// Reserved: redaction-pass identifier.
-    #[serde(default)]
-    #[allow(dead_code)]
-    redaction_pass: Option<String>,
 }
 
 /// Tenant manifest schema fragment.
@@ -380,23 +355,25 @@ mod tests {
         assert_eq!(mode, Mode::Shadow);
     }
 
-    /// The deployment-shape fields documented in
-    /// `examples/tee-sidecar/chio-tee.toml` are accepted today (they
-    /// are wired in a later task) so the example continues to load.
     #[test]
-    fn toml_accepts_documented_deployment_fields() {
-        let raw = r#"
-[tee]
-mode = "shadow"
-runtime_dir = "/run/chio-tee"
-spool_dir = "/var/lib/chio/tee/spool"
-max_spool_bytes = 67108864
-frame_format = "chio-tee-frame.v1"
-redaction_pass = "chio:guards/redact@0.1.0"
-"#;
-        let mode = parse_toml_mode_from_str(&PathBuf::from("test.toml"), raw)
-            .unwrap()
-            .unwrap();
-        assert_eq!(mode, Mode::Shadow);
+    fn toml_refuses_deployment_shape_keys() {
+        for key in [
+            "runtime_dir",
+            "spool_dir",
+            "max_spool_bytes",
+            "frame_format",
+            "redaction_pass",
+        ] {
+            let raw = format!("[tee]\nmode = \"shadow\"\n{key} = \"x\"\n");
+            let err = parse_toml_mode_from_str(&PathBuf::from("test.toml"), &raw).unwrap_err();
+            let ConfigError::Toml { path, source } = err else {
+                panic!("expected a toml error for {key}");
+            };
+            assert_eq!(path, PathBuf::from("test.toml"));
+            assert_eq!(
+                source.message(),
+                format!("unknown field `{key}`, expected `mode`")
+            );
+        }
     }
 }
