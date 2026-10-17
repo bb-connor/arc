@@ -540,9 +540,9 @@ patient databases, or clinical tool servers. Chio's controls map to several
 
 Chio's data layer guards provide ePHI-relevant protections:
 
-- **`QueryResultGuard`**: Post-invocation guard that applies PII pattern
-  matching (SSN, date of birth, medical record number patterns) to tool
-  results. Can block or redact results containing detected ePHI patterns.
+- **`QueryResultGuard`**: Post-invocation guard that truncates rows, redacts
+  denylisted columns, and redacts matches of operator-supplied
+  `redact_pii_patterns`. It ships no built-in PII patterns.
 - **`SqlQueryGuard`**: Pre-invocation guard that restricts which database
   tables and columns agents can query. Column constraints can deny access
   to ePHI fields (e.g., `denied_columns: ["ssn", "dob", "diagnosis"]`).

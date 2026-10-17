@@ -299,6 +299,10 @@ matches before the data reaches the agent.
 | `max_input_bytes` | 1000000 | Input past this bound is truncated and marked unscanned |
 | `include_findings` | `true` | Whether findings are returned to the caller |
 
+`pii_mrn` and `secret_gcp_service_account` recommend `drop`, which overrides
+the category strategy, so the whole match is removed (a string that is
+entirely the match becomes `null`).
+
 Operators add deployment-specific identifiers as `denylist.patterns`. An
 invalid allowlist or denylist regex **MUST** reject construction.
 

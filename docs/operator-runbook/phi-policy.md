@@ -9,7 +9,9 @@ alerts, and audit-log exports.
 The pilot relies on the post-invocation `SanitizerHook` (see
 `spec/GUARDS.md` section 4.2), which the default runtime profile installs.
 Its built-in PII detectors cover SSN, card numbers (Luhn validated), email
-and medical record numbers (`MRN` followed by 6 to 12 digits).
+and medical record numbers (`MRN` followed by 6 to 12 digits). A medical
+record number is removed whole; the other PII detectors keep a two-character
+prefix and suffix under the default `partial` strategy.
 
 Required deployment settings:
 
