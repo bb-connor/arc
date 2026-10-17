@@ -1,14 +1,12 @@
-use chio_mcp_adapter_integration::{
-    emit_tool_call_receipt, verify_tool_call_receipt, McpReceiptError, StreamableHttpTransport,
-};
+use chio_mcp_adapter_integration::StreamableHttpTransport;
 use chio_mcp_edge::{McpToolInfo, McpToolResult, McpTransport};
 use serde_json::json;
 
 fn tool_info() -> McpToolInfo {
     McpToolInfo {
-        name: "chio.receipt.issue".to_string(),
-        title: Some("Issue Chio receipt".to_string()),
-        description: Some("Emit a Chio-format receipt for a governed tool call".to_string()),
+        name: "chio.fixture.echo".to_string(),
+        title: Some("Fixture tool".to_string()),
+        description: Some("Fixture tool for the Streamable HTTP transport tests".to_string()),
         input_schema: json!({
             "type": "object",
             "properties": {
@@ -24,14 +22,15 @@ fn tool_info() -> McpToolInfo {
 
 fn tool_result() -> McpToolResult {
     McpToolResult {
-        content: vec![json!({ "type": "text", "text": "receipt issued" })],
+        content: vec![json!({ "type": "text", "text": "ok" })],
         structured_content: Some(json!({ "ok": true })),
         is_error: Some(false),
     }
 }
 
 #[test]
-fn streamable_http_transport_round_trip_emits_receipt() -> Result<(), Box<dyn std::error::Error>> {
+fn streamable_http_transport_round_trip_lists_and_calls_tool(
+) -> Result<(), Box<dyn std::error::Error>> {
     let transport = StreamableHttpTransport::builder()
         .endpoint_path("/mcp")
         .bearer_token("test-token")
@@ -40,20 +39,10 @@ fn streamable_http_transport_round_trip_emits_receipt() -> Result<(), Box<dyn st
 
     let tools = transport.list_tools()?;
     assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0].name, "chio.receipt.issue");
+    assert_eq!(tools[0].name, "chio.fixture.echo");
 
-    let result = transport.call_tool("chio.receipt.issue", json!({ "tenant_id": "tenant-a" }))?;
+    let result = transport.call_tool("chio.fixture.echo", json!({ "tenant_id": "tenant-a" }))?;
     assert_eq!(result.is_error, Some(false));
-
-    let receipt = emit_tool_call_receipt(
-        "cap-mcp-a",
-        "tenant-a",
-        "chio.receipt.issue",
-        json!({ "tenant_id": "tenant-a" }),
-        serde_json::to_value(&result)?,
-    )?;
-    assert!(verify_tool_call_receipt(&receipt));
-    assert_eq!(receipt["tool_server"], "chio-mcp");
 
     let exchanges = transport.exchange_log()?;
     assert_eq!(exchanges.len(), 2);
@@ -89,18 +78,4 @@ fn streamable_http_transport_rejects_padded_bearer_token() {
         panic!("padded bearer token should fail closed");
     };
     assert!(error.to_string().contains("bearer token"));
-}
-
-#[test]
-fn receipt_emission_rejects_padded_capability_id() {
-    let error = emit_tool_call_receipt(
-        " cap-mcp-a",
-        "tenant-a",
-        "chio.receipt.issue",
-        json!({}),
-        json!({}),
-    )
-    .err();
-
-    assert_eq!(error, Some(McpReceiptError::MissingCapabilityId));
 }

@@ -1,15 +1,15 @@
-use chio_mcp_adapter_integration::{
-    emit_tool_call_receipt, verify_tool_call_receipt, ProtectedResourceMetadata,
-    StreamableHttpTransport,
-};
+use chio_mcp_adapter_integration::{ProtectedResourceMetadata, StreamableHttpTransport};
 use chio_mcp_edge::{McpToolInfo, McpToolResult, McpTransport};
 use serde_json::json;
 
+/// Replays a recorded gateway-consumer scenario over the in-memory
+/// Streamable HTTP transport. No AWS service, signing, or receipt is involved.
 #[test]
-fn agentcore_gateway_consumer_receives_chio_receipt() -> Result<(), Box<dyn std::error::Error>> {
+fn gateway_consumer_scenario_round_trips_over_in_memory_transport(
+) -> Result<(), Box<dyn std::error::Error>> {
     let scenario: serde_json::Value =
-        serde_json::from_str(include_str!("../fixtures/agentcore_gateway/scenario.json"))?;
-    assert_eq!(scenario["consumer"], "aws-bedrock-agentcore-gateway");
+        serde_json::from_str(include_str!("../fixtures/gateway_consumer/scenario.json"))?;
+    assert_eq!(scenario["consumer"], "mcp-gateway-consumer");
     assert_eq!(scenario["oauth"]["grant_type"], "authorization_code_pkce");
 
     let metadata = ProtectedResourceMetadata::new(
@@ -22,34 +22,27 @@ fn agentcore_gateway_consumer_receives_chio_receipt() -> Result<(), Box<dyn std:
     assert_eq!(metadata.bearer_methods_supported[0], "header");
 
     let transport = StreamableHttpTransport::builder()
-        .bearer_token("agentcore-token")
+        .bearer_token("gateway-consumer-token")
         .tool(
             McpToolInfo {
                 name: "chio.bedrock.invoke".to_string(),
                 title: Some("Invoke governed Bedrock".to_string()),
-                description: Some("AgentCore Gateway consumer test tool".to_string()),
+                description: Some("Gateway consumer scenario tool".to_string()),
                 input_schema: json!({ "type": "object" }),
                 output_schema: None,
                 annotations: None,
-                execution: Some(json!({ "consumer": "agentcore-gateway" })),
+                execution: None,
             },
             McpToolResult {
                 content: vec![json!({ "type": "text", "text": "bedrock ok" })],
-                structured_content: Some(json!({ "receipt_required": true })),
+                structured_content: None,
                 is_error: Some(false),
             },
         )
         .build()?;
 
     let result = transport.call_tool("chio.bedrock.invoke", json!({ "model": "bedrock" }))?;
-    let receipt = emit_tool_call_receipt(
-        "cap-agentcore",
-        "tenant-agentcore",
-        "chio.bedrock.invoke",
-        json!({ "model": "bedrock" }),
-        serde_json::to_value(&result)?,
-    )?;
-    assert!(verify_tool_call_receipt(&receipt));
-    assert_eq!(receipt["metadata"]["transport"], "streamable-http");
+    assert_eq!(result.is_error, Some(false));
+    assert_eq!(transport.exchange_log()?.len(), 1);
     Ok(())
 }

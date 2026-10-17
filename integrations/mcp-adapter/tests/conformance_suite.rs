@@ -1,20 +1,18 @@
 use chio_mcp_adapter_integration::{
-    emit_tool_call_receipt, pkce_challenge, verify_tool_call_receipt, ProtectedResourceMetadata,
-    StreamableHttpTransport,
+    pkce_challenge, ProtectedResourceMetadata, StreamableHttpTransport,
 };
 use chio_mcp_edge::{McpToolInfo, McpToolResult, McpTransport};
 use serde_json::json;
 
 const PINNED_HASH: &str = "17f1f93cc070754cdd290ac13476dcfa13f39855";
 
-const SCENARIO_MODULES: [&str; 31] = [
+const SCENARIO_MODULES: [&str; 28] = [
     "initialize",
     "tools_list",
     "tools_call",
     "streamable_http",
     "oauth_pkce",
     "protected_resource_metadata",
-    "receipt_emit",
     "resources_list",
     "resources_read",
     "prompts_list",
@@ -36,15 +34,13 @@ const SCENARIO_MODULES: [&str; 31] = [
     "token_audience",
     "registry_metadata",
     "namespace_proof",
-    "agentcore_gateway",
-    "receipt_lineage",
     "transport_headers",
 ];
 
 #[test]
 fn pinned_mcp_conformance_suite_passes_local_contract() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(PINNED_HASH, "17f1f93cc070754cdd290ac13476dcfa13f39855");
-    assert_eq!(SCENARIO_MODULES.len(), 31);
+    assert_eq!(SCENARIO_MODULES.len(), 28);
 
     let transport = StreamableHttpTransport::builder()
         .bearer_token("conformance-token")
@@ -68,14 +64,7 @@ fn pinned_mcp_conformance_suite_passes_local_contract() -> Result<(), Box<dyn st
 
     assert_eq!(transport.list_tools()?.len(), 1);
     let result = transport.call_tool("chio.conformance.echo", json!({ "ping": true }))?;
-    let receipt = emit_tool_call_receipt(
-        "cap-conformance",
-        "tenant-conformance",
-        "chio.conformance.echo",
-        json!({ "ping": true }),
-        serde_json::to_value(&result)?,
-    )?;
-    assert!(verify_tool_call_receipt(&receipt));
+    assert_eq!(result.is_error, Some(false));
 
     let pkce = pkce_challenge("abcdefghijklmnopqrstuvwxyz0123456789ABCDEFG")?;
     assert_eq!(pkce.method, "S256");
@@ -88,7 +77,7 @@ fn pinned_mcp_conformance_suite_passes_local_contract() -> Result<(), Box<dyn st
 
     let skipped = 0;
     let passed = SCENARIO_MODULES.len() - skipped;
-    assert_eq!(passed, 31);
+    assert_eq!(passed, 28);
     assert_eq!(skipped, 0);
     Ok(())
 }
