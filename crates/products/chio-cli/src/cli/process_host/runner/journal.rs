@@ -12,6 +12,35 @@ use super::container::Lease;
 use super::plan::{FailurePolicy, Plan, Worker};
 use crate::CliError;
 
+const JOURNAL_COLUMNS: [(&str, &[&str]); 5] = [
+    ("run_binding", &["singleton", "binding"]),
+    (
+        "run_workers",
+        &[
+            "process",
+            "state",
+            "attempts",
+            "suspensions",
+            "outcome",
+            "peak_resident_bytes",
+            "cpu_ms",
+        ],
+    ),
+    (
+        "run_containers",
+        &[
+            "owner",
+            "process",
+            "attempt",
+            "engine",
+            "container_id",
+            "create_rejected",
+        ],
+    ),
+    ("run_container_launches", &["process", "attempt", "record"]),
+    ("run_child_settlements", &["parent", "child", "request_id"]),
+];
+
 pub(super) struct Journal<'a> {
     clock: std::sync::Arc<dyn chio_security_types::clock::Clock>,
     db: Connection,
@@ -152,35 +181,22 @@ impl<'a> Journal<'a> {
             .map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_binding(singleton INTEGER PRIMARY KEY CHECK(singleton=1), binding TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS run_workers(process TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','running','completed','failed')), attempts INTEGER NOT NULL DEFAULT 0, suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts), outcome TEXT, peak_resident_bytes INTEGER NOT NULL DEFAULT 0, cpu_ms INTEGER NOT NULL DEFAULT 0);").map_err(error)?;
-        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_containers(owner TEXT PRIMARY KEY, process TEXT NOT NULL, attempt INTEGER NOT NULL, engine TEXT NOT NULL, container_id TEXT, UNIQUE(process,attempt));").map_err(error)?;
-        let container_columns = tx
-            .prepare("PRAGMA table_info(run_containers)")
-            .map_err(error)?
-            .query_map([], |row| row.get::<_, String>(1))
-            .map_err(error)?
-            .collect::<Result<BTreeSet<_>, _>>()
-            .map_err(error)?;
-        if !container_columns.contains("create_rejected") {
-            tx.execute_batch("ALTER TABLE run_containers ADD COLUMN create_rejected INTEGER NOT NULL DEFAULT 0 CHECK(create_rejected IN (0,1))").map_err(error)?;
-        }
+        tx.execute_batch("CREATE TABLE IF NOT EXISTS run_containers(owner TEXT PRIMARY KEY, process TEXT NOT NULL, attempt INTEGER NOT NULL, engine TEXT NOT NULL, container_id TEXT, create_rejected INTEGER NOT NULL DEFAULT 0 CHECK(create_rejected IN (0,1)), UNIQUE(process,attempt));").map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_container_launches(process TEXT NOT NULL, attempt INTEGER NOT NULL, record TEXT NOT NULL, PRIMARY KEY(process,attempt));").map_err(error)?;
         tx.execute_batch("CREATE TABLE IF NOT EXISTS run_child_settlements(parent TEXT NOT NULL, child TEXT NOT NULL, request_id TEXT NOT NULL, PRIMARY KEY(parent,child));").map_err(error)?;
-        // Journals written before suspensions were counted gain the column; their
-        // recorded attempts all count as failures, as they did when recorded.
-        // Journals written before resource use was accounted gain those columns
-        // at zero.
-        let columns = tx
-            .prepare("PRAGMA table_info(run_workers)")
-            .map_err(error)?
-            .query_map([], |row| row.get::<_, String>(1))
-            .map_err(error)?
-            .collect::<Result<BTreeSet<_>, _>>()
-            .map_err(error)?;
-        if !columns.contains("suspensions") {
-            tx.execute_batch("ALTER TABLE run_workers ADD COLUMN suspensions INTEGER NOT NULL DEFAULT 0 CHECK(suspensions <= attempts)").map_err(error)?;
-        }
-        if !columns.contains("cpu_ms") {
-            tx.execute_batch("ALTER TABLE run_workers ADD COLUMN peak_resident_bytes INTEGER NOT NULL DEFAULT 0; ALTER TABLE run_workers ADD COLUMN cpu_ms INTEGER NOT NULL DEFAULT 0").map_err(error)?;
+        for (table, expected) in JOURNAL_COLUMNS {
+            let columns = tx
+                .prepare(&format!("PRAGMA table_info({table})"))
+                .map_err(error)?
+                .query_map([], |row| row.get::<_, String>(1))
+                .map_err(error)?
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(error)?;
+            if columns != expected {
+                return Err(error(format!(
+                    "runner journal table {table} does not have the v1 columns"
+                )));
+            }
         }
         let binding = chio_core_types::crypto::canonical_json_bytes(&serde_json::json!({
             "version": 1, "authority": host.kernel.durable_admission_store_uuid(),
