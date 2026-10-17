@@ -113,10 +113,10 @@ impl SqliteRuntimeOrchestrationStore {
                 "#,
             )
             .map_err(sqlite_error)?;
-        Self::migrate_evidence_artifacts_schema(&connection)
+        Self::require_evidence_artifacts_primary_key(&connection)
     }
 
-    pub(super) fn migrate_evidence_artifacts_schema(
+    fn require_evidence_artifacts_primary_key(
         connection: &Connection,
     ) -> Result<(), ChioRuntimeError> {
         let mut statement = connection
@@ -134,31 +134,14 @@ impl SqliteRuntimeOrchestrationStore {
                 primary_key_columns.insert(name);
             }
         }
-        if primary_key_columns.contains("run_id") && primary_key_columns.contains("artifact_sha256")
-        {
+        let expected = BTreeSet::from(["run_id".to_string(), "artifact_sha256".to_string()]);
+        if primary_key_columns == expected {
             return Ok(());
         }
-        connection
-            .execute_batch(
-                r#"
-                CREATE TABLE runtime_evidence_artifacts_v2 (
-                    run_id TEXT NOT NULL,
-                    artifact_sha256 TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    relative_path TEXT NOT NULL,
-                    byte_count INTEGER NOT NULL,
-                    recorded_at_unix_ms INTEGER NOT NULL,
-                    PRIMARY KEY (run_id, artifact_sha256)
-                );
-                INSERT OR REPLACE INTO runtime_evidence_artifacts_v2 (
-                    run_id, artifact_sha256, role, relative_path, byte_count, recorded_at_unix_ms
-                )
-                SELECT run_id, artifact_sha256, role, relative_path, byte_count, recorded_at_unix_ms
-                FROM runtime_evidence_artifacts;
-                DROP TABLE runtime_evidence_artifacts;
-                ALTER TABLE runtime_evidence_artifacts_v2 RENAME TO runtime_evidence_artifacts;
-                "#,
-            )
-            .map_err(sqlite_error)
+        Err(ChioRuntimeError::Rejected {
+            code: "runtime_evidence_artifacts_schema_mismatch",
+            detail: "runtime_evidence_artifacts primary key must be (run_id, artifact_sha256)"
+                .to_string(),
+        })
     }
 }

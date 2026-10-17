@@ -293,6 +293,7 @@ pub const CHIO_RUNTIME_FAILURE_CODES: &[&str] = &[
     "runtime_admission_swarm_unsupported",
     "runtime_evidence_artifact_byte_count_mismatch",
     "runtime_evidence_artifact_hash_mismatch",
+    "runtime_evidence_artifacts_schema_mismatch",
     "runtime_evidence_health_empty_run_id",
     "runtime_evidence_health_invalid_required_role",
     "runtime_evidence_health_invalid_root_hash",
