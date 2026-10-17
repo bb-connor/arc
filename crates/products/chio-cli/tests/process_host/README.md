@@ -7,6 +7,15 @@ The `process-workers.yml` native recovery step runs that entire target after
 the `enforced-native-fixture` action qualifies the host. It builds the real
 static `process-report-fixture` and sets `CHIO_PROCESS_REPORT_TOOL`.
 
+`process_host_survives_os_death_at_each_dispatch_cutpoint` runs `os_death.py`.
+It SIGKILLs `chio process serve` while the fixture holds an append before its
+effect (C1, control `hold-before`) or after it (C2, `hold-after`), always with
+an uncheckpointed authority WAL (C5), and for C4 also kills the restarted host
+before output, after `ready` and after one inspect. The fixture writes the
+granted `publications.held` marker and waits for control `ready` within a fixed
+number of polls. These cases discharge REST-1 TEST-03 only for the
+non-recovery native lifecycle; they are not recovery-runtime qualification.
+
 Native tests require Linux x86_64 with the qualified cage enforcement features,
 a non-root operator, a static position-independent `chio-cage-init`, and a
 private receipt anchor on a different filesystem from the receipt database.

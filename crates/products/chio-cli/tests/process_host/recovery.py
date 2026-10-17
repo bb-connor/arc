@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 def report_server(binary, directory):
-    """Use the reviewed static fixture with exact source, control and output grants."""
+    """Use the reviewed static fixture with exact source, control, output and hold-marker grants."""
     from chio_process.launch import provision_native_demo
 
     target = Path(os.environ["CHIO_PROCESS_REPORT_TOOL"]).resolve(strict=True)
@@ -23,6 +23,8 @@ def report_server(binary, directory):
     source = publications.with_suffix(".source.txt")
     if not source.exists():
         source.write_text("A useful report source.")
+    held = publications.with_suffix(".held")
+    held.touch()
     return provision_native_demo(
         binary,
         "reports",
@@ -30,7 +32,7 @@ def report_server(binary, directory):
         directory / "launch-reports",
         directory,
         read_paths=[control, source],
-        write_paths=[publications],
+        write_paths=[publications, held],
     )
 
 
