@@ -300,20 +300,21 @@ exfiltrates or includes in outputs visible to unauthorized parties.
 
 Existing controls:
 
-- the ResponseSanitizationGuard scans responses for PII/PHI patterns with
-  configurable sensitivity levels and block/redact actions
-- pre-invocation scanning prevents PII in request arguments from reaching
-  tool servers
-- custom patterns can be added for deployment-specific sensitive data
+- the post-invocation SanitizerHook redacts SSNs, card numbers, emails,
+  medical record numbers and secrets from tool responses before the agent
+  sees them
+- when configured, ContentReviewGuard scans outbound message content on
+  external API calls for PII before dispatch
+- operator denylist patterns cover deployment-specific sensitive data
 
 Required mitigations:
 
-- deployments handling healthcare or financial data **MUST** enable the
-  ResponseSanitizationGuard at `Medium` sensitivity or higher
-- operators **SHOULD** configure `Redact` mode rather than `Block` where
-  partial results are acceptable, to reduce information loss
-- operators **SHOULD** define custom patterns for any deployment-specific
+- deployments handling healthcare or financial data **MUST** keep the
+  SanitizerHook installed with the `pii` category enabled
+- operators **SHOULD** define denylist patterns for any deployment-specific
   identifiers (employee IDs, internal account numbers)
+- tools whose responses cannot be safely redacted **SHOULD** stay out of
+  the capability scope of agents handling regulated data
 
 Residual risk:
 

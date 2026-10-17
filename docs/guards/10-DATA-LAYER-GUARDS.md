@@ -628,13 +628,12 @@ pre-invocation guards can only partially enforce.
 #### Integration with `PostInvocationPipeline`
 
 `QueryResultGuard` is registered on the `PostInvocationPipeline`
-alongside the existing `ResponseSanitizationGuard`. Evaluation order
-matters:
+alongside the existing `SanitizerHook`. Evaluation order matters:
 
-1. `ResponseSanitizationGuard` (existing) -- general PII/PHI detection
+1. `SanitizerHook` (existing) -- general secret and PII/PHI detection
 2. `QueryResultGuard` (new) -- data-layer-specific result enforcement
 
-If `ResponseSanitizationGuard` redacts the response,
+If `SanitizerHook` redacts the response,
 `QueryResultGuard` sees the redacted version (the pipeline chains
 redactions). This is the correct behavior -- the more specific guard
 operates on already-sanitized data.
@@ -729,7 +728,7 @@ kernel.add_guard(Box::new(pipeline));
 
 // Post-invocation pipeline.
 let mut post_pipeline = PostInvocationPipeline::new();
-post_pipeline.add(Box::new(ResponseSanitizationGuard::new(/* ... */)));
+post_pipeline.add(Box::new(SanitizerHook::new()));
 post_pipeline.add(Box::new(QueryResultGuard::new(/* ... */)));
 ```
 

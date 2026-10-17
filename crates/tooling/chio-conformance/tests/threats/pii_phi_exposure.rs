@@ -1,10 +1,11 @@
 //! Threat test for threat ID `pii_phi_exposure`.
 //!
-//! Coverage strategy: exercise the in-tree response sanitization guard against
-//! definite PHI/PII markers and assert both block and redact modes fail closed
-//! before raw identifiers reach downstream consumers.
+//! Coverage strategy: run the default post-invocation `SanitizerHook` against
+//! definite PHI/PII markers and assert that the raw identifiers never reach
+//! the agent and that receipt evidence names each detector without the raw
+//! values.
 
-use chio_guards::{ResponseSanitizationGuard, SanitizationAction, ScanResult, SensitivityLevel};
+use chio_guards::{sanitize_json, PostInvocationPipeline, PostInvocationVerdict, SanitizerHook};
 
 #[test]
 fn threat_pii_phi_exposure_is_covered() {
@@ -14,32 +15,43 @@ fn threat_pii_phi_exposure_is_covered() {
         "mrn": "MRN 123456789",
         "ssn": "123-45-6789"
     });
+    let raw_identifiers = ["123-45-6789", "MRN 123456789", "123456789"];
 
-    let blocking =
-        ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Block);
+    let mut pipeline = PostInvocationPipeline::new();
+    pipeline.add(Box::new(SanitizerHook::new()));
+
     let benign = serde_json::json!({"message": "operation completed successfully"});
-    assert!(matches!(blocking.scan_response(&benign), ScanResult::Clean));
+    let clean = pipeline.evaluate_with_evidence("tool", &benign);
+    assert!(matches!(clean.verdict, PostInvocationVerdict::Allow));
+    assert!(clean.evidence.is_empty());
 
-    match blocking.scan_response(&payload) {
-        ScanResult::Blocked(findings) => {
-            assert!(findings.iter().any(|(name, _)| name == "MRN"));
-            assert!(findings.iter().any(|(name, _)| name == "SSN"));
-        }
-        other => panic!("PHI payload must block, got {other:?}"),
-    }
-
-    let redacting =
-        ResponseSanitizationGuard::new(SensitivityLevel::High, SanitizationAction::Redact);
-    match redacting.scan_response(&payload) {
-        ScanResult::Redacted {
-            redacted_text,
-            redaction_count,
-            ..
-        } => {
-            assert!(redaction_count >= 2);
-            assert!(!redacted_text.contains("123-45-6789"));
-            assert!(!redacted_text.contains("MRN 123456789"));
+    let outcome = pipeline.evaluate_with_evidence("tool", &payload);
+    match &outcome.verdict {
+        PostInvocationVerdict::Redact(redacted) => {
+            let rendered = redacted.to_string();
+            for raw in raw_identifiers {
+                assert!(!rendered.contains(raw), "{raw} leaked: {rendered}");
+            }
         }
         other => panic!("PHI payload must redact, got {other:?}"),
     }
+    assert_eq!(outcome.evidence.len(), 1);
+    let details = outcome.evidence[0].details.as_deref().unwrap_or("");
+    assert!(details.contains("pii_mrn:"), "got: {details}");
+    assert!(details.contains("pii_ssn:"), "got: {details}");
+    for raw in raw_identifiers {
+        assert!(!details.contains(raw), "{raw} leaked into evidence");
+    }
+
+    let hook = SanitizerHook::new();
+    let (_, result) = sanitize_json(hook.sanitizer(), &payload);
+    assert!(result.redactions.len() >= 2);
+    assert!(result
+        .findings
+        .iter()
+        .any(|finding| finding.id == "pii_mrn"));
+    assert!(result
+        .findings
+        .iter()
+        .any(|finding| finding.id == "pii_ssn"));
 }

@@ -273,15 +273,15 @@
       "mitigations": [
         {
           "status": "existing",
-          "control": "The ResponseSanitizationGuard scans responses for PII and PHI patterns with configurable sensitivity levels and block or redact actions."
+          "control": "The post-invocation SanitizerHook, installed by the default runtime profile, redacts SSN, card number, email, medical record number and secret patterns from tool responses and records detector ids without raw values in receipt evidence."
         },
         {
           "status": "existing",
-          "control": "Pre-invocation scanning prevents PII in request arguments from reaching tool servers, and custom patterns support deployment-specific sensitive data."
+          "control": "Operator denylist patterns redact deployment-specific sensitive data, and a configured ContentReviewGuard scans outbound message content for PII before dispatch."
         },
         {
           "status": "planned",
-          "control": "Healthcare and financial deployments must enable ResponseSanitizationGuard at Medium sensitivity or higher and define custom patterns for local identifiers."
+          "control": "Healthcare and financial deployments must define denylist patterns for local identifiers."
         }
       ],
       "residualRisk": "Regex-based pattern detection is incomplete, may false-positive in non-medical contexts, and does not scan image or binary response content.",
@@ -289,7 +289,7 @@
       "coveredBy": [
         "crates/tooling/chio-conformance/tests/threats/pii_phi_exposure.rs"
       ],
-      "deferred_to": "future milestone (deployment-specific detectors and non-text inspection): real mutation evidence closes built-in structured-text SSN and MRN detection with block and redact outcomes; local identifier coverage, image and binary inspection, mandatory regulated-profile activation, and detector-quality qualification remain deferred (see audits/evidence/threats/pii_phi_exposure.json::deferred_follow_up)"
+      "deferred_to": "future milestone (deployment-specific detectors and non-text inspection): real mutation evidence closes built-in structured-text SSN and MRN redaction through SanitizerHook; local identifier coverage, image and binary inspection, mandatory regulated-profile activation, and detector-quality qualification remain deferred (see audits/evidence/threats/pii_phi_exposure.json::deferred_follow_up)"
     },
     {
       "id": "agent_velocity_abuse",
