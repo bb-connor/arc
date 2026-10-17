@@ -1420,20 +1420,22 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
 
     let (wrong_reference, _wrong_reference_precommitment) =
         audit_reference_for_execution(&fixture, &request, true);
-    assert!(crate::audit::verify_broker_audit_runner_authorization(
-        &signed_runner,
-        &request,
-        &wrong_reference,
-        crate::audit::BrokerAuditRunnerTrust {
-            deployment_id: "test-deployment",
-            broker_instance_id: "test-broker-instance",
-            tenant_scope: "tenant-a",
-            runner_id: "test-enterprise-runner",
-            trusted_runner: &fixture.audit_runner.public_key().unwrap(),
-        },
-        20,
-    )
-    .is_err());
+    assert!(matches!(
+        crate::audit::verify_broker_audit_runner_authorization(
+            &signed_runner,
+            &request,
+            &wrong_reference,
+            crate::audit::BrokerAuditRunnerTrust {
+                deployment_id: "test-deployment",
+                broker_instance_id: "test-broker-instance",
+                tenant_scope: "tenant-a",
+                runner_id: "test-enterprise-runner",
+                trusted_runner: &fixture.audit_runner.public_key().unwrap(),
+            },
+            20,
+        ),
+        Err(crate::BrokerError::AuthorizationDenied(_))
+    ));
     let wrong_runner = Keypair::from_seed(&[64; 32]).public_key();
     assert!(crate::audit::verify_broker_audit_runner_authorization(
         &signed_runner,

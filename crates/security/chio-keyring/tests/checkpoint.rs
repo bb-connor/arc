@@ -93,9 +93,10 @@ fn checkpoint_operator_signature_and_identity_are_canonical() {
     checkpoint
         .verify_operator(&operator.public_key().test_unwrap())
         .test_unwrap();
-    assert!(checkpoint
-        .verify_operator(&backend(11).public_key().test_unwrap())
-        .is_err());
+    assert!(matches!(
+        checkpoint.verify_operator(&backend(11).public_key().test_unwrap()),
+        Err(chio_keyring::KeyringError::AlgorithmMismatch)
+    ));
 }
 
 #[test]

@@ -261,9 +261,10 @@ fn router_persists_epoch_evidence_cuts_over_atomically_and_reopens_exact_selecto
     let mut corrupted_evidence = first.clone();
     corrupted_evidence.artifact_signature =
         ready.old.sign_bytes(b"corrupted evidence").test_unwrap();
-    assert!(corrupted_evidence
-        .verify(&ready.old.public_key().test_unwrap())
-        .is_err());
+    assert!(matches!(
+        corrupted_evidence.verify(&ready.old.public_key().test_unwrap()),
+        Err(chio_keyring::KeyringError::InvalidSignature)
+    ));
     assert!(router
         .sign_canonical(1, &serde_json::json!({"artifact": 2}))
         .is_err());
@@ -349,7 +350,10 @@ fn keyring_public_key_errors_when_selector_lock_is_poisoned() {
         router.active_public_key(),
         Err(chio_keyring::KeyringError::Synchronization)
     ));
-    assert!(router.sign_bytes_with_identity(b"m").is_err());
+    assert!(matches!(
+        router.sign_bytes_with_identity(b"m"),
+        Err(chio_keyring::KeyringError::Synchronization)
+    ));
 }
 
 struct PanicOnDropBackend(Ed25519Backend);
@@ -575,9 +579,10 @@ fn enterprise_router_returns_one_identity_epoch_signature_and_anchor_result() {
     assert_eq!(result.signature, result.evidence.artifact_signature);
     assert!(result.public_key.verify(artifact, &result.signature));
     assert!(result.time_anchor.is_some());
-    assert!(router
-        .sign_bytes_for_identity(&ready.new.public_key().test_unwrap(), artifact)
-        .is_err());
+    assert!(matches!(
+        router.sign_bytes_for_identity(&ready.new.public_key().test_unwrap(), artifact),
+        Err(chio_keyring::KeyringError::StateInvariant(_))
+    ));
 }
 
 #[test]
