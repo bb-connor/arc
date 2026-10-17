@@ -673,8 +673,12 @@ fn fixture_with_receipt_signer(
     let audit_subject = Keypair::from_seed(&[62; 32]).public_key();
     let audit_runner: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[63; 32])));
-    let audit_runner_key = audit_runner.public_key().unwrap();
-    let audit_receipt_signer = receipt_signer.public_key().unwrap();
+    let audit_runner_key = audit_runner
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
+    let audit_receipt_signer = receipt_signer
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
     let audit_authority_broker_signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[71; 32])));
     let audit_authority_signer: Arc<dyn SigningBackend> =
@@ -688,7 +692,9 @@ fn fixture_with_receipt_signer(
                 threshold: 1,
                 maximum_token_lifetime_seconds: 300,
             },
-            receipt_signer.public_key().unwrap(),
+            receipt_signer
+                .public_key()
+                .unwrap_or_else(|error| panic!("signing identity: {error}")),
             Arc::new(trusted_time::FixedClock::new(20)),
         )
         .test_expect("audit admin authorizer"),
@@ -806,7 +812,9 @@ fn fixture_with_receipt_signer(
         audit_subject,
         audit_runner,
         audit_runner_key,
-        audit_authority: audit_authority_signer.public_key().unwrap(),
+        audit_authority: audit_authority_signer
+            .public_key()
+            .unwrap_or_else(|error| panic!("signing identity: {error}")),
         audit_receipt_signer,
         audit_approval_sequence: AtomicU64::new(0),
         secret_database,
@@ -884,7 +892,10 @@ fn authorized_audit(
             broker_instance_id: "test-broker-instance",
             tenant_scope: "tenant-a",
             runner_id: "test-enterprise-runner",
-            trusted_runner: &fixture.audit_runner.public_key().unwrap(),
+            trusted_runner: &fixture
+                .audit_runner
+                .public_key()
+                .unwrap_or_else(|error| panic!("signing identity: {error}")),
         },
         now_unix_seconds,
     )
