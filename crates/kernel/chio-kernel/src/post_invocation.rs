@@ -4,7 +4,6 @@ use chio_core::receipt::metadata::GuardEvidence;
 use chio_core::{capability::scope::ChioScope, AgentId, ServerId};
 use serde::Serialize;
 use serde_json::Value;
-use std::sync::{Mutex, MutexGuard};
 
 use crate::runtime::ToolCallRequest;
 use crate::SecurityInvocationContext;
@@ -227,16 +226,12 @@ pub struct PipelineOutcome {
 /// Pipeline of post-invocation hooks evaluated in registration order.
 pub struct PostInvocationPipeline {
     hooks: Vec<Box<dyn PostInvocationHook>>,
-    evaluation_lock: Mutex<()>,
 }
 
 impl PostInvocationPipeline {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            hooks: Vec::new(),
-            evaluation_lock: Mutex::new(()),
-        }
+        Self { hooks: Vec::new() }
     }
 
     pub fn add(&mut self, hook: Box<dyn PostInvocationHook>) {
@@ -282,7 +277,6 @@ impl PostInvocationPipeline {
         response: &Value,
         expected_identities: &[PostInvocationHookIdentity],
     ) -> Result<DurablePipelineOutcome, String> {
-        let _evaluation = self.lock_evaluation();
         if self.hooks.len() != expected_identities.len() {
             return Err("post-invocation pipeline changed after durable admission".to_owned());
         }
@@ -363,7 +357,6 @@ impl PostInvocationPipeline {
         context: &PostInvocationContext<'_>,
         response: &Value,
     ) -> PipelineOutcome {
-        let _evaluation = self.lock_evaluation();
         let mut current_response = response.clone();
         let mut escalations = Vec::new();
         let mut evidence = Vec::new();
@@ -404,13 +397,6 @@ impl PostInvocationPipeline {
         }
     }
 
-    fn lock_evaluation(&self) -> MutexGuard<'_, ()> {
-        match self.evaluation_lock.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        }
-    }
-
     #[must_use]
     pub fn evaluate(
         &self,
@@ -425,68 +411,5 @@ impl PostInvocationPipeline {
 impl Default for PostInvocationPipeline {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-    use std::sync::{Arc, Barrier};
-    use std::thread;
-    use std::time::Duration;
-
-    struct OverlapDetectingHook {
-        active: Arc<AtomicUsize>,
-        overlapped: Arc<AtomicBool>,
-    }
-
-    impl PostInvocationHook for OverlapDetectingHook {
-        fn name(&self) -> &str {
-            "overlap-detecting-hook"
-        }
-
-        fn inspect(
-            &self,
-            _ctx: &PostInvocationContext<'_>,
-            _response: &Value,
-        ) -> PostInvocationVerdict {
-            if self.active.fetch_add(1, Ordering::SeqCst) != 0 {
-                self.overlapped.store(true, Ordering::SeqCst);
-            }
-            thread::sleep(Duration::from_millis(25));
-            self.active.fetch_sub(1, Ordering::SeqCst);
-            PostInvocationVerdict::Allow
-        }
-    }
-
-    #[test]
-    fn pipeline_serializes_hook_evaluation() {
-        let active = Arc::new(AtomicUsize::new(0));
-        let overlapped = Arc::new(AtomicBool::new(false));
-        let mut pipeline = PostInvocationPipeline::new();
-        pipeline.add(Box::new(OverlapDetectingHook {
-            active,
-            overlapped: overlapped.clone(),
-        }));
-        let pipeline = Arc::new(pipeline);
-        let start = Arc::new(Barrier::new(3));
-        let workers = (0..2)
-            .map(|index| {
-                let pipeline = pipeline.clone();
-                let start = start.clone();
-                thread::spawn(move || {
-                    start.wait();
-                    let _ = pipeline
-                        .evaluate_with_evidence("tool", &serde_json::json!({"index": index}));
-                })
-            })
-            .collect::<Vec<_>>();
-        start.wait();
-        for worker in workers {
-            worker.join().expect("post-invocation worker");
-        }
-
-        assert!(!overlapped.load(Ordering::SeqCst));
     }
 }
