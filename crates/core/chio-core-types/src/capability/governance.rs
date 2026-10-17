@@ -35,10 +35,7 @@ const MAX_RESPONSE_PLAN_JSON_NODES: usize = 4_096;
 const MAX_RESPONSE_PLAN_EFFECTS: usize = 5;
 
 pub const GOVERNED_RESPONSE_PLAN_SCHEMA: &str = "chio.response-plan.v1";
-pub const CHIO_RESPONSE_PLAN_SCHEMA: &str = GOVERNED_RESPONSE_PLAN_SCHEMA;
 pub const ACTIVE_RESPONSE_SERVER_ID: &str = "chio.control-plane.active-response";
-/// Backward-compatible protocol name used by the enterprise response runtime.
-pub const CHIO_ACTIVE_RESPONSE_SERVER_ID: &str = ACTIVE_RESPONSE_SERVER_ID;
 pub const ACTIVE_RESPONSE_PLAN_TOOL_NAME: &str = "apply_plan";
 
 /// Explicit governed autonomy tier requested for one economically sensitive action.
@@ -206,7 +203,7 @@ pub struct GovernedCallChainContext {
     pub delegator_subject: String,
 }
 
-/// Reserved key inside `GovernedTransactionIntent.context` for compatibility upstream call-chain proofs.
+/// Reserved key inside `GovernedTransactionIntent.context` for upstream call-chain proofs.
 pub const GOVERNED_CALL_CHAIN_UPSTREAM_PROOF_CONTEXT_KEY: &str = "callChainUpstreamProof";
 
 /// Signable upstream proof for delegated governed call-chain provenance.

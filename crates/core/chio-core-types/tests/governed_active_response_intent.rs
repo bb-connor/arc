@@ -2,7 +2,7 @@
 
 use chio_core_types::capability::governance::{
     GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntent,
-    CHIO_RESPONSE_PLAN_SCHEMA,
+    GOVERNED_RESPONSE_PLAN_SCHEMA,
 };
 use chio_core_types::{canonical_json_bytes, Keypair};
 use serde_json::{json, Value};
@@ -21,7 +21,7 @@ fn valid_response_plan_body() -> GovernedResponsePlanIntentBody {
     let plan_body_hash =
         GovernedResponsePlanIntentBody::compute_plan_body_hash(&canonical_plan_body).unwrap();
     GovernedResponsePlanIntentBody::new(
-        CHIO_RESPONSE_PLAN_SCHEMA,
+        GOVERNED_RESPONSE_PLAN_SCHEMA,
         "action-1",
         "operator-capability-1",
         "b".repeat(64),

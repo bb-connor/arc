@@ -20,7 +20,7 @@ fn signed_request(
         crate::security::event_consumer::digest_from_canonical_hex(&plan_body_hash).test_unwrap();
     let intent = GovernedTransactionIntent::active_response_plan(
         GovernedResponsePlanIntentBody::new(
-            CHIO_RESPONSE_PLAN_SCHEMA,
+            GOVERNED_RESPONSE_PLAN_SCHEMA,
             plan.action_id.as_str(),
             capability.id.clone(),
             capability_hash.clone(),
@@ -154,7 +154,7 @@ fn active_response_refuses_a_signed_capability_without_the_required_effect_grant
         &fixture,
         &request,
         &format!("active-response authorization denied: verified capability lacks an exact unconditional Invoke grant for {} on {}",
-            GovernedResponseEffect::ThrottleSession.tool_name(), CHIO_ACTIVE_RESPONSE_SERVER_ID),
+            GovernedResponseEffect::ThrottleSession.tool_name(), ACTIVE_RESPONSE_SERVER_ID),
     );
 }
 
