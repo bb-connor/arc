@@ -3,6 +3,7 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 fn assert_refusal_without_writes(
     connection: &mut Connection,
+    allow_empty: bool,
     expected: ToolOutcomeStoreError,
 ) -> TestResult {
     let catalog = tool_outcome_schema_catalog(connection)?;
@@ -11,7 +12,10 @@ fn assert_refusal_without_writes(
     let schema_version: i32 =
         connection.pragma_query_value(None, "schema_version", |row| row.get(0))?;
     let changes = connection.total_changes();
-    assert_eq!(initialize_tool_outcome_schema(connection), Err(expected));
+    assert_eq!(
+        initialize_tool_outcome_schema(connection, allow_empty),
+        Err(expected)
+    );
     assert_eq!(tool_outcome_schema_catalog(connection)?, catalog);
     assert_eq!(
         connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?,
@@ -29,7 +33,7 @@ fn assert_refusal_without_writes(
 fn tool_outcome_store_refuses_noncurrent_stamp_without_writes() -> TestResult {
     for found in [4, 3, 2, 0, -1, i32::MAX] {
         let mut connection = Connection::open_in_memory()?;
-        initialize_tool_outcome_schema(&mut connection)?;
+        initialize_tool_outcome_schema(&mut connection, true)?;
         crate::stamp_schema_version(&connection, TOOL_OUTCOME_SCHEMA_KEY, found)?;
         let expected = ToolOutcomeStoreError::NoncurrentSchema { found, current: 1 };
         assert_eq!(
@@ -38,7 +42,7 @@ fn tool_outcome_store_refuses_noncurrent_stamp_without_writes() -> TestResult {
                 "tool outcome schema version {found} is not the current schema version 1; refusing to open"
             )
         );
-        assert_refusal_without_writes(&mut connection, expected)?;
+        assert_refusal_without_writes(&mut connection, true, expected)?;
         assert_eq!(
             connection.query_row(
                 "SELECT version FROM chio_store_schema_versions WHERE store_key = 'tool_outcome'",
@@ -54,7 +58,7 @@ fn tool_outcome_store_refuses_noncurrent_stamp_without_writes() -> TestResult {
 #[test]
 fn tool_outcome_store_creates_v1_and_reopens_without_writes() -> TestResult {
     let mut connection = Connection::open_in_memory()?;
-    initialize_tool_outcome_schema(&mut connection)?;
+    initialize_tool_outcome_schema(&mut connection, true)?;
     assert_eq!(
         connection.query_row(
             "SELECT version FROM chio_store_schema_versions WHERE store_key = 'tool_outcome'",
@@ -75,7 +79,7 @@ fn tool_outcome_store_creates_v1_and_reopens_without_writes() -> TestResult {
     let changes = connection.total_changes();
     let schema_version: i32 =
         connection.pragma_query_value(None, "schema_version", |row| row.get(0))?;
-    initialize_tool_outcome_schema(&mut connection)?;
+    initialize_tool_outcome_schema(&mut connection, false)?;
     assert_eq!(tool_outcome_schema_catalog(&connection)?, catalog);
     assert_eq!(connection.total_changes(), changes);
     assert_eq!(
@@ -121,6 +125,7 @@ END;"#,
     crate::stamp_schema_version(&connection, TOOL_OUTCOME_SCHEMA_KEY, 1)?;
     assert_refusal_without_writes(
         &mut connection,
+        true,
         invariant("tool outcome schema differs from the canonical definition"),
     )
 }
@@ -137,10 +142,10 @@ fn tool_outcome_store_refuses_damaged_v1_without_repair() -> TestResult {
         "CREATE TRIGGER unrelated_outcome_guard AFTER INSERT ON tool_outcome_blobs BEGIN SELECT 1; END",
     ] {
         let mut connection = Connection::open_in_memory()?;
-        initialize_tool_outcome_schema(&mut connection)?;
+        initialize_tool_outcome_schema(&mut connection, true)?;
         connection.execute_batch(damage)?;
         assert_refusal_without_writes(
-            &mut connection,
+            &mut connection, true,
             invariant("tool outcome schema differs from the canonical definition"),
         )?;
     }
@@ -154,10 +159,11 @@ fn tool_outcome_store_refuses_missing_stamp_with_owned_schema() -> TestResult {
         "DROP TABLE chio_store_schema_versions",
     ] {
         let mut connection = Connection::open_in_memory()?;
-        initialize_tool_outcome_schema(&mut connection)?;
+        initialize_tool_outcome_schema(&mut connection, true)?;
         connection.execute_batch(damage)?;
         assert_refusal_without_writes(
             &mut connection,
+            true,
             invariant("unstamped tool outcome schema cannot be adopted"),
         )?;
     }
@@ -180,6 +186,7 @@ fn tool_outcome_store_refuses_unstamped_namespace_beside_admission_store() -> Te
         connection.execute_batch(owned_schema)?;
         assert_refusal_without_writes(
             &mut connection,
+            true,
             invariant("unstamped tool outcome schema cannot be adopted"),
         )?;
     }
@@ -192,8 +199,8 @@ fn tool_outcome_store_initializes_beside_admission_store() -> TestResult {
     connection.pragma_update(None, "application_id", crate::CHIO_SQLITE_APPLICATION_ID)?;
     connection.execute_batch("CREATE TABLE admission_operations (operation_id TEXT)")?;
     crate::stamp_schema_version(&connection, "admission_operation", 1)?;
-    initialize_tool_outcome_schema(&mut connection)?;
-    initialize_tool_outcome_schema(&mut connection)?;
+    initialize_tool_outcome_schema(&mut connection, true)?;
+    initialize_tool_outcome_schema(&mut connection, false)?;
     assert_eq!(
         connection.query_row(
             "SELECT COUNT(*) FROM chio_store_schema_versions WHERE version = 1",
@@ -208,15 +215,17 @@ fn tool_outcome_store_initializes_beside_admission_store() -> TestResult {
 #[test]
 fn tool_outcome_store_refuses_damaged_application_identity() -> TestResult {
     let mut connection = Connection::open_in_memory()?;
-    initialize_tool_outcome_schema(&mut connection)?;
+    initialize_tool_outcome_schema(&mut connection, true)?;
     connection.pragma_update(None, "application_id", 0)?;
     assert_refusal_without_writes(
         &mut connection,
+        true,
         invariant("unstamped security release source cannot be adopted"),
     )?;
     connection.execute_batch("DROP TABLE tool_outcome_security_releases")?;
     assert_refusal_without_writes(
         &mut connection,
+        true,
         invariant("versioned outcome source has a damaged application identity"),
     )
 }
@@ -227,6 +236,7 @@ fn tool_outcome_store_refuses_unstamped_owned_tables() -> TestResult {
     connection.execute_batch("CREATE TABLE tool_outcomes (operation_id TEXT)")?;
     assert_refusal_without_writes(
         &mut connection,
+        true,
         invariant("unstamped tool outcome schema cannot be adopted"),
     )
 }
@@ -243,7 +253,7 @@ fn tool_outcome_store_refuses_noncanonical_version_namespace() -> TestResult {
             connection.execute_batch(metadata)?;
             connection.pragma_update(None, "application_id", app_id)?;
             assert_refusal_without_writes(
-                &mut connection,
+                &mut connection, true,
                 invariant("outcome schema-version namespace is not canonical"),
             )?;
         }
@@ -257,6 +267,7 @@ fn tool_outcome_store_refuses_foreign_identity() -> TestResult {
     connection.pragma_update(None, "application_id", 0x1234_5678)?;
     assert_refusal_without_writes(
         &mut connection,
+        true,
         invariant(
             crate::SchemaVersionError::ForeignDatabase {
                 found: 0x1234_5678,
@@ -298,6 +309,29 @@ fn outcome_view_without_application_identity_is_refused_before_writes() -> TestR
     connection.execute_batch("CREATE VIEW TOOL_OUTCOMES AS SELECT 1")?;
     assert_refusal_without_writes(
         &mut connection,
+        true,
         invariant("unstamped tool outcome schema cannot be adopted"),
     )
+}
+
+#[test]
+fn provisioned_outcome_initializer_refuses_namespace_deleted_after_preflight() -> TestResult {
+    let mut connection = Connection::open_in_memory()?;
+    connection.pragma_update(None, "application_id", crate::CHIO_SQLITE_APPLICATION_ID)?;
+    connection.execute_batch("CREATE TABLE admission_operations (operation_id TEXT)")?;
+    initialize_tool_outcome_schema(&mut connection, true)?;
+    preflight_tool_outcome_schema(&connection, false)?;
+    connection.execute_batch(
+        "DROP TABLE tool_outcome_security_releases;
+         DROP TABLE post_return_evaluations;
+         DROP TABLE tool_outcomes;
+         DROP TABLE tool_outcome_blobs;
+         DELETE FROM chio_store_schema_versions WHERE store_key = 'tool_outcome';",
+    )?;
+    assert_refusal_without_writes(
+        &mut connection,
+        false,
+        ToolOutcomeStoreError::Invariant("provisioned tool outcome schema is missing".into()),
+    )?;
+    Ok(())
 }

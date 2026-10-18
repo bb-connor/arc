@@ -761,11 +761,12 @@ pub(crate) fn preflight_tool_outcome_schema(
 
 pub(crate) fn initialize_tool_outcome_schema(
     connection: &mut Connection,
+    allow_empty: bool,
 ) -> Result<(), ToolOutcomeStoreError> {
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    preflight_tool_outcome_schema(&transaction, true)?;
+    preflight_tool_outcome_schema(&transaction, allow_empty)?;
     let state = crate::check_current_schema(
         &transaction,
         TOOL_OUTCOME_SCHEMA_KEY,
