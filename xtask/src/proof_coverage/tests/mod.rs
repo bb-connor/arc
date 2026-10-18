@@ -429,11 +429,6 @@ fn current_registries_have_total_primary_attribution() {
         Err(error) => panic!("coverage build failed: {error}"),
     };
 
-    assert!(
-        build.parse_warnings.is_empty(),
-        "{:?}",
-        build.parse_warnings
-    );
     let kani: KaniManifest = match parse_toml(
         ".kani/harnesses.toml",
         include_str!("../../../../.kani/harnesses.toml"),

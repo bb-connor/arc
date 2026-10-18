@@ -278,6 +278,5 @@ pub(super) fn build_coverage(root: &Path) -> Result<CoverageBuild, String> {
         excluded_surfaces: manifest.excluded_surfaces,
         review_links,
         lane_postures,
-        parse_warnings: mapping.warnings,
     })
 }

@@ -238,14 +238,6 @@ pub(super) fn render_document(build: &CoverageBuild) -> Result<String, String> {
         output.push_str(&input.sha256);
         output.push_str("`\n");
     }
-    if !build.parse_warnings.is_empty() {
-        output.push_str("\n### Parse Warnings\n\n");
-        for warning in &build.parse_warnings {
-            output.push_str("- ");
-            output.push_str(warning);
-            output.push('\n');
-        }
-    }
 
     for line in output.lines().filter(|line| line.starts_with('|')) {
         if line.len() > 120 {

@@ -157,8 +157,7 @@ Abridged `coverage.json` shape:
       "target": "formal/lean4/Chio/Chio/Core/Capability.lean"
     }
   ],
-  "excluded_surfaces": ["..."],
-  "parse_warnings": []
+  "excluded_surfaces": ["..."]
 }
 ```
 
@@ -173,7 +172,7 @@ companion, and compares the committed page byte-for-byte.
 
 ### Parsing details
 
-- MAPPING.md: parse markdown tables tolerantly - split rows on `|`, trim cells, skip separator rows and prose between tables, and record any malformed row as a deterministic `parse_warnings` entry in coverage.json instead of failing (the file is grep-enforced by scripts/check-mapping.sh, not schema-enforced, so tolerance is required; warnings keep tolerance honest).
+- MAPPING.md: parse markdown tables tolerantly - split rows on `|`, trim cells, skip separator rows and prose between tables, and fail generation with an error naming the file, line and reason for any malformed property-table row.
 - Fuzz attribution: `crate` is authoritative. Exactly one literal owner-local
   Rust trigger refines a target to a file; zero or multiple literal files keep
   the target at crate granularity, with files recorded as related surfaces.

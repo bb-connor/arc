@@ -439,7 +439,6 @@ struct CoverageDocument {
     excluded_surfaces: Vec<String>,
     review_links: Vec<ReviewLink>,
     lane_postures: BTreeMap<String, String>,
-    parse_warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -490,7 +489,6 @@ struct CoverageBuild {
     excluded_surfaces: Vec<String>,
     review_links: Vec<ReviewLink>,
     lane_postures: BTreeMap<String, String>,
-    parse_warnings: Vec<String>,
 }
 
 pub(crate) fn run(check: bool) -> Result<(), XtaskError> {
@@ -511,7 +509,6 @@ pub(crate) fn run(check: bool) -> Result<(), XtaskError> {
         excluded_surfaces: build.excluded_surfaces.clone(),
         review_links: build.review_links.clone(),
         lane_postures: build.lane_postures.clone(),
-        parse_warnings: build.parse_warnings.clone(),
     };
     let json = serde_json::to_string_pretty(&document)
         .map_err(|error| XtaskError::ProofCoverage(format!("JSON render failed: {error}")))?
