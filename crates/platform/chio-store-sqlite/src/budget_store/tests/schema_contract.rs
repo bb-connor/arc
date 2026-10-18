@@ -423,3 +423,73 @@ fn budget_schema_serving_refuses_noncurrent_stamp_without_mutation() -> TestResu
     assert_eq!(snapshot(&connection)?, before);
     Ok(())
 }
+
+#[cfg(unix)]
+fn provisioned_authority() -> TestResult<(tempfile::TempDir, std::path::PathBuf, std::path::PathBuf)>
+{
+    use std::os::unix::fs::PermissionsExt;
+    let directory = tempfile::tempdir()?;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    let path = directory.path().join("authority.db");
+    let lock_root = directory.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+    crate::SqliteAuthorityStore::provision(&path, &lock_root)?;
+    Ok((directory, path, lock_root))
+}
+
+#[cfg(unix)]
+#[test]
+fn budget_schema_reprovision_refuses_deleted_namespace_without_mutation() -> TestResult {
+    let (_directory, path, lock_root) = provisioned_authority()?;
+    let connection = Connection::open(&path)?;
+    let tables = {
+        let mut statement = connection.prepare(
+            "SELECT name FROM sqlite_schema WHERE type = 'table' AND
+             (name GLOB 'budget_*' OR name = 'capability_grant_budgets'
+              OR name IN ('payment_journal', 'payment_release_evidence'))",
+        )?;
+        let names = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        names
+    };
+    for table in tables {
+        connection.execute_batch(&format!("DROP TABLE \"{}\"", table.replace('"', "\"\"")))?;
+    }
+    connection.execute(
+        "DELETE FROM chio_store_schema_versions WHERE store_key = 'budget'",
+        [],
+    )?;
+    let before = snapshot(&connection)?;
+    let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
+        .expect_err("reprovisioning cannot recreate deleted budget custody");
+    assert!(matches!(error,
+        crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(ref message))
+        if message == "budget schema does not match the current v1 shape"));
+    assert_eq!(snapshot(&connection)?, before);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn budget_schema_serving_refuses_catalog_drift_and_missing_stamp_without_mutation() -> TestResult {
+    for damage in [
+        "CREATE TRIGGER budget_injected AFTER INSERT ON budget_authorization_holds BEGIN SELECT 1; END;",
+        "DELETE FROM chio_store_schema_versions WHERE store_key = 'budget';",
+    ] {
+        let (_directory, path, lock_root) = provisioned_authority()?;
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(damage)?;
+        let before = snapshot(&connection)?;
+        let error = match crate::test_authority::open_serving(&path, &lock_root) {
+            Ok(_) => panic!("damaged budget schema cannot serve"),
+            Err(error) => error,
+        };
+        assert!(matches!(error,
+            crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(ref message))
+            if message == "budget schema does not match the current v1 shape"));
+        assert_eq!(snapshot(&connection)?, before);
+    }
+    Ok(())
+}
