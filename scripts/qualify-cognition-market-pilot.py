@@ -121,6 +121,41 @@ def run(
     return completed
 
 
+REFUSAL_EXIT = 1
+TYPESCRIPT_ACCEPTED = 3
+TYPESCRIPT_OTHER_FAILURE = 4
+PROOF_REFUSAL = (
+    "urn:chio:error:cli:other",
+    "finding operator bundle artifact failed verification: "
+    "finding_id does not match the canonical artifact body",
+)
+PURCHASE_REFUSAL = (
+    "urn:chio:error:transport:invalid-request-shape",
+    "purchase record body or embedded signature is invalid",
+)
+
+
+def exact_refusal(
+    completed: subprocess.CompletedProcess[str],
+    label: str,
+    refusal: tuple[str, str],
+) -> bool:
+    """True for the exact refusal, False if the input was accepted, else raise."""
+    if completed.returncode == 0:
+        return False
+    code, message = refusal
+    if (
+        completed.returncode == REFUSAL_EXIT
+        and code in completed.stderr
+        and message in completed.stderr
+    ):
+        return True
+    raise RuntimeError(
+        f"{label} exited {completed.returncode} without the exact tamper refusal "
+        f"{code}: {message}\nstderr:\n{completed.stderr[-4000:]}"
+    )
+
+
 def git(repository: Path, *arguments: str) -> str:
     return run(["git", *arguments], cwd=repository).stdout.strip()
 
@@ -150,6 +185,11 @@ def create_corpus(repository: Path) -> list[dict[str, str]]:
         baseline = run(["python3", "-B", "-m", module_name], cwd=repository, check=False)
         if baseline.returncode == 0:
             raise RuntimeError(f"pilot task {task.name} does not fail at its base revision")
+        if baseline.returncode != 1 or "AssertionError" not in baseline.stderr:
+            raise RuntimeError(
+                f"pilot task {task.name} base revision crashed instead of failing its test "
+                f"(exit {baseline.returncode}):\n{baseline.stderr[-4000:]}"
+            )
         text = module.read_text(encoding="utf-8")
         if text.count(task.broken) != 1:
             raise RuntimeError(f"pilot task {task.name} broken source is not unique")
@@ -472,16 +512,30 @@ def tampered_proof_rejected(
                 f'import {{ CognitionMarketBuyer }} from "{source}";',
                 f'const buyer = new CognitionMarketBuyer({json.dumps(str(buyer_profile))}, '
                 f'{{ chioBinary: {json.dumps(str(binary))} }});',
-                "let rejected = false;",
+                f"const code = {json.dumps(PROOF_REFUSAL[0])};",
+                f"const message = {json.dumps(PROOF_REFUSAL[1])};",
                 f"try {{ await buyer.verifyProof(readFileSync({json.dumps(str(tampered))})); }} "
-                "catch { rejected = true; }",
-                "if (!rejected) process.exit(1);",
+                "catch (error) {",
+                "  const text = error instanceof Error ? error.message : String(error);",
+                "  if (text.includes(code) && text.includes(message)) process.exit(0);",
+                "  console.error(text);",
+                f"  process.exit({TYPESCRIPT_OTHER_FAILURE});",
+                "}",
+                f"process.exit({TYPESCRIPT_ACCEPTED});",
             ]
         ),
         encoding="utf-8",
     )
     typescript = run(["node", "--experimental-strip-types", str(program)], check=False)
-    return {"rustRejected": rust.returncode != 0, "typescriptRejected": typescript.returncode == 0}
+    if typescript.returncode not in (0, TYPESCRIPT_ACCEPTED):
+        raise RuntimeError(
+            f"typescript verifier exited {typescript.returncode} without the exact tamper "
+            f"refusal {PROOF_REFUSAL[0]}: {PROOF_REFUSAL[1]}\nstderr:\n{typescript.stderr[-4000:]}"
+        )
+    return {
+        "rustRejected": exact_refusal(rust, "rust verify-bundle", PROOF_REFUSAL),
+        "typescriptRejected": typescript.returncode == 0,
+    }
 
 
 def tampered_purchase_terminal_rejected(
@@ -560,11 +614,8 @@ def tampered_purchase_terminal_rejected(
     result_path.write_bytes(
         json.dumps(result, ensure_ascii=False, separators=(",", ":"), sort_keys=True).encode()
     )
-    completed = run(
-        verification_command,
-        check=False,
-    )
-    return completed.returncode != 0
+    completed = run(verification_command, check=False)
+    return exact_refusal(completed, "rust verify-bundle purchase terminal", PURCHASE_REFUSAL)
 
 
 def qualify(binary: Path, output: Path, candidate_sha: str) -> dict[str, Any]:
