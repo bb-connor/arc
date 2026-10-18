@@ -2,9 +2,10 @@ use std::path::PathBuf;
 
 use chio_core_types::{Keypair, PublicKey};
 use chio_federation::frost::{
-    registered_frost_actions, FrostArtifactAuthorityRole, FrostArtifactTrustRoot,
-    FrostArtifactTrustStore, FrostAuthorizationDomain, FrostParticipantV1, FrostRosterKeyOrigin,
-    FrostRosterV1, CHIO_FROST_ROSTER_SCHEMA, FROST_ED25519_SHA512_SUITE_ID,
+    registered_frost_actions, FrostArtifactAuthorityRole, FrostArtifactTrustError,
+    FrostArtifactTrustRoot, FrostArtifactTrustStore, FrostAuthorizationDomain, FrostParticipantV1,
+    FrostRosterError, FrostRosterKeyOrigin, FrostRosterV1, CHIO_FROST_ROSTER_SCHEMA,
+    FROST_ED25519_SHA512_SUITE_ID,
 };
 use frost_ed25519::keys::{SigningShare, VerifyingShare};
 
@@ -110,7 +111,12 @@ fn dealer_fixture_roster_is_never_active_resolution_material() {
     trust_store(authority().public_key())
         .verify_roster(&roster)
         .unwrap_or_else(|error| panic!("fixture origin remains signed evidence: {error}"));
-    assert!(roster.validate_for_active_resolution().is_err());
+    assert_eq!(
+        roster.validate_for_active_resolution(),
+        Err(FrostRosterError::ContractMismatch(
+            "active rosters must originate from distributed DKG"
+        ))
+    );
 }
 
 #[test]
@@ -123,8 +129,31 @@ fn frost_roster_requires_a_pinned_authority_signature() {
 
     let untrusted = trust_store(Keypair::from_seed(&[0x24; 32]).public_key());
     assert!(
-        untrusted.verify_roster(&roster).is_err(),
+        matches!(
+            untrusted.verify_roster(&roster),
+            Err(FrostArtifactTrustError::InvalidSignature(
+                FrostArtifactAuthorityRole::Roster
+            ))
+        ),
         "an artifact cannot authenticate its own signing key"
+    );
+    let mut forged_key_id = roster.clone();
+    forged_key_id.roster_authority_key_id = "authority.other.v1".to_string();
+    forged_key_id.roster_id = forged_key_id
+        .recompute_roster_id()
+        .unwrap_or_else(|error| panic!("forged key id must compute: {error}"));
+    forged_key_id.roster_digest = forged_key_id
+        .recompute_roster_digest()
+        .unwrap_or_else(|error| panic!("forged key id digest must compute: {error}"));
+    assert!(
+        matches!(
+            trusted.verify_roster(&forged_key_id),
+            Err(FrostArtifactTrustError::UntrustedKey {
+                role: FrostArtifactAuthorityRole::Roster,
+                ref key_id,
+            }) if key_id == "authority.other.v1"
+        ),
+        "a key id outside the pinned set must not authenticate"
     );
     let wrong_role = FrostArtifactTrustStore::new([FrostArtifactTrustRoot {
         role: FrostArtifactAuthorityRole::EpochAnchor,
@@ -133,23 +162,47 @@ fn frost_roster_requires_a_pinned_authority_signature() {
     }])
     .unwrap_or_else(|error| panic!("wrong-role trust store must build: {error}"));
     assert!(
-        wrong_role.verify_roster(&roster).is_err(),
+        matches!(
+            wrong_role.verify_roster(&roster),
+            Err(FrostArtifactTrustError::UntrustedKey {
+                role: FrostArtifactAuthorityRole::Roster,
+                ..
+            })
+        ),
         "a key trusted for another role must not authenticate a roster"
     );
     let shared_key = authority().public_key();
-    assert!(FrostArtifactTrustStore::new([
-        FrostArtifactTrustRoot {
+    assert!(matches!(
+        FrostArtifactTrustStore::new([
+            FrostArtifactTrustRoot {
+                role: FrostArtifactAuthorityRole::Roster,
+                key_id: "authority.treaty.v1".to_string(),
+                public_key: shared_key.clone(),
+            },
+            FrostArtifactTrustRoot {
+                role: FrostArtifactAuthorityRole::EpochAnchor,
+                key_id: "epoch-anchor-key.v1".to_string(),
+                public_key: shared_key,
+            },
+        ]),
+        Err(FrostArtifactTrustError::InvalidRoot(
+            "authority public keys must not be reused"
+        ))
+    ));
+    assert!(matches!(
+        FrostArtifactTrustStore::new([]),
+        Err(FrostArtifactTrustError::InvalidRoot(
+            "at least one trust root is required"
+        ))
+    ));
+    assert!(matches!(
+        FrostArtifactTrustStore::new([FrostArtifactTrustRoot {
             role: FrostArtifactAuthorityRole::Roster,
-            key_id: "authority.treaty.v1".to_string(),
-            public_key: shared_key.clone(),
-        },
-        FrostArtifactTrustRoot {
-            role: FrostArtifactAuthorityRole::EpochAnchor,
-            key_id: "epoch-anchor-key.v1".to_string(),
-            public_key: shared_key,
-        },
-    ])
-    .is_err());
+            key_id: " padded ".to_string(),
+            public_key: authority().public_key(),
+        }]),
+        Err(FrostArtifactTrustError::InvalidRoot("invalid key id"))
+    ));
 
     let mut tampered = roster;
     tampered.valid_until += 1;
@@ -159,7 +212,12 @@ fn frost_roster_requires_a_pinned_authority_signature() {
     tampered.roster_digest = tampered
         .recompute_roster_digest()
         .unwrap_or_else(|error| panic!("tampered digest must compute: {error}"));
-    assert!(trusted.verify_roster(&tampered).is_err());
+    assert!(matches!(
+        trusted.verify_roster(&tampered),
+        Err(FrostArtifactTrustError::InvalidSignature(
+            FrostArtifactAuthorityRole::Roster
+        ))
+    ));
 }
 
 #[test]
@@ -168,32 +226,108 @@ fn frost_roster_rejects_unknown_shape_and_invalid_contract_fields() {
     let mut value = serde_json::to_value(&roster)
         .unwrap_or_else(|error| panic!("roster must serialize: {error}"));
     value["rosterAuthorityPublicKey"] = serde_json::json!(authority().public_key().to_hex());
-    assert!(serde_json::from_value::<FrostRosterV1>(value).is_err());
+    let decode_error = serde_json::from_value::<FrostRosterV1>(value)
+        .err()
+        .unwrap_or_else(|| panic!("embedded key must be refused at decode"));
+    assert!(
+        decode_error
+            .to_string()
+            .contains("unknown field `rosterAuthorityPublicKey`"),
+        "{decode_error}"
+    );
 
     let mut unknown_schema = roster.clone();
     unknown_schema.schema = "chio.frost.roster.v9".to_string();
-    assert!(unknown_schema.validate().is_err());
+    assert_eq!(
+        unknown_schema.validate(),
+        Err(FrostRosterError::UnsupportedSchema(
+            "chio.frost.roster.v9".to_string()
+        ))
+    );
 
     let mut unsorted = roster.clone();
     unsorted.participants.swap(0, 1);
-    assert!(unsorted.validate().is_err());
+    assert_eq!(
+        unsorted.validate(),
+        Err(FrostRosterError::InvalidField {
+            field: "participants",
+            detail: "must be sorted by unique participant_id",
+        })
+    );
 
     let mut duplicate_share = roster.clone();
     duplicate_share.participants[1].verification_share =
         duplicate_share.participants[0].verification_share.clone();
-    assert!(duplicate_share.validate().is_err());
+    assert_eq!(
+        duplicate_share.validate(),
+        Err(FrostRosterError::InvalidField {
+            field: "verification_share",
+            detail: "must be unique",
+        })
+    );
 
     let mut invalid_threshold = roster.clone();
     invalid_threshold.threshold = 3;
-    assert!(invalid_threshold.validate().is_err());
+    assert_eq!(
+        invalid_threshold.validate(),
+        Err(FrostRosterError::ContractMismatch(
+            "allowed domain quorum and authority scope"
+        ))
+    );
+
+    let mut zero_threshold = roster.clone();
+    zero_threshold.threshold = 0;
+    assert_eq!(
+        zero_threshold.validate(),
+        Err(FrostRosterError::InvalidField {
+            field: "threshold",
+            detail: "must be between one and participant_count",
+        })
+    );
+
+    let mut short_participants = roster.clone();
+    short_participants.participants.pop();
+    assert_eq!(
+        short_participants.validate(),
+        Err(FrostRosterError::InvalidField {
+            field: "participant_count",
+            detail: "must equal participants length",
+        })
+    );
+
+    let mut stale_id = roster.clone();
+    stale_id.valid_until += 1;
+    assert_eq!(stale_id.validate(), Err(FrostRosterError::RosterIdMismatch));
+
+    let mut stale_digest = roster.clone();
+    stale_digest.valid_until += 1;
+    stale_digest.roster_id = stale_digest
+        .recompute_roster_id()
+        .unwrap_or_else(|error| panic!("changed roster id must compute: {error}"));
+    assert_eq!(
+        stale_digest.validate(),
+        Err(FrostRosterError::RosterDigestMismatch)
+    );
 
     let mut missing_predecessor = roster.clone();
     missing_predecessor.predecessor_roster_digest = None;
-    assert!(missing_predecessor.validate().is_err());
+    assert_eq!(
+        missing_predecessor.validate(),
+        Err(FrostRosterError::InvalidField {
+            field: "predecessor_roster_digest",
+            detail: "is required after the first key epoch",
+        })
+    );
 
     let mut reserved_domain = roster;
     reserved_domain.allowed_domains = vec![FrostAuthorizationDomain::AdjudicationPanelDecision];
-    assert!(reserved_domain.validate().is_err());
+    assert_eq!(
+        reserved_domain.validate(),
+        Err(FrostRosterError::InvalidField {
+            field: "allowed_domains",
+            detail: "contains a reserved or unregistered domain",
+        })
+    );
 }
 
 #[test]
@@ -317,13 +451,15 @@ fn frost_roster_published_schemas_validate_signed_fixtures() {
         let mut invalid = roster_value.clone();
         invalid[mutate.0] = mutate.1;
         assert!(
-            chio_spec_validate::validate_value(
-                &roster_schema_path,
-                &roster_schema,
-                &PathBuf::from(format!("<{case}>")),
-                &invalid,
-            )
-            .is_err(),
+            matches!(
+                chio_spec_validate::validate_value(
+                    &roster_schema_path,
+                    &roster_schema,
+                    &PathBuf::from(format!("<{case}>")),
+                    &invalid,
+                ),
+                Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+            ),
             "{case} must reject at the published schema boundary"
         );
     }
@@ -332,13 +468,15 @@ fn frost_roster_published_schemas_validate_signed_fixtures() {
         .as_object_mut()
         .unwrap_or_else(|| panic!("roster fixture must be an object"))
         .remove("predecessorRosterDigest");
-    assert!(chio_spec_validate::validate_value(
-        &roster_schema_path,
-        &roster_schema,
-        &PathBuf::from("<missing predecessor>"),
-        &missing_predecessor,
-    )
-    .is_err());
+    assert!(matches!(
+        chio_spec_validate::validate_value(
+            &roster_schema_path,
+            &roster_schema,
+            &PathBuf::from("<missing predecessor>"),
+            &missing_predecessor,
+        ),
+        Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+    ));
 
     let tampered_path = family.join("fixtures/roster.tampered-signature.json");
     chio_spec_validate::validate(&roster_schema_path, &tampered_path)
@@ -348,9 +486,12 @@ fn frost_roster_published_schemas_validate_signed_fixtures() {
     let tampered: FrostRosterV1 = serde_json::from_str(&tampered_text)
         .unwrap_or_else(|error| panic!("tampered fixture must decode: {error}"));
     assert!(
-        trust_store(authority().public_key())
-            .verify_roster(&tampered)
-            .is_err(),
+        matches!(
+            trust_store(authority().public_key()).verify_roster(&tampered),
+            Err(FrostArtifactTrustError::InvalidSignature(
+                FrostArtifactAuthorityRole::Roster
+            ))
+        ),
         "schema validity cannot substitute for pinned signature verification"
     );
 }

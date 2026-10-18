@@ -1,7 +1,8 @@
 use chio_federation::frost::{
     frost_action_registration, registered_frost_actions, FrostActionPreimageV1,
-    FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostSettleCommitmentActionV1,
-    CHIO_FROST_AUTHORIZATION_BODY_SCHEMA, CHIO_FROST_SETTLE_COMMITMENT_ACTION_SCHEMA,
+    FrostAuthorizationBodyV1, FrostAuthorizationDomain, FrostAuthorizationError,
+    FrostSettleCommitmentActionV1, CHIO_FROST_AUTHORIZATION_BODY_SCHEMA,
+    CHIO_FROST_SETTLE_COMMITMENT_ACTION_SCHEMA,
 };
 
 fn authorization_body() -> FrostAuthorizationBodyV1 {
@@ -195,18 +196,74 @@ fn validation_rejects_contract_drift_and_a_stale_stored_id() {
     wrong_class.authorization_id = wrong_class
         .recompute_authorization_id()
         .unwrap_or_else(|error| panic!("changed body must canonicalize: {error}"));
-    assert!(wrong_class.validate().is_err());
+    assert_eq!(
+        wrong_class.validate(),
+        Err(FrostAuthorizationError::ContractMismatch(
+            "domain and ladder_action_class"
+        ))
+    );
 
     let mut wrong_quorum = body.clone();
     wrong_quorum.quorum_n = 3;
     wrong_quorum.authorization_id = wrong_quorum
         .recompute_authorization_id()
         .unwrap_or_else(|error| panic!("changed body must canonicalize: {error}"));
-    assert!(wrong_quorum.validate().is_err());
+    assert_eq!(
+        wrong_quorum.validate(),
+        Err(FrostAuthorizationError::ContractMismatch(
+            "registered quorum"
+        ))
+    );
+
+    let mut wrong_ladder_digest = body.clone();
+    wrong_ladder_digest.ladder_contract_digest = "77".repeat(32);
+    wrong_ladder_digest.authorization_id = wrong_ladder_digest
+        .recompute_authorization_id()
+        .unwrap_or_else(|error| panic!("changed body must canonicalize: {error}"));
+    assert_eq!(
+        wrong_ladder_digest.validate(),
+        Err(FrostAuthorizationError::ContractMismatch(
+            "ladder_contract_digest"
+        ))
+    );
+
+    let mut disabled = body.clone();
+    disabled.domain = FrostAuthorizationDomain::AdjudicationPanelDecision;
+    disabled.authorization_id = disabled
+        .recompute_authorization_id()
+        .unwrap_or_else(|error| panic!("changed body must canonicalize: {error}"));
+    assert_eq!(
+        disabled.validate(),
+        Err(FrostAuthorizationError::DisabledDomain(
+            FrostAuthorizationDomain::AdjudicationPanelDecision.as_str()
+        ))
+    );
+
+    let mut unsupported_schema = body.clone();
+    unsupported_schema.schema = "chio.frost.authorization-body.v9".to_string();
+    assert_eq!(
+        unsupported_schema.validate(),
+        Err(FrostAuthorizationError::UnsupportedSchema(
+            "chio.frost.authorization-body.v9".to_string()
+        ))
+    );
+
+    let mut inverted_window = body.clone();
+    inverted_window.expires_at = inverted_window.issued_at;
+    assert_eq!(
+        inverted_window.validate(),
+        Err(FrostAuthorizationError::InvalidField {
+            field: "expires_at",
+            detail: "must be greater than issued_at",
+        })
+    );
 
     let mut stale_id = body;
     stale_id.resource_fence += 1;
-    assert!(stale_id.validate().is_err());
+    assert_eq!(
+        stale_id.validate(),
+        Err(FrostAuthorizationError::AuthorizationIdMismatch)
+    );
 }
 
 #[test]
@@ -220,21 +277,41 @@ fn decoding_rejects_unknown_fields_and_noncanonical_identifiers() {
         .insert("unexpected".to_string(), serde_json::json!(true));
     let encoded = serde_json::to_string(&value)
         .unwrap_or_else(|error| panic!("mutated authorization must serialize: {error}"));
-    assert!(serde_json::from_str::<FrostAuthorizationBodyV1>(&encoded).is_err());
+    let decode_error = serde_json::from_str::<FrostAuthorizationBodyV1>(&encoded)
+        .err()
+        .unwrap_or_else(|| panic!("unknown field must be refused at decode"));
+    assert!(
+        decode_error
+            .to_string()
+            .contains("unknown field `unexpected`"),
+        "{decode_error}"
+    );
 
     let mut padded = body.clone();
     padded.scope_id = format!(" {} ", padded.scope_id);
     padded.authorization_id = padded
         .recompute_authorization_id()
         .unwrap_or_else(|error| panic!("padded body must canonicalize: {error}"));
-    assert!(padded.validate().is_err());
+    assert_eq!(
+        padded.validate(),
+        Err(FrostAuthorizationError::InvalidField {
+            field: "scope_id",
+            detail: "must contain only unpadded printable ASCII",
+        })
+    );
 
     let mut uppercase_digest = body;
     uppercase_digest.action_digest = "AB".repeat(32);
     uppercase_digest.authorization_id = uppercase_digest
         .recompute_authorization_id()
         .unwrap_or_else(|error| panic!("uppercase body must canonicalize: {error}"));
-    assert!(uppercase_digest.validate().is_err());
+    assert_eq!(
+        uppercase_digest.validate(),
+        Err(FrostAuthorizationError::InvalidField {
+            field: "action_digest",
+            detail: "must be 64 lowercase hexadecimal characters",
+        })
+    );
 }
 
 #[test]
@@ -273,10 +350,25 @@ fn typed_action_preimage_dispatch_binds_the_registered_domain_and_resource() {
             .unwrap_or_else(|error| panic!("changed preimage must hash: {error}"))
     );
 
+    let mut wrong_digest = body.clone();
+    wrong_digest.action_digest = "66".repeat(32);
+    wrong_digest.authorization_id = wrong_digest
+        .recompute_authorization_id()
+        .unwrap_or_else(|error| panic!("changed body must canonicalize: {error}"));
+    assert_eq!(
+        wrong_digest.validate_action_preimage(&preimage),
+        Err(FrostAuthorizationError::ActionDigestMismatch)
+    );
+
     let mut wrong_resource = body;
     wrong_resource.resource_id = "settlement.other".to_string();
     wrong_resource.authorization_id = wrong_resource
         .recompute_authorization_id()
         .unwrap_or_else(|error| panic!("changed body must canonicalize: {error}"));
-    assert!(wrong_resource.validate_action_preimage(&preimage).is_err());
+    assert_eq!(
+        wrong_resource.validate_action_preimage(&preimage),
+        Err(FrostAuthorizationError::ContractMismatch(
+            "action preimage resource_id"
+        ))
+    );
 }

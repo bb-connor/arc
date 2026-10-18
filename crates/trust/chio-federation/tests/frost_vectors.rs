@@ -666,13 +666,15 @@ fn signed_frost_numbers_enforce_ijson_boundaries() {
         let mut invalid = proof_value.clone();
         invalid["body"][field] = serde_json::json!(UNSAFE);
         assert!(
-            chio_spec_validate::validate_value(
-                &authorization_schema_path,
-                &authorization_schema,
-                &PathBuf::from(format!("<unsafe {field}>")),
-                &invalid,
-            )
-            .is_err(),
+            matches!(
+                chio_spec_validate::validate_value(
+                    &authorization_schema_path,
+                    &authorization_schema,
+                    &PathBuf::from(format!("<unsafe {field}>")),
+                    &invalid,
+                ),
+                Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+            ),
             "authorization schema accepted unsafe {field}"
         );
     }
@@ -699,13 +701,15 @@ fn signed_frost_numbers_enforce_ijson_boundaries() {
         let mut invalid = checkpoint_value.clone();
         invalid[field] = serde_json::json!(UNSAFE);
         assert!(
-            chio_spec_validate::validate_value(
-                &checkpoint_schema_path,
-                &checkpoint_schema,
-                &PathBuf::from(format!("<unsafe {field}>")),
-                &invalid,
-            )
-            .is_err(),
+            matches!(
+                chio_spec_validate::validate_value(
+                    &checkpoint_schema_path,
+                    &checkpoint_schema,
+                    &PathBuf::from(format!("<unsafe {field}>")),
+                    &invalid,
+                ),
+                Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+            ),
             "slot checkpoint schema accepted unsafe {field}"
         );
     }
@@ -726,13 +730,15 @@ fn signed_frost_numbers_enforce_ijson_boundaries() {
         let mut invalid = roster_value.clone();
         invalid[field] = serde_json::json!(UNSAFE);
         assert!(
-            chio_spec_validate::validate_value(
-                &roster_schema_path,
-                &roster_schema,
-                &PathBuf::from(format!("<unsafe {field}>")),
-                &invalid,
-            )
-            .is_err(),
+            matches!(
+                chio_spec_validate::validate_value(
+                    &roster_schema_path,
+                    &roster_schema,
+                    &PathBuf::from(format!("<unsafe {field}>")),
+                    &invalid,
+                ),
+                Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+            ),
             "roster schema accepted unsafe {field}"
         );
     }
@@ -758,13 +764,15 @@ fn signed_frost_numbers_enforce_ijson_boundaries() {
         let mut invalid = epoch_value.clone();
         invalid[field] = serde_json::json!(UNSAFE);
         assert!(
-            chio_spec_validate::validate_value(
-                &epoch_schema_path,
-                &epoch_schema,
-                &PathBuf::from(format!("<unsafe {field}>")),
-                &invalid,
-            )
-            .is_err(),
+            matches!(
+                chio_spec_validate::validate_value(
+                    &epoch_schema_path,
+                    &epoch_schema,
+                    &PathBuf::from(format!("<unsafe {field}>")),
+                    &invalid,
+                ),
+                Err(chio_spec_validate::ValidateError::SchemaViolation(..))
+            ),
             "epoch checkpoint schema accepted unsafe {field}"
         );
     }
@@ -819,6 +827,65 @@ fn upstream_official_vector_and_active_execution_authorization_verify() {
     );
 }
 
+fn verify_with(
+    fixture: &Fixture,
+    expected: &ExpectedFrostAuthorization<'_>,
+    active_roster: &chio_federation::frost::VerifiedActiveFrostRoster,
+    epoch_checkpoint: &FrostEpochCheckpointV1,
+    slot: &FrostAnchoredAuthorizationSlot,
+    now: u64,
+) -> Result<VerifiedFrostAuthorization, FrostVerificationError> {
+    verify_for_execution(
+        &fixture.proof,
+        expected,
+        active_roster,
+        &TestEpochAnchor {
+            checkpoint: epoch_checkpoint.clone(),
+        },
+        &TestSlotAnchor { slot: slot.clone() },
+        &artifact_trust(),
+        now,
+    )
+}
+
+fn verify_fixture_at(
+    fixture: &Fixture,
+    now: u64,
+) -> Result<VerifiedFrostAuthorization, FrostVerificationError> {
+    verify_with(
+        fixture,
+        &fixture.expected(),
+        &fixture.active_roster(250),
+        &fixture.epoch_checkpoint,
+        &fixture.slot,
+        now,
+    )
+}
+
+fn resign_slot(slot: &mut FrostAnchoredAuthorizationSlot) {
+    slot.checkpoint.anchor_signature.clear();
+    slot.checkpoint.checkpoint_digest.clear();
+    sign_slot_checkpoint(&mut slot.checkpoint);
+}
+
+fn refused_slot_error(
+    fixture: &Fixture,
+    mutate: impl FnOnce(&mut FrostAnchoredAuthorizationSlot),
+) -> FrostVerificationError {
+    let mut slot = fixture.slot.clone();
+    mutate(&mut slot);
+    verify_with(
+        fixture,
+        &fixture.expected(),
+        &fixture.active_roster(250),
+        &fixture.epoch_checkpoint,
+        &slot,
+        250,
+    )
+    .err()
+    .unwrap_or_else(|| panic!("slot must refuse"))
+}
+
 #[test]
 fn active_verification_rejects_wrong_group_key_and_altered_body() {
     let wrong_key = SigningKey::deserialize(&[
@@ -831,41 +898,45 @@ fn active_verification_rejects_wrong_group_key_and_altered_body() {
         .unwrap_or_else(|error| panic!("alternate verifying key must serialize: {error}"));
     let wrong_key_fixture =
         fixture_with_keys(&hex::encode(wrong_verifying_key), OFFICIAL_SECRET_KEY);
-    assert!(
+    assert_eq!(
+        verify_fixture_at(&wrong_key_fixture, 250)
+            .err()
+            .unwrap_or_else(|| panic!("wrong group key")),
+        FrostVerificationError::InvalidGroupSignature,
+        "a signature from another group key must reject"
+    );
+
+    let mut tampered_signature = fixture();
+    let mut signature_bytes = decode_hex(&tampered_signature.proof.group_signature);
+    signature_bytes[40] ^= 0x01;
+    tampered_signature.proof.group_signature = hex::encode(signature_bytes);
+    assert_eq!(
         verify_for_execution(
-            &wrong_key_fixture.proof,
-            &wrong_key_fixture.expected(),
-            &wrong_key_fixture.active_roster(250),
+            &tampered_signature.proof,
+            &tampered_signature.expected(),
+            &tampered_signature.active_roster(250),
             &TestEpochAnchor {
-                checkpoint: wrong_key_fixture.epoch_checkpoint.clone(),
+                checkpoint: tampered_signature.epoch_checkpoint.clone(),
             },
             &TestSlotAnchor {
-                slot: wrong_key_fixture.slot.clone(),
+                slot: tampered_signature.slot.clone(),
             },
             &artifact_trust(),
             250,
         )
-        .is_err(),
-        "a signature from another group key must reject"
+        .err()
+        .unwrap_or_else(|| panic!("tampered signature")),
+        FrostVerificationError::SlotMismatch("aggregate signature digest"),
+        "the anchored signature digest binds the exact signature bytes"
     );
 
     let mut altered = fixture();
     altered.proof.body.resource_fence += 1;
-    assert!(
-        verify_for_execution(
-            &altered.proof,
-            &altered.expected(),
-            &altered.active_roster(250),
-            &TestEpochAnchor {
-                checkpoint: altered.epoch_checkpoint.clone(),
-            },
-            &TestSlotAnchor {
-                slot: altered.slot.clone(),
-            },
-            &artifact_trust(),
-            250,
-        )
-        .is_err(),
+    assert_eq!(
+        verify_fixture_at(&altered, 250)
+            .err()
+            .unwrap_or_else(|| panic!("altered body")),
+        FrostVerificationError::Authorization(FrostAuthorizationError::AuthorizationIdMismatch),
         "a body changed after signing must reject"
     );
 }
@@ -882,36 +953,35 @@ fn active_verification_rejects_forged_epoch_and_slot_checkpoints() {
     forged_epoch.checkpoint_digest = forged_epoch
         .recompute_checkpoint_digest()
         .unwrap_or_else(|error| panic!("forged epoch digest must compute: {error}"));
-    assert!(resolve_active_roster_for_execution(
-        &fixture.proof.body.scope_id,
-        &resolver,
-        &TestEpochAnchor {
-            checkpoint: forged_epoch,
-        },
-        &artifact_trust(),
-        250,
-    )
-    .is_err());
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &resolver,
+            &TestEpochAnchor {
+                checkpoint: forged_epoch,
+            },
+            &artifact_trust(),
+            250,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("forged epoch checkpoint")),
+        FrostVerificationError::ArtifactTrust(
+            "invalid FROST EpochAnchor artifact signature".to_string()
+        )
+    );
 
-    let active_roster = fixture.active_roster(250);
-    let mut forged_slot = fixture.slot.clone();
-    forged_slot.checkpoint.clock_high_water += 1;
-    forged_slot.checkpoint.checkpoint_digest = forged_slot
-        .checkpoint
-        .recompute_checkpoint_digest()
-        .unwrap_or_else(|error| panic!("forged slot digest must compute: {error}"));
-    assert!(verify_for_execution(
-        &fixture.proof,
-        &fixture.expected(),
-        &active_roster,
-        &TestEpochAnchor {
-            checkpoint: fixture.epoch_checkpoint.clone(),
-        },
-        &TestSlotAnchor { slot: forged_slot },
-        &artifact_trust(),
-        250,
-    )
-    .is_err());
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.clock_high_water += 1;
+            slot.checkpoint.checkpoint_digest = slot
+                .checkpoint
+                .recompute_checkpoint_digest()
+                .unwrap_or_else(|error| panic!("forged slot digest must compute: {error}"));
+        }),
+        FrostVerificationError::ArtifactTrust(
+            "invalid FROST AuthorizationSlotAnchor artifact signature".to_string()
+        )
+    );
 }
 
 #[test]
@@ -920,28 +990,29 @@ fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
     let active_roster = fixture.active_roster(250);
     let mut wrong_expected = fixture.expected();
     wrong_expected.domain = FrostAuthorizationDomain::ChannelClose;
-    assert!(verify_for_execution(
-        &fixture.proof,
-        &wrong_expected,
-        &active_roster,
-        &TestEpochAnchor {
-            checkpoint: fixture.epoch_checkpoint.clone(),
-        },
-        &TestSlotAnchor {
-            slot: fixture.slot.clone(),
-        },
-        &artifact_trust(),
-        250,
-    )
-    .is_err());
+    assert_eq!(
+        verify_with(
+            &fixture,
+            &wrong_expected,
+            &active_roster,
+            &fixture.epoch_checkpoint,
+            &fixture.slot,
+            250,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("wrong domain")),
+        FrostVerificationError::ExpectedMismatch("domain")
+    );
 
     let mut stale_checkpoint = fixture.epoch_checkpoint.clone();
     stale_checkpoint.key_epoch += 1;
+    stale_checkpoint.rotation_authorization_digest = Some("99".repeat(32));
+    sign_epoch_checkpoint(&mut stale_checkpoint);
     let resolver = TestActiveResolver {
         roster: fixture.roster.clone(),
         scope_classification: "treaty".to_string(),
     };
-    assert!(
+    assert_eq!(
         resolve_active_roster_for_execution(
             &fixture.proof.body.scope_id,
             &resolver,
@@ -951,7 +1022,9 @@ fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
             &artifact_trust(),
             250,
         )
-        .is_err(),
+        .err()
+        .unwrap_or_else(|| panic!("stale local roster")),
+        FrostVerificationError::EpochMismatch("local roster and external checkpoint"),
         "local roster state behind the external epoch must reject"
     );
 
@@ -964,40 +1037,477 @@ fn active_verification_rejects_wrong_domain_stale_epoch_and_expiry() {
     rotated_checkpoint.key_epoch += 1;
     rotated_checkpoint.activation_fence += 1;
     sign_epoch_checkpoint(&mut rotated_checkpoint);
-    assert!(
-        verify_for_execution(
-            &fixture.proof,
+    assert_eq!(
+        verify_with(
+            &fixture,
             &fixture.expected(),
             &active_roster,
+            &rotated_checkpoint,
+            &fixture.slot,
+            250,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("rotated epoch")),
+        FrostVerificationError::EpochMismatch("active roster changed after resolution"),
+        "a retained roster handle must fail after the external epoch rotates"
+    );
+
+    assert_eq!(
+        verify_with(
+            &fixture,
+            &fixture.expected(),
+            &active_roster,
+            &fixture.epoch_checkpoint,
+            &fixture.slot,
+            400,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("expired authorization")),
+        FrostVerificationError::NotCurrent("authorization validity window"),
+        "authorization expiry is exclusive"
+    );
+    assert_eq!(
+        verify_with(
+            &fixture,
+            &fixture.expected(),
+            &active_roster,
+            &fixture.epoch_checkpoint,
+            &fixture.slot,
+            199,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("authorization not yet issued")),
+        FrostVerificationError::NotCurrent("authorization validity window"),
+        "authorization issuance is inclusive"
+    );
+}
+
+type ExpectedMutation = fn(&mut ExpectedFrostAuthorization<'_>);
+
+#[test]
+fn verification_refuses_every_expected_field_mismatch() {
+    let fixture = fixture();
+    let active_roster = fixture.active_roster(250);
+    const OTHER_DIGEST: &str = "abababababababababababababababababababababababababababababababab";
+    let cases: [(&str, ExpectedMutation); 8] = [
+        ("domain", |expected| {
+            expected.domain = FrostAuthorizationDomain::ChannelClose;
+        }),
+        ("ladder_action_class", |expected| {
+            expected.ladder_action_class = "channel.close";
+        }),
+        ("ladder_contract_digest", |expected| {
+            expected.ladder_contract_digest = OTHER_DIGEST;
+        }),
+        ("scope_id", |expected| {
+            expected.scope_id = "treaty.other.v1";
+        }),
+        ("resource_id", |expected| {
+            expected.resource_id = "settlement.other";
+        }),
+        ("resource_version", |expected| {
+            expected.resource_version += 1;
+        }),
+        ("resource_fence", |expected| {
+            expected.resource_fence += 1;
+        }),
+        ("action_digest", |expected| {
+            expected.action_digest = OTHER_DIGEST;
+        }),
+    ];
+    for (field, mutate) in cases {
+        let mut expected = fixture.expected();
+        mutate(&mut expected);
+        assert_eq!(
+            verify_with(
+                &fixture,
+                &expected,
+                &active_roster,
+                &fixture.epoch_checkpoint,
+                &fixture.slot,
+                250,
+            )
+            .err()
+            .unwrap_or_else(|| panic!("expected mismatch")),
+            FrostVerificationError::ExpectedMismatch(field),
+            "{field}"
+        );
+    }
+}
+
+#[test]
+fn verification_refuses_clocks_behind_the_anchored_high_waters() {
+    let fixture = fixture();
+    let resolver = TestActiveResolver {
+        roster: fixture.roster.clone(),
+        scope_classification: "treaty".to_string(),
+    };
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &resolver,
             &TestEpochAnchor {
-                checkpoint: rotated_checkpoint,
+                checkpoint: fixture.epoch_checkpoint.clone(),
             },
-            &TestSlotAnchor {
-                slot: fixture.slot.clone(),
+            &artifact_trust(),
+            199,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("clock behind epoch")),
+        FrostVerificationError::NotCurrent("clock is behind external epoch high-water")
+    );
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &resolver,
+            &TestEpochAnchor {
+                checkpoint: fixture.epoch_checkpoint.clone(),
+            },
+            &artifact_trust(),
+            fixture.roster.valid_until,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("roster window")),
+        FrostVerificationError::NotCurrent("active roster validity window")
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.clock_high_water = 260;
+            resign_slot(slot);
+        }),
+        FrostVerificationError::NotCurrent("clock is behind authorization-slot high-water")
+    );
+}
+
+#[test]
+fn active_roster_resolution_refuses_absent_or_misclassified_scopes() {
+    let fixture = fixture();
+    let epoch_anchor = TestEpochAnchor {
+        checkpoint: fixture.epoch_checkpoint.clone(),
+    };
+    let resolver = TestActiveResolver {
+        roster: fixture.roster.clone(),
+        scope_classification: "treaty".to_string(),
+    };
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            "treaty.other.v1",
+            &resolver,
+            &epoch_anchor,
+            &artifact_trust(),
+            250,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("absent roster")),
+        FrostVerificationError::EpochMismatch("active roster is absent")
+    );
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &TestActiveResolver {
+                roster: fixture.roster.clone(),
+                scope_classification: "consortium".to_string(),
+            },
+            &epoch_anchor,
+            &artifact_trust(),
+            250,
+        )
+        .err()
+        .unwrap_or_else(|| panic!("scope classification")),
+        FrostVerificationError::EpochMismatch("trusted scope classification")
+    );
+
+    let mut wrong_group_digest = fixture.epoch_checkpoint.clone();
+    wrong_group_digest.group_public_key_digest = "12".repeat(32);
+    sign_epoch_checkpoint(&mut wrong_group_digest);
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &resolver,
+            &TestEpochAnchor {
+                checkpoint: wrong_group_digest,
             },
             &artifact_trust(),
             250,
         )
-        .is_err(),
-        "a retained roster handle must fail after the external epoch rotates"
+        .err()
+        .unwrap_or_else(|| panic!("group key digest")),
+        FrostVerificationError::EpochMismatch("group public key digest")
     );
 
-    assert!(
-        verify_for_execution(
-            &fixture.proof,
-            &fixture.expected(),
-            &active_roster,
-            &TestEpochAnchor {
-                checkpoint: fixture.epoch_checkpoint.clone(),
+    let mut dealer = fixture.roster.clone();
+    dealer.key_origin = FrostRosterKeyOrigin::DealerFixture;
+    sign_roster(&mut dealer);
+    assert_eq!(
+        resolve_active_roster_for_execution(
+            &fixture.proof.body.scope_id,
+            &TestActiveResolver {
+                roster: dealer,
+                scope_classification: "treaty".to_string(),
             },
-            &TestSlotAnchor {
-                slot: fixture.slot.clone(),
-            },
+            &epoch_anchor,
             &artifact_trust(),
-            400,
+            250,
         )
-        .is_err(),
-        "authorization expiry is exclusive"
+        .err()
+        .unwrap_or_else(|| panic!("dealer roster")),
+        FrostVerificationError::Roster(FrostRosterError::ContractMismatch(
+            "active rosters must originate from distributed DKG"
+        ))
+    );
+}
+
+#[test]
+fn completed_slot_must_match_the_authorization_and_carry_the_exact_blob() {
+    let fixture = fixture();
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.anchor_signature.clear();
+            slot.checkpoint.checkpoint_digest.clear();
+            slot.checkpoint.state = FrostAuthorizationSlotState::Bound;
+            slot.checkpoint.aggregate_signature_digest = None;
+            slot.checkpoint.authorization_blob_digest = None;
+            slot.checkpoint.availability_receipt = None;
+            sign_slot_checkpoint(&mut slot.checkpoint);
+        }),
+        FrostVerificationError::SlotMismatch("slot is not permanently completed")
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.action_digest = "ab".repeat(32);
+            resign_slot(slot);
+        }),
+        FrostVerificationError::SlotMismatch("completed slot and authorization body")
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.signing_message_digest = "ab".repeat(32);
+            resign_slot(slot);
+        }),
+        FrostVerificationError::ArtifactTrust(
+            "FROST authorization slot mismatch: checkpoint session id".to_string()
+        )
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.aggregate_signature_digest = Some("ab".repeat(32));
+            resign_slot(slot);
+        }),
+        FrostVerificationError::SlotMismatch("aggregate signature digest")
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.authorization_blob = None;
+        }),
+        FrostVerificationError::SlotMismatch(
+            "completed slot lacks rollback-independent authorization blob"
+        )
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.authorization_blob = Some(b"{}".to_vec());
+        }),
+        FrostVerificationError::SlotMismatch(
+            "anchored authorization blob is not exact canonical proof"
+        )
+    );
+    assert_eq!(
+        refused_slot_error(&fixture, |slot| {
+            slot.checkpoint.authorization_blob_digest = Some("ab".repeat(32));
+            resign_slot(slot);
+        }),
+        FrostVerificationError::SlotMismatch("authorization blob digest")
+    );
+}
+
+type SlotCase = (
+    &'static str,
+    FrostAuthorizationSlotCheckpointV1,
+    FrostVerificationError,
+);
+
+#[test]
+fn slot_checkpoint_validation_refuses_each_malformed_shape() {
+    let fixture = fixture();
+    let (bound, _) = historical_slot_pair(&fixture);
+    let completed = fixture.slot.checkpoint.clone();
+    let cases: Vec<SlotCase> = vec![
+        (
+            "schema",
+            FrostAuthorizationSlotCheckpointV1 {
+                schema: "chio.frost.authorization-slot-checkpoint.v9".to_string(),
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("unsupported checkpoint schema"),
+        ),
+        (
+            "first checkpoint with predecessor",
+            FrostAuthorizationSlotCheckpointV1 {
+                predecessor_digest: Some("bb".repeat(32)),
+                ..bound.clone()
+            },
+            FrostVerificationError::SlotMismatch("first checkpoint has a predecessor"),
+        ),
+        (
+            "later checkpoint without predecessor",
+            FrostAuthorizationSlotCheckpointV1 {
+                predecessor_digest: None,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("checkpoint predecessor is missing"),
+        ),
+        (
+            "disabled domain",
+            FrostAuthorizationSlotCheckpointV1 {
+                domain: FrostAuthorizationDomain::AdjudicationPanelDecision,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("checkpoint domain is disabled"),
+        ),
+        (
+            "ladder class",
+            FrostAuthorizationSlotCheckpointV1 {
+                ladder_action_class: "channel.close".to_string(),
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("checkpoint domain and ladder class"),
+        ),
+        (
+            "slot id",
+            FrostAuthorizationSlotCheckpointV1 {
+                resource_fence: completed.resource_fence + 1,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("checkpoint slot id"),
+        ),
+        (
+            "session id",
+            FrostAuthorizationSlotCheckpointV1 {
+                session_id: "ab".repeat(32),
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("checkpoint session id"),
+        ),
+        (
+            "bound with completion data",
+            FrostAuthorizationSlotCheckpointV1 {
+                availability_receipt: Some("availability.slot-anchor.primary.v1".to_string()),
+                ..bound.clone()
+            },
+            FrostVerificationError::SlotMismatch(
+                "non-completed checkpoint carries completion data",
+            ),
+        ),
+        (
+            "completed without signature digest",
+            FrostAuthorizationSlotCheckpointV1 {
+                aggregate_signature_digest: None,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("completed checkpoint lacks signature digest"),
+        ),
+        (
+            "completed without blob digest",
+            FrostAuthorizationSlotCheckpointV1 {
+                authorization_blob_digest: None,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch(
+                "completed checkpoint lacks authorization blob digest",
+            ),
+        ),
+        (
+            "completed without availability receipt",
+            FrostAuthorizationSlotCheckpointV1 {
+                availability_receipt: None,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch("completed checkpoint lacks availability receipt"),
+        ),
+        (
+            "digest",
+            FrostAuthorizationSlotCheckpointV1 {
+                clock_high_water: completed.clock_high_water + 1,
+                ..completed.clone()
+            },
+            FrostVerificationError::SlotMismatch(
+                "checkpoint digest does not match canonical signed artifact",
+            ),
+        ),
+    ];
+    for (case, checkpoint, expected) in cases {
+        assert_eq!(
+            checkpoint
+                .validate()
+                .err()
+                .unwrap_or_else(|| panic!("malformed checkpoint")),
+            expected,
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn historical_verification_refuses_absent_and_rebound_rosters() {
+    let fixture = fixture();
+    let other = TestHistoricalResolver {
+        roster: roster(OFFICIAL_VERIFYING_KEY, 3),
+    };
+    assert_eq!(
+        verify_historical_evidence(&fixture.proof, &other, &artifact_trust())
+            .err()
+            .unwrap_or_else(|| panic!("absent historical roster")),
+        FrostVerificationError::EpochMismatch("historical roster is absent")
+    );
+
+    struct AnyHistoricalResolver(FrostRosterV1);
+    impl FrostHistoricalRosterResolver for AnyHistoricalResolver {
+        fn resolve_historical_roster(
+            &self,
+            _roster_digest: &str,
+            _key_epoch: u64,
+            _issued_at: u64,
+        ) -> Result<Option<FrostRosterV1>, FrostRosterResolutionError> {
+            Ok(Some(self.0.clone()))
+        }
+    }
+    assert_eq!(
+        verify_historical_evidence(
+            &fixture.proof,
+            &AnyHistoricalResolver(roster(OFFICIAL_VERIFYING_KEY, 5)),
+            &artifact_trust(),
+        )
+        .err()
+        .unwrap_or_else(|| panic!("rebound roster")),
+        FrostVerificationError::EpochMismatch("authorization and roster")
+    );
+    let mut early = fixture.roster.clone();
+    early.valid_from = fixture.proof.body.issued_at + 1;
+    sign_roster(&mut early);
+    assert_eq!(
+        verify_historical_evidence(
+            &fixture.proof,
+            &AnyHistoricalResolver(early),
+            &artifact_trust()
+        )
+        .err()
+        .unwrap_or_else(|| panic!("roster not yet valid")),
+        FrostVerificationError::NotCurrent("historical roster at authorization issuance")
+    );
+    let mut channel_only = fixture.roster.clone();
+    channel_only.allowed_domains = vec![FrostAuthorizationDomain::ChannelClose];
+    sign_roster(&mut channel_only);
+    let mut rebound = fixture.proof.clone();
+    rebound.body.roster_digest = channel_only.roster_digest.clone();
+    assert_eq!(
+        verify_historical_evidence(
+            &rebound,
+            &AnyHistoricalResolver(channel_only),
+            &artifact_trust()
+        )
+        .err()
+        .unwrap_or_else(|| panic!("domain outside roster")),
+        FrostVerificationError::Authorization(FrostAuthorizationError::AuthorizationIdMismatch)
     );
 }
 
@@ -1024,21 +1534,18 @@ fn retired_epoch_is_historical_evidence_but_not_execution_authority() {
     )
     .unwrap_or_else(|error| panic!("current roster must resolve: {error}"));
 
-    assert!(
-        verify_for_execution(
-            &retired.proof,
+    assert_eq!(
+        verify_with(
+            &retired,
             &retired.expected(),
             &current,
-            &TestEpochAnchor {
-                checkpoint: epoch_checkpoint(&retired.roster),
-            },
-            &TestSlotAnchor {
-                slot: retired.slot.clone(),
-            },
-            &artifact_trust(),
+            &epoch_checkpoint(&retired.roster),
+            &retired.slot,
             250,
         )
-        .is_err(),
+        .err()
+        .unwrap_or_else(|| panic!("retired roster")),
+        FrostVerificationError::EpochMismatch("active roster changed after resolution"),
         "retired roster signatures cannot authorize current execution"
     );
     let historical = verify_historical_evidence(
@@ -1098,30 +1605,40 @@ fn historical_completion_requires_the_exact_bound_slot_and_live_completion_windo
     substituted_completed.checkpoint.anchor_signature.clear();
     substituted_completed.checkpoint.checkpoint_digest.clear();
     sign_slot_checkpoint(&mut substituted_completed.checkpoint);
-    assert!(verify_historical_completed_authorization(
-        &fixture.proof,
-        &substituted_bound,
-        &substituted_completed,
-        &TestHistoricalResolver {
-            roster: fixture.roster.clone(),
-        },
-        &artifact_trust(),
-    )
-    .is_err());
+    assert_eq!(
+        verify_historical_completed_authorization(
+            &fixture.proof,
+            &substituted_bound,
+            &substituted_completed,
+            &TestHistoricalResolver {
+                roster: fixture.roster.clone(),
+            },
+            &artifact_trust(),
+        )
+        .err()
+        .unwrap_or_else(|| panic!("substituted bound checkpoint")),
+        FrostVerificationError::SlotMismatch(
+            "completed slot is not the exact bound-checkpoint successor"
+        )
+    );
 
     let mut expired = completed;
     expired.checkpoint.clock_high_water = fixture.proof.body.expires_at;
     expired.checkpoint.anchor_signature.clear();
     expired.checkpoint.checkpoint_digest.clear();
     sign_slot_checkpoint(&mut expired.checkpoint);
-    assert!(verify_historical_completed_authorization(
-        &fixture.proof,
-        &bound,
-        &expired,
-        &TestHistoricalResolver {
-            roster: fixture.roster,
-        },
-        &artifact_trust(),
-    )
-    .is_err());
+    assert_eq!(
+        verify_historical_completed_authorization(
+            &fixture.proof,
+            &bound,
+            &expired,
+            &TestHistoricalResolver {
+                roster: fixture.roster,
+            },
+            &artifact_trust(),
+        )
+        .err()
+        .unwrap_or_else(|| panic!("expired completion")),
+        FrostVerificationError::NotCurrent("historical authorization completion window")
+    );
 }
