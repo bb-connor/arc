@@ -37,7 +37,7 @@ pub(super) fn install_usage_anchors(store: &SqliteBudgetStore, records: &[Budget
     let transaction = store.begin_write(&mut connection).unwrap();
     transaction
         .execute(
-            "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+            "INSERT OR IGNORE INTO budget_usage_anchor_write_gate(singleton) VALUES (1)",
             [],
         )
         .unwrap();
@@ -49,7 +49,7 @@ pub(super) fn install_usage_anchors(store: &SqliteBudgetStore, records: &[Budget
                 INSERT INTO budget_usage_history_anchors (
                     capability_id, grant_index, invocation_count, updated_at, seq,
                     total_cost_exposed, total_cost_realized_spend, anchored_schema_version
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
                 "#,
                 params![
                     &record.capability_id,
@@ -68,7 +68,7 @@ pub(super) fn install_usage_anchors(store: &SqliteBudgetStore, records: &[Budget
             .unwrap();
     }
     transaction
-        .execute("DELETE FROM budget_usage_anchor_migration_gate", [])
+        .execute("DELETE FROM budget_usage_anchor_write_gate", [])
         .unwrap();
     transaction.commit().unwrap();
 }
@@ -89,27 +89,4 @@ pub(super) fn authority(
         lease_id: lease_id.to_string(),
         lease_epoch,
     }
-}
-
-/// Older budget fixtures must not retain the schema12 payment catalog created
-/// by today's factory. Reinstall the exact supported predecessor only when no
-/// payment journal or release-evidence facts can be lost.
-pub(super) fn install_empty_legacy_payment_journal(
-    connection: &Connection,
-) -> rusqlite::Result<()> {
-    let transaction = connection.unchecked_transaction()?;
-    let counts: (i64, i64) = transaction.query_row(
-        "SELECT (SELECT COUNT(*) FROM payment_journal),
-                (SELECT COUNT(*) FROM payment_release_evidence)",
-        [],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    )?;
-    assert_eq!(
-        counts,
-        (0, 0),
-        "older fixtures must retain all payment facts"
-    );
-    transaction.execute_batch("DROP TABLE payment_journal;")?;
-    transaction.execute_batch(include_str!("../composite_schema/payment/legacy_v11.sql"))?;
-    transaction.commit()
 }

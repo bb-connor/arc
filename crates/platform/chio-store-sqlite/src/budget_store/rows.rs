@@ -121,8 +121,8 @@ pub(super) fn appended_event_lifecycle(
     };
     let current_invocation = match hold.as_ref() {
         None => BudgetInvocationState::Absent,
-        Some(hold) if hold.5 == "legacy" && hold.0 => BudgetInvocationState::Captured,
-        Some(hold) if hold.5 == "legacy" => BudgetInvocationState::Authorized,
+        Some(hold) if hold.5 == "standalone" && hold.0 => BudgetInvocationState::Captured,
+        Some(hold) if hold.5 == "standalone" => BudgetInvocationState::Authorized,
         Some(hold) => match hold.3.as_deref() {
             Some(value) => budget_invocation_state(value)?,
             None if hold.0 => BudgetInvocationState::Captured,
@@ -131,9 +131,9 @@ pub(super) fn appended_event_lifecycle(
     };
     let current_money = match hold.as_ref() {
         None => live_money,
-        Some(hold) if hold.5 == "legacy" && hold.2 == 0 => BudgetMonetaryState::None,
-        Some(hold) if hold.5 == "legacy" && hold.1 == 0 => BudgetMonetaryState::Released,
-        Some(hold) if hold.5 == "legacy" => BudgetMonetaryState::Exposed,
+        Some(hold) if hold.5 == "standalone" && hold.2 == 0 => BudgetMonetaryState::None,
+        Some(hold) if hold.5 == "standalone" && hold.1 == 0 => BudgetMonetaryState::Released,
+        Some(hold) if hold.5 == "standalone" => BudgetMonetaryState::Exposed,
         Some(hold) => match hold.4.as_deref() {
             Some(value) => budget_monetary_state(value)?,
             None if hold.2 == 0 => BudgetMonetaryState::None,

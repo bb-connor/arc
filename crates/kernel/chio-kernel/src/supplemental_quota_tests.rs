@@ -112,7 +112,7 @@ fn verifies_opaque_artifact_and_derives_request_bound_quota() -> Result<(), Supp
 
     let verified = verify_supplemental_quota(Some(&verifier), EXTENSION, &context, 100)?;
 
-    assert_eq!(verified.profile(), BROKER_CAPABILITY_EXECUTION_PROFILE);
+    assert_eq!(verified.profile(), "chio.broker-capability-execution.v1");
     assert_eq!(
         verified.owner_id(),
         derive_broker_quota_owner_id(

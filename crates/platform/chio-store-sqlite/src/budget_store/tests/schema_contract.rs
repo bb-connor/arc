@@ -84,12 +84,104 @@ pub(super) fn assert_refused_without_mutation(
 }
 
 #[test]
+fn budget_schema_refuses_stamp_twelve_without_mutation() -> TestResult {
+    let (_directory, path) = populated_database()?;
+    let connection = Connection::open(&path)?;
+    crate::stamp_schema_version(&connection, "budget", 12)?;
+    drop(connection);
+    assert_stale_without_mutation(&path, 12)
+}
+
+#[test]
+fn budget_schema_refuses_additional_hold_column_without_mutation() -> TestResult {
+    let (_directory, path) = populated_database()?;
+    let connection = Connection::open(&path)?;
+    connection.execute_batch(
+        "ALTER TABLE budget_authorization_holds ADD COLUMN unexpected_reservation INTEGER",
+    )?;
+    drop(connection);
+    assert_refused_without_mutation(&path, "budget schema does not match the current v1 shape")
+}
+
+#[test]
 fn budget_schema_refuses_missing_quota_table_without_mutation() -> TestResult {
     let (_directory, path) = populated_database()?;
     let connection = Connection::open(&path)?;
     connection.execute_batch("DROP TABLE budget_event_quota_members")?;
     drop(connection);
     assert_refused_without_mutation(&path, "budget schema does not match the current v1 shape")
+}
+
+#[test]
+fn budget_schema_refuses_incomplete_stamp_one_without_mutation() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("budget.db");
+    let connection = Connection::open(&path)?;
+    connection.execute_batch(
+        "CREATE TABLE capability_grant_budgets (
+             capability_id TEXT NOT NULL,
+             grant_index INTEGER NOT NULL,
+             invocation_count INTEGER NOT NULL,
+             updated_at INTEGER NOT NULL,
+             seq INTEGER NOT NULL DEFAULT 0,
+             total_cost_exposed INTEGER NOT NULL DEFAULT 0,
+             total_cost_realized_spend INTEGER NOT NULL DEFAULT 0,
+             PRIMARY KEY (capability_id, grant_index)
+         );",
+    )?;
+    connection.pragma_update(
+        None,
+        "application_id",
+        crate::schema_version::CHIO_SQLITE_APPLICATION_ID,
+    )?;
+    crate::stamp_schema_version(&connection, "budget", 1)?;
+    drop(connection);
+    assert_refused_without_mutation(&path, "budget schema does not match the current v1 shape")
+}
+
+#[test]
+fn budget_schema_creates_and_reopens_version_one() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("budget.db");
+    drop(SqliteBudgetStore::open(&path)?);
+    let reopened = SqliteBudgetStore::open(&path)?;
+    assert_eq!(reopened.count_open_holds()?, 0);
+    let connection = Connection::open(&path)?;
+    let version: i32 = connection.query_row(
+        "SELECT version FROM chio_store_schema_versions WHERE store_key = 'budget'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(version, 1);
+    Ok(())
+}
+
+#[test]
+fn budget_schema_refuses_missing_current_objects_without_mutation() -> TestResult {
+    let canonical = Connection::open_in_memory()?;
+    canonical.execute_batch(schema::SCHEMA)?;
+    let mut statement = canonical.prepare(
+        "SELECT type, name FROM sqlite_schema WHERE sql IS NOT NULL ORDER BY type, name",
+    )?;
+    let objects = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    for (kind, name) in objects {
+        if name == "capability_grant_budgets" {
+            continue;
+        }
+        let (_directory, path) = populated_database()?;
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(&format!("DROP {kind} \"{name}\""))?;
+        drop(connection);
+        assert_refused_without_mutation(
+            &path,
+            "budget schema does not match the current v1 shape",
+        )?;
+    }
+    Ok(())
 }
 
 #[test]
@@ -117,10 +209,217 @@ fn budget_schema_refuses_additional_trigger_without_mutation() -> TestResult {
 }
 
 #[test]
+fn budget_schema_refuses_changed_current_constraints_without_mutation() -> TestResult {
+    for changed in [
+        schema::SCHEMA.replace("anchored_schema_version = 1", "anchored_schema_version = 6"),
+        schema::SCHEMA.replace(
+            "'payment journal identity is immutable'",
+            "'payment  journal identity is immutable'",
+        ),
+        schema::SCHEMA.replace(
+            "REFERENCES budget_authorization_holds(operation_id, hold_id)",
+            "REFERENCES budget_authorization_holds(hold_id, operation_id)",
+        ),
+    ] {
+        assert_ne!(changed, schema::SCHEMA);
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("budget.db");
+        let connection = Connection::open(&path)?;
+        connection.execute_batch(&changed)?;
+        connection.pragma_update(
+            None,
+            "application_id",
+            crate::schema_version::CHIO_SQLITE_APPLICATION_ID,
+        )?;
+        crate::stamp_schema_version(&connection, "budget", 1)?;
+        drop(connection);
+        assert_refused_without_mutation(
+            &path,
+            "budget schema does not match the current v1 shape",
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+fn budget_schema_refuses_unbounded_catalog_without_mutation() -> TestResult {
+    let (_directory, path) = populated_database()?;
+    let connection = Connection::open(&path)?;
+    connection.execute_batch(&format!(
+        "CREATE TABLE budget_unbounded(payload TEXT DEFAULT '{}')",
+        "x".repeat(262_144),
+    ))?;
+    drop(connection);
+    assert_refused_without_mutation(&path, "budget schema exceeds its catalog bounds")
+}
+
+#[test]
 fn budget_schema_refuses_missing_sequence_state_without_mutation() -> TestResult {
     let (_directory, path) = populated_database()?;
     let connection = Connection::open(&path)?;
     connection.execute("DELETE FROM budget_replication_meta", [])?;
     drop(connection);
     assert_refused_without_mutation(&path, "budget replication state is invalid")
+}
+
+#[test]
+fn budget_schema_refuses_missing_identity_table_without_mutation() -> TestResult {
+    let (_directory, path) = populated_database()?;
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("DROP TABLE capability_grant_budgets")?;
+    drop(connection);
+    assert_refused_without_mutation(
+        &path,
+        "database carries the Chio application_id but none of this store's tables ([\"capability_grant_budgets\"]); refusing to open another store's database",
+    )
+}
+
+#[test]
+fn budget_schema_refuses_unsequenced_usage_without_mutation() -> TestResult {
+    let (_directory, path) = populated_database()?;
+    let connection = Connection::open(&path)?;
+    connection.execute(
+        "INSERT INTO capability_grant_budgets (capability_id, grant_index, invocation_count, updated_at)
+         VALUES ('unsequenced', 0, 1, 1)",
+        [],
+    )?;
+    drop(connection);
+    assert_refused_without_mutation(&path, "budget replication state is invalid")
+}
+
+#[test]
+fn budget_schema_accepts_unrelated_colocated_tables() -> TestResult {
+    let (_directory, path) = populated_database()?;
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("CREATE TABLE operator_events (sequence INTEGER PRIMARY KEY); INSERT INTO operator_events VALUES (1);")?;
+    let store = SqliteBudgetStore::open(&path)?;
+    assert_eq!(store.count_open_holds()?, 0);
+    let sequence: i64 =
+        connection.query_row("SELECT sequence FROM operator_events", [], |row| row.get(0))?;
+    assert_eq!(sequence, 1);
+    Ok(())
+}
+
+pub(super) fn assert_stale_without_mutation(path: &std::path::Path, found: i32) -> TestResult {
+    let connection = Connection::open(path)?;
+    let before = snapshot(&connection)?;
+    let error = match SqliteBudgetStore::open(path) {
+        Ok(_) => panic!("budget store accepted a noncurrent schema stamp"),
+        Err(error) => error,
+    };
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "database schema version {found} is not the current schema version 1; refusing to open",
+        )
+    );
+    match error {
+        BudgetStoreError::StaleSchema {
+            found: actual,
+            current,
+        } => assert_eq!((actual, current), (found, 1)),
+        other => panic!("unexpected budget schema refusal: {other:?}"),
+    }
+    assert_eq!(snapshot(&connection)?, before);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn budget_schema_provisioning_preserves_typed_stale_refusal() -> TestResult {
+    use std::error::Error;
+    use std::os::unix::fs::PermissionsExt;
+
+    for provisioned in [false, true] {
+        let (directory, path) = populated_database()?;
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        let lock_root = directory.path().join("locks");
+        std::fs::create_dir(&lock_root)?;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+        if provisioned {
+            Connection::open(&path)?.execute(
+                "UPDATE budget_replication_meta SET next_seq = 0 WHERE singleton = 1",
+                [],
+            )?;
+            crate::SqliteAuthorityStore::provision(&path, &lock_root)?;
+        }
+        let connection = Connection::open(&path)?;
+        crate::stamp_schema_version(&connection, "budget", 12)?;
+        let before = snapshot(&connection)?;
+        let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
+            .expect_err("a noncurrent budget stamp cannot be provisioned");
+        let source = error
+            .source()
+            .and_then(|error| error.downcast_ref::<BudgetStoreError>())
+            .ok_or("provisioning lost the typed budget error")?;
+        assert!(matches!(
+            source,
+            BudgetStoreError::StaleSchema {
+                found: 12,
+                current: 1
+            }
+        ));
+        assert_eq!(error.to_string(), "budget schema refused: database schema version 12 is not the current schema version 1; refusing to open");
+        assert!(matches!(
+            error,
+            crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+                found: 12,
+                current: 1
+            })
+        ));
+        assert_eq!(snapshot(&connection)?, before);
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn budget_schema_provisioning_refuses_unstamped_colocated_catalog_without_mutation() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+    let (directory, path) = populated_database()?;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+    let lock_root = directory.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("CREATE TABLE revoked_capabilities(capability_id TEXT PRIMARY KEY); DELETE FROM chio_store_schema_versions WHERE store_key = 'budget'; PRAGMA application_id = 0;")?;
+    let before = snapshot(&connection)?;
+    let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
+        .expect_err("unstamped budget catalog cannot be provisioned");
+    assert!(
+        matches!(error, crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(ref message)) if message == "budget schema does not match the current v1 shape")
+    );
+    assert_eq!(snapshot(&connection)?, before);
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn budget_schema_serving_refuses_noncurrent_stamp_without_mutation() -> TestResult {
+    use std::os::unix::fs::PermissionsExt;
+    let directory = tempfile::tempdir()?;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    let path = directory.path().join("authority.db");
+    let lock_root = directory.path().join("locks");
+    std::fs::create_dir(&lock_root)?;
+    std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+    crate::SqliteAuthorityStore::provision(&path, &lock_root)?;
+    let connection = Connection::open(&path)?;
+    crate::stamp_schema_version(&connection, "budget", 0)?;
+    let before = snapshot(&connection)?;
+    let error = match crate::test_authority::open_serving(&path, &lock_root) {
+        Ok(_) => panic!("noncurrent budget schema cannot serve"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+            found: 0,
+            current: 1
+        })
+    ));
+    assert_eq!(snapshot(&connection)?, before);
+    Ok(())
 }
