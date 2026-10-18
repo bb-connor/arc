@@ -58,17 +58,12 @@ pub(in crate::security_state) fn preflight_automatic_preparation_schema(
     validate_automatic_preparation_schema(connection)
 }
 
-pub(in crate::security_state) fn ensure_automatic_preparation_schema(
+pub(in crate::security_state) fn create_automatic_preparation_schema(
     connection: &Connection,
 ) -> PortResult<()> {
     preflight_automatic_preparation_schema(connection)?;
     connection
-        .execute_batch(&format!(
-            "{};{};{};",
-            TABLE_DDL.replacen("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", 1),
-            UPDATE_DDL.replacen("CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS ", 1),
-            DELETE_DDL.replacen("CREATE TRIGGER ", "CREATE TRIGGER IF NOT EXISTS ", 1),
-        ))
+        .execute_batch(&format!("{};{};{};", TABLE_DDL, UPDATE_DDL, DELETE_DDL,))
         .map_err(sqlite_error)?;
     validate_automatic_preparation_schema(connection)
 }
