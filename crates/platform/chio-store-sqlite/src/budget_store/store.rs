@@ -35,6 +35,17 @@ pub(super) const LIST_CAPABILITY_USAGES_SQL: &str = r#"
 const BUDGET_STORE_ANCHOR_TABLES: &[&str] = &["capability_grant_budgets"];
 
 impl SqliteBudgetStore {
+    #[cfg(feature = "admission-test-support")]
+    pub fn inject_nonce_preflight_rollback_failure_for_test(&self) -> Result<(), BudgetStoreError> {
+        self.connection()?.execute_batch(
+            "CREATE TEMP TRIGGER preflight_rollback_cutpoint BEFORE INSERT ON main.budget_mutation_events
+             WHEN NEW.event_id LIKE 'nonce-preflight-authorize:%:rollback:%'
+             AND (SELECT COUNT(*) FROM admission_operations) = 1
+             BEGIN SELECT RAISE(ABORT, 'injected preflight rollback cutpoint'); END;",
+        )?;
+        Ok(())
+    }
+
     pub fn open(path: impl AsRef<Path>) -> Result<Self, BudgetStoreError> {
         Self::open_with_clock(path, Arc::new(SystemClock))
     }

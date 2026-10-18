@@ -83,7 +83,7 @@ chio-quarantine = { workspace = true }
 # Benches and integration tests link the regular (non-`cfg(test)`) library;
 # this self edge enables the security admission store under `cargo test` and
 # `cargo bench` only.
-chio-store-sqlite = { workspace = true, features = ["security-admission-test-support"] }
+chio-store-sqlite = { workspace = true, features = ["admission-test-support", "security-admission-test-support"] }
 chio-test-support = { workspace = true }
 chio-open-market = { workspace = true }
 criterion = { workspace = true }

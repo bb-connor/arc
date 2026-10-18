@@ -294,10 +294,11 @@ fn live_issuance_survives_startup_recovery_until_it_expires() -> TestResult {
 #[test]
 fn unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery() -> TestResult {
     let fixture = Fixture::new()?;
-    // The serving owner refuses outside schema changes once it opens, so the
-    // cutpoint is installed on the provisioned database before the kernel starts.
-    execute_sql(&fixture, &rollback_cutpoint("1"))?;
     let runtime = fixture.open()?;
+    runtime
+        .authority
+        .budget_store()
+        .inject_nonce_preflight_rollback_failure_for_test()?;
     let request = fixture.request(&runtime, "cleanup-cutpoint")?;
     assert_unconfirmed_cleanup(&runtime, &request)?;
     assert_state(&fixture, &request, "prepared")?;
@@ -312,7 +313,6 @@ fn unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery() -> TestRes
         0
     );
     drop(runtime);
-    execute_sql(&fixture, "DROP TRIGGER preflight_rollback_cutpoint")?;
 
     let runtime = fixture.open()?;
     assert_state(&fixture, &request, "compensated_before_dispatch")?;
@@ -326,10 +326,11 @@ fn unconfirmed_preflight_cleanup_is_compensated_by_startup_recovery() -> TestRes
 #[test]
 fn unconfirmed_preflight_cleanup_replays_on_the_next_preflight() -> TestResult {
     let fixture = Fixture::new()?;
-    // The cutpoint only fires while this is the sole retained operation, so a
-    // second request lifts it without touching the database from outside.
-    execute_sql(&fixture, &rollback_cutpoint("1"))?;
     let runtime = fixture.open()?;
+    runtime
+        .authority
+        .budget_store()
+        .inject_nonce_preflight_rollback_failure_for_test()?;
     let request = fixture.request(&runtime, "cleanup-retry")?;
     assert_unconfirmed_cleanup(&runtime, &request)?;
     assert_eq!(grant_quota(&runtime, &request)?, (1, 0));
@@ -355,21 +356,17 @@ fn assert_unconfirmed_cleanup(runtime: &Runtime, request: &ToolCallRequest) -> T
         .evaluate_tool_call_blocking(request)
         .err()
         .ok_or("unconfirmed preflight cleanup signed a response")?;
-    assert_eq!(
-        format!("{error:?}"),
-        "BudgetStore(Sqlite(SqliteFailure(Error { code: ConstraintViolation, extended_code: 1811 }, Some(\"injected preflight rollback cutpoint\"))))"
+    assert!(
+        matches!(
+            error,
+            chio_kernel::KernelError::BudgetStore(chio_kernel::budget_store::BudgetStoreError::Sqlite(
+                rusqlite::Error::SqliteFailure(ref code, Some(ref detail))
+            )) if code.extended_code == 1811 && detail == "injected preflight rollback cutpoint"
+        ),
+        "{error}"
     );
     assert_eq!(runtime.kernel.receipt_log().len(), receipts);
     Ok(())
-}
-
-fn rollback_cutpoint(operation_count: &str) -> String {
-    format!(
-        "CREATE TRIGGER preflight_rollback_cutpoint BEFORE INSERT ON budget_mutation_events
-         WHEN NEW.event_id LIKE 'nonce-preflight-authorize:%:rollback:%'
-         AND (SELECT COUNT(*) FROM admission_operations) = {operation_count}
-         BEGIN SELECT RAISE(ABORT, 'injected preflight rollback cutpoint'); END;"
-    )
 }
 
 #[test]
