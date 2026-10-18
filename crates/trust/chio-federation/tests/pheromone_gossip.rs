@@ -310,3 +310,366 @@ fn pheromone_batch_verifier_rejects_wrong_direct_sender() {
     .expect_err("wrong direct sender fails");
     assert_eq!(err.code(), "authenticated_sender_mismatch");
 }
+
+const NOW: u64 = 1_700_000_000_500;
+const INGRESS_TREATY: &str = "treaty:buyer-llamaworks:support-ops";
+const EGRESS_TREATY: &str = "treaty:buyer-dataco:support-ops";
+
+fn relay_hops() -> Vec<PheromoneTransitHop> {
+    vec![
+        PheromoneTransitHop {
+            from_kernel_id: "did:chio:llamaworks".to_string(),
+            to_kernel_id: "did:chio:buyer-kernel".to_string(),
+            treaty_id: INGRESS_TREATY.to_string(),
+            ladder_manifest_id: "ladder:llamaworks:support".to_string(),
+            ladder_manifest_sha256: "a".repeat(64),
+            ladder_manifest_expires_at_unix_ms: 1_800_000_000_000,
+            ladder_intersection_id: "intersection:buyer:llamaworks".to_string(),
+            ladder_intersection_sha256: "c".repeat(64),
+            action_class_id: "whisker.pheromone_deposit".to_string(),
+            emitted_at_unix_ms: 1_700_000_000_100,
+        },
+        PheromoneTransitHop {
+            from_kernel_id: "did:chio:buyer-kernel".to_string(),
+            to_kernel_id: "did:chio:dataco".to_string(),
+            treaty_id: EGRESS_TREATY.to_string(),
+            ladder_manifest_id: "ladder:buyer:support".to_string(),
+            ladder_manifest_sha256: "b".repeat(64),
+            ladder_manifest_expires_at_unix_ms: 1_800_000_000_000,
+            ladder_intersection_id: "intersection:buyer:dataco".to_string(),
+            ladder_intersection_sha256: "d".repeat(64),
+            action_class_id: "whisker.pheromone_deposit".to_string(),
+            emitted_at_unix_ms: 1_700_000_000_200,
+        },
+    ]
+}
+
+fn relay_frame() -> PheromoneDepositGossip {
+    PheromoneDepositGossip {
+        schema: PHEROMONE_GOSSIP_SCHEMA.to_string(),
+        deposit: deposit(),
+        origin_kernel_id: "did:chio:llamaworks".to_string(),
+        gossiping_peer_kernel_id: "did:chio:buyer-kernel".to_string(),
+        treaty_id: EGRESS_TREATY.to_string(),
+        ts_unix_ms: NOW,
+        transit_chain: Some(PheromoneTransitChain { hops: relay_hops() }),
+    }
+}
+
+fn direct_frame() -> PheromoneDepositGossip {
+    PheromoneDepositGossip {
+        schema: PHEROMONE_GOSSIP_SCHEMA.to_string(),
+        deposit: deposit(),
+        origin_kernel_id: "did:chio:llamaworks".to_string(),
+        gossiping_peer_kernel_id: "did:chio:llamaworks".to_string(),
+        treaty_id: INGRESS_TREATY.to_string(),
+        ts_unix_ms: NOW,
+        transit_chain: None,
+    }
+}
+
+fn hops_mut(frame: &mut PheromoneDepositGossip) -> &mut Vec<PheromoneTransitHop> {
+    &mut frame.transit_chain.as_mut().expect("relay frame").hops
+}
+
+fn batch_of(
+    recipient: &str,
+    treaty_id: &str,
+    frames: Vec<PheromoneDepositGossip>,
+) -> chio_federation::pheromone_gossip::PheromoneGossipBatch {
+    chio_federation::pheromone_gossip::PheromoneGossipBatch {
+        schema: PHEROMONE_GOSSIP_BATCH_SCHEMA.to_string(),
+        recipient_kernel_id: recipient.to_string(),
+        treaty_id: treaty_id.to_string(),
+        frames,
+        flushed_at_unix_ms: NOW,
+    }
+}
+
+fn context(recipient: &str, sender: &str) -> PheromoneGossipBatchVerificationContext {
+    PheromoneGossipBatchVerificationContext {
+        now_unix_ms: NOW,
+        recipient_kernel_id: recipient.to_string(),
+        authenticated_sender_kernel_id: sender.to_string(),
+    }
+}
+
+fn assert_frame_refused(frame: &PheromoneDepositGossip, code: &str, message: &str) {
+    let err = verify_pheromone_gossip_frame(frame, &policy(), NOW).expect_err("frame must refuse");
+    assert_eq!(err.code(), code);
+    assert_eq!(err.to_string(), format!("{code}: {message}"));
+}
+
+#[test]
+fn unsupported_policy_schema_is_refused() {
+    let mut policy = policy();
+    policy.schema = "chio.pheromone.transit-policy.v0".to_string();
+    let err = verify_pheromone_gossip_frame(&relay_frame(), &policy, NOW)
+        .expect_err("policy schema must refuse");
+    assert_eq!(err.code(), "unsupported_schema");
+    assert_eq!(
+        err.to_string(),
+        "unsupported_schema: chio.pheromone.transit-policy.v0"
+    );
+}
+
+#[test]
+fn unsupported_frame_schema_is_refused() {
+    let mut frame = relay_frame();
+    frame.schema = "chio.pheromone.gossip.v0".to_string();
+    assert_frame_refused(&frame, "unsupported_schema", "chio.pheromone.gossip.v0");
+}
+
+#[test]
+fn unsupported_batch_schema_is_refused() {
+    let mut batch = batch_of(
+        "did:chio:buyer-kernel",
+        INGRESS_TREATY,
+        vec![direct_frame()],
+    );
+    batch.schema = "chio.pheromone.gossip-batch.v0".to_string();
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:llamaworks"),
+    )
+    .expect_err("batch schema must refuse");
+    assert_eq!(err.code(), "unsupported_schema");
+    assert_eq!(
+        err.to_string(),
+        "unsupported_schema: chio.pheromone.gossip-batch.v0"
+    );
+}
+
+#[test]
+fn origin_not_matching_deposit_kernel_is_refused() {
+    let mut frame = direct_frame();
+    frame.origin_kernel_id = "did:chio:impostor".to_string();
+    assert_frame_refused(
+        &frame,
+        "origin_mismatch",
+        "origin did:chio:impostor does not match deposit kernel did:chio:llamaworks",
+    );
+}
+
+#[test]
+fn empty_transit_chain_is_refused() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame).clear();
+    assert_frame_refused(&frame, "transit_chain_invalid", "transit chain is empty");
+}
+
+#[test]
+fn transit_chain_over_hop_cap_is_refused() {
+    let frame = relay_frame();
+    let mut policy = policy();
+    policy.max_hops = 1;
+    let err = verify_pheromone_gossip_frame(&frame, &policy, NOW).expect_err("hop cap");
+    assert_eq!(err.code(), "transit_chain_invalid");
+    assert_eq!(
+        err.to_string(),
+        "transit_chain_invalid: transit chain exceeds hop cap"
+    );
+}
+
+#[test]
+fn transit_chain_first_hop_must_start_at_origin() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[0].from_kernel_id = "did:chio:other".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "first hop does not start at deposit origin",
+    );
+}
+
+#[test]
+fn transit_chain_first_hop_treaty_must_be_in_deposit_scope() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[0].treaty_id = "treaty:unscoped".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "first hop treaty is not in deposit scope",
+    );
+}
+
+#[test]
+fn transit_chain_last_hop_treaty_must_match_frame_treaty() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[1].treaty_id = "treaty:other".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "last hop treaty does not match frame treaty",
+    );
+}
+
+#[test]
+fn transit_chain_final_relay_must_be_gossiping_peer() {
+    let mut frame = relay_frame();
+    frame.gossiping_peer_kernel_id = "did:chio:other".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "gossiping peer is not the final relay",
+    );
+}
+
+#[test]
+fn transit_chain_stale_ladder_manifest_is_refused() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[0].ladder_manifest_expires_at_unix_ms = NOW;
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "hop ladder manifest is stale",
+    );
+}
+
+#[test]
+fn transit_chain_malformed_manifest_hash_is_refused() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[0].ladder_manifest_sha256 = "a".repeat(63);
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "hop ladder manifest hash is malformed",
+    );
+}
+
+#[test]
+fn transit_chain_repeated_kernel_is_refused() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[1].from_kernel_id = "did:chio:llamaworks".to_string();
+    frame.gossiping_peer_kernel_id = "did:chio:llamaworks".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "transit chain repeats a kernel",
+    );
+}
+
+#[test]
+fn transit_chain_broken_adjacency_is_refused() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[0].to_kernel_id = "did:chio:elsewhere".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "transit chain breaks hop adjacency",
+    );
+}
+
+#[test]
+fn transit_chain_repeated_final_kernel_is_refused() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame)[1].to_kernel_id = "did:chio:llamaworks".to_string();
+    assert_frame_refused(
+        &frame,
+        "transit_chain_invalid",
+        "transit chain repeats final kernel",
+    );
+}
+
+#[test]
+fn batch_with_empty_transit_chain_is_refused_for_missing_last_hop() {
+    let mut frame = relay_frame();
+    hops_mut(&mut frame).clear();
+    let batch = batch_of("did:chio:buyer-kernel", EGRESS_TREATY, vec![frame]);
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:buyer-kernel"),
+    )
+    .expect_err("empty chain in batch");
+    assert_eq!(err.to_string(), "transit_chain_invalid: missing last hop");
+}
+
+#[test]
+fn batch_recipient_not_matching_receiver_is_refused() {
+    let batch = batch_of("did:chio:dataco", INGRESS_TREATY, vec![direct_frame()]);
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:llamaworks"),
+    )
+    .expect_err("recipient mismatch");
+    assert_eq!(err.code(), "batch_recipient_mismatch");
+    assert_eq!(
+        err.to_string(),
+        "batch_recipient_mismatch: batch recipient did:chio:dataco does not match receiver did:chio:buyer-kernel"
+    );
+}
+
+#[test]
+fn batch_final_transit_recipient_not_matching_receiver_is_refused() {
+    let batch = batch_of("did:chio:buyer-kernel", EGRESS_TREATY, vec![relay_frame()]);
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:buyer-kernel"),
+    )
+    .expect_err("final recipient mismatch");
+    assert_eq!(err.code(), "batch_recipient_mismatch");
+    assert_eq!(
+        err.to_string(),
+        "batch_recipient_mismatch: final transit recipient did:chio:dataco does not match receiver did:chio:buyer-kernel"
+    );
+}
+
+#[test]
+fn batch_frame_treaty_not_matching_batch_treaty_is_refused() {
+    let batch = batch_of("did:chio:buyer-kernel", EGRESS_TREATY, vec![direct_frame()]);
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:llamaworks"),
+    )
+    .expect_err("treaty mismatch");
+    assert_eq!(err.code(), "batch_treaty_mismatch");
+    assert_eq!(
+        err.to_string(),
+        format!(
+            "batch_treaty_mismatch: frame treaty {INGRESS_TREATY} does not match batch treaty {EGRESS_TREATY}"
+        )
+    );
+}
+
+#[test]
+fn batch_gossiping_peer_not_matching_sender_is_refused() {
+    let batch = batch_of(
+        "did:chio:buyer-kernel",
+        INGRESS_TREATY,
+        vec![direct_frame()],
+    );
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:buyer-kernel"),
+    )
+    .expect_err("gossiping peer mismatch");
+    assert_eq!(err.code(), "authenticated_sender_mismatch");
+    assert_eq!(
+        err.to_string(),
+        "authenticated_sender_mismatch: frame gossiping peer did:chio:llamaworks does not match authenticated sender did:chio:buyer-kernel"
+    );
+}
+
+#[test]
+fn batch_direct_frame_origin_not_matching_sender_is_refused() {
+    let mut frame = direct_frame();
+    frame.gossiping_peer_kernel_id = "did:chio:buyer-kernel".to_string();
+    let batch = batch_of("did:chio:buyer-kernel", INGRESS_TREATY, vec![frame]);
+    let err = verify_pheromone_gossip_batch(
+        &batch,
+        &policy(),
+        &context("did:chio:buyer-kernel", "did:chio:buyer-kernel"),
+    )
+    .expect_err("direct origin mismatch");
+    assert_eq!(err.code(), "authenticated_sender_mismatch");
+    assert_eq!(
+        err.to_string(),
+        "authenticated_sender_mismatch: direct frame origin did:chio:llamaworks does not match authenticated sender did:chio:buyer-kernel"
+    );
+}
