@@ -8,7 +8,7 @@ import type {
   VerifyReceiptResponse,
 } from "../src/types.js";
 
-function legacyBareReceipt(): HttpReceipt {
+function unstructuredReceipt(): HttpReceipt {
   return {
     id: "rcpt-1",
     request_id: "req-1",
@@ -28,7 +28,7 @@ function legacyBareReceipt(): HttpReceipt {
 
 function authoritativeAllowReceipt(): HttpReceipt {
   return {
-    ...legacyBareReceipt(),
+    ...unstructuredReceipt(),
     receipt_kind: "mediated_decision",
     boundary_class: "prevent",
     tool_origin: "caller_executed",
@@ -39,7 +39,7 @@ function authoritativeAllowReceipt(): HttpReceipt {
 
 function advisoryAllowReceipt(): HttpReceipt {
   return {
-    ...legacyBareReceipt(),
+    ...unstructuredReceipt(),
     receipt_kind: "advisory_evaluation",
     boundary_class: "advisory_only",
     observation_outcome: "evaluated",
@@ -335,7 +335,7 @@ describe("ChioSidecarClient.evaluate", () => {
   it("rejects allow-shaped responses without structural receipt authority", async () => {
     const result: EvaluateResponse = {
       verdict: { verdict: "allow" },
-      receipt: legacyBareReceipt(),
+      receipt: unstructuredReceipt(),
       evidence: [],
     };
     const { server, url } = await startEvaluateSidecar(result, true);
@@ -470,7 +470,7 @@ describe("ChioSidecarClient.evaluate", () => {
     const result: EvaluateResponse = {
       verdict: { verdict: "deny", reason: "blocked", guard: "policy", http_status: 403 },
       receipt: {
-        ...legacyBareReceipt(),
+        ...unstructuredReceipt(),
         verdict: { verdict: "deny", reason: "blocked", guard: "policy", http_status: 403 },
       },
       evidence: [],
@@ -574,7 +574,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
 
     try {
       const client = new ChioSidecarClient({ sidecarUrl: url });
-      await expect(client.verifyReceipt(legacyBareReceipt())).resolves.toEqual(
+      await expect(client.verifyReceipt(unstructuredReceipt())).resolves.toEqual(
         verifyResponse(false),
       );
     } finally {
@@ -594,7 +594,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
       try {
         const client = new ChioSidecarClient({ sidecarUrl: url });
         await expectSidecarError(
-          client.verifyReceipt(legacyBareReceipt()),
+          client.verifyReceipt(unstructuredReceipt()),
           "chio_invalid_receipt",
           422,
         );
@@ -616,7 +616,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
       try {
         const client = new ChioSidecarClient({ sidecarUrl: url });
         await expectSidecarError(
-          client.verifyReceipt(legacyBareReceipt()),
+          client.verifyReceipt(unstructuredReceipt()),
           "chio_evaluation_failed",
           statusCode,
         );
@@ -638,7 +638,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
       try {
         const client = new ChioSidecarClient({ sidecarUrl: url });
         await expectSidecarError(
-          client.verifyReceipt(legacyBareReceipt()),
+          client.verifyReceipt(unstructuredReceipt()),
           "chio_sidecar_unavailable",
           statusCode,
         );
@@ -657,7 +657,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
     try {
       const client = new ChioSidecarClient({ sidecarUrl: url });
       await expectSidecarError(
-        client.verifyReceipt(legacyBareReceipt()),
+        client.verifyReceipt(unstructuredReceipt()),
         "chio_sidecar_unavailable",
         503,
       );
@@ -675,7 +675,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
 
     const client = new ChioSidecarClient({ sidecarUrl: url, timeoutMs: 250 });
     await expectSidecarError(
-      client.verifyReceipt(legacyBareReceipt()),
+      client.verifyReceipt(unstructuredReceipt()),
       "chio_sidecar_unreachable",
     );
   });
@@ -689,7 +689,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
     try {
       const client = new ChioSidecarClient({ sidecarUrl: url });
       await expectSidecarError(
-        client.verifyReceipt(legacyBareReceipt()),
+        client.verifyReceipt(unstructuredReceipt()),
         "chio_evaluation_failed",
       );
     } finally {
@@ -706,7 +706,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
     try {
       const client = new ChioSidecarClient({ sidecarUrl: url });
       await expectSidecarError(
-        client.verifyReceipt(legacyBareReceipt()),
+        client.verifyReceipt(unstructuredReceipt()),
         "chio_evaluation_failed",
       );
     } finally {
@@ -723,7 +723,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
     try {
       const client = new ChioSidecarClient({ sidecarUrl: url, timeoutMs: 25 });
       await expectSidecarError(
-        client.verifyReceipt(legacyBareReceipt()),
+        client.verifyReceipt(unstructuredReceipt()),
         "chio_timeout",
       );
     } finally {
@@ -747,7 +747,7 @@ describe("ChioSidecarClient.verifyReceipt", () => {
     try {
       const client = new ChioSidecarClient({ sidecarUrl: "http://127.0.0.1:9090" });
       await expectSidecarError(
-        client.verifyReceipt(legacyBareReceipt()),
+        client.verifyReceipt(unstructuredReceipt()),
         "chio_sidecar_unreachable",
       );
     } finally {
