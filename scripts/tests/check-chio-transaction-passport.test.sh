@@ -81,4 +81,116 @@ if ! grep -Fq "CHIO_COMMERCE_TRUSTED_PAYMENT_SIGNER_KEYS" "$script" && ! grep -F
   exit 1
 fi
 
+fixture_tree="$(mktemp -d)"
+trap 'rm -rf "$fixture_tree"' EXIT
+mkdir -p \
+  "$fixture_tree/scripts/lib" \
+  "$fixture_tree/spec/schemas/chio-transaction/v1" \
+  "$fixture_tree/crates/core/chio-core-types/src" \
+  "$fixture_tree/fixtures/proof-room/family/valid" \
+  "$fixture_tree/fixtures/proof-room/family/digest-mismatch" \
+  "$fixture_tree/fixtures/proof-room/family/head-reorged" \
+  "$fixture_tree/fixtures/proof-room/family/negatives" \
+  "$fixture_tree/fixtures/proof-room/room/proof-room-bundle/roots" \
+  "$fixture_tree/bin" \
+  "$fixture_tree/stub"
+cp "$script" "$fixture_tree/scripts/check-chio-transaction-passport.sh"
+cp "$lib" "$fixture_tree/scripts/lib/chio-proof-trusted-keys.sh"
+printf '{}\n' >"$fixture_tree/spec/schemas/chio-transaction/v1/transaction-passport.schema.json"
+cat >"$fixture_tree/spec/schemas/registry.json" <<'JSON'
+{"artifacts": [{"schema": "chio.transaction-passport.v1", "schemaFile": "spec/schemas/chio-transaction/v1/transaction-passport.schema.json"}]}
+JSON
+cat >"$fixture_tree/crates/core/chio-core-types/src/signed_artifact.rs" <<'RS'
+pub const CHIO_TRANSACTION_PASSPORT_V1_SCHEMA: &str = "chio.transaction-passport.v1";
+("transaction_passport", "transaction-passport-v1")
+RS
+cat >"$fixture_tree/fixtures/proof-room/catalog.json" <<'JSON'
+{"fixtures": [
+  {"id": "family-valid", "kind": "transaction-passport", "path": "fixtures/proof-room/family/valid"},
+  {"id": "family-digest-mismatch", "kind": "negative-transaction-passport", "path": "fixtures/proof-room/family/digest-mismatch"},
+  {"id": "family-head-reorged", "kind": "negative-transaction-passport", "path": "fixtures/proof-room/family/head-reorged"},
+  {"id": "room", "kind": "proof-room", "path": "fixtures/proof-room/room"}
+]}
+JSON
+cat >"$fixture_tree/fixtures/proof-room/family/negatives/digest-mismatch.json" <<'JSON'
+{"id": "digest-mismatch", "expected_failure_code": "proof-room.negative.evidence-graph-digest-mismatch"}
+JSON
+cat >"$fixture_tree/fixtures/proof-room/family/negatives/head-reorged.json" <<'JSON'
+{"id": "head-reorged", "expected_failure_code": "proof-room.negative.public-settlement-independent-head-block-hash-mismatch", "verifier_context": {"public_settlement_independent_chain_head": "block_hash_mismatch"}}
+JSON
+for passport in family/valid family/digest-mismatch family/head-reorged room/proof-room-bundle/roots; do
+  printf '{}\n' >"$fixture_tree/fixtures/proof-room/$passport/transaction-passport.json"
+done
+printf '{}\n' >"$fixture_tree/fixtures/proof-room/room/proof-room-bundle/manifest.json"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$fixture_tree/bin/cargo"
+chmod +x "$fixture_tree/bin/cargo"
+stub_chio="$fixture_tree/bin/chio"
+cat >"$stub_chio" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+stub_dir="$(cd "$(dirname "$0")/../stub" && pwd)"
+[[ "${1:-}" == "--json" ]] && shift
+[[ "${1:-}" == "proof" && "${2:-}" == "verify" ]] || exit 2
+case "${3:-}" in
+  */family/valid/*|*/room/proof-room-bundle) printf '{"verdict":"verified"}\n'; exit 0 ;;
+  */family/head-reorged/*)
+    if [[ -z "${CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON:-}" || -n "${CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL:-}" ]]; then
+      printf '{"message":"proof verify: unexpected verifier context"}\n' >&2
+      exit 1
+    fi
+    printf '{"message":"proof verify: invalid settlement: public settlement independent head block hash mismatch"}\n' >&2
+    exit 1
+    ;;
+  */family/digest-mismatch/*)
+    printf '%s\n' "$(cat "$stub_dir/message")" >&2
+    exit "$(cat "$stub_dir/exit")"
+    ;;
+esac
+exit 2
+STUB
+chmod +x "$stub_chio"
+
+run_stub_gate() {
+  local exit_code="$1"
+  local message="$2"
+  printf '%s\n' "$exit_code" >"$fixture_tree/stub/exit"
+  printf '{"code":"urn:chio:error:transaction:passport-hash-mismatch","message":"%s"}\n' "$message" >"$fixture_tree/stub/message"
+  CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL=http://127.0.0.1:9 \
+    PATH="$fixture_tree/bin:$PATH" CHIO_BIN="$stub_chio" \
+    bash "$fixture_tree/scripts/check-chio-transaction-passport.sh" >"$fixture_tree/gate.log" 2>&1
+}
+
+right_message="proof verify: evidence graph digest mismatch: expected 01, got 02"
+for rejected in \
+  "2|$right_message|exited 2" \
+  "101|$right_message|exited 101" \
+  "127|$right_message|exited 127" \
+  "20|proof verify: claim set digest mismatch: expected 01, got 02|wrong reason: expected proof-room.negative.evidence-graph-digest-mismatch, got proof-room.negative.claim-set-digest-mismatch" \
+  "20|proof verify: evidence graph digest mismatch extended: expected 01|wrong reason" \
+  "0|$right_message|unexpectedly verified"; do
+  IFS='|' read -r exit_code message reason <<<"$rejected"
+  if run_stub_gate "$exit_code" "$message"; then
+    echo "check-chio-transaction-passport.test.sh: gate accepted a negative that exited $exit_code with: $message" >&2
+    exit 1
+  fi
+  if ! grep -Fq "$reason" "$fixture_tree/gate.log"; then
+    echo "check-chio-transaction-passport.test.sh: gate rejected exit $exit_code without naming: $reason" >&2
+    cat "$fixture_tree/gate.log" >&2
+    exit 1
+  fi
+done
+
+for accepted in 20 1; do
+  if ! run_stub_gate "$accepted" "$right_message"; then
+    echo "check-chio-transaction-passport.test.sh: gate refused a negative rejected with exit $accepted and the expected code" >&2
+    cat "$fixture_tree/gate.log" >&2
+    exit 1
+  fi
+  if ! grep -Fq "OK transaction-passport verifier gate: 1 positive, 2 negative, 1 proof-room" "$fixture_tree/gate.log"; then
+    echo "check-chio-transaction-passport.test.sh: gate did not count every fixture" >&2
+    cat "$fixture_tree/gate.log" >&2
+    exit 1
+  fi
+done
+
 echo "check-chio-transaction-passport.test.sh: transaction passport gate contract passed"

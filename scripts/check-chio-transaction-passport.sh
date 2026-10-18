@@ -156,26 +156,163 @@ PY
 verify_negative() {
   local fixture_id="$1"
   local passport_path="$2"
-  local metadata_path="${3:-}"
+  local metadata_path="$3"
   local stdout_path="$tmpdir/${fixture_id}.stdout.json"
   local stderr_path="$tmpdir/${fixture_id}.stderr.log"
   local verifier_context
+  local status=0
 
   verifier_context="$(negative_verifier_context "$metadata_path")"
 
-  if run_negative_verify "$verifier_context" "$passport_path" "$stdout_path" "$stderr_path"; then
+  run_negative_verify "$verifier_context" "$passport_path" "$stdout_path" "$stderr_path" || status=$?
+  if [[ "$status" -eq 0 ]]; then
     echo "transaction-passport negative fixture unexpectedly verified: $fixture_id" >&2
     cat "$stdout_path" >&2
+    return 1
+  fi
+  if ! python3 - "$fixture_id" "$metadata_path" "$status" "$stderr_path" <<'PY'; then
+import json
+import pathlib
+import re
+import sys
+
+# Exit classes of `chio proof verify` for a rejected passport: 1 unclassified
+# rejection, 10 required claim, 20 integrity, 30 parse or schema, 50 unsupported
+# feature. A usage error (2), a panic (101) or a missing command (126, 127) is
+# not a rejection.
+REJECTION_EXITS = {1, 10, 20, 30, 50}
+
+# Mirrors semantic_negative_failure_code and negative_failure_code_matches in
+# crates/products/chio-cli/src/cli/dispatch/proof.rs.
+CONTEXT_PREFIXES = (
+    "invalid disclosure lineage artifact: ",
+    "proof-room.source-verifier.failed: ",
+    "proof-room.passport.invalid: ",
+    "invalid agent web interop artifact: ",
+    "invalid Agent Web interop artifact: ",
+    "invalid public settlement artifact: ",
+    "invalid enterprise export artifact: ",
+    "invalid trust market artifact: ",
+    "invalid runtime security artifact: ",
+    "runtime security claim failed: ",
+    "invalid evidence graph artifact: ",
+    "minimal governed action evidence invalid: ",
+    "commerce payment failed: ",
+    "commerce mandate failed: ",
+    "commerce event log failed: ",
+    "commerce replay failed: ",
+    "commerce recovery failed: ",
+    "commerce fraud failed: ",
+    "swarm authority invalid: ",
+    "public settlement proof invalid: ",
+    "invalid settlement: ",
+    "invalid proof: ",
+    "agent web interop invalid: ",
+    "agent web claim failed: ",
+    "Agent Web claim failed: ",
+    "enterprise export invalid: ",
+    "enterprise export claim failed: ",
+    "risk comptroller claim failed: ",
+    "trust market context invalid: ",
+    "trust market claim failed: ",
+    "trust-market claim failed: ",
+    "Trust market claim failed: ",
+    "Trust Market claim failed: ",
+)
+ASCII_WHITESPACE = " \t\n\x0c\r"
+
+
+def is_dotted(code):
+    base = code.split(":", 1)[0]
+    return (
+        bool(base)
+        and "." in base
+        and not any(character.isspace() for character in base)
+        and all(
+            ("a" <= character <= "z") or ("0" <= character <= "9") or character in ".-_"
+            for character in base
+        )
+    )
+
+
+def strip_context(code):
+    code = code.strip()
+    for prefix in CONTEXT_PREFIXES:
+        if code.startswith(prefix):
+            code = code[len(prefix):].strip()
+    if not is_dotted(code) and ": " in code:
+        code = code.split(": ", 1)[0].strip()
+    return code
+
+
+def slug(code):
+    characters = []
+    last_was_separator = False
+    for character in code.lower():
+        if character.isascii() and character.isalnum():
+            characters.append(character)
+            last_was_separator = False
+        elif not last_was_separator:
+            characters.append("-")
+            last_was_separator = True
+    return "".join(characters).strip("-")
+
+
+def semantic_failure_code(error):
+    parts = error.split("proof verify: ")
+    code = (parts[1] if len(parts) > 1 else error).split(" (", 1)[0].strip()
+    if not code:
+        return error
+    normalized = strip_context(code)
+    if is_dotted(normalized):
+        return normalized
+    slugged = slug(normalized)
+    return f"proof-room.negative.{slugged}" if slugged else "proof-room.negative.unknown"
+
+
+def failure_code_matches(observed, expected):
+    for match in re.finditer(re.escape(expected), observed):
+        before = observed[: match.start()][-1:]
+        after = observed[match.end():][:1]
+        if before in ("", ":") or before in ASCII_WHITESPACE:
+            if after in ("", ":"):
+                return True
+    return False
+
+
+fixture_id = sys.argv[1]
+metadata = json.loads(pathlib.Path(sys.argv[2]).read_text(encoding="utf-8"))
+status = int(sys.argv[3])
+stderr_text = pathlib.Path(sys.argv[4]).read_text(encoding="utf-8", errors="replace")
+expected = metadata.get("expected_failure_code")
+if not isinstance(expected, str) or not expected:
+    raise SystemExit(f"negative fixture {fixture_id} has no expected_failure_code")
+if status not in REJECTION_EXITS:
+    raise SystemExit(
+        f"negative fixture {fixture_id} exited {status}, not a proof rejection exit {sorted(REJECTION_EXITS)}"
+    )
+lines = [line for line in stderr_text.splitlines() if line.strip()]
+try:
+    report = json.loads(lines[-1]) if lines else None
+except json.JSONDecodeError:
+    report = None
+message = report.get("message") if isinstance(report, dict) else None
+if not isinstance(message, str):
+    raise SystemExit(f"negative fixture {fixture_id} did not emit a JSON error report")
+observed = semantic_failure_code(message)
+if not failure_code_matches(observed, expected):
+    raise SystemExit(
+        f"negative fixture {fixture_id} rejected for the wrong reason: expected {expected}, got {observed}"
+    )
+PY
+    echo "transaction-passport negative fixture failed: $fixture_id" >&2
+    cat "$stderr_path" >&2
     return 1
   fi
 }
 
 negative_verifier_context() {
-  local metadata_path="${1:-}"
-  if [[ -z "$metadata_path" || ! -f "$metadata_path" ]]; then
-    printf 'none\n'
-    return 0
-  fi
+  local metadata_path="$1"
   python3 - "$metadata_path" <<'PY'
 import json
 import pathlib
@@ -197,16 +334,15 @@ run_negative_verify() {
     missing)
       env -u CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON \
         -u CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL \
-        "$CHIO_BIN" proof verify "$passport_path" >"$stdout_path" 2>"$stderr_path"
+        "$CHIO_BIN" --json proof verify "$passport_path" >"$stdout_path" 2>"$stderr_path"
       ;;
     block_hash_mismatch)
-      env \
+      env -u CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL \
         CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON="$PUBLIC_SETTLEMENT_REORGED_INDEPENDENT_CHAIN_HEAD_JSON" \
-        -u CHIO_PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL \
-        "$CHIO_BIN" proof verify "$passport_path" >"$stdout_path" 2>"$stderr_path"
+        "$CHIO_BIN" --json proof verify "$passport_path" >"$stdout_path" 2>"$stderr_path"
       ;;
     none)
-      "$CHIO_BIN" proof verify "$passport_path" >"$stdout_path" 2>"$stderr_path"
+      "$CHIO_BIN" --json proof verify "$passport_path" >"$stdout_path" 2>"$stderr_path"
       ;;
     *)
       echo "unknown negative verifier context: $verifier_context" >&2
@@ -263,8 +399,12 @@ for entry in catalog.get("fixtures", []):
     else:
         base = pathlib.Path(entry["path"])
         rel = base / "transaction-passport.json"
-        metadata_path = base.parent / "negatives" / f"{base.name}.json"
-        metadata = str(metadata_path) if (root / metadata_path).is_file() else ""
+        metadata = ""
+        if kind == "negative-transaction-passport":
+            metadata_path = base.parent / "negatives" / f"{base.name}.json"
+            if not (root / metadata_path).is_file():
+                raise SystemExit(f"missing negative fixture metadata: {metadata_path}")
+            metadata = str(metadata_path)
         if not (root / rel).is_file():
             raise SystemExit(f"missing fixture passport: {rel}")
     print(f"{kind}\t{fixture_id}\t{rel}\t{metadata}")
@@ -277,7 +417,7 @@ while IFS=$'\t' read -r kind fixture_id fixture_path metadata_path; do
       positive_count=$((positive_count + 1))
       ;;
     negative-transaction-passport)
-      verify_negative "$fixture_id" "$ROOT/$fixture_path" "${metadata_path:+$ROOT/$metadata_path}"
+      verify_negative "$fixture_id" "$ROOT/$fixture_path" "$ROOT/$metadata_path"
       negative_count=$((negative_count + 1))
       ;;
     proof-room)
