@@ -71,3 +71,28 @@ fn absent_outbox_trigger_is_refused_without_repair() -> TestResult {
         "DROP TRIGGER security_attested_finding_response_outbox_immutable;",
     )
 }
+
+#[test]
+fn retry_columns_without_boolean_constraint_are_refused() -> TestResult {
+    assert_refused_without_repair(
+        "DROP TABLE security_scheduler_retries;
+         CREATE TABLE security_scheduler_retries (
+             tenant_id TEXT NOT NULL,
+             action_id TEXT NOT NULL,
+             attempts INTEGER NOT NULL,
+             last_error TEXT NOT NULL,
+             first_failure_at INTEGER NOT NULL,
+             not_before INTEGER NOT NULL,
+             health_event_id TEXT,
+             health_event_delivered INTEGER NOT NULL,
+             PRIMARY KEY (tenant_id, action_id)
+         );",
+    )
+}
+
+#[test]
+fn extra_scheduler_column_is_refused_without_repair() -> TestResult {
+    assert_refused_without_repair(
+        "ALTER TABLE security_scheduler_retries ADD COLUMN unrecognized_authority TEXT;",
+    )
+}
