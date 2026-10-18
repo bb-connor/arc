@@ -654,6 +654,22 @@ mod status_feed_config_tests {
     use chio_test_support::prelude::*;
 
     const FEED_ID: &str = "status-feed/test-venue";
+    const OPERATOR_OUTSIDE_WINDOW: &str =
+        "finding-market status operator authorization is outside its validity window";
+    const SIZE_BOUND: &str = "finding-market status operator authorization is invalid: value exceeds its size bound: status_operator.operator";
+    const BOND_INVALID_SLASH: &str =
+        "finding-market status service bond has invalid objective slash conditions";
+    const BOND_SHORT_SLA: &str =
+        "finding-market status service bond cannot cover one full inclusion SLA";
+
+    fn assert_refusal<T: std::fmt::Debug>(result: Result<T, CliError>, message: &str) {
+        let error = result.test_expect_err("the pin must be refused");
+        assert!(matches!(error, CliError::Chio(_)), "{error:?}");
+        assert_eq!(
+            error.to_string(),
+            CliError::cli_other_error(message).to_string()
+        );
+    }
 
     fn operator() -> FindingStatusOperatorPin {
         FindingStatusOperatorPin {
@@ -693,53 +709,77 @@ mod status_feed_config_tests {
     fn status_operator_requires_exact_role_and_live_key_window() {
         let mut pin = operator();
         pin.role = "venue".to_string();
-        assert!(pin.validate().is_err());
+        assert_refusal(
+            pin.validate(),
+            "finding-market status operator role is invalid",
+        );
 
         let pin = operator();
         assert!(pin.require_live(FEED_ID, 100).is_ok());
         assert!(pin.require_live(FEED_ID, 499).is_ok());
-        assert!(pin.require_live(FEED_ID, 500).is_err());
-        assert!(pin.require_live("status-feed/other", 200).is_err());
+        assert_refusal(pin.require_live(FEED_ID, 500), OPERATOR_OUTSIDE_WINDOW);
+        assert_refusal(
+            pin.require_live("status-feed/other", 200),
+            "finding-market status feed does not match the configured feed",
+        );
 
         let mut invalid = operator();
         invalid.feed_id = "status feed/test".to_string();
-        assert!(invalid.validate().is_err());
+        assert_refusal(
+            invalid.validate(),
+            "finding-market status feed id is not a portable wire identifier",
+        );
         invalid.feed_id = "status-feed/café".to_string();
-        assert!(invalid.validate().is_err());
+        assert_refusal(
+            invalid.validate(),
+            "finding-market status feed id is not a portable wire identifier",
+        );
 
         let mut oversized_authority_id = operator();
         oversized_authority_id.authority.authority_id = "a".repeat(513);
-        assert!(oversized_authority_id.validate().is_err());
+        assert_refusal(oversized_authority_id.validate(), SIZE_BOUND);
 
         let mut nonportable_authority_id = operator();
         nonportable_authority_id.authority.authority_id = "status-opérator".to_string();
-        assert!(nonportable_authority_id.validate().is_err());
+        assert_refusal(
+            nonportable_authority_id.validate(),
+            "finding-market status operator authority id is not a portable wire identifier",
+        );
 
         let mut oversized_rotation_ref = operator();
         oversized_rotation_ref.rotation_policy_ref = "r".repeat(513);
-        assert!(oversized_rotation_ref.validate().is_err());
+        assert_refusal(oversized_rotation_ref.validate(), SIZE_BOUND);
 
         let mut oversized_revocation_ref = operator();
         oversized_revocation_ref.authority.revocation_status_ref = "s".repeat(513);
-        assert!(oversized_revocation_ref.validate().is_err());
+        assert_refusal(oversized_revocation_ref.validate(), SIZE_BOUND);
     }
 
     #[test]
     fn revoked_operator_and_mismatched_bond_fail_closed() {
         let mut pin = operator();
         pin.revoked_from = Some(200);
-        assert!(pin.require_live(FEED_ID, 200).is_err());
+        assert_refusal(pin.require_live(FEED_ID, 200), OPERATOR_OUTSIDE_WINDOW);
 
         let mut never_live = operator();
         never_live.revoked_from = Some(never_live.authority.valid_from);
-        assert!(never_live.validate().is_err());
+        assert_refusal(
+            never_live.validate(),
+            "finding-market status operator revocation time is invalid",
+        );
         never_live.revoked_from = Some(never_live.authority.valid_from - 1);
-        assert!(never_live.validate().is_err());
+        assert_refusal(
+            never_live.validate(),
+            "finding-market status operator revocation time is invalid",
+        );
 
         let pin = operator();
         let mut service_bond = bond();
         service_bond.operator_id = "substitute-operator".to_string();
-        assert!(service_bond.validate(&pin).is_err());
+        assert_refusal(
+            service_bond.validate(&pin),
+            "finding-market status service bond is bound to another feed or operator",
+        );
     }
 
     #[test]
@@ -753,21 +793,24 @@ mod status_feed_config_tests {
         assert!(service_bond.covers(399));
         assert!(!service_bond.covers(400));
         assert!(require_status_feed_through(&pin, &service_bond, FEED_ID, 300, 399).is_ok());
-        assert!(require_status_feed_through(&pin, &service_bond, FEED_ID, 300, 400).is_err());
+        assert_refusal(
+            require_status_feed_through(&pin, &service_bond, FEED_ID, 300, 400),
+            "finding-market status service bond does not cover the inclusion deadline",
+        );
 
         let mut missing_sla = service_bond.clone();
         missing_sla.inclusion_sla_secs = 0;
-        assert!(missing_sla.validate(&pin).is_err());
+        assert_refusal(missing_sla.validate(&pin), BOND_INVALID_SLASH);
 
         let mut short_bond = service_bond.clone();
         short_bond.valid_until = short_bond.valid_from + short_bond.inclusion_sla_secs;
-        assert!(short_bond.validate(&pin).is_err());
+        assert_refusal(short_bond.validate(&pin), BOND_SHORT_SLA);
 
         let mut short_operator_overlap = service_bond.clone();
         short_operator_overlap.valid_from =
             pin.authority.valid_until - short_operator_overlap.inclusion_sla_secs;
         short_operator_overlap.valid_until = pin.authority.valid_until + 100;
-        assert!(short_operator_overlap.validate(&pin).is_err());
+        assert_refusal(short_operator_overlap.validate(&pin), BOND_SHORT_SLA);
 
         let mut revoked_before_sla = pin.clone();
         revoked_before_sla.revoked_from = Some(
@@ -775,7 +818,7 @@ mod status_feed_config_tests {
                 .valid_from
                 .saturating_add(service_bond.inclusion_sla_secs),
         );
-        assert!(service_bond.validate(&revoked_before_sla).is_err());
+        assert_refusal(service_bond.validate(&revoked_before_sla), BOND_SHORT_SLA);
 
         let mut revoked_after_sla = pin.clone();
         revoked_after_sla.revoked_from = Some(
@@ -790,7 +833,7 @@ mod status_feed_config_tests {
 
         let mut unbacked_equivocation = service_bond;
         unbacked_equivocation.equivocation_slash_units = 1_001;
-        assert!(unbacked_equivocation.validate(&pin).is_err());
+        assert_refusal(unbacked_equivocation.validate(&pin), BOND_INVALID_SLASH);
     }
 
     #[test]
