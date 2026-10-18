@@ -467,7 +467,13 @@ def aggregate(
                     "source-sha.txt": f"{source}\n".encode(),
                 },
             )
-        finally:
+        except BaseException as primary:
+            try:
+                git(candidate, "worktree", "remove", "--force", str(workspace))
+            except Exception as cleanup:
+                raise primary from cleanup
+            raise
+        else:
             git(candidate, "worktree", "remove", "--force", str(workspace))
 
 

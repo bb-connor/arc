@@ -2047,6 +2047,14 @@ def run_lane(repo: str, lane: Lane, *, report_only: bool) -> int:
         print_history(history, "report")
         return 0
     if lane.posture == "required" and not promotion_evidence_matches(repo, history):
+        current_ok, current = current_result(lane)
+        if not current_ok:
+            print_history(history, "fail", current)
+            print(
+                "lane-gate: promotion_evidence_mismatch also present",
+                file=sys.stderr,
+            )
+            return 1
         print_history(history, "fail", "promotion_evidence_mismatch")
         return 1
     current_ok, current = current_result(lane)
