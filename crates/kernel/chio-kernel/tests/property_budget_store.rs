@@ -144,6 +144,7 @@ fn error_kind(error: &BudgetStoreError) -> &'static str {
         BudgetStoreError::Clock(_) => "clock",
         BudgetStoreError::Fenced { .. } => "fenced",
         BudgetStoreError::Invariant(_) => "invariant",
+        BudgetStoreError::StaleSchema { .. } => "stale_schema",
         BudgetStoreError::Sqlite(_) => "sqlite",
         BudgetStoreError::Io(_) => "io",
         BudgetStoreError::OutcomeUnknown(_) => "outcome_unknown",
