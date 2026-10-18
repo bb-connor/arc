@@ -623,6 +623,12 @@ impl<
             .map_or(dispatch.initial_work.fencing_token, |work| {
                 work.fencing_token
             });
+        let expected_fencing_token = core::num::NonZeroU64::new(expected_fencing_token)
+            .ok_or_else(|| {
+                ActiveResponseExecutorError::OutcomeUnknown(
+                    "active-response recovery fence is zero".to_owned(),
+                )
+            })?;
         let outcome = self
             .store
             .recover_dispatch_work(&ResponseDispatchRecoveryRequest {
@@ -630,7 +636,7 @@ impl<
                 action_id: request.raw.response_plan.action_id.clone(),
                 recovery_id,
                 lease_owner_id: self.lease_owner_id.clone(),
-                expected_fencing_token: expected_fencing_token,
+                expected_fencing_token,
                 now_unix_ms,
                 lease_expires_at_unix_ms,
             })

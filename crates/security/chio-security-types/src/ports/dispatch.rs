@@ -94,7 +94,7 @@ pub struct ResponseDispatchRecoveryRequest {
     pub recovery_id: RecordId,
     pub lease_owner_id: LeaseOwnerId,
     /// Exact fencing token observed before the atomic recovery attempt.
-    pub expected_fencing_token: u64,
+    pub expected_fencing_token: core::num::NonZeroU64,
     pub now_unix_ms: u64,
     pub lease_expires_at_unix_ms: u64,
 }
