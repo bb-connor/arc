@@ -231,6 +231,7 @@ run_exact_target --label "strict manifest" --expected \
 run_exact_target --label "security kernel adapters" --expected \
   atomic_post_evidence_remains_bound_to_each_concurrent_response \
   clear_paths_preserve_allow_decisions \
+  concurrent_post_invocation::concurrent_pipeline_calls_keep_their_own_results_and_evidence \
   containment_active_and_store_error_both_prevent_dispatch \
   detector_failure_is_fail_closed \
   enforced_pre_dispatch_hook_commits_and_records_release_at_connector_boundary \
