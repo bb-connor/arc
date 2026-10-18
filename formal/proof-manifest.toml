@@ -2871,13 +2871,13 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-control-plane/src/security/adapters/native_flow.rs"
 rust_symbols = ["NativeFlowError","NativeFlowResolver","PreparedNativeFlowDispatch","NativeFlowCustody","NativeFlowResolver::new","NativeFlowResolver::prepare_dispatch","NativeFlowResolver::policy","PreparedNativeFlowDispatch::admission","PreparedNativeFlowDispatch::commit_custody","NativeFlowCustody::operation_id","NativeFlowCustody::observation","NativeFlowCustody::live_request_digest","NativeFlowCustody::admission","NativeFlowCustody::egress_history","require_time","policy_call","NativeFlowResolver::name","NativeFlowResolver::native_authority_binding","NativeFlowResolver::prepare_native_admission","NativeFlowResolver::prepare_native_output","NativeFlowResolver::commit","PreparedNativeFlowDispatch::policy_evidence","NativeFlowCustody::policy_evidence","PreparedNativeFlowDispatch::commit_custody_with_dispatch_ledger","PreparedNativeFlowDispatch::commit_custody_inner","NativeFlowCustody::dispatch_ledger","PreparedNativeFlowDispatch::capture_invocation","NativeFlowResolver::with_captured_lifecycle","NativeFlowResolver::supports_native_dispatch","NativeFlowResolver::commit_native_dispatch","NativeFlowResolver::classify_admission_input","NativeFlowResolver::prepare_native_nonce_preflight","NativeFlowResolver::validate_declassification_issuer"]
-normalized_sha256 = "e1dfe5b87e22dd683cfbdba4a2d5e25f09ff0f0f69d1e22ca21b628bcc973752"
+normalized_sha256 = "064a5240df51e680dade025935b3fd16f03c717f8931596214d60a61290e4b98"
 symbol_sha256 = [
-  { symbol = "NativeFlowError", sha256 = "034eb01d1c1ba4ac1d75e79532d13f465a4af400b400bd1fa61a16db68d15dc7" },
+  { symbol = "NativeFlowError", sha256 = "f536ecaf9d3307ed20a4cd9a6b0fa563d4364b039ffcb14931d467f4e66a7bd3" },
   { symbol = "NativeFlowResolver", sha256 = "ab08fe9ed77d609f60022212bfa5421a7061df5a82f529500a5bc7b44f107d05" },
   { symbol = "PreparedNativeFlowDispatch", sha256 = "6e3dd91095c33cb30cf880c205f4ece8782f9f3aa2c6915108560ca059f5d19c" },
   { symbol = "NativeFlowCustody", sha256 = "cdbfec64c054d6e0a75b0adeec9cb9155e19992f132d3e49c4afb78c555194dd" },
-  { symbol = "NativeFlowResolver::new", sha256 = "90b72051194fc15ae91031142312dc8e9a3b08241c65ee63121a549820f1456a" },
+  { symbol = "NativeFlowResolver::new", sha256 = "6d70d452ef2c31ca721b52d63430b5822dadcd1f79deb2e1ca8b87bfe510dc9e" },
   { symbol = "NativeFlowResolver::prepare_dispatch", sha256 = "a88a832568a2ed953d1b309dfa50f4204d7d62c655b14604a1be1242e66deff2" },
   { symbol = "NativeFlowResolver::policy", sha256 = "ebb56091a248d59ae002bad196e8c9cb277afcc8805f567af5ca3aaf06251d09" },
   { symbol = "PreparedNativeFlowDispatch::admission", sha256 = "f004f42a6accdf243199b912a23ffea9ecd66740b07860750ab83e2f6520d39e" },
