@@ -2,10 +2,10 @@ use chio_cage::{
     persist_signed_cage_receipt, persist_signed_cage_receipt_with_trusted_key, sign_cage_receipt,
     verify_signed_cage_receipt, verify_signed_cage_receipt_with_trusted_key,
     CageEnforcementFailure, CageEnforcementFailureCode, CageEnforcementRecord,
-    CageEnforcementState, CageReceiptBindings, CageReceiptBody, CageReceiptPersistenceError,
-    CageReceiptSigningContext, EnforcementEvidenceError, EnforcementPrepared,
-    ExecTransitionObserved, ExecutionIdentity, FullyEnforcedEvidence, ObservedRulesetStatus,
-    ProcessExitEvidence, SandboxArchitecture, SeccompEnforcementStatus,
+    CageEnforcementState, CageReceiptBindings, CageReceiptBody, CageReceiptError,
+    CageReceiptPersistenceError, CageReceiptSigningContext, EnforcementEvidenceError,
+    EnforcementPrepared, ExecTransitionObserved, ExecutionIdentity, FullyEnforcedEvidence,
+    ObservedRulesetStatus, ProcessExitEvidence, SandboxArchitecture, SeccompEnforcementStatus,
     CAGE_ENFORCEMENT_RECORD_SCHEMA, ENFORCEMENT_PREPARED_SCHEMA, EXEC_TRANSITION_OBSERVED_SCHEMA,
     NONO_PATCH_VERSION, PINNED_NONO_VERSION, PINNED_SECCOMPILER_VERSION,
 };
@@ -95,13 +95,22 @@ fn fully_enforced_requires_prepared_exec_identity_and_status_eof() {
     assert_eq!(record.schema, CAGE_ENFORCEMENT_RECORD_SCHEMA);
     record.validate().test_expect("valid record");
 
-    assert!(FullyEnforcedEvidence::new(prepared(), exec_transition(), false).is_err());
+    assert_eq!(
+        FullyEnforcedEvidence::new(prepared(), exec_transition(), false),
+        Err(EnforcementEvidenceError::MissingStatusEof)
+    );
     let mut wrong_process = exec_transition();
     wrong_process.process_id = 43;
-    assert!(FullyEnforcedEvidence::new(prepared(), wrong_process, true).is_err());
+    assert_eq!(
+        FullyEnforcedEvidence::new(prepared(), wrong_process, true),
+        Err(EnforcementEvidenceError::BindingMismatch)
+    );
     let mut wrong_target = exec_transition();
     wrong_target.target_binding_digest = digest('9');
-    assert!(FullyEnforcedEvidence::new(prepared(), wrong_target, true).is_err());
+    assert_eq!(
+        FullyEnforcedEvidence::new(prepared(), wrong_target, true),
+        Err(EnforcementEvidenceError::BindingMismatch)
+    );
 
     // Millisecond timestamps may tie, but a backwards wall clock must deny
     // launch rather than mint apparently ordered enforcement evidence.
@@ -115,13 +124,14 @@ fn fully_enforced_requires_prepared_exec_identity_and_status_eof() {
         FullyEnforcedEvidence::new(prepared(), earlier_exec.clone(), true),
         Err(EnforcementEvidenceError::BindingMismatch)
     );
-    assert!(
+    assert_eq!(
         CageEnforcementRecord::fully_enforced(FullyEnforcedEvidence {
             prepared: prepared(),
             exec_transition: earlier_exec,
             status_eof_observed: true,
         })
-        .is_err()
+        .err(),
+        Some(EnforcementEvidenceError::BindingMismatch)
     );
 
     let forged = FullyEnforcedEvidence {
@@ -132,14 +142,20 @@ fn fully_enforced_requires_prepared_exec_identity_and_status_eof() {
         },
         status_eof_observed: true,
     };
-    assert!(CageEnforcementRecord::fully_enforced(forged).is_err());
+    assert_eq!(
+        CageEnforcementRecord::fully_enforced(forged).err(),
+        Some(EnforcementEvidenceError::BindingMismatch)
+    );
 
     let forged_without_status_eof = FullyEnforcedEvidence {
         prepared: prepared(),
         exec_transition: exec_transition(),
         status_eof_observed: false,
     };
-    assert!(CageEnforcementRecord::fully_enforced(forged_without_status_eof).is_err());
+    assert_eq!(
+        CageEnforcementRecord::fully_enforced(forged_without_status_eof).err(),
+        Some(EnforcementEvidenceError::MissingStatusEof)
+    );
 }
 
 #[test]
@@ -156,7 +172,10 @@ fn bootstrap_failure_cannot_claim_enforcement_or_exit() {
     let mut value = serde_json::to_value(record).test_expect("record json");
     value["state"] = serde_json::json!("fully_enforced");
     let forged: CageEnforcementRecord = serde_json::from_value(value).test_expect("shape decodes");
-    assert!(forged.validate().is_err());
+    assert_eq!(
+        forged.validate(),
+        Err(EnforcementEvidenceError::InvalidStateShape)
+    );
 }
 
 #[test]
@@ -179,26 +198,44 @@ fn exit_is_bound_to_a_previously_fully_enforced_process() {
         signal: Some(9),
         exited_at_unix_ms: 1_002,
     };
-    assert!(CageEnforcementRecord::exited(evidence, invalid).is_err());
+    assert_eq!(
+        CageEnforcementRecord::exited(evidence, invalid).err(),
+        Some(EnforcementEvidenceError::InvalidExit)
+    );
 }
 
 #[test]
 fn evidence_shapes_reject_unknown_fields_and_noncanonical_digests() {
     let mut value = serde_json::to_value(prepared()).test_expect("prepared json");
     value["legacy"] = serde_json::json!(true);
-    assert!(serde_json::from_value::<EnforcementPrepared>(value).is_err());
+    let unknown = serde_json::from_value::<EnforcementPrepared>(value)
+        .err()
+        .test_expect("unknown field must be rejected");
+    assert!(
+        unknown.to_string().contains("unknown field `legacy`"),
+        "{unknown}"
+    );
 
     let mut invalid = prepared();
     invalid.plan_digest = "ABC".to_string();
-    assert!(invalid.validate().is_err());
+    assert_eq!(
+        invalid.validate(),
+        Err(EnforcementEvidenceError::InvalidDigest)
+    );
 
     let mut partial = prepared();
     partial.landlock_network_status = ObservedRulesetStatus::PartiallyEnforced;
-    assert!(partial.validate().is_err());
+    assert_eq!(
+        partial.validate(),
+        Err(EnforcementEvidenceError::IncompleteEnforcement)
+    );
 
     let mut missing_seccomp = prepared();
     missing_seccomp.seccomp_status = SeccompEnforcementStatus::NotEnforced;
-    assert!(missing_seccomp.validate().is_err());
+    assert_eq!(
+        missing_seccomp.validate(),
+        Err(EnforcementEvidenceError::IncompleteEnforcement)
+    );
 
     for forged_identity in [
         serde_json::json!({"uid": 0, "gid": 10001, "supplementary_gids": []}),
@@ -210,7 +247,10 @@ fn evidence_shapes_reject_unknown_fields_and_noncanonical_digests() {
         value["applied_execution_identity"] = forged_identity;
         let forged = serde_json::from_value::<EnforcementPrepared>(value)
             .test_expect("identity shape decodes");
-        assert!(forged.validate().is_err());
+        assert_eq!(
+            forged.validate(),
+            Err(EnforcementEvidenceError::BindingMismatch)
+        );
     }
 }
 
@@ -245,15 +285,20 @@ fn fully_enforced_release_receipt_is_signed_verified_and_persistable() {
     persist_signed_cage_receipt_with_trusted_key(&receipt, &trusted_key, |_| Ok::<_, ()>(()))
         .test_expect("trusted receipt persistence");
     let attacker_key = Keypair::from_seed(&[94; 32]).public_key();
-    assert!(verify_signed_cage_receipt_with_trusted_key(&receipt, &attacker_key).is_err());
+    assert!(matches!(
+        verify_signed_cage_receipt_with_trusted_key(&receipt, &attacker_key),
+        Err(CageReceiptError::UntrustedSigner)
+    ));
     let mut called = false;
-    assert!(
+    assert!(matches!(
         persist_signed_cage_receipt_with_trusted_key(&receipt, &attacker_key, |_| {
             called = true;
             Ok::<_, ()>(())
-        })
-        .is_err()
-    );
+        }),
+        Err(CageReceiptPersistenceError::Invalid(
+            CageReceiptError::UntrustedSigner
+        ))
+    ));
     assert!(!called);
 }
 
@@ -336,7 +381,10 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
         .test_expect("complete admitted policy")
         .with_launch_bindings(&original, &bound)
         .test_expect("stdio preparation updates plan bindings");
-    assert!(context.with_launch_bindings(&original, &bound).is_err());
+    assert!(matches!(
+        context.with_launch_bindings(&original, &bound),
+        Err(CageReceiptError::BindingMismatch)
+    ));
     for field in [
         "manifest_digest",
         "helper_binding_digest",
@@ -351,9 +399,10 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
         }
         let altered = serde_json::from_value(value).test_unwrap();
         assert!(
-            signing_context()
-                .with_launch_bindings(&original, &altered)
-                .is_err(),
+            matches!(
+                signing_context().with_launch_bindings(&original, &altered),
+                Err(CageReceiptError::BindingMismatch)
+            ),
             "{field}"
         );
     }
@@ -368,7 +417,10 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
     let body =
         CageReceiptBody::new("prepared-stdio", Some(bound), record, 900, 1_001).test_unwrap();
     let backend = Ed25519Backend::new(Keypair::from_seed(&[94; 32]));
-    assert!(sign_cage_receipt(body.clone(), &signing_context(), &backend).is_err());
+    assert!(matches!(
+        sign_cage_receipt(body.clone(), &signing_context(), &backend),
+        Err(CageReceiptError::BindingMismatch)
+    ));
     let signed = sign_cage_receipt(body, &context, &backend).test_unwrap();
     assert_eq!(signed.policy_hash, digest('a'));
     let verified = verify_signed_cage_receipt(&signed).test_unwrap();
@@ -379,13 +431,22 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
     let mut tampered = signed.clone();
     tampered.metadata.as_mut().test_unwrap()["cage_receipt"]["admitted_policy_digest"] =
         serde_json::json!(digest('f'));
-    assert!(verify_signed_cage_receipt(&tampered).is_err());
+    assert!(matches!(
+        verify_signed_cage_receipt(&tampered),
+        Err(CageReceiptError::InvalidSignature)
+    ));
     let wrong_context = context
         .clone()
         .with_admitted_policy_digest(digest('f'))
         .test_unwrap();
-    assert!(sign_cage_receipt(verified, &wrong_context, &backend).is_err());
-    assert!(context.with_admitted_policy_digest("invalid").is_err());
+    assert!(matches!(
+        sign_cage_receipt(verified, &wrong_context, &backend),
+        Err(CageReceiptError::BindingMismatch)
+    ));
+    assert!(matches!(
+        context.with_admitted_policy_digest("invalid"),
+        Err(CageReceiptError::InvalidDigest)
+    ));
 
     let bootstrap = CageEnforcementRecord::bootstrap_failed(
         CageEnforcementFailure::new(
@@ -395,12 +456,18 @@ fn cage_receipt_rejects_missing_or_forged_enforcement_bindings() {
         .test_expect("failure"),
     )
     .test_expect("bootstrap record");
-    assert!(CageReceiptBody::new("attempt", None, bootstrap, 8_000, 9_000).is_err());
+    assert!(matches!(
+        CageReceiptBody::new("attempt", None, bootstrap, 8_000, 9_000),
+        Err(CageReceiptError::MissingBindings)
+    ));
 
     let mut forged = CageReceiptBindings::from_prepared(&prepared());
     forged.target_binding_digest = digest('9');
     let record = CageEnforcementRecord::fully_enforced(evidence()).test_expect("enforced record");
-    assert!(CageReceiptBody::new("attempt", Some(forged), record, 900, 1_001).is_err());
+    assert!(matches!(
+        CageReceiptBody::new("attempt", Some(forged), record, 900, 1_001),
+        Err(CageReceiptError::BindingMismatch)
+    ));
 }
 
 #[test]
@@ -422,7 +489,10 @@ fn cage_receipt_tampering_and_sink_failure_fail_closed() {
     let mut tampered = receipt;
     tampered.metadata.as_mut().test_expect("cage metadata")["cage_receipt"]["stage"] =
         serde_json::json!("rejection");
-    assert!(verify_signed_cage_receipt(&tampered).is_err());
+    assert!(matches!(
+        verify_signed_cage_receipt(&tampered),
+        Err(CageReceiptError::InvalidSignature)
+    ));
     let mut called = false;
     let result = persist_signed_cage_receipt(&tampered, |_| {
         called = true;
