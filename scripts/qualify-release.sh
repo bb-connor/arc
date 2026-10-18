@@ -13,6 +13,11 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
+# shellcheck source=lib/qualification-skips.sh
+source scripts/lib/qualification-skips.sh
+
+optional_tests=()
+
 output_root="target/release-qualification"
 conformance_root="${output_root}/conformance"
 log_root="${output_root}/logs"
@@ -295,6 +300,8 @@ run_conformance_area nested-callbacks tests/conformance/scenarios/nested_callbac
 
 cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qualification -- --ignored --nocapture \
   | tee "${log_root}/trust-cluster-repeat-run.log"
+qualification_assert_no_required_skips "${log_root}/trust-cluster-repeat-run.log" \
+  ${optional_tests[@]+"${optional_tests[@]}"}
 
 COVERAGE_FAIL_UNDER=65 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"
 cp -R coverage/. "${coverage_root}/"

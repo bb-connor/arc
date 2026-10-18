@@ -59,6 +59,7 @@ bash scripts/tests/check-sdk-release-ts-bun.test.sh
 bash scripts/tests/conformance-matrix-peer-target.test.sh
 bash scripts/tests/qualify-release-provider-replay.test.sh
 bash scripts/tests/qualify-release-peer-smoke.test.sh
+bash scripts/tests/qualification-skips.test.sh
 bash scripts/tests/qualify-cognition-market-hosted.test.sh
 bash scripts/tests/release-qualification-formal-tools.test.sh
 bash scripts/tests/release-npm-package-matrix.test.sh
