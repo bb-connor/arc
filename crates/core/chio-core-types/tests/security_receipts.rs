@@ -334,6 +334,13 @@ fn parse(value: Value) -> ActiveDefenseReceiptBody {
         .unwrap_or_else(|error| panic!("active-defense fixture must validate: {error}"))
 }
 
+fn assert_rejected(value: Value, expected: &str) {
+    match serde_json::from_value::<ActiveDefenseReceiptBody>(value) {
+        Ok(_) => panic!("active-defense body must be rejected with `{expected}`"),
+        Err(error) => assert_eq!(error.to_string(), expected),
+    }
+}
+
 #[derive(Clone, Debug)]
 enum JsonPathSegment {
     Key(String),
@@ -550,9 +557,13 @@ fn closed_bodies_reject_secret_bearing_and_unknown_fields() {
         for forbidden_field in ["raw_payload", "marker", "credential", "rollback_secret"] {
             let mut value = fixture(kind);
             value["body"][forbidden_field] = json!("seeded-secret-value");
+            let error = match serde_json::from_value::<ActiveDefenseReceiptBody>(value) {
+                Ok(_) => panic!("{kind:?} accepted forbidden field {forbidden_field}"),
+                Err(error) => error.to_string(),
+            };
             assert!(
-                serde_json::from_value::<ActiveDefenseReceiptBody>(value).is_err(),
-                "{kind:?} accepted forbidden field {forbidden_field}"
+                error.starts_with(&format!("unknown field `{forbidden_field}`, expected ")),
+                "{kind:?} rejected {forbidden_field} with {error}"
             );
         }
     }
@@ -568,15 +579,31 @@ fn closed_bodies_reject_secret_bearing_and_unknown_fields() {
 #[test]
 fn header_requires_exact_schema_time_and_sorted_unique_prior_links() {
     let base = fixture(ActiveDefenseReceiptKind::FlowDenial);
-    for (path, invalid) in [
-        ("schema_version", json!(2)),
-        ("occurred_at_unix_ms", json!(0)),
-        ("prior_receipt_ids", json!(["receipt-002", "receipt-001"])),
-        ("prior_receipt_ids", json!(["receipt-001", "receipt-001"])),
+    for (path, invalid, expected) in [
+        (
+            "schema_version",
+            json!(2),
+            "unsupported active-defense receipt schema version",
+        ),
+        (
+            "occurred_at_unix_ms",
+            json!(0),
+            "occurred_at_unix_ms must be nonzero",
+        ),
+        (
+            "prior_receipt_ids",
+            json!(["receipt-002", "receipt-001"]),
+            "prior receipt ids must be strictly sorted and unique",
+        ),
+        (
+            "prior_receipt_ids",
+            json!(["receipt-001", "receipt-001"]),
+            "prior receipt ids must be strictly sorted and unique",
+        ),
     ] {
         let mut value = base.clone();
         value["body"]["header"][path] = invalid;
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(value).is_err());
+        assert_rejected(value, expected);
     }
 
     let mut missing = base;
@@ -584,72 +611,108 @@ fn header_requires_exact_schema_time_and_sorted_unique_prior_links() {
         .as_object_mut()
         .unwrap_or_else(|| panic!("header fixture must be an object"))
         .remove("transition_id");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(missing).is_err());
+    assert_rejected(missing, "missing field `transition_id`");
 }
 
 #[test]
 fn declassification_receipts_enforce_one_way_consumption_states() {
     let mut consumption = fixture(ActiveDefenseReceiptKind::DeclassificationConsumption);
     consumption["body"]["state"] = json!("released");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(consumption).is_err());
+    assert_rejected(
+        consumption,
+        "declassification consumption must enter consumed_pending_dispatch",
+    );
 
     let mut outcome = fixture(ActiveDefenseReceiptKind::DeclassificationOutcome);
     outcome["body"]["from_state"] = json!("released");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(outcome).is_err());
+    assert_rejected(
+        outcome,
+        "declassification outcome must leave consumed_pending_dispatch exactly once",
+    );
 
     let mut outcome = fixture(ActiveDefenseReceiptKind::DeclassificationOutcome);
     outcome["body"]["to_state"] = json!("consumed_pending_dispatch");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(outcome).is_err());
+    assert_rejected(
+        outcome,
+        "declassification outcome must leave consumed_pending_dispatch exactly once",
+    );
 }
 
 #[test]
 fn correlated_finding_requires_ordered_unique_events_and_matching_evidence() {
     let mut duplicate = fixture(ActiveDefenseReceiptKind::CorrelatedFinding);
     duplicate["body"]["ordered_event_ids"] = json!(["event-001", "event-001"]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(duplicate).is_err());
+    assert_rejected(
+        duplicate,
+        "correlated finding contains a duplicate event id",
+    );
 
     let mut mismatched = fixture(ActiveDefenseReceiptKind::CorrelatedFinding);
     mismatched["body"]["ordered_evidence_digests"] = json!([digest(5)]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(mismatched).is_err());
+    assert_rejected(
+        mismatched,
+        "correlated finding event, evidence, and source receipt cardinalities must match",
+    );
 
     let mut source_mismatched = fixture(ActiveDefenseReceiptKind::CorrelatedFinding);
     source_mismatched["body"]["ordered_source_receipt_ids"] = json!(["receipt-001"]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(source_mismatched).is_err());
+    assert_rejected(
+        source_mismatched,
+        "correlated finding event, evidence, and source receipt cardinalities must match",
+    );
 
     let mut omitted_prior = fixture(ActiveDefenseReceiptKind::CorrelatedFinding);
     omitted_prior["body"]["header"]["prior_receipt_ids"] = json!(["receipt-001"]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(omitted_prior).is_err());
+    assert_rejected(
+        omitted_prior,
+        "correlated finding prior receipts do not match its source receipts",
+    );
 
     let mut extra_prior = fixture(ActiveDefenseReceiptKind::CorrelatedFinding);
     extra_prior["body"]["header"]["prior_receipt_ids"] =
         json!(["receipt-001", "receipt-002", "receipt-003"]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(extra_prior).is_err());
+    assert_rejected(
+        extra_prior,
+        "correlated finding prior receipts do not match its source receipts",
+    );
 
     let mut future = fixture(ActiveDefenseReceiptKind::CorrelatedFinding);
     future["body"]["last_event_time_unix_ms"] = json!(OCCURRED_AT_UNIX_MS + 1);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(future).is_err());
+    assert_rejected(
+        future,
+        "correlated_finding_event_time is outside its valid time range",
+    );
 }
 
 #[test]
 fn response_plan_requires_canonical_effect_order_and_target_binding() {
     let mut empty = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     empty["body"]["effects"] = json!([]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(empty).is_err());
+    assert_rejected(empty, "response receipt must contain at least one effect");
 
     let mut skipped_ordinal = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     skipped_ordinal["body"]["effects"][1]["ordinal"] = json!(2);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(skipped_ordinal).is_err());
+    assert_rejected(
+        skipped_ordinal,
+        "response effects are not in canonical ordinal order",
+    );
 
     let mut duplicate_id = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     duplicate_id["body"]["effects"][1]["effect_id"] = json!("effect-001");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(duplicate_id).is_err());
+    assert_rejected(
+        duplicate_id,
+        "response receipt contains a duplicate effect id",
+    );
 
     let mut wrong_target = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     wrong_target["body"]["effects"][0]["target"] = json!({
         "target_type": "tenant",
         "tenant_id": "tenant-a"
     });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(wrong_target).is_err());
+    assert_rejected(
+        wrong_target,
+        "response effect kind does not accept its target",
+    );
 
     let mut cross_tenant = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     cross_tenant["body"]["effects"][0]["kind"] = json!("escalate_alert");
@@ -657,38 +720,47 @@ fn response_plan_requires_canonical_effect_order_and_target_binding() {
         "target_type": "tenant",
         "tenant_id": "tenant-b"
     });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(cross_tenant).is_err());
+    assert_rejected(
+        cross_tenant,
+        "response effect target crosses the receipt tenant",
+    );
 }
 
 #[test]
 fn response_plan_requires_the_exact_trigger_finding_receipt_as_a_prior() {
     let mut missing = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     missing["body"]["header"]["prior_receipt_ids"] = json!(["receipt-002"]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(missing).is_err());
+    assert_rejected(
+        missing,
+        "response plan receipt does not cite its trigger finding receipt",
+    );
 
     let mut rebound = fixture(ActiveDefenseReceiptKind::ResponsePlan);
     rebound["body"]["response"]["trigger_finding_receipt_id"] = json!("receipt-003");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(rebound).is_err());
+    assert_rejected(
+        rebound,
+        "response plan receipt does not cite its trigger finding receipt",
+    );
 }
 
 #[test]
 fn response_state_transition_enforces_exact_edge_cause_and_applying_lease() {
     let mut wrong_cause = fixture(ActiveDefenseReceiptKind::ResponseStateTransition);
     wrong_cause["body"]["cause"] = json!("rollback_requested");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(wrong_cause).is_err());
+    assert_rejected(wrong_cause, "response state transition is invalid");
 
     let mut illegal_edge = fixture(ActiveDefenseReceiptKind::ResponseStateTransition);
     illegal_edge["body"]["to_state"] = json!("lifted");
     illegal_edge["body"]["applying_lease_expires_at_unix_ms"] = Value::Null;
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(illegal_edge).is_err());
+    assert_rejected(illegal_edge, "response state transition is invalid");
 
     let mut missing_lease = fixture(ActiveDefenseReceiptKind::ResponseStateTransition);
     missing_lease["body"]["applying_lease_expires_at_unix_ms"] = Value::Null;
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(missing_lease).is_err());
+    assert_rejected(missing_lease, "response state transition is invalid");
 
     let mut late_lease = fixture(ActiveDefenseReceiptKind::ResponseStateTransition);
     late_lease["body"]["applying_lease_expires_at_unix_ms"] = json!(OCCURRED_AT_UNIX_MS + 100_001);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(late_lease).is_err());
+    assert_rejected(late_lease, "response state transition is invalid");
 
     let mut renewal = fixture(ActiveDefenseReceiptKind::ResponseStateTransition);
     renewal["body"]["from_state"] = json!("applying");
@@ -700,11 +772,11 @@ fn response_state_transition_enforces_exact_edge_cause_and_applying_lease() {
 
     let mut missing_owner = renewal.clone();
     missing_owner["body"]["scheduler_lease_owner_id"] = Value::Null;
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(missing_owner).is_err());
+    assert_rejected(missing_owner, "response state transition is invalid");
 
     let mut zero_token = renewal.clone();
     zero_token["body"]["scheduler_fencing_token"] = json!(0);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(zero_token).is_err());
+    assert_rejected(zero_token, "response state transition is invalid");
 
     let mut fenced_initial_apply = renewal;
     fenced_initial_apply["body"]["from_state"] = json!("planned");
@@ -737,14 +809,20 @@ fn failed_completion_requires_a_resolved_unapplied_effect_shape() {
 
     let mut requested = one_failed.clone();
     requested["body"]["effects"][0]["outcome"] = json!({ "state": "requested" });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(requested).is_err());
+    assert_rejected(
+        requested,
+        "response completion state contradicts its effect outcomes",
+    );
 
     let mut multiple_failures = one_failed;
     multiple_failures["body"]["effects"][1]["outcome"] = json!({
         "state": "apply_failed",
         "error_code": "effect.second_external_failure"
     });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(multiple_failures).is_err());
+    assert_rejected(
+        multiple_failures,
+        "response completion state contradicts its effect outcomes",
+    );
 
     let mut mismatch = fixture(ActiveDefenseReceiptKind::ResponseCompletion);
     mismatch["body"]["final_state"] = json!("failed");
@@ -754,11 +832,17 @@ fn failed_completion_requires_a_resolved_unapplied_effect_shape() {
         "error_code": "effect.external_failure"
     });
     mismatch["body"]["effects"][1]["outcome"] = json!({ "state": "planned" });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(mismatch).is_err());
+    assert_rejected(
+        mismatch,
+        "response completion state contradicts its effect outcomes",
+    );
 
     let mut extra_prior = fixture(ActiveDefenseReceiptKind::ResponseCompletion);
     extra_prior["body"]["header"]["prior_receipt_ids"] = json!(["receipt-001", "receipt-002"]);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(extra_prior).is_err());
+    assert_rejected(
+        extra_prior,
+        "receipt kind requires exactly one prior receipt id",
+    );
 }
 
 #[test]
@@ -768,7 +852,10 @@ fn partial_apply_cannot_validate_as_active_completion() {
         "state": "apply_failed",
         "error_code": "effect.external_failure"
     });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(partial.clone()).is_err());
+    assert_rejected(
+        partial.clone(),
+        "response completion state contradicts its effect outcomes",
+    );
 
     partial["body"]["final_state"] = json!("apply_partial");
     partial["body"]["error_code"] = json!("effect.external_failure");
@@ -776,7 +863,10 @@ fn partial_apply_cannot_validate_as_active_completion() {
 
     let mut false_failure = fixture(ActiveDefenseReceiptKind::ResponseCompletion);
     false_failure["body"]["final_state"] = json!("failed");
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(false_failure).is_err());
+    assert_rejected(
+        false_failure,
+        "response completion state contradicts its effect outcomes",
+    );
 }
 
 #[test]
@@ -807,7 +897,7 @@ fn completion_dispatch_proofs_require_an_exact_nonzero_paired_binding() {
         ] {
             let mut zero = valid.clone();
             zero["body"]["execution_dispatch"][field] = digest(0);
-            assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(zero).is_err());
+            assert_rejected(zero, "response dispatch proof binding is invalid");
         }
 
         for (field, value) in [
@@ -823,20 +913,29 @@ fn completion_dispatch_proofs_require_an_exact_nonzero_paired_binding() {
         ] {
             let mut mismatched = valid.clone();
             mismatched["body"]["execution_dispatch"][field] = value;
-            assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(mismatched).is_err());
+            assert_rejected(mismatched, "response dispatch proof binding is invalid");
         }
 
         let mut missing_authorization = valid.clone();
         missing_authorization["body"]["dispatch_authorization_hash"] = Value::Null;
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(missing_authorization).is_err());
+        assert_rejected(
+            missing_authorization,
+            "response dispatch proof binding is invalid",
+        );
 
         let mut missing_dispatch = valid.clone();
         missing_dispatch["body"]["execution_dispatch"] = Value::Null;
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(missing_dispatch).is_err());
+        assert_rejected(
+            missing_dispatch,
+            "response dispatch proof binding is invalid",
+        );
 
         let mut zero_authorization = valid.clone();
         zero_authorization["body"]["dispatch_authorization_hash"] = digest(0);
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(zero_authorization).is_err());
+        assert_rejected(
+            zero_authorization,
+            "dispatch_authorization_hash must not be the zero digest",
+        );
 
         let mut governed = valid;
         governed["body"]["execution_dispatch"]["approval"] = json!({
@@ -845,11 +944,14 @@ fn completion_dispatch_proofs_require_an_exact_nonzero_paired_binding() {
             "admission_operation_version": 0,
             "approval_set_hash": digest(44)
         });
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(governed.clone()).is_err());
+        assert_rejected(
+            governed.clone(),
+            "response dispatch proof binding is invalid",
+        );
         governed["body"]["execution_dispatch"]["approval"]["admission_operation_version"] =
             json!(1);
         governed["body"]["execution_dispatch"]["approval"]["approval_set_hash"] = digest(0);
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(governed).is_err());
+        assert_rejected(governed, "response dispatch proof binding is invalid");
     }
 }
 
@@ -860,7 +962,10 @@ fn partial_rollback_cannot_validate_as_lifted_completion() {
         "state": "rollback_failed",
         "error_code": "effect.restore_conflict"
     });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(partial.clone()).is_err());
+    assert_rejected(
+        partial.clone(),
+        "lift or rollback state contradicts its effect outcomes",
+    );
 
     partial["body"]["final_state"] = json!("rollback_partial");
     parse(partial);
@@ -877,22 +982,37 @@ fn lift_completion_allows_effects_that_durably_never_applied_but_not_unknown_req
 
     let mut requested = fixture(ActiveDefenseReceiptKind::LiftRollbackCompletion);
     requested["body"]["effects"][1]["outcome"] = json!({ "state": "requested" });
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(requested).is_err());
+    assert_rejected(
+        requested,
+        "lift or rollback state contradicts its effect outcomes",
+    );
 }
 
 #[test]
 fn health_receipts_reject_zero_or_future_operational_state() {
     let mut detector = fixture(ActiveDefenseReceiptKind::DetectorHealth);
     detector["body"]["watermark"]["unix_ms"] = json!(OCCURRED_AT_UNIX_MS + 1);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(detector).is_err());
+    assert_rejected(
+        detector,
+        "detector_watermark is outside its valid time range",
+    );
 
     let mut scheduler = fixture(ActiveDefenseReceiptKind::SchedulerHealth);
     scheduler["body"]["first_failure_at_unix_ms"] = json!(OCCURRED_AT_UNIX_MS + 1);
-    assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(scheduler).is_err());
+    assert_rejected(
+        scheduler,
+        "scheduler_first_failure is outside its valid time range",
+    );
 
-    for field in ["attempts", "scheduler_fencing_token"] {
+    for (field, expected) in [
+        ("attempts", "scheduler attempts must be nonzero"),
+        (
+            "scheduler_fencing_token",
+            "scheduler fencing token must be nonzero",
+        ),
+    ] {
         let mut scheduler = fixture(ActiveDefenseReceiptKind::SchedulerHealth);
         scheduler["body"][field] = json!(0);
-        assert!(serde_json::from_value::<ActiveDefenseReceiptBody>(scheduler).is_err());
+        assert_rejected(scheduler, expected);
     }
 }
