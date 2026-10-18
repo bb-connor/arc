@@ -4,7 +4,7 @@
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::StoreMutationFence;
 use chio_store_sqlite::delegation_store::{SqliteDelegationStore, SqliteDelegationStoreError};
-use chio_store_sqlite::SqliteAuthorityStore;
+use chio_store_sqlite::{SqliteAuthorityStore, SqliteServingOwnerError};
 use chio_workflow::delegation::*;
 use serde_json::json;
 use std::collections::BTreeSet;
@@ -71,6 +71,20 @@ fn binding(id: &str, receiver: u8) -> DispatchBinding {
         max_units: 20,
         currency: "USD".into(),
     }
+}
+
+fn assert_open_invalid(fixture: &Fixture, message: &str) {
+    let refusal = fixture
+        .open()
+        .err()
+        .map(|error| error.downcast::<SqliteServingOwnerError>());
+    assert!(
+        matches!(
+            &refusal,
+            Some(Ok(error)) if matches!(**error, SqliteServingOwnerError::Invalid(ref m) if m == message)
+        ),
+        "{refusal:?}"
+    );
 }
 
 struct Env {
@@ -212,8 +226,14 @@ fn nested_holders_allocate_without_copying_parent_capacity() -> TestResult {
     env.child("independent", 40)?;
     let specialist = env.child_of("research", 2, "specialist", 3, 45)?;
     assert_eq!(specialist.holder, key(3).public_key());
-    assert!(env.child("excess", 1).is_err());
-    assert!(env.child_of("research", 2, "nested-excess", 3, 16).is_err());
+    assert!(matches!(
+        env.child("excess", 1),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Bounds))
+    ));
+    assert!(matches!(
+        env.child_of("research", 2, "nested-excess", 3, 16),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Bounds))
+    ));
     Ok(())
 }
 
@@ -312,7 +332,10 @@ fn concurrent_over_allocation_grants_exactly_the_capacity() -> TestResult {
         .map(|slot| slot.contract.max_units)
         .sum();
     assert_eq!(held, 100);
-    assert!(env.child("one-more", 1).is_err());
+    assert!(matches!(
+        env.child("one-more", 1),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Bounds))
+    ));
     Ok(())
 }
 
@@ -335,7 +358,10 @@ fn mutation_requires_current_holder_and_untampered_signature() -> TestResult {
         env.store.subdivide(&cmd(), &signed, &env.fence, NOW_MS),
         Err(SqliteDelegationStoreError::Rule(DelegationError::Signature))
     ));
-    assert!(env.store.slot("child").is_err());
+    assert!(matches!(
+        env.store.slot("child"),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Invalid(m))) if m == "unknown work slot"
+    ));
     Ok(())
 }
 
@@ -371,9 +397,15 @@ fn replay_cannot_change_a_child_or_move_it_to_another_parent() -> TestResult {
     let env = Env::new()?;
     env.child("child", 30)?;
     env.child("child", 30)?;
-    assert!(env.child("child", 31).is_err());
+    assert!(matches!(
+        env.child("child", 31),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     env.child("other", 70)?;
-    assert!(env.child_of("other", 1, "child", 2, 30).is_err());
+    assert!(matches!(
+        env.child_of("other", 1, "child", 2, 30),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Authority))
+    ));
     Ok(())
 }
 
@@ -384,16 +416,23 @@ fn provider_replacement_stops_at_dispatch_and_survives_reopen() -> TestResult {
     let qualified = [key(3).public_key(), key(4).public_key()];
     env.select("leaf", 3, 0, &qualified)?;
     env.select("leaf", 4, 1, &qualified)?;
-    assert!(env.select("leaf", 3, 0, &qualified).is_err());
-    assert!(env
-        .store
-        .claim_dispatch(&cmd(), &binding("leaf", 3), &env.fence, NOW_MS)
-        .is_err());
+    assert!(matches!(
+        env.select("leaf", 3, 0, &qualified),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
+    assert!(matches!(
+        env.store
+            .claim_dispatch(&cmd(), &binding("leaf", 3), &env.fence, NOW_MS),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Authority))
+    ));
     let accepted = env
         .store
         .claim_dispatch(&cmd(), &binding("leaf", 4), &env.fence, NOW_MS)?;
     assert_eq!(accepted.slot.contract.max_units, 60);
-    assert!(env.select("leaf", 3, 2, &qualified).is_err());
+    assert!(matches!(
+        env.select("leaf", 3, 2, &qualified),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     let reopened = env.reopen()?;
     reopened.fixture.at(NOW_MS + 1000);
     reopened
@@ -401,10 +440,12 @@ fn provider_replacement_stops_at_dispatch_and_survives_reopen() -> TestResult {
         .claim_dispatch(&cmd(), &binding("leaf", 4), &reopened.fence, NOW_MS + 1000)?;
     let mut replaced = binding("leaf", 4);
     replaced.request_id = "fresh-retry".into();
-    assert!(reopened
-        .store
-        .claim_dispatch(&cmd(), &replaced, &reopened.fence, NOW_MS + 1000)
-        .is_err());
+    assert!(matches!(
+        reopened
+            .store
+            .claim_dispatch(&cmd(), &replaced, &reopened.fence, NOW_MS + 1000),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     let request = subdivision(&reopened.store, "root", 1, slot("sibling", 2, 40, 1))?;
     reopened
         .store
@@ -442,7 +483,10 @@ fn selection_and_dispatch_cannot_race_into_different_providers() -> TestResult {
 fn neither_containers_nor_unqualified_receivers_can_execute() -> TestResult {
     let env = Env::new()?;
     env.child("leaf", 60)?;
-    assert!(env.select("leaf", 3, 0, &[]).is_err());
+    assert!(matches!(
+        env.select("leaf", 3, 0, &[]),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Authority))
+    ));
     let mut s = selection(&env.store, "leaf", 3, 0)?.body;
     s.offer = Signed::sign(
         WorkOffer {
@@ -451,18 +495,21 @@ fn neither_containers_nor_unqualified_receivers_can_execute() -> TestResult {
         },
         &key(3),
     )?;
-    assert!(env
-        .store
-        .select(
+    assert!(matches!(
+        env.store.select(
             &cmd(),
             &Signed::sign(s, &key(1))?,
             &[key(3).public_key()],
             &env.fence,
             NOW_MS
-        )
-        .is_err());
+        ),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     env.select("leaf", 3, 0, &[key(3).public_key()])?;
-    assert!(env.child_of("leaf", 2, "late", 2, 1).is_err());
+    assert!(matches!(
+        env.child_of("leaf", 2, "late", 2, 1),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     Ok(())
 }
 
@@ -480,10 +527,26 @@ fn dispatch_checks_subject_currency_ceiling_capability_and_arguments() -> TestRe
             3 => b.capability_hash = chio_core::crypto::sha256_hex(b"new-capability"),
             _ => b.arguments_hash = chio_core::crypto::sha256_hex(b"other-input"),
         }
-        assert!(env
+        let refusal = env
             .store
             .claim_dispatch(&cmd(), &b, &env.fence, NOW_MS)
-            .is_err());
+            .err();
+        assert!(
+            matches!(
+                (mutation, &refusal),
+                (
+                    0,
+                    Some(SqliteDelegationStoreError::Rule(DelegationError::Authority))
+                ) | (
+                    1 | 2,
+                    Some(SqliteDelegationStoreError::Rule(DelegationError::Bounds))
+                ) | (
+                    3 | 4,
+                    Some(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+                )
+            ),
+            "mutation {mutation}: {refusal:?}"
+        );
     }
     env.store
         .claim_dispatch(&cmd(), &binding("leaf", 3), &env.fence, NOW_MS)?;
@@ -508,15 +571,15 @@ fn expiry_and_noncanonical_numeric_envelopes_reject() -> TestResult {
             .subdivide(&cmd(), &request, &env.fence, expired_at),
         Err(SqliteDelegationStoreError::Rule(DelegationError::Expired))
     ));
-    assert!(env
-        .store
-        .create_root(
+    assert!(matches!(
+        env.store.create_root(
             &cmd(),
             slot("overflow", 1, u64::MAX, 1),
             &env.fence,
             expired_at
-        )
-        .is_err());
+        ),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Invalid(m))) if m == "envelope bounds"
+    ));
     Ok(())
 }
 
@@ -535,25 +598,32 @@ fn predicates_validate_and_check_the_actual_json_result() -> TestResult {
         json!({"count": 2.0, "status":"checked"}),
         json!({"status":"checked"}),
     ] {
-        assert!(a.check(&v).is_err());
+        assert!(matches!(a.check(&v), Err(DelegationError::Rejected)));
     }
-    assert!(Acceptance { clauses: vec![] }.validate().is_err());
-    assert!(Acceptance {
-        clauses: vec![Clause::Equals {
-            pointer: "bad".into(),
-            value: json!(true)
-        }]
-    }
-    .validate()
-    .is_err());
-    assert!(Acceptance {
-        clauses: vec![Clause::Equals {
-            pointer: "/~2".into(),
-            value: json!(true)
-        }]
-    }
-    .validate()
-    .is_err());
+    assert!(matches!(
+        Acceptance { clauses: vec![] }.validate(),
+        Err(DelegationError::Invalid(m)) if m == "acceptance clause count"
+    ));
+    assert!(matches!(
+        Acceptance {
+            clauses: vec![Clause::Equals {
+                pointer: "bad".into(),
+                value: json!(true)
+            }]
+        }
+        .validate(),
+        Err(DelegationError::Invalid(m)) if m == "JSON pointer"
+    ));
+    assert!(matches!(
+        Acceptance {
+            clauses: vec![Clause::Equals {
+                pointer: "/~2".into(),
+                value: json!(true)
+            }]
+        }
+        .validate(),
+        Err(DelegationError::Invalid(m)) if m == "JSON pointer escape"
+    ));
     Ok(())
 }
 
@@ -572,17 +642,32 @@ fn sealed_allocation_is_portable_and_cannot_be_reassigned() -> TestResult {
             .seal_dispatch(&cmd(), &b, &key(1), &env.fence, NOW_MS + 1000)?
     );
     env.fixture.at(NOW_MS + 1000);
-    assert!(env.select("leaf", 4, 1, &[key(4).public_key()]).is_err());
+    assert!(matches!(
+        env.select("leaf", 4, 1, &[key(4).public_key()]),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     drop(env);
     verify_dispatch_permit(&permit, &b, 1002, &[key(1).public_key()])?;
-    assert!(verify_dispatch_permit(&permit, &b, 1002, &[]).is_err());
+    assert!(matches!(
+        verify_dispatch_permit(&permit, &b, 1002, &[]),
+        Err(DelegationError::Authority)
+    ));
     let mut altered = permit.clone();
     altered.body.slot.contract.acceptance.clauses.clear();
-    assert!(verify_dispatch_permit(&altered, &b, 1002, &[key(1).public_key()]).is_err());
+    assert!(matches!(
+        verify_dispatch_permit(&altered, &b, 1002, &[key(1).public_key()]),
+        Err(DelegationError::Signature)
+    ));
     let mut other = b.clone();
     other.receiver = key(4).public_key();
-    assert!(verify_dispatch_permit(&permit, &other, 1002, &[key(1).public_key()]).is_err());
-    assert!(verify_dispatch_permit(&permit, &b, 1900, &[key(1).public_key()]).is_err());
+    assert!(matches!(
+        verify_dispatch_permit(&permit, &other, 1002, &[key(1).public_key()]),
+        Err(DelegationError::Authority)
+    ));
+    assert!(matches!(
+        verify_dispatch_permit(&permit, &b, 1900, &[key(1).public_key()]),
+        Err(DelegationError::Expired)
+    ));
     Ok(())
 }
 
@@ -633,12 +718,16 @@ fn signed_subdivision_cannot_cross_allocator_or_root_namespaces() -> TestResult 
         let request = subdivision(&a.store, "shared-parent", 2, slot("worker", 3, 30, 1))?;
         a.store.subdivide(&cmd(), &request, &a.fence, NOW_MS)?;
         assert!(
-            b.store
-                .subdivide(&cmd(), &request, &b.fence, NOW_MS)
-                .is_err(),
+            matches!(
+                b.store.subdivide(&cmd(), &request, &b.fence, NOW_MS),
+                Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+            ),
             "foreign signed mutation must reject"
         );
-        assert!(b.store.slot("worker").is_err());
+        assert!(matches!(
+            b.store.slot("worker"),
+            Err(SqliteDelegationStoreError::Rule(DelegationError::Invalid(m))) if m == "unknown work slot"
+        ));
     }
     Ok(())
 }
@@ -652,14 +741,16 @@ fn signed_selection_cannot_cross_allocator_namespaces() -> TestResult {
     let request = selection(&a.store, "leaf", 3, 0)?;
     a.store
         .select(&cmd(), &request, &[key(3).public_key()], &a.fence, NOW_MS)?;
-    assert!(b
-        .store
-        .select(&cmd(), &request, &[key(3).public_key()], &b.fence, NOW_MS)
-        .is_err());
-    assert!(b
-        .store
-        .claim_dispatch(&cmd(), &binding("leaf", 3), &b.fence, NOW_MS)
-        .is_err());
+    assert!(matches!(
+        b.store
+            .select(&cmd(), &request, &[key(3).public_key()], &b.fence, NOW_MS),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
+    assert!(matches!(
+        b.store
+            .claim_dispatch(&cmd(), &binding("leaf", 3), &b.fence, NOW_MS),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     Ok(())
 }
 
@@ -683,13 +774,15 @@ fn allocator_namespace_survives_reopen_and_is_not_silently_recreated() -> TestRe
             .seal_dispatch(&cmd(), &binding("leaf", 3), &key(1), &env.fence, NOW_MS)?;
     let mut transplanted = permit.body.clone();
     transplanted.allocation_hash = chio_core::crypto::sha256_hex(b"another-allocation");
-    assert!(verify_dispatch_permit(
-        &Signed::sign(transplanted, &key(1))?,
-        &binding("leaf", 3),
-        1001,
-        &[key(1).public_key()],
-    )
-    .is_err());
+    assert!(matches!(
+        verify_dispatch_permit(
+            &Signed::sign(transplanted, &key(1))?,
+            &binding("leaf", 3),
+            1001,
+            &[key(1).public_key()],
+        ),
+        Err(DelegationError::Conflict)
+    ));
     let Env {
         fixture,
         owner,
@@ -703,7 +796,10 @@ fn allocator_namespace_survives_reopen_and_is_not_silently_recreated() -> TestRe
         "DROP TRIGGER work_delegation_namespace_no_delete;
          DELETE FROM work_delegation_namespace;",
     )?;
-    assert!(fixture.open().is_err());
+    assert_open_invalid(
+        &fixture,
+        "delegation schema differs from the canonical definition",
+    );
     let count: i64 = db.query_row("SELECT count(*) FROM work_delegation_namespace", [], |r| {
         r.get(0)
     })?;
@@ -729,7 +825,10 @@ fn store_refuses_a_stale_schema_stamp() -> TestResult {
         "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'work_delegation'",
         [],
     )?;
-    assert!(fixture.open().is_err());
+    assert_open_invalid(
+        &fixture,
+        "database schema version 2 is not the current schema version 1; refusing to open",
+    );
     Ok(())
 }
 
@@ -748,7 +847,10 @@ fn store_refuses_populated_tables_without_a_schema_stamp() -> TestResult {
         "DELETE FROM chio_store_schema_versions WHERE store_key = 'work_delegation'",
         [],
     )?;
-    assert!(fixture.open().is_err());
+    assert_open_invalid(
+        &fixture,
+        "delegation store was provisioned without a schema stamp",
+    );
     Ok(())
 }
 
@@ -766,7 +868,10 @@ fn store_refuses_a_missing_table() -> TestResult {
     fixture
         .raw()?
         .execute_batch("DROP TABLE work_delegation_permits;")?;
-    assert!(fixture.open().is_err());
+    assert_open_invalid(
+        &fixture,
+        "delegation schema differs from the canonical definition",
+    );
     Ok(())
 }
 
@@ -786,7 +891,10 @@ fn tampering_with_a_slot_row_fails_reopen() -> TestResult {
         "UPDATE work_delegation_slots SET allocated = 0 WHERE slot_id = 'root'",
         [],
     )?;
-    assert!(fixture.open().is_err());
+    assert_open_invalid(
+        &fixture,
+        "delegation slot state differs from its committed event",
+    );
     Ok(())
 }
 
@@ -805,30 +913,40 @@ fn stale_fence_is_rejected_without_state_change() -> TestResult {
     let events = env.events()?;
 
     let sibling = subdivision(&env.store, "root", 1, slot("sibling", 2, 40, 1))?;
-    assert!(env
-        .store
-        .subdivide(&cmd(), &sibling, &stale, NOW_MS)
-        .is_err());
+    assert!(matches!(
+        env.store.subdivide(&cmd(), &sibling, &stale, NOW_MS),
+        Err(SqliteDelegationStoreError::Unavailable(m)) if m == "admission operation mutation was fenced"
+    ));
     let replacement = selection(&env.store, "leaf", 4, 1)?;
-    assert!(env
-        .store
-        .select(&cmd(), &replacement, &qualified, &stale, NOW_MS)
-        .is_err());
-    assert!(env
-        .store
-        .claim_dispatch(&cmd(), &binding("leaf", 3), &stale, NOW_MS)
-        .is_err());
-    assert!(env
-        .store
-        .seal_dispatch(&cmd(), &binding("leaf", 3), &key(1), &stale, NOW_MS)
-        .is_err());
-    assert!(env
-        .store
-        .create_root(&cmd(), slot("other-root", 1, 10, 1), &stale, NOW_MS)
-        .is_err());
+    assert!(matches!(
+        env.store
+            .select(&cmd(), &replacement, &qualified, &stale, NOW_MS),
+        Err(SqliteDelegationStoreError::Unavailable(m)) if m == "admission operation mutation was fenced"
+    ));
+    assert!(matches!(
+        env.store
+            .claim_dispatch(&cmd(), &binding("leaf", 3), &stale, NOW_MS),
+        Err(SqliteDelegationStoreError::Unavailable(m)) if m == "admission operation mutation was fenced"
+    ));
+    assert!(matches!(
+        env.store
+            .seal_dispatch(&cmd(), &binding("leaf", 3), &key(1), &stale, NOW_MS),
+        Err(SqliteDelegationStoreError::Unavailable(m)) if m == "admission operation mutation was fenced"
+    ));
+    assert!(matches!(
+        env.store
+            .create_root(&cmd(), slot("other-root", 1, 10, 1), &stale, NOW_MS),
+        Err(SqliteDelegationStoreError::Unavailable(m)) if m == "admission operation mutation was fenced"
+    ));
 
-    assert!(env.store.slot("sibling").is_err());
-    assert!(env.store.slot("other-root").is_err());
+    assert!(matches!(
+        env.store.slot("sibling"),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Invalid(m))) if m == "unknown work slot"
+    ));
+    assert!(matches!(
+        env.store.slot("other-root"),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Invalid(m))) if m == "unknown work slot"
+    ));
     assert_eq!(env.store.allocation_digest("root")?, root_digest);
     assert_eq!(env.store.slot("leaf")?, leaf);
     assert_eq!(env.events()?, events);
@@ -861,7 +979,10 @@ fn changed_command_body_conflicts_while_exact_replay_changes_nothing() -> TestRe
         env.store.subdivide(&command, &changed, &env.fence, NOW_MS),
         Err(SqliteDelegationStoreError::CommandConflict)
     ));
-    assert!(env.store.slot("b").is_err());
+    assert!(matches!(
+        env.store.slot("b"),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Invalid(m))) if m == "unknown work slot"
+    ));
     assert_eq!(env.events()?, events);
     assert_eq!(env.store.allocation_digest("a")?, digest);
 
@@ -999,10 +1120,10 @@ fn historical_permit_outlives_expiry_while_fresh_dispatch_is_denied() -> TestRes
             .seal_dispatch(&cmd(), &b, &key(1), &env.fence, expired),
         Err(SqliteDelegationStoreError::Rule(DelegationError::Expired))
     ));
-    assert!(env
-        .store
-        .historical_dispatch(&b, &key(9).public_key())
-        .is_err());
+    assert!(matches!(
+        env.store.historical_dispatch(&b, &key(9).public_key()),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     Ok(())
 }
 
@@ -1023,8 +1144,14 @@ fn claim_without_seal_leaves_no_permit_and_keeps_capacity_consumed() -> TestResu
         .store
         .historical_dispatch(&b, &key(1).public_key())?
         .is_none());
-    assert!(env.child("excess", 41).is_err());
-    assert!(env.select("leaf", 4, 1, &qualified).is_err());
+    assert!(matches!(
+        env.child("excess", 41),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Bounds))
+    ));
+    assert!(matches!(
+        env.select("leaf", 4, 1, &qualified),
+        Err(SqliteDelegationStoreError::Rule(DelegationError::Conflict))
+    ));
     env.child("fits", 40)?;
     Ok(())
 }
