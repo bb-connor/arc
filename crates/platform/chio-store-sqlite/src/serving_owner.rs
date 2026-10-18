@@ -358,7 +358,7 @@ impl SqliteAuthorityStore {
         let canonical_database_path = fs::canonicalize(database_path)?;
         let mut connection = open_existing_database(&canonical_database_path)?;
         validate_database_identity(&canonical_database_path, &expected_database)?;
-        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection)
+        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection, true)
             .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         if owner_table_exists(&connection)? {
             verify_serving_owner_schema(&connection)?;
@@ -367,6 +367,8 @@ impl SqliteAuthorityStore {
                     canonical_database_path.display().to_string(),
                 )
             })?;
+            crate::tool_outcome_store::preflight_tool_outcome_schema(&connection, false)
+                .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
             path_identity::inspect(
                 &lock_root,
@@ -606,7 +608,7 @@ impl SqliteAuthorityStore {
         let mut connection = open_existing_database(&database_path)?;
         let expected_data_version = authority_data_version(&connection)?;
         validate_database_identity(&database_path, &expected_database)?;
-        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection)
+        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection, true)
             .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         if !owner_table_exists(&connection)? {
             verify_path_available_for_new_identity(&lock_root, &database_path)?;
@@ -618,6 +620,8 @@ impl SqliteAuthorityStore {
         let record = load_provisioning_record(&connection)?.ok_or_else(|| {
             SqliteServingOwnerError::PartialProvision(database_path.display().to_string())
         })?;
+        crate::tool_outcome_store::preflight_tool_outcome_schema(&connection, false)
+            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         validate_provisioning_record(&database_path, &lock_root, &record)?;
         path_identity::inspect(&lock_root, &database_path, Some(&record.store_uuid))?;
         let lock_path = lock_root.join(format!("{}.lock", record.store_uuid));

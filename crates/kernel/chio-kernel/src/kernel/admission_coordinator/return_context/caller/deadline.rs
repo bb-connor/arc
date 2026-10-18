@@ -49,28 +49,19 @@ impl ChioKernel {
 
 impl CallerReturnWire {
     pub(super) fn valid_deadline_shape(&self) -> bool {
-        match (self.schema.as_str(), self.start_valid_until_unix_ms) {
-            (SCHEMA, Some(deadline)) => {
-                deadline > self.frozen_at_unix_ms && deadline <= I_JSON_MAX_SAFE_INTEGER
-            }
-            (SCHEMA, None) | (_, Some(_)) => false,
-            (_, None) => true,
-        }
+        self.schema == CALLER_RETURN_CONTEXT_SCHEMA
+            && self.start_valid_until_unix_ms > self.frozen_at_unix_ms
+            && self.start_valid_until_unix_ms <= I_JSON_MAX_SAFE_INTEGER
+            && self.native_custody.as_ref().is_none_or(|custody| {
+                self.start_valid_until_unix_ms == custody.valid_until_unix_ms()
+            })
     }
 
     pub(super) fn start_deadline(&self) -> Result<u64, KernelError> {
-        match self.schema.as_str() {
-            SCHEMA if self.valid_deadline_shape() => self
-                .start_valid_until_unix_ms
-                .ok_or_else(|| invalid("caller start deadline is absent")),
-            NATIVE_CALLER_CONTEXT_SCHEMA => self
-                .native_custody
-                .as_ref()
-                .map(NativeCallerReleaseCustodyV1::valid_until_unix_ms)
-                .ok_or_else(|| invalid("native caller start custody is absent")),
-            _ => Err(invalid(
-                "legacy caller context cannot acquire start authority",
-            )),
+        if self.valid_deadline_shape() {
+            Ok(self.start_valid_until_unix_ms)
+        } else {
+            Err(invalid("caller context cannot acquire start authority"))
         }
     }
 }

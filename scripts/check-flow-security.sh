@@ -859,17 +859,20 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
-  kernel::admission_coordinator::return_context::caller::caller_return_wire_pins_its_written_and_legacy_schema_identities \
+  kernel::admission_coordinator::return_context::caller::caller_return_wire_pins_its_v1_schema_identity \
+  kernel::admission_coordinator::return_context::caller::tests::missing_frozen_signer_refuses_caller_decode_without_state_changes \
+  kernel::admission_coordinator::return_context::caller::tests::caller_return_wire_requires_signer_participants_custody_and_deadline \
+  kernel::admission_coordinator::return_context::caller::tests::caller_return_wire_writes_one_complete_v1_schema \
   kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_custody_rejects_each_selected_family_without_its_physical_ledger \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
-  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_refuses_absent_participant_custody \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations \
-  kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_legacy_identity_absence_explicit \
+  kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_noncurrent_schema_identities \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_individually_valid_but_unadmitted_security_context \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_noncanonical_oversized_and_unbound_frames \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_private_payload_schema_identity_grant_and_limit_substitution \
-  kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_preserve_legacy_absence_without_upgrading_custody \
+  kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_refuse_absent_snapshot \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_caller_decode \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_live_context \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_require_every_reference_and_reject_substitution \

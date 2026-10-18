@@ -180,7 +180,7 @@ Production authentication is unchanged. All five hosted targets passed (3 auth,
 `/tmp/chio-m4-proof-hosted-regressions.log`.
 
 Proof fixture drift was traced to the retained raw-outcome schema
-`chio.raw-invocation-outcome-with-signing-identity.v1`: federation context and
+`chio.raw-invocation-outcome.v1`: federation context and
 receipt-signing identity now participate in the outcome blob hash. Recomputing
 all three old outcome identities using only the previous schema and omitting
 those two fields reproduces the old fixture IDs exactly. The regenerated proof

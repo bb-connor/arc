@@ -1360,7 +1360,7 @@ impl ToolOutcomeInsertResultV1 {
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum ToolOutcomeStoreError {
     #[error("tool outcome schema version {found} is not the current schema version {current}; refusing to open")]
-    StaleSchema { found: i32, current: i32 },
+    NoncurrentSchema { found: i32, current: i32 },
     #[error("tool outcome store is unavailable: {0}")]
     Unavailable(String),
     #[error("tool outcome mutation was fenced")]

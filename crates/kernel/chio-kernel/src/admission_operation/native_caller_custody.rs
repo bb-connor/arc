@@ -4,7 +4,7 @@
 use super::*;
 use crate::SecurityInvocationContext;
 
-pub const NATIVE_CALLER_CONTEXT_SCHEMA: &str = "chio.kernel-caller-return-context.v5";
+pub const CALLER_RETURN_CONTEXT_SCHEMA: &str = "chio.kernel-caller-return-context.v1";
 const MAX_LEDGER_BYTES: usize = 256 * 1024;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -101,24 +101,19 @@ impl AdmissionCallerDispatchContextV1 {
         let native = operation
             .provider_attempt()
             .is_some_and(ProviderAttemptBindingV1::is_native_caller_report);
+        if payload.get("schema").and_then(serde_json::Value::as_str)
+            != Some(CALLER_RETURN_CONTEXT_SCHEMA)
+        {
+            return Err(invalid("caller frame requires the current v1 schema"));
+        }
         let value = payload.get("native_custody");
         if !native {
-            if value.is_some()
-                || payload.get("schema").and_then(serde_json::Value::as_str)
-                    == Some(NATIVE_CALLER_CONTEXT_SCHEMA)
-            {
+            if value != Some(&serde_json::Value::Null) {
                 return Err(invalid(
                     "ordinary caller frame cannot acquire native custody",
                 ));
             }
             return Ok(None);
-        }
-        if payload.get("schema").and_then(serde_json::Value::as_str)
-            != Some(NATIVE_CALLER_CONTEXT_SCHEMA)
-        {
-            return Err(invalid(
-                "native caller requires its original versioned release custody",
-            ));
         }
         let custody: NativeCallerReleaseCustodyV1 = serde_json::from_value(
             value

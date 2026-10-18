@@ -122,7 +122,10 @@ fn ownerless_authority_refuses_tool_outcome_stamp_before_initialization(
         assert_tool_outcome_preflight_refusal(
             &database,
             &lock_root,
-            chio_kernel::tool_outcome::ToolOutcomeStoreError::StaleSchema { found, current: 1 },
+            chio_kernel::tool_outcome::ToolOutcomeStoreError::NoncurrentSchema {
+                found,
+                current: 1,
+            },
         )?;
     }
     Ok(())
@@ -143,7 +146,10 @@ fn provisioned_authority_refuses_tool_outcome_stamp_before_initialization(
             assert_tool_outcome_preflight_refusal(
                 &database,
                 &lock_root,
-                chio_kernel::tool_outcome::ToolOutcomeStoreError::StaleSchema { found, current: 1 },
+                chio_kernel::tool_outcome::ToolOutcomeStoreError::NoncurrentSchema {
+                    found,
+                    current: 1,
+                },
             )?;
         }
     }

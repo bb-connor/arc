@@ -6,6 +6,9 @@ mod required_envelope;
 #[path = "tool_outcome_tests/terminal_snapshot.rs"]
 mod terminal_snapshot;
 
+#[path = "tool_outcome_tests/caller_delivery.rs"]
+mod caller_delivery;
+
 #[path = "tool_outcome_tests/original_security_dispatch.rs"]
 mod original_security_dispatch;
 
@@ -846,17 +849,6 @@ fn raw_outcome_rejects_unsafe_recovery_fields() {
             maximum: MAX_RECEIPT_GUARD_EVIDENCE,
         }) if actual == MAX_RECEIPT_GUARD_EVIDENCE + 1
     ));
-}
-
-#[test]
-fn caller_report_outcome_requires_delivery_evidence() {
-    let operation = committed_operation("caller-report-evidence");
-    let mut persisted = raw_for(&operation, json!({"returned": true})).to_persisted();
-    persisted.provider_attempt.transport_id = "caller-report:executor-1".to_owned();
-    assert_eq!(
-        RawInvocationOutcomeV1::from_persisted(persisted),
-        Err(ToolOutcomeError::Binding("raw.caller_delivery_evidence"))
-    );
 }
 
 #[test]
