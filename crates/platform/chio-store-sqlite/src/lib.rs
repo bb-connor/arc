@@ -866,7 +866,6 @@ impl chio_kernel::receipt_store::AnchoredAdmissionProjectionStore
 pub use settle_attempts::{SqliteSettlementOutcomeStore, SETTLE_ATTEMPTS_MIGRATION};
 pub use tool_outcome_store::{
     SqliteToolOutcomeStore, ToolOutcomeCompactionLimits, ToolOutcomeCompactionPage,
-    ToolOutcomeCompactionSummary,
 };
 
 #[cfg(test)]

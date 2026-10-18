@@ -57,7 +57,7 @@ impl DurableToolReturn {
             .get("report_digest")?
             .as_str()
     }
-    pub(super) fn recovery_request(&self) -> Result<Option<ToolCallRequest>, ToolOutcomeError> {
+    pub(super) fn recovery_request(&self) -> Result<ToolCallRequest, ToolOutcomeError> {
         self.raw.recovery_request()
     }
 }
@@ -709,7 +709,7 @@ impl ChioKernel {
         let binding = operation.binding().to_persisted();
         let expected_tenant = (binding.authenticated_tenant_id.as_str() != LOCAL_SYSTEM_TENANT_ID)
             .then_some(binding.authenticated_tenant_id.as_str());
-        let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
+        let signing_identity = tool_return.raw.receipt_signing_identity().clone();
         let signature_valid = receipt
             .verify_signature_with_floor(signing_identity.crypto_floor())
             .map_err(|error| {
@@ -871,10 +871,8 @@ impl ChioKernel {
             .outcome
             .validate_canonical_blob(&admission.operation, &raw_blob)
             .map_err(tool_outcome_error)?;
-        // Select no replacement authority for unfinished historical output.
-        // Check before output/settlement callbacks and pin the eventual body
-        // again in the core identity-bound signing primitive.
-        let signing_identity = self.durable_return_signing_identity(&tool_return.raw)?;
+        // Output evaluation and settlement require the original receipt signer.
+        let signing_identity = tool_return.raw.receipt_signing_identity().clone();
         self.require_original_receipt_signer(&signing_identity)?;
         let existing_evaluation = runtime
             .outcome_store

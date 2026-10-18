@@ -1,9 +1,7 @@
 //! Actual captured-native store refusal before retaining or releasing output.
 use super::*;
 use chio_kernel::budget_store::BudgetQuotaKey;
-use chio_kernel::tool_outcome::{
-    RawInvocationOutcomeV1, RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA,
-};
+use chio_kernel::tool_outcome::{RawInvocationOutcomeV1, ToolOutcomeError};
 use chio_kernel::BudgetStore;
 
 #[test]
@@ -70,7 +68,15 @@ fn native_raw_store_rejects_substituted_original_dispatch_bindings() -> TestResu
         )?;
         let original = RawInvocationOutcomeV1::from_canonical_bytes(correct.bytes())?;
         let before = snapshot(&fixture, &captured.operation_id)?;
-        for substitution in ["id", "full_hash", "ledger", "context", "request", "missing"] {
+        for substitution in [
+            "id",
+            "full_hash",
+            "ledger",
+            "context",
+            "request",
+            "missing",
+            "null",
+        ] {
             let mut value = serde_json::to_value(original.to_persisted())?;
             match substitution {
                 "id" => {
@@ -108,39 +114,57 @@ fn native_raw_store_rejects_substituted_original_dispatch_bindings() -> TestResu
                         chio_core::canonical::canonical_json_bytes(&changed)?,
                     )?);
                 }
-                _ => {
+                "missing" => {
                     value
                         .as_object_mut()
                         .ok_or("raw object")?
                         .remove("original_security_dispatch_binding");
-                    value["schema"] =
-                        serde_json::json!(RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA);
                 }
+                "null" => value["original_security_dispatch_binding"] = serde_json::Value::Null,
+                _ => return Err("unexpected original dispatch substitution".into()),
             }
-            // Every forged candidate is structurally canonical. The physical
-            // original ledger, rather than a DTO decoder, must refuse it.
-            let raw = RawInvocationOutcomeV1::from_canonical_bytes(
+            let decoded = RawInvocationOutcomeV1::from_canonical_bytes(
                 &chio_core::canonical::canonical_json_bytes(&value)?,
-            )?;
-            let blob = raw.canonical_blob()?;
-            let record =
-                test_support::record_returned_blob(&operation, &blob, fence.clone(), now_ms()?)?;
-            assert!(
-                matches!(
-                    outcomes.record_tool_returned(
-                        &operation,
-                        &lease,
-                        &blob,
-                        &record,
-                        &fence,
-                        now_ms()?
-                    ),
-                    Err(chio_kernel::tool_outcome::ToolOutcomeStoreError::Invariant(
-                        _
-                    ))
-                ),
-                "egress={egress} substitution={substitution}"
             );
+            if substitution == "missing" {
+                assert!(
+                    matches!(decoded, Err(ToolOutcomeError::UntrustedInput(ref error))
+                        if error.code() == "urn:chio:error:attest:signed-json-invalid-shape"),
+                    "unexpected missing-binding refusal: {decoded:?}"
+                );
+            } else if substitution == "null" {
+                assert_eq!(
+                    decoded,
+                    Err(ToolOutcomeError::Binding(
+                        "raw.original_security_dispatch_binding"
+                    ))
+                );
+            } else {
+                let raw = decoded?;
+                let blob = raw.canonical_blob()?;
+                let record = test_support::record_returned_blob(
+                    &operation,
+                    &blob,
+                    fence.clone(),
+                    now_ms()?,
+                )?;
+                assert!(
+                    matches!(
+                        outcomes.record_tool_returned(
+                            &operation,
+                            &lease,
+                            &blob,
+                            &record,
+                            &fence,
+                            now_ms()?
+                        ),
+                        Err(chio_kernel::tool_outcome::ToolOutcomeStoreError::Invariant(
+                            _
+                        ))
+                    ),
+                    "egress={egress} substitution={substitution}"
+                );
+            }
             assert_eq!(snapshot(&fixture, &captured.operation_id)?, before);
             assert_eq!(
                 store.load_by_operation_id(&captured.operation_id)?,
@@ -154,8 +178,6 @@ fn native_raw_store_rejects_substituted_original_dispatch_bindings() -> TestResu
                 Some(ledger.clone())
             );
         }
-        // Both an actual no-egress capture and actual committed egress accept
-        // only the complete original tuple, without recapturing invocation.
         let (_, finalizing) = outcomes
             .record_tool_returned(
                 &operation,

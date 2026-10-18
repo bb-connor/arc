@@ -1,14 +1,15 @@
-//! Old canonical formats retain data and cannot invent a fresh release binding.
+//! Complete canonical returns bind the request and its security release evidence.
 use super::*;
+use crate::admission_operation::NativeSecurityDispatchRequestBindingV1;
 
 #[test]
-fn legacy_raw_security_formats_decode_without_fresh_release_authority(
+fn complete_raw_security_envelope_roundtrips_canonical_bytes(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let operation = committed_operation("legacy-original-dispatch");
-    let signer = Keypair::generate();
+    let operation = committed_operation("original-dispatch");
+    let signer = Keypair::from_seed(&[0x61; 32]);
     let capability = CapabilityToken::sign(
         CapabilityTokenBody {
-            id: "capability-1".into(),
+            id: operation.binding().capability_id().as_str().to_owned(),
             issuer: signer.public_key(),
             subject: signer.public_key(),
             scope: ChioScope::default(),
@@ -20,45 +21,54 @@ fn legacy_raw_security_formats_decode_without_fresh_release_authority(
         &signer,
     )?;
     let request: ToolCallRequest = serde_json::from_value(json!({
-        "request_id": "legacy-original-dispatch", "capability": capability,
+        "request_id": operation.binding().request_id(), "capability": capability,
         "agent_id": signer.public_key().to_hex(), "arguments": {},
         "server_id": "server-1", "tool_name": "tool-1"
     }))?;
     let context = SecurityInvocationContext::v1(SecurityInvocationContextV1::new(
-        TenantId::new("legacy-tenant")?,
-        SessionId::new("legacy-session")?,
+        TenantId::new("tenant")?,
+        SessionId::new("session")?,
         PrincipalId::new(request.agent_id.clone())?,
-        IsolationEpochId::new("legacy-epoch")?,
+        IsolationEpochId::new("epoch")?,
         LineageId::new(request.capability.id.clone())?,
         1,
     ));
-    let mut persisted = raw_for(&operation, json!({"retained": true})).to_persisted();
-    persisted.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA.into();
-    persisted.request_canonical_json = Some(String::from_utf8(canonical_json_bytes(&request)?)?);
-    persisted.security_invocation_context = Some(context.clone());
-    let contextual = RawInvocationOutcomeV1::from_persisted(persisted)?;
-    let required = contextual.clone().with_security_release_requirement(true)?;
-    let signing =
-        required
-            .clone()
-            .with_receipt_signing_identity(FrozenReceiptSigningIdentityV1::new(
+    let live = NativeSecurityDispatchRequestBindingV1::from_live_request(&request, &context)?;
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch(
+        &operation,
+        operation.dispatch_commit().ok_or("committed fixture")?,
+        id("server-1"),
+        id("tool-1"),
+        provider_attempt(&operation, "attempt-1"),
+        admission_digest("transport-terminal"),
+        0,
+        7,
+        stream_limits(),
+        InvocationOutputV1::Value {
+            value: json!({"retained": true}),
+        },
+        Some(MonetaryAmount {
+            units: 25,
+            currency: "USD".to_owned(),
+        }),
+        None,
+        Vec::new(),
+        RawInvocationContext {
+            request: &request,
+            security_invocation_context: Some(context.clone()),
+            federation_context_json: None,
+            security_release_required: true,
+            receipt_signing_identity: FrozenReceiptSigningIdentityV1::new(
                 signer.public_key(),
                 chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
-            )?)?;
-    wire_shape::verify(&signing, &operation, &request, &context)?;
-    for legacy in [contextual, required, signing] {
-        let bytes = legacy.canonical_blob()?.bytes().to_vec();
-        let decoded = RawInvocationOutcomeV1::from_canonical_bytes(&bytes)?;
-        assert_eq!(decoded.canonical_blob()?.bytes(), bytes);
-        assert_eq!(decoded.to_persisted().schema, legacy.to_persisted().schema);
-        assert!(decoded.original_security_dispatch_binding().is_none());
-        assert!(matches!(
-            decoded.security_dispatch_commitment_id(),
-            Err(ToolOutcomeError::Binding(
-                "security_release.original_dispatch"
-            ))
-        ));
-    }
+            )?,
+            caller_delivery_evidence: None,
+            original_security_dispatch_binding: Some(Box::new(
+                OriginalSecurityDispatchBindingV1::new(&live)?,
+            )),
+        },
+    )?;
+    wire_shape::verify(&raw, &operation, &request, &context)?;
     Ok(())
 }
 

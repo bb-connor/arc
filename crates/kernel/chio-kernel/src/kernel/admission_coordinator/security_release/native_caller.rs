@@ -114,10 +114,7 @@ impl ChioKernel {
         // generate an authorization that release-only recovery does not need.
         let canonical =
             canonical_json_bytes(original.request_for_revalidation()).map_err(recovery_required)?;
-        let raw_request = raw
-            .recovery_request()
-            .map_err(recovery_required)?
-            .ok_or_else(|| recovery_required("native caller raw request is absent"))?;
+        let raw_request = raw.recovery_request().map_err(recovery_required)?;
         if ledger.record_digest != *custody.ledger_digest()
             || ledger.canonical_record != custody.ledger_bytes()
             || context.security_invocation_context.as_ref() != Some(custody.security_context())
