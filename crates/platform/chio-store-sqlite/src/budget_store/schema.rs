@@ -1,269 +1,107 @@
 #![cfg_attr(not(test), deny(clippy::arithmetic_side_effects))]
 use super::*;
 
-pub(super) fn ensure_budget_seq_column(connection: &Connection) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(capability_grant_budgets)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let has_seq = columns
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .any(|column| column == "seq");
-    if !has_seq {
-        connection.execute(
-            "ALTER TABLE capability_grant_budgets ADD COLUMN seq INTEGER NOT NULL DEFAULT 0",
-            [],
-        )?;
-    }
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_capability_grant_budgets_seq ON capability_grant_budgets(seq)",
-        [],
-    )?;
-    Ok(())
-}
+#[path = "composite_schema/payment/sql_normalizer.rs"]
+mod sql_normalizer;
 
-pub(super) fn ensure_split_budget_cost_columns(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(capability_grant_budgets)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|c| c == "total_cost_exposed")
-        || !columns.iter().any(|c| c == "total_cost_realized_spend")
-    {
+#[cfg(test)]
+#[path = "composite_schema/payment/tests.rs"]
+mod payment_tests;
+
+pub(super) const SCHEMA: &str = concat!(
+    include_str!("schema.sql"),
+    include_str!("composite_schema/payment/schema.sql")
+);
+
+const CATALOG_PREDICATE: &str = "lower(tbl_name) GLOB 'budget_*'
+    OR lower(name) GLOB 'budget_*' OR lower(name) GLOB 'idx_budget_*'
+    OR lower(tbl_name) = 'capability_grant_budgets'
+    OR lower(name) GLOB 'capability_grant_budgets_*'
+    OR lower(name) GLOB 'idx_capability_grant_budgets_*'
+    OR lower(tbl_name) IN ('payment_journal', 'payment_release_evidence')
+    OR lower(name) GLOB 'payment_journal_*'
+    OR lower(name) GLOB 'idx_payment_journal_*'
+    OR lower(name) GLOB 'payment_release_evidence_*'";
+
+type CatalogEntry = (String, String, String, Option<String>);
+
+fn budget_catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, BudgetStoreError> {
+    let (count, bytes): (i64, i64) = connection.query_row(
+        &format!(
+            "SELECT COUNT(*), COALESCE(SUM(
+                 COALESCE(length(CAST(sql AS BLOB)), 0)
+                 + length(CAST(name AS BLOB)) + length(CAST(tbl_name AS BLOB))
+             ), 0) FROM sqlite_schema WHERE {CATALOG_PREDICATE}"
+        ),
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )?;
+    if !(0..=128).contains(&count) || !(0..=262_144).contains(&bytes) {
         return Err(BudgetStoreError::Invariant(
-            "unsupported budget schema: missing split cost columns `total_cost_exposed` and `total_cost_realized_spend`".to_string(),
+            "budget schema exceeds its catalog bounds".into(),
         ));
     }
+    let mut statement = connection.prepare(&format!(
+        "SELECT type, name, tbl_name, sql FROM sqlite_schema
+         WHERE {CATALOG_PREDICATE} ORDER BY type, name, tbl_name"
+    ))?;
+    let entries = statement
+        .query_map([], |row| {
+            let sql: Option<String> = row.get(3)?;
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                sql.as_deref().map(sql_normalizer::normalize_sql),
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(entries)
+}
+
+pub(super) fn verify_budget_catalog(connection: &Connection) -> Result<(), BudgetStoreError> {
+    let actual = budget_catalog(connection)?;
+    let expected = Connection::open_in_memory()?;
+    expected.execute_batch(SCHEMA)?;
+    if actual != budget_catalog(&expected)? {
+        return Err(schema_shape_error());
+    }
     Ok(())
 }
 
-pub(super) fn ensure_budget_hold_authority_columns(
+pub(super) fn require_empty_budget_catalog(
     connection: &Connection,
 ) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|column| column == "authority_id") {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN authority_id TEXT",
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "lease_id") {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN lease_id TEXT",
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "lease_epoch") {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN lease_epoch INTEGER",
-            [],
-        )?;
+    if !budget_catalog(connection)?.is_empty() {
+        return Err(schema_shape_error());
     }
     Ok(())
 }
 
-pub(super) fn ensure_budget_hold_reserved_until_column(
+fn schema_shape_error() -> BudgetStoreError {
+    BudgetStoreError::Invariant("budget schema does not match the current v1 shape".into())
+}
+
+pub(super) fn verify_budget_replication_state(
     connection: &Connection,
 ) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|column| column == "reserved_until") {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_until INTEGER",
-            [],
-        )?;
-    }
-    connection.execute(
-        "CREATE INDEX IF NOT EXISTS idx_budget_authorization_holds_reserved_until \
-         ON budget_authorization_holds(disposition, reserved_until)",
+    let invalid: bool = connection.query_row(
+        "SELECT NOT EXISTS (
+             SELECT 1 FROM budget_replication_meta WHERE singleton = 1 AND typeof(next_seq) = 'integer' AND next_seq >= 0
+         ) OR EXISTS (
+             SELECT 1 FROM capability_grant_budgets WHERE typeof(seq) <> 'integer' OR seq <= 0
+         ) OR EXISTS (
+             SELECT 1 FROM budget_mutation_events WHERE typeof(event_seq) <> 'integer' OR event_seq <= 0
+         ) OR EXISTS (
+             SELECT 1 FROM budget_usage_history_anchors WHERE anchored_schema_version <> 1
+         )",
         [],
+        |row| row.get(0),
     )?;
-    Ok(())
-}
-
-pub(super) fn ensure_budget_hold_reserved_currency_column(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|column| column == "reserved_currency") {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_currency TEXT",
-            [],
-        )?;
+    if invalid {
+        return Err(BudgetStoreError::Invariant(
+            "budget replication state is invalid".into(),
+        ));
     }
-    Ok(())
-}
-
-pub(super) fn ensure_budget_hold_reserved_payment_reference_column(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns
-        .iter()
-        .any(|column| column == "reserved_payment_reference")
-    {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_payment_reference TEXT",
-            [],
-        )?;
-    }
-    Ok(())
-}
-
-pub(super) fn ensure_budget_hold_reserved_envelope_columns(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns
-        .iter()
-        .any(|column| column == "reserved_budget_total")
-    {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_budget_total INTEGER",
-            [],
-        )?;
-    }
-    if !columns
-        .iter()
-        .any(|column| column == "reserved_delegation_depth")
-    {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_delegation_depth INTEGER",
-            [],
-        )?;
-    }
-    if !columns
-        .iter()
-        .any(|column| column == "reserved_root_budget_holder")
-    {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN reserved_root_budget_holder TEXT",
-            [],
-        )?;
-    }
-    Ok(())
-}
-
-pub(super) fn ensure_budget_hold_invocation_captured_column(
-    connection: &Connection,
-) -> Result<bool, BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_authorization_holds)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    if !columns
-        .collect::<Result<Vec<_>, _>>()?
-        .iter()
-        .any(|column| column == "invocation_captured")
-    {
-        connection.execute(
-            "ALTER TABLE budget_authorization_holds ADD COLUMN invocation_captured INTEGER NOT NULL DEFAULT 0",
-            [],
-        )?;
-        return Ok(true);
-    }
-    Ok(false)
-}
-
-pub(super) fn ensure_budget_mutation_event_authority_columns(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_mutation_events)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|column| column == "authority_id") {
-        connection.execute(
-            "ALTER TABLE budget_mutation_events ADD COLUMN authority_id TEXT",
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "lease_id") {
-        connection.execute(
-            "ALTER TABLE budget_mutation_events ADD COLUMN lease_id TEXT",
-            [],
-        )?;
-    }
-    if !columns.iter().any(|column| column == "lease_epoch") {
-        connection.execute(
-            "ALTER TABLE budget_mutation_events ADD COLUMN lease_epoch INTEGER",
-            [],
-        )?;
-    }
-    Ok(())
-}
-
-pub(super) fn ensure_budget_mutation_event_seq_column(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    let mut statement = connection.prepare("PRAGMA table_info(budget_mutation_events)")?;
-    let columns = statement.query_map([], |row| row.get::<_, String>(1))?;
-    let columns = columns.collect::<Result<Vec<_>, _>>()?;
-    if !columns.iter().any(|column| column == "event_seq") {
-        connection.execute(
-            "ALTER TABLE budget_mutation_events ADD COLUMN event_seq INTEGER",
-            [],
-        )?;
-    }
-    connection.execute(
-        "CREATE UNIQUE INDEX IF NOT EXISTS idx_budget_mutation_events_event_seq ON budget_mutation_events(event_seq)",
-        [],
-    )?;
-    Ok(())
-}
-
-/// Ensure the AFTER DELETE trigger that resets the ack-head watermark AND clears
-/// the per-origin heads exists, so any delete from `budget_mutation_events`
-/// forces `budget_ack_heads` to re-verify contiguity from genesis (fail-closed).
-///
-/// The trigger deliberately does NOT record the deleted seq as abandoned: a delete
-/// caused by DATA LOSS (a restored older DB) must CAP the head below the hole so a
-/// data-losing node cannot over-count. Only a genuine rollback-retry records the
-/// abandoned seq, explicitly at its own call site.
-///
-/// Idempotent and non-churning: the trigger is (re)created
-/// only when it is absent or an OLDER version (one that predates the per-origin
-/// `budget_origin_ack_heads` clear). Steady state is a single `sqlite_master`
-/// read with NO DDL, so concurrent opens on the hot status path do not take
-/// repeated schema locks. In the one-time upgrade window the drop and the create
-/// are BOTH idempotent (`DROP TRIGGER IF EXISTS` then `CREATE TRIGGER IF NOT
-/// EXISTS`), so two opens racing the upgrade cannot fail with "trigger already
-/// exists"; the momentary drop window is covered by the manual
-/// `reset_budget_ack_head_watermark` calls at each delete site (belt-and-suspenders).
-pub(super) fn ensure_budget_ack_head_reset_trigger(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    const TRIGGER_NAME: &str = "budget_mutation_events_reset_ack_head_watermark";
-    let existing_sql: Option<String> = connection
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = ?1",
-            rusqlite::params![TRIGGER_NAME],
-            |row| row.get(0),
-        )
-        .optional()?;
-    // Up to date iff the trigger exists AND already clears the per-origin heads.
-    let up_to_date = existing_sql
-        .as_deref()
-        .is_some_and(|sql| sql.contains("budget_origin_ack_heads"));
-    if up_to_date {
-        return Ok(());
-    }
-    connection.execute_batch(
-        r#"
-        DROP TRIGGER IF EXISTS budget_mutation_events_reset_ack_head_watermark;
-        CREATE TRIGGER IF NOT EXISTS budget_mutation_events_reset_ack_head_watermark
-        AFTER DELETE ON budget_mutation_events
-        BEGIN
-            UPDATE budget_ack_head_watermark SET head_seq = 0 WHERE singleton = 1;
-            DELETE FROM budget_origin_ack_heads;
-        END;
-        "#,
-    )?;
     Ok(())
 }

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS payment_journal (
+CREATE TABLE payment_journal (
     operation_id TEXT PRIMARY KEY CHECK (operation_id <> '' AND length(operation_id) <= 512),
     journal_version INTEGER NOT NULL CHECK (
         journal_version BETWEEN 1 AND 9007199254740991
@@ -160,12 +160,12 @@ CREATE TABLE IF NOT EXISTS payment_journal (
     )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_journal_request
+CREATE UNIQUE INDEX idx_payment_journal_request
     ON payment_journal(request_namespace_digest, request_id);
-CREATE INDEX IF NOT EXISTS idx_payment_journal_state
+CREATE INDEX idx_payment_journal_state
     ON payment_journal(state, updated_at_unix_ms);
 
-CREATE TRIGGER IF NOT EXISTS payment_journal_identity_immutable
+CREATE TRIGGER payment_journal_identity_immutable
 BEFORE UPDATE OF operation_id, request_namespace_digest, request_id,
                  capability_id, grant_index, hold_id, rail, rail_mode,
                  amount_units, authorized_amount_units, currency, created_at_unix_ms
@@ -174,14 +174,14 @@ BEGIN
     SELECT RAISE(ABORT, 'payment journal identity is immutable');
 END;
 
-CREATE TRIGGER IF NOT EXISTS payment_journal_no_delete
+CREATE TRIGGER payment_journal_no_delete
 BEFORE DELETE ON payment_journal
 BEGIN
     SELECT RAISE(ABORT, 'payment journal is append-preserving');
 END;
 
 
-CREATE TRIGGER IF NOT EXISTS payment_journal_authorization_attempt_monotone
+CREATE TRIGGER payment_journal_authorization_attempt_monotone
 BEFORE UPDATE OF authorization_attempt ON payment_journal
 WHEN OLD.authorization_attempt IS NOT NEW.authorization_attempt
   AND (OLD.authorization_attempt IS NOT 'not_started'

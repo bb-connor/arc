@@ -132,7 +132,7 @@ impl SqliteBudgetStore {
                 true
             }
             Some(marker)
-                if marker.0 == "legacy"
+                if marker.0 == "standalone"
                     && marker.1.is_none()
                     && marker.2.is_none()
                     && marker.3.is_none()

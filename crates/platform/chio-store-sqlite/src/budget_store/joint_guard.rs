@@ -92,7 +92,7 @@ impl SqliteBudgetStore {
                 "legacy {operation} cannot mutate structured budget hold `{hold_id}`"
             ))),
             Some(row)
-                if row.0 == "legacy"
+                if row.0 == "standalone"
                     && row.1.is_none()
                     && row.2.is_none()
                     && row.3.is_none()

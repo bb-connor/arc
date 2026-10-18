@@ -1,4 +1,4 @@
-//! Physical migration and compare-and-set controls; no rail effects occur here.
+//! Payment custody, catalog integrity and compare-and-set contracts.
 use super::*;
 use chio_kernel::payment::{
     PaymentAuthorizationAttempt, PaymentJournalRecord, PaymentJournalState,
@@ -6,29 +6,65 @@ use chio_kernel::payment::{
 };
 use rusqlite::types::Value;
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
-fn parent(connection: &Connection) -> rusqlite::Result<()> {
-    connection.execute_batch("PRAGMA foreign_keys=ON; CREATE TABLE budget_authorization_holds(hold_id TEXT PRIMARY KEY);")
-}
-fn fields(connection: &Connection) -> rusqlite::Result<Vec<Vec<Value>>> {
-    let mut statement = connection.prepare(&format!(
-        "SELECT {COLUMNS} FROM payment_journal ORDER BY operation_id"
-    ))?;
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+fn fields(connection: &Connection, sql: &str) -> rusqlite::Result<Vec<Vec<Value>>> {
+    let mut statement = connection.prepare(sql)?;
     let count = statement.column_count();
     let rows = statement
         .query_map([], |row| (0..count).map(|index| row.get(index)).collect())?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     Ok(rows)
 }
+
+#[derive(Debug, PartialEq)]
+struct DatabaseSnapshot {
+    application_id: i32,
+    user_version: i32,
+    journal_mode: String,
+    catalog: Vec<Vec<Value>>,
+    tables: Vec<(String, Vec<Vec<Value>>)>,
+}
+
+fn snapshot(connection: &Connection) -> TestResult<DatabaseSnapshot> {
+    let mut statement = connection.prepare(
+        "SELECT name FROM sqlite_schema WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    )?;
+    let names = statement
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut tables = Vec::with_capacity(names.len());
+    for name in names {
+        let quoted = name.replace('"', "\"\"");
+        tables.push((
+            name,
+            fields(
+                connection,
+                &format!("SELECT * FROM \"{quoted}\" ORDER BY rowid"),
+            )?,
+        ));
+    }
+    Ok(DatabaseSnapshot {
+        application_id: connection.query_row("PRAGMA application_id", [], |row| row.get(0))?,
+        user_version: connection.query_row("PRAGMA user_version", [], |row| row.get(0))?,
+        journal_mode: connection.query_row("PRAGMA journal_mode", [], |row| row.get(0))?,
+        catalog: fields(
+            connection,
+            "SELECT type,name,tbl_name,sql FROM sqlite_schema ORDER BY type,name,tbl_name",
+        )?,
+        tables,
+    })
+}
+
 fn initial() -> PaymentJournalRecord {
     PaymentJournalRecord {
-        operation_id: "physical-budget12-op".into(),
+        operation_id: "physical-payment-op".into(),
         journal_version: 1,
         request_namespace_digest: "a".repeat(64),
-        request_id: "physical-budget12-request".into(),
-        capability_id: "physical-budget12-cap".into(),
+        request_id: "physical-payment-request".into(),
+        capability_id: "physical-payment-cap".into(),
         grant_index: 0,
-        hold_id: Some("physical-budget12-hold".into()),
+        hold_id: Some("physical-payment-hold".into()),
         rail: "test-reversible-rail".into(),
         rail_mode: PaymentRailMode::ReversibleHold,
         authorization_id: None,
@@ -45,87 +81,145 @@ fn initial() -> PaymentJournalRecord {
     }
 }
 
-#[test]
-fn budget12_populated_migration_preserves_original_fields_and_evidence_across_reopen() -> TestResult
-{
-    let directory = tempfile::tempdir()?;
-    let database = directory.path().join("physical-budget12.db");
-    let mut connection = Connection::open(&database)?;
-    parent(&connection)?;
-    connection.execute_batch(LEGACY)?;
-    connection.execute(
-        "INSERT INTO budget_authorization_holds VALUES('legacy-hold')",
-        [],
-    )?;
-    connection.execute(
-        "INSERT INTO payment_journal(operation_id,journal_version,request_namespace_digest,request_id,capability_id,grant_index,
-         hold_id,rail,rail_mode,authorization_id,amount_units,currency,state,created_at_unix_ms,updated_at_unix_ms)
-         VALUES('legacy-op',2,?1,'legacy-request','legacy-cap',0,'legacy-hold','legacy-rail','prepaid_final','actual-legacy-prepayment',10,'USD','settled',1,2)", ["b".repeat(64)])?;
-    connection.execute_batch("CREATE TABLE retained_payment_evidence(operation_id TEXT PRIMARY KEY REFERENCES payment_journal(operation_id), bytes BLOB NOT NULL);")?;
-    let evidence = b"original-retained-evidence-bytes";
-    connection.execute(
-        "INSERT INTO retained_payment_evidence VALUES('legacy-op',?1)",
-        [evidence.as_slice()],
-    )?;
-    let before = fields(&connection)?;
+fn populate(database: &Path, prepaid: bool) -> TestResult<PaymentJournalRecord> {
+    let store = SqliteBudgetStore::open(database)?;
+    let mut original = initial();
+    if prepaid {
+        original.rail_mode = PaymentRailMode::PrepaidFinal;
+        original.rail = "test-prepaid-rail".into();
+    }
+    let authorized = store.authorize_budget_hold(BudgetAuthorizeHoldRequest {
+        capability_id: original.capability_id.clone(),
+        grant_index: 0,
+        max_invocations: Some(2),
+        invocation_quotas: Vec::new(),
+        cumulative_approval: None,
+        admission_binding: None,
+        requested_exposure_units: original.amount_units,
+        max_cost_per_invocation: Some(original.amount_units),
+        max_total_cost_units: Some(100),
+        hold_id: original.hold_id.clone(),
+        event_id: Some("physical-payment-authorize".into()),
+        authority: None,
+    })?;
+    assert!(matches!(
+        authorized,
+        BudgetAuthorizeHoldDecision::Authorized(_)
+    ));
+    let mut connection = store.connection()?;
     let transaction = connection.transaction()?;
-    ensure(&transaction, 11)?;
+    crate::budget_store::payment_journal::insert_payment_journal(&transaction, &original)?;
+    if prepaid {
+        let (attempted, changed) = crate::budget_store::payment_journal::advance_payment_journal(
+            &transaction,
+            &original,
+            &PaymentJournalTransition::BeginAuthorizationAttempt,
+            None,
+            2,
+        )?;
+        assert!(changed);
+        let (settled, changed) = crate::budget_store::payment_journal::advance_payment_journal(
+            &transaction,
+            &attempted,
+            &PaymentJournalTransition::PrepaymentSettled {
+                authorization_id: "recorded-prepayment".into(),
+            },
+            None,
+            3,
+        )?;
+        assert!(changed);
+        original = settled;
+    }
     transaction.commit()?;
-    assert_eq!(fields(&connection)?, before);
-    let legacy =
-        crate::budget_store::payment_journal::load_payment_journal(&connection, "legacy-op")?
-            .ok_or("legacy journal")?;
-    assert_eq!(
-        legacy.authorization_attempt, None,
-        "absence remains unknown"
-    );
-    assert_eq!(
-        legacy.authorized_amount_units, None,
-        "exposure cannot invent a debit"
-    );
-    assert_eq!(
-        legacy.authorization_id.as_deref(),
-        Some("actual-legacy-prepayment")
-    );
-    assert!(!legacy.is_compensated_before_dispatch());
     drop(connection);
-    let mut reopened = Connection::open(&database)?;
-    reopened.execute_batch("PRAGMA foreign_keys=ON")?;
-    let transaction = reopened.transaction()?;
-    ensure(&transaction, 12)?;
-    transaction.commit()?;
-    assert_eq!(fields(&reopened)?, before);
-    let retained: Vec<u8> = reopened.query_row(
-        "SELECT bytes FROM retained_payment_evidence WHERE operation_id='legacy-op'",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(retained, evidence);
-    assert!(reopened
-        .execute(
-            "UPDATE payment_journal SET authorized_amount_units=10 WHERE operation_id='legacy-op'",
-            []
+    drop(store);
+    drop(SqliteBudgetStore::open(database)?);
+    Ok(original)
+}
+
+fn assert_invariant<T>(result: Result<T, BudgetStoreError>, expected: &str) {
+    match result {
+        Err(BudgetStoreError::Invariant(reason)) => assert_eq!(reason, expected),
+        Err(error) => panic!("unexpected budget error: {error:?}"),
+        Ok(_) => panic!("invalid budget state was accepted"),
+    }
+}
+
+fn assert_stale<T>(result: Result<T, BudgetStoreError>, found: i32) {
+    let error = match result {
+        Err(error) => error,
+        Ok(_) => panic!("noncurrent budget schema was accepted"),
+    };
+    assert_eq!(
+        error.to_string(),
+        format!(
+            "database schema version {found} is not the current schema version 1; refusing to open"
         )
-        .is_err());
-    assert!(reopened.execute("UPDATE payment_journal SET authorization_attempt='not_started' WHERE operation_id='legacy-op'", []).is_err());
+    );
+    match error {
+        BudgetStoreError::StaleSchema {
+            found: actual,
+            current,
+        } => {
+            assert_eq!((actual, current), (found, 1));
+        }
+        error => panic!("unexpected budget error: {error:?}"),
+    }
+}
+
+fn assert_trigger(result: rusqlite::Result<usize>, expected: &str) {
+    assert!(matches!(result,
+        Err(rusqlite::Error::SqliteFailure(code, Some(message)))
+            if code.code == rusqlite::ErrorCode::ConstraintViolation
+                && code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER
+                && message == expected
+    ));
+}
+
+#[test]
+fn noncurrent_stamps_preserve_populated_payment_and_evidence() -> TestResult {
+    for found in [0, 2, 11, 12, 99] {
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("payment-stamp-refusal.db");
+        let original = populate(&database, true)?;
+        assert_eq!(original.state, PaymentJournalState::Settled);
+        assert_eq!(original.authorized_amount_units, Some(5));
+        assert_eq!(
+            original.authorization_id.as_deref(),
+            Some("recorded-prepayment")
+        );
+        let mut connection = Connection::open(&database)?;
+        connection.execute_batch("PRAGMA foreign_keys=ON; CREATE TABLE retained_payment_evidence(operation_id TEXT PRIMARY KEY REFERENCES payment_journal(operation_id), bytes BLOB NOT NULL);")?;
+        connection.execute(
+            "INSERT INTO retained_payment_evidence VALUES(?1,?2)",
+            params![
+                &original.operation_id,
+                b"retained-payment-evidence".as_slice()
+            ],
+        )?;
+        crate::stamp_schema_version(&connection, "budget", found)?;
+        let before = snapshot(&connection)?;
+        for _ in 0..2 {
+            assert_stale(SqliteBudgetStore::open(&database), found);
+            assert_eq!(snapshot(&connection)?, before);
+        }
+        assert_stale(
+            SqliteBudgetStore::initialize_connection_offline(&mut connection),
+            found,
+        );
+        assert_eq!(snapshot(&connection)?, before);
+    }
     Ok(())
 }
 
 #[test]
-fn budget12_attempt_marker_cas_is_idempotent_and_survives_commit_before_rail() -> TestResult {
+fn payment_attempt_cas_is_idempotent_and_survives_reopen_without_rail_authorization() -> TestResult
+{
     let directory = tempfile::tempdir()?;
     let database = directory.path().join("physical-attempt-cas.db");
+    let original = populate(&database, false)?;
     let mut connection = Connection::open(&database)?;
-    parent(&connection)?;
-    let transaction = connection.transaction()?;
-    ensure(&transaction, 0)?;
-    transaction.execute(
-        "INSERT INTO budget_authorization_holds VALUES('physical-budget12-hold')",
-        [],
-    )?;
-    let original = initial();
-    crate::budget_store::payment_journal::insert_payment_journal(&transaction, &original)?;
-    transaction.commit()?;
+    connection.execute_batch("PRAGMA foreign_keys=ON")?;
     {
         let transaction = connection.transaction()?;
         crate::budget_store::payment_journal::advance_payment_journal(
@@ -163,7 +257,8 @@ fn budget12_attempt_marker_cas_is_idempotent_and_survives_commit_before_rail() -
     assert!(!changed);
     assert_eq!(replayed, attempted);
     transaction.commit()?;
-    drop(connection); // Crash after marker, before the test invokes any rail.
+    drop(connection);
+    drop(SqliteBudgetStore::open(&database)?);
     let mut reopened = Connection::open(&database)?;
     reopened.execute_batch("PRAGMA foreign_keys=ON")?;
     let retained = crate::budget_store::payment_journal::load_payment_journal(
@@ -171,143 +266,123 @@ fn budget12_attempt_marker_cas_is_idempotent_and_survives_commit_before_rail() -
         &original.operation_id,
     )?
     .ok_or("retained attempt")?;
+    assert_eq!(retained, attempted);
     assert_eq!(
         retained.authorization_attempt,
         Some(PaymentAuthorizationAttempt::Started)
     );
     assert_eq!(retained.authorization_id, None);
     assert!(!retained.is_compensated_before_dispatch());
-    assert!(reopened
-        .execute(
+    let before = snapshot(&reopened)?;
+    assert_trigger(
+        reopened.execute(
             "UPDATE payment_journal SET authorization_attempt='not_started' WHERE operation_id=?1",
-            [&original.operation_id]
-        )
-        .is_err());
-    assert!(reopened
-        .execute(
+            [&original.operation_id],
+        ),
+        "payment authorization attempt is monotone",
+    );
+    assert_trigger(
+        reopened.execute(
             "UPDATE payment_journal SET authorized_amount_units=6 WHERE operation_id=?1",
-            [&original.operation_id]
-        )
-        .is_err());
+            [&original.operation_id],
+        ),
+        "payment journal identity is immutable",
+    );
+    assert_trigger(
+        reopened.execute(
+            "DELETE FROM payment_journal WHERE operation_id=?1",
+            [&original.operation_id],
+        ),
+        "payment journal is append-preserving",
+    );
     let transaction = reopened.transaction()?;
     let mut wrong = original.clone();
     wrong.authorized_amount_units = Some(6);
-    assert!(
+    assert_invariant(
         crate::budget_store::payment_journal::advance_payment_journal(
             &transaction,
             &wrong,
             &PaymentJournalTransition::BeginAuthorizationAttempt,
             None,
-            3
-        )
-        .is_err()
+            3,
+        ),
+        "payment journal compare-and-set conflicted",
     );
     transaction.rollback()?;
+    assert_eq!(snapshot(&reopened)?, before);
     Ok(())
 }
 
 #[test]
-fn budget12_declared_or_partial_catalog_never_gets_silently_repaired() -> TestResult {
-    let mut missing = Connection::open_in_memory()?;
-    parent(&missing)?;
-    let transaction = missing.transaction()?;
-    assert!(ensure(&transaction, 12).is_err());
-    transaction.rollback()?;
+fn current_payment_catalog_corruption_is_refused_without_repair() -> TestResult {
     for corrupt in [
+        "DROP TABLE payment_journal",
         "DROP TRIGGER payment_journal_identity_immutable",
         "DROP TRIGGER payment_journal_authorization_attempt_monotone",
         "CREATE TABLE payment_journal_future_alias(value INTEGER)",
     ] {
-        let mut connection = Connection::open_in_memory()?;
-        parent(&connection)?;
-        connection.execute_batch(SCHEMA)?;
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("payment-catalog-refusal.db");
+        drop(SqliteBudgetStore::open(&database)?);
+        let connection = Connection::open(&database)?;
         connection.execute_batch(corrupt)?;
-        let transaction = connection.transaction()?;
-        assert!(ensure(&transaction, 12).is_err());
-        transaction.rollback()?;
+        let before = snapshot(&connection)?;
+        assert_invariant(
+            SqliteBudgetStore::open(&database),
+            "budget schema does not match the current v1 shape",
+        );
+        assert_eq!(snapshot(&connection)?, before);
     }
-    let mut future = Connection::open_in_memory()?;
-    parent(&future)?;
-    future.execute_batch(LEGACY)?;
-    future
-        .execute_batch("ALTER TABLE payment_journal ADD COLUMN unauthorized_future_field TEXT")?;
-    let transaction = future.transaction()?;
-    assert!(ensure(&transaction, 11).is_err());
-    transaction.rollback()?;
+    Ok(())
+}
+
+fn create_catalog(database: &Path, sql: &str) -> TestResult {
+    let connection = Connection::open(database)?;
+    connection.execute_batch(sql)?;
+    connection.pragma_update(None, "application_id", crate::CHIO_SQLITE_APPLICATION_ID)?;
+    crate::stamp_schema_version(&connection, "budget", 1)?;
     Ok(())
 }
 
 #[test]
-fn budget12_migrates_supported_predecessor_with_equivalent_whitespace() -> TestResult {
-    let mut connection = Connection::open_in_memory()?;
-    parent(&connection)?;
-    let formatted = LEGACY
+fn current_catalog_accepts_equivalent_unquoted_whitespace() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let database = directory.path().join("payment-catalog-whitespace.db");
+    let formatted = SCHEMA
         .replace("CHECK (", "CHECK\n\t (")
         .replace(" AND ", " \n AND \t ");
-    connection.execute_batch(&formatted)?;
-    let transaction = connection.transaction()?;
-    ensure(&transaction, 11)?;
-    transaction.commit()?;
-    let transaction = connection.transaction()?;
-    ensure(&transaction, 12)?;
-    transaction.commit()?;
+    assert_ne!(formatted, SCHEMA);
+    create_catalog(&database, &formatted)?;
+    verify_budget_catalog(&Connection::open(&database)?)?;
+    drop(SqliteBudgetStore::open(&database)?);
+    drop(SqliteBudgetStore::open(&database)?);
     Ok(())
 }
 
 #[test]
-fn budget12_rejects_changed_predecessor_constraints_and_quoted_literals() -> TestResult {
+fn current_catalog_rejects_changed_payment_constraints_and_quoted_literals() -> TestResult {
     for changed in [
-        LEGACY.replace("length(hold_id) <= 512", "length(hold_id) <= 513"),
-        LEGACY.replace(
+        SCHEMA.replace("length(hold_id) <= 512", "length(hold_id) <= 513"),
+        SCHEMA.replace(
             "'payment journal identity is immutable'",
             "'payment  journal identity is immutable'",
         ),
     ] {
-        let mut connection = Connection::open_in_memory()?;
-        parent(&connection)?;
-        connection.execute_batch(&changed)?;
-        let transaction = connection.transaction()?;
-        assert!(ensure(&transaction, 11).is_err());
-        transaction.rollback()?;
-    }
-    Ok(())
-}
-
-#[test]
-fn budget12_downgraded_current_catalog_is_not_a_supported_predecessor() -> TestResult {
-    for declared_version in [0, 1, 3, 6, 9, 10, 11] {
-        let mut connection = Connection::open_in_memory()?;
-        parent(&connection)?;
-        connection.execute_batch(SCHEMA)?;
-        let transaction = connection.transaction()?;
-        assert!(matches!(
-            ensure(&transaction, declared_version),
-            Err(BudgetStoreError::Invariant(reason))
-                if reason == "pre-schema12 payment journal catalog is not a supported predecessor"
-        ));
-        transaction.rollback()?;
-    }
-    Ok(())
-}
-
-#[test]
-fn budget12_pre_cancel_catalog_is_rejected_from_version11_onward() -> TestResult {
-    for (declared_version, expected_reason) in [
-        (
-            11,
-            "pre-schema12 payment journal catalog is not a supported predecessor",
-        ),
-        (12, "schema12 payment journal catalog differs"),
-    ] {
-        let mut connection = Connection::open_in_memory()?;
-        parent(&connection)?;
-        connection.execute_batch(&LEGACY.replace(CANCELLED_BRANCH, ""))?;
-        let transaction = connection.transaction()?;
-        assert!(matches!(
-            ensure(&transaction, declared_version),
-            Err(BudgetStoreError::Invariant(reason)) if reason == expected_reason
-        ));
-        transaction.rollback()?;
+        assert_ne!(changed, SCHEMA);
+        let directory = tempfile::tempdir()?;
+        let database = directory.path().join("payment-catalog-contract.db");
+        create_catalog(&database, &changed)?;
+        let connection = Connection::open(&database)?;
+        let before = snapshot(&connection)?;
+        assert_invariant(
+            verify_budget_catalog(&connection),
+            "budget schema does not match the current v1 shape",
+        );
+        assert_invariant(
+            SqliteBudgetStore::open(&database),
+            "budget schema does not match the current v1 shape",
+        );
+        assert_eq!(snapshot(&connection)?, before);
     }
     Ok(())
 }
