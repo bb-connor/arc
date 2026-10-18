@@ -1245,6 +1245,7 @@
     "crates/kernel/chio-kernel/src/tool_outcome/security_release.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/transport.rs::recv::from_wire",
     "crates/kernel/chio-runtime-core/src/buyer/helpers.rs::parse_review_json::from_wire",
+    "crates/kernel/chio-runtime-core/src/computer/mod.rs::decode::from_wire",
     "crates/kernel/chio-runtime-core/src/ops.rs::runtime_evidence_manifest_report_binding_mismatches::from_wire",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::load_runtime_json_artifact_hashes::from_wire",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::parse_json::from_wire",
@@ -5923,6 +5924,9 @@
       "proof_package_contains_signed_receipt::from_value",
       "proof_package_receipt_subject::from_value"
     ],
+    "crates/kernel/chio-runtime-core/src/computer/mod.rs": [
+      "decode::from_value"
+    ],
     "crates/kernel/chio-runtime-core/src/treaty/predicate.rs": [
       "evaluate_bounded_treaty_predicate_json::from_slice",
       "evaluate_bounded_treaty_predicate_json::from_value"
@@ -8005,6 +8009,22 @@
         },
         {
           "reader": "proof_package_receipt_subject",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/kernel/chio-runtime-core/src/computer/mod.rs": {
+      "kind": "parser-internal-or-typed",
+      "contract": "Unsigned Computer descriptions enforce byte, depth and exact nonnegative safe-integer token limits before duplicate-aware document decoding. Decoded collection and Unicode string budgets precede closed typed projection. Integral decimal and exponent spellings normalize exactly; malformed or lossy numbers refuse. Typed descriptions grant no execution or owner authority.",
+      "readers": [
+        {
+          "reader": "decode",
           "decoders": [
             "from_value"
           ],
@@ -16603,6 +16623,7 @@
     "crates/kernel/chio-kernel/src/tool_outcome/security_release.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/transport.rs::recv::from_wire#1::decode_canonical",
     "crates/kernel/chio-runtime-core/src/buyer/helpers.rs::parse_review_json::from_wire#1::decode_signed",
+    "crates/kernel/chio-runtime-core/src/computer/mod.rs::decode::from_wire#1::decode_document",
     "crates/kernel/chio-runtime-core/src/ops.rs::runtime_evidence_manifest_report_binding_mismatches::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::load_runtime_json_artifact_hashes::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/orchestration.rs::parse_json::from_wire#1::decode_signed",
@@ -17677,6 +17698,10 @@
       "verify_buyer_attestation_review_package_internal::shared-reader::crates/kernel/chio-runtime-core/src/buyer/proof_package.rs::verify_buyer_review_existing_verifier",
       "verify_buyer_attestation_review_package_with_trust::shared-reader::crates/kernel/chio-runtime-core/src/buyer/review_package.rs::verify_buyer_attestation_review_package_internal"
     ],
+    "crates/kernel/chio-runtime-core/src/computer/mod.rs": [
+      "decode::original-json-reader::UntrustedJsonText",
+      "from_json::shared-reader::crates/kernel/chio-runtime-core/src/computer/mod.rs::decode"
+    ],
     "crates/kernel/chio-runtime-core/src/ops.rs": [
       "generate_runtime_evidence_sink_health_report::shared-reader::crates/kernel/chio-runtime-core/src/ops.rs::runtime_evidence_manifest_report_binding_mismatches",
       "runtime_evidence_manifest_report_binding_mismatches::original-json-reader::UntrustedJsonText"
@@ -17694,6 +17719,10 @@
       "parse_json::original-json-reader::UntrustedJsonText",
       "runtime_orchestration_evidence_sink_healthy::shared-reader::crates/kernel/chio-runtime-core/src/orchestration.rs::load_runtime_orchestration_evidence",
       "validate_runtime_orchestration_manifest_artifacts::shared-reader::crates/kernel/chio-runtime-core/src/orchestration.rs::load_runtime_json_artifact_hashes"
+    ],
+    "crates/kernel/chio-runtime-core/src/program/mod.rs": [
+      "from_json#1::shared-reader::crates/kernel/chio-runtime-core/src/computer/mod.rs::decode",
+      "from_json#2::shared-reader::crates/kernel/chio-runtime-core/src/computer/mod.rs::decode"
     ],
     "crates/kernel/chio-runtime-core/src/replay_source.rs": [
       "from_canonical_bytes::original-json-reader::UntrustedJsonText"

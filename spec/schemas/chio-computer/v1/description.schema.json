@@ -1,0 +1,506 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-computer/v1/description.schema.json",
+  "title": "ComputerDescription",
+  "description": "Bounded descriptive references without session, capability or execution authority. Aggregate, identity and digest checks are mandatory in the compiler.",
+  "x-chio-max-bytes": 2097152,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "record",
+    "revision",
+    "image"
+  ],
+  "properties": {
+    "schema": {
+      "const": "chio.computer.description.v1"
+    },
+    "record": {
+      "$ref": "#/$defs/ComputerRecord"
+    },
+    "revision": {
+      "$ref": "#/$defs/ComputerRevision"
+    },
+    "image": {
+      "$ref": "#/$defs/ComputerImage"
+    }
+  },
+  "$defs": {
+    "ContentRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ownerDomain",
+        "artifactId",
+        "sha256",
+        "byteLength"
+      ],
+      "properties": {
+        "ownerDomain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "artifactId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "byteLength": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 67108864
+        }
+      }
+    },
+    "SchemaShape": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "schema"
+          ],
+          "properties": {
+            "kind": {
+              "const": "value"
+            },
+            "schema": {
+              "$ref": "#/$defs/ContentRef"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "schemas"
+          ],
+          "properties": {
+            "kind": {
+              "const": "all_success"
+            },
+            "schemas": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentRef"
+              },
+              "minItems": 2,
+              "maxItems": 16
+            }
+          }
+        }
+      ]
+    },
+    "ResourceRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "resourceId",
+        "ownerDomain",
+        "generation",
+        "operations"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^/[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,127})*(?![\\s\\S])"
+        },
+        "resourceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "ownerDomain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "read",
+              "write",
+              "invoke"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true
+        }
+      }
+    },
+    "ResourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "resourceId",
+        "ownerDomain",
+        "generation",
+        "operations",
+        "provider",
+        "version"
+      ],
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "maxLength": 256,
+          "pattern": "^/[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?:/[A-Za-z0-9][A-Za-z0-9._-]{0,127})*(?![\\s\\S])"
+        },
+        "resourceId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "ownerDomain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "read",
+              "write",
+              "invoke"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true
+        },
+        "provider": {
+          "$ref": "#/$defs/ContentRef"
+        },
+        "version": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "live"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "content"
+              ],
+              "properties": {
+                "kind": {
+                  "const": "pinned"
+                },
+                "content": {
+                  "$ref": "#/$defs/ContentRef"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "ComputerRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "computerId",
+        "ownerDomain",
+        "parentRevision",
+        "headRevision",
+        "lifecycleGeneration",
+        "profileRefs"
+      ],
+      "properties": {
+        "computerId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "ownerDomain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "parentRevision": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            }
+          ]
+        },
+        "headRevision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "lifecycleGeneration": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "profileRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentRef"
+          },
+          "minItems": 0,
+          "maxItems": 64
+        }
+      }
+    },
+    "ComputerRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "computerId",
+        "ownerDomain",
+        "revisionId",
+        "namespaceDigest",
+        "boot",
+        "input",
+        "inputSchema",
+        "resources",
+        "profileRefs",
+        "creationOperation"
+      ],
+      "properties": {
+        "computerId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "ownerDomain": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        },
+        "revisionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "namespaceDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "boot": {
+          "$ref": "#/$defs/ContentRef"
+        },
+        "input": {
+          "$ref": "#/$defs/ContentRef"
+        },
+        "inputSchema": {
+          "$ref": "#/$defs/SchemaShape"
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceBinding"
+          },
+          "minItems": 0,
+          "maxItems": 256
+        },
+        "profileRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentRef"
+          },
+          "minItems": 0,
+          "maxItems": 64
+        },
+        "creationOperation": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+        }
+      }
+    },
+    "ComputerImage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revisionId",
+        "boot",
+        "input",
+        "resourceManifestDigest",
+        "requirements"
+      ],
+      "properties": {
+        "revisionId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "boot": {
+          "$ref": "#/$defs/ContentRef"
+        },
+        "input": {
+          "$ref": "#/$defs/ContentRef"
+        },
+        "resourceManifestDigest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ContentRef"
+          },
+          "minItems": 0,
+          "maxItems": 64
+        }
+      }
+    },
+    "LeafDescriptor": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "contract",
+            "acceptance",
+            "harnessRequirements",
+            "inputSchema",
+            "outputSchema",
+            "resources"
+          ],
+          "properties": {
+            "kind": {
+              "const": "task"
+            },
+            "contract": {
+              "$ref": "#/$defs/ContentRef"
+            },
+            "acceptance": {
+              "$ref": "#/$defs/ContentRef"
+            },
+            "harnessRequirements": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ContentRef"
+              },
+              "minItems": 1,
+              "maxItems": 64
+            },
+            "inputSchema": {
+              "$ref": "#/$defs/SchemaShape"
+            },
+            "outputSchema": {
+              "$ref": "#/$defs/ContentRef"
+            },
+            "resources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ResourceRequirement"
+              },
+              "minItems": 0,
+              "maxItems": 256
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "bundle",
+            "entrypoint",
+            "inputSchema",
+            "outputSchema",
+            "resources"
+          ],
+          "properties": {
+            "kind": {
+              "const": "program"
+            },
+            "bundle": {
+              "$ref": "#/$defs/ContentRef"
+            },
+            "entrypoint": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}(?![\\s\\S])"
+            },
+            "inputSchema": {
+              "$ref": "#/$defs/SchemaShape"
+            },
+            "outputSchema": {
+              "$ref": "#/$defs/ContentRef"
+            },
+            "resources": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ResourceRequirement"
+              },
+              "minItems": 0,
+              "maxItems": 256
+            }
+          }
+        }
+      ]
+    },
+    "ProgramExpr": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "leaf"
+          ],
+          "properties": {
+            "op": {
+              "const": "leaf"
+            },
+            "leaf": {
+              "$ref": "#/$defs/LeafDescriptor"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "op",
+            "items"
+          ],
+          "properties": {
+            "op": {
+              "enum": [
+                "parallel",
+                "sequence"
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ProgramExpr"
+              },
+              "minItems": 2,
+              "maxItems": 2046
+            }
+          }
+        }
+      ]
+    }
+  }
+}
