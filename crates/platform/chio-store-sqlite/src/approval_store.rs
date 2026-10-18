@@ -658,19 +658,17 @@ impl ApprovalStore for SqliteApprovalStore {
                     "SELECT CASE WHEN octet_length(request_json) <= 1048576 THEN request_json ELSE NULL END, CASE WHEN octet_length(token_json) <= 1048576 THEN token_json ELSE NULL END FROM chio_hitl_decision_artifacts WHERE approval_id = ?1",
                     params![id], |row| Ok((row.get(0)?, row.get(1)?)),
                 ).optional().map_err(|error| ApprovalStoreError::Backend(format!("load decision artifacts: {error}")))?;
-                let (request, token) = match artifacts {
-                    Some((request, token)) => (
-                        Some(deserialize_payload(&request)?),
-                        Some(
-                            chio_core::canonical::UntrustedJsonText::from_wire(
-                                token.as_bytes(),
-                                1024 * 1024,
-                            )
-                            .and_then(|input| input.decode_signed())?,
-                        ),
-                    ),
-                    None => (None, None),
+                let Some((request, token)) = artifacts else {
+                    return Err(ApprovalStoreError::Serialization(format!(
+                        "resolved approval {approval_id} has no retained request and signed decision"
+                    )));
                 };
+                let request = deserialize_payload(&request)?;
+                let token = chio_core::canonical::UntrustedJsonText::from_wire(
+                    token.as_bytes(),
+                    1024 * 1024,
+                )
+                .and_then(|input| input.decode_signed())?;
                 Ok(Some(ResolvedApproval {
                     request,
                     token,

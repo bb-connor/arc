@@ -54,8 +54,6 @@ pub mod admission_operation;
 #[cfg(not(loom))]
 pub mod approval;
 #[cfg(not(loom))]
-pub mod approval_channels;
-#[cfg(not(loom))]
 pub mod authority;
 #[cfg(not(loom))]
 pub mod boot;
@@ -247,13 +245,10 @@ pub use threshold_approval::{
 
 #[cfg(not(loom))]
 pub use approval::{
-    compute_parameter_hash, resume_with_decision, ApprovalChannel, ApprovalContext,
-    ApprovalDecision, ApprovalFilter, ApprovalGuard, ApprovalOutcome, ApprovalRequest,
-    ApprovalStore, ApprovalStoreError, ApprovalToken, ChannelError, ChannelHandle, HitlVerdict,
+    compute_parameter_hash, resume_with_decision, ApprovalDecision, ApprovalFilter,
+    ApprovalOutcome, ApprovalRequest, ApprovalStore, ApprovalStoreError, ApprovalToken,
     InMemoryApprovalStore, ResolvedApproval, MAX_APPROVAL_TTL_SECS,
 };
-#[cfg(not(loom))]
-pub use approval_channels::{RecordingChannel, WebhookChannel, WebhookPayload};
 #[cfg(not(loom))]
 pub use authority::{
     capability_security_binding, ensure_capability_issuance_supported,

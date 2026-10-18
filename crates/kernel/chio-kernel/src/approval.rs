@@ -1,18 +1,9 @@
 //! Human-in-the-loop (HITL) primitives.
 //!
 //! This module houses the approval-request data model, the persistent
-//! approval-store contract, the approval guard that decides when a call
-//! needs human sign-off, and the async resume entry points used by the
-//! HTTP surface after a human responds. The design follows
+//! approval-store contract, and the resume entry points used by the HTTP
+//! surface after a human responds. The design follows
 //! `docs/protocols/HUMAN-IN-THE-LOOP-PROTOCOL.md`.
-//!
-//! `crate::runtime::Verdict` is `Copy`. This module exposes a richer
-//! [`HitlVerdict`] that carries the pending approval request when one is
-//! needed, keeping `Verdict` itself `Copy`. The public `Verdict` enum carries a
-//! `PendingApproval` marker variant so external callers can pattern-match on
-//! the three-way decision; the payload is returned separately via
-//! [`ApprovalGuard::evaluate`] and
-//! [`ChioKernel::evaluate_tool_call_with_hitl`](crate::ChioKernel).
 
 mod collector;
 mod tool_context;
@@ -28,18 +19,12 @@ pub use collector::{
 use std::collections::HashMap;
 use std::sync::{Mutex, RwLock};
 
-use chio_core::capability::{
-    governance::{
-        GovernedApprovalDecision, GovernedApprovalToken, GovernedAutonomyTier,
-        GovernedTransactionIntent,
-    },
-    scope::Constraint,
+use chio_core::capability::governance::{
+    GovernedApprovalDecision, GovernedApprovalToken, GovernedTransactionIntent,
 };
 use chio_core::crypto::{sha256_hex, PublicKey};
-use chio_log_redact::redacted;
 use serde::{Deserialize, Serialize};
 
-use crate::runtime::{ToolCallRequest, Verdict};
 use crate::security_admission_operation::ReplayReservationState;
 use crate::{AgentId, KernelError, ServerId};
 
@@ -50,9 +35,8 @@ use crate::{AgentId, KernelError, ServerId};
 pub const MAX_APPROVAL_TTL_SECS: u64 = 3600;
 pub(crate) const MAX_RESERVATION_IDENTIFIER_BYTES: usize = 512;
 
-/// A request for human approval, produced when the approval guard
-/// returns `Verdict::PendingApproval`. Designed to be serialized into
-/// the approval store and the webhook payload without further wrapping.
+/// A request for human approval. Designed to be serialized into the
+/// approval store and the approval API responses without further wrapping.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApprovalRequest {
     /// Unique request identifier. Caller-stable so the approval store
@@ -559,12 +543,8 @@ pub struct ResolvedApproval {
     pub resolved_at: u64,
     pub approver_hex: String,
     pub token_id: String,
-    /// Original request and signed decision. Legacy audit-only resolutions may
-    /// omit these, in which case they cannot authorize a new execution.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub request: Option<ApprovalRequest>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub token: Option<GovernedApprovalToken>,
+    pub request: ApprovalRequest,
+    pub token: GovernedApprovalToken,
 }
 
 /// Persistent store for pending and resolved HITL approvals. The trait
@@ -649,64 +629,6 @@ pub trait ApprovalStore: Send + Sync {
     }
 }
 
-/// Contract a channel must satisfy to dispatch an approval request.
-///
-/// The trait is sync; implementations that need async I/O should use a
-/// dedicated thread or a small runtime. `WebhookChannel` uses the
-/// blocking `ureq` client already in the crate's dependency tree.
-pub trait ApprovalChannel: Send + Sync {
-    /// Short channel name (`"webhook"`, `"slack"`, `"dashboard"`...).
-    fn name(&self) -> &str;
-
-    /// Deliver an approval request to the configured endpoint. The
-    /// channel implementation is responsible for retries; on terminal
-    /// failure the call returns `Err` and the kernel leaves the
-    /// request in the store (fail-closed).
-    fn dispatch(&self, request: &ApprovalRequest) -> Result<ChannelHandle, ChannelError>;
-}
-
-/// Handle returned by `dispatch`. Kernel records this alongside the
-/// request in the store so `cancel` can be called later.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChannelHandle {
-    pub channel: String,
-    pub channel_ref: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub action_url: Option<String>,
-}
-
-/// Errors returned by approval channels.
-#[derive(Debug, thiserror::Error)]
-pub enum ChannelError {
-    #[error("channel transport error: {0}")]
-    Transport(String),
-    #[error("channel remote rejected dispatch: {status}: {body}")]
-    Remote { status: u16, body: String },
-    #[error("channel misconfigured: {0}")]
-    Config(String),
-}
-
-/// Outcome of running an approval guard against a tool call.
-///
-/// The pending + approved variants box their inner payloads so the
-/// enum stays cheap to pass by value; large variants trip clippy's
-/// `large_enum_variant` lint.
-#[derive(Debug, Clone)]
-pub enum HitlVerdict {
-    /// Guard passes -- no approval required.
-    Allow,
-    /// Guard denies without an approval path (e.g. fail-closed).
-    Deny { reason: String },
-    /// Approval is required. Kernel should persist the request and
-    /// return a 202-style response to the caller.
-    Pending {
-        request: Box<ApprovalRequest>,
-        verdict: Verdict,
-    },
-    /// Approval was supplied with the request and passed verification.
-    Approved { token: Box<ApprovalToken> },
-}
-
 /// Compute the parameter hash that binds an `ApprovalRequest` to a
 /// specific set of arguments. Input is canonicalized via the existing
 /// `sha256_hex(chio_core::canonical::canonical_json_bytes(..))` helper
@@ -733,276 +655,6 @@ pub fn compute_parameter_hash(
         // a stable string so callers do not have to handle the error.
         Err(_) => sha256_hex(envelope.to_string().as_bytes()),
     }
-}
-
-fn checked_approval_request_expiry(now: u64, ttl_secs: u64) -> Result<u64, KernelError> {
-    if !(1..=MAX_APPROVAL_TTL_SECS).contains(&ttl_secs) {
-        return Err(KernelError::ApprovalRejected(
-            "approval request lifetime is outside the supported range".into(),
-        ));
-    }
-    now.checked_add(ttl_secs)
-        .ok_or_else(|| KernelError::ApprovalRejected("approval request expiry overflow".into()))
-}
-
-/// The built-in HITL guard. Runs before the generic guard pipeline and
-/// decides whether a call passes straight through, requires approval,
-/// or was already approved by an accompanying token.
-pub struct ApprovalGuard {
-    /// Persistent store of pending / resolved approvals.
-    store: std::sync::Arc<dyn ApprovalStore>,
-    /// Channels fired on new pending requests. Dispatch failures are
-    /// logged but do NOT clear the pending record -- the fail-closed
-    /// rule from the protocol table is that a webhook delivery failure
-    /// keeps the request pending and queryable via the API.
-    channels: Vec<std::sync::Arc<dyn ApprovalChannel>>,
-    /// Default timeout for newly created requests.
-    default_ttl_secs: u64,
-}
-
-impl ApprovalGuard {
-    pub fn new(store: std::sync::Arc<dyn ApprovalStore>) -> Self {
-        Self {
-            store,
-            channels: Vec::new(),
-            default_ttl_secs: 3600,
-        }
-    }
-
-    #[must_use]
-    pub fn with_channel(mut self, channel: std::sync::Arc<dyn ApprovalChannel>) -> Self {
-        self.channels.push(channel);
-        self
-    }
-
-    #[must_use]
-    pub fn with_default_ttl(mut self, secs: u64) -> Self {
-        self.default_ttl_secs = secs;
-        self
-    }
-
-    /// Evaluate the grant's constraints against the request. Returns
-    /// a `HitlVerdict` describing the next step.
-    pub fn evaluate(&self, ctx: ApprovalContext<'_>, now: u64) -> Result<HitlVerdict, KernelError> {
-        let mut triggered = Vec::<String>::new();
-        let mut threshold_hit = false;
-        let mut always_hit = false;
-        let mut tier_hit = false;
-
-        for constraint in ctx.constraints {
-            match constraint {
-                Constraint::RequireApprovalAbove { threshold_units } => {
-                    let amount = ctx
-                        .request
-                        .governed_intent
-                        .as_ref()
-                        .and_then(|intent| intent.max_amount.as_ref());
-                    match amount {
-                        Some(amt) if amt.units >= *threshold_units => {
-                            threshold_hit = true;
-                            triggered.push(format!("require_approval_above:{threshold_units}"));
-                        }
-                        Some(_) => {
-                            // Below threshold -- no approval triggered.
-                        }
-                        None => {
-                            // Fail-closed: constraint present but no
-                            // amount to compare. Deny rather than
-                            // silently skip.
-                            return Ok(HitlVerdict::Deny {
-                                reason: format!(
-                                    "RequireApprovalAbove requires a governed intent with max_amount (threshold={threshold_units})"
-                                ),
-                            });
-                        }
-                    }
-                }
-                Constraint::MinimumAutonomyTier(GovernedAutonomyTier::Autonomous)
-                    if ctx.request.governed_intent.is_some() =>
-                {
-                    // When paired with the HITL guard, Autonomous tier
-                    // is treated as "requires human approval". Direct
-                    // / Delegated pass through.
-                    tier_hit = true;
-                    triggered.push("minimum_autonomy_tier:autonomous".to_string());
-                }
-                _ => {}
-            }
-        }
-
-        // An attribute flag on the request (`force_approval`) forces a
-        // PendingApproval outcome so host integrations can enter the HITL
-        // flow without teaching every constraint variant.
-        // Test harnesses use this path too.
-        if ctx.force_approval {
-            always_hit = true;
-            triggered.push("force_approval".to_string());
-        }
-
-        let needs_approval = threshold_hit || always_hit || tier_hit;
-        if !needs_approval {
-            return Ok(HitlVerdict::Allow);
-        }
-        if ctx.trusted_approvers.is_empty() {
-            return Ok(HitlVerdict::Deny {
-                reason: "approval required but no trusted approvers are configured".to_string(),
-            });
-        }
-
-        // If the caller attached an approval token, try to satisfy the
-        // request with it before creating a new pending entry.
-        if let Some(token) = ctx.presented_token {
-            // Reconstruct the request envelope matching the original
-            // pending record so we can validate binding.
-            let parameter_hash = compute_parameter_hash(
-                &ctx.request.server_id,
-                &ctx.request.tool_name,
-                &ctx.request.arguments,
-                ctx.request.governed_intent.as_ref(),
-            );
-
-            // Lookup the pending record. If the token refers to an
-            // approval id, prefer the stored record; otherwise build
-            // a synthetic record to verify against (binding by
-            // parameter hash is the cryptographic gate).
-            let stored = self
-                .store
-                .get_pending(&token.approval_id)
-                .map_err(|e| KernelError::Internal(format!("approval store: {e}")))?;
-            let resolved = self
-                .store
-                .get_resolution(&token.approval_id)
-                .map_err(|e| KernelError::Internal(format!("approval store: {e}")))?;
-
-            let approval_request = match stored.or_else(|| {
-                resolved.map(|res| ApprovalRequest {
-                    approval_id: res.approval_id,
-                    policy_id: ctx.policy_id.to_string(),
-                    subject_id: ctx.request.agent_id.clone(),
-                    capability_id: ctx.request.capability.id.clone(),
-                    subject_public_key: Some(ctx.request.capability.subject.clone()),
-                    tool_server: ctx.request.server_id.clone(),
-                    tool_name: ctx.request.tool_name.clone(),
-                    action: "invoke".to_string(),
-                    parameter_hash: parameter_hash.clone(),
-                    expires_at: token.governed_token.expires_at,
-                    callback_hint: None,
-                    created_at: token.governed_token.issued_at,
-                    summary: String::new(),
-                    governed_intent: ctx.request.governed_intent.clone(),
-                    trusted_approvers: ctx.trusted_approvers.to_vec(),
-                    triggered_by: triggered.clone(),
-                })
-            }) {
-                Some(record) => record,
-                None => {
-                    return Err(KernelError::ApprovalRejected(
-                        "approval token does not match any known request".into(),
-                    ));
-                }
-            };
-
-            // Replay check first: before spending cycles on signature
-            // verification, fail-closed on a previously consumed token.
-            let already_consumed = self
-                .store
-                .is_consumed(&token.governed_token.id, &approval_request.parameter_hash)
-                .map_err(|e| KernelError::Internal(format!("approval store: {e}")))?;
-            if already_consumed {
-                return Err(KernelError::ApprovalRejected(
-                    "approval token already consumed (replay)".into(),
-                ));
-            }
-
-            let decision = token.verify_against(&approval_request, now)?;
-            match decision {
-                GovernedApprovalDecision::Approved => Ok(HitlVerdict::Approved {
-                    token: Box::new(token.clone()),
-                }),
-                GovernedApprovalDecision::Denied => Ok(HitlVerdict::Deny {
-                    reason: "human approver denied the request".into(),
-                }),
-            }
-        } else {
-            // No token on the request -- build a new pending entry.
-            let parameter_hash = compute_parameter_hash(
-                &ctx.request.server_id,
-                &ctx.request.tool_name,
-                &ctx.request.arguments,
-                ctx.request.governed_intent.as_ref(),
-            );
-            let expires_at = checked_approval_request_expiry(now, self.default_ttl_secs)?;
-            let summary = format!(
-                "agent {} requests approval for {}:{}",
-                ctx.request.agent_id, ctx.request.server_id, ctx.request.tool_name
-            );
-            let request = ApprovalRequest {
-                approval_id: ctx
-                    .approval_id_override
-                    .unwrap_or_else(|| uuid::Uuid::now_v7().to_string()),
-                policy_id: ctx.policy_id.to_string(),
-                subject_id: ctx.request.agent_id.clone(),
-                capability_id: ctx.request.capability.id.clone(),
-                subject_public_key: Some(ctx.request.capability.subject.clone()),
-                tool_server: ctx.request.server_id.clone(),
-                tool_name: ctx.request.tool_name.clone(),
-                action: "invoke".to_string(),
-                parameter_hash,
-                expires_at,
-                callback_hint: None,
-                created_at: now,
-                summary,
-                governed_intent: ctx.request.governed_intent.clone(),
-                trusted_approvers: ctx.trusted_approvers.to_vec(),
-                triggered_by: triggered,
-            };
-            self.store
-                .store_pending(&request)
-                .map_err(|e| KernelError::Internal(format!("approval store: {e}")))?;
-
-            // Dispatch to channels. Delivery failures are logged but
-            // the pending row stays in place: the API can still serve
-            // it from `/approvals/pending`.
-            for channel in &self.channels {
-                if let Err(err) = channel.dispatch(&request) {
-                    tracing::warn!(
-                        approval_id = %request.approval_id,
-                        channel = %channel.name(),
-                        error = %redacted!(&err),
-                        "approval channel dispatch failed; request remains pending"
-                    );
-                }
-            }
-
-            Ok(HitlVerdict::Pending {
-                request: Box::new(request),
-                verdict: Verdict::PendingApproval,
-            })
-        }
-    }
-
-    /// Accessor used by the resume flow in the HTTP layer.
-    #[must_use]
-    pub fn store(&self) -> std::sync::Arc<dyn ApprovalStore> {
-        self.store.clone()
-    }
-}
-
-/// Context passed into [`ApprovalGuard::evaluate`].
-pub struct ApprovalContext<'a> {
-    pub request: &'a ToolCallRequest,
-    pub constraints: &'a [Constraint],
-    pub policy_id: &'a str,
-    /// Public keys trusted to sign the approval token for this request.
-    pub trusted_approvers: &'a [PublicKey],
-    /// Approval token presented by the caller, if any.
-    pub presented_token: Option<&'a ApprovalToken>,
-    /// When `true`, force the guard into the pending path regardless
-    /// of constraints. Used by integration tests and by host adapters
-    /// that decided out-of-band that the call needs approval.
-    pub force_approval: bool,
-    /// Optional deterministic id for the generated approval request.
-    pub approval_id_override: Option<String>,
 }
 
 /// Apply a resolved approval decision: verify the token, mark it
@@ -1230,8 +882,8 @@ impl ApprovalStore for InMemoryApprovalStore {
                 resolved_at: decision.received_at,
                 approver_hex: decision.approver.to_hex(),
                 token_id: decision.token.id.clone(),
-                request: Some(pending.clone()),
-                token: Some(decision.token.clone()),
+                request: pending.clone(),
+                token: decision.token.clone(),
             },
         );
 
@@ -1541,6 +1193,34 @@ mod tests {
                 assert!(reason.contains("subject"), "{reason}");
             }
             other => panic!("expected ApprovalRejected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resolution_without_request_or_token_is_refused_at_decode() {
+        let approver = Keypair::generate();
+        let subject = Keypair::generate();
+        let resolution = ResolvedApproval {
+            approval_id: "a-decode".into(),
+            outcome: ApprovalOutcome::Approved,
+            resolved_at: 50,
+            approver_hex: approver.public_key().to_hex(),
+            token_id: "tok-a-decode".into(),
+            request: make_request("a-decode", "h-decode"),
+            token: make_token(
+                &approver,
+                &subject,
+                "a-decode",
+                "h-decode",
+                GovernedApprovalDecision::Approved,
+            ),
+        };
+        let encoded = serde_json::to_value(&resolution).unwrap();
+        for field in ["request", "token"] {
+            let mut missing = encoded.clone();
+            missing.as_object_mut().unwrap().remove(field);
+            let error = serde_json::from_value::<ResolvedApproval>(missing).unwrap_err();
+            assert_eq!(error.to_string(), format!("missing field `{field}`"));
         }
     }
 }

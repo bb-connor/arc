@@ -999,89 +999,25 @@ async def call_tool_with_approval(tool_name, args, chio_client):
 
 ---
 
-## 13. Approval Guard Implementation
+## 13. Approval Enforcement
 
-### Built-in `ApprovalGuard`
+Approval is enforced inside governed-transaction validation, not by a
+separate guard. When the matched grant carries
+`Constraint::RequireApprovalAbove { threshold_units }` and the governed
+intent's `max_amount` reaches the threshold, the kernel requires a signed
+`GovernedApprovalToken` bound to the intent hash, the request id and the
+subject, signed by a trusted approval authority and inside its validity window
+(`crates/kernel/chio-kernel/src/kernel/governed_validation.rs`). A missing,
+expired, replayed or mis-bound token denies the call.
 
-The kernel ships a built-in guard that evaluates approval constraints:
-
-```rust
-pub struct ApprovalGuard {
-    approval_store: Chio<dyn ApprovalStore>,
-    channels: Vec<Chio<dyn ApprovalChannel>>,
-    escalation_config: Option<EscalationChain>,
-}
-
-impl Guard for ApprovalGuard {
-    fn name(&self) -> &str { "approval" }
-
-    fn evaluate(&self, ctx: &GuardContext) -> Result<Verdict, KernelError> {
-        let grant = ctx.matched_grant();
-
-        // Check each constraint on the grant.
-        for constraint in &grant.constraints {
-            match constraint {
-                Constraint::RequireApprovalAbove { threshold_units } => {
-                    if let Some(intent) = &ctx.request.governed_intent {
-                        if let Some(amount) = &intent.max_amount {
-                            if amount.units >= *threshold_units {
-                                // Check for existing approval token on the request.
-                                if let Some(token) = &ctx.request.approval_token {
-                                    return self.validate_approval_token(ctx, token);
-                                }
-                                // Require approval when the request has no valid token.
-                                return Ok(Verdict::PendingApproval(
-                                    self.build_approval_request(ctx, "threshold")?
-                                ));
-                            }
-                        } else {
-                            // No amount on intent but threshold constraint exists.
-                            // Fail-closed: require approval.
-                            return Ok(Verdict::PendingApproval(
-                                self.build_approval_request(ctx, "threshold_no_amount")?
-                            ));
-                        }
-                    } else {
-                        // No governed intent but threshold constraint exists.
-                        // Fail-closed: deny (not pending -- cannot approve
-                        // without an intent to bind to).
-                        return Err(KernelError::GuardDenied(
-                            "RequireApprovalAbove requires a governed intent".to_string()
-                        ));
-                    }
-                }
-                Constraint::RequireApprovalAlways => {
-                    if let Some(token) = &ctx.request.approval_token {
-                        return self.validate_approval_token(ctx, token);
-                    }
-                    return Ok(Verdict::PendingApproval(
-                        self.build_approval_request(ctx, "always")?
-                    ));
-                }
-                Constraint::RequireApprovalFirstN { count } => {
-                    let invocation_count = self.approval_store
-                        .count_approved_calls(
-                            &ctx.agent_id,
-                            &grant.id,
-                        )?;
-                    if invocation_count < *count as u64 {
-                        if let Some(token) = &ctx.request.approval_token {
-                            return self.validate_approval_token(ctx, token);
-                        }
-                        return Ok(Verdict::PendingApproval(
-                            self.build_approval_request(ctx, "first_n")?
-                        ));
-                    }
-                    // Past the count threshold -- no approval needed.
-                }
-                _ => { /* not an approval constraint, skip */ }
-            }
-        }
-
-        Ok(Verdict::Allow)
-    }
-}
-```
+Pending requests are created by the host. `chio-api-protect` exposes
+`POST /approvals/submit`, which records an `ApprovalRequest` for one exact
+tool invocation in the approval store. A human answers through
+`POST /approvals/{id}/respond`, which runs `resume_with_decision`: it
+verifies the signed decision against the pending request, consumes the token
+once and persists a `ResolvedApproval` that retains the request and the
+signed token. The approved call is then redeemed against that retained
+resolution.
 
 ### Approval Store Trait
 
@@ -1148,10 +1084,10 @@ A customer support agent needs to issue a refund of $450. The grant has
 ### Step 2: Kernel Evaluates
 
 1. Capability validation passes (agent has grant for `payment-server:issue_refund`).
-2. ApprovalGuard evaluates `RequireApprovalAbove { threshold_units: 200 }`.
+2. Governed validation evaluates `RequireApprovalAbove { threshold_units: 200 }`.
 3. `governed_intent.max_amount.units` (450) >= 200 -- approval required.
-4. No `approval_token` on the request.
-5. Guard returns `Verdict::PendingApproval(approval_request)`.
+4. No approval token on the request.
+5. The host records the pending request through `POST /approvals/submit`.
 
 ### Step 3: Kernel Dispatches Approval Request
 
@@ -1351,9 +1287,9 @@ timeout_seconds = 3600
 4. Add the request-bound `ApprovalStore` trait.
 5. Add SQLite implementation in `chio-store-sqlite`.
 
-### Phase 2: Approval Guard and HTTP API
+### Phase 2: Approval Enforcement and HTTP API
 
-1. Implement `ApprovalGuard` with support for all constraint variants.
+1. Enforce approval constraints in governed-transaction validation.
 2. Add `/approvals/*` HTTP endpoints to the sidecar.
 3. Implement `WebhookChannel` and `ApiPollChannel`.
 4. Add approval-related receipt queries.

@@ -34,13 +34,8 @@ pub use invocation_context::ToolInvocationContext;
 /// The kernel uses this internally; it maps to `chio_core::receipt::decision::Decision` when
 /// building receipts.
 ///
-/// The `PendingApproval` variant is a marker: the payload (`ApprovalRequest`)
-/// is returned separately via [`crate::approval::HitlVerdict`] so existing
-/// call sites that pattern-match on `Verdict` and rely on its `Copy` semantics
-/// keep compiling without change. The public contract is: `Allow`, `Deny`, and
-/// `PendingApproval` are the three possible outcomes of guard evaluation, and
-/// callers receive the full approval request via the richer HITL API surface
-/// when they need it.
+/// `PendingApproval` is a marker without payload so `Verdict` stays `Copy`;
+/// the approval request itself lives in the approval store.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Verdict {
     /// The action is allowed.
