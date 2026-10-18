@@ -4525,41 +4525,6 @@ files = ["crates/core/chio-core/src/identity_network/types.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.raw-invocation-outcome-with-caller-delivery.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
-first_seen = "90a77c37e5"
-
-[[schema]]
-value = "chio.raw-invocation-outcome-with-federation-context.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
-value = "chio.raw-invocation-outcome-with-original-security-dispatch.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome/original_security_dispatch.rs"]
-first_seen = "de519d7776"
-
-[[schema]]
-value = "chio.raw-invocation-outcome-with-request.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
-first_seen = "51e46336b1"
-
-[[schema]]
-value = "chio.raw-invocation-outcome-with-security-context.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
-first_seen = "2b78941163"
-
-[[schema]]
-value = "chio.raw-invocation-outcome-with-security-release.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
-value = "chio.raw-invocation-outcome-with-signing-identity.v1"
-files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
-first_seen = "7fe2b92663"
-
-[[schema]]
 value = "chio.raw-invocation-outcome.v1"
 files = ["crates/kernel/chio-kernel/src/tool_outcome.rs"]
 first_seen = "51e46336b1"
