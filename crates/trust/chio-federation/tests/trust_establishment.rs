@@ -54,7 +54,7 @@ fn handshake_succeeds_and_pins_both_sides() {
 }
 
 #[test]
-fn default_handshake_omits_v1_compatibility_fields() {
+fn default_handshake_signs_capabilities_and_tier() {
     let kp_b = Keypair::generate();
     let now: u64 = 1_800_000_000;
 
@@ -62,8 +62,8 @@ fn default_handshake_omits_v1_compatibility_fields() {
         PeerHandshakeEnvelope::sign("kernel.org-b", "kernel.org-a", "nonce-b", now, &kp_b).unwrap();
     let challenge = serde_json::to_value(&envelope.challenge).unwrap();
 
-    assert!(challenge.get("capabilities").is_none());
-    assert!(challenge.get("conformanceTier").is_none());
+    assert!(challenge.get("capabilities").is_some());
+    assert_eq!(challenge["conformanceTier"], "bronze");
     assert!(challenge.get("ladderManifestRef").is_none());
     envelope.verify_signature().unwrap();
 }

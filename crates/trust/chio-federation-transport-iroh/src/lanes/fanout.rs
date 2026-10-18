@@ -20,7 +20,7 @@
 //! treaty's frames off another treaty's wire by default.
 //!
 //! Topic-per-treaty ROUTING separation is one layer; ACCESS CONTROL is the other
-//! and is now ENFORCED (below). The `TopicId` is deterministic and therefore NOT a
+//! and is ENFORCED (below). The `TopicId` is deterministic and therefore NOT a
 //! secret; it grants no access on its own. The accept-time
 //! [`DirectoryGate`](crate::admission::DirectoryGate) is FEDERATION-GLOBAL: it
 //! admits an operator to the federation, not to a specific treaty. So a
@@ -35,8 +35,7 @@
 //! [`VerifiedDirectory`](crate::identity::VerifiedDirectory) (an issuer-signed
 //! `treaty_id -> {party kernel_ids}` map, body-hash-pinned, validity-windowed,
 //! monotone-versioned). The gate is enforced FAIL-CLOSED in two places (defense in
-//! depth), so this is no longer routing separation alone but enforced
-//! treaty-scoped access control:
+//! depth), so access control is treaty-scoped, not routing separation alone:
 //!
 //! 1. JOIN side: [`FanoutLane::subscribe_treaty`] /
 //!    [`subscribe_treaty_with_timeout`](FanoutLane::subscribe_treaty_with_timeout)
@@ -99,8 +98,6 @@
 //! Until then treaty confidentiality against a passive federation-admitted observer
 //! rests on federation admission plus routing separation, not join-time treaty
 //! enforcement. This is a documented API limitation, NOT a closed gap.
-//!
-//! Upstream tracking (iroh-gossip 0.101): the missing admission predicate is tracked in the compatibility ledger.
 //!
 //! ## The load-bearing correctness property: `delivered_from` is NOT the author
 //!
@@ -664,7 +661,7 @@ where
 ///
 /// Fail-closed: a frame whose `treaty_id` is not `expected_treaty` is rejected with
 /// [`FanoutError::TreatyMismatch`] BEFORE any signature work, so a raw receive loop
-/// can no longer accept a foreign-treaty frame that a caller forgot to bind (a
+/// cannot accept a foreign-treaty frame that a caller forgot to bind (a
 /// valid self-signed frame for a DIFFERENT treaty does not pass here). Note the
 /// signature takes only the payload bytes: `delivered_from` is structurally absent,
 /// so it cannot leak into the authorship decision.

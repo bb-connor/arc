@@ -250,14 +250,6 @@ pub fn play_integrity_pinned_jwks_json() -> String {
     .to_string()
 }
 
-/// Backwards-compatible alias used by deterministic tests that need the
-/// JWKS the pinned verifier trusts.
-#[cfg(any(test, feature = "dev-fixtures"))]
-#[must_use]
-pub fn play_integrity_jwks_json() -> String {
-    play_integrity_pinned_jwks_json()
-}
-
 /// SHA-256 fingerprint (hex) of the pinned Play Integrity public point.
 ///
 /// # Errors

@@ -12,12 +12,8 @@ pub struct MailboxConfig {
     #[serde(default)]
     pub limits: MailboxLimits,
     /// Advertise a separately granted endpoint for renewing live delivery claims.
-    #[serde(default, skip_serializing_if = "is_false")]
+    #[serde(default)]
     pub renewable_leases: bool,
-}
-
-fn is_false(value: &bool) -> bool {
-    !value
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

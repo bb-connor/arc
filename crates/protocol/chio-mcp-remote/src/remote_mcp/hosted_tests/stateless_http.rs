@@ -216,3 +216,77 @@ fn handshake_sessions_keep_working_beside_stateless_requests() {
     assert_eq!(tools["result"]["tools"][0]["name"], "echo_json");
     assert!(tools["result"].get("resultType").is_none());
 }
+
+#[cfg(target_os = "linux")]
+const TEARDOWN_CHILD: &str = "CHIO_TEST_SESSION_TEARDOWN_CHILD";
+
+#[cfg(target_os = "linux")]
+fn store_pool_threads() -> usize {
+    std::fs::read_dir("/proc/self/task")
+        .unwrap()
+        .filter(|task| {
+            std::fs::read_to_string(task.as_ref().unwrap().path().join("comm"))
+                .is_ok_and(|name| name.starts_with("r2d2-worker"))
+        })
+        .count()
+}
+
+/// Thread counts are process-wide, so the measurement runs alone in a child
+/// test process.
+#[cfg(target_os = "linux")]
+#[test]
+fn ended_sessions_release_their_store_pool_threads() {
+    if std::env::var_os(TEARDOWN_CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "hosted_tests::stateless_http::ended_sessions_release_their_store_pool_threads",
+                "--test-threads",
+                "1",
+            ])
+            .env(TEARDOWN_CHILD, "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+        return;
+    }
+
+    let server = support::start_http_server("test-token");
+    let baseline = store_pool_threads();
+    let settled = |phase: &str| {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while store_pool_threads() > baseline {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "{phase}: {} store pool threads outlived their sessions (baseline {baseline})",
+                store_pool_threads()
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    };
+
+    for id in 0..10 {
+        let response = post_stateless(
+            &server,
+            &stateless_body(
+                id,
+                "tools/call",
+                json!({ "name": "echo_json", "arguments": { "message": "teardown" } }),
+                STATELESS,
+            ),
+        );
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+    settled("stateless requests");
+
+    let session = server.initialize_session();
+    assert!(store_pool_threads() > baseline);
+    assert!(server.delete_session(&session.id).status().is_success());
+    settled("DELETE");
+}

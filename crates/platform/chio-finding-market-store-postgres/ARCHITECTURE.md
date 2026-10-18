@@ -44,8 +44,9 @@ Connection options force TLS with full certificate/hostname verification.
 `connect` and `connect_worker` validate their role before accepting the complete
 embedded SQLx version/checksum/success ledger.
 
-Migration uses a one-connection pool and a session advisory lock. It validates
-and bridges the legacy migration ledger before running `MIGRATOR`. Runtime
+Migration uses a one-connection pool and a session advisory lock around
+`MIGRATOR`, which refuses a ledger whose versions or checksums differ from the
+embedded baseline. Runtime
 connections require an already current schema. Database, schema, table, and
 function grants are validated independently of credentials parsing.
 

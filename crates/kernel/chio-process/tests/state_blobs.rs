@@ -2,9 +2,7 @@ mod support;
 
 use chio_core_types::crypto::{sha256_hex, Keypair};
 use chio_kernel::{KernelError, NestedFlowBridge, ToolServerConnection};
-use chio_process::{
-    ProcessError, ProcessLimits, ProcessRuntime, ProcessStateLimits, MAX_STATE_BLOB_BYTES,
-};
+use chio_process::{ProcessError, ProcessRuntime, ProcessStateLimits, MAX_STATE_BLOB_BYTES};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use support::{child, kernel, limits, parent_key, root, scope, Result};
@@ -134,15 +132,6 @@ async fn operator_reads_retained_data_without_live_authority_or_schema_writes() 
     let absent = dir.path().join("absent.db");
     assert!(chio_process::ProcessStateReader::open(&absent).is_err());
     assert!(!absent.exists());
-    Ok(())
-}
-
-#[test]
-fn legacy_limits_keep_their_serialized_identity() -> Result {
-    let old = json!({"max_processes":100,"max_depth":8,"max_calls":2});
-    let decoded: ProcessLimits = serde_json::from_value(old.clone())?;
-    assert_eq!(decoded.state, ProcessStateLimits::default());
-    assert_eq!(serde_json::to_value(decoded)?, old);
     Ok(())
 }
 

@@ -51,17 +51,17 @@ it. From bottom to top:
                     chio-core (capability, receipt, crypto)
 ```
 
-### 1.1 chio-metering: Cost Attribution and Budget Enforcement
+### 1.1 chio-metering: Cost Attribution and Budget Trees
 
-**Purpose:** Per-receipt cost tracking, cumulative cost queries, monetary budget
-enforcement, and billing-export-compatible cost records.
+**Purpose:** Per-receipt cost tracking, cumulative cost queries, hierarchical budget
+trees, and billing-export-compatible cost records.
 
 **Key types:**
 
 - `CostMetadata` / `CostDimension` -- per-receipt cost attribution covering
   compute time, data volume, and API cost dimensions
-- `BudgetEnforcer` / `BudgetPolicy` / `BudgetViolation` -- monetary budget
-  enforcement with denominated currency support and configurable policy
+- `BudgetTree` / `BudgetNode` / `BudgetDecision` -- organization-wide budget
+  limits evaluated against a caller-supplied spend snapshot
 - `CostQuery` / `CostQueryResult` / `CostSummary` -- CLI-style cost queries
   filterable by session, agent, tool, or time range
 - `BillingExport` / `BillingRecord` -- billing-export-compatible cost records
@@ -475,7 +475,7 @@ Receipt Store
     |
     |-- chio-metering: CostQuery by session/agent/tool/time-range
     |-- chio-metering: BillingExport for downstream invoicing
-    |-- chio-metering: BudgetEnforcer for policy-level enforcement
+    |-- chio-metering: BudgetTree for organization-level limits
     |
     v
 Exposure Ledger (chio-credit)
@@ -932,7 +932,7 @@ Quick reference for navigating the codebase:
 
 | Crate | Entry Point | Key Exports |
 |-------|------------|-------------|
-| `chio-metering` | `crates/economy/chio-metering/src/lib.rs` | `CostMetadata`, `BudgetEnforcer`, `CostQuery`, `BillingExport` |
+| `chio-metering` | `crates/economy/chio-metering/src/lib.rs` | `CostMetadata`, `BudgetTree`, `CostQuery`, `BillingExport` |
 | `chio-underwriting` | `crates/economy/chio-underwriting/src/lib.rs` | `evaluate_underwriting_policy_input`, `UnderwritingDecisionArtifact`, `UnderwritingRiskClass`, `UnderwritingPremiumQuote` |
 | `chio-credit` | `crates/economy/chio-credit/src/lib.rs` | `ExposureLedgerReport`, `CreditScorecardReport`, `CreditFacilityArtifact`, `CreditBondArtifact`, `CreditLossLifecycleArtifact`, `CapitalBookReport`, `CapitalExecutionInstructionArtifact` |
 | `chio-market` | `crates/economy/chio-market/src/lib.rs` | `LiabilityProviderReport`, `LiabilityQuoteRequestArtifact`, `LiabilityQuoteResponseArtifact`, `LiabilityBoundCoverageArtifact`, `LiabilityClaimPackageArtifact` |

@@ -13,6 +13,7 @@
     "id": "cap-bindings-broken-chain",
     "issued_at": 1710000200,
     "issuer": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
+    "schema": "chio.capability.v1",
     "scope": {
       "grants": [
         {

@@ -37,26 +37,17 @@ process, or to more than one, is rejected. A message key then belongs to the
 process that committed it: replaying the key with the same payload from that
 process returns the original sequence, while another process reusing it is a
 conflict. Received messages carry the attested process id in `sender`. The
-CLI host attests senders. Servers opened without a registry, and messages
-stored before attestation, report `sender: null`; consumers must treat a null
-sender as unattested. Attestation names the process identity the kernel
-admitted, not the application code that ran inside it.
+CLI host attests senders. Servers opened without a registry report
+`sender: null`; consumers must treat a null sender as unattested. Attestation
+names the process identity the kernel admitted, not the application code that
+ran inside it.
 
-Direct embedders may reopen a pre-sender or pre-claim mailbox database with the
-same authority, key and configuration. Migration adds nullable sender/claimant
-and deadline columns and starts historical claim generations at zero. It never
-assigns a sender to historical rows. An attested sender cannot replay a key
-originally written with a null sender, even after its payload is drained.
-Before enabling attestation, stop producers and drain historical payloads with
-the original receive/ack API, or deliberately consume them as unattested data
-using newly granted claim/complete authority. Use fresh application message keys
-for new messages; keep tombstones and original operation identities.
-
-This direct-embedder migration is not a CLI host upgrade. ABI v1 hosts must
-finish or drain with their original compatible binary. ABI v2 refuses those
-hosts, and all accepted tool manifests remain pinned by canonical equality,
-including `wait_ms` and renewal configuration. Reinitializing a host does not
-recover pending messages or uncertain effects.
+A mailbox database opens only with the same authority, key and configuration
+and the current message-table layout; any other layout is refused before the
+store is bound. An attested sender cannot replay a key written with a null
+sender, even after its payload is drained. Accepted tool manifests are pinned by
+canonical equality, including `wait_ms` and renewal configuration.
+Reinitializing a host does not recover pending messages or uncertain effects.
 
 Messages and tool outputs are untrusted data and traverse native guards.
 Output guards can redact message content. Applications needing exact signed
@@ -147,10 +138,8 @@ death is denied on recovery like any other effect, and its lease expires.
 For tasks that can outlast one lease, configure a new channel with
 `{"id": "jobs", "renewable_leases": true}`. This adds `renew_jobs` as a
 separately granted tool. Grant it to the pool members that should retain work
-while making progress. The option defaults to false and is omitted from the
-serialized configuration then, preserving existing manifests and bindings.
-An existing channel's configuration cannot be changed to enable renewal.
-Older binaries refuse execution with the new enabled configuration.
+while making progress. The option defaults to false. An existing channel's
+configuration cannot be changed to enable renewal.
 
 ```python
 renewed = worker.invoke("renew-job-1-1", "chio-ipc", "renew_jobs", {

@@ -364,6 +364,7 @@ async fn manager_to_sink(sink: &str) {
     };
     let mut manager = ExporterManager::new(SiemConfig {
         db_path: db.clone(),
+        cursor_db_path: db.with_extension("cursor.sqlite3"),
         poll_interval: Duration::from_secs(60),
         max_retries: 0,
         trusted_kernel_keys: BTreeSet::from([Keypair::from_seed(&[91; 32]).public_key().to_hex()]),

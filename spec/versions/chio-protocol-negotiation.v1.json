@@ -1,6 +1,6 @@
 {
   "schema": "chio.protocol-negotiation.v1",
-  "updatedAt": "2026-04-13",
+  "updatedAt": "2026-10-13",
   "surfaces": {
     "nativeChio": {
       "wireVersion": "chio-wire-v1",
@@ -15,14 +15,17 @@
     "hostedMcp": {
       "initializeRequestField": "params.protocolVersion",
       "initializeResponseField": "result.protocolVersion",
+      "statelessRequestField": "params._meta.io.modelcontextprotocol/protocolVersion",
       "sessionHeader": "MCP-Protocol-Version",
       "supportedProtocolVersions": [
+        "2026-07-28",
         "2025-11-25"
       ],
-      "selectionPolicy": "exact_match_from_supported_set",
-      "downgradeBehavior": "current implementation publishes one supported version and rejects mismatches",
+      "selectionPolicy": "server_selected_on_initialize_exact_match_per_request",
+      "downgradeBehavior": "initialize answers 2025-11-25 for any requested revision; per-request metadata naming an unserved revision is refused",
       "connectionRejection": {
         "jsonrpcCode": -32600,
+        "statelessJsonrpcCode": -32022,
         "chioErrorCode": 1000
       }
     },

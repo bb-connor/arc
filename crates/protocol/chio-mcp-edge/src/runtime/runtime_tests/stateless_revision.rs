@@ -209,5 +209,5 @@ fn initialize_still_selects_the_handshake_revision() {
             "params": { "protocolVersion": MCP_2026_07_28 }
         }))
         .unwrap();
-    assert_eq!(response["error"]["message"], "unsupported protocolVersion");
+    assert_eq!(response["result"]["protocolVersion"], MCP_2025_11_25);
 }

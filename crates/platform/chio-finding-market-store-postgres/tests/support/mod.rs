@@ -778,85 +778,7 @@ pub(super) async fn apply_authority_transition(
     Ok(())
 }
 
-pub(super) async fn install_legacy_migration_fixture(
-    pool: &sqlx::PgPool,
-) -> Result<(), Box<dyn Error>> {
-    const LEGACY: &[(i64, &str, &str)] = &[
-        (
-            1,
-            "hosted_market",
-            include_str!("../../migrations/0001_hosted_market.sql"),
-        ),
-        (
-            2,
-            "terminal_jobs",
-            include_str!("../../migrations/0002_terminal_jobs.sql"),
-        ),
-        (
-            3,
-            "lease_fencing",
-            include_str!("../../migrations/0003_lease_fencing.sql"),
-        ),
-        (
-            4,
-            "hosted_auth",
-            include_str!("../../migrations/0004_hosted_auth.sql"),
-        ),
-        (
-            5,
-            "market_aggregates",
-            include_str!("../../migrations/0005_market_aggregates.sql"),
-        ),
-        (
-            6,
-            "tenant_registry_rls",
-            include_str!("../../migrations/0006_tenant_registry_rls.sql"),
-        ),
-        (
-            7,
-            "tenant_limits",
-            include_str!("../../migrations/0007_tenant_limits.sql"),
-        ),
-        (
-            8,
-            "append_only_aggregates",
-            include_str!("../../migrations/0008_append_only_aggregates.sql"),
-        ),
-        (
-            9,
-            "aggregate_checkpoints",
-            include_str!("../../migrations/0009_aggregate_checkpoints.sql"),
-        ),
-    ];
-    sqlx::raw_sql(
-        r#"CREATE TABLE chio_finding_market_schema_migrations (
-            version BIGINT PRIMARY KEY CHECK (version > 0),
-            name TEXT NOT NULL UNIQUE CHECK (length(name) BETWEEN 1 AND 128),
-            checksum_sha256 CHAR(64) NOT NULL CHECK (
-                checksum_sha256 !~ '[^0-9a-f]'
-            ),
-            applied_at BIGINT NOT NULL CHECK (applied_at > 0)
-        )"#,
-    )
-    .execute(pool)
-    .await?;
-    for (version, name, sql) in LEGACY {
-        let mut transaction = pool.begin().await?;
-        sqlx::raw_sql(sql).execute(&mut *transaction).await?;
-        sqlx::query(
-            "INSERT INTO chio_finding_market_schema_migrations (version, name, checksum_sha256, applied_at) VALUES ($1, $2, $3, floor(extract(epoch from clock_timestamp()))::bigint)",
-        )
-        .bind(version)
-        .bind(name)
-        .bind(sha256_hex(sql.as_bytes()))
-        .execute(&mut *transaction)
-        .await?;
-        transaction.commit().await?;
-    }
-    Ok(())
-}
-
-pub(super) async fn migrate_legacy_fixture(
+pub(super) async fn migrate_fixture(
     admin_pool: &sqlx::PgPool,
     migrator_url: &str,
 ) -> Result<(), Box<dyn Error>> {
@@ -865,50 +787,14 @@ pub(super) async fn migrate_legacy_fixture(
         .max_connections(1)
         .connect(migrator_url)
         .await?;
-    install_legacy_migration_fixture(&migrator_pool).await?;
-    sqlx::query(
-        r#"INSERT INTO chio_finding_market_tenants (
-               tenant_id, enabled, created_at, max_concurrent_jobs,
-               max_queued_jobs, max_monthly_spend_units, configuration_revision
-           ) VALUES ($1, TRUE, 1700000000, 1, 10, 1000, 'legacy-probe')"#,
-    )
-    .bind("legacy-principal-probe")
-    .execute(admin_pool)
-    .await?;
-    sqlx::query(
-        r#"INSERT INTO chio_finding_market_principals (
-               tenant_id, principal_id, role, capability_public_key_hex,
-               enabled, created_at, updated_at
-           ) VALUES ($1, 'legacy-buyer', 'buyer', $2, TRUE, 1700000000, 1700000000)"#,
-    )
-    .bind("legacy-principal-probe")
-    .bind("9".repeat(64))
-    .execute(admin_pool)
-    .await?;
     let migrator = PostgresFindingMarketMigrator::from_pool_for_integration_tests(migrator_pool);
-    assert!(migrator.migrate().await.is_err());
-    let migration_eleven_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM _sqlx_migrations WHERE version = 11")
-            .fetch_one(admin_pool)
+    migrator.migrate().await?;
+    migrator.migrate().await?;
+    let migration_versions: Vec<i64> =
+        sqlx::query_scalar("SELECT version FROM _sqlx_migrations ORDER BY version")
+            .fetch_all(admin_pool)
             .await?;
-    assert_eq!(migration_eleven_count, 0);
-    let retained_legacy_principal_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM chio_finding_market_principals WHERE tenant_id = $1",
-    )
-    .bind("legacy-principal-probe")
-    .fetch_one(admin_pool)
-    .await?;
-    assert_eq!(retained_legacy_principal_count, 1);
-    sqlx::query("DELETE FROM chio_finding_market_principals WHERE tenant_id = $1")
-        .bind("legacy-principal-probe")
-        .execute(admin_pool)
-        .await?;
-    sqlx::query("DELETE FROM chio_finding_market_tenants WHERE tenant_id = $1")
-        .bind("legacy-principal-probe")
-        .execute(admin_pool)
-        .await?;
-    migrator.migrate().await?;
-    migrator.migrate().await?;
+    assert_eq!(migration_versions, [1]);
     let migration_checksum: Vec<u8> =
         sqlx::query_scalar("SELECT checksum FROM _sqlx_migrations WHERE version = 1")
             .fetch_one(admin_pool)
@@ -925,43 +811,35 @@ pub(super) async fn migrate_legacy_fixture(
         .bind(migration_checksum)
         .execute(admin_pool)
         .await?;
+    sqlx::query(
+        "INSERT INTO _sqlx_migrations (version, description, success, checksum, execution_time) VALUES (2, 'unknown', TRUE, '\\x00', 0)",
+    )
+    .execute(admin_pool)
+    .await?;
+    assert!(matches!(
+        migrator.migrate().await,
+        Err(HostedMarketStoreError::MigrationDrift)
+    ));
+    sqlx::query("DELETE FROM _sqlx_migrations WHERE version = 2")
+        .execute(admin_pool)
+        .await?;
     migrator.migrate().await?;
     Ok(())
 }
 
-pub(super) async fn assert_legacy_delivery_upgrade_rejects(
+pub(super) async fn assert_unauthenticated_delivery_rejected(
     admin_pool: &sqlx::PgPool,
     tenant: &HostedTenantId,
 ) -> Result<(), Box<dyn Error>> {
-    let mut transaction = admin_pool.begin().await?;
-    sqlx::raw_sql(
-        r#"
-        ALTER TABLE chio_finding_market_domain_event_contracts
-            DISABLE TRIGGER chio_finding_market_domain_event_contracts_immutable;
-        DELETE FROM chio_finding_market_domain_event_contracts
-        WHERE aggregate_kind = 'delivery'
-          AND event_kind = 'delivery.accepted'
-          AND artifact_schema = 'chio.finding.hosted-authenticated-delivery.v1';
-        INSERT INTO chio_finding_market_domain_event_contracts (
-            aggregate_kind, event_kind, artifact_schema, signed_artifact
-        ) VALUES (
-            'delivery', 'delivery.accepted', 'chio.finding.delivery.v1', FALSE
-        );
-        ALTER TABLE chio_finding_market_domain_event_contracts
-            ENABLE TRIGGER chio_finding_market_domain_event_contracts_immutable;
-        "#,
-    )
-    .execute(&mut *transaction)
-    .await?;
-    sqlx::query(
+    let unauthenticated = sqlx::query(
         r#"INSERT INTO chio_finding_market_replication_outbox (
                tenant_id, authority_epoch, sequence, aggregate_kind,
                aggregate_id, expected_revision, expected_event_sha256,
                event_id, event_kind, artifact_schema, payload_sha256,
                payload_json, event_sha256, committed_at
            ) VALUES (
-               $1, 1, 999, 'delivery', 'legacy-delivery', 0, NULL,
-               'legacy-delivery-event', 'delivery.accepted',
+               $1, 1, 999, 'delivery', 'unauthenticated-delivery', 0, NULL,
+               'unauthenticated-delivery-event', 'delivery.accepted',
                'chio.finding.delivery.v1', $2, $3, $4, 1700000000
            )"#,
     )
@@ -969,15 +847,9 @@ pub(super) async fn assert_legacy_delivery_upgrade_rejects(
     .bind("a".repeat(64))
     .bind(b"{}".as_slice())
     .bind("b".repeat(64))
-    .execute(&mut *transaction)
-    .await?;
-    let unsafe_upgrade = sqlx::raw_sql(include_str!(
-        "../../migrations/0016_authenticated_delivery_receipt.sql"
-    ))
-    .execute(&mut *transaction)
+    .execute(admin_pool)
     .await;
-    assert!(unsafe_upgrade.is_err());
-    transaction.rollback().await?;
+    assert!(unauthenticated.is_err());
     Ok(())
 }
 
@@ -1666,17 +1538,14 @@ pub(super) async fn assert_paged_aggregate_history(
     Ok(())
 }
 
-/// A writer that predates the derived accumulators still keeps them
-/// correct. The rollout applies migrations before the previous release is
-/// replaced, so during that window a replica writes only the reservation
-/// and nonce tables; both accumulators are trigger-maintained so the new
-/// binary's capacity decisions still see those writes.
+/// Direct writes to the reservation and nonce tables keep the derived
+/// accumulators correct, because both accumulators are trigger-maintained.
 pub(super) async fn assert_prior_release_writes_keep_accumulators(
     store: &PostgresFindingMarketStore,
     runtime_pool: &sqlx::PgPool,
     nonce: u128,
 ) -> Result<(), Box<dyn Error>> {
-    let tenant = &HostedTenantId::new(format!("integration-prior-release-{nonce}"))?;
+    let tenant = &HostedTenantId::new(format!("integration-direct-writes-{nonce}"))?;
     store
         .register_tenant(
             tenant,
@@ -1684,57 +1553,57 @@ pub(super) async fn assert_prior_release_writes_keep_accumulators(
             1_700_000_000,
         )
         .await?;
-    let mut legacy = runtime_pool.begin().await?;
+    let mut direct = runtime_pool.begin().await?;
     sqlx::query("SELECT set_config('chio.tenant_id', $1, TRUE)")
         .bind(tenant.as_str())
-        .execute(&mut *legacy)
+        .execute(&mut *direct)
         .await?;
     let billing_period: String =
         sqlx::query_scalar("SELECT to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM')")
-            .fetch_one(&mut *legacy)
+            .fetch_one(&mut *direct)
             .await?;
     sqlx::query(
         "INSERT INTO chio_finding_market_spend_reservations (tenant_id, reservation_id, billing_period, units, state, created_at, updated_at) VALUES ($1, $2, $3, $4, 'reserved', $5, $5)",
     )
     .bind(tenant.as_str())
-    .bind("purchase-spend-prior-release")
+    .bind("purchase-spend-direct-insert")
     .bind(&billing_period)
     .bind(3_000_i64)
     .bind(1_700_000_000_i64)
-    .execute(&mut *legacy)
+    .execute(&mut *direct)
     .await?;
     sqlx::query(
         "INSERT INTO chio_finding_market_dpop_nonces (tenant_id, capability_id, nonce_sha256, valid_through, created_at) VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(tenant.as_str())
-    .bind("capability-prior-release")
+    .bind("capability-direct-insert")
     .bind("2".repeat(64))
     .bind(1_900_000_000_i64)
     .bind(1_700_000_000_i64)
-    .execute(&mut *legacy)
+    .execute(&mut *direct)
     .await?;
     let consumed: i64 = sqlx::query_scalar(
         "SELECT consumed_units FROM chio_finding_market_spend_periods WHERE tenant_id = $1 AND billing_period = $2",
     )
     .bind(tenant.as_str())
     .bind(&billing_period)
-    .fetch_one(&mut *legacy)
+    .fetch_one(&mut *direct)
     .await?;
     assert_eq!(
         consumed, 3_000,
-        "a reservation written by the previous release must charge the period"
+        "a directly inserted reservation must charge the period"
     );
     let live_nonces: i64 = sqlx::query_scalar(
         "SELECT live_nonces FROM chio_finding_market_dpop_admission_state WHERE tenant_id = $1",
     )
     .bind(tenant.as_str())
-    .fetch_one(&mut *legacy)
+    .fetch_one(&mut *direct)
     .await?;
     assert_eq!(
         live_nonces, 1,
-        "a nonce written by the previous release must count against the tenant"
+        "a directly inserted nonce must count against the tenant"
     );
-    legacy.commit().await?;
+    direct.commit().await?;
 
     assert!(
         matches!(
@@ -1743,14 +1612,14 @@ pub(super) async fn assert_prior_release_writes_keep_accumulators(
                 .await,
             Err(HostedMarketStoreError::Capacity)
         ),
-        "the ceiling must account for the previous release's reservation"
+        "the ceiling must account for the directly inserted reservation"
     );
     assert!(
         matches!(
             store
                 .consume_capability_dpop_admission(
                     tenant,
-                    "capability-after-prior-release",
+                    "capability-after-direct-insert",
                     &"3".repeat(64),
                     Some(&"9".repeat(64)),
                     1_900_000_000,
@@ -1762,7 +1631,7 @@ pub(super) async fn assert_prior_release_writes_keep_accumulators(
                 .await,
             Err(HostedMarketStoreError::Capacity)
         ),
-        "the nonce ceiling must account for the previous release's nonce"
+        "the nonce ceiling must account for the directly inserted nonce"
     );
     Ok(())
 }

@@ -43,7 +43,7 @@ struct MemoryStore {
 }
 
 impl MemoryStore {
-    fn rewrite_only_row_as_unversioned_v1(&self, encryption_fill: u8) {
+    fn rewrite_only_row_without_key_version(&self, encryption_fill: u8) {
         let mut rows = self.rows.lock().test_expect("rows lock");
         assert_eq!(rows.len(), 1);
         let row = rows.values_mut().next().test_expect("sealed row");
@@ -63,12 +63,14 @@ impl MemoryStore {
         let object = envelope
             .as_object_mut()
             .test_expect("private envelope object");
-        assert!(object.remove("key_version").is_some());
-        object.insert(
-            "schema".to_string(),
-            serde_json::Value::String("chio.decoy-private-envelope.v1".to_string()),
+        assert_eq!(
+            object.get("schema"),
+            Some(&serde_json::Value::String(
+                "chio.decoy-private-envelope.v1".to_string()
+            ))
         );
-        let canonical = canonical_json_bytes(&envelope).test_expect("canonical v1 envelope");
+        assert!(object.remove("key_version").is_some());
+        let canonical = canonical_json_bytes(&envelope).test_expect("canonical envelope");
         let ciphertext = cipher
             .encrypt(
                 Nonce::from_slice(row.nonce.as_bytes()),
@@ -77,7 +79,7 @@ impl MemoryStore {
                     aad: aad.as_slice(),
                 },
             )
-            .test_expect("seal unversioned v1 fixture");
+            .test_expect("seal envelope without key version");
         row.encrypted_envelope =
             EncryptedDecoyEnvelope::new(ciphertext).test_expect("valid encrypted envelope");
     }
@@ -486,7 +488,6 @@ fn overlap_opens_legacy_private_public_and_marker_lookups_and_writes_active() {
         b"old-marker",
         DecoySurface::BrowserCookie,
     );
-    store.rewrite_only_row_as_unversioned_v1(0xA1);
     let watermark = create(
         &registry,
         "tenant-a",
@@ -543,6 +544,31 @@ fn overlap_opens_legacy_private_public_and_marker_lookups_and_writes_active() {
         .load_private(&tenant_a, &artifact("old-private"))
         .test_expect("retired key is absent after migration window")
         .is_none());
+}
+
+#[test]
+fn private_envelope_without_key_version_is_refused() {
+    let store = Arc::new(MemoryStore::default());
+    let keys = Arc::new(RotatingKeys::new());
+    let registry = PrivateDecoyRegistry::new(
+        Arc::clone(&store) as Arc<dyn SealedDecoyRegistryStore>,
+        Arc::clone(&keys) as Arc<dyn RegistryKeyProvider>,
+        Arc::new(Exports),
+    );
+    let tenant_a = tenant("tenant-a");
+    create(
+        &registry,
+        "tenant-a",
+        "unbound-private",
+        b"unbound-marker",
+        DecoySurface::BrowserCookie,
+    );
+    store.rewrite_only_row_without_key_version(0xA1);
+
+    assert!(matches!(
+        registry.load_private(&tenant_a, &artifact("unbound-private")),
+        Err(RegistryError::IntegrityFailure)
+    ));
 }
 
 #[test]

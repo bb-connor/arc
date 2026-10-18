@@ -475,14 +475,10 @@ SCHEMA_MEMBER = '"schema":"%s"' % CAPABILITY_SCHEMA
 
 
 def capability_signing_input(token: Dict[str, Any]) -> str:
-    """The canonical JSON that a capability issuer signs.
-
-    It is the token without its signature and algorithm members, with the schema
-    member added when the token leaves it out, as every token of the corpus does.
-    """
-    body = without(token, "signature", "algorithm")
-    body.setdefault("schema", CAPABILITY_SCHEMA)
-    return canonicalize(body)
+    """The canonical JSON that a capability issuer signs: the token without its
+    signature and algorithm members."""
+    _require(token.get("schema") == CAPABILITY_SCHEMA, "capability token %s lacks schema %s" % (token.get("id"), CAPABILITY_SCHEMA))
+    return canonicalize(without(token, "signature", "algorithm"))
 
 
 def receipt_body(receipt: Dict[str, Any]) -> Dict[str, Any]:
@@ -608,13 +604,13 @@ def build_appendix_a(corpus: Corpus) -> Fragment:
     f.heading("Capability Token", "example-capability")
     f.para(
         "%s It is a directly issued token with no delegation chain and one tool grant, "
-        "pretty-printed here for reading. The corpus omits the `schema` member from its tokens. "
+        "pretty-printed here for reading. "
         "Capability tokens are defined in {{capabilities}}." % provenance("capability", cap_id)
     )
     f.block(pretty(cap), "json", indent=4)
     f.para(
-        "The signing input of the token is its canonical form without the `signature` member and "
-        "with the member `%s` added, which sorts between `issuer` and `scope`. It is the "
+        "The signing input of the token is its canonical form without the `signature` member. "
+        "The member `%s` sorts between `issuer` and `scope`. The signing input is the "
         "`capability_signing_body_canonical_json` value of the case:" % SCHEMA_MEMBER
     )
     f.block(cap_signing, "json")
@@ -832,9 +828,8 @@ def build_appendix_b(corpus: Corpus) -> Fragment:
         "Each case gives the signing input of a token, the value of its `signature` member, the "
         "Unix time at which the token is verified, and the result that verification is expected "
         "to produce. The signing input is the canonical form of the token without its `signature` "
-        "member and with the member `%s` added, as in {{example-capability}}. The "
-        "corpus omits the `schema` member from the token itself, and its "
-        "`capability_signing_body_canonical_json` value is the signing input."
+        "member, including its member `%s`, as in {{example-capability}}. It is the "
+        "`capability_signing_body_canonical_json` value of the case."
         % SCHEMA_MEMBER
     )
     f.para(

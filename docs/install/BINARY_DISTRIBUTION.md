@@ -1,10 +1,16 @@
 # Chio Binary Distribution
 
-This page defines the release distribution contract for future tagged releases.
-Publication and hosted acceptance must be checked for the exact intended tag;
-this page does not establish them. Authenticate signed artifacts using the
-canonical `bb-connor/arc` policy in [VERIFY.md](VERIFY.md) before execution.
-Historical release publication is separate from acceptance of this pipeline.
+This page defines the distribution contract for the signed `0.2.0-alpha.N`
+preview releases. No preview is published yet; build from source as described
+in [README.md](README.md). Publication and hosted acceptance must be checked
+for the exact intended tag; this page does not establish them. Authenticate
+signed artifacts using the canonical `bb-connor/arc` policy in
+[VERIFY.md](VERIFY.md) before execution.
+
+The deprecated `v0.1.0` release and its images and packages do not satisfy this
+contract. Do not install them, and do not use `latest` URLs or image tags:
+GitHub marks `v0.1.0` as the latest release, previews are prereleases that
+never become Latest, and the `latest` image tag tracks unreleased `main`.
 
 ## Supported Platforms
 
@@ -16,13 +22,17 @@ Historical release publication is separate from acceptance of this pipeline.
 | macOS   | aarch64 (Apple)      | `aarch64-apple-darwin`         | `.tar.gz`         |
 | Windows | x86_64               | `x86_64-pc-windows-msvc`       | `.zip`            |
 
+The release workflow builds every target above. The preview exit criterion
+(REL-1) covers installation on Linux x86_64, Linux arm64 and macOS arm64 only.
+
 Container images are expected for `linux/amd64` and `linux/arm64` after the
 release workflow publishes them.
 
-## Install via Homebrew After A Tagged Release
+## Install via Homebrew After A Tagged Preview
 
 ```bash
-curl -fsSL -o /tmp/chio.rb https://github.com/bb-connor/arc/releases/latest/download/chio.rb
+TAG=v0.2.0-alpha.1
+curl -fsSL -o /tmp/chio.rb "https://github.com/bb-connor/arc/releases/download/${TAG}/chio.rb"
 brew install --formula /tmp/chio.rb
 chio --version
 ```
@@ -32,18 +42,15 @@ The release workflow renders the installable formula from
 asset when a release is cut. See [`docs/install/homebrew.md`](./homebrew.md) for
 details.
 
-## Install via Docker After A Tagged Release
+## Install via Docker After A Tagged Preview
 
 ```bash
-# Pull the latest published image
-docker pull ghcr.io/bb-connor/chio-sidecar:latest
-
-# Pin to a specific version
-docker pull ghcr.io/bb-connor/chio-sidecar:0.1.0
-
-# Run the published image
-docker run --rm ghcr.io/bb-connor/chio-sidecar:latest --help
+docker pull ghcr.io/bb-connor/chio-sidecar:0.2.0-alpha.1
+docker run --rm ghcr.io/bb-connor/chio-sidecar:0.2.0-alpha.1 --help
 ```
+
+Verify the image signature and pin its digest as described in
+[PUBLISHING.md](PUBLISHING.md#sidecar-image-signing) before deploying it.
 
 The published image must satisfy this contract:
 
@@ -54,11 +61,11 @@ The published image must satisfy this contract:
 - uses `tini` as PID 1 for correct signal handling;
 - stores sidecar state under `/var/lib/chio` (mount a volume to persist it).
 
-## Install a verified native archive after an accepted tagged release
+## Install a verified native archive after an accepted tagged preview
 
 ```bash
 set -euo pipefail
-VERSION=0.1.1-rc.1
+VERSION=0.2.0-alpha.1
 TAG="v${VERSION}"
 : "${SOURCE_SHA:?Set the independently accepted full source commit}"
 TARGET=$(uname -m | sed 's/x86_64/x86_64/; s/arm64/aarch64/; s/aarch64/aarch64/')
@@ -94,7 +101,7 @@ contracts; see [homebrew.md](homebrew.md) and
 
 ## Signature and Checksum Verification
 
-Every tagged release must publish:
+Every tagged preview must publish:
 
 - Per-archive `.sig` and `.pem` files for exact-tag signature verification.
 - Per-archive `.sha256` files (one line each: `<hash>  <archive>`).
@@ -104,11 +111,13 @@ Authenticate the archive with [VERIFY.md](VERIFY.md) first. The following
 checksum checks detect byte mismatches but provide no signer authentication:
 
 ```bash
+TAG=v0.2.0-alpha.1
+
 # Single archive
-shasum -a 256 -c chio-0.1.0-aarch64-apple-darwin.tar.gz.sha256
+shasum -a 256 -c chio-0.2.0-alpha.1-aarch64-apple-darwin.tar.gz.sha256
 
 # All archives at once
-curl -fsSL https://github.com/bb-connor/arc/releases/download/v0.1.0/SHA256SUMS -o SHA256SUMS
+curl -fsSL "https://github.com/bb-connor/arc/releases/download/${TAG}/SHA256SUMS" -o SHA256SUMS
 shasum -a 256 -c SHA256SUMS
 ```
 
@@ -117,7 +126,7 @@ Container image provenance must be attested by the build workflow
 workflow logs:
 
 ```bash
-docker buildx imagetools inspect ghcr.io/bb-connor/chio-sidecar:0.1.0
+docker buildx imagetools inspect ghcr.io/bb-connor/chio-sidecar:0.2.0-alpha.1
 ```
 
 ## Troubleshooting

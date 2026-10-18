@@ -46,9 +46,8 @@ reserve or record accepted usage in an authoritative store.
 
 ## Status
 
-The crate implements local metering models and projections. `BudgetEnforcer`
-is deprecated: its counters reset on restart, and `check` and `record` are
-separate operations. `BudgetTree` evaluates caller-provided state and has no
+The crate implements local metering models and projections. `BudgetTree`
+evaluates caller-provided state and has no
 persistence. Kernel charging, durable budgets, oracle conversion, and external
 settlement need their own integration; billing exports carry no signatures.
 

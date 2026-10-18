@@ -492,7 +492,7 @@ mod tests {
 
     fn pool() -> Pool<SqliteConnectionManager> {
         let manager = SqliteConnectionManager::memory();
-        Pool::builder()
+        crate::pool::sqlite_pool_builder()
             .max_size(2)
             .build(manager)
             .test_expect("test pool builds")

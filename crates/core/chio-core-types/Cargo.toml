@@ -81,9 +81,6 @@ pq = ["dep:fips204"]
 # no-default builds, so this feature is a no-op kept for downstream manifests
 # that enable it by name.
 delegation = []
-# Alias of `delegation` so consumers pinning `features = ["delegation_v2"]`
-# continue to resolve. Both spellings are no-ops; new code should use `delegation`.
-delegation_v2 = ["delegation"]
 
 [dev-dependencies]
 uuid = { workspace = true, features = ["serde"] }

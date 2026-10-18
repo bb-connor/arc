@@ -4,7 +4,6 @@ use crate::error::*;
 use crate::issuer::*;
 use crate::proof_package::*;
 use crate::report::*;
-use crate::revocation::*;
 use crate::trust_bundle::*;
 use crate::validation::*;
 use chio_core_types::crypto::Keypair;
@@ -58,16 +57,10 @@ fn receipt_v1_disclosure_policy(message_count: usize) -> ChioDisclosurePolicy {
 
 fn trust_bundle_with_revocations(revoked_key_fingerprints: Vec<String>) -> ChioVerifierTrustBundle {
     let mut document = trust_bundle_document_from_fixture();
-    let ChioRevocationMaterial::Checkpoint(checkpoint) = document.revocation else {
-        panic!("fixture carries signed revocation checkpoint");
-    };
-    let checkpoint = *checkpoint;
-    let mut body = checkpoint.body;
+    let mut body = document.revocation.body;
     body.revoked_key_fingerprints = revoked_key_fingerprints;
-    document.revocation = ChioRevocationMaterial::Checkpoint(Box::new(
-        SignedExportEnvelope::sign(body, &Keypair::from_seed(&[11; 32]))
-            .expect("revocation checkpoint re-signs"),
-    ));
+    document.revocation = SignedExportEnvelope::sign(body, &Keypair::from_seed(&[11; 32]))
+        .expect("revocation checkpoint re-signs");
     ChioVerifierTrustBundle::from_document(document).expect("trust bundle parses")
 }
 
@@ -133,7 +126,7 @@ fn receipt_v1_disclosure_requires_receipt_embedded_bbs() {
         issuer_fingerprint: bbs_keypair.issuer_fingerprint.clone(),
         public_key_hex: bbs_keypair.public_key_hex.clone(),
     }];
-    document.disclosure_policy = Some(receipt_v1_disclosure_policy(projection.messages.len()));
+    document.disclosure_policy = receipt_v1_disclosure_policy(projection.messages.len());
     let trust_bundle =
         ChioVerifierTrustBundle::from_document(document).expect("receipt v1 policy parses");
 
@@ -146,7 +139,7 @@ fn receipt_v1_disclosure_requires_receipt_embedded_bbs() {
 #[test]
 fn verifier_trust_bundle_rejects_unsupported_receipt_projection_policy() {
     let mut document = trust_bundle_document_from_fixture();
-    document.disclosure_policy = Some(ChioDisclosurePolicy {
+    document.disclosure_policy = ChioDisclosurePolicy {
         projection_version: "chio.bbs-projection.receipt.v0".to_string(),
         ciphersuite: BBS_CIPHERSUITE_SHA256.to_string(),
         message_count: 14,
@@ -156,7 +149,7 @@ fn verifier_trust_bundle_rejects_unsupported_receipt_projection_policy() {
             "id".to_string(),
             "tool_name".to_string(),
         ],
-    });
+    };
 
     let error = ChioVerifierTrustBundle::from_document(document)
         .expect_err("unsupported receipt projection policy must fail closed");
@@ -295,16 +288,10 @@ fn revocation_checkpoint_must_cover_verifier_context() {
     .expect("package fixture parses");
     let context = verification_context_from_fixture();
     let mut document = trust_bundle_document_from_fixture();
-    let ChioRevocationMaterial::Checkpoint(checkpoint) = document.revocation else {
-        panic!("fixture carries signed revocation checkpoint");
-    };
-    let checkpoint = *checkpoint;
-    let mut body = checkpoint.body;
+    let mut body = document.revocation.body;
     body.expires_at_unix_ms = context.expires_at_unix_ms - 1;
-    document.revocation = ChioRevocationMaterial::Checkpoint(Box::new(
-        SignedExportEnvelope::sign(body, &Keypair::from_seed(&[11; 32]))
-            .expect("revocation checkpoint re-signs"),
-    ));
+    document.revocation = SignedExportEnvelope::sign(body, &Keypair::from_seed(&[11; 32]))
+        .expect("revocation checkpoint re-signs");
     let trust_bundle = ChioVerifierTrustBundle::from_document(document)
         .expect("trust bundle remains structurally valid");
 
@@ -540,19 +527,6 @@ fn verifier_trust_bundle_v3_requires_authority_roots() {
     )
     .unwrap_err();
     assert!(error.to_string().contains("authorit"));
-}
-
-#[test]
-#[ignore = "v1-only collapse: v1 is now the strict schema, not a historical one"]
-fn historical_v1_trust_bundle_is_not_strict_verifier_input() {
-    // Ignored while v1 is the only trust-bundle schema: there is no older
-    // version for the strict verifier to reject. Guards the rejection
-    // contract for any future revision that reintroduces multiple versions.
-    let mut document = trust_bundle_document_from_fixture();
-    document.schema = VERIFIER_TRUST_BUNDLE_SCHEMA.to_string();
-
-    let error = ChioVerifierTrustBundle::from_document(document).unwrap_err();
-    assert!(error.to_string().contains("historical"));
 }
 
 #[test]

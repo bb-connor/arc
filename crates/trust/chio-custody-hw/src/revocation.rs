@@ -1312,7 +1312,7 @@ mod tests {
 
     #[test]
     fn cascade_rolls_back_when_a_subject_becomes_unstageable() {
-        // Defense in depth: even though register_dependency now validates
+        // Defense in depth: even though register_dependency validates
         // subjects up-front, the staging path itself must still be
         // all-or-nothing. A subject that the oracle rejects at insert time
         // aborts the WHOLE staged batch, leaving neither the root nor any

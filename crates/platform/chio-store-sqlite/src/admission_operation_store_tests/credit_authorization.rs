@@ -17,6 +17,7 @@ use chio_credit::{
     CREDIT_FACILITY_ARTIFACT_SCHEMA, CREDIT_FACILITY_REPORT_SCHEMA,
 };
 use chio_kernel::admission_operation::AdmissionCaptureError;
+use chio_kernel::budget_store::BudgetHoldCleanupCustody;
 
 use super::*;
 
@@ -455,14 +456,16 @@ fn credit_account_provisioning_authorization_and_replay_are_exact() -> CreditAut
         &fixture.fence,
         now + 5,
     )?;
-    assert!(matches!(
-        &decision,
-        BudgetAuthorizeHoldDecision::Authorized(_)
-    ));
+    let BudgetAuthorizeHoldDecision::Authorized(fresh) = &decision else {
+        panic!("credit authorization must authorize the hold: {decision:?}");
+    };
+    assert_eq!(fresh.cleanup_custody, BudgetHoldCleanupCustody::Fresh);
     assert_eq!(
         authorized.state(),
         AdmissionOperationState::BudgetAuthorized
     );
+    let mut expected_replay = fresh.clone();
+    expected_replay.cleanup_custody = BudgetHoldCleanupCustody::Replayed;
     let replayed = fixture.store.authorize_budget_and_commit_admission(
         &operation,
         &lease,
@@ -472,7 +475,10 @@ fn credit_account_provisioning_authorization_and_replay_are_exact() -> CreditAut
         &fixture.fence,
         now + 5,
     )?;
-    assert_eq!(replayed.0, decision);
+    assert_eq!(
+        replayed.0,
+        BudgetAuthorizeHoldDecision::Authorized(expected_replay)
+    );
     assert_eq!(replayed.1, authorized);
     let reservation = fixture
         .store

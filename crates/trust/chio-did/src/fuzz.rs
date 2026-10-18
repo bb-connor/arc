@@ -9,7 +9,7 @@
 //! drives them through the four trust-boundary surfaces in `chio-did`:
 //!
 //! 1. [`DidChio::from_str`] - the `did:chio:<hex>` URI parser.
-//! 2. [`resolve_did_arc`] - the parser-plus-resolver convenience used by
+//! 2. [`resolve_did_chio`] - the parser-plus-resolver convenience used by
 //!    callers that want the populated [`DidDocument`] for a given URI. No
 //!    network resolution is involved; `did:chio` documents are fully
 //!    self-certifying from the URI.
@@ -32,7 +32,7 @@
 
 use std::str::FromStr;
 
-use crate::{resolve_did_arc, DidChio, DidDocument, DidService, ResolveOptions};
+use crate::{resolve_did_chio, DidChio, DidDocument, DidService, ResolveOptions};
 
 /// Drive arbitrary bytes through the `chio-did` trust-boundary surface.
 ///
@@ -45,8 +45,8 @@ use crate::{resolve_did_arc, DidChio, DidDocument, DidService, ResolveOptions};
 /// parse paths.
 ///
 /// 1. As a UTF-8 string, the input is run through both [`DidChio::from_str`]
-///    and [`resolve_did_arc`] with an empty [`ResolveOptions`]. The two
-///    calls share the same parser, but `resolve_did_arc` additionally
+///    and [`resolve_did_chio`] with an empty [`ResolveOptions`]. The two
+///    calls share the same parser, but `resolve_did_chio` additionally
 ///    exercises the multibase encoder on the success path; together they
 ///    cover both the URI-only and URI-plus-document trust-boundary
 ///    surfaces.
@@ -63,7 +63,7 @@ pub fn fuzz_did_resolve(data: &[u8]) {
         let _ = DidChio::from_str(text);
         // 1b. URI parser plus resolve (exercises the multibase encoder on
         //     the success path).
-        let _ = resolve_did_arc(text, &ResolveOptions::default());
+        let _ = resolve_did_chio(text, &ResolveOptions::default());
         // 2.  Service-endpoint URL validator. Constant id/type so the only
         //     varying input is the URL bytes under test.
         let _ = DidService::new("did:chio:fuzz#endpoint", "ChioFuzzService", text);

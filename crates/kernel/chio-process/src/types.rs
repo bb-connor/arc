@@ -49,7 +49,7 @@ pub struct ProcessLimits {
     pub max_processes: u32,
     pub max_depth: u32,
     pub max_calls: u32,
-    #[serde(default, skip_serializing_if = "ProcessStateLimits::is_default")]
+    #[serde(default)]
     pub state: ProcessStateLimits,
 }
 
@@ -82,10 +82,6 @@ impl Default for ProcessStateLimits {
 }
 
 impl ProcessStateLimits {
-    pub fn is_default(&self) -> bool {
-        *self == Self::default()
-    }
-
     fn validate(self) -> Result<(), ProcessError> {
         if self.max_bytes == 0
             || self.max_bytes > 1024 * 1024 * 1024

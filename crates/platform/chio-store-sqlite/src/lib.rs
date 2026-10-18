@@ -89,6 +89,7 @@ pub mod iou_store;
 #[cfg(feature = "lineage")]
 pub mod lineage_cte;
 pub mod memory_provenance_store;
+mod pool;
 mod read_companion;
 pub mod receipt_query;
 pub mod receipt_query_snapshot;
@@ -515,7 +516,8 @@ pub use receipt_store::{
 };
 pub use revocation_store::SqliteRevocationStore;
 pub use schema_version::{
-    check_schema_version, stamp_schema_version, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
+    check_current_schema, check_schema_version, stamp_schema_version, SchemaState,
+    SchemaVersionError, CHIO_SQLITE_APPLICATION_ID,
 };
 pub use sealed_decoy_registry::SqliteSealedDecoyRegistryStore;
 #[cfg(any(test, feature = "security-admission-test-support"))]

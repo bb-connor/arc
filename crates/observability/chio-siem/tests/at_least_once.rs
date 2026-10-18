@@ -144,6 +144,7 @@ async fn malformed_row_is_captured_not_silently_skipped() {
     let recorder = Arc::new(RecordingSink::default());
     let config = SiemConfig {
         db_path: db_path.clone(),
+        cursor_db_path: db_path.with_extension("cursor.sqlite3"),
         poll_interval: Duration::from_millis(10),
         ..SiemConfig::default()
     };
