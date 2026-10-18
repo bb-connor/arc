@@ -1236,7 +1236,6 @@
     "crates/kernel/chio-kernel/src/provider_verdict.rs::build_tool_call_request::from_wire",
     "crates/kernel/chio-kernel/src/stop/config.rs::decode::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire",
-    "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::from_canonical_bytes::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::recovery_request::from_wire",
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs::from_canonical_record_verified::from_wire",
@@ -7784,6 +7783,9 @@
     ],
     "crates/kernel/chio-runtime-core/src/work/ids.rs": [
       "as_str::custom_deserialize"
+    ],
+    "crates/kernel/chio-kernel/src/tool_outcome/test_support.rs": [
+      "returned_value::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -13048,6 +13050,22 @@
           "checked": true
         }
       ]
+    },
+    "crates/kernel/chio-kernel/src/tool_outcome/test_support.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Feature-gated test fixture builds a request from a local signed capability, typed operation request identifier and fixed server, tool and argument values. Deserialization constructs test input only; retained outcomes still validate their committed operation, canonical bytes and frozen signing identity.",
+      "readers": [
+        {
+          "reader": "returned_value",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
     }
   },
   "tenant_runtime_families": {
@@ -18017,7 +18035,6 @@
     "crates/kernel/chio-kernel/src/provider_verdict.rs::build_tool_call_request::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/stop/config.rs::decode::from_wire#1::decode_canonical",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire#1::decode_signed",
-    "crates/kernel/chio-kernel/src/tool_outcome.rs::canonical_blob_bounded::from_wire#2::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::from_canonical_bytes::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome.rs::recovery_request::from_wire#1::decode_signed",
     "crates/kernel/chio-kernel/src/tool_outcome/release.rs::from_canonical_record_verified#1::from_wire#1::decode_signed",
