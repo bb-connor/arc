@@ -88,6 +88,8 @@ pub enum BrokerError {
     Invariant(String),
     #[error("broker storage failed: {0}")]
     Storage(String),
+    #[error("broker store layout is unsupported: {0}")]
+    UnsupportedStoreLayout(String),
     #[error("broker storage failed: storage")]
     CredentialStorage(#[source] CredentialStoreError),
     #[error("broker upstream request failed: {0}")]
@@ -108,7 +110,11 @@ impl BrokerError {
     pub(crate) const fn is_service_fault(&self) -> bool {
         matches!(
             self,
-            Self::Invariant(_) | Self::Storage(_) | Self::CredentialStorage(_) | Self::Custody(_)
+            Self::Invariant(_)
+                | Self::Storage(_)
+                | Self::UnsupportedStoreLayout(_)
+                | Self::CredentialStorage(_)
+                | Self::Custody(_)
         )
     }
 
@@ -149,6 +155,7 @@ impl BrokerError {
             Self::Upstream(_) | Self::AdapterUpstream(_) => "upstream",
             Self::ResponseRejected(_) => "response_rejected",
             Self::Custody(_) => "custody",
+            Self::UnsupportedStoreLayout(_) => "store_layout",
         }
     }
 
@@ -171,6 +178,7 @@ impl BrokerError {
             Self::Upstream(_) => Self::Upstream(code),
             Self::ResponseRejected(_) => Self::ResponseRejected(code),
             Self::Custody(_) => Self::Custody(code),
+            Self::UnsupportedStoreLayout(_) => Self::UnsupportedStoreLayout(code),
         }
     }
 }

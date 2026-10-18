@@ -542,6 +542,7 @@ impl SqliteBrokerReceiptSink {
 
     fn migrate(&self) -> Result<()> {
         let connection = self.connection()?;
+        reject_unsupported_indexes(&connection)?;
         connection
             .execute_batch(
                 r#"
@@ -580,10 +581,6 @@ impl SqliteBrokerReceiptSink {
                     issued_at INTEGER NOT NULL CHECK(issued_at > 0),
                     canonical_receipt BLOB NOT NULL
                 ) STRICT;
-
-                DROP INDEX IF EXISTS broker_failure_receipts_attempt;
-
-                DROP INDEX IF EXISTS broker_failure_receipts_attempt_events;
 
                 CREATE UNIQUE INDEX IF NOT EXISTS broker_failure_receipts_attempt_terminal
                     ON broker_failure_receipts(attempt_id)
@@ -1106,6 +1103,29 @@ fn sqlite_u64(value: u64, label: &str) -> Result<i64> {
         .map_err(|_| BrokerError::Storage(format!("{label} exceeds SQLite INTEGER")))
 }
 
+const UNSUPPORTED_FAILURE_INDEXES: [&str; 2] = [
+    "broker_failure_receipts_attempt",
+    "broker_failure_receipts_attempt_events",
+];
+
+fn reject_unsupported_indexes(connection: &Connection) -> Result<()> {
+    for name in UNSUPPORTED_FAILURE_INDEXES {
+        let present: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
+                params![name],
+                |row| row.get(0),
+            )
+            .map_err(receipt_storage)?;
+        if present != 0 {
+            return Err(BrokerError::UnsupportedStoreLayout(format!(
+                "broker receipt store holds unsupported index {name}"
+            )));
+        }
+    }
+    Ok(())
+}
+
 fn receipt_storage(error: rusqlite::Error) -> BrokerError {
     BrokerError::Storage(format!("broker receipt store failed: {error}"))
 }
@@ -1254,5 +1274,37 @@ mod tests {
             .load_failure(&second.body.receipt_id)
             .test_expect("load rejected second")
             .is_none());
+    }
+
+    #[test]
+    fn open_refuses_a_store_that_holds_an_unsupported_attempt_index() {
+        for name in UNSUPPORTED_FAILURE_INDEXES {
+            let directory = crate::private_tempdir().test_expect("tempdir");
+            let trusted_directory = std::fs::canonicalize(directory.path())
+                .test_expect("canonicalize database directory");
+            let path = trusted_directory.join("unsupported-index.sqlite3");
+            let signer = Keypair::from_seed(&[212; 32]);
+            drop(
+                SqliteBrokerReceiptSink::open(&path, signer.public_key())
+                    .test_expect("create store"),
+            );
+            let raw = Connection::open(&path).test_expect("raw connection");
+            raw.execute_batch(&format!(
+                "CREATE INDEX {name} ON broker_failure_receipts(attempt_id);"
+            ))
+            .test_expect("create unsupported index");
+            drop(raw);
+
+            match SqliteBrokerReceiptSink::open(&path, signer.public_key()) {
+                Err(BrokerError::UnsupportedStoreLayout(message)) => {
+                    assert_eq!(
+                        message,
+                        format!("broker receipt store holds unsupported index {name}")
+                    );
+                }
+                Err(other) => panic!("unexpected error: {other}"),
+                Ok(_) => panic!("store with unsupported index was opened"),
+            }
+        }
     }
 }
