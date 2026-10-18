@@ -18,9 +18,9 @@ use chio_kernel::{
     PostInvocationInspection, PostInvocationVerdict, SecurityInvocationContextV1, ToolCallRequest,
 };
 use chio_security_types::ports::{
-    CanonicalBody, Digest32, EventAppend, EventId, OpaqueReceiptRef, PortError, PortResult,
-    ProducerId, ProducerTrustClass, ReceiptAppendRequest, RecordId, RequestId, SecurityReceiptSink,
-    TripwireDecision, TripwireInput, TripwireKind, UnverifiedSecurityEvent,
+    CanonicalBody, Digest32, EventAppend, EventId, OpaqueReceiptRef, PortError, PortErrorKind,
+    PortResult, ProducerId, ProducerTrustClass, ReceiptAppendRequest, RecordId, RequestId,
+    SecurityReceiptSink, TripwireDecision, TripwireInput, TripwireKind, UnverifiedSecurityEvent,
 };
 use chio_security_types::{
     DecoySurface, SecurityEventBody, SecurityEventBodyInput, SecurityEventKind, SecuritySeverity,
@@ -914,6 +914,12 @@ fn map_watermark_error(error: WatermarkScanError) -> PortError {
         WatermarkScanError::InvalidObservationContext
         | WatermarkScanError::CandidateLimitExceeded
         | WatermarkScanError::TextTooLarge => PortError::invalid_data(),
+        WatermarkScanError::ObservationUnrecorded(kind) => match kind {
+            PortErrorKind::Unavailable => PortError::unavailable(),
+            PortErrorKind::Conflict => PortError::conflict(),
+            PortErrorKind::InvalidData => PortError::invalid_data(),
+            PortErrorKind::IntegrityFailure => PortError::integrity_failure(),
+        },
     }
 }
 

@@ -53,6 +53,8 @@ policy, requires an unexpired matchable registry marker, and reserves its sequen
 before signing. `WatermarkVerifier::scan_text` finds bounded candidates, verifies each,
 resolves registry state, and records attribution through an observation store.
 Observation-store failure remains explicit even when a verified active hit exists.
+Without an active hit, a verified inactive watermark whose observation is not
+recorded fails the scan with `ObservationUnrecorded` carrying the store failure kind.
 
 ## Trust and invariants
 
