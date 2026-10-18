@@ -1165,7 +1165,7 @@ fn create_schema(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, transition_id)
             );
                 "#).map_err(sqlite_error)?;
-    super::dispatch::ensure_automatic_preparation_schema(connection)?;
+    super::dispatch::create_automatic_preparation_schema(connection)?;
     super::effect_finality::create_schema(connection)?;
     create_attested_finding_response_outbox_schema(connection)?;
     connection.execute_batch(r#"
