@@ -2414,9 +2414,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/admission_operation/store.rs"
 rust_symbols = ["AdmissionOperationStore", "QualifiedAdmissionOperationStoreExt"]
-normalized_sha256 = "21074e2411b537717d512a2f003b168631e1dcba4ab88d1d71dc9b39488a0e38"
+normalized_sha256 = "a93478612141ee8455f7bd00ce6c2c2f3ed805589533a00fc3c5a25679fdf58f"
 symbol_sha256 = [
-  { symbol = "AdmissionOperationStore", sha256 = "cb6176a1f20ac66fa4dedc3149e711720d99fa7704687ed9482b8a817ca324dd" },
+  { symbol = "AdmissionOperationStore", sha256 = "2c2b3f61d1b5c5a78ee397d7f63194ef114768f974acfd2b8074096583fcfb5b" },
   { symbol = "QualifiedAdmissionOperationStoreExt", sha256 = "ee66d1c294c98dbb92981bbb6176ef3d1b767fcb7f91e7d65a9a36233bf5111f" },
 ]
 
