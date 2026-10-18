@@ -914,14 +914,6 @@ impl WriterHandle {
         self.run_receipt_write_kind_with_timeout(job, false, timeout)
     }
 
-    fn run_critical_receipt_write<T, F>(&self, job: F) -> Result<T, ReceiptStoreError>
-    where
-        F: FnOnce(&rusqlite::Transaction<'_>) -> Result<T, ReceiptStoreError> + Send + 'static,
-        T: Send + 'static,
-    {
-        self.run_receipt_write_kind(job, true)
-    }
-
     /// Bounded variant of [`run_write_receipt`]: identical up to the response
     /// wait, which is capped at `timeout`. On expiry it fails this caller loudly
     /// without decrementing `inflight` (the actor still owns the queued job and
@@ -941,9 +933,8 @@ impl WriterHandle {
         self.run_receipt_write_kind_with_timeout(job, false, timeout)
     }
 
-    /// Bounded variant of a critical receipt write. Transaction failures retain
-    /// the critical poisoning semantics of [`run_critical_receipt_write`], while
-    /// the caller's response wait is capped at `timeout`.
+    /// Transaction failures poison the critical receipt writer. The caller's
+    /// response wait is capped at `timeout`; the writer retains the queued job.
     fn run_critical_receipt_write_with_timeout<T, F>(
         &self,
         job: F,
