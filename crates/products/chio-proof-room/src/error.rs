@@ -149,6 +149,8 @@ fn validation_public_reason(message: &str) -> Option<&'static str> {
         "proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys" => Some("CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys"),
         "proof-room.disclosure-lineage-invalid: CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys" => Some("CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys"),
         "proof-room.public-settlement-invalid: CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS must pin trusted public settlement chain IDs" => Some("CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS must pin trusted public settlement chain IDs"),
+        "proof-room.source-verifier.failed: enterprise export claim failed: telemetry projection passport mismatch" => Some("telemetry projection passport mismatch"),
+        "proof-room.source-verifier.failed: enterprise export claim failed: telemetry SIEM event missing receipt" => Some("telemetry SIEM event missing receipt"),
         _ => None,
     }
 }
@@ -173,6 +175,8 @@ mod tests {
         for (message, reason) in [
             ("proof-room.commerce-invalid: CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys", "CHIO_COMMERCE_TRUSTED_PROVIDER_KEYS must pin trusted commerce provider keys"),
             ("proof-room.disclosure-lineage-invalid: CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys", "CHIO_DISCLOSURE_TRUSTED_LINEAGE_SIGNER_KEYS must pin trusted disclosure lineage signer keys"),
+            ("proof-room.source-verifier.failed: enterprise export claim failed: telemetry projection passport mismatch", "telemetry projection passport mismatch"),
+            ("proof-room.source-verifier.failed: enterprise export claim failed: telemetry SIEM event missing receipt", "telemetry SIEM event missing receipt"),
         ] {
             assert_eq!(
                 ProofRoomError::Validation(message.into()).public_reason(),
