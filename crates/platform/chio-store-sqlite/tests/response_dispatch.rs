@@ -697,7 +697,7 @@ fn atomic_dispatch_is_idempotent_bound_and_recoverable_after_crash() {
             recovery_id: record_id("recovery-after-scheduler-ack-loss"),
             lease_owner_id: LeaseOwnerId::new("replacement-recovery-worker")
                 .unwrap_or_else(|error| panic!("invalid replacement owner: {error}")),
-            expected_fencing_token: Some(initial_fencing_token),
+            expected_fencing_token: initial_fencing_token,
             now_unix_ms: takeover_now,
             lease_expires_at_unix_ms: takeover_now + 7_000,
         })

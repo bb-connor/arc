@@ -814,7 +814,7 @@ fn historical_governed_commit_is_unclaimable_until_zero_effect_terminalization()
             recovery_id: record_id("historical-dispatch-recovery"),
             lease_owner_id: LeaseOwnerId::new("historical-recovery-worker")
                 .unwrap_or_else(|error| panic!("invalid recovery owner: {error}")),
-            expected_fencing_token: Some(committed_record.initial_work.fencing_token),
+            expected_fencing_token: committed_record.initial_work.fencing_token,
             now_unix_ms: trusted_now,
             lease_expires_at_unix_ms: trusted_now.saturating_add(5_000),
         })
@@ -880,7 +880,7 @@ fn exact_dispatch_recovery_is_live_idempotent_and_fenced_after_restart() {
         action_id: request.authorization.body.action_id.clone(),
         recovery_id: record_id("recovery-live"),
         lease_owner_id: initial_work.lease_owner_id.clone(),
-        expected_fencing_token: Some(initial_work.fencing_token),
+        expected_fencing_token: initial_work.fencing_token,
         now_unix_ms: now_unix_ms(),
         lease_expires_at_unix_ms: initial_work.lease_expires_at_unix_ms,
     };
@@ -937,7 +937,7 @@ fn exact_dispatch_recovery_is_live_idempotent_and_fenced_after_restart() {
         recovery_id: record_id("recovery-takeover"),
         lease_owner_id: LeaseOwnerId::new("recovery-worker")
             .unwrap_or_else(|error| panic!("invalid recovery owner: {error}")),
-        expected_fencing_token: Some(initial_work.fencing_token),
+        expected_fencing_token: initial_work.fencing_token,
         now_unix_ms: takeover_now,
         lease_expires_at_unix_ms: takeover_now + 5_000,
     };
@@ -1027,7 +1027,7 @@ fn dispatch_recovery_rejects_non_due_work_without_a_live_lease() {
         recovery_id: record_id("recovery-before-due"),
         lease_owner_id: LeaseOwnerId::new("early-recovery-worker")
             .unwrap_or_else(|error| panic!("invalid recovery owner: {error}")),
-        expected_fencing_token: Some(initial_work.fencing_token),
+        expected_fencing_token: initial_work.fencing_token,
         now_unix_ms: recovery_now,
         lease_expires_at_unix_ms: recovery_now + 5_000,
     };
@@ -1165,7 +1165,10 @@ fn dispatch_readiness_rejects_a_corrupt_schema() {
         .unwrap_or_else(|error| panic!("dispatch schema corruption failed: {error}"));
     drop(connection);
 
-    let reopened = SqliteSecurityStateStore::open(&path)
-        .unwrap_or_else(|error| panic!("security store reopen failed: {error}"));
-    assert!(reopened.ensure_dispatch_ready().is_err());
+    let error = rejected(
+        SqliteSecurityStateStore::open(&path),
+        "corrupt dispatch schema reopened",
+    );
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+    assert_eq!(error.code().as_str(), "store.integrity_failure");
 }

@@ -23,7 +23,7 @@ fn exact_dispatch_id_cannot_cross_tenants_after_restart() {
         action_id: request.authorization.body.action_id.clone(),
         recovery_id: record_id("exact-recovery"),
         lease_owner_id: request.initial_lease.lease_owner_id.clone(),
-        expected_fencing_token: Some(committed.initial_work.fencing_token),
+        expected_fencing_token: committed.initial_work.fencing_token,
         now_unix_ms: now,
         lease_expires_at_unix_ms: now + 10_000,
     };

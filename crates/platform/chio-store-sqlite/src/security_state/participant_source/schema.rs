@@ -131,8 +131,7 @@ fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>> {
 
 fn expected_catalog(sealed: bool) -> Result<Vec<CatalogEntry>> {
     let connection = Connection::open_in_memory()?;
-    // Construct only a disposable model catalog. Never normalize the source.
-    super::super::migrate(&connection)
+    super::super::open_schema(&connection)
         .map_err(|_| Error::Invalid("canonical security catalog is unavailable"))?;
     if sealed {
         connection.execute_batch(SEAL_SCHEMA)?;
@@ -142,11 +141,17 @@ fn expected_catalog(sealed: bool) -> Result<Vec<CatalogEntry>> {
 }
 
 pub(super) fn verify(connection: &Connection, sealed: bool) -> Result<()> {
+    verify_schema_version(connection)?;
     if catalog(connection)? != expected_catalog(sealed)? {
         return Err(Error::Invalid(
-            "source catalog is not the exact qualified predecessor",
+            "source catalog is not the exact qualified schema",
         ));
     }
+    super::super::effect_finality::validate_schema(connection)
+        .map_err(|_| Error::Invalid("source finality schema is not qualified"))
+}
+
+fn verify_schema_version(connection: &Connection) -> Result<()> {
     let app_id: i32 = connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
     if app_id != crate::CHIO_SQLITE_APPLICATION_ID {
         return Err(Error::Invalid(
@@ -155,7 +160,7 @@ pub(super) fn verify(connection: &Connection, sealed: bool) -> Result<()> {
     }
     let valid: bool = connection.query_row(
         "SELECT COUNT(*) = 1 AND COALESCE(MIN(store_key = 'security_state'
-        AND typeof(version) = 'integer' AND version IN (0, 1)), 0)
+        AND typeof(version) = 'integer'), 0)
         FROM chio_store_schema_versions WHERE lower(store_key) = 'security_state'",
         [],
         |row| row.get(0),
@@ -165,57 +170,31 @@ pub(super) fn verify(connection: &Connection, sealed: bool) -> Result<()> {
             "source security schema version is not canonical",
         ));
     }
-    match authenticated_revision(connection)? {
-        0 if super::super::effect_finality::objects_absent(connection)
-            .map_err(|_| Error::Invalid("legacy source finality namespace is invalid"))? => {}
-        1 => super::super::effect_finality::validate_schema(connection)
-            .map_err(|_| Error::Invalid("source finality schema is not qualified"))?,
-        _ => {
-            return Err(Error::Invalid(
-                "source version and finality schema disagree",
-            ))
+    match crate::check_current_schema(connection, "security_state", 1, &["security_transitions"])? {
+        crate::SchemaState::Current => Ok(()),
+        crate::SchemaState::Unstamped => Err(crate::SchemaVersionError::StaleSchema {
+            found: 0,
+            current: 1,
         }
+        .into()),
     }
-    Ok(())
-}
-
-fn authenticated_revision(connection: &Connection) -> Result<i32> {
-    super::super::effect_finality::schema_revision(connection)
-        .map_err(|_| Error::Invalid("source security schema version is not canonical"))
 }
 
 pub(super) fn digest(connection: &Connection) -> Result<String> {
+    verify_schema_version(connection)?;
+    #[derive(serde::Serialize)]
+    struct Catalog<'a> {
+        schema_revision: u8,
+        catalog: &'a [CatalogEntry],
+    }
     let catalog = expected_catalog(true)?;
-    let bytes = match authenticated_revision(connection)? {
-        0 => {
-            let mut bytes = b"chio.security-participant-source.catalog.v1\0".to_vec();
-            bytes.extend(
-                canonical_json_bytes(&catalog)
-                    .map_err(|_| Error::Invalid("source catalog cannot be encoded"))?,
-            );
-            bytes
-        }
-        1 => {
-            #[derive(serde::Serialize)]
-            struct VersionedCatalog<'a> {
-                schema_revision: u8,
-                catalog: &'a [CatalogEntry],
-            }
-            let mut bytes = b"chio.security-participant-source.catalog.v2\0".to_vec();
-            bytes.extend(
-                canonical_json_bytes(&VersionedCatalog {
-                    schema_revision: 1,
-                    catalog: &catalog,
-                })
-                .map_err(|_| Error::Invalid("source catalog cannot be encoded"))?,
-            );
-            bytes
-        }
-        _ => {
-            return Err(Error::Invalid(
-                "source security schema version is unsupported",
-            ))
-        }
-    };
+    let mut bytes = b"chio.security-participant-source.catalog.v1\0".to_vec();
+    bytes.extend(
+        canonical_json_bytes(&Catalog {
+            schema_revision: 1,
+            catalog: &catalog,
+        })
+        .map_err(|_| Error::Invalid("source catalog cannot be encoded"))?,
+    );
     Ok(sha256_hex(&bytes))
 }

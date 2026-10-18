@@ -14,7 +14,7 @@ use super::{
 use crate::SqliteSecurityStateStore;
 
 mod barriers;
-mod catalog_compat;
+mod catalog_integrity;
 mod codec;
 mod connection_recovery;
 mod crash;
