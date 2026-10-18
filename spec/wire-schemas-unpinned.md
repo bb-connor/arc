@@ -8,7 +8,7 @@ lock. Written by `scripts/check-wire-schemas.py --update`; the gate fails
 when an unpinned constant is missing from this list, and an entry that has
 since been pinned is removed by the next `--update`.
 
-198 of 607 identifier constants in the security crates are unpinned.
+191 of 600 identifier constants in the security crates are unpinned.
 
 ## crates/core/chio-core-types (66)
 
@@ -79,7 +79,7 @@ since been pinned is removed by the next `--update`.
 - `crates/core/chio-core-types/src/recovery/semantic.rs:18` `SEMANTIC_TRANSFORMATION_SIGNATURE_DOMAIN` = `chio:semantic-transformation:v1`
 - `crates/core/chio-core-types/src/recovery/semantic.rs:19` `SEMANTIC_PREREQUISITE_SIGNATURE_DOMAIN` = `chio:semantic-prerequisite:v1`
 
-## crates/kernel/chio-kernel (45)
+## crates/kernel/chio-kernel (38)
 
 - `crates/kernel/chio-kernel/src/admission_operation.part1.inc:9` `ADMISSION_OPERATION_SCHEMA` = `chio.security-admission-operation.v1`
 - `crates/kernel/chio-kernel/src/admission_operation.rs:95` `ADMISSION_REQUEST_NAMESPACE_SCHEMA` = `chio.admission-request-namespace.v1`
@@ -100,7 +100,6 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/kernel/active_response_artifact.rs:18` `ACTIVE_RESPONSE_ADMISSION_ARTIFACT_PAYLOAD_SCHEMA` = `chio.attested-finding-admission-artifact-payload.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_executor.rs:23` `ACTIVE_RESPONSE_EXECUTOR_AUTHORITY_SCHEMA` = `chio.active-response-executor-authority.v1`
 - `crates/kernel/chio-kernel/src/kernel/active_response_policy.rs:22` `ACTIVE_RESPONSE_POLICY_DECISION_SCHEMA` = `chio.active-response-policy-decision.v1`
-- `crates/kernel/chio-kernel/src/kernel/admission_cleanup.rs:17` `APPROVAL_CLEANUP_SCHEMA` = `chio.admission-cleanup.approval.v1`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:11` `LEGACY_SCHEMA` = `chio.kernel-caller-return-context.v1`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:12` `SIGNING_SCHEMA` = `chio.kernel-caller-return-context.v2`
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs:13` `PARTICIPANT_SCHEMA` = `chio.kernel-caller-return-context.v3`
@@ -115,16 +114,10 @@ since been pinned is removed by the next `--update`.
 - `crates/kernel/chio-kernel/src/receipt_store.rs:1097` `ADMISSION_TERMINAL_PROJECTION_DESCRIPTOR_KIND` = `chio.admission.terminal-projection.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:28` `SUPPLEMENTAL_REQUEST_BINDING_DOMAIN` = `chio.supplemental-quota-request-binding.v1`
 - `crates/kernel/chio-kernel/src/supplemental_quota.rs:29` `ADMISSION_REVOCATION_SET_DOMAIN` = `chio.admission-revocation-set.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:24` `RAW_INVOCATION_OUTCOME_SCHEMA` = `chio.raw-invocation-outcome.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:25` `RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA` = `chio.raw-invocation-outcome-with-request.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:27` `RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA` = `chio.raw-invocation-outcome-with-security-context.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:29` `RAW_INVOCATION_OUTCOME_WITH_FEDERATION_CONTEXT_SCHEMA` = `chio.raw-invocation-outcome-with-federation-context.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:31` `RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA` = `chio.raw-invocation-outcome-with-security-release.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:35` `RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA` = `chio.raw-invocation-outcome-with-caller-delivery.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:47` `TOOL_OUTCOME_SCHEMA` = `chio.tool-outcome.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:48` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:49` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
-- `crates/kernel/chio-kernel/src/tool_outcome.rs:92` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:32` `TOOL_OUTCOME_SCHEMA` = `chio.tool-outcome.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:33` `POST_RETURN_EVALUATION_SCHEMA` = `chio.post-return-evaluation.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:34` `POST_RETURN_EXACT_INPUTS_SCHEMA` = `chio.post-return-exact-inputs.v1`
+- `crates/kernel/chio-kernel/src/tool_outcome.rs:77` `MONETARY_RELEASE_EVIDENCE_SCHEMA` = `chio.monetary-release-evidence.v1`
 - `crates/kernel/chio-kernel/src/tool_outcome/security_release.rs:34` `SCHEMA` = `chio.security-release-checkpoint.v1`
 
 ## crates/kernel/chio-kernel-core (1)
