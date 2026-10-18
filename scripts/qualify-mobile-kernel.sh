@@ -206,7 +206,14 @@ echo "[portable-mobile] report_md=$REPORT_MD"
 echo "[portable-mobile] report_json=$REPORT_JSON"
 
 if [[ "$FAILED" -ne 0 ]]; then
-  echo "[portable-mobile] one or more required lanes failed: $target_mobile_gate_detail" >&2
+  failed_lanes=()
+  [[ "$host_ffi_status" == "fail" ]] && failed_lanes+=("host_ffi: $host_ffi_detail")
+  [[ "$ios_device_status" == "fail" ]] && failed_lanes+=("ios_device: $ios_device_detail")
+  [[ "$ios_sim_status" == "fail" ]] && failed_lanes+=("ios_sim: $ios_sim_detail")
+  [[ "$android_arm64_status" == "fail" ]] && failed_lanes+=("android_arm64: $android_arm64_detail")
+  [[ "$target_mobile_gate_status" == "fail" ]] && failed_lanes+=("target_mobile_gate: $target_mobile_gate_detail")
+  failed_summary="$(IFS="; "; echo "${failed_lanes[*]}")"
+  echo "[portable-mobile] one or more required lanes failed: $failed_summary" >&2
   exit 1
 fi
 

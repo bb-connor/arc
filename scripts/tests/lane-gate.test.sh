@@ -1251,6 +1251,26 @@ if LANE_EXIT=1 bash scripts/lane-gate.sh scheduled >"${tmp_dir}/required.out" 2>
 fi
 grep -Fq 'verdict=fail' "${tmp_dir}/required.out"
 
+mismatch_config="${tmp_dir}/mismatch-promotion.toml"
+sed 's/report_sha256 = "[0-9a-f]*"/report_sha256 = "'"$(printf '0%.0s' {1..64})"'"/' \
+  "${config}" >"${mismatch_config}"
+if LANE_EXIT=1 LANE_GATE_CONFIG="${mismatch_config}" \
+  bash scripts/lane-gate.sh scheduled >"${tmp_dir}/mismatch-failed.out" 2>&1; then
+  echo "required lane accepted a failed current run with mismatched evidence" >&2
+  exit 1
+fi
+grep -Fq 'current=current_job_failed verdict=fail' "${tmp_dir}/mismatch-failed.out"
+if grep -Fq 'current=promotion_evidence_mismatch' "${tmp_dir}/mismatch-failed.out"; then
+  echo "failed current job was reported as promotion evidence mismatch" >&2
+  exit 1
+fi
+if LANE_EXIT=0 LANE_GATE_CONFIG="${mismatch_config}" \
+  bash scripts/lane-gate.sh scheduled >"${tmp_dir}/mismatch-ok.out" 2>&1; then
+  echo "required lane accepted mismatched promotion evidence" >&2
+  exit 1
+fi
+grep -Fq 'current=promotion_evidence_mismatch verdict=fail' "${tmp_dir}/mismatch-ok.out"
+
 if MOCK_GH_ERROR=rate-limit LANE_GATE_RATE_LIMIT_MODE=warn \
   bash scripts/lane-gate.sh scheduled >"${tmp_dir}/required-api.out" 2>&1; then
   echo "required lane downgraded an API failure to a warning" >&2

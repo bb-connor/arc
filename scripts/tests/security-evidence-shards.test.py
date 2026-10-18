@@ -366,6 +366,36 @@ class AggregationContractTests(unittest.TestCase):
             )
             self.assertEqual(aggregate.git(candidate, "status", "--porcelain"), b"")
 
+    def test_cleanup_failure_is_chained_and_original_error_stays_primary(self):
+        aggregate = self.aggregate
+        real_git = aggregate.git
+
+        def failing_remove(root, *arguments, **kwargs):
+            if arguments[:2] == ("worktree", "remove"):
+                raise aggregate.AggregationError("cleanup failed")
+            return real_git(root, *arguments, **kwargs)
+
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            candidate, source, shards = self.prepare_git_shards(root)
+            with mock.patch.object(aggregate, "git", side_effect=failing_remove):
+                with mock.patch.object(
+                    aggregate,
+                    "validate_composed",
+                    side_effect=aggregate.AggregationError("incomplete"),
+                ):
+                    with self.assertRaises(aggregate.AggregationError) as caught:
+                        aggregate.aggregate(
+                            candidate,
+                            source,
+                            shards,
+                            root / "output",
+                            "sha256:" + "c" * 64,
+                            authorized_source=source,
+                        )
+            self.assertEqual(str(caught.exception), "incomplete")
+            self.assertEqual(str(caught.exception.__cause__), "cleanup failed")
+
     def test_evidence_descendant_keeps_reviewed_tooling_identity_during_composition(
         self,
     ):
