@@ -60,6 +60,9 @@ mod security_callbacks;
 #[path = "adapters/tripwire_arguments.rs"]
 mod tripwire_arguments;
 
+#[path = "adapters/post_output_watermark.rs"]
+mod post_output_watermark;
+
 const FLOW_DENIALS: [FlowDenial; 19] = [
     FlowDenial::StateOverflow,
     FlowDenial::StateChanged,

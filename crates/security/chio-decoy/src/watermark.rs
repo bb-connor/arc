@@ -24,6 +24,7 @@ const ENVELOPE_SCHEMA: &str = "chio.signed-watermark-envelope.v1";
 const SIGNING_DOMAIN: &[u8] = b"chio.signed-watermark.v1\0";
 const PAYLOAD_DIGEST_DOMAIN: &[u8] = b"chio.watermark-payload-digest.v1\0";
 const TOKEN_DIGEST_DOMAIN: &[u8] = b"chio.watermark-token-digest.v1\0";
+const OBSERVATION_ID_DOMAIN: &[u8] = b"chio.watermark-observation-id.v1\0";
 const TOKEN_PREFIX: &str = "[[chio-wm1:";
 const TOKEN_SUFFIX: &str = "]]";
 const MAX_TOKEN_BYTES: usize = 16_384;
@@ -392,7 +393,10 @@ pub trait WatermarkKeyResolver: Send + Sync {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WatermarkObservationContext {
     pub observing_tenant_id: TenantId,
-    pub observation_id: RecordId,
+    /// Stable across retries of one scanned output. Each verified token is
+    /// recorded under an observation id derived from this value and the
+    /// token digest.
+    pub scan_id: RecordId,
     pub evidence_ref: RecordId,
     pub observed_at_unix_ms: u64,
 }
@@ -635,11 +639,15 @@ impl WatermarkVerifier {
             return CandidateResult::InfrastructureFailure;
         };
         let payload_digest = digest(PAYLOAD_DIGEST_DOMAIN, &canonical);
+        let Ok(observation_id) = token_observation_id(&observation_context.scan_id, token_digest)
+        else {
+            return CandidateResult::InfrastructureFailure;
+        };
         let observation = WatermarkObservation {
             source_tenant_id: envelope.payload.tenant_id.clone(),
             observing_tenant_id: observation_context.observing_tenant_id.clone(),
             public_ref_token,
-            observation_id: observation_context.observation_id.clone(),
+            observation_id,
             payload_digest,
             token_digest,
             evidence_ref: observation_context.evidence_ref.clone(),
@@ -886,6 +894,19 @@ fn observation_result_matches(
             ..
         } => *first_payload_digest == payload_digest && *first_token_digest == token_digest,
     }
+}
+
+fn token_observation_id(scan_id: &RecordId, token_digest: Digest32) -> PortResult<RecordId> {
+    let mut preimage = Vec::with_capacity(32 + scan_id.as_str().len());
+    preimage.extend_from_slice(token_digest.as_bytes());
+    preimage.extend_from_slice(scan_id.as_str().as_bytes());
+    let id = digest(OBSERVATION_ID_DOMAIN, &preimage);
+    let hex: String = id
+        .as_bytes()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    RecordId::new(format!("watermark-observation-{hex}")).map_err(|_| PortError::invalid_data())
 }
 
 fn signing_message(canonical_payload: &[u8]) -> Vec<u8> {

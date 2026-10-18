@@ -346,7 +346,7 @@ impl Fixture {
     ) -> WatermarkObservationContext {
         WatermarkObservationContext {
             observing_tenant_id: self.tenant_id.clone(),
-            observation_id: RecordId::new(id).test_expect("valid observation"),
+            scan_id: RecordId::new(id).test_expect("valid scan id"),
             evidence_ref: RecordId::new(evidence).test_expect("valid evidence"),
             observed_at_unix_ms: observed_at,
         }
@@ -736,6 +736,115 @@ fn an_inactive_hit_retried_later_is_a_duplicate_with_the_first_time() {
             ..
         }) if first_evidence_ref.as_str() == "evidence-first"
     ));
+}
+
+fn two_retired_tokens(fixture: &Fixture) -> String {
+    let first = fixture
+        .issuer
+        .issue(fixture.issue_request(1, "issue-1"))
+        .test_expect("issue first watermark");
+    let second = fixture
+        .issuer
+        .issue(fixture.issue_request(2, "issue-2"))
+        .test_expect("issue second watermark");
+    assert_ne!(first, second);
+    retire_issued_marker(fixture);
+    format!("{first} {second}")
+}
+
+#[test]
+fn two_inactive_tokens_under_one_public_ref_record_two_observations() {
+    let fixture = Fixture::new(true, 10_000);
+    let text = two_retired_tokens(&fixture);
+    let report = fixture
+        .verifier()
+        .scan_text(
+            &text,
+            &fixture.observation("scan-two-tokens", "evidence-two", OBSERVED_AT),
+        )
+        .test_expect("two inactive tokens");
+    assert_eq!(report.verdict, WatermarkScanVerdict::Advisory);
+    assert_eq!(report.detector_failures, 0);
+    assert_eq!(report.inactive_hits.len(), 2);
+    for hit in &report.inactive_hits {
+        assert_eq!(
+            hit.observation,
+            WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Recorded)
+        );
+    }
+    let rows = fixture.observations.rows.lock().test_expect("rows lock");
+    assert_eq!(rows.len(), 2);
+    let mut rows = rows.values();
+    let (first, second) = (
+        rows.next().test_expect("first row"),
+        rows.next().test_expect("second row"),
+    );
+    assert_eq!(first.public_ref_token, second.public_ref_token);
+    assert_ne!(first.observation_id, second.observation_id);
+}
+
+#[test]
+fn a_retried_scan_of_two_inactive_tokens_returns_both_first_observations() {
+    let fixture = Fixture::new(true, 10_000);
+    let text = two_retired_tokens(&fixture);
+    fixture
+        .verifier()
+        .scan_text(
+            &text,
+            &fixture.observation("scan-two-tokens", "evidence-two", OBSERVED_AT),
+        )
+        .test_expect("first scan");
+    let retry = fixture
+        .verifier()
+        .scan_text(
+            &text,
+            &fixture.observation("scan-two-tokens", "evidence-two", OBSERVED_AT + 1),
+        )
+        .test_expect("retried scan");
+    assert_eq!(retry.verdict, WatermarkScanVerdict::Advisory);
+    assert_eq!(retry.detector_failures, 0);
+    assert_eq!(retry.inactive_hits.len(), 2);
+    for hit in &retry.inactive_hits {
+        assert!(matches!(
+            &hit.observation,
+            WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Duplicate {
+                first_evidence_ref,
+                first_observed_at_unix_ms: OBSERVED_AT,
+                ..
+            }) if first_evidence_ref.as_str() == "evidence-two"
+        ));
+    }
+    assert_eq!(
+        fixture
+            .observations
+            .rows
+            .lock()
+            .test_expect("rows lock")
+            .len(),
+        2
+    );
+}
+
+#[test]
+fn a_rescan_of_two_inactive_tokens_with_changed_attribution_conflicts() {
+    let fixture = Fixture::new(true, 10_000);
+    let text = two_retired_tokens(&fixture);
+    fixture
+        .verifier()
+        .scan_text(
+            &text,
+            &fixture.observation("scan-two-tokens", "evidence-two", OBSERVED_AT),
+        )
+        .test_expect("first scan");
+    assert_eq!(
+        fixture.verifier().scan_text(
+            &text,
+            &fixture.observation("scan-two-tokens", "evidence-changed", OBSERVED_AT),
+        ),
+        Err(WatermarkScanError::ObservationUnrecorded(
+            PortErrorKind::Conflict
+        ))
+    );
 }
 
 #[test]

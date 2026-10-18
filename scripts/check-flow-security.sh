@@ -243,6 +243,9 @@ run_exact_target --label "security kernel adapters" --expected \
   generic_pre_invocation_adapter_fails_closed_without_declassification_store \
   pinned_workload_capability_requires_exact_signed_live_context \
   post_output_match_blocks_delivery_after_server_execution \
+  post_output_watermark::a_retried_request_with_two_inactive_tokens_keeps_both_first_observations \
+  post_output_watermark::an_inactive_token_whose_request_attribution_changes_still_blocks \
+  post_output_watermark::two_inactive_tokens_under_one_public_ref_are_two_observations_and_do_not_block \
   public_entrypoint_propagates_authoritative_context_pre_and_post \
   request_lifecycle_linearizes_release_after_post_invocation_block \
   security_callbacks::caller_reservation_rejects_live_security_hook_before_acquiring_it \

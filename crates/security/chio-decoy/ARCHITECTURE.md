@@ -52,6 +52,9 @@ again, and removes that owned entry. Exact retries validate existing content.
 policy, requires an unexpired matchable registry marker, and reserves its sequence
 before signing. `WatermarkVerifier::scan_text` finds bounded candidates, verifies each,
 resolves registry state, and records attribution through an observation store.
+Each verified token is recorded under an observation id derived from the scan id
+and its token digest, so distinct tokens in one output are distinct observations
+and a retry of the same scan returns each first observation.
 Observation-store failure remains explicit even when a verified active hit exists.
 Without an active hit, a verified inactive watermark whose observation is not
 recorded fails the scan with `ObservationUnrecorded` carrying the store failure kind.
