@@ -1600,6 +1600,8 @@
     "crates/security/chio-secret-broker/src/service/ipc/prepared.rs::prepare_connection::from_wire",
     "crates/security/chio-secret-broker/src/service/ipc/response.rs::validate_signed_broker_execute_failure::from_wire",
     "crates/security/chio-secret-broker/src/sqlite.rs::load_attempt_row::from_wire",
+    "crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse::from_wire",
+    "crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize::from_wire",
     "crates/trust/chio-attest-buyer-core/src/input.rs::decode::from_wire",
     "crates/trust/chio-attest-buyer/src/input.rs::decode::from_wire",
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::tuf_root_version::from_wire",
@@ -16962,6 +16964,8 @@
     "crates/security/chio-secret-broker/src/service/ipc/prepared.rs::prepare_connection::from_wire#2::decode_signed",
     "crates/security/chio-secret-broker/src/service/ipc/response.rs::validate_signed_broker_execute_failure::from_wire#1::decode_canonical",
     "crates/security/chio-secret-broker/src/sqlite.rs::load_attempt_row::from_wire#1::decode_signed",
+    "crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse::from_wire#1::decode_document",
+    "crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize::from_wire#1::decode_document",
     "crates/trust/chio-attest-buyer-core/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/trust/chio-attest-buyer/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/trust/chio-attest-verify/src/bin/tuf-rebake.rs::tuf_root_version::from_wire#1::decode_external",
@@ -22436,6 +22440,13 @@
     "crates/platform/chio-store-sqlite/src/security_state/flow_state.rs": [
       "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label",
       "native_session_dominated::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::decode_label"
+    ],
+    "crates/tooling/chio-conformance/src/runner/restart_probe.rs": [
+      "open_subscribed_session::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::validate_initialize",
+      "parse_sse::original-json-reader::UntrustedJsonText",
+      "rpc::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse",
+      "validate_initialize::original-json-reader::UntrustedJsonText",
+      "validate_initialize::shared-reader::crates/tooling/chio-conformance/src/runner/restart_probe.rs::parse_sse"
     ]
   },
   "retired_direct_readers": {
