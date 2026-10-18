@@ -309,6 +309,10 @@ fn a_new_store_in_a_world_readable_parent_is_private_with_its_sidecars() {
 
     let store = SqliteSecurityStateStore::open(&path)
         .unwrap_or_else(|error| panic!("open security state: {error}"));
+    assert_eq!(file_mode(&path), FileMode(0o600));
+    store
+        .active_defense_overlay_inventory()
+        .unwrap_or_else(|error| panic!("read security state: {error}"));
     let observed = open_database_modes(&path);
     drop(store);
 
