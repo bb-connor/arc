@@ -62,7 +62,8 @@ jobs:
               tag="${GITHUB_REF_NAME}"
               ;;
             schedule)
-              tag="$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)"
+              tag="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/releases" | \
+                jq -sr '[.[][] | select(.draft == false and (.tag_name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+([+-].+)?$")))] | max_by(.published_at) | .tag_name // empty')"
               ;;
             workflow_run)
               tag="$(git tag --points-at "${WORKFLOW_RUN_HEAD_SHA}" | grep -E '^v[0-9]' | sort -V | tail -n 1)"
@@ -128,13 +129,13 @@ jobs:
           set -euo pipefail
           first="${GITHUB_WORKSPACE}/${OUT_DIR}/source.cdx.json"
           second="${GITHUB_WORKSPACE}/${OUT_DIR}/source-repeat.cdx.json"
-          # Scan the immutable release tree, retaining the current workflow's verifier.
+          scan_config="${GITHUB_WORKSPACE}/deploy/sbom/syft.yaml"
           (
             cd "${SOURCE_DIR}"
-            syft --config deploy/sbom/syft.yaml \
+            syft --config "${scan_config}" \
               -o "cyclonedx-json@1.6=${first}" "dir:." \
               >"${first}.stdout" 2> >(tee "${first}.stderr" >&2)
-            syft --config deploy/sbom/syft.yaml \
+            syft --config "${scan_config}" \
               -o "cyclonedx-json@1.6=${second}" "dir:." \
               >"${second}.stdout" 2> >(tee "${second}.stderr" >&2)
           )
