@@ -1520,7 +1520,7 @@ fn revocations_do_not_create_budget_replication_holes() {
 }
 
 #[test]
-fn offline_provision_upgrade_is_fenced_and_idempotent() {
+fn offline_provision_is_fenced_idempotent_and_refuses_noncurrent_budget() {
     let (_temp, database, lock_root) = fixture();
     SqliteAuthorityStore::provision(&database, &lock_root).expect("provision");
     let authority =
@@ -1541,58 +1541,22 @@ fn offline_provision_upgrade_is_fenced_and_idempotent() {
     assert_eq!(admission_projection(&database), before);
 
     let connection = Connection::open(&database).expect("schema connection");
-    {
-        let transaction = connection
-            .unchecked_transaction()
-            .expect("legacy payment fixture transaction");
-        let payment_counts: (i64, i64) = transaction
-            .query_row(
-                "SELECT (SELECT COUNT(*) FROM payment_journal),
-                        (SELECT COUNT(*) FROM payment_release_evidence)",
-                [],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .expect("inspect empty payment fixture");
-        assert_eq!(
-            payment_counts,
-            (0, 0),
-            "offline upgrade fixture must retain all payment facts"
-        );
-        transaction
-            .execute_batch("DROP TABLE payment_journal;")
-            .expect("drop empty current payment catalog");
-        transaction
-            .execute_batch(include_str!(
-                "../budget_store/composite_schema/payment/legacy_v11.sql"
-            ))
-            .expect("install supported predecessor payment catalog");
-        transaction.commit().expect("commit legacy payment fixture");
-    }
-    crate::stamp_schema_version(&connection, "budget", 3).expect("old budget stamp");
-    crate::stamp_schema_version(&connection, "revocation", 1).expect("old revocation stamp");
-    drop(connection);
-    SqliteAuthorityStore::provision(&database, &lock_root).expect("offline upgrade");
-    let connection = Connection::open(&database).expect("verify schema connection");
+    crate::stamp_schema_version(&connection, "budget", 3).expect("noncurrent budget stamp");
+    let error = SqliteAuthorityStore::provision(&database, &lock_root)
+        .expect_err("noncurrent budget schema must be refused");
+    assert!(matches!(
+        error,
+        SqliteServingOwnerError::BudgetSchema(BudgetStoreError::StaleSchema {
+            found: 3,
+            current: 1
+        })
+    ));
     assert_eq!(
-        crate::check_schema_version(
-            &connection,
-            "budget",
-            BUDGET_STORE_SUPPORTED_SCHEMA_VERSION,
-            &["capability_grant_budgets"],
-        )
-        .expect("budget version"),
-        BUDGET_STORE_SUPPORTED_SCHEMA_VERSION
+        crate::schema_version::read_store_schema_version(&connection, "budget")
+            .expect("read stamp"),
+        Some(3)
     );
-    assert_eq!(
-        crate::check_schema_version(
-            &connection,
-            "revocation",
-            REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-            &["revoked_capabilities"],
-        )
-        .expect("revocation version"),
-        REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION
-    );
+
     assert_eq!(admission_projection(&database), before);
 }
 

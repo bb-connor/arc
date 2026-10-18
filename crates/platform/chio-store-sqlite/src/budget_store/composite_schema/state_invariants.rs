@@ -387,7 +387,7 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
                         WHEN profile = 'chio.grant-invocation.v1' THEN COALESCE((
                             SELECT legacy.invocation_count_after
                             FROM budget_mutation_events AS legacy
-                            WHERE legacy.projection_kind = 'legacy'
+                            WHERE legacy.projection_kind = 'standalone'
                               AND legacy.capability_id = ordered.owner_id
                               AND legacy.grant_index = ordered.grant_index
                               AND legacy.event_seq < ordered.event_seq
@@ -459,7 +459,7 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
             WHERE rank = 1 AND (
                 (captured_before > 0 AND NOT EXISTS (
                     SELECT 1 FROM budget_mutation_events AS legacy
-                    WHERE legacy.projection_kind = 'legacy'
+                    WHERE legacy.projection_kind = 'standalone'
                       AND legacy.capability_id = first.owner_id
                       AND legacy.grant_index = first.grant_index
                       AND legacy.max_invocations IS NOT NULL
@@ -467,7 +467,7 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
                 OR EXISTS (
                     SELECT 1
                     FROM budget_mutation_events AS legacy
-                    WHERE legacy.projection_kind = 'legacy'
+                    WHERE legacy.projection_kind = 'standalone'
                       AND legacy.capability_id = first.owner_id
                       AND legacy.grant_index = first.grant_index
                       AND legacy.max_invocations IS NOT NULL
@@ -483,7 +483,7 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
               AND structured.kind IN ('reserve_invocation', 'authorize_exposure')
               AND EXISTS (
                   SELECT 1 FROM budget_mutation_events AS legacy
-                  WHERE legacy.projection_kind = 'legacy'
+                  WHERE legacy.projection_kind = 'standalone'
                     AND legacy.capability_id = structured.capability_id
                     AND legacy.grant_index = structured.grant_index
                     AND legacy.max_invocations IS NOT NULL

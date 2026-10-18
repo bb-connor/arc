@@ -113,7 +113,9 @@ impl Category {
         match error {
             BudgetStoreError::Fenced { .. } => Self::Fenced,
             BudgetStoreError::OutcomeUnknown(_) => Self::OutcomeUnknown,
-            BudgetStoreError::Invariant(_) => Self::Invariant,
+            BudgetStoreError::Invariant(_) | BudgetStoreError::StaleSchema { .. } => {
+                Self::Invariant
+            }
             BudgetStoreError::Clock(_) => Self::Clock,
             BudgetStoreError::Sqlite(_) => Self::Sqlite,
             BudgetStoreError::Io(_) => Self::Io,

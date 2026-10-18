@@ -57,7 +57,7 @@ impl SqliteBudgetStore {
                 }
             } else if allow_verified_install {
                 transaction.execute(
-                    "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+                    "INSERT OR IGNORE INTO budget_usage_anchor_write_gate(singleton) VALUES (1)",
                     [],
                 )?;
                 transaction.execute(
@@ -66,7 +66,7 @@ impl SqliteBudgetStore {
                         capability_id, grant_index, invocation_count, updated_at, seq,
                         total_cost_exposed, total_cost_realized_spend,
                         anchored_schema_version
-                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
                     "#,
                     params![
                         &anchor.capability_id,
@@ -84,10 +84,10 @@ impl SqliteBudgetStore {
                         )?,
                     ],
                 )?;
-                transaction.execute("DELETE FROM budget_usage_anchor_migration_gate", [])?;
+                transaction.execute("DELETE FROM budget_usage_anchor_write_gate", [])?;
             } else {
                 return Err(BudgetStoreError::Invariant(format!(
-                    "budget history anchor `{}` grant {} has no identical locally migration-anchored state; a fresh follower must use the elected-leader snapshot path with verified anchor provenance",
+                    "budget history anchor `{}` grant {} has no identical locally anchored state; a fresh follower must use the elected-leader snapshot path with verified anchor provenance",
                     anchor.capability_id, anchor.grant_index
                 )));
             }
@@ -270,7 +270,7 @@ impl SqliteBudgetStore {
                     params![&event.event_id],
                     |row| row.get(0),
                 )?;
-                if projection_kind == "legacy" {
+                if projection_kind == "standalone" {
                     validate_legacy_event_lifecycle(&event)?;
                 }
                 if let Some(previous) = previous.as_ref() {

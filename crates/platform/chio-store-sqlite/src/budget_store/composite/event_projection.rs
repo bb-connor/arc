@@ -101,7 +101,7 @@ fn project_mutation_event(
         },
     )?;
 
-    if row.0 == "legacy" {
+    if row.0 == "standalone" {
         let has_structured_metadata = row.1.is_some()
             || row.2.is_some()
             || row.3.is_some()
