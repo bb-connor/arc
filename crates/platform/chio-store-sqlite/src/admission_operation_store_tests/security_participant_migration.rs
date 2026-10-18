@@ -7,20 +7,20 @@ use crate::security_state::SqliteSecurityParticipantSource;
 #[path = "security_participant_migration/barrier.rs"]
 mod barrier;
 #[cfg(unix)]
-#[path = "security_participant_migration/catalog_compat.rs"]
-mod catalog_compat;
-#[cfg(unix)]
 #[path = "security_participant_migration/cutpoints.rs"]
 mod cutpoints;
 #[cfg(unix)]
 #[path = "security_participant_migration/integrity.rs"]
 mod integrity;
 #[cfg(unix)]
-#[path = "security_participant_migration/legacy_owner_pair.rs"]
-mod legacy_owner_pair;
-#[cfg(unix)]
 #[path = "security_participant_migration/lifecycle.rs"]
 mod lifecycle;
+#[cfg(unix)]
+#[path = "security_participant_migration/owner_restart.rs"]
+mod owner_restart;
+#[cfg(unix)]
+#[path = "security_participant_migration/source_integrity.rs"]
+mod source_integrity;
 
 thread_local! { static FAIL_AFTER: Cell<u8> = const { Cell::new(0) }; }
 

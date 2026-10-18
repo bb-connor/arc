@@ -65,112 +65,11 @@ fn remove_marker_schema(connection: &rusqlite::Connection) {
          DROP TRIGGER IF EXISTS security_response_effect_finality_delete_rejected; \
          DROP TABLE IF EXISTS security_response_effect_finality;",
         )
-        .unwrap_or_else(|error| panic!("legacy-only fixture inverse: {error}"));
-}
-
-fn command_table(kind: ResponseEffectKind) -> &'static str {
-    match kind {
-        ResponseEffectKind::SuspendSession => "security_containment_overlay_commands",
-        ResponseEffectKind::RestrictEgress => "security_egress_restriction_commands",
-        ResponseEffectKind::ThrottleSession => "security_session_throttle_commands",
-        ResponseEffectKind::SuspendCapabilitySet => "security_capability_set_suspension_commands",
-        _ => panic!("unexpected overlay command kind"),
-    }
+        .unwrap_or_else(|error| panic!("remove marker schema: {error}"));
 }
 
 #[test]
-fn legacy0_completed_lifts_backfill_without_changing_original_journal_bytes() {
-    for (index, kind) in REMOVABLE_KINDS.into_iter().enumerate() {
-        let label = format!("legacy-backfill-{index}");
-        let case = FinalityCase::new(kind, &label);
-        let removed = case.remove_original(&label);
-        let connection = open_connection(&case);
-        // This is a fixture inverse only. It retains the actual completed
-        // legacy journal, aggregates, leases and preparation, without creating
-        // fake command history or weakening the serving schema.
-        remove_marker_schema(&connection);
-        connection.execute(
-            "UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state'",
-            [],
-        ).unwrap_or_else(|error| panic!("legacy fixture stamp: {error}"));
-        let journal_table = command_table(kind);
-        let original_journal = case
-            .snapshot()
-            .into_iter()
-            .find(|(name, _)| name == journal_table)
-            .unwrap_or_else(|| panic!("original journal absent"));
-        drop(connection);
-        let reopened = reopen(&case).unwrap_or_else(|error| panic!("legacy migration: {error}"));
-        let connection = open_connection(&case);
-        let stamp: i32 = connection
-            .query_row(
-                "SELECT version FROM chio_store_schema_versions WHERE store_key = 'security_state'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap_or_else(|error| panic!("migrated stamp: {error}"));
-        assert_eq!(stamp, 1);
-        let marker: (String, String) = connection
-            .query_row(
-                "SELECT action_id, remove_idempotency_key FROM security_response_effect_finality \
-             WHERE tenant_id = ?1 AND effect_id = ?2",
-                rusqlite::params![
-                    removed.remove.tenant_id.as_str(),
-                    removed.remove.effect_id.as_str()
-                ],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .unwrap_or_else(|error| panic!("verified legacy marker: {error}"));
-        assert_eq!(
-            marker,
-            (
-                removed.remove.action_id.as_str().to_owned(),
-                removed.remove.idempotency_key.as_str().to_owned()
-            )
-        );
-        assert_eq!(
-            case.snapshot()
-                .into_iter()
-                .find(|(name, _)| name == journal_table),
-            Some(original_journal)
-        );
-        let before = case.snapshot();
-        let blast: Arc<dyn BlastRadiusPort> = case.fixture.resolver.clone();
-        let restarted_effects = production_response_effects(
-            ResponseExecutionMode::Live,
-            Arc::new(reopened),
-            Arc::clone(&case.fixture.outbox),
-            blast,
-            Arc::clone(&case.fixture.trusted_clock),
-        )
-        .unwrap_or_else(|error| panic!("production effects over reopened store: {error}"));
-        for (request, result) in [
-            (&removed.apply, &removed.applied),
-            (&removed.remove, &removed.removed),
-        ] {
-            assert_eq!(
-                restarted_effects
-                    .execute(request)
-                    .unwrap_or_else(|error| panic!("legacy exact replay: {error}")),
-                *result
-            );
-            assert_eq!(case.snapshot(), before);
-            assert!(case.installed_ids().is_empty());
-        }
-        let mut fresh = removed.apply;
-        fresh.idempotency_key = record(format!("response_effect_command:{label}-fresh"));
-        assert_eq!(
-            restarted_effects
-                .execute(&fresh)
-                .map_err(|error| error.kind()),
-            Err(PortErrorKind::Conflict)
-        );
-        assert_eq!(case.snapshot(), before);
-    }
-}
-
-#[test]
-fn revision1_missing_or_foreign_marker_schema_is_refused_before_normalization() {
+fn missing_or_foreign_marker_schema_is_refused_without_repair() {
     for damage in [
         "missing",
         "foreign-columns",
@@ -196,16 +95,12 @@ fn revision1_missing_or_foreign_marker_schema_is_refused_before_normalization() 
             ).unwrap_or_else(|error| panic!("missing marker trigger: {error}")),
             _ => panic!("unexpected schema damage"),
         }
-        connection.execute(
-            "UPDATE chio_store_schema_versions SET version = 1 WHERE store_key = 'security_state'",
-            [],
-        ).unwrap_or_else(|error| panic!("revision1 fixture stamp: {error}"));
         drop(connection);
         let before = schema_snapshot(&case);
         let error = reopen(&case)
             .err()
-            .unwrap_or_else(|| panic!("damaged revision1 schema was normalized: {damage}"));
-        assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+            .unwrap_or_else(|| panic!("damaged marker schema was accepted: {damage}"));
+        assert_eq!(error, PortError::integrity_failure());
         assert_eq!(schema_snapshot(&case), before);
     }
 }
@@ -256,8 +151,8 @@ fn marker_update_and_delete_are_denied_and_missing_coverage_is_not_rebuilt() {
     let before = schema_snapshot(&case);
     let error = reopen(&case)
         .err()
-        .unwrap_or_else(|| panic!("revision1 missing removal coverage was rebuilt"));
-    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+        .unwrap_or_else(|| panic!("missing removal coverage was rebuilt"));
+    assert_eq!(error, PortError::integrity_failure());
     assert_eq!(schema_snapshot(&case), before);
 }
 
@@ -315,29 +210,6 @@ fn missing_referenced_remove_and_rehashed_foreign_marker_fail_closed() {
         assert_eq!(schema_snapshot(&case), before);
         assert!(case.installed_ids().is_empty());
     }
-}
-
-#[test]
-fn upgraded_revision1_is_refused_by_the_actual_legacy_writer_version_gate() {
-    let case = FinalityCase::new(ResponseEffectKind::RestrictEgress, "old-writer");
-    case.remove_original("old-writer");
-    let connection = open_connection(&case);
-    let before = schema_snapshot(&case);
-    assert_eq!(before.stamp, 1);
-    let result = chio_store_sqlite::check_schema_version(
-        &connection,
-        "security_state",
-        0,
-        &["security_flow_contexts"],
-    );
-    assert!(matches!(
-        result,
-        Err(chio_store_sqlite::SchemaVersionError::FutureSchema {
-            found: 1,
-            supported: 0
-        })
-    ));
-    assert_eq!(schema_snapshot(&case), before);
 }
 
 #[test]
@@ -405,9 +277,8 @@ fn concurrent_connections_cannot_reinstall_an_effect_after_the_real_remove_commi
                 Ok(result) => assert_eq!(result, applied),
                 Err(error) if error.kind() == PortErrorKind::Conflict => {}
                 Err(error) if error.kind() == PortErrorKind::IntegrityFailure => {
-                    // Some backends recheck their committed aggregate after
-                    // returning from the store. Removal can win that read;
-                    // it is acceptable only with the exact durable Apply.
+                    // A concurrent removal permits IntegrityFailure only with
+                    // the exact durable Apply.
                     assert_eq!(
                         other_effects
                             .load_result(&query(&concurrent_apply))

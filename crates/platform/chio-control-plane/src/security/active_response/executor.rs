@@ -630,7 +630,7 @@ impl<
                 action_id: request.raw.response_plan.action_id.clone(),
                 recovery_id,
                 lease_owner_id: self.lease_owner_id.clone(),
-                expected_fencing_token: Some(expected_fencing_token),
+                expected_fencing_token: expected_fencing_token,
                 now_unix_ms,
                 lease_expires_at_unix_ms,
             })

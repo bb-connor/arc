@@ -200,7 +200,7 @@ fn dispatch_recovery_binds_the_exact_action_and_fencing_observation() {
         recovery_id: record_id("recovery-response"),
         lease_owner_id: LeaseOwnerId::new("executor-worker")
             .unwrap_or_else(|error| panic!("invalid lease owner: {error}")),
-        expected_fencing_token: Some(8),
+        expected_fencing_token: 8,
         now_unix_ms: 40_000,
         lease_expires_at_unix_ms: 50_000,
     };

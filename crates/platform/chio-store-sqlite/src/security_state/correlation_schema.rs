@@ -41,10 +41,6 @@ const CORRELATION_INGRESS_PENDING_INDEX_DDL: &str = r#"
 CREATE INDEX security_correlation_ingress_pending
 ON security_correlation_ingress (acknowledged, event_time, sequence)
 "#;
-const CORRELATION_INGRESS_LEGACY_PENDING_INDEX_DDL: &str = r#"
-CREATE INDEX security_correlation_ingress_pending
-ON security_correlation_ingress (acknowledged, sequence)
-"#;
 const CORRELATION_INGRESS_IMMUTABLE_TRIGGER_DDL: &str = r#"
 CREATE TRIGGER security_correlation_ingress_immutable
 BEFORE UPDATE ON security_correlation_ingress
@@ -125,35 +121,6 @@ CREATE TABLE security_attested_finding_batch_items (
     UNIQUE (tenant_id, reservation_id),
     FOREIGN KEY (tenant_id, batch_id)
         REFERENCES security_attested_finding_batches (tenant_id, batch_id)
-)
-"#;
-const ATTESTED_FINDING_BATCH_LEGACY_DDL: &str = r#"
-CREATE TABLE security_attested_finding_batches (
-    batch_id TEXT NOT NULL,
-    tenant_id TEXT NOT NULL,
-    item_count INTEGER NOT NULL CHECK (item_count > 0 AND item_count <= 4096),
-    body BLOB NOT NULL CHECK (length(body) <= 1048576),
-    body_hash BLOB NOT NULL CHECK (length(body_hash) = 32),
-    PRIMARY KEY (batch_id)
-)
-"#;
-const ATTESTED_FINDING_BATCH_ITEM_LEGACY_DDL: &str = r#"
-CREATE TABLE security_attested_finding_batch_items (
-    batch_id TEXT NOT NULL,
-    ordinal INTEGER NOT NULL CHECK (ordinal >= 0 AND ordinal < 4096),
-    tenant_id TEXT NOT NULL,
-    evidence_id TEXT NOT NULL,
-    finding_id TEXT NOT NULL,
-    finding_hash BLOB NOT NULL CHECK (length(finding_hash) = 32),
-    action_id TEXT NOT NULL,
-    reservation_id TEXT NOT NULL,
-    PRIMARY KEY (batch_id, ordinal),
-    UNIQUE (tenant_id, evidence_id),
-    UNIQUE (tenant_id, finding_id),
-    UNIQUE (tenant_id, action_id),
-    UNIQUE (tenant_id, reservation_id),
-    FOREIGN KEY (batch_id)
-        REFERENCES security_attested_finding_batches (batch_id)
 )
 "#;
 
@@ -273,26 +240,6 @@ pub(super) fn validate_attested_finding_batch_tenant_keys(
     validate_attested_finding_batch_records(connection)
 }
 
-fn attested_finding_batch_legacy_schema_is_exact(connection: &Connection) -> PortResult<bool> {
-    Ok(table_definition_is_exact(
-        connection,
-        "security_attested_finding_batches",
-        ATTESTED_FINDING_BATCH_LEGACY_DDL,
-    )? && table_definition_is_exact(
-        connection,
-        "security_attested_finding_batch_items",
-        ATTESTED_FINDING_BATCH_ITEM_LEGACY_DDL,
-    )?)
-}
-
-pub(super) fn count_rows(connection: &Connection, table: &str) -> PortResult<i64> {
-    connection
-        .query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
-            row.get(0)
-        })
-        .map_err(sqlite_error)
-}
-
 pub(super) fn table_has_foreign_key_violation(
     connection: &Connection,
     table: &str,
@@ -302,117 +249,6 @@ pub(super) fn table_has_foreign_key_violation(
         .map_err(sqlite_error)?;
     let mut rows = statement.query([]).map_err(sqlite_error)?;
     rows.next().map(|row| row.is_some()).map_err(sqlite_error)
-}
-
-pub(super) fn ensure_attested_finding_batch_tenant_keys(connection: &Connection) -> PortResult<()> {
-    if table_definition_is_exact(
-        connection,
-        "security_attested_finding_batches",
-        ATTESTED_FINDING_BATCH_CANONICAL_DDL,
-    )? && table_definition_is_exact(
-        connection,
-        "security_attested_finding_batch_items",
-        ATTESTED_FINDING_BATCH_ITEM_CANONICAL_DDL,
-    )? {
-        return validate_attested_finding_batch_tenant_keys(connection);
-    }
-    if !attested_finding_batch_legacy_schema_is_exact(connection)? {
-        return Err(PortError::integrity_failure());
-    }
-    validate_no_attested_finding_batch_schema_extensions(connection)?;
-    validate_attested_finding_batch_records(connection)?;
-
-    connection
-        .execute_batch(
-            r#"
-            DROP TRIGGER IF EXISTS security_attested_finding_response_outbox_delete_rejected;
-            DROP TRIGGER IF EXISTS security_attested_finding_response_outbox_immutable;
-            DROP INDEX IF EXISTS security_attested_finding_response_outbox_due;
-            DROP TABLE IF EXISTS security_attested_finding_response_outbox;
-            "#,
-        )
-        .map_err(|_| PortError::integrity_failure())?;
-
-    const BATCH_STAGING: &str = "security_attested_finding_batches_tenant_migration";
-    const ITEM_STAGING: &str = "security_attested_finding_batch_items_tenant_migration";
-    let batch_staging_ddl = ATTESTED_FINDING_BATCH_CANONICAL_DDL
-        .replace("security_attested_finding_batches", BATCH_STAGING);
-    let item_staging_ddl = ATTESTED_FINDING_BATCH_ITEM_CANONICAL_DDL
-        .replace("security_attested_finding_batch_items", ITEM_STAGING)
-        .replace("security_attested_finding_batches", BATCH_STAGING);
-    connection
-        .execute_batch(&format!("{batch_staging_ddl};{item_staging_ddl};"))
-        .map_err(|_| PortError::integrity_failure())?;
-    connection
-        .execute_batch(&format!(
-            r#"
-            INSERT INTO {BATCH_STAGING} (
-                batch_id, tenant_id, item_count, body, body_hash
-            )
-            SELECT batch_id, tenant_id, item_count, body, body_hash
-            FROM security_attested_finding_batches;
-            INSERT INTO {ITEM_STAGING} (
-                batch_id, ordinal, tenant_id, evidence_id, finding_id,
-                finding_hash, action_id, reservation_id
-            )
-            SELECT batch_id, ordinal, tenant_id, evidence_id, finding_id,
-                   finding_hash, action_id, reservation_id
-            FROM security_attested_finding_batch_items;
-            "#,
-        ))
-        .map_err(|_| PortError::integrity_failure())?;
-    let original_batch_count = count_rows(connection, "security_attested_finding_batches")?;
-    let original_item_count = count_rows(connection, "security_attested_finding_batch_items")?;
-    if count_rows(connection, BATCH_STAGING)? != original_batch_count
-        || count_rows(connection, ITEM_STAGING)? != original_item_count
-        || table_has_foreign_key_violation(connection, ITEM_STAGING)?
-    {
-        return Err(PortError::integrity_failure());
-    }
-
-    connection
-        .execute_batch(
-            r#"
-            DROP TABLE security_attested_finding_batch_items;
-            DROP TABLE security_attested_finding_batches;
-            "#,
-        )
-        .map_err(|_| PortError::integrity_failure())?;
-    connection
-        .execute_batch(&format!(
-            "{ATTESTED_FINDING_BATCH_CANONICAL_DDL};{ATTESTED_FINDING_BATCH_ITEM_CANONICAL_DDL};"
-        ))
-        .map_err(|_| PortError::integrity_failure())?;
-    connection
-        .execute_batch(&format!(
-            r#"
-            INSERT INTO security_attested_finding_batches (
-                batch_id, tenant_id, item_count, body, body_hash
-            )
-            SELECT batch_id, tenant_id, item_count, body, body_hash
-            FROM {BATCH_STAGING};
-            INSERT INTO security_attested_finding_batch_items (
-                batch_id, ordinal, tenant_id, evidence_id, finding_id,
-                finding_hash, action_id, reservation_id
-            )
-            SELECT batch_id, ordinal, tenant_id, evidence_id, finding_id,
-                   finding_hash, action_id, reservation_id
-            FROM {ITEM_STAGING};
-            "#,
-        ))
-        .map_err(|_| PortError::integrity_failure())?;
-    if count_rows(connection, "security_attested_finding_batches")? != original_batch_count
-        || count_rows(connection, "security_attested_finding_batch_items")? != original_item_count
-        || table_has_foreign_key_violation(connection, "security_attested_finding_batch_items")?
-    {
-        return Err(PortError::integrity_failure());
-    }
-    connection
-        .execute_batch(&format!(
-            "DROP TABLE {ITEM_STAGING};DROP TABLE {BATCH_STAGING};"
-        ))
-        .map_err(|_| PortError::integrity_failure())?;
-    validate_attested_finding_batch_tenant_keys(connection)
 }
 
 pub(super) fn validate_correlation_durable_schema(connection: &Connection) -> PortResult<()> {
@@ -456,34 +292,6 @@ pub(super) fn validate_correlation_durable_schema(connection: &Connection) -> Po
         return Err(PortError::integrity_failure());
     }
     Ok(())
-}
-
-pub(super) fn upgrade_correlation_ingress_pending_index(connection: &Connection) -> PortResult<()> {
-    if schema_object_definition_is_exact(
-        connection,
-        "index",
-        "security_correlation_ingress_pending",
-        CORRELATION_INGRESS_PENDING_INDEX_DDL,
-    )? {
-        return Ok(());
-    }
-    if !schema_object_definition_is_exact(
-        connection,
-        "index",
-        "security_correlation_ingress_pending",
-        CORRELATION_INGRESS_LEGACY_PENDING_INDEX_DDL,
-    )? {
-        return Err(PortError::integrity_failure());
-    }
-    connection
-        .execute_batch(
-            r#"
-            DROP INDEX security_correlation_ingress_pending;
-            CREATE INDEX security_correlation_ingress_pending
-                ON security_correlation_ingress (acknowledged, event_time, sequence);
-            "#,
-        )
-        .map_err(sqlite_error)
 }
 
 fn correlation_schema_has_extensions(connection: &Connection) -> PortResult<bool> {

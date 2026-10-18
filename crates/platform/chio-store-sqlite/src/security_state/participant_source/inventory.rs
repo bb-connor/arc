@@ -147,7 +147,7 @@ impl TableHasher {
 /// expired fences and unresolved consumptions remain inventory, not permission.
 pub(super) fn validate_domain(connection: &Connection) -> Result<()> {
     let lifecycle_valid: bool = connection.query_row(
-        "SELECT COUNT(*) = 1 AND COALESCE(MIN(singleton = 1 AND schema_version = 2
+        "SELECT COUNT(*) = 1 AND COALESCE(MIN(singleton = 1 AND schema_version = 1
         AND readiness_cursor = ?1 AND reconciliation_active IN (0, 1)
         AND live_dispatch_sealed IN (0, 1) AND compaction_active = 0
         AND (reconciliation_active = 0 OR live_dispatch_sealed = 0)), 0)
