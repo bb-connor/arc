@@ -58,27 +58,6 @@ BEGIN
     SELECT RAISE(ABORT, 'tool outcome blob is immutable');
 END;
 
--- Compaction is only in scope once every operation owning the blob is terminal,
--- so a live invocation can never lose the payload it is still working from.
-CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_compaction_requires_terminal
-BEFORE UPDATE OF canonical_bytes ON tool_outcome_blobs
-WHEN NEW.canonical_bytes IS NULL
-  AND (
-      NOT EXISTS (
-          SELECT 1 FROM tool_outcomes
-          WHERE raw_output_digest = OLD.digest
-      )
-      OR EXISTS (
-          SELECT 1 FROM tool_outcomes o
-          JOIN admission_operations a ON a.operation_id = o.operation_id
-          WHERE o.raw_output_digest = OLD.digest
-            AND a.terminal = 0
-      )
-  )
-BEGIN
-    SELECT RAISE(ABORT, 'tool outcome blob is retained while an owning operation is live');
-END;
-
 CREATE TRIGGER IF NOT EXISTS tool_outcome_blobs_no_delete
 BEFORE DELETE ON tool_outcome_blobs
 BEGIN
@@ -246,4 +225,84 @@ CREATE TRIGGER IF NOT EXISTS post_return_evaluations_no_delete
 BEFORE DELETE ON post_return_evaluations
 BEGIN
     SELECT RAISE(ABORT, 'post-return evaluation must be retained');
+END;
+
+CREATE INDEX IF NOT EXISTS tool_outcomes_raw_digest_owners
+ON tool_outcomes (raw_output_digest, operation_id);
+
+CREATE INDEX IF NOT EXISTS tool_outcomes_resolved_digest_owners
+ON tool_outcomes (json_extract(outcome_json, '$.disposition.resolved_output.digest'));
+
+CREATE INDEX IF NOT EXISTS post_return_evaluations_resolved_digest_owners
+ON post_return_evaluations (json_extract(evaluation_json, '$.state.resolution.resolved_output.digest'));
+
+CREATE TRIGGER tool_outcome_blobs_compaction_requires_terminal
+BEFORE UPDATE OF canonical_bytes ON tool_outcome_blobs
+WHEN NEW.canonical_bytes IS NULL
+  AND (
+      NOT EXISTS (
+          SELECT 1 FROM tool_outcomes INDEXED BY tool_outcomes_raw_digest_owners
+          WHERE raw_output_digest = OLD.digest
+      )
+      OR EXISTS (
+          SELECT 1 FROM tool_outcomes AS o INDEXED BY tool_outcomes_raw_digest_owners
+          JOIN admission_operations AS a ON a.operation_id = o.operation_id
+          WHERE o.raw_output_digest = OLD.digest AND (a.terminal = 0 OR a.state <> 'completed')
+      )
+      -- Resolved-output references retain payload custody for every owner.
+      OR EXISTS (
+          SELECT 1 FROM tool_outcomes INDEXED BY tool_outcomes_resolved_digest_owners
+          WHERE json_extract(outcome_json, '$.disposition.resolved_output.digest') = OLD.digest
+      )
+      OR EXISTS (
+          SELECT 1 FROM post_return_evaluations INDEXED BY post_return_evaluations_resolved_digest_owners
+          WHERE json_extract(evaluation_json, '$.state.resolution.resolved_output.digest') = OLD.digest
+      )
+  )
+BEGIN
+    SELECT RAISE(ABORT, 'tool outcome blob is retained by live, unsupported terminal or resolved replay custody');
+END;
+
+CREATE TABLE IF NOT EXISTS tool_outcome_security_releases (
+    operation_id TEXT NOT NULL PRIMARY KEY,
+    canonical_record BLOB NOT NULL CHECK (length(canonical_record) BETWEEN 1 AND 8192),
+    participant_digest TEXT NOT NULL CHECK (
+        length(participant_digest) = 64 AND participant_digest NOT GLOB '*[^0-9a-f]*'
+    ),
+    acknowledged_at_unix_ms INTEGER NOT NULL CHECK (acknowledged_at_unix_ms > 0),
+    store_uuid TEXT NOT NULL CHECK (store_uuid <> ''),
+    store_lease_id TEXT NOT NULL CHECK (store_lease_id <> ''),
+    store_owner_epoch INTEGER NOT NULL CHECK (store_owner_epoch > 0),
+    FOREIGN KEY (operation_id) REFERENCES tool_outcomes(operation_id),
+    FOREIGN KEY (store_uuid, store_owner_epoch) REFERENCES chio_serving_leases(store_uuid, owner_epoch)
+);
+
+CREATE TRIGGER IF NOT EXISTS tool_outcome_security_releases_exact_owner
+BEFORE INSERT ON tool_outcome_security_releases
+WHEN NOT EXISTS (
+    SELECT 1 FROM chio_serving_leases
+    WHERE store_uuid = NEW.store_uuid AND owner_epoch = NEW.store_owner_epoch
+      AND lease_id = NEW.store_lease_id AND end_head_index IS NULL
+)
+BEGIN
+    SELECT RAISE(ABORT, 'security release requires the exact serving owner');
+END;
+
+CREATE TRIGGER IF NOT EXISTS tool_outcome_security_releases_no_replace
+BEFORE INSERT ON tool_outcome_security_releases
+WHEN EXISTS (SELECT 1 FROM tool_outcome_security_releases WHERE operation_id = NEW.operation_id)
+BEGIN
+    SELECT RAISE(ABORT, 'security release cannot be replaced');
+END;
+
+CREATE TRIGGER IF NOT EXISTS tool_outcome_security_releases_no_update
+BEFORE UPDATE ON tool_outcome_security_releases
+BEGIN
+    SELECT RAISE(ABORT, 'security release is immutable');
+END;
+
+CREATE TRIGGER IF NOT EXISTS tool_outcome_security_releases_no_delete
+BEFORE DELETE ON tool_outcome_security_releases
+BEGIN
+    SELECT RAISE(ABORT, 'security release must be retained');
 END;

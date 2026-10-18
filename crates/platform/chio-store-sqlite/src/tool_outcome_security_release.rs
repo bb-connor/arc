@@ -46,59 +46,6 @@ pub(super) fn verify_unstamped_source(
     Ok(())
 }
 
-fn predecessor_schema(version: i32) -> String {
-    if version == 1 {
-        // Exact v1 trigger predicate from 1ba3d031ff^, before qualified payload
-        // rehydration was introduced. No other predecessor shape is accepted.
-        TOOL_OUTCOME_SCHEMA.replace(
-            "  OR (OLD.canonical_bytes IS NULL AND NEW.canonical_bytes IS NULL)\n  OR (OLD.canonical_bytes IS NOT NULL AND NEW.canonical_bytes IS NOT NULL)",
-            "  OR OLD.canonical_bytes IS NULL\n  OR NEW.canonical_bytes IS NOT NULL",
-        )
-    } else {
-        TOOL_OUTCOME_SCHEMA.to_owned()
-    }
-}
-
-pub(super) fn verify_pre_migration(
-    connection: &Connection,
-    on_disk: i32,
-) -> Result<(), ToolOutcomeStoreError> {
-    if has_release_namespace(connection)? {
-        return Err(invariant(
-            "pre-v3 outcome source contains unqualified security release records",
-        ));
-    }
-    let actual = tool_outcome_schema_catalog(connection)?;
-    if on_disk != 0 || !actual.is_empty() {
-        let mut matched = false;
-        for version in [1, 2] {
-            if on_disk != 0 && on_disk != version {
-                continue;
-            }
-            let expected = Connection::open_in_memory().map_err(sqlite_error)?;
-            expected
-                .execute_batch(&predecessor_schema(version))
-                .map_err(sqlite_error)?;
-            matched |= actual == tool_outcome_schema_catalog(&expected)?;
-        }
-        if !matched {
-            return Err(invariant(
-                "pre-v3 outcome schema is not the exact qualified predecessor",
-            ));
-        }
-        let future: bool = connection.query_row(
-            "SELECT EXISTS(SELECT 1 FROM tool_outcome_blobs WHERE canonical_bytes IS NOT NULL AND (json_extract(canonical_bytes, '$.schema') = 'chio.raw-invocation-outcome-with-security-release.v1' OR json_type(canonical_bytes, '$.security_release_required') IS NOT NULL))",
-            [], |row| row.get(0),
-        ).map_err(sqlite_error)?;
-        if future {
-            return Err(invariant(
-                "pre-v3 outcome source carries unqualified release requirements",
-            ));
-        }
-    }
-    Ok(())
-}
-
 fn participant_digest(record: &SecurityReleaseRecordV1) -> Result<String, ToolOutcomeStoreError> {
     #[derive(Serialize)]
     struct Commitment<'a> {
@@ -148,7 +95,6 @@ pub(super) fn verify_projection(
     evaluation: Option<&PostReturnEvaluationRecordV1>,
     raw: Option<&RawInvocationOutcomeV1>,
 ) -> Result<Option<String>, ToolOutcomeStoreError> {
-    // This payload was decoded and bound by the enclosing projection verifier.
     let record = load(connection, operation.binding().operation_id().as_str())?;
     if let Some(record) = record {
         let evaluation =
@@ -160,8 +106,7 @@ pub(super) fn verify_projection(
         .map_err(|error| invariant(error.to_string()))?;
         return participant_digest(&record).map(Some);
     }
-    // Historical records retain their bytes; runtime recovery rejects an
-    // unknown legacy requirement instead of inventing a successful release.
+    // Terminal operations retain their required release checkpoint.
     if operation.state().is_terminal()
         && raw.is_some_and(|raw| raw.requires_security_release() == Ok(true))
     {

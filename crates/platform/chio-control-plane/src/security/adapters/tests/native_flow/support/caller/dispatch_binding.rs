@@ -49,10 +49,7 @@ pub(super) fn verify(
                 .ok_or("original grant index")?,
         )?,
     )?;
-    let retained = persisted
-        .request_canonical_json
-        .as_ref()
-        .ok_or("stripped original request")?;
+    let retained = &persisted.request_canonical_json;
     let retained_request: chio_kernel::ToolCallRequest = serde_json::from_str(retained)?;
     assert!(retained_request.execution_nonce.is_none());
     assert!(retained_request.dpop_proof.is_none());

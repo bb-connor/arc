@@ -3,8 +3,9 @@
     reason = "This feature-gated test support deliberately rejects malformed fixture identifiers."
 )]
 
-use chio_core::canonical::canonical_json_bytes;
-use chio_core::capability::scope::MonetaryAmount;
+use chio_core::capability::scope::{ChioScope, MonetaryAmount};
+use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
+use chio_core::crypto::Keypair;
 use chio_core::sha256_hex;
 use serde_json::{json, Value};
 
@@ -34,6 +35,30 @@ pub fn returned_value(
         .provider_attempt()
         .cloned()
         .ok_or(ToolOutcomeError::Binding("test_support.provider_attempt"))?;
+    let issuer = Keypair::from_seed(&[0x71; 32]);
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: operation.binding().capability_id().as_str().to_owned(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 1,
+            expires_at: 2,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+    let request: ToolCallRequest = serde_json::from_value(json!({
+        "request_id": operation.binding().request_id(),
+        "capability": capability,
+        "agent_id": issuer.public_key().to_hex(),
+        "arguments": {},
+        "server_id": "tool-outcome-test-server",
+        "tool_name": "tool-outcome-test-tool",
+    }))
+    .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
     let raw = RawInvocationOutcomeV1::from_committed_dispatch(
         operation,
         commit,
@@ -52,6 +77,18 @@ pub fn returned_value(
         reported_cost,
         None,
         Vec::new(),
+        RawInvocationContext {
+            request: &request,
+            security_invocation_context: None,
+            federation_context_json: None,
+            security_release_required: false,
+            receipt_signing_identity: FrozenReceiptSigningIdentityV1::new(
+                Keypair::from_seed(&[0x72; 32]).public_key(),
+                chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
+            )?,
+            caller_delivery_evidence: None,
+            original_security_dispatch_binding: None,
+        },
     )?;
     let blob = raw.canonical_blob()?;
     let outcome = ToolOutcomeRecordV1::record_tool_returned(
@@ -123,33 +160,44 @@ pub fn native_returned_value(
     }
     let original = OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?
         .ok_or(ToolOutcomeError::Binding("test_support.original_dispatch"))?;
-    let (blob, _) = returned_value(
+    let commit = operation
+        .dispatch_commit()
+        .ok_or(ToolOutcomeError::Binding("test_support.dispatch_commit"))?;
+    let provider_attempt = operation
+        .provider_attempt()
+        .cloned()
+        .ok_or(ToolOutcomeError::Binding("test_support.provider_attempt"))?;
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch(
         operation,
-        recording_fence.clone(),
-        recorded_at_unix_ms,
-        value,
+        commit,
+        identifier(&request.server_id),
+        identifier(&request.tool_name),
+        provider_attempt,
+        digest("transport-terminal"),
+        0,
+        7,
+        InvocationStreamLimitsV1 {
+            max_total_bytes: 1024,
+            max_chunks: 16,
+            max_duration_secs: 30,
+        },
+        InvocationOutputV1::Value { value },
         None,
+        None,
+        Vec::new(),
+        RawInvocationContext {
+            request,
+            security_invocation_context: Some(context.clone()),
+            federation_context_json: None,
+            security_release_required: true,
+            receipt_signing_identity: FrozenReceiptSigningIdentityV1::new(
+                receipt_signing_public_key,
+                receipt_crypto_floor,
+            )?,
+            caller_delivery_evidence: None,
+            original_security_dispatch_binding: Some(Box::new(original)),
+        },
     )?;
-    let mut raw = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?.to_persisted();
-    raw.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA.into();
-    raw.tool_server = identifier(&request.server_id);
-    raw.tool_name = identifier(&request.tool_name);
-    let retained = crate::admission_operation::RetainedToolAdmissionRequestV1::request_without_transient_credentials(request);
-    raw.request_canonical_json = Some(
-        String::from_utf8(
-            canonical_json_bytes(&retained)
-                .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
-        )
-        .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?,
-    );
-    raw.security_invocation_context = Some(context.clone());
-    raw.security_release_required = Some(true);
-    let raw = RawInvocationOutcomeV1::from_persisted(raw)?
-        .with_receipt_signing_identity(FrozenReceiptSigningIdentityV1::new(
-            receipt_signing_public_key,
-            receipt_crypto_floor,
-        )?)?
-        .with_original_security_dispatch_binding(Some(Box::new(original)))?;
     let blob = raw.canonical_blob()?;
     let outcome = ToolOutcomeRecordV1::record_tool_returned(
         operation,

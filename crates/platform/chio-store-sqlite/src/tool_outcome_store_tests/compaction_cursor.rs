@@ -6,17 +6,28 @@ use compaction_fixture::deterministic_completed_return;
 fn compaction_retained_prefix_resumes_replay_verification_under_same_byte_cap() {
     let initial = 1_700_000_000;
     let _time = chio_test_support::clock::scope_unix_secs(initial);
-    let _identity = crate::scope_fixed_authority_ids_for_current_thread(
-        "018bcfe5-6800-7000-8000-000000000001",
-        ["018bcfe5-6800-7000-8000-000000000002".to_owned()],
-    )
-    .expect("fixed authentic store namespace");
-    let fixture = fixture();
-    let (_, stream) = deterministic_completed_return(&fixture, "cursor-stream", true, initial)
-        .expect("actual signed stream completion");
-    let (operation, value) =
-        deterministic_completed_return(&fixture, "cursor-value", false, initial)
+    let (fixture, stream, operation, value) = (0..32)
+        .find_map(|index| {
+            let _identity = crate::scope_fixed_authority_ids_for_current_thread(
+                "018bcfe5-6800-7000-8000-000000000001",
+                ["018bcfe5-6800-7000-8000-000000000002".to_owned()],
+            )
+            .expect("fixed authentic store namespace");
+            let fixture = fixture();
+            let (_, stream) =
+                deterministic_completed_return(&fixture, "cursor-stream", true, initial)
+                    .expect("actual signed stream completion");
+            let (operation, value) = deterministic_completed_return(
+                &fixture,
+                &format!("cursor-value-{index}"),
+                false,
+                initial,
+            )
             .expect("actual signed value completion");
+            (stream.raw_output_digest() < value.raw_output_digest())
+                .then_some((fixture, stream, operation, value))
+        })
+        .expect("bounded authentic fixture search finds stream before value");
     assert!(
         stream.raw_output_digest() < value.raw_output_digest(),
         "stable stream digest {} must precede value {}",
