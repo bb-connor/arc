@@ -2371,3 +2371,6 @@ mod statement_caching;
 
 #[path = "tests/capability_usage_index.rs"]
 mod capability_usage_index;
+
+#[path = "tests/schema_contract.rs"]
+mod schema_contract;
