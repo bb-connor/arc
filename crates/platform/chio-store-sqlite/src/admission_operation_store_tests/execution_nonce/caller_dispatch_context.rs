@@ -5,7 +5,7 @@ use chio_kernel::admission_operation::AdmissionCallerDispatchContextV1;
 use chio_kernel::receipt_store::AdmissionCallerDispatchCapture;
 
 const PAYLOAD: &[u8] =
-    br#"{"schema":"chio.kernel-caller-context-test.v1","value":"private-context"}"#;
+    br#"{"native_custody":null,"schema":"chio.kernel-caller-return-context.v1","value":"private-context"}"#;
 
 fn pending() -> TestResult<NonceFixture> {
     pending_with_transport("caller-report:test-server")
