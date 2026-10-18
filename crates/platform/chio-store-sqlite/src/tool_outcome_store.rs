@@ -723,12 +723,16 @@ impl QualifiedToolOutcomeStore for SqliteToolOutcomeStore {}
 
 pub(crate) fn preflight_tool_outcome_schema(
     connection: &Connection,
+    allow_empty: bool,
 ) -> Result<(), ToolOutcomeStoreError> {
     security_release::verify_unstamped_source(connection)?;
     let version =
         crate::schema_version::read_store_schema_version(connection, TOOL_OUTCOME_SCHEMA_KEY)
             .map_err(|error| invariant(error.to_string()))?;
     let Some(found) = version else {
+        if !allow_empty {
+            return Err(invariant("provisioned tool outcome schema is missing"));
+        }
         if !tool_outcome_schema_catalog(connection)?.is_empty() {
             return Err(invariant("unstamped tool outcome schema cannot be adopted"));
         }
@@ -747,7 +751,7 @@ pub(crate) fn preflight_tool_outcome_schema(
         ));
     }
     if found != TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION {
-        return Err(ToolOutcomeStoreError::StaleSchema {
+        return Err(ToolOutcomeStoreError::NoncurrentSchema {
             found,
             current: TOOL_OUTCOME_SUPPORTED_SCHEMA_VERSION,
         });
@@ -761,7 +765,7 @@ pub(crate) fn initialize_tool_outcome_schema(
     let transaction = connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(sqlite_error)?;
-    preflight_tool_outcome_schema(&transaction)?;
+    preflight_tool_outcome_schema(&transaction, true)?;
     let state = crate::check_current_schema(
         &transaction,
         TOOL_OUTCOME_SCHEMA_KEY,
@@ -770,7 +774,7 @@ pub(crate) fn initialize_tool_outcome_schema(
     )
     .map_err(|error| match error {
         crate::SchemaVersionError::StaleSchema { found, current } => {
-            ToolOutcomeStoreError::StaleSchema { found, current }
+            ToolOutcomeStoreError::NoncurrentSchema { found, current }
         }
         error => invariant(error.to_string()),
     })?;

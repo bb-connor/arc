@@ -123,79 +123,18 @@ fn frozen_participants_require_every_reference_and_reject_substitution() -> Test
 }
 
 #[test]
-fn frozen_participants_preserve_legacy_absence_without_upgrading_custody() -> TestResult {
+fn frozen_participants_refuse_absent_snapshot() -> TestResult {
     let fixture = fixture()?;
-    let original: serde_json::Value = serde_json::from_slice(fixture.frame.kernel_context_json())?;
-    let mut payload = original.clone();
+    let mut payload: serde_json::Value =
+        serde_json::from_slice(fixture.frame.kernel_context_json())?;
     payload
         .as_object_mut()
         .ok_or("caller object")?
         .remove("participants");
-    assert!(
-        fixture
-            .kernel
-            .decode_caller_return_payload(
-                &fixture.admission,
-                &canonical_json_bytes(&payload)?,
-                current_unix_timestamp_ms(),
-            )
-            .is_err(),
-        "v3 cannot omit its participant snapshot"
-    );
-    for schema in [SIGNING_SCHEMA, LEGACY_SCHEMA] {
-        payload
-            .as_object_mut()
-            .ok_or("caller object")?
-            .remove("participant_custody");
-        payload["schema"] = serde_json::json!(schema);
-        payload
-            .as_object_mut()
-            .ok_or("caller object")?
-            .remove("start_valid_until_unix_ms");
-        if schema == LEGACY_SCHEMA {
-            payload
-                .as_object_mut()
-                .ok_or("caller object")?
-                .remove("receipt_signing_identity");
-        }
-        let legacy = fixture.kernel.decode_caller_return_payload(
-            &fixture.admission,
-            &canonical_json_bytes(&payload)?,
-            current_unix_timestamp_ms(),
-        )?;
-        assert!(legacy.participants.is_none());
-        assert_eq!(
-            legacy.receipt_signing_identity.is_some(),
-            schema == SIGNING_SCHEMA
-        );
-        assert!(
-            matches!(
-                fixture
-                    .kernel
-                    .frame_caller_return_context(
-                        &fixture.admission,
-                        &fixture.request,
-                        &legacy,
-                        current_unix_timestamp_ms(),
-                    ),
-                Err(KernelError::DurableAdmission(reason))
-                    if reason == "caller return component lost its admission binding"
-            ),
-            "legacy context cannot be reissued as a complete v3 context"
-        );
-        let mut smuggled = payload.clone();
-        smuggled["participants"] = original["participants"].clone();
-        assert!(
-            fixture
-                .kernel
-                .decode_caller_return_payload(
-                    &fixture.admission,
-                    &canonical_json_bytes(&smuggled)?,
-                    current_unix_timestamp_ms(),
-                )
-                .is_err(),
-            "{schema} cannot smuggle a participant snapshot"
-        );
-    }
+    let error = serde_json::from_value::<CallerReturnWire>(payload)
+        .err()
+        .ok_or("missing participants decoded")?;
+    assert_eq!(error.classify(), serde_json::error::Category::Data);
+    assert_eq!(error.to_string(), "missing field `participants`");
     Ok(())
 }

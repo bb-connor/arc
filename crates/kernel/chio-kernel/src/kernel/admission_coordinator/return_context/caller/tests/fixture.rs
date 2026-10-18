@@ -224,7 +224,6 @@ pub(super) fn fixture() -> TestResult<Fixture> {
         .frame_caller_return_context(&admission, &request, &frozen, now)?
         .ok_or("caller model frame")?;
     Ok(Fixture {
-        request,
         kernel,
         admission,
         frame,

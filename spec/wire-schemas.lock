@@ -2821,33 +2821,8 @@ first_seen = "d299a87e8b"
 
 [[schema]]
 value = "chio.kernel-caller-return-context.v1"
-files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
-value = "chio.kernel-caller-return-context.v2"
-files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs"]
-first_seen = "7fe2b92663"
-
-[[schema]]
-value = "chio.kernel-caller-return-context.v3"
-files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs"]
-first_seen = "12ca47df6e"
-
-[[schema]]
-value = "chio.kernel-caller-return-context.v4"
-files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs"]
-first_seen = "2c5188e8ad"
-
-[[schema]]
-value = "chio.kernel-caller-return-context.v5"
 files = ["crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs"]
-first_seen = "90a77c37e5"
-
-[[schema]]
-value = "chio.kernel-caller-return-context.v6"
-files = ["crates/kernel/chio-kernel/src/kernel/admission_coordinator/return_context/caller.rs"]
-first_seen = "3cd73631a1"
+first_seen = "7e54c14a60"
 
 [[schema]]
 value = "chio.kernel-terminal-snapshot.v1"

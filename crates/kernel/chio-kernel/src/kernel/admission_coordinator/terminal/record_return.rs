@@ -16,10 +16,7 @@ impl ChioKernel {
             trusted_now_unix_ms,
         } = input;
         context.validate_binding(admission, request)?;
-        let receipt_signing_identity =
-            context.receipt_signing_identity.clone().ok_or_else(|| {
-                tool_outcome_error(ToolOutcomeError::Binding("raw.receipt_signing_identity"))
-            })?;
+        let receipt_signing_identity = context.receipt_signing_identity.clone();
         let matched_grant_index = context.matched_grant_index;
         let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
         self.validate_guarded_output(request, matched_grant_index, output, false)?;
