@@ -78,7 +78,7 @@ const SECURITY_STATE_STORE_ANCHOR_TABLES: &[&str] = &[
 pub(super) fn open_schema(connection: &Connection) -> PortResult<()> {
     connection
         .execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; \
+            "PRAGMA synchronous = FULL; \
          PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; BEGIN IMMEDIATE;",
         )
         .map_err(sqlite_error)?;
@@ -108,7 +108,9 @@ pub(super) fn open_schema(connection: &Connection) -> PortResult<()> {
         validate_schema(connection)
     })();
     match result {
-        Ok(()) => connection.execute_batch("COMMIT;").map_err(sqlite_error),
+        Ok(()) => connection
+            .execute_batch("COMMIT; PRAGMA journal_mode = WAL;")
+            .map_err(sqlite_error),
         Err(error) => {
             let _ = connection.execute_batch("ROLLBACK;");
             Err(error)
