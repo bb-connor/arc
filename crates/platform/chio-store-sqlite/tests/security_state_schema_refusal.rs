@@ -130,3 +130,24 @@ fn view_only_security_namespace_is_refused_without_stamping() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn schema_refusal_preserves_delete_journal_mode() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("security.db");
+    drop(SqliteSecurityStateStore::open(&path)?);
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("PRAGMA journal_mode = DELETE; UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';")?;
+    let before: String = connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+    assert_eq!(before, "delete");
+    drop(connection);
+    let error = SqliteSecurityStateStore::open(&path)
+        .err()
+        .ok_or("noncurrent schema accepted")?;
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+    assert_eq!(error.code().as_str(), "store.integrity_failure");
+    let connection = Connection::open(&path)?;
+    let after: String = connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
+    assert_eq!(after, before);
+    Ok(())
+}
