@@ -655,13 +655,15 @@ impl crate::post_invocation::PostInvocationHook for BlockingPostInvocationHook {
         "test-post-invocation-block"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _ctx: &crate::post_invocation::PostInvocationContext<'_>,
         _response: &serde_json::Value,
-    ) -> crate::post_invocation::PostInvocationVerdict {
-        crate::post_invocation::PostInvocationVerdict::Block(
-            "post-invocation output guard blocked destructive tool output".to_string(),
+    ) -> crate::post_invocation::PostInvocationInspection {
+        crate::post_invocation::PostInvocationInspection::without_evidence(
+            crate::post_invocation::PostInvocationVerdict::Block(
+                "post-invocation output guard blocked destructive tool output".to_string(),
+            ),
         )
     }
 }

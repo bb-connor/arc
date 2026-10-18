@@ -21,11 +21,11 @@ use chio_flow::{
 use chio_kernel::{
     CapabilityAuthority, CapabilityAuthorityWorkloadBinding, ChioKernel, Guard, GuardContext,
     KernelConfig, MemoryBudgetConfig, NestedFlowBridge, PostInvocationContext, PostInvocationHook,
-    PostInvocationPipeline, PostInvocationVerdict, SecurityInvocationContext,
-    SecurityInvocationContextV1, SecurityPreDispatchContext, SecurityPreDispatchHook,
-    SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit, ToolCallRequest,
-    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
-    DEFAULT_MAX_STREAM_TOTAL_BYTES,
+    PostInvocationInspection, PostInvocationPipeline, PostInvocationVerdict,
+    SecurityInvocationContext, SecurityInvocationContextV1, SecurityPreDispatchContext,
+    SecurityPreDispatchHook, SecurityPreDispatchPolicy, SecurityRequestLifecyclePermit,
+    ToolCallRequest, ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
+    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_security_kernel::{
     ContainmentGuard, EngineFlowPostInvocationPort, EngineFlowPreInvocationPort,
@@ -408,12 +408,14 @@ impl PostInvocationHook for BlockingPostInvocationHook {
         "blocking-post-invocation"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _context: &PostInvocationContext<'_>,
         _response: &serde_json::Value,
-    ) -> PostInvocationVerdict {
-        PostInvocationVerdict::Block("blocked after connector execution".to_string())
+    ) -> PostInvocationInspection {
+        PostInvocationInspection::without_evidence(PostInvocationVerdict::Block(
+            "blocked after connector execution".to_string(),
+        ))
     }
 }
 
@@ -744,16 +746,18 @@ impl PostInvocationHook for ContextProbeHook {
         "context-probe-post"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         context: &PostInvocationContext<'_>,
         _response: &serde_json::Value,
-    ) -> PostInvocationVerdict {
+    ) -> PostInvocationInspection {
         match context.security_context() {
             Some(security) if security.as_v1().context_generation() == 7 => {
-                PostInvocationVerdict::Allow
+                PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
             }
-            _ => PostInvocationVerdict::Block("context missing".to_string()),
+            _ => PostInvocationInspection::without_evidence(PostInvocationVerdict::Block(
+                "context missing".to_string(),
+            )),
         }
     }
 }

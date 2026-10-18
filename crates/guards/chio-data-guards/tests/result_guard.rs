@@ -18,7 +18,8 @@
 use chio_core::capability::scope::{ChioScope, Constraint, Operation, ToolGrant};
 use chio_data_guards::{QueryResultGuard, QueryResultGuardConfig};
 use chio_guards::post_invocation::{
-    PostInvocationContext, PostInvocationHook, PostInvocationPipeline, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationInspection, PostInvocationPipeline,
+    PostInvocationVerdict,
 };
 
 fn grant(constraints: Vec<Constraint>) -> ToolGrant {
@@ -240,17 +241,17 @@ impl PostInvocationHook for OwnedHook {
         "query-result"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _ctx: &PostInvocationContext<'_>,
         response: &serde_json::Value,
-    ) -> PostInvocationVerdict {
+    ) -> PostInvocationInspection {
         let mut redacted = response.clone();
         self.guard.redact_result(&self.scope, &mut redacted);
         if redacted == *response {
-            PostInvocationVerdict::Allow
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
         } else {
-            PostInvocationVerdict::Redact(redacted)
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Redact(redacted))
         }
     }
 }

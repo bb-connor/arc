@@ -1,7 +1,8 @@
 use super::*;
 use crate::kernel::verified_treaty::TreatyVerificationEvidence;
 use crate::post_invocation::{
-    PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
+    PostInvocationInspection, PostInvocationVerdict,
 };
 use std::sync::{Condvar, Mutex, Weak};
 
@@ -45,11 +46,11 @@ impl PostInvocationHook for ProbeHook {
         "retained-federation-recovery-probe"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         context: &PostInvocationContext<'_>,
         _: &serde_json::Value,
-    ) -> PostInvocationVerdict {
+    ) -> PostInvocationInspection {
         let kernel = self
             .0
             .kernel
@@ -58,7 +59,7 @@ impl PostInvocationHook for ProbeHook {
             .and_then(|kernel| kernel.upgrade());
         let Some(kernel) = kernel else {
             // Initial dispatch uses the same frozen, identity output plan.
-            return PostInvocationVerdict::Allow;
+            return PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow);
         };
         let observation = (|| -> Result<(), String> {
             self.0.overlap.installed.meet()?;
@@ -103,8 +104,10 @@ impl PostInvocationHook for ProbeHook {
         // Neither recovery may drop its retained scope before both inspect it.
         let finished = self.0.overlap.observed.meet();
         match observation.and(finished) {
-            Ok(()) => PostInvocationVerdict::Allow,
-            Err(reason) => PostInvocationVerdict::Escalate(reason),
+            Ok(()) => PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow),
+            Err(reason) => {
+                PostInvocationInspection::without_evidence(PostInvocationVerdict::Escalate(reason))
+            }
         }
     }
 

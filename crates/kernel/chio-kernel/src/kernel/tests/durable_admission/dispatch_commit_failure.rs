@@ -33,12 +33,14 @@ impl crate::post_invocation::PostInvocationHook for FailAfterPaymentAuthorizatio
         "fail-after-payment-authorization"
     }
 
-    fn inspect(
+    fn inspect_with_evidence(
         &self,
         _: &crate::post_invocation::PostInvocationContext<'_>,
         _: &serde_json::Value,
-    ) -> crate::post_invocation::PostInvocationVerdict {
-        crate::post_invocation::PostInvocationVerdict::Allow
+    ) -> crate::post_invocation::PostInvocationInspection {
+        crate::post_invocation::PostInvocationInspection::without_evidence(
+            crate::post_invocation::PostInvocationVerdict::Allow,
+        )
     }
 
     fn durable_identity(

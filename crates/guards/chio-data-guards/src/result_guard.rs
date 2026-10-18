@@ -59,7 +59,8 @@ use tracing::warn;
 
 use chio_core::capability::scope::{ChioScope, Constraint};
 use chio_guards::post_invocation::{
-    PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationHookIdentity,
+    PostInvocationInspection, PostInvocationVerdict,
 };
 use chio_kernel::{GuardContext, GuardDecision, KernelError};
 
@@ -289,15 +290,19 @@ impl<'a> PostInvocationHook for QueryResultHook<'a> {
         "query-result"
     }
 
-    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
+    fn inspect_with_evidence(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
         let scope = ctx.scope.unwrap_or(&self.scope);
         let redacted =
             self.guard
                 .redact_result_cloned_for_request(scope, ctx.matched_grant_index, response);
         if redacted == *response {
-            PostInvocationVerdict::Allow
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
         } else {
-            PostInvocationVerdict::Redact(redacted)
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Redact(redacted))
         }
     }
 
@@ -318,15 +323,19 @@ impl PostInvocationHook for OwnedQueryResultHook {
         "query-result"
     }
 
-    fn inspect(&self, ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
+    fn inspect_with_evidence(
+        &self,
+        ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
         let scope = ctx.scope.unwrap_or(&self.scope);
         let redacted =
             self.guard
                 .redact_result_cloned_for_request(scope, ctx.matched_grant_index, response);
         if redacted == *response {
-            PostInvocationVerdict::Allow
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
         } else {
-            PostInvocationVerdict::Redact(redacted)
+            PostInvocationInspection::without_evidence(PostInvocationVerdict::Redact(redacted))
         }
     }
 
@@ -768,7 +777,7 @@ mod tests {
         let hook = guard.as_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}, {"id": 2}]});
         let context = PostInvocationContext::synthetic("sql");
-        match hook.inspect(&context, &value) {
+        match hook.inspect_with_evidence(&context, &value).verdict {
             PostInvocationVerdict::Redact(v) => {
                 assert_eq!(v["rows"].as_array().unwrap().len(), 1);
             }
@@ -783,7 +792,7 @@ mod tests {
         let hook = guard.as_hook(scope);
         let value = serde_json::json!({"rows": [{"id": 1}]});
         let context = PostInvocationContext::synthetic("sql");
-        match hook.inspect(&context, &value) {
+        match hook.inspect_with_evidence(&context, &value).verdict {
             PostInvocationVerdict::Allow => {}
             other => panic!("expected Allow, got {other:?}"),
         }

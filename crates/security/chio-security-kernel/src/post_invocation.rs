@@ -103,14 +103,6 @@ impl PostInvocationHook for FlowPostInvocationHook {
         "chio-flow-post-invocation"
     }
 
-    fn inspect(
-        &self,
-        context: &PostInvocationContext<'_>,
-        response: &Value,
-    ) -> PostInvocationVerdict {
-        self.inspect_once(context, response).verdict
-    }
-
     fn inspect_with_evidence(
         &self,
         context: &PostInvocationContext<'_>,
@@ -140,14 +132,6 @@ impl RawOutputTripwireHook {
 impl PostInvocationHook for RawOutputTripwireHook {
     fn name(&self) -> &str {
         "chio-watermark-tripwire"
-    }
-
-    fn inspect(
-        &self,
-        context: &PostInvocationContext<'_>,
-        response: &Value,
-    ) -> PostInvocationVerdict {
-        self.evaluator.inspect(context, response).verdict
     }
 
     fn inspect_with_evidence(

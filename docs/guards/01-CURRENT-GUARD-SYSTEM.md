@@ -634,7 +634,16 @@ A separate pipeline for inspecting tool **responses** after invocation:
 ```rust
 pub trait PostInvocationHook: Send + Sync {
     fn name(&self) -> &str;
-    fn inspect(&self, tool_name: &str, response: &Value) -> PostInvocationVerdict;
+    fn inspect_with_evidence(
+        &self,
+        context: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection;
+}
+
+pub struct PostInvocationInspection {
+    pub verdict: PostInvocationVerdict,
+    pub evidence: Vec<GuardEvidence>,
 }
 
 pub enum PostInvocationVerdict {

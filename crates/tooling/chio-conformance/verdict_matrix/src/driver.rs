@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use chio_core::capability::{
     scope::{ChioScope, Operation, ToolGrant},
@@ -13,7 +12,7 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, ExecutionNonceError, InMemoryExecutionNonceStore, NonceBinding,
 };
 use chio_kernel::post_invocation::{
-    PostInvocationContext, PostInvocationHook, PostInvocationVerdict,
+    PostInvocationContext, PostInvocationHook, PostInvocationInspection, PostInvocationVerdict,
 };
 use chio_kernel::{
     ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, NestedFlowBridge,
@@ -1032,25 +1031,11 @@ impl Guard for MatrixInputGuard {
 
 struct MatrixOutputHook {
     action: RedactionAction,
-    evidence: Mutex<Option<GuardEvidence>>,
 }
 
 impl MatrixOutputHook {
     fn new(action: RedactionAction) -> Self {
-        Self {
-            action,
-            evidence: Mutex::new(None),
-        }
-    }
-
-    fn set_evidence(&self, verdict: bool, details: &str) {
-        if let Ok(mut evidence) = self.evidence.lock() {
-            *evidence = Some(GuardEvidence {
-                guard_name: self.name().to_string(),
-                verdict,
-                details: Some(details.to_string()),
-            });
-        }
+        Self { action }
     }
 }
 
@@ -1059,27 +1044,36 @@ impl PostInvocationHook for MatrixOutputHook {
         "verdict-matrix-output"
     }
 
-    fn inspect(&self, _ctx: &PostInvocationContext<'_>, response: &Value) -> PostInvocationVerdict {
-        match self.action {
-            RedactionAction::None => PostInvocationVerdict::Allow,
-            RedactionAction::Deny => {
-                self.set_evidence(false, "output redaction denied the response");
+    fn inspect_with_evidence(
+        &self,
+        _ctx: &PostInvocationContext<'_>,
+        response: &Value,
+    ) -> PostInvocationInspection {
+        let (verdict, allowed, details) = match self.action {
+            RedactionAction::None => {
+                return PostInvocationInspection::without_evidence(PostInvocationVerdict::Allow)
+            }
+            RedactionAction::Deny => (
                 PostInvocationVerdict::Block(
                     "guard \"verdict-matrix-output\" denied the request".to_string(),
-                )
-            }
-            RedactionAction::Mask | RedactionAction::Drop => {
-                self.set_evidence(true, "output redaction sanitized the response");
-                PostInvocationVerdict::Redact(redacted_output_envelope(response))
-            }
-        }
-    }
-
-    fn take_evidence(&self) -> Option<GuardEvidence> {
-        match self.evidence.lock() {
-            Ok(mut evidence) => evidence.take(),
-            Err(_) => None,
-        }
+                ),
+                false,
+                "output redaction denied the response",
+            ),
+            RedactionAction::Mask | RedactionAction::Drop => (
+                PostInvocationVerdict::Redact(redacted_output_envelope(response)),
+                true,
+                "output redaction sanitized the response",
+            ),
+        };
+        PostInvocationInspection::new(
+            verdict,
+            vec![GuardEvidence {
+                guard_name: self.name().to_string(),
+                verdict: allowed,
+                details: Some(details.to_string()),
+            }],
+        )
     }
 }
 
@@ -1138,8 +1132,7 @@ mod tests {
 
     #[test]
     fn delivery_lane_rejects_unknown_name() {
-        let Err(error) = serde_json::from_value::<DeliveryLane>(serde_json::json!("legacy"))
-        else {
+        let Err(error) = serde_json::from_value::<DeliveryLane>(serde_json::json!("legacy")) else {
             panic!("unknown delivery lane accepted");
         };
         assert_eq!(
