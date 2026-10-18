@@ -46,7 +46,8 @@ pq = ["chio-core-types/pq", "chio-core/pq"]
 delegation = ["chio-core-types/delegation"]
 
 # The dependencies needed by `session` stay unconditional for `--cfg loom`.
-# This types, crypto, clock and serialization graph reaches no async transport.
+# This types, crypto, identifier, clock and serialization graph reaches no async
+# transport.
 # The real Session retains its trusted native clock and terminal-admission
 # state machine under loom; runtime-bearing dependencies remain gated below.
 [dependencies]
@@ -54,6 +55,7 @@ chio-core = { workspace = true }
 chio-security-types = { workspace = true, features = ["std"] }
 serde = { workspace = true }
 thiserror = { workspace = true }
+uuid = { workspace = true, features = ["v4", "v7"] }
 
 # Under `--cfg loom` the `session` module's own RwLock and atomics are loom
 # primitives, so the interleaving model explores real schedules on the session
@@ -102,7 +104,6 @@ opentelemetry-semantic-conventions = { workspace = true, optional = true }
 rusqlite = { workspace = true }
 chio-underwriting = { workspace = true }
 chio-swarm-authority = { workspace = true, optional = true }
-uuid = { workspace = true, features = ["v4", "v7"] }
 ureq = { version = "2.10", features = ["json"] }
 url = { workspace = true }
 rand = { workspace = true }
