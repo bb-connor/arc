@@ -3,6 +3,11 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# shellcheck source=lib/qualification-skips.sh
+source scripts/lib/qualification-skips.sh
+
+optional_tests=()
+
 output_root="target/release-qualification/trust-control"
 log_root="${output_root}/logs"
 report_path="${output_root}/qualification-report.md"
@@ -19,6 +24,10 @@ run_check() {
   "$@" 2>&1 | tee "${log_path}"
   if ! grep -Eq "test result: ok\. [1-9][0-9]* passed" "${log_path}"; then
     echo "trust-control check ${slug} did not run a nonzero passing test count" >&2
+    exit 1
+  fi
+  if ! qualification_assert_no_required_skips "${log_path}" ${optional_tests[@]+"${optional_tests[@]}"}; then
+    echo "trust-control check ${slug} skipped a required test" >&2
     exit 1
   fi
 }
