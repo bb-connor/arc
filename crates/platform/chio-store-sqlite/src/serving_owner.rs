@@ -392,7 +392,7 @@ impl SqliteAuthorityStore {
             )?;
             crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
             crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
-            crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+            crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection, false)
                 .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
             crate::finding_market_store::initialize_finding_market_schema(&mut connection)
                 .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
@@ -542,7 +542,7 @@ impl SqliteAuthorityStore {
         )?;
         crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
         crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
-        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection, true)
             .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         crate::finding_market_store::initialize_finding_market_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
@@ -647,7 +647,7 @@ impl SqliteAuthorityStore {
         )?;
         crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
         crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
-        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection)
+        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection, false)
             .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
         crate::finding_market_store::initialize_finding_market_schema(&mut connection)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;

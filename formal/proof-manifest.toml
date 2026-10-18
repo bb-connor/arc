@@ -2046,12 +2046,12 @@ rust_symbols = [
   "preflight_tool_outcome_schema",
   "verify_tool_outcome_schema_catalog",
 ]
-normalized_sha256 = "602f68a5afef1bcee7bcb5c72ede8c145d377a74422e194dbdfcdfa568990dfa"
+normalized_sha256 = "4f616652ef229d5df25deb21d216cb59368263eedf14322f5f6b45aa9b003cf1"
 symbol_sha256 = [
   { symbol = "SqliteToolOutcomeStore::require_security_release_checkpoint_support", sha256 = "cbf49359b0aa14f5549fe6e1fb787b9fe1565ca27319ef120cb0baa20f9c75df" },
   { symbol = "SqliteToolOutcomeStore::record_security_release", sha256 = "d95908fa37f96e5c10dbda7d8b7f396ddc99420e3ad86c08a1a394610a909a65" },
   { symbol = "SqliteToolOutcomeStore::lookup_security_release", sha256 = "3315ac8508a69f3aa77e42d00c478dcc98b734e98d5a5265e1d076fa8517da1e" },
-  { symbol = "initialize_tool_outcome_schema", sha256 = "33bd64c15856871a06fc649d591d9a52e1acedc0e8df4e11c77c878acf29ef49" },
+  { symbol = "initialize_tool_outcome_schema", sha256 = "32b31634f0efcd3ad09f988865ceddbb2e529e69ee410db3970efc9f0eb18e67" },
   { symbol = "verify_tool_outcome_invariants", sha256 = "45fbfb7999b00c1486881ff4cc71ee87eef6b9ce6a81128b45dcef7659b751d3" },
   { symbol = "verify_tool_outcome_data_invariants", sha256 = "5c71f770b78fcacc10df25ff3ad452f3a07424b073ccc409ae3894215a9dbeb2" },
   { symbol = "preflight_tool_outcome_schema", sha256 = "94aca80e6d260543451bc057d416c34fc11d43ae2c57f8fa202847ad3fd2d874" },
