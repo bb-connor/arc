@@ -15,7 +15,7 @@ fn durable_runtime_refuses_noncurrent_and_damaged_tool_outcome_catalogs() -> Tes
                 "tool outcome schema differs from the canonical definition".to_owned(),
             )
         } else {
-            ToolOutcomeStoreError::StaleSchema {
+            ToolOutcomeStoreError::NoncurrentSchema {
                 found: version,
                 current: 1,
             }

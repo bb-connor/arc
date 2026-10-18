@@ -44,13 +44,8 @@ pub(crate) struct DurableToolReturnContext {
     pub(super) caller_delivery_evidence:
         Option<Box<crate::caller_delivery::CallerDeliveryEvidenceV1>>,
     pub(super) federation_context: Option<FrozenFederationContext>,
-    pub(super) receipt_signing_identity:
-        Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
-    // Legacy caller frames stay explicitly unbound. New live contexts always
-    // retain the original selection, including absent participants.
-    participants: Option<Box<FrozenDispatchParticipants>>,
-    // None on native dispatch and on older caller formats. Historical frames
-    // cannot acquire missing custody by reading a newer current projection.
+    pub(super) receipt_signing_identity: crate::tool_outcome::FrozenReceiptSigningIdentityV1,
+    participants: Box<FrozenDispatchParticipants>,
     caller_participant_custody: Option<caller::CallerParticipantCustody>,
 }
 
@@ -124,9 +119,7 @@ impl DurableToolReturnContext {
                 "frozen return context lost its selected grant".into(),
             ));
         }
-        if let Some(participants) = self.participants.as_ref() {
-            participants.validate(&admission.operation)?;
-        }
+        self.participants.validate(&admission.operation)?;
         Ok(())
     }
 
@@ -152,10 +145,6 @@ impl DurableToolReturnContext {
             .bind_native_ledger(ledger, context)
             .map_err(tool_outcome_error)?;
         self.participants
-            .as_mut()
-            .ok_or_else(|| {
-                KernelError::DurableAdmission("native dispatch lost frozen participants".into())
-            })?
             .bind_native_dispatch(&ledger.record_digest)?;
         self.original_security_dispatch_binding = Some(binding);
         Ok(())
@@ -309,10 +298,10 @@ impl ChioKernel {
                 request,
                 trusted_now_unix_ms,
             )?,
-            receipt_signing_identity: Some(self.freeze_receipt_signing_identity()?),
-            participants: Some(Box::new(FrozenDispatchParticipants::from_operation(
+            receipt_signing_identity: self.freeze_receipt_signing_identity()?,
+            participants: Box::new(FrozenDispatchParticipants::from_operation(
                 &admission.operation,
-            )?)),
+            )?),
             caller_participant_custody: if admission
                 .operation
                 .provider_attempt()

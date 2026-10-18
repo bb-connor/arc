@@ -31,7 +31,7 @@ fn tool_outcome_store_refuses_noncurrent_stamp_without_writes() -> TestResult {
         let mut connection = Connection::open_in_memory()?;
         initialize_tool_outcome_schema(&mut connection)?;
         crate::stamp_schema_version(&connection, TOOL_OUTCOME_SCHEMA_KEY, found)?;
-        let expected = ToolOutcomeStoreError::StaleSchema { found, current: 1 };
+        let expected = ToolOutcomeStoreError::NoncurrentSchema { found, current: 1 };
         assert_eq!(
             expected.to_string(),
             format!(
@@ -273,7 +273,7 @@ fn tool_outcome_preflight_leaves_a_fresh_database_unstamped() -> TestResult {
     connection.pragma_update(None, "query_only", true)?;
     let before_catalog = tool_outcome_schema_catalog(&connection)?;
     let before_changes = connection.total_changes();
-    preflight_tool_outcome_schema(&connection)?;
+    preflight_tool_outcome_schema(&connection, true)?;
     assert_eq!(tool_outcome_schema_catalog(&connection)?, before_catalog);
     assert_eq!(connection.total_changes(), before_changes);
     assert_eq!(

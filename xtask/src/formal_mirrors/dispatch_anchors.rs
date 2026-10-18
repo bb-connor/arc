@@ -809,10 +809,11 @@ const DISPATCH_COMMIT_SOURCES: &[RequiredSource] = &[
             "ChioKernel::restore_caller_return_context",
             "ChioKernel::decode_caller_return_context",
             "ChioKernel::decode_caller_return_payload",
-            "SCHEMA",
-            "SIGNING_SCHEMA",
-            "LEGACY_SCHEMA",
         ],
+    },
+    RequiredSource {
+        path: "crates/kernel/chio-kernel/src/admission_operation/native_caller_custody.rs",
+        symbols: &["CALLER_RETURN_CONTEXT_SCHEMA", "AdmissionCallerDispatchContextV1::native_release_custody"],
     },
     RequiredSource {
         path: "crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs",

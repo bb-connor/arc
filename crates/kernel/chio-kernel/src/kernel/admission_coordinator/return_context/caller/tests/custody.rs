@@ -179,63 +179,18 @@ fn caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims() 
 }
 
 #[test]
-fn caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue() -> TestResult {
+fn caller_return_refuses_absent_participant_custody() -> TestResult {
     let fixture = fixture()?;
     let mut payload: serde_json::Value =
         serde_json::from_slice(fixture.frame.kernel_context_json())?;
-    payload["schema"] = serde_json::json!(PARTICIPANT_SCHEMA);
-    payload
-        .as_object_mut()
-        .ok_or("caller object")?
-        .remove("start_valid_until_unix_ms");
-    assert!(
-        fixture
-            .kernel
-            .decode_caller_return_payload(
-                &fixture.admission,
-                &canonical_json_bytes(&payload)?,
-                current_unix_timestamp_ms(),
-            )
-            .is_err(),
-        "v3 cannot smuggle a new custody snapshot"
-    );
     payload
         .as_object_mut()
         .ok_or("caller object")?
         .remove("participant_custody");
-    let legacy = fixture.kernel.decode_caller_return_payload(
-        &fixture.admission,
-        &canonical_json_bytes(&payload)?,
-        current_unix_timestamp_ms(),
-    )?;
-    assert!(legacy.participants.is_some());
-    assert!(legacy.caller_participant_custody.is_none());
-    assert!(
-        matches!(
-            fixture
-                .kernel
-                .frame_caller_return_context(
-                    &fixture.admission,
-                    &fixture.request,
-                    &legacy,
-                    current_unix_timestamp_ms(),
-                ),
-            Err(KernelError::DurableAdmission(reason))
-                if reason == "caller return component lost its admission binding"
-        ),
-        "historical framing cannot infer missing custody"
-    );
-    payload["schema"] = serde_json::json!(SCHEMA);
-    assert!(
-        fixture
-            .kernel
-            .decode_caller_return_payload(
-                &fixture.admission,
-                &canonical_json_bytes(&payload)?,
-                current_unix_timestamp_ms(),
-            )
-            .is_err(),
-        "v4 requires the original custody snapshot"
-    );
+    let error = serde_json::from_value::<CallerReturnWire>(payload)
+        .err()
+        .ok_or("missing participant custody decoded")?;
+    assert_eq!(error.classify(), serde_json::error::Category::Data);
+    assert_eq!(error.to_string(), "missing field `participant_custody`");
     Ok(())
 }

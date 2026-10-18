@@ -3,7 +3,6 @@ use super::*;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 struct Fixture {
-    request: ToolCallRequest,
     kernel: ChioKernel,
     admission: DurableToolAdmission,
     frame: AdmissionCallerDispatchContextV1,
@@ -21,47 +20,32 @@ mod participants;
 mod custody;
 
 #[test]
-fn missing_frozen_signer_refuses_return_recording_without_state_changes() -> TestResult {
-    let mut fixture = fixture()?;
-    let now = current_unix_timestamp_ms();
-    let mut context = fixture.kernel.freeze_durable_tool_return_context(
-        &fixture.admission,
-        DurableToolReturnContextInput {
-            request: &fixture.request,
-            matched_grant_index: 0,
-            extra_receipt_metadata: None,
-            pre_invocation_guard_evidence: &[],
-            verified_payee_binding: None,
-            verified_purchase: None,
-            verified_recovery: None,
-            trusted_now_unix_ms: now,
-            security_invocation_context: None,
-            security_release_required: false,
-        },
-    )?;
-    assert!(context.receipt_signing_identity.take().is_some());
+fn missing_frozen_signer_refuses_caller_decode_without_state_changes() -> TestResult {
+    let fixture = fixture()?;
     let operation = fixture.admission.operation.clone();
     let receipts = fixture.kernel.receipt_log().len();
-    let error = fixture
-        .kernel
-        .record_durable_tool_return(
-            &mut fixture.admission,
-            DurableToolReturnInput {
-                request: &fixture.request,
-                output: &ToolServerOutput::Value(serde_json::json!({"done": true})),
-                reported_cost: None,
-                context: &context,
-                elapsed: std::time::Duration::ZERO,
-                trusted_now_unix_ms: now,
-            },
-        )
+    let mut payload: serde_json::Value =
+        serde_json::from_slice(fixture.frame.kernel_context_json())?;
+    payload
+        .as_object_mut()
+        .ok_or("caller object")?
+        .remove("receipt_signing_identity");
+    let error = serde_json::from_value::<CallerReturnWire>(payload.clone())
         .err()
-        .ok_or("return without a frozen signer was recorded")?;
-    assert!(
-        matches!(&error, KernelError::DurableAdmission(message)
-            if message == "binding mismatch: raw.receipt_signing_identity"),
-        "unexpected refusal: {error}"
+        .ok_or("missing signer decoded")?;
+    assert_eq!(error.classify(), serde_json::error::Category::Data);
+    assert_eq!(
+        error.to_string(),
+        "missing field `receipt_signing_identity`"
     );
+    assert!(fixture
+        .kernel
+        .decode_caller_return_payload(
+            &fixture.admission,
+            &canonical_json_bytes(&payload)?,
+            current_unix_timestamp_ms(),
+        )
+        .is_err());
     assert_eq!(fixture.admission.operation, operation);
     assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     Ok(())
@@ -129,11 +113,7 @@ fn caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observat
         before.receipt_signing_identity
     );
     assert_eq!(
-        before
-            .receipt_signing_identity
-            .as_ref()
-            .ok_or("frozen signer")?
-            .public_key(),
+        before.receipt_signing_identity.public_key(),
         &fixture.kernel.receipt_signing_public_key()
     );
     assert_eq!(
@@ -213,57 +193,28 @@ fn caller_return_codec_rejects_private_payload_schema_identity_grant_and_limit_s
 }
 
 #[test]
-fn caller_return_codec_keeps_legacy_identity_absence_explicit() -> TestResult {
+fn caller_return_codec_rejects_noncurrent_schema_identities() -> TestResult {
     let fixture = fixture()?;
-    let mut payload: serde_json::Value =
-        serde_json::from_slice(fixture.frame.kernel_context_json())?;
-    payload
-        .as_object_mut()
-        .ok_or("caller object")?
-        .remove("receipt_signing_identity");
-    assert!(
-        fixture
+    for version in 2..=6 {
+        let mut payload: serde_json::Value =
+            serde_json::from_slice(fixture.frame.kernel_context_json())?;
+        payload["schema"] =
+            serde_json::json!(format!("chio.kernel-caller-return-context.v{version}"));
+        let error = fixture
             .kernel
             .decode_caller_return_payload(
                 &fixture.admission,
                 &canonical_json_bytes(&payload)?,
                 current_unix_timestamp_ms(),
             )
-            .is_err(),
-        "current frames require a frozen identity"
-    );
-    payload["schema"] = serde_json::json!(LEGACY_SCHEMA);
-    payload
-        .as_object_mut()
-        .ok_or("caller object")?
-        .remove("start_valid_until_unix_ms");
-    payload
-        .as_object_mut()
-        .ok_or("caller object")?
-        .remove("participant_custody");
-    payload
-        .as_object_mut()
-        .ok_or("caller object")?
-        .remove("participants");
-    let legacy = fixture.kernel.decode_caller_return_payload(
-        &fixture.admission,
-        &canonical_json_bytes(&payload)?,
-        current_unix_timestamp_ms(),
-    )?;
-    assert!(legacy.receipt_signing_identity.is_none());
-    payload["receipt_signing_identity"] =
-        serde_json::to_value(fixture.kernel.freeze_receipt_signing_identity()?)?;
-    assert!(
-        fixture
-            .kernel
-            .decode_caller_return_payload(
-                &fixture.admission,
-                &canonical_json_bytes(&payload)?,
-                current_unix_timestamp_ms(),
-            )
-            .is_err(),
-        "legacy frames cannot smuggle a signing selection"
-    );
+            .err()
+            .ok_or("noncurrent caller schema decoded")?;
+        assert!(
+            matches!(error, KernelError::DurableAdmission(ref reason)
+            if reason == "caller return component lost its admission binding"),
+            "{error}"
+        );
+    }
     Ok(())
 }
 
@@ -333,5 +284,38 @@ fn caller_return_codec_rejects_individually_valid_but_unadmitted_security_contex
             current_unix_timestamp_ms(),
         )
         .is_err());
+    Ok(())
+}
+
+#[test]
+fn caller_return_wire_requires_signer_participants_custody_and_deadline() -> TestResult {
+    let fixture = fixture()?;
+    let original: serde_json::Value = serde_json::from_slice(fixture.frame.kernel_context_json())?;
+    for field in [
+        "receipt_signing_identity",
+        "participants",
+        "participant_custody",
+        "start_valid_until_unix_ms",
+    ] {
+        let mut missing = original.clone();
+        missing
+            .as_object_mut()
+            .ok_or("caller context object")?
+            .remove(field);
+        let error = match serde_json::from_value::<CallerReturnWire>(missing) {
+            Ok(_) => panic!("caller context accepted missing {field}"),
+            Err(error) => error,
+        };
+        assert_eq!(error.classify(), serde_json::error::Category::Data);
+        assert_eq!(error.to_string(), format!("missing field `{field}`"));
+    }
+    Ok(())
+}
+
+#[test]
+fn caller_return_wire_writes_one_complete_v1_schema() -> TestResult {
+    let fixture = fixture()?;
+    let payload: serde_json::Value = serde_json::from_slice(fixture.frame.kernel_context_json())?;
+    assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v1");
     Ok(())
 }
