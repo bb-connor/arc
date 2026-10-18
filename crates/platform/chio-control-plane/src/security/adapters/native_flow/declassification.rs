@@ -1,5 +1,6 @@
 //! The verified plan becomes consumed only after exact native commit readback.
-//! No legacy use store or deserialized acknowledgement can construct this path.
+//! No persistent declassification use store or deserialized acknowledgement can
+//! construct this path.
 
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};

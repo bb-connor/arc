@@ -1,5 +1,5 @@
 //! Native input and post-join policy use only kernel-owned mutation/custody.
-//! No legacy flow, declassification or receipt store is installed by this resolver.
+//! This resolver installs no flow-state, declassification or receipt store.
 
 use super::{
     active_defense_receipt_request, declassification_consumption_body, declassification_grant_hash,
@@ -32,8 +32,10 @@ pub enum NativeFlowError {
 
     #[error("native flow authority differs from original kernel custody")]
     AuthorityMismatch,
-    #[error("legacy evidence stores cannot configure native flow authority")]
-    LegacyEvidenceConfigured,
+    #[error(
+        "flow declassification and receipt evidence stores cannot configure native flow authority"
+    )]
+    EvidenceStoresConfigured,
     #[error("native declassification is unsupported outside the captured lifecycle")]
     UnsupportedDeclassification,
     #[error("native flow classification exceeds the already recorded input taint")]
@@ -52,7 +54,8 @@ pub enum NativeFlowError {
 
 /// Trusted-host policy configuration for an independently initialized native
 /// authority. Construction grants neither activation nor mutation authority.
-/// Unlike the persistent legacy resolver, this type owns no flow-state store.
+/// Unlike [`PersistentFlowResolver`](super::PersistentFlowResolver), this type owns no
+/// flow-state store.
 pub struct NativeFlowResolver {
     binding: NativeSecurityAuthorityBindingV1,
     manifests: Arc<VerifiedManifestRegistry>,
@@ -144,7 +147,7 @@ impl NativeFlowResolver {
         config: FlowResolverConfig,
     ) -> Result<Self, NativeFlowError> {
         if config.declassification_evidence.is_some() || config.receipt_evidence.is_some() {
-            return Err(NativeFlowError::LegacyEvidenceConfigured);
+            return Err(NativeFlowError::EvidenceStoresConfigured);
         }
         Ok(Self {
             binding,
@@ -158,7 +161,8 @@ impl NativeFlowResolver {
 
     /// Opt into the kernel-owned capture, output and receipt lifecycle.
     /// Unsupported credential profiles and stores still deny; this never
-    /// enables a legacy fallback or qualifies an operating-system sandbox.
+    /// enables the persistent flow-state lifecycle or qualifies an
+    /// operating-system sandbox.
     #[must_use]
     pub fn with_captured_lifecycle(mut self) -> Self {
         self.captured_lifecycle = true;
@@ -199,8 +203,8 @@ impl NativeFlowResolver {
         }
         let policy_inputs = policy::PreparedInputs::capture(self, &custody, &resolved)?;
         let admission = prepare_pre_invocation(resolved.request)?;
-        // Legacy preparation would now apply this transition. Native admission
-        // has already joined exactly once. Classification drift or insufficient
+        // Native admission has already joined exactly once, so preparation
+        // applies no transition. Classification drift or insufficient
         // propagation must deny, not silently discard a required taint write.
         let taint = &admission.admission().taint_transition;
         if taint.key != state.key
@@ -339,7 +343,7 @@ impl chio_kernel::SecurityPreDispatchHook for NativeFlowResolver {
         &self,
         _: &chio_kernel::SecurityPreDispatchContext<'_>,
     ) -> Result<Option<chio_kernel::SecurityDispatchOutcomeHandle>, KernelError> {
-        // Native policy cannot fall back to legacy lifecycle or grant execution.
+        // Native policy never dispatches through the persistent lifecycle or grants execution.
         Err(KernelError::GuardDenied(
             "native security dispatch lifecycle is unsupported".into(),
         ))
@@ -432,7 +436,7 @@ impl PreparedNativeFlowDispatch<'_> {
 
     /// Retain this exact policy and the selected grant's physical participants
     /// in the native authority journal. This is not atomic budget capture or
-    /// dispatch activation. Unsupported stores deny without a legacy fallback.
+    /// dispatch activation. Unsupported stores deny.
     pub fn commit_custody_with_dispatch_ledger(
         self,
         grant_index: usize,
