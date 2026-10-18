@@ -96,3 +96,27 @@ fn extra_scheduler_column_is_refused_without_repair() -> TestResult {
         "ALTER TABLE security_scheduler_retries ADD COLUMN unrecognized_authority TEXT;",
     )
 }
+
+#[test]
+fn view_only_security_namespace_is_refused_without_stamping() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let path = directory.path().join("security.db");
+    let connection = Connection::open(&path)?;
+    connection.execute_batch("CREATE VIEW security_unrecognized AS SELECT 1 AS authority;")?;
+    let error = SqliteSecurityStateStore::open(&path)
+        .err()
+        .ok_or("unowned security view was accepted")?;
+    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
+    assert_eq!(error.code().as_str(), "store.integrity_failure");
+    assert_eq!(
+        connection.pragma_query_value(None, "application_id", |row| row.get::<_, i32>(0))?,
+        0
+    );
+    assert_eq!(
+        connection.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| {
+            row.get::<_, i64>(0)
+        })?,
+        1
+    );
+    Ok(())
+}
