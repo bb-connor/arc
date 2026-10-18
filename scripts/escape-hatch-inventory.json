@@ -70,6 +70,7 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/image_visit_test_support.rs::observe_native_image_visits_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/faults.rs::clear_native_output_join_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/output/faults.rs::inject_native_output_join_failure_for_test": 1,
+    "crates/platform/chio-store-sqlite/src/budget_store/store.rs::inject_nonce_preflight_rollback_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store.rs::claim_candidate_unqualified_for_test": 1,
     "crates/platform/chio-store-sqlite/src/channel_release_publisher_store.rs::replay_candidate_unqualified_for_test": 1,
     "crates/platform/chio-store-sqlite/src/economic_state_cache.rs::from_stored": 1,
