@@ -146,7 +146,10 @@ fn completed_replay_does_not_weaken_the_current_crypto_floor() -> TestResult {
 }
 
 #[test]
-fn raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor() -> TestResult {
+fn raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor() -> TestResult
+{
+    use crate::tool_outcome::ToolOutcomeError;
+
     let (kernel, request, store, _) = durable_admission_fixture("signing-codec");
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Allow);
@@ -159,9 +162,7 @@ fn raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor() -> 
         .ok_or("raw return")?;
     let blob = raw.canonical_blob()?;
     let decoded = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes())?;
-    let identity = decoded
-        .receipt_signing_identity()
-        .ok_or("frozen identity")?;
+    let identity = decoded.receipt_signing_identity();
     assert_eq!(identity.public_key(), &response.receipt.kernel_key);
     assert_eq!(
         identity.crypto_floor(),
@@ -179,9 +180,7 @@ fn raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor() -> 
                     .remove("receipt_signing_identity");
             }
             1 => {
-                value["schema"] = serde_json::json!(
-                    crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA
-                );
+                value["schema"] = serde_json::json!("chio.raw-invocation-outcome-with-request.v1");
             }
             2 => {
                 value["receipt_signing_identity"]["crypto_floor"] =
@@ -199,25 +198,21 @@ fn raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor() -> 
             }
             _ => return Err("unexpected mutation".into()),
         }
-        assert!(
-            RawInvocationOutcomeV1::from_canonical_bytes(
-                &chio_core::canonical::canonical_json_bytes(&value)?,
-            )
-            .is_err(),
-            "accepted mutation {mutation}"
+        let result = RawInvocationOutcomeV1::from_canonical_bytes(
+            &chio_core::canonical::canonical_json_bytes(&value)?,
         );
+        match mutation {
+            1 => assert_eq!(result, Err(ToolOutcomeError::Invalid("raw.schema"))),
+            2 => assert_eq!(
+                result,
+                Err(ToolOutcomeError::Binding("raw.receipt_signing_floor"))
+            ),
+            _ => assert!(
+                matches!(result, Err(ToolOutcomeError::UntrustedInput(ref error))
+                    if error.code() == "urn:chio:error:attest:signed-json-invalid-shape"),
+                "unexpected refusal for mutation {mutation}: {result:?}"
+            ),
+        }
     }
-    // Legacy bytes remain readable but never acquire a claimed frozen signer.
-    let mut legacy = original;
-    legacy["schema"] =
-        serde_json::json!(crate::tool_outcome::RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA);
-    legacy
-        .as_object_mut()
-        .ok_or("raw object")?
-        .remove("receipt_signing_identity");
-    let legacy = RawInvocationOutcomeV1::from_canonical_bytes(
-        &chio_core::canonical::canonical_json_bytes(&legacy)?,
-    )?;
-    assert!(legacy.receipt_signing_identity().is_none());
     Ok(())
 }

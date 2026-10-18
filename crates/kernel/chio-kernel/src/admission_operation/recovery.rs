@@ -102,7 +102,6 @@ pub enum AdmissionRecoveryFailureKind {
     ContractChanged,
     ParticipantUnavailable,
     PaymentPending,
-    RecoveryRequestAbsent,
     OutputDenied,
     UnsupportedState,
     LegacyPaymentAmountAbsent,

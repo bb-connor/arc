@@ -157,10 +157,12 @@ fn checkpoint_survives_authorized_payload_compaction_and_owner_rotation() -> Tes
         Some(context(&request)?)
     );
     let payload = raw.canonical_blob()?;
-    let summary = outcomes.compact_retained_invocation_blobs(
+    let summary = outcomes.compact_retained_invocation_blobs_page_with_limits(
         cutoff,
         &runtime.authority.mutation_fence(),
         cutoff,
+        None,
+        chio_store_sqlite::ToolOutcomeCompactionLimits::default(),
     )?;
     assert_eq!(summary.compacted, 0);
     assert_eq!(summary.retained_unsupported, 1);

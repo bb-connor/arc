@@ -63,8 +63,9 @@ resolved-output completeness are still checked. Recovery deferral and clearance
 have separate fenced journal commits and status verification; those commits do
 not replace the outcome attachment's commit binding. These are concrete readback
 boundaries, not modeled SQL recovery transitions or a proof of durable custody.
-The outcome schema anchor also installs `tool_outcome_payload_compaction.sql`;
-hashing the Rust entry point does not prove that SQL migration.
+The outcome schema anchor installs the complete v1 schema in
+`tool_outcome_store.sql`; hashing the Rust entry point does not prove the SQL
+schema or its catalog validation.
 Native policy schema literals are anchored at the shared
 `chio_security_types::flow` constants used by both the producer and storage
 validator; centralizing those unchanged v1/v2 literals adds no model state.

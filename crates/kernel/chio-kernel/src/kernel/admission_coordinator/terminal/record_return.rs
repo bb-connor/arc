@@ -1,4 +1,4 @@
-//! Record an observed return once; historical loading never creates authority.
+//! Record an observed return once; retained loading never creates authority.
 use super::*;
 
 impl ChioKernel {
@@ -16,6 +16,10 @@ impl ChioKernel {
             trusted_now_unix_ms,
         } = input;
         context.validate_binding(admission, request)?;
+        let receipt_signing_identity =
+            context.receipt_signing_identity.clone().ok_or_else(|| {
+                tool_outcome_error(ToolOutcomeError::Binding("raw.receipt_signing_identity"))
+            })?;
         let matched_grant_index = context.matched_grant_index;
         let pre_invocation_guard_evidence = &context.pre_invocation_guard_evidence;
         self.validate_guarded_output(request, matched_grant_index, output, false)?;
@@ -120,7 +124,7 @@ impl ChioKernel {
                     "durable tool return lost its dispatch commit".to_owned(),
                 )
             })?;
-        let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
+        let raw = RawInvocationOutcomeV1::from_committed_dispatch(
             &admission.operation,
             &commit,
             AdmissionIdentifier::try_new("tool_server", request.server_id.clone())?,
@@ -134,35 +138,22 @@ impl ChioKernel {
             monetary_cost,
             receipt_metadata_snapshot,
             pre_invocation_guard_evidence.to_vec(),
-            request,
-            context.security_invocation_context.clone(),
-        )
-        .map_err(tool_outcome_error)?;
-        let raw = raw
-            .with_security_release_requirement(context.security_release_required)
-            .map_err(tool_outcome_error)?;
-        let raw = raw
-            .with_federation_context_json(
-                context
+            crate::tool_outcome::RawInvocationContext {
+                request,
+                security_invocation_context: context.security_invocation_context.clone(),
+                federation_context_json: context
                     .federation_context
                     .as_ref()
                     .map(|federation| federation.canonical_json().to_owned()),
-            )
-            .map_err(tool_outcome_error)?;
-        let raw = match context.receipt_signing_identity.as_ref() {
-            Some(identity) => raw
-                .with_receipt_signing_identity(identity.clone())
-                .map_err(tool_outcome_error)?,
-            None => raw,
-        };
-        let raw = raw
-            .with_caller_delivery_evidence(context.caller_delivery_evidence.clone())
-            .map_err(tool_outcome_error)?;
-        let raw = raw
-            .with_original_security_dispatch_binding(
-                context.original_security_dispatch_binding.clone(),
-            )
-            .map_err(tool_outcome_error)?;
+                security_release_required: context.security_release_required,
+                receipt_signing_identity,
+                caller_delivery_evidence: context.caller_delivery_evidence.clone(),
+                original_security_dispatch_binding: context
+                    .original_security_dispatch_binding
+                    .clone(),
+            },
+        )
+        .map_err(tool_outcome_error)?;
         let blob = raw.canonical_blob().map_err(tool_outcome_error)?;
         let record = ToolOutcomeRecordV1::record_tool_returned(
             &admission.operation,

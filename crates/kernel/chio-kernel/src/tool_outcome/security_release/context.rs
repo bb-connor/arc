@@ -61,11 +61,7 @@ impl<'a> DurableSecurityReleaseContext<'a> {
             operation: artifacts.operation,
             outcome: artifacts.outcome,
             evaluation: artifacts.evaluation,
-            request_canonical_json: artifacts
-                .raw
-                .request_canonical_json
-                .as_deref()
-                .ok_or(ToolOutcomeError::Binding("security_release.request"))?,
+            request_canonical_json: &artifacts.raw.request_canonical_json,
             security_context: artifacts
                 .raw
                 .security_invocation_context()

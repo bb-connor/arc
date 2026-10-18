@@ -4,8 +4,8 @@ mod signing;
 
 use super::*;
 
-#[path = "payload_maintenance_tests/migration.rs"]
-mod migration;
+#[path = "payload_maintenance_tests/schema_refusal.rs"]
+mod schema_refusal;
 #[path = "payload_maintenance_tests/stop.rs"]
 mod stop;
 use std::error::Error;
@@ -292,10 +292,7 @@ fn durable_payload_maintenance_new_raw_requests_omit_transient_canaries() -> Tes
         .tool_outcome_store()
         .load_raw_invocation_by_operation(&operation.operation_id)?
         .ok_or("missing raw envelope")?;
-    let request_json = raw
-        .to_persisted()
-        .request_canonical_json
-        .ok_or("missing raw request")?;
+    let request_json = raw.to_persisted().request_canonical_json;
     assert!(!request_json.contains("DURABLE_TRANSIENT_PROOF_CANARY"));
     assert!(!request_json.contains("DURABLE_TRANSIENT_APPROVAL_CANARY"));
     let retained: ToolCallRequest = serde_json::from_str(&request_json)?;

@@ -76,10 +76,7 @@ pub(super) fn require_original(
                 .ok_or_else(|| invalid("native output lacks its admitted security identity"))?,
         )?;
         let request = chio_core::canonical::UntrustedJsonText::from_wire(
-            (raw.request_canonical_json
-                .as_deref()
-                .ok_or_else(|| invalid("native output lacks its frozen request"))?)
-            .as_bytes(),
+            raw.request_canonical_json.as_bytes(),
             64 * 1024 * 1024,
         )
         .and_then(|input| input.decode_signed())
