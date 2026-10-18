@@ -225,6 +225,43 @@ fn dispatch_recovery_binds_the_exact_action_and_fencing_observation() {
     ));
 }
 
+#[test]
+fn dispatch_recovery_requires_a_fencing_token_on_the_wire() {
+    let request = serde_json::json!({
+        "key": {"tenant_id": "tenant-dispatch", "dispatch_id": "dispatch-response"},
+        "action_id": "action-response",
+        "recovery_id": "recovery-response",
+        "lease_owner_id": "executor-worker",
+        "expected_fencing_token": 8,
+        "now_unix_ms": 40_000,
+        "lease_expires_at_unix_ms": 50_000
+    });
+    let decoded = serde_json::from_value::<ResponseDispatchRecoveryRequest>(request.clone())
+        .unwrap_or_else(|error| panic!("valid recovery request was refused: {error}"));
+    assert_eq!(
+        serde_json::to_value(decoded)
+            .unwrap_or_else(|error| panic!("recovery serialization failed: {error}")),
+        request
+    );
+    let mut absent = request.clone();
+    absent
+        .as_object_mut()
+        .unwrap_or_else(|| panic!("recovery request is not an object"))
+        .remove("expected_fencing_token");
+    let mut null = request;
+    null["expected_fencing_token"] = serde_json::Value::Null;
+    for (invalid, expected) in [
+        (absent, "missing field `expected_fencing_token`"),
+        (null, "invalid type: null, expected u64"),
+    ] {
+        let error = serde_json::from_value::<ResponseDispatchRecoveryRequest>(invalid)
+            .err()
+            .unwrap_or_else(|| panic!("unfenced recovery request was accepted"));
+        assert_eq!(error.classify(), serde_json::error::Category::Data);
+        assert_eq!(error.to_string(), expected);
+    }
+}
+
 fn assert_legacy_canonical<T: serde::de::DeserializeOwned + serde::Serialize>(
     bytes: &[u8],
     expected_hash: [u8; 32],
