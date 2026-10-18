@@ -91,6 +91,21 @@ pub(super) fn parse_mapping(input: &str) -> MappingParse {
     parsed
 }
 
+pub(super) fn reject_mapping_warnings(path: &str, warnings: &[String]) -> Result<(), String> {
+    if warnings.is_empty() {
+        return Ok(());
+    }
+    let lines = warnings
+        .iter()
+        .map(|warning| format!("  {path} {warning}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Err(format!(
+        "{path} has {} malformed property table row(s):\n{lines}",
+        warnings.len()
+    ))
+}
+
 pub(super) fn validate_kani_crates(
     harnesses: &[KaniHarness],
     workspace_members: &BTreeSet<String>,
