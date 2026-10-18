@@ -75,6 +75,7 @@ impl WatermarkSequenceStore for Sequences {
 struct Observations {
     rows: Mutex<BTreeMap<(TenantId, Digest32, RecordId), WatermarkObservation>>,
     fail: AtomicBool,
+    mismatched_duplicate: AtomicBool,
 }
 
 impl WatermarkObservationStore for Observations {
@@ -84,6 +85,14 @@ impl WatermarkObservationStore for Observations {
     ) -> PortResult<WatermarkObservationResult> {
         if self.fail.load(Ordering::SeqCst) {
             return Err(PortError::unavailable());
+        }
+        if self.mismatched_duplicate.load(Ordering::SeqCst) {
+            return Ok(WatermarkObservationResult::Duplicate {
+                first_payload_digest: Digest32::new([0xA5; 32]),
+                first_token_digest: Digest32::new([0x5A; 32]),
+                first_evidence_ref: observation.evidence_ref.clone(),
+                first_observed_at_unix_ms: observation.observed_at_unix_ms,
+            });
         }
         let mut rows = self.rows.lock().map_err(|_| PortError::unavailable())?;
         let key = (
@@ -722,10 +731,31 @@ fn an_inactive_hit_retried_later_is_a_duplicate_with_the_first_time() {
     assert!(matches!(
         &retry.inactive_hits[0].observation,
         WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Duplicate {
+            first_evidence_ref,
             first_observed_at_unix_ms: OBSERVED_AT,
             ..
-        })
+        }) if first_evidence_ref.as_str() == "evidence-first"
     ));
+}
+
+#[test]
+fn an_inactive_hit_whose_store_returns_a_mismatched_duplicate_is_an_integrity_failure() {
+    let fixture = Fixture::new(true, 10_000);
+    let token = fixture.issue();
+    retire_issued_marker(&fixture);
+    fixture
+        .observations
+        .mismatched_duplicate
+        .store(true, Ordering::SeqCst);
+    assert_eq!(
+        fixture.verifier().scan_text(
+            &token,
+            &fixture.observation("observation-retired", "evidence-retired", OBSERVED_AT),
+        ),
+        Err(WatermarkScanError::ObservationUnrecorded(
+            PortErrorKind::IntegrityFailure
+        ))
+    );
 }
 
 #[test]
