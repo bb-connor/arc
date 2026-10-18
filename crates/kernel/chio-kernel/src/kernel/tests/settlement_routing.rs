@@ -43,7 +43,6 @@ mod settlement_routing_tests {
         inputs: Vec<SettlementRoutingInput>,
         legacy_appends: usize,
         atomic_appends: usize,
-        legacy_atomic_appends: usize,
         timed_atomic_appends: usize,
         timed_atomic_budget_ms: Option<u64>,
         claim_calls: usize,
@@ -63,7 +62,6 @@ mod settlement_routing_tests {
                 inputs: Vec::new(),
                 legacy_appends: 0,
                 atomic_appends: 0,
-                legacy_atomic_appends: 0,
                 timed_atomic_appends: 0,
                 timed_atomic_budget_ms: None,
                 claim_calls: 0,
@@ -137,24 +135,6 @@ mod settlement_routing_tests {
 
         fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
             true
-        }
-
-        fn append_chio_receipt_with_pending_observation(
-            &self,
-            receipt: &ChioReceipt,
-            pending: &PendingSettlementObservation,
-        ) -> Result<(), ReceiptStoreError> {
-            let mut state = self.state();
-            state.atomic_appends += 1;
-            state.legacy_atomic_appends += 1;
-            if state.seed_fails {
-                return Err(ReceiptStoreError::Conflict(
-                    "forced atomic settlement seed failure".to_string(),
-                ));
-            }
-            state.receipts.insert(receipt.id.clone(), receipt.clone());
-            state.attempts.insert(receipt.id.clone(), *pending);
-            Ok(())
         }
 
         fn append_chio_receipt_with_pending_observation_and_timeout(
@@ -643,7 +623,6 @@ mod settlement_routing_tests {
 
         let state = store.state();
         assert_eq!(state.timed_atomic_appends, 1);
-        assert_eq!(state.legacy_atomic_appends, 0);
         assert_eq!(state.timed_atomic_budget_ms, Some(321));
         assert_eq!(state.legacy_appends, 0);
         assert!(state.receipts.contains_key(&receipt.id));

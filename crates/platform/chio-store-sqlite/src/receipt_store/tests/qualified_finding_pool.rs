@@ -418,8 +418,11 @@ fn qualified_settlement_state_writes_advance_the_rollback_anchor(
     let pending = chio_kernel::PendingSettlementObservation {
         next_visible_at_ms: 1,
     };
-    chio_kernel::ReceiptStore::append_chio_receipt_with_pending_observation(
-        &store, &receipt, &pending,
+    chio_kernel::ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        std::time::Duration::from_secs(2),
     )?;
     store.flush_receipt_writes()?;
     let connection = rusqlite::Connection::open(&database)?;

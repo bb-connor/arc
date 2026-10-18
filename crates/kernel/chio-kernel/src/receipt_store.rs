@@ -490,26 +490,14 @@ pub trait ReceiptStore: Send + Sync {
     }
     /// Whether the atomic receipt projection also honors the supplied append
     /// deadline. Settlement runtime installation requires this capability so a
-    /// legacy atomic-only store cannot reintroduce an unbounded writer wait.
+    /// store without deadline enforcement cannot introduce an unbounded writer wait.
     fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
         false
-    }
-    /// Atomically append a receipt and its initial settlement observation.
-    ///
-    /// The default fails without appending either record.
-    fn append_chio_receipt_with_pending_observation(
-        &self,
-        _receipt: &ChioReceipt,
-        _pending: &PendingSettlementObservation,
-    ) -> Result<(), ReceiptStoreError> {
-        Err(ReceiptStoreError::Unsupported(
-            "atomic settlement observation projection".to_string(),
-        ))
     }
     /// Atomically append a receipt and its initial settlement observation while
     /// honoring the receipt-append deadline on stores with an async writer.
     ///
-    /// The default fails without invoking the legacy unbounded atomic method.
+    /// The default fails without appending either record.
     /// Stores that advertise `supports_atomic_receipt_projection_with_timeout`
     /// must override this method and enforce `budget`.
     fn append_chio_receipt_with_pending_observation_and_timeout(
@@ -1538,26 +1526,18 @@ mod tests {
         }
     }
 
-    struct LegacyAtomicOnlyStore {
-        atomic_append_calls: AtomicUsize,
+    struct AtomicStoreWithoutTimeout {
+        append_calls: AtomicUsize,
     }
 
-    impl ReceiptStore for LegacyAtomicOnlyStore {
+    impl ReceiptStore for AtomicStoreWithoutTimeout {
         fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
+            self.append_calls.fetch_add(1, Ordering::SeqCst);
             Ok(())
         }
 
         fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
             AtomicReceiptProjection::SettlementObservationV1
-        }
-
-        fn append_chio_receipt_with_pending_observation(
-            &self,
-            _receipt: &ChioReceipt,
-            _pending: &PendingSettlementObservation,
-        ) -> Result<(), ReceiptStoreError> {
-            self.atomic_append_calls.fetch_add(1, Ordering::SeqCst);
-            Ok(())
         }
 
         fn append_child_receipt(
@@ -1620,24 +1600,21 @@ mod tests {
             next_visible_at_ms: 1,
         };
         assert!(matches!(
-            store.append_chio_receipt_with_pending_observation(&receipt, &pending),
-            Err(ReceiptStoreError::Unsupported(_))
-        ));
-        assert!(matches!(
             store.append_chio_receipt_with_pending_observation_and_timeout(
                 &receipt,
                 &pending,
                 std::time::Duration::from_millis(1),
             ),
-            Err(ReceiptStoreError::Unsupported(_))
+            Err(ReceiptStoreError::Unsupported(message))
+                if message == "timeout-aware atomic settlement observation projection"
         ));
         assert_eq!(store.append_calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]
-    fn timed_atomic_default_never_calls_the_legacy_unbounded_projection() {
-        let store = LegacyAtomicOnlyStore {
-            atomic_append_calls: AtomicUsize::new(0),
+    fn timed_atomic_projection_requires_timeout_support() {
+        let store = AtomicStoreWithoutTimeout {
+            append_calls: AtomicUsize::new(0),
         };
         let receipt = signed_receipt();
         let pending = PendingSettlementObservation {
@@ -1655,9 +1632,10 @@ mod tests {
                 &pending,
                 std::time::Duration::from_millis(1),
             ),
-            Err(ReceiptStoreError::Unsupported(_))
+            Err(ReceiptStoreError::Unsupported(message))
+                if message == "timeout-aware atomic settlement observation projection"
         ));
-        assert_eq!(store.atomic_append_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(store.append_calls.load(Ordering::SeqCst), 0);
     }
 
     #[test]
