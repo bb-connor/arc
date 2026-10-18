@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 474bdbf3f47de4760cd26c431403a6dfec83325e15db307cb5fcbf132a6f05dd
+# Schema sha256: 8fd2dc945c403527957fdee645503c30211940f9393f37c043b244ed2c5ed102
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -48,7 +48,7 @@ class Witness(BaseModel):
 
 class WitnessState1(BaseModel):
     """
-    W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+    W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
     """
 
     model_config = ConfigDict(
@@ -59,7 +59,7 @@ class WitnessState1(BaseModel):
 
 class WitnessState3(BaseModel):
     """
-    W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+    W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
     """
 
     model_config = ConfigDict(
@@ -90,7 +90,7 @@ class WitnessReceipt(BaseModel):
 
 class WitnessState2(BaseModel):
     """
-    W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+    W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
     """
 
     model_config = ConfigDict(
@@ -104,7 +104,7 @@ class WitnessState2(BaseModel):
 class WitnessState(RootModel[WitnessState1 | WitnessState2 | WitnessState3]):
     root: WitnessState1 | WitnessState2 | WitnessState3 = Field(
         ...,
-        description="W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.",
+        description="W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.",
     )
 
 
@@ -121,7 +121,7 @@ class Body(BaseModel):
     signerKey: constr(
         pattern=r"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\+mldsa65)$"
     )
-    witnessState: WitnessState | None = None
+    witnessState: WitnessState
 
 
 class ChioAnchorBatchV1(BaseModel):

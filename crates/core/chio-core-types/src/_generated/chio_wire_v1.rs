@@ -12335,7 +12335,8 @@ pub mod anchor_batch {
     ///    "schema",
     ///    "signerKey",
     ///    "treeRoot",
-    ///    "witness"
+    ///    "witness",
+    ///    "witnessState"
     ///  ],
     ///  "properties": {
     ///    "checkpointIds": {
@@ -12394,12 +12395,8 @@ pub mod anchor_batch {
         #[serde(rename = "treeRoot")]
         pub tree_root: BodyTreeRoot,
         pub witness: Witness,
-        #[serde(
-            rename = "witnessState",
-            default,
-            skip_serializing_if = "::std::option::Option::is_none"
-        )]
-        pub witness_state: ::std::option::Option<WitnessState>,
+        #[serde(rename = "witnessState")]
+        pub witness_state: WitnessState,
     }
     impl ::std::convert::From<&Body> for Body {
         fn from(value: &Body) -> Self {
@@ -13637,13 +13634,13 @@ pub mod anchor_batch {
                 })
         }
     }
-    ///W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.
+    ///W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.
     ///
     /// <details><summary>JSON schema</summary>
     ///
     /// ```json
     ///{
-    ///  "description": "W2.3 lifecycle for the public-witness lane. Defaults to {kind: pending} when omitted to preserve wire compatibility for v1 batches that pre-date the state machine.",
+    ///  "description": "W2.3 lifecycle for the public-witness lane. Required: the body signature covers the canonical bytes including witnessState, and a freshly minted batch carries {kind: pending}.",
     ///  "oneOf": [
     ///    {
     ///      "type": "object",
