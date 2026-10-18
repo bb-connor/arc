@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "tool_outcome_tests/required_envelope.rs"]
+mod required_envelope;
+
 #[path = "tool_outcome_tests/terminal_snapshot.rs"]
 mod terminal_snapshot;
 
