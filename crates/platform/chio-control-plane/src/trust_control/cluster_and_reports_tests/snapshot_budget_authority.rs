@@ -1,9 +1,9 @@
 use super::*;
 
 #[test]
-fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
-    let source_budget_db = unique_temp_path("cluster-source-legacy-budget", "sqlite3");
-    let target_budget_db = unique_temp_path("cluster-target-legacy-budget", "sqlite3");
+fn elected_leader_snapshot_bootstraps_v1_usage_anchors() {
+    let source_budget_db = unique_temp_path("cluster-source-anchored-budget", "sqlite3");
+    let target_budget_db = unique_temp_path("cluster-target-anchored-budget", "sqlite3");
     let authority_directory = chio_test_support::private_tempdir().test_unwrap();
     let source_authority_db = authority_directory.path().join("source-authority.sqlite3");
     let target_authority_db = authority_directory.path().join("target-authority.sqlite3");
@@ -38,7 +38,7 @@ fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
     let source_connection = rusqlite::Connection::open(&source_budget_db).test_unwrap();
     source_connection
         .execute(
-            "INSERT INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+            "INSERT INTO budget_usage_anchor_write_gate(singleton) VALUES (1)",
             [],
         )
         .test_unwrap();
@@ -48,7 +48,7 @@ fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
             INSERT INTO capability_grant_budgets (
                 capability_id, grant_index, invocation_count, updated_at, seq,
                 total_cost_exposed, total_cost_realized_spend
-            ) VALUES ('cap-pre-upgrade', 0, 3, 1717171717, 42, 55, 21)
+            ) VALUES ('cap-anchored', 0, 3, 1717171717, 42, 55, 21)
             "#,
             [],
         )
@@ -59,13 +59,19 @@ fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
             INSERT INTO budget_usage_history_anchors (
                 capability_id, grant_index, invocation_count, updated_at, seq,
                 total_cost_exposed, total_cost_realized_spend, anchored_schema_version
-            ) VALUES ('cap-pre-upgrade', 0, 3, 1717171717, 42, 55, 21, 6)
+            ) VALUES ('cap-anchored', 0, 3, 1717171717, 42, 55, 21, 1)
             "#,
             [],
         )
         .test_unwrap();
     source_connection
-        .execute("DELETE FROM budget_usage_anchor_migration_gate", [])
+        .execute("DELETE FROM budget_usage_anchor_write_gate", [])
+        .test_unwrap();
+    source_connection
+        .execute(
+            "UPDATE budget_replication_meta SET next_seq = 42 WHERE singleton = 1",
+            [],
+        )
         .test_unwrap();
     drop(source_connection);
 
@@ -84,7 +90,7 @@ fn elected_leader_snapshot_bootstraps_pre_upgrade_usage_anchors() {
 
     let target_store = SqliteBudgetStore::open(&target_budget_db).test_unwrap();
     let imported = target_store
-        .get_usage("cap-pre-upgrade", 0)
+        .get_usage("cap-anchored", 0)
         .test_unwrap()
         .test_expect("fresh follower imported the leader-committed baseline");
     assert_eq!(imported.invocation_count, 3);

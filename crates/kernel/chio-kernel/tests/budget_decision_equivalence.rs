@@ -44,7 +44,7 @@ impl SqliteFixture {
         let transaction = connection.transaction().test_unwrap();
         transaction
             .execute(
-                "INSERT OR IGNORE INTO budget_usage_anchor_migration_gate(singleton) VALUES (1)",
+                "INSERT OR IGNORE INTO budget_usage_anchor_write_gate(singleton) VALUES (1)",
                 [],
             )
             .test_unwrap();
@@ -54,7 +54,7 @@ impl SqliteFixture {
                 INSERT INTO budget_usage_history_anchors (
                     capability_id, grant_index, invocation_count, updated_at, seq,
                     total_cost_exposed, total_cost_realized_spend, anchored_schema_version
-                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 6)
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
                 "#,
                 params![
                     &record.capability_id,
@@ -68,7 +68,7 @@ impl SqliteFixture {
             )
             .test_unwrap();
         transaction
-            .execute("DELETE FROM budget_usage_anchor_migration_gate", [])
+            .execute("DELETE FROM budget_usage_anchor_write_gate", [])
             .test_unwrap();
         transaction.commit().test_unwrap();
         self.store().upsert_usage(record).test_unwrap();
