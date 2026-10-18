@@ -3,7 +3,7 @@ use rusqlite::types::Value;
 
 use super::*;
 
-mod migration;
+mod schema_refusal;
 mod tenant_isolation;
 
 const REMOVABLE_KINDS: [ResponseEffectKind; 4] = [

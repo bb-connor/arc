@@ -370,130 +370,23 @@ fn empty_overlay(target: TenantScopedId) -> OverlaySnapshot {
 }
 
 #[test]
-fn response_effect_generation_migration_preserves_existing_intent() {
-    let directory =
-        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-    let path = directory.path().join("legacy-response-effect.db");
-    let connection = rusqlite::Connection::open(&path)
-        .unwrap_or_else(|error| panic!("open legacy database: {error}"));
-    connection
-        .execute_batch(
-            r#"
-            CREATE TABLE security_response_effects (
-                effect_id TEXT NOT NULL,
-                tenant_id TEXT NOT NULL,
-                action_id TEXT NOT NULL,
-                scheduler_fencing_token INTEGER NOT NULL,
-                state TEXT NOT NULL,
-                body BLOB NOT NULL CHECK (length(body) <= 1048576),
-                body_hash BLOB NOT NULL CHECK (length(body_hash) = 32),
-                encrypted_rollback_ref TEXT,
-                PRIMARY KEY (tenant_id, effect_id)
-            );
-
-            CREATE TABLE security_scheduler_leases (
-                action_id TEXT NOT NULL,
-                tenant_id TEXT NOT NULL,
-                claim_id TEXT NOT NULL,
-                claim_ordinal INTEGER NOT NULL,
-                lease_owner_id TEXT NOT NULL,
-                lease_expires_at INTEGER NOT NULL,
-                fencing_token INTEGER NOT NULL,
-                PRIMARY KEY (tenant_id, action_id)
-            );
-
-            INSERT INTO security_scheduler_leases (
-                action_id, tenant_id, claim_id, claim_ordinal,
-                lease_owner_id, lease_expires_at, fencing_token
-            ) VALUES (
-                'legacy-action', 'tenant-a', 'legacy-claim', 0,
-                'legacy-worker', 4102444800000, 7
-            );
-            "#,
-        )
-        .unwrap_or_else(|error| panic!("create legacy response table: {error}"));
-    connection
-        .execute(
-            r#"
-            INSERT INTO security_response_effects (
-                effect_id, tenant_id, action_id, scheduler_fencing_token,
-                state, body, body_hash, encrypted_rollback_ref
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
-            "#,
-            rusqlite::params![
-                "legacy-effect",
-                "tenant-a",
-                "legacy-action",
-                7_i64,
-                "apply_requested",
-                b"{}".as_slice(),
-                digest(b"{}").as_bytes().as_slice()
-            ],
-        )
-        .unwrap_or_else(|error| panic!("insert legacy effect: {error}"));
-    drop(connection);
-
-    let store = SqliteSecurityStateStore::open(&path)
-        .unwrap_or_else(|error| panic!("migrate response store: {error}"));
-    let loaded = store
-        .load_effect(&ResponseEffectKey {
-            tenant_id: tenant("tenant-a"),
-            effect_id: EffectId::new("legacy-effect")
-                .unwrap_or_else(|error| panic!("effect id: {error}")),
-        })
-        .unwrap_or_else(|error| panic!("load migrated effect: {error}"))
-        .unwrap_or_else(|| panic!("migrated effect missing"));
-    assert_eq!(loaded.generation, 0);
-    assert_eq!(loaded.scheduler_lease_owner_id.as_str(), "legacy-worker");
-    assert_eq!(loaded.scheduler_fencing_token, 7);
-    assert_eq!(loaded.state, record("apply_requested"));
-    let lease_body_hash_length = rusqlite::Connection::open(&path)
-        .and_then(|connection| {
-            connection.query_row(
-                r#"
-                SELECT length(lease_body_hash)
-                FROM security_scheduler_leases
-                WHERE tenant_id = 'tenant-a' AND action_id = 'legacy-action'
-                "#,
-                [],
-                |row| row.get::<_, i64>(0),
-            )
-        })
-        .unwrap_or_else(|error| panic!("load migrated lease body hash: {error}"));
-    assert_eq!(lease_body_hash_length, 32);
-}
-
-#[test]
-fn response_effect_owner_migration_rejects_unbound_existing_intent() {
+fn response_effect_without_a_lease_owner_is_refused() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("unbound-response-effect.db");
-    let connection = rusqlite::Connection::open(&path)
-        .unwrap_or_else(|error| panic!("open legacy database: {error}"));
-    connection
-        .execute_batch(
-            r#"
-            CREATE TABLE security_response_effects (
-                effect_id TEXT NOT NULL,
-                tenant_id TEXT NOT NULL,
-                action_id TEXT NOT NULL,
-                scheduler_fencing_token INTEGER NOT NULL,
-                state TEXT NOT NULL,
-                body BLOB NOT NULL CHECK (length(body) <= 1048576),
-                body_hash BLOB NOT NULL CHECK (length(body_hash) = 32),
-                encrypted_rollback_ref TEXT,
-                PRIMARY KEY (tenant_id, effect_id)
-            );
-            "#,
-        )
-        .unwrap_or_else(|error| panic!("create legacy response table: {error}"));
+    drop(
+        SqliteSecurityStateStore::open(&path)
+            .unwrap_or_else(|error| panic!("initialize store: {error}")),
+    );
+    let connection =
+        rusqlite::Connection::open(&path).unwrap_or_else(|error| panic!("open database: {error}"));
     connection
         .execute(
             r#"
             INSERT INTO security_response_effects (
-                effect_id, tenant_id, action_id, scheduler_fencing_token,
-                state, body, body_hash, encrypted_rollback_ref
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL)
+                effect_id, tenant_id, action_id, scheduler_lease_owner_id,
+                scheduler_fencing_token, state, body, body_hash
+            ) VALUES (?1, ?2, ?3, '', ?4, ?5, ?6, ?7)
             "#,
             rusqlite::params![
                 "unbound-effect",
@@ -506,57 +399,29 @@ fn response_effect_owner_migration_rejects_unbound_existing_intent() {
             ],
         )
         .unwrap_or_else(|error| panic!("insert unbound effect: {error}"));
-    drop(connection);
+    let schema_version: i64 = connection
+        .query_row("PRAGMA schema_version", [], |row| row.get(0))
+        .unwrap_or_else(|error| panic!("read schema version: {error}"));
 
     let error = match SqliteSecurityStateStore::open(&path) {
-        Ok(_) => panic!("unbound response effect migration unexpectedly succeeded"),
+        Ok(_) => panic!("unbound response effect was accepted"),
         Err(error) => error,
     };
-    assert_eq!(error.kind(), PortErrorKind::IntegrityFailure);
-}
-
-#[test]
-fn scheduler_retry_health_migration_preserves_age_conservatively() {
-    let directory =
-        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-    let path = directory.path().join("legacy-scheduler-retry.db");
-    let connection = rusqlite::Connection::open(&path)
-        .unwrap_or_else(|error| panic!("open legacy database: {error}"));
-    connection
-        .execute_batch(
-            r#"
-            CREATE TABLE security_scheduler_retries (
-                tenant_id TEXT NOT NULL,
-                action_id TEXT NOT NULL,
-                attempts INTEGER NOT NULL,
-                last_error TEXT NOT NULL,
-                not_before INTEGER NOT NULL,
-                PRIMARY KEY (tenant_id, action_id)
-            );
-            INSERT INTO security_scheduler_retries (
-                tenant_id, action_id, attempts, last_error, not_before
-            ) VALUES ('tenant-a', 'legacy-action', 3, 'store.unavailable', 1234);
-            "#,
+    assert_eq!(error, PortError::integrity_failure());
+    let retained: (String, i64) = connection
+        .query_row(
+            "SELECT scheduler_lease_owner_id, scheduler_fencing_token FROM security_response_effects WHERE effect_id = 'unbound-effect' AND tenant_id = 'tenant-a'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .unwrap_or_else(|error| panic!("create legacy retry table: {error}"));
-    drop(connection);
-
-    let store = SqliteSecurityStateStore::open(&path)
-        .unwrap_or_else(|error| panic!("migrate scheduler retry store: {error}"));
-    let loaded = store
-        .load_retry(&SchedulerWorkKey {
-            tenant_id: tenant("tenant-a"),
-            action_id: ActionId::new("legacy-action")
-                .unwrap_or_else(|error| panic!("action id: {error}")),
-        })
-        .unwrap_or_else(|error| panic!("load migrated retry: {error}"))
-        .unwrap_or_else(|| panic!("migrated retry missing"));
-    assert_eq!(loaded.attempts, 3);
-    assert_eq!(loaded.last_error.as_str(), "store.unavailable");
-    assert_eq!(loaded.first_failure_at_unix_ms, 0);
-    assert_eq!(loaded.not_before_unix_ms, 1_234);
-    assert!(loaded.health_event_id.is_none());
-    assert!(!loaded.health_event_delivered);
+        .unwrap_or_else(|error| panic!("read retained effect: {error}"));
+    assert_eq!(retained, (String::new(), 11));
+    assert_eq!(
+        connection
+            .query_row("PRAGMA schema_version", [], |row| row.get::<_, i64>(0))
+            .unwrap_or_else(|error| panic!("read retained schema version: {error}")),
+        schema_version
+    );
 }
 
 #[test]

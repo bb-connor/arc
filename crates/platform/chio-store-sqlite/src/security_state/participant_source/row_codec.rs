@@ -43,8 +43,8 @@ fn layout(table: &str) -> Result<&'static [Column]> {
     let layouts = LAYOUTS
         .get_or_init(|| {
             let connection = Connection::open_in_memory()?;
-            // Cache only the compiled predecessor layout, not observed state.
-            super::super::migrate(&connection)
+            // Cache only the verified source layout, never observed state.
+            super::super::open_schema(&connection)
                 .map_err(|_| Error::Invalid("canonical row layout is unavailable"))?;
             schema::TABLES
                 .iter()
