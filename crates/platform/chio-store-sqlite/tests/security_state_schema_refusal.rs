@@ -98,6 +98,16 @@ fn extra_scheduler_column_is_refused_without_repair() -> TestResult {
 }
 
 #[test]
+fn stamp_without_unique_store_key_is_refused_without_repair() -> TestResult {
+    assert_refused_without_repair(
+        "ALTER TABLE chio_store_schema_versions RENAME TO saved_versions;
+         CREATE TABLE chio_store_schema_versions (store_key TEXT, version INTEGER NOT NULL);
+         INSERT INTO chio_store_schema_versions SELECT store_key, version FROM saved_versions;
+         DROP TABLE saved_versions;",
+    )
+}
+
+#[test]
 fn view_only_security_namespace_is_refused_without_stamping() -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("security.db");
