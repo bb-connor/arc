@@ -38,14 +38,24 @@ fn missing_frozen_signer_refuses_caller_decode_without_state_changes() -> TestRe
         error.to_string(),
         "missing field `receipt_signing_identity`"
     );
-    assert!(fixture
+    let error = fixture
         .kernel
         .decode_caller_return_payload(
             &fixture.admission,
             &canonical_json_bytes(&payload)?,
             current_unix_timestamp_ms(),
         )
-        .is_err());
+        .err()
+        .ok_or("missing signer decoded by kernel")?;
+    assert!(
+        matches!(
+            error,
+            KernelError::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(ref decode))
+                if decode.classify() == serde_json::error::Category::Data
+                    && decode.to_string() == "missing field `receipt_signing_identity`"
+        ),
+        "{error}"
+    );
     assert_eq!(fixture.admission.operation, operation);
     assert_eq!(fixture.kernel.receipt_log().len(), receipts);
     Ok(())
