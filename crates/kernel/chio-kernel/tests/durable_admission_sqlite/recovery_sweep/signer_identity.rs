@@ -123,10 +123,7 @@ fn retained_signer(
         .tool_outcome_store()
         .load_raw_invocation_by_operation(operation.binding().operation_id())?
         .ok_or("retained raw return")?;
-    let identity = raw
-        .to_persisted()
-        .receipt_signing_identity
-        .ok_or("retained receipt signing identity")?;
+    let identity = raw.to_persisted().receipt_signing_identity;
     Ok(serde_json::to_value(identity)?["public_key"].clone())
 }
 
