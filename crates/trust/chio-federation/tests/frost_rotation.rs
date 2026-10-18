@@ -384,10 +384,14 @@ fn verified_rotation(
             .checkpoint(),
         &burned
     );
-    assert!(
-        verify_burned_frost_authorization_slot(&bound, &burned_anchor, &trust_store(), 150)
-            .is_err()
-    );
+    assert!(matches!(
+        verify_burned_frost_authorization_slot(&bound, &burned_anchor, &trust_store(), 150),
+        Err(
+            chio_federation::frost::FrostAuthorizationSlotTransitionError::Invalid(
+                "authorization slot is not the exact burned successor"
+            )
+        )
+    ));
     let completion = verify_frost_authorization_slot_completion(
         &bound,
         &proof,
@@ -479,19 +483,25 @@ fn verified_rotation(
     wrong_predecessor.checkpoint_digest = wrong_predecessor
         .recompute_checkpoint_digest()
         .unwrap_or_else(|error| panic!("compute wrong predecessor digest: {error}"));
-    assert!(verify_completed_frost_authorization_slot(
-        &proof.body,
-        &active,
-        &EpochAnchor(governance_checkpoint.clone()),
-        &FrostAnchoredAuthorizationSlot {
-            checkpoint: wrong_predecessor,
-            authorization_blob: Some(proof_bytes.clone()),
-        },
-        &trust_store(),
-        &bound_checkpoint_digest,
-        200,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_completed_frost_authorization_slot(
+            &proof.body,
+            &active,
+            &EpochAnchor(governance_checkpoint.clone()),
+            &FrostAnchoredAuthorizationSlot {
+                checkpoint: wrong_predecessor,
+                authorization_blob: Some(proof_bytes.clone()),
+            },
+            &trust_store(),
+            &bound_checkpoint_digest,
+            200,
+        ),
+        Err(
+            chio_federation::frost::FrostAuthorizationSlotTransitionError::Invalid(
+                "completed slot is not the exact bound-checkpoint successor"
+            )
+        )
+    ));
     let expected = ExpectedFrostAuthorization {
         domain: proof.body.domain,
         ladder_action_class: &proof.body.ladder_action_class,
@@ -584,14 +594,16 @@ fn epoch_advance_requires_distinct_governance_quorum_and_zero_live_sessions() {
 
     let mut live = burn;
     live.live_session_count = 1;
-    assert!(verify_frost_epoch_advance(
-        &current_checkpoint,
-        &target_roster,
-        &authorization,
-        &action,
-        &live,
-        &trust_store(),
-        200,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_frost_epoch_advance(
+            &current_checkpoint,
+            &target_roster,
+            &authorization,
+            &action,
+            &live,
+            &trust_store(),
+            200,
+        ),
+        Err(chio_federation::frost::FrostEpochAdvanceError::LiveSessionsRemain)
+    ));
 }
