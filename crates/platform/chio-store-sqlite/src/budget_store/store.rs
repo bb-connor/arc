@@ -88,9 +88,7 @@ impl SqliteBudgetStore {
                 verify_budget_replication_state(connection)
             }
             None if allow_empty => require_empty_budget_catalog(connection),
-            None => Err(BudgetStoreError::Invariant(
-                "budget schema does not match the current v1 shape".into(),
-            )),
+            None => Err(schema::schema_shape_error()),
         }
     }
 

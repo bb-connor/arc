@@ -78,7 +78,7 @@ pub(super) fn require_empty_budget_catalog(
     Ok(())
 }
 
-fn schema_shape_error() -> BudgetStoreError {
+pub(super) fn schema_shape_error() -> BudgetStoreError {
     BudgetStoreError::Invariant("budget schema does not match the current v1 shape".into())
 }
 
