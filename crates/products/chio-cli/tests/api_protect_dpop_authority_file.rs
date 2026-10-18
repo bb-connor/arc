@@ -49,8 +49,13 @@ fn activated_descriptor(receipt_db: &Path) -> Vec<u8> {
 fn spawn_protect(directory: &Path, listen: &str, authority_file: &Path) -> Child {
     let spec = directory.join("openapi.json");
     std::fs::write(&spec, SPEC).unwrap();
+    let seed = directory.join("authority.seed");
+    std::fs::write(&seed, chio_core::crypto::Keypair::generate().seed_hex()).unwrap();
+    std::fs::set_permissions(&seed, std::fs::Permissions::from_mode(0o600)).unwrap();
     Command::new(env!("CARGO_BIN_EXE_chio"))
         .env("CHIO_DPOP_REPLAY_AUTHORITY_FILE", authority_file)
+        .arg("--authority-seed-file")
+        .arg(&seed)
         .args([
             "api",
             "protect",
