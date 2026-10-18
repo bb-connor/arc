@@ -703,6 +703,8 @@ else:
         else {"command": command, "status": "not_run", "exitCode": None, "outputTail": ""}
         for command in report_commands
     ]
+failed_gates = [result for result in gate_results if result["status"] == "failed"]
+gates_passed = run_gates and not failed_gates
 
 source_locations = {}
 for entry in inventory.get("assumptions", []) + inventory.get("theorems", []):
@@ -766,18 +768,20 @@ for path in tracked_paths:
     tracked_artifacts[path.relative_to(repo).as_posix()] = digest
 
 generated_paths = [coverage_path]
-if run_gates:
+if gates_passed:
     generated_paths.extend(repo / relative_path for relative_path in AENEAS_ARTIFACTS)
     generated_paths.extend(repo / relative_path for relative_path in TRACE_GENERATED_ARTIFACTS)
 generated_artifacts = {}
 for path in generated_paths:
     digest = maybe_hash(path)
     if digest is None:
+        if failed_gates:
+            continue
         fail(f"generated proof artifact is missing or symlinked: {path.relative_to(repo)}")
     generated_artifacts[path.relative_to(repo).as_posix()] = digest
 
 trace_validation: dict[str, Any] = {"result": "not_run"}
-if run_gates:
+if gates_passed:
     trace_report_path = repo / "target/formal/trace-validation.json"
     trace_bindings_path = repo / "target/formal/receipt-trace/bindings.json"
     trace_report = json.loads(trace_report_path.read_text(encoding="utf-8"))
@@ -832,7 +836,7 @@ tool_versions = {
     ),
 }
 dirty_record = command_output("git status --short", max_lines=None)
-if run_gates and (dirty_record["exitCode"] != 0 or dirty_record["output"]):
+if gates_passed and (dirty_record["exitCode"] != 0 or dirty_record["output"]):
     fail("strict proof reports require a clean git worktree after gates run")
 git = {
     "commit": command_output("git rev-parse HEAD"),
@@ -881,14 +885,13 @@ report = {
 }
 atomic_write(report_path, json.dumps(report, indent=2, sort_keys=True) + "\n")
 
-failed = [result for result in gate_results if result["status"] == "failed"]
-if failed:
+if failed_gates:
     print(f"Proof report written to {report_path.relative_to(repo)}")
-    output_tail = failed[0].get("outputTail", "").strip()
+    output_tail = failed_gates[0].get("outputTail", "").strip()
     if output_tail:
         print("Failing proof gate output tail:")
         print(output_tail)
-    fail(f"gate failed: {failed[0]['command']}")
+    fail(f"gate failed: {failed_gates[0]['command']}")
 
 print(f"Proof report written to {report_path.relative_to(repo)}")
 PY
