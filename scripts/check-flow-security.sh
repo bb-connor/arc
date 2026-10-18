@@ -113,6 +113,8 @@ run_exact_target --label "security response-dispatch types" --expected \
   dispatch_authorization_binds_every_security_identity \
   dispatch_lease_and_load_outcome_are_explicit \
   dispatch_recovery_binds_the_exact_action_and_fencing_observation \
+  dispatch_recovery_requires_a_fencing_token_on_the_wire \
+  dispatch_recovery_rejects_zero_fencing_token_on_wire \
   execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields \
   execution_binding_requires_exact_artifact_schema_pairing \
   legacy_dispatch_authorization_v1_preserves_canonical_bytes_and_hash \

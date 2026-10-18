@@ -107,7 +107,7 @@ expected_counts = {
     "security event types": 3,
     "security issuance-freeze types": 4,
     "security port contracts": 7,
-    "security response-dispatch types": 8,
+    "security response-dispatch types": 10,
     "security response types": 19,
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 48,
