@@ -289,7 +289,7 @@ impl WatermarkObservationStore for SqliteSealedDecoyRegistryStore {
             &observation.public_ref_token,
             &observation.observation_id,
         )? {
-            if stored != *observation {
+            if !same_watermark_attribution(&stored, observation) {
                 return Err(PortError::conflict());
             }
             let result = WatermarkObservationResult::Duplicate {
@@ -1009,6 +1009,28 @@ fn validate_sequence_operation_reference(
         return Err(PortError::integrity_failure());
     }
     Ok(())
+}
+
+/// Every attribution field matches; the observation time is not attribution,
+/// so a retry keeps the first stored time.
+fn same_watermark_attribution(stored: &WatermarkObservation, retry: &WatermarkObservation) -> bool {
+    let WatermarkObservation {
+        source_tenant_id,
+        observing_tenant_id,
+        public_ref_token,
+        observation_id,
+        payload_digest,
+        token_digest,
+        evidence_ref,
+        observed_at_unix_ms: _,
+    } = retry;
+    stored.source_tenant_id == *source_tenant_id
+        && stored.observing_tenant_id == *observing_tenant_id
+        && stored.public_ref_token == *public_ref_token
+        && stored.observation_id == *observation_id
+        && stored.payload_digest == *payload_digest
+        && stored.token_digest == *token_digest
+        && stored.evidence_ref == *evidence_ref
 }
 
 fn insert_watermark_observation(

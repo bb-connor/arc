@@ -1079,15 +1079,45 @@ fn watermark_observation_retry_preserves_first_attribution_and_rejects_mutation(
             value.evidence_ref = record_id("evidence-b");
             value
         },
-        {
-            let mut value = first.clone();
-            value.observed_at_unix_ms = 2_000;
-            value
-        },
     ];
     for mutation in mutations {
         assert_error_kind(reopened.record_first(&mutation), PortErrorKind::Conflict);
     }
+}
+
+#[test]
+fn watermark_observation_retry_at_a_later_time_keeps_the_first_time() {
+    let temp = tempfile::tempdir().test_expect("temporary directory");
+    let path = database(&temp, "watermark-observation-later-retry");
+    let first = observation(
+        &tenant("source-tenant"),
+        &tenant("observing-tenant"),
+        90,
+        "observation-a",
+    );
+    let first_duplicate = WatermarkObservationResult::Duplicate {
+        first_payload_digest: first.payload_digest,
+        first_token_digest: first.token_digest,
+        first_evidence_ref: first.evidence_ref.clone(),
+        first_observed_at_unix_ms: 1_000,
+    };
+    let mut later = first.clone();
+    later.observed_at_unix_ms = 2_000;
+    {
+        let store = open(&path);
+        assert_eq!(
+            store.record_first(&first).test_unwrap(),
+            WatermarkObservationResult::Recorded
+        );
+        assert_eq!(store.record_first(&later).test_unwrap(), first_duplicate);
+    }
+
+    let reopened = open(&path);
+    assert_eq!(reopened.record_first(&later).test_unwrap(), first_duplicate);
+    assert_eq!(reopened.record_first(&first).test_unwrap(), first_duplicate);
+    let mut mismatched = later;
+    mismatched.evidence_ref = record_id("evidence-b");
+    assert_error_kind(reopened.record_first(&mismatched), PortErrorKind::Conflict);
 }
 
 #[test]

@@ -92,7 +92,11 @@ impl WatermarkObservationStore for Observations {
             observation.observation_id.clone(),
         );
         if let Some(first) = rows.get(&key) {
-            if first != observation {
+            let retry = WatermarkObservation {
+                observed_at_unix_ms: first.observed_at_unix_ms,
+                ..observation.clone()
+            };
+            if *first != retry {
                 return Err(PortError::conflict());
             }
             return Ok(WatermarkObservationResult::Duplicate {
@@ -688,6 +692,40 @@ fn an_inactive_hit_whose_observation_store_fails_is_a_typed_scan_error() {
             PortErrorKind::Unavailable
         ))
     );
+}
+
+#[test]
+fn an_inactive_hit_retried_later_is_a_duplicate_with_the_first_time() {
+    let fixture = Fixture::new(true, 10_000);
+    let token = fixture.issue();
+    retire_issued_marker(&fixture);
+    let first = fixture
+        .verifier()
+        .scan_text(
+            &token,
+            &fixture.observation("observation-retired", "evidence-first", OBSERVED_AT),
+        )
+        .test_expect("first inactive scan");
+    assert_eq!(
+        first.inactive_hits[0].observation,
+        WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Recorded)
+    );
+    let retry = fixture
+        .verifier()
+        .scan_text(
+            &token,
+            &fixture.observation("observation-retired", "evidence-first", OBSERVED_AT + 1),
+        )
+        .test_expect("later retry of the same observation");
+    assert_eq!(retry.verdict, WatermarkScanVerdict::Advisory);
+    assert_eq!(retry.detector_failures, 0);
+    assert!(matches!(
+        &retry.inactive_hits[0].observation,
+        WatermarkObservationPersistence::Persisted(WatermarkObservationResult::Duplicate {
+            first_observed_at_unix_ms: OBSERVED_AT,
+            ..
+        })
+    ));
 }
 
 #[test]
