@@ -7,14 +7,15 @@ pub fn serve_http(config: RemoteServeHttpConfig) -> Result<(), CliError> {
 
 const MCP_MAX_POST_BODY_BYTES: usize = 8 * 1024 * 1024;
 
-fn load_enterprise_provider_registry(
+fn enterprise_provider_registry_file(
     path: Option<&FsPath>,
     surface: &str,
 ) -> Result<Option<EnterpriseProviderRegistryFile>, CliError> {
     let Some(path) = path else {
         return Ok(None);
     };
-    let registry = EnterpriseProviderRegistry::load(path)?;
+    let file = EnterpriseProviderRegistryFile::new(path);
+    let registry = file.load()?;
     for record in registry.providers.values() {
         if !record.validation_errors.is_empty() {
             warn!(
@@ -25,9 +26,7 @@ fn load_enterprise_provider_registry(
             );
         }
     }
-    Ok(Some(EnterpriseProviderRegistryFile {
-        path: Arc::new(path.to_path_buf()),
-    }))
+    Ok(Some(file))
 }
 
 async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliError> {
@@ -42,7 +41,7 @@ async fn serve_http_async(mut config: RemoteServeHttpConfig) -> Result<(), CliEr
     if tls && config.public_base_url.is_none() {
         config.public_base_url = Some(format!("https://{local_addr}"));
     }
-    let enterprise_provider_registry = load_enterprise_provider_registry(
+    let enterprise_provider_registry = enterprise_provider_registry_file(
         config.enterprise_providers_file.as_deref(),
         "remote_mcp",
     )?;

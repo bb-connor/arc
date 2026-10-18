@@ -1,6 +1,6 @@
-//! Bearer admission matches enterprise provider records from the registry
-//! file each authenticated request reads, so an operator mutation governs the
-//! next request without a restart.
+//! Bearer admission reads enterprise provider records from the registry file
+//! on each authenticated request through the bounded reader, so an operator
+//! mutation governs the next request and an unusable registry refuses it.
 
 use super::*;
 use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
@@ -37,12 +37,24 @@ fn provider_record(enabled: bool) -> serde_json::Value {
     })
 }
 
-fn write_registry(path: &std::path::Path, enabled: bool) {
+fn write_registry_record(path: &std::path::Path, record: serde_json::Value) {
     let registry = json!({
         "version": "chio.enterprise-providers.v1",
-        "providers": { "enterprise-login": provider_record(enabled) }
+        "providers": { "enterprise-login": record }
     });
     std::fs::write(path, serde_json::to_vec(&registry).unwrap()).unwrap();
+}
+
+pub(super) fn write_registry(path: &std::path::Path, enabled: bool) {
+    write_registry_record(path, provider_record(enabled));
+}
+
+/// Writes a registry one byte over the bounded reader's limit.
+pub(super) fn write_oversized_registry(path: &std::path::Path) {
+    let document = br#"{"version":"chio.enterprise-providers.v1","providers":{}}"#;
+    let mut bytes = document.to_vec();
+    bytes.resize(16 * 1024 * 1024 + 1, b' ');
+    std::fs::write(path, bytes).unwrap();
 }
 
 fn signed_token(keypair: &Keypair) -> String {
@@ -69,7 +81,7 @@ fn signed_token(keypair: &Keypair) -> String {
 }
 
 fn jwt_verifier(config: &RemoteServeHttpConfig) -> Arc<JwtBearerVerifier> {
-    let registry = load_enterprise_provider_registry(
+    let registry = enterprise_provider_registry_file(
         config.enterprise_providers_file.as_deref(),
         "remote_mcp",
     )
@@ -86,16 +98,38 @@ fn authenticate(verifier: &JwtBearerVerifier, token: &str) -> Result<SessionAuth
     verifier.authenticate_token(token, &empty_header_map(), None, None)
 }
 
-fn provider_record_id(auth_context: &SessionAuthContext) -> Option<String> {
+fn enterprise_identity(auth_context: &SessionAuthContext) -> Option<EnterpriseIdentityContext> {
     match &auth_context.method {
         SessionAuthMethod::OAuthBearer {
             enterprise_identity,
             ..
-        } => enterprise_identity
-            .as_ref()
-            .and_then(|identity| identity.provider_record_id.clone()),
+        } => enterprise_identity.clone(),
         other => panic!("unexpected auth method: {other:?}"),
     }
+}
+
+fn provider_record_id(auth_context: &SessionAuthContext) -> Option<String> {
+    enterprise_identity(auth_context).and_then(|identity| identity.provider_record_id)
+}
+
+/// Asserts a 503 whose body is exactly the refusal message and whose local
+/// cause is the refusal itself.
+async fn assert_registry_refusal(
+    refused: Response,
+    expected_message: &str,
+) -> Arc<EnterpriseProviderRegistryRefusal> {
+    assert_eq!(refused.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let refusal = refused
+        .extensions()
+        .get::<Arc<EnterpriseProviderRegistryRefusal>>()
+        .cloned()
+        .expect("registry refusal attached as the local cause");
+    assert_eq!(refusal.to_string(), expected_message);
+    let body = axum::body::to_bytes(refused.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    assert_eq!(String::from_utf8_lossy(&body), expected_message);
+    refusal
 }
 
 struct Fixture {
@@ -125,42 +159,144 @@ impl Fixture {
             verifier,
         }
     }
+
+    fn admitted(&self) -> SessionAuthContext {
+        let admitted = authenticate(&self.verifier, &signed_token(&self.keypair)).unwrap();
+        assert_eq!(
+            provider_record_id(&admitted).as_deref(),
+            Some("enterprise-login")
+        );
+        admitted
+    }
+
+    fn next_request(&self) -> Result<SessionAuthContext, Response> {
+        authenticate(&self.verifier, &signed_token(&self.keypair))
+    }
 }
 
 #[test]
 fn a_provider_disabled_after_startup_no_longer_admits_its_record() {
     let fixture = Fixture::started_with_enabled_provider();
-    let token = signed_token(&fixture.keypair);
-    let admitted = authenticate(&fixture.verifier, &token).unwrap();
-    assert_eq!(
-        provider_record_id(&admitted).as_deref(),
-        Some("enterprise-login")
-    );
+    let admitted = fixture.admitted();
 
     write_registry(&fixture.path, false);
-    let next = authenticate(&fixture.verifier, &token).unwrap();
+    let next = fixture.next_request().unwrap();
     assert_eq!(
         provider_record_id(&next),
         None,
         "a bearer request after the provider was disabled matched the startup record"
     );
+    let refused = validate_session_auth_context(&next, &admitted)
+        .expect_err("a session admitted under the enabled provider continued after disable");
+    assert_eq!(refused.status(), StatusCode::FORBIDDEN);
+}
+
+#[test]
+fn subject_mapping_and_trust_material_changes_govern_the_next_request() {
+    let fixture = Fixture::started_with_enabled_provider();
+    let admitted = fixture.admitted();
+    let admitted_identity = enterprise_identity(&admitted).unwrap();
+    assert_eq!(
+        admitted_identity
+            .attribute_sources
+            .get("tenantId")
+            .map(String::as_str),
+        Some("tid")
+    );
+
+    let mut record = provider_record(true);
+    record["subject_mapping"]["tenant_id_field"] = json!("tenant");
+    record["provenance"]["trust_material_ref"] = json!("jwks:rotated");
+    write_registry_record(&fixture.path, record);
+    let next = fixture.next_request().unwrap();
+    let next_identity = enterprise_identity(&next).unwrap();
+    assert_eq!(
+        next_identity
+            .attribute_sources
+            .get("tenantId")
+            .map(String::as_str),
+        Some("tenant")
+    );
+    assert_eq!(
+        next_identity.trust_material_ref.as_deref(),
+        Some("jwks:rotated")
+    );
+    let refused = validate_session_auth_context(&next, &admitted)
+        .expect_err("a session continued under a remapped provider record");
+    assert_eq!(refused.status(), StatusCode::FORBIDDEN);
 }
 
 #[tokio::test]
 async fn a_provider_registry_corrupted_after_startup_refuses_the_next_request() {
     let fixture = Fixture::started_with_enabled_provider();
-    let token = signed_token(&fixture.keypair);
-    authenticate(&fixture.verifier, &token).unwrap();
+    fixture.admitted();
 
     std::fs::write(&fixture.path, b"{\"version\":").unwrap();
-    let expected = EnterpriseProviderRegistry::load(&fixture.path)
+    let expected_cause = EnterpriseProviderRegistry::load(&fixture.path)
         .expect_err("a truncated registry loaded")
         .to_string();
-    let refused = authenticate(&fixture.verifier, &token)
+    let refused = fixture
+        .next_request()
         .expect_err("a corrupted provider registry still admitted");
-    assert_eq!(refused.status(), StatusCode::SERVICE_UNAVAILABLE);
-    let body = axum::body::to_bytes(refused.into_body(), usize::MAX)
-        .await
-        .unwrap();
-    assert_eq!(String::from_utf8_lossy(&body), expected);
+    let refusal = assert_registry_refusal(refused, "enterprise provider registry is invalid").await;
+    let EnterpriseProviderRegistryRefusal::Invalid(cause) = refusal.as_ref() else {
+        panic!("expected an invalid registry refusal, got {refusal:?}");
+    };
+    assert_eq!(cause.to_string(), expected_cause);
+}
+
+#[tokio::test]
+async fn a_provider_registry_oversized_at_request_time_refuses_the_request() {
+    let fixture = Fixture::started_with_enabled_provider();
+    fixture.admitted();
+
+    write_oversized_registry(&fixture.path);
+    let refused = fixture
+        .next_request()
+        .expect_err("an oversized provider registry still admitted");
+    let refusal = assert_registry_refusal(
+        refused,
+        "enterprise provider registry exceeds the bounded read limit",
+    )
+    .await;
+    let EnterpriseProviderRegistryRefusal::Oversized(CliError::SignedJson(
+        chio_core::canonical::UntrustedJsonError::TooLarge { bytes, bound },
+    )) = refusal.as_ref()
+    else {
+        panic!("expected an oversized registry refusal, got {refusal:?}");
+    };
+    assert_eq!(*bound, 16 * 1024 * 1024);
+    assert_eq!(*bytes, bound + 1);
+}
+
+#[tokio::test]
+async fn a_provider_registry_unreadable_at_request_time_refuses_the_request() {
+    let fixture = Fixture::started_with_enabled_provider();
+    fixture.admitted();
+
+    std::fs::remove_file(&fixture.path).unwrap();
+    let expected_cause = EnterpriseProviderRegistry::load(&fixture.path)
+        .expect_err("a missing registry loaded")
+        .to_string();
+    let refused = fixture
+        .next_request()
+        .expect_err("an unreadable provider registry still admitted");
+    let refusal =
+        assert_registry_refusal(refused, "enterprise provider registry is unreadable").await;
+    let EnterpriseProviderRegistryRefusal::Unreadable(cause) = refusal.as_ref() else {
+        panic!("expected an unreadable registry refusal, got {refusal:?}");
+    };
+    assert_eq!(cause.to_string(), expected_cause);
+}
+
+#[test]
+fn startup_refuses_an_unreadable_provider_registry_with_its_cause() {
+    let directory = chio_test_support::private_tempdir().unwrap();
+    let path = directory.path().join("enterprise-providers.json");
+    let expected = EnterpriseProviderRegistry::load(&path)
+        .expect_err("a missing registry loaded")
+        .to_string();
+    let error = enterprise_provider_registry_file(Some(&path), "remote_mcp")
+        .expect_err("startup accepted a missing provider registry");
+    assert_eq!(error.to_string(), expected);
 }

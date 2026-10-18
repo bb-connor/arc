@@ -484,3 +484,7 @@ mod subscription_persistence;
 #[cfg(target_os = "linux")]
 #[path = "session_recovery/subscription_restore.rs"]
 mod subscription_restore;
+
+#[cfg(target_os = "linux")]
+#[path = "session_recovery/provider_registry_binding.rs"]
+mod provider_registry_binding;
