@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use chio_core::capability::governance::{
     GovernedResponseEffect, GovernedResponsePlanIntentBody, GovernedTransactionIntent,
-    CHIO_ACTIVE_RESPONSE_SERVER_ID,
+    ACTIVE_RESPONSE_SERVER_ID,
 };
 use chio_core::capability::scope::Operation;
 use chio_core::capability::token::CapabilityToken;
@@ -963,7 +963,7 @@ fn validate_exact_effect_grants(
 ) -> Result<(), KernelError> {
     for effect in ordered_effects {
         let covered = capability.scope.grants.iter().any(|grant| {
-            grant.server_id == CHIO_ACTIVE_RESPONSE_SERVER_ID
+            grant.server_id == ACTIVE_RESPONSE_SERVER_ID
                 && grant.tool_name == effect.tool_name()
                 && grant.operations.contains(&Operation::Invoke)
                 && grant.constraints.is_empty()
@@ -976,7 +976,7 @@ fn validate_exact_effect_grants(
             return Err(denied(&format!(
                 "verified capability lacks an exact unconditional Invoke grant for {} on {}",
                 effect.tool_name(),
-                CHIO_ACTIVE_RESPONSE_SERVER_ID
+                ACTIVE_RESPONSE_SERVER_ID
             )));
         }
     }

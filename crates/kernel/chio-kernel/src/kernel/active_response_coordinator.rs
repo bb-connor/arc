@@ -1,5 +1,5 @@
 use chio_core::capability::governance::{
-    GovernedApprovalToken, GovernedResponsePlanIntentBody, CHIO_ACTIVE_RESPONSE_SERVER_ID,
+    GovernedApprovalToken, GovernedResponsePlanIntentBody, ACTIVE_RESPONSE_SERVER_ID,
 };
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::receipt::decision::ToolCallAction;
@@ -895,7 +895,7 @@ impl ChioKernel {
         let verified = verify_threshold_approval_set(
             &ThresholdApprovalVerificationInput {
                 request_id: bindings.request_id(),
-                server_id: CHIO_ACTIVE_RESPONSE_SERVER_ID,
+                server_id: ACTIVE_RESPONSE_SERVER_ID,
                 tool_name: ACTIVE_RESPONSE_APPROVAL_TOOL_NAME,
                 governed_intent_hash: bindings.governed_intent_hash(),
                 subject: bindings.executor_subject(),
