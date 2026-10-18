@@ -483,10 +483,10 @@ impl ResponseDispatchStore for SqliteSecurityStateStore {
         &self,
         request: &ResponseDispatchRecoveryRequest,
     ) -> PortResult<ResponseDispatchRecoveryOutcome> {
-        let expected_fencing_token = request
-            .expected_fencing_token
-            .filter(|token| *token > 0)
-            .ok_or_else(PortError::invalid_data)?;
+        let expected_fencing_token = request.expected_fencing_token;
+        if expected_fencing_token == 0 {
+            return Err(PortError::invalid_data());
+        }
         let request_hash = canonical_request_hash(request)?;
         let mut connection = self.connection()?;
         let transaction = connection
@@ -1275,18 +1275,10 @@ fn load_response_dispatch_recovery(
         return Err(PortError::integrity_failure());
     }
     let outcome = match outcome.as_str() {
-        "live_lease"
-            if request
-                .expected_fencing_token
-                .is_none_or(|expected| expected == work.fencing_token) =>
-        {
+        "live_lease" if request.expected_fencing_token == work.fencing_token => {
             ResponseDispatchRecoveryOutcome::LiveLease(work)
         }
-        "takeover"
-            if request
-                .expected_fencing_token
-                .is_none_or(|expected| work.fencing_token > expected) =>
-        {
+        "takeover" if work.fencing_token > request.expected_fencing_token => {
             ResponseDispatchRecoveryOutcome::Takeover(work)
         }
         "live_lease" | "takeover" => return Err(PortError::integrity_failure()),
@@ -1305,16 +1297,12 @@ fn record_response_dispatch_recovery(
         ResponseDispatchRecoveryOutcome::LiveLease(work) => (
             "live_lease",
             work,
-            request
-                .expected_fencing_token
-                .is_none_or(|expected| expected == work.fencing_token),
+            request.expected_fencing_token == work.fencing_token,
         ),
         ResponseDispatchRecoveryOutcome::Takeover(work) => (
             "takeover",
             work,
-            request
-                .expected_fencing_token
-                .is_none_or(|expected| work.fencing_token > expected),
+            work.fencing_token > request.expected_fencing_token,
         ),
     };
     if work.tenant_id != request.key.tenant_id

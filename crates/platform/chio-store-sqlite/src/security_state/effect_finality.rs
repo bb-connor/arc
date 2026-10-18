@@ -12,12 +12,11 @@ use serde::{Deserialize, Serialize};
 use super::{body_hash, decode_digest, sqlite_error, PortError, PortResult};
 
 mod commands;
-mod migration;
+mod coverage;
 mod schema;
 
-pub(super) use schema::{
-    ensure_schema, objects_absent, preflight, revision as schema_revision, validate_schema,
-};
+pub(super) use coverage::verify_coverage;
+pub(super) use schema::{create_schema, validate_schema};
 
 const MAX_MARKER_BYTES: usize = 16_384;
 
@@ -237,11 +236,7 @@ fn persist_first(connection: &Connection, marker: &Marker) -> PortResult<()> {
 
 pub(super) fn validate_ready(connection: &Connection, kind: ResponseEffectKind) -> PortResult<()> {
     validate_schema(connection)?;
-    migration::verify_kind_coverage(connection, kind)
-}
-
-pub(super) fn migrate_legacy(connection: &Connection) -> PortResult<()> {
-    migration::backfill(connection)
+    coverage::verify_kind_coverage(connection, kind)
 }
 
 pub(super) fn completed_capability_remove(

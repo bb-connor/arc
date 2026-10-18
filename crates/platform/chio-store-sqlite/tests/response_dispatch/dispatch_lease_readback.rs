@@ -30,23 +30,14 @@ fn live_dispatch_recovery_rejects_unfenced_wrong_owner_and_stale_fencing_token()
         action_id: request.authorization.body.action_id.clone(),
         recovery_id: record_id("bound-live-recovery"),
         lease_owner_id: initial_work.lease_owner_id.clone(),
-        expected_fencing_token: Some(initial_work.fencing_token),
+        expected_fencing_token: initial_work.fencing_token,
         now_unix_ms: created_at_unix_ms,
         lease_expires_at_unix_ms: initial_work.lease_expires_at_unix_ms,
     };
 
-    let mut unfenced = base.clone();
-    unfenced.recovery_id = record_id("unfenced-live-recovery");
-    unfenced.expected_fencing_token = None;
-    let unfenced_error = match store.recover_dispatch_work(&unfenced) {
-        Ok(_) => panic!("unfenced live recovery unexpectedly succeeded"),
-        Err(error) => error,
-    };
-    assert_eq!(unfenced_error.kind(), PortErrorKind::InvalidData);
-
     let mut zero_fence = base.clone();
     zero_fence.recovery_id = record_id("zero-fence-live-recovery");
-    zero_fence.expected_fencing_token = Some(0);
+    zero_fence.expected_fencing_token = 0;
     let zero_error = match store.recover_dispatch_work(&zero_fence) {
         Ok(_) => panic!("zero-fence live recovery unexpectedly succeeded"),
         Err(error) => error,
@@ -66,7 +57,7 @@ fn live_dispatch_recovery_rejects_unfenced_wrong_owner_and_stale_fencing_token()
 
     let mut stale_fence = base;
     stale_fence.recovery_id = record_id("stale-fence-live-recovery");
-    stale_fence.expected_fencing_token = Some(initial_work.fencing_token.saturating_add(1));
+    stale_fence.expected_fencing_token = initial_work.fencing_token.saturating_add(1);
     let stale_fence_error = match store.recover_dispatch_work(&stale_fence) {
         Ok(_) => panic!("stale-fence live recovery unexpectedly succeeded"),
         Err(error) => error,
@@ -132,7 +123,7 @@ fn scheduler_lease_body_hash_covers_dispatch_and_takeover_origins() {
             action_id: initial_work.action_id.clone(),
             recovery_id: record_id("dispatch-lease-body-hash-recovery"),
             lease_owner_id: initial_work.lease_owner_id.clone(),
-            expected_fencing_token: Some(initial_work.fencing_token),
+            expected_fencing_token: initial_work.fencing_token,
             now_unix_ms: initial_now_unix_ms,
             lease_expires_at_unix_ms: initial_work.lease_expires_at_unix_ms,
         }),
@@ -176,7 +167,7 @@ fn scheduler_lease_body_hash_covers_dispatch_and_takeover_origins() {
         recovery_id: record_id("takeover-lease-body-hash-recovery"),
         lease_owner_id: LeaseOwnerId::new("takeover-lease-body-hash-owner")
             .unwrap_or_else(|error| panic!("takeover owner failed: {error}")),
-        expected_fencing_token: Some(stale_work.fencing_token),
+        expected_fencing_token: stale_work.fencing_token,
         now_unix_ms: recovery_now_unix_ms,
         lease_expires_at_unix_ms: recovery_now_unix_ms.saturating_add(5_000),
     };
