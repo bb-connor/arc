@@ -44,6 +44,16 @@ fn live_dispatch_recovery_rejects_unfenced_wrong_owner_and_stale_fencing_token()
     };
     assert_eq!(unfenced_error.kind(), PortErrorKind::InvalidData);
 
+    let mut zero_fence = base.clone();
+    zero_fence.recovery_id = record_id("zero-fence-live-recovery");
+    zero_fence.expected_fencing_token = Some(0);
+    let zero_error = match store.recover_dispatch_work(&zero_fence) {
+        Ok(_) => panic!("zero-fence live recovery unexpectedly succeeded"),
+        Err(error) => error,
+    };
+    assert_eq!(zero_error.kind(), PortErrorKind::InvalidData);
+    assert_eq!(zero_error.code().as_str(), "store.invalid_data");
+
     let mut wrong_owner = base.clone();
     wrong_owner.recovery_id = record_id("wrong-owner-live-recovery");
     wrong_owner.lease_owner_id = LeaseOwnerId::new("different-response-worker")
