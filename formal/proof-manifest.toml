@@ -775,9 +775,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "3f10e650539417bee5bd9c7ba745ab131f89f5fc47c9fa71930f76b797a86217"
+normalized_sha256 = "94c01b271d7b7ce5de4dca2fadd9e909523ef7251613cc11e3cbed809e25fc67"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "9f366be183bd4caba9441cb6f2602a81dfece6df92a8b22fdfba2acb6e352409" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "5ab456521c35461b48e5f090db931989abbaac86c78c401e7133ca44e3decc9f" },
 ]
 
 [[mirror]]
@@ -1115,9 +1115,9 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/evaluation/async_evaluation_
 rust_symbols = [
   "ChioKernel::evaluate_tool_call_async_with_session_context_scoped",
 ]
-normalized_sha256 = "3f10e650539417bee5bd9c7ba745ab131f89f5fc47c9fa71930f76b797a86217"
+normalized_sha256 = "94c01b271d7b7ce5de4dca2fadd9e909523ef7251613cc11e3cbed809e25fc67"
 symbol_sha256 = [
-  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "9f366be183bd4caba9441cb6f2602a81dfece6df92a8b22fdfba2acb6e352409" },
+  { symbol = "ChioKernel::evaluate_tool_call_async_with_session_context_scoped", sha256 = "5ab456521c35461b48e5f090db931989abbaac86c78c401e7133ca44e3decc9f" },
 ]
 
 [[mirror]]
