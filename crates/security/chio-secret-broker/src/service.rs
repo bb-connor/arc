@@ -234,8 +234,6 @@ use failure::{
 };
 use request_digest::{attempt_operation_gate_index, FAILURE_RECEIPT_REQUEST_DOMAIN};
 use wire::read_bounded_sensitive_frame;
-#[cfg(test)]
-use wire::read_sensitive_frame_body;
 pub use wire::{
     canonical_ipc_request_bytes, read_bounded_frame, write_bounded_frame, AuthenticatedIpcRequest,
     IpcOperation, IpcResponse, SensitiveIpcBytes,
@@ -246,6 +244,8 @@ pub(crate) use wire::{
     response_payload_limit, response_wire_limit, BoundedZeroizingByteArray, BoundedZeroizingString,
     SensitiveJsonParser, ZeroizingCanonicalJsonWriter,
 };
+#[cfg(test)]
+use wire::{parse_canonical_ipc_frame, read_sensitive_frame_body, SensitiveJsonRefusal};
 #[cfg(test)]
 pub(crate) use wire::{reset_sensitive_drop_observer, sensitive_drop_observation};
 
