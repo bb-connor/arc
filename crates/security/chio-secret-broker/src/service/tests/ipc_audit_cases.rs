@@ -106,7 +106,10 @@ fn pre_evidence_execute_fault_does_not_stop_the_endpoint() {
     let execute_frame = canonical_ipc_request_bytes(&request(IpcOperation::Execute))
         .test_expect("execute request frame");
     write_bounded_frame(&mut execute, &execute_frame).test_expect("write execute request");
-    assert!(read_bounded_frame(&mut execute).is_err());
+    assert_invalid_request(
+        read_bounded_frame(&mut execute),
+        "IPC frame prefix failed: failed to fill whole buffer",
+    );
 
     let mut status = UnixStream::connect(&socket_path).test_expect("connect status client");
     status
@@ -483,7 +486,10 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
     )
     .test_expect("construct mutation probe open request");
     mutated_open.reference_request_body.push(b'!');
-    assert!(mutated_open.validate().is_err());
+    assert_authorization_denied(
+        mutated_open.validate(),
+        "privileged audit open request does not match the runner precommitment",
+    );
     let mut salt_rebound_open = BrokerPrivilegedAuditOpenRequest::new(
         "audit-socket-salt-mutation".to_string(),
         "pre-broker-provider-observation".to_string(),
@@ -502,7 +508,10 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
     salt_rebound_open
         .reference_commitment_salt
         .replace_range(0..1, replacement);
-    assert!(salt_rebound_open.validate().is_err());
+    assert_authorization_denied(
+        salt_rebound_open.validate(),
+        "privileged audit open request does not match the runner precommitment",
+    );
 
     let directory = crate::private_tempdir().test_expect("privileged audit socket directory");
     let socket_path = directory.path().join("privileged-audit").join("audit.sock");
@@ -622,34 +631,38 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
     let rebound_precommitment =
         crate::audit::BrokerAuditReferencePrecommitment::generate(&rebound_head, &reference_body)
             .test_expect("rebound runner reference precommitment");
-    assert!(verify_broker_privileged_audit_challenge_reference(
-        &evidence.challenge,
-        &trusted_broker,
-        &rebound_precommitment,
-    )
-    .is_err());
-    assert!(crate::audit::verify_broker_audit_evidence(
-        crate::audit::BrokerAuditEvidenceBundle {
-            comparison: &evidence.comparison,
-            runner_authorization: &evidence.runner_authorization,
-            admin_authorization: &evidence_admin,
-            authority: crate::audit::BrokerAuditAuthorityEvidence {
-                liveness: &liveness,
-                revocation: &revocation,
+    assert_authorization_denied(
+        verify_broker_privileged_audit_challenge_reference(
+            &evidence.challenge,
+            &trusted_broker,
+            &rebound_precommitment,
+        ),
+        "privileged audit challenge replaced the runner reference precommitment",
+    );
+    assert_authorization_denied(
+        crate::audit::verify_broker_audit_evidence(
+            crate::audit::BrokerAuditEvidenceBundle {
+                comparison: &evidence.comparison,
+                runner_authorization: &evidence.runner_authorization,
+                admin_authorization: &evidence_admin,
+                authority: crate::audit::BrokerAuditAuthorityEvidence {
+                    liveness: &liveness,
+                    revocation: &revocation,
+                },
             },
-        },
-        crate::audit::BrokerAuditExpectedContext {
-            request: &request,
-            audit_id: "audit-socket-144",
-            reference_source: "pre-broker-provider-observation",
-            reference_precommitment: &rebound_precommitment,
-            revocation_authority_domain: "combined-authority",
-            trust: audit_trust(&fixture),
-            not_before_unix_seconds: 19,
-            expires_at_unix_seconds: 21,
-        },
-    )
-    .is_err());
+            crate::audit::BrokerAuditExpectedContext {
+                request: &request,
+                audit_id: "audit-socket-144",
+                reference_source: "pre-broker-provider-observation",
+                reference_precommitment: &rebound_precommitment,
+                revocation_authority_domain: "combined-authority",
+                trust: audit_trust(&fixture),
+                not_before_unix_seconds: 19,
+                expires_at_unix_seconds: 21,
+            },
+        ),
+        "broker audit runner evidence does not match the expected context",
+    );
 }
 
 #[cfg(target_os = "linux")]
@@ -1144,11 +1157,13 @@ fn audit_comparison_is_exact_non_dispatching_non_accounting_and_secret_free() {
 
     let mut unsafe_claim = matching;
     unsafe_claim.comparison.body.network_dispatch_count = 1;
-    assert!(crate::audit::verify_broker_audit_comparison(
+    assert_authorization_denied(
+crate::audit::verify_broker_audit_comparison(
         &unsafe_claim.comparison,
         &fixture.audit_receipt_signer,
-    )
-    .is_err());
+    ),
+"broker audit comparison body is invalid: broker request is invalid: broker audit comparison safety claims are inconsistent",
+);
 }
 
 #[test]
@@ -1184,83 +1199,93 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
     )
     .test_expect("independently verify audit evidence");
 
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "another-audit",
-            "pre-broker-provider-observation",
-            &reference_precommitment,
-            audit_trust(&fixture),
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "another-audit",
+                "pre-broker-provider-observation",
+                &reference_precommitment,
+                audit_trust(&fixture),
+            ),
         ),
-    )
-    .is_err());
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "audit-evidence-143",
-            "another-reference-source",
-            &reference_precommitment,
-            audit_trust(&fixture),
+        "broker audit runner evidence does not match the expected context",
+    );
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "audit-evidence-143",
+                "another-reference-source",
+                &reference_precommitment,
+                audit_trust(&fixture),
+            ),
         ),
-    )
-    .is_err());
+        "broker audit runner evidence does not match the expected context",
+    );
 
     let wrong_authority = Keypair::from_seed(&[73; 32]).public_key();
     let mut wrong_authority_trust = audit_trust(&fixture);
     wrong_authority_trust.trusted_authority = &wrong_authority;
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "audit-evidence-143",
-            "pre-broker-provider-observation",
-            &reference_precommitment,
-            wrong_authority_trust,
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "audit-evidence-143",
+                "pre-broker-provider-observation",
+                &reference_precommitment,
+                wrong_authority_trust,
+            ),
         ),
-    )
-    .is_err());
+        "broker audit authority evidence uses an unexpected trust root",
+    );
 
     let wrong_runner = Keypair::from_seed(&[74; 32]).public_key();
     let mut wrong_runner_trust = audit_trust(&fixture);
     wrong_runner_trust.trusted_runner = &wrong_runner;
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "audit-evidence-143",
-            "pre-broker-provider-observation",
-            &reference_precommitment,
-            wrong_runner_trust,
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "audit-evidence-143",
+                "pre-broker-provider-observation",
+                &reference_precommitment,
+                wrong_runner_trust,
+            ),
         ),
-    )
-    .is_err());
+        "broker audit runner evidence does not match the expected context",
+    );
 
     let wrong_receipt_signer = Keypair::from_seed(&[75; 32]).public_key();
     let mut wrong_receipt_trust = audit_trust(&fixture);
     wrong_receipt_trust.receipt_signer = &wrong_receipt_signer;
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "audit-evidence-143",
-            "pre-broker-provider-observation",
-            &reference_precommitment,
-            wrong_receipt_trust,
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "audit-evidence-143",
+                "pre-broker-provider-observation",
+                &reference_precommitment,
+                wrong_receipt_trust,
+            ),
         ),
-    )
-    .is_err());
+        "broker audit comparison signer or algorithm is invalid",
+    );
 
     let wrong_subject = Keypair::from_seed(&[76; 32]).public_key();
     let wrong_policy = crate::provision::GovernedAdminPolicy {
@@ -1271,58 +1296,64 @@ fn audit_evidence_verifier_recomputes_every_external_trust_binding() {
     };
     let mut wrong_policy_trust = audit_trust(&fixture);
     wrong_policy_trust.governed_admin_policy = &wrong_policy;
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "audit-evidence-143",
-            "pre-broker-provider-observation",
-            &reference_precommitment,
-            wrong_policy_trust,
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "audit-evidence-143",
+                "pre-broker-provider-observation",
+                &reference_precommitment,
+                wrong_policy_trust,
+            ),
         ),
-    )
-    .is_err());
+        "governed admin approval subject, intent, decision, or approver is invalid",
+    );
 
     let mut wrong_provider_trust = audit_trust(&fixture);
     wrong_provider_trust.provider_adapter_id = "another-provider-adapter";
-    assert!(verify_completed_audit(
-        &completed,
-        &signed_runner,
-        &admin,
-        completed_audit_context(
-            &request,
-            "audit-evidence-143",
-            "pre-broker-provider-observation",
-            &reference_precommitment,
-            wrong_provider_trust,
+    assert_authorization_denied(
+        verify_completed_audit(
+            &completed,
+            &signed_runner,
+            &admin,
+            completed_audit_context(
+                &request,
+                "audit-evidence-143",
+                "pre-broker-provider-observation",
+                &reference_precommitment,
+                wrong_provider_trust,
+            ),
         ),
-    )
-    .is_err());
+        "broker audit request does not match the trusted provider configuration",
+    );
 
-    assert!(crate::audit::verify_broker_audit_evidence(
-        crate::audit::BrokerAuditEvidenceBundle {
-            comparison: &completed.comparison,
-            runner_authorization: &signed_runner,
-            admin_authorization: &admin,
-            authority: crate::audit::BrokerAuditAuthorityEvidence {
-                liveness: &completed.liveness_authority_exchange,
-                revocation: &completed.liveness_authority_exchange,
+    assert_authorization_denied(
+        crate::audit::verify_broker_audit_evidence(
+            crate::audit::BrokerAuditEvidenceBundle {
+                comparison: &completed.comparison,
+                runner_authorization: &signed_runner,
+                admin_authorization: &admin,
+                authority: crate::audit::BrokerAuditAuthorityEvidence {
+                    liveness: &completed.liveness_authority_exchange,
+                    revocation: &completed.liveness_authority_exchange,
+                },
             },
-        },
-        crate::audit::BrokerAuditExpectedContext {
-            request: &request,
-            audit_id: "audit-evidence-143",
-            reference_source: "pre-broker-provider-observation",
-            reference_precommitment: &reference_precommitment,
-            revocation_authority_domain: "combined-authority",
-            trust: audit_trust(&fixture),
-            not_before_unix_seconds: 19,
-            expires_at_unix_seconds: 21,
-        },
-    )
-    .is_err());
+            crate::audit::BrokerAuditExpectedContext {
+                request: &request,
+                audit_id: "audit-evidence-143",
+                reference_source: "pre-broker-provider-observation",
+                reference_precommitment: &reference_precommitment,
+                revocation_authority_domain: "combined-authority",
+                trust: audit_trust(&fixture),
+                not_before_unix_seconds: 19,
+                expires_at_unix_seconds: 21,
+            },
+        ),
+        "broker audit revocation evidence has the wrong operation",
+    );
 }
 
 #[test]
@@ -1420,35 +1451,39 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
 
     let (wrong_reference, _wrong_reference_precommitment) =
         audit_reference_for_execution(&fixture, &request, true);
-    assert!(crate::audit::verify_broker_audit_runner_authorization(
-        &signed_runner,
-        &request,
-        &wrong_reference,
-        crate::audit::BrokerAuditRunnerTrust {
-            deployment_id: "test-deployment",
-            broker_instance_id: "test-broker-instance",
-            tenant_scope: "tenant-a",
-            runner_id: "test-enterprise-runner",
-            trusted_runner: &fixture.audit_runner.public_key(),
-        },
-        20,
-    )
-    .is_err());
+    assert_authorization_denied(
+        crate::audit::verify_broker_audit_runner_authorization(
+            &signed_runner,
+            &request,
+            &wrong_reference,
+            crate::audit::BrokerAuditRunnerTrust {
+                deployment_id: "test-deployment",
+                broker_instance_id: "test-broker-instance",
+                tenant_scope: "tenant-a",
+                runner_id: "test-enterprise-runner",
+                trusted_runner: &fixture.audit_runner.public_key(),
+            },
+            20,
+        ),
+        "broker audit runner authorization is stale, untrusted, or rebound",
+    );
     let wrong_runner = Keypair::from_seed(&[64; 32]).public_key();
-    assert!(crate::audit::verify_broker_audit_runner_authorization(
-        &signed_runner,
-        &request,
-        &reference,
-        crate::audit::BrokerAuditRunnerTrust {
-            deployment_id: "test-deployment",
-            broker_instance_id: "test-broker-instance",
-            tenant_scope: "tenant-a",
-            runner_id: "test-enterprise-runner",
-            trusted_runner: &wrong_runner,
-        },
-        20,
-    )
-    .is_err());
+    assert_authorization_denied(
+        crate::audit::verify_broker_audit_runner_authorization(
+            &signed_runner,
+            &request,
+            &reference,
+            crate::audit::BrokerAuditRunnerTrust {
+                deployment_id: "test-deployment",
+                broker_instance_id: "test-broker-instance",
+                tenant_scope: "tenant-a",
+                runner_id: "test-enterprise-runner",
+                trusted_runner: &wrong_runner,
+            },
+            20,
+        ),
+        "broker audit runner authorization is stale, untrusted, or rebound",
+    );
 
     fixture
         .service

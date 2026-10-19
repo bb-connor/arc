@@ -1,15 +1,32 @@
 use super::*;
 
+fn denied_at_capture() -> crate::service::failure::FailureProjection {
+    crate::service::failure::FailureProjection {
+        stage: BrokerFailureStage::Capture,
+        outcome: BrokerFailureOutcome::Denied,
+        dispatch_knowledge: BrokerDispatchKnowledge::NotCommitted,
+    }
+}
+
 #[test]
 fn expired_authority_after_capture_never_reaches_network_dispatch() {
     let fixture = fixture(1, false, false);
     let (request, trusted) = execution(&fixture, 189, 1);
     register_prepared_execution(&fixture, &request, &trusted, 20);
     let expired = request.capability.body.expires_at_unix_seconds + 1;
-    assert!(fixture
+    let Err(failure) = fixture
         .service
         .execute_inner(&request, &trusted, 21, &|| Ok(expired))
-        .is_err());
+    else {
+        panic!("expired authority must refuse dispatch");
+    };
+    assert!(matches!(
+        &failure.error,
+        BrokerError::AuthorizationDenied(message)
+            if message == "broker capability is outside its validity interval"
+    ));
+    assert_eq!(failure.error.diagnostic_code(), "authorization_denied");
+    assert_eq!(failure.projection, Some(denied_at_capture()));
     assert_eq!(fixture.authority.captured_count(), 1);
     assert!(fixture
         .observed_authorizations
@@ -36,10 +53,18 @@ fn credential_mutation_fences_an_already_prepared_dispatch() {
                 .disable(credential)
                 .test_expect("disable prepared credential");
         }
-        assert!(fixture
+        let Err(failure) = fixture
             .service
             .execute_inner(&request, &trusted, 21, &|| Ok(21))
-            .is_err());
+        else {
+            panic!("a fenced credential must refuse dispatch");
+        };
+        assert!(matches!(
+            &failure.error,
+            BrokerError::CredentialUnavailable(_)
+        ));
+        assert_eq!(failure.error.diagnostic_code(), "authorization_denied");
+        assert_eq!(failure.projection, Some(denied_at_capture()));
         assert!(fixture
             .observed_authorizations
             .lock()
@@ -183,19 +208,28 @@ fn post_capture_migration_change_preserves_truthful_failure_evidence() {
 fn framing_rejects_empty_and_oversized_frames() {
     let empty_bytes = 0_u32.to_be_bytes();
     let mut empty = empty_bytes.as_slice();
-    assert!(read_bounded_frame(&mut empty).is_err());
+    assert_invalid_request(
+        read_bounded_frame(&mut empty),
+        "IPC frame is empty or oversized",
+    );
     let oversized_bytes = u32::try_from(MAX_WIRE_BYTES + 1)
         .test_expect("u32")
         .to_be_bytes();
     let mut oversized = oversized_bytes.as_slice();
-    assert!(read_bounded_frame(&mut oversized).is_err());
+    assert_invalid_request(
+        read_bounded_frame(&mut oversized),
+        "IPC frame is empty or oversized",
+    );
 }
 
 #[test]
 fn partial_sensitive_frame_is_zeroized_before_the_read_error_escapes() {
     let mut frame = Zeroizing::new(vec![0xaa; 32]);
     let mut partial = b"partial-secret-frame".as_slice();
-    assert!(read_sensitive_frame_body(&mut partial, &mut frame).is_err());
+    assert_invalid_request(
+        read_sensitive_frame_body(&mut partial, &mut frame),
+        "IPC frame body failed: failed to fill whole buffer",
+    );
     assert!(frame.is_empty());
 }
 
@@ -249,36 +283,72 @@ fn sensitive_ipc_envelope_is_strictly_canonical_and_zeroizing() {
     );
 
     let reordered = br#"{"operation":"provision","authorization":[1],"payload":[2,3],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(reordered).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(reordered),
+        "sensitive JSON payload is invalid",
+    );
     let duplicate = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"payload":[4],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(duplicate).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(duplicate),
+        "sensitive JSON payload is invalid",
+    );
     let unknown = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-ipc","unexpected":true}"#;
-    assert!(decode_canonical_ipc_request(unknown).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(unknown),
+        "sensitive JSON payload is invalid",
+    );
     let escaped_key = br#"{"authoriz\u0061tion":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(escaped_key).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(escaped_key),
+        "sensitive JSON payload is invalid",
+    );
     let surrogate_pair = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"\ud83d\ude00"}"#;
-    assert!(decode_canonical_ipc_request(surrogate_pair).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(surrogate_pair),
+        "sensitive JSON payload is invalid",
+    );
     let exponent_byte = br#"{"authorization":[1],"operation":"provision","payload":[2e0],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(exponent_byte).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(exponent_byte),
+        "sensitive JSON payload is invalid",
+    );
     let negative_byte = br#"{"authorization":[1],"operation":"provision","payload":[-1],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(negative_byte).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(negative_byte),
+        "sensitive JSON payload is invalid",
+    );
     let fractional_byte = br#"{"authorization":[1],"operation":"provision","payload":[2.0],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(fractional_byte).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(fractional_byte),
+        "sensitive JSON payload is invalid",
+    );
     let trailing_data = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-ipc"}true"#;
-    assert!(decode_canonical_ipc_request(trailing_data).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(trailing_data),
+        "sensitive JSON payload is invalid",
+    );
     let deep_nesting = br#"{"authorization":[1],"operation":"provision","payload":[[[[2]]]],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(deep_nesting).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(deep_nesting),
+        "sensitive JSON payload is invalid",
+    );
 
     let mut malformed_utf8 = Zeroizing::new(
         br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":""#.to_vec(),
     );
     malformed_utf8.push(0xff);
     malformed_utf8.extend_from_slice(br#""}"#);
-    assert!(decode_canonical_ipc_request(&malformed_utf8).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(&malformed_utf8),
+        "sensitive JSON payload is invalid",
+    );
 
     reset_sensitive_drop_observer();
     let malformed_nested = br#"{"authorization":[1],"operation":"provision","payload":[2,"secret-canary"],"tenantScope":"tenant-ipc"}"#;
-    assert!(decode_canonical_ipc_request(malformed_nested).is_err());
+    assert_invalid_request(
+        decode_canonical_ipc_request(malformed_nested),
+        "sensitive JSON payload is invalid",
+    );
     assert!(sensitive_drop_observation().0 >= 1);
 }
 
@@ -843,9 +913,10 @@ fn failure_terminal_and_concurrent_execution_cannot_cross_capture() {
         &failure_receipt_key_digest(&request).test_expect("failure receipt key digest"),
     )
     .test_expect("attempt operation gate index");
-    assert!(fixture.service.attempt_operation_gates[gate_index]
-        .try_lock()
-        .is_err());
+    assert!(matches!(
+        fixture.service.attempt_operation_gates[gate_index].try_lock(),
+        Err(std::sync::TryLockError::WouldBlock)
+    ));
 
     let contender_started = Arc::new(Barrier::new(2));
     let execution_service = Arc::clone(&fixture.service);
