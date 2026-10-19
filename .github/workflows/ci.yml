@@ -242,6 +242,9 @@ jobs:
           run_gate bash scripts/tests/check-rust-public-surface.test.sh
           run_gate python3 scripts/check-architecture-docs.py
           run_gate python3 scripts/tests/check-architecture-docs.test.py
+          run_gate python3 scripts/tests/check-mutants-rationale.test.py
+          run_gate python3 scripts/tests/check-workspace-layering.test.py
+          run_gate python3 scripts/tests/check-sre-metrics-registry.test.py
           run_gate python3 scripts/tests/check-receipt-trace-negative-registry.test.py
           run_gate python3 scripts/tests/check-external-wildcard-deps.test.py
           run_gate python3 scripts/tests/check-cargo-deny-duplicate-baseline.test.py
