@@ -52,27 +52,54 @@ fn assert_unknown_schema_rejected(name: &str, artifact: &impl Serialize) -> Test
         &mut value["schema"]
     };
     *schema_value = json!("chio.outcome.unknown.v9");
-    assert!(chio_spec_validate::validate_value(
+    let violations = require_schema_violation(chio_spec_validate::validate_value(
         &path,
         &schema,
         &std::path::PathBuf::from("<unknown-outcome-artifact>"),
         &value,
-    )
-    .is_err());
+    ));
+    assert_eq!(
+        violations,
+        vec![format!(
+            "\"chio.outcome.{}.v1\" was expected",
+            name.trim_end_matches(".schema.json")
+        )]
+    );
     Ok(())
 }
 
 fn assert_schema_rejected(name: &str, artifact: &impl Serialize) -> TestResult {
     let path = schema_path(name);
     let schema = chio_spec_validate::load_json(&path)?;
-    assert!(chio_spec_validate::validate_value(
+    let violations = require_schema_violation(chio_spec_validate::validate_value(
         &path,
         &schema,
         &std::path::PathBuf::from("<invalid-outcome-artifact>"),
         &serde_json::to_value(artifact)?,
-    )
-    .is_err());
+    ));
+    assert!(!violations.is_empty());
     Ok(())
+}
+
+fn require_schema_violation(result: Result<(), chio_spec_validate::ValidateError>) -> Vec<String> {
+    match result {
+        Err(chio_spec_validate::ValidateError::SchemaViolation(_, _, violations)) => violations,
+        other => panic!("expected a schema violation, got {other:?}"),
+    }
+}
+
+fn refusal<T, E: std::fmt::Debug>(result: Result<T, E>) -> E {
+    match result {
+        Ok(_) => panic!("input was accepted"),
+        Err(error) => error,
+    }
+}
+
+fn input_code(error: OutcomeError) -> &'static str {
+    match error {
+        OutcomeError::Input(input) => input.code(),
+        other => panic!("expected an untrusted-input refusal, got {other:?}"),
+    }
 }
 
 fn require_error<T>(result: Result<T, OutcomeError>) -> OutcomeError {
@@ -750,7 +777,7 @@ fn predicate_uses_rfc6901_canonical_ijson_and_exact_output_bytes() -> TestResult
         })),
         OutcomeError::InvalidField("duplicate_assertion")
     );
-    assert!(OutcomePredicateBodyV1::new(OutcomePredicateInputV1 {
+    let error = require_error(OutcomePredicateBodyV1::new(OutcomePredicateInputV1 {
         assertions: vec![OutcomeAssertionV1 {
             pointer: "".to_owned(),
             comparator: OutcomeComparatorV1::Eq {
@@ -760,8 +787,15 @@ fn predicate_uses_rfc6901_canonical_ijson_and_exact_output_bytes() -> TestResult
         provider_id: "provider-1".to_owned(),
         issued_at_unix_ms: 1,
         expires_at_unix_ms: 2,
-    })
-    .is_err());
+    }));
+    assert!(
+        matches!(
+            &error,
+            OutcomeError::Canonicalization(message)
+                if message.contains("integer 9007199254740992 outside I-JSON safe range")
+        ),
+        "{error:?}"
+    );
 
     let mut malformed_pointer = serde_json::to_value(&fixture.signed_predicate)?;
     malformed_pointer["body"]["assertions"][0]["pointer"] = json!("/bad~2escape");
@@ -775,32 +809,38 @@ fn predicate_uses_rfc6901_canonical_ijson_and_exact_output_bytes() -> TestResult
     let canonical = canonical_outcome_bytes(&fixture.signed_predicate)?;
     let loaded: SignedOutcomePredicateV1 = load_canonical_outcome_json(&canonical)?;
     assert_eq!(loaded, fixture.signed_predicate);
-    assert!(
-        load_canonical_outcome_json::<SignedOutcomePredicateV1>(&serde_json::to_vec_pretty(
+    assert_eq!(
+        input_code(require_error(load_canonical_outcome_json::<
+            SignedOutcomePredicateV1,
+        >(&serde_json::to_vec_pretty(
             &fixture.signed_predicate
-        )?)
-        .is_err()
+        )?))),
+        "urn:chio:error:attest:signed-json-noncanonical"
     );
-    assert!(verify_outcome_predicate(
-        &serde_json::to_vec_pretty(&fixture.signed_predicate)?,
-        &OutcomePredicateVerificationV1 {
-            provider_id: "provider-1",
-            trust: &provider_trust(&fixture)?,
-            trusted_now_unix_ms: 1_200,
-        },
-    )
-    .is_err());
+    assert_eq!(
+        input_code(require_error(verify_outcome_predicate(
+            &serde_json::to_vec_pretty(&fixture.signed_predicate)?,
+            &OutcomePredicateVerificationV1 {
+                provider_id: "provider-1",
+                trust: &provider_trust(&fixture)?,
+                trusted_now_unix_ms: 1_200,
+            },
+        ))),
+        "urn:chio:error:attest:signed-json-noncanonical"
+    );
     let mut unknown_field = serde_json::to_value(&fixture.signed_predicate)?;
     unknown_field["body"]["unexpected"] = json!(true);
-    assert!(verify_outcome_predicate(
-        &canonical_outcome_bytes(&unknown_field)?,
-        &OutcomePredicateVerificationV1 {
-            provider_id: "provider-1",
-            trust: &provider_trust(&fixture)?,
-            trusted_now_unix_ms: 1_200,
-        },
-    )
-    .is_err());
+    assert_eq!(
+        input_code(require_error(verify_outcome_predicate(
+            &canonical_outcome_bytes(&unknown_field)?,
+            &OutcomePredicateVerificationV1 {
+                provider_id: "provider-1",
+                trust: &provider_trust(&fixture)?,
+                trusted_now_unix_ms: 1_200,
+            },
+        ))),
+        "urn:chio:error:attest:signed-json-invalid-shape"
+    );
     Ok(())
 }
 
@@ -873,16 +913,18 @@ fn signed_contracts_and_eligibility_fail_closed() -> TestResult {
     let mut tampered = serde_json::to_value(&fixture.signed_eligibility)?;
     tampered["body"]["quoteDigest"] = json!(digest("other-quote"));
     let tampered = canonical_outcome_bytes(&tampered)?;
-    assert!(authenticate_outcome_eligibility(
-        &tampered,
-        &OutcomeEligibilityAuthenticationV1 {
-            expected: &expected,
-            trust: &kernel_trust,
-            referenced_artifacts_valid_until_unix_ms: 2_000,
-        },
-        1_200,
-    )
-    .is_err());
+    assert_eq!(
+        require_error(authenticate_outcome_eligibility(
+            &tampered,
+            &OutcomeEligibilityAuthenticationV1 {
+                expected: &expected,
+                trust: &kernel_trust,
+                referenced_artifacts_valid_until_unix_ms: 2_000,
+            },
+            1_200,
+        )),
+        OutcomeError::BindingMismatch
+    );
     assert_eq!(
         require_error(authenticate_outcome_eligibility(
             &canonical_outcome_bytes(&fixture.signed_eligibility)?,
@@ -895,51 +937,55 @@ fn signed_contracts_and_eligibility_fail_closed() -> TestResult {
         )),
         OutcomeError::BindingMismatch
     );
-    assert!(
-        OutcomeEligibilityBodyV1::from_kernel_assertion(OutcomeEligibilityInputV1 {
-            request_id: "req-outcome-1".to_owned(),
-            capability_id: "cap-outcome-1".to_owned(),
-            tool_server: "tool-server-1".to_owned(),
-            tool_name: "produce".to_owned(),
-            provider_id: "provider-1".to_owned(),
-            listing_id: "listing-1".to_owned(),
-            listing_digest: digest("listing"),
-            provider_binding_digest: digest("provider-binding"),
-            pricing_id: fixture.pricing.body().pricing_id().to_owned(),
-            pricing_digest: fixture.pricing.envelope_digest().to_owned(),
-            predicate_id: fixture.predicate.body().predicate_id().to_owned(),
-            predicate_digest: fixture.predicate.envelope_digest().to_owned(),
-            quote_digest: digest("quote"),
-            sla_digest: None,
-            outcome_price: money(250),
-            request_extension_digest: digest("request-extension"),
-            pre_action_authority_digest: digest("pre-action-authority"),
-            post_guard_policy_digest: digest("post-guard-policy"),
-            receiver_binding_digest: receiver_binding(&fixture)?.digest().to_owned(),
-            delivery_ack_deadline_unix_ms: 1_000,
-            qualified_rail_id: "qualified-rail-1".to_owned(),
-            qualified_rail_capability_digest: digest("rail-capability"),
-            rail_capture_deadline_unix_ms: 1_800,
-            issued_at_unix_ms: 1_100,
-            expires_at_unix_ms: 1_900,
-            artifact_valid_until_unix_ms: 2_000,
-            kernel_authority_id: "kernel-1".to_owned(),
-            kernel_key_epoch: 6,
-        })
-        .is_err()
+    assert_eq!(
+        require_error(OutcomeEligibilityBodyV1::from_kernel_assertion(
+            OutcomeEligibilityInputV1 {
+                request_id: "req-outcome-1".to_owned(),
+                capability_id: "cap-outcome-1".to_owned(),
+                tool_server: "tool-server-1".to_owned(),
+                tool_name: "produce".to_owned(),
+                provider_id: "provider-1".to_owned(),
+                listing_id: "listing-1".to_owned(),
+                listing_digest: digest("listing"),
+                provider_binding_digest: digest("provider-binding"),
+                pricing_id: fixture.pricing.body().pricing_id().to_owned(),
+                pricing_digest: fixture.pricing.envelope_digest().to_owned(),
+                predicate_id: fixture.predicate.body().predicate_id().to_owned(),
+                predicate_digest: fixture.predicate.envelope_digest().to_owned(),
+                quote_digest: digest("quote"),
+                sla_digest: None,
+                outcome_price: money(250),
+                request_extension_digest: digest("request-extension"),
+                pre_action_authority_digest: digest("pre-action-authority"),
+                post_guard_policy_digest: digest("post-guard-policy"),
+                receiver_binding_digest: receiver_binding(&fixture)?.digest().to_owned(),
+                delivery_ack_deadline_unix_ms: 1_000,
+                qualified_rail_id: "qualified-rail-1".to_owned(),
+                qualified_rail_capability_digest: digest("rail-capability"),
+                rail_capture_deadline_unix_ms: 1_800,
+                issued_at_unix_ms: 1_100,
+                expires_at_unix_ms: 1_900,
+                artifact_valid_until_unix_ms: 2_000,
+                kernel_authority_id: "kernel-1".to_owned(),
+                kernel_key_epoch: 6,
+            }
+        )),
+        OutcomeError::BindingMismatch
     );
 
     let canonical = canonical_outcome_bytes(&fixture.signed_eligibility)?;
-    assert!(authenticate_outcome_eligibility(
-        &serde_json::to_vec_pretty(&fixture.signed_eligibility)?,
-        &OutcomeEligibilityAuthenticationV1 {
-            expected: &expected,
-            trust: &kernel_trust,
-            referenced_artifacts_valid_until_unix_ms: 2_000,
-        },
-        1_200,
-    )
-    .is_err());
+    assert_eq!(
+        input_code(require_error(authenticate_outcome_eligibility(
+            &serde_json::to_vec_pretty(&fixture.signed_eligibility)?,
+            &OutcomeEligibilityAuthenticationV1 {
+                expected: &expected,
+                trust: &kernel_trust,
+                referenced_artifacts_valid_until_unix_ms: 2_000,
+            },
+            1_200,
+        ))),
+        "urn:chio:error:attest:signed-json-noncanonical"
+    );
     let checkpoint = pending_checkpoint(&fixture, DELIVERED_OUTPUT)?;
     assert_eq!(
         require_error(authenticate_outcome_eligibility(
@@ -1408,13 +1454,18 @@ fn pricing_classification_cross_binds_delivery_and_attribution() -> TestResult {
         let mut overcharged = serde_json::to_value(&failed_verdict)?;
         overcharged["chargedAmount"][field] = value;
         let overcharged: OutcomeVerdictV1 = serde_json::from_value(overcharged)?;
-        assert!(overcharged
-            .validate_against_eligibility(&fixture.eligibility)
-            .is_err());
+        assert_eq!(
+            require_error(overcharged.validate_against_eligibility(&fixture.eligibility)),
+            OutcomeError::BindingMismatch
+        );
     }
     let mut unknown_field = verdict_fixture(&fixture);
     unknown_field["unexpected"] = json!(true);
-    assert!(serde_json::from_value::<OutcomeVerdictV1>(unknown_field).is_err());
+    let message = refusal(serde_json::from_value::<OutcomeVerdictV1>(unknown_field)).to_string();
+    assert!(
+        message.starts_with("unknown field `unexpected`, expected one of `schema`, `requestId`"),
+        "{message}"
+    );
     Ok(())
 }
 
@@ -1462,10 +1513,22 @@ fn sla_arithmetic_and_fixed_interval_boundaries_are_exact() -> TestResult {
     };
     assert_eq!(outcome_sla_window(&quarter_sla, 120_500)?, expected);
     assert_eq!(outcome_sla_window(&quarter_sla, 180_499)?, expected);
-    assert!(outcome_sla_window(&quarter_sla, 999).is_err());
-    assert!(outcome_sla_window(&quarter_sla, 1_000).is_err());
-    assert!(outcome_sla_window(&quarter_sla, 299_999).is_err());
-    assert!(outcome_sla_window(&quarter_sla, 300_000).is_err());
+    assert_eq!(
+        require_error(outcome_sla_window(&quarter_sla, 999)),
+        OutcomeError::NotCurrent
+    );
+    assert_eq!(
+        require_error(outcome_sla_window(&quarter_sla, 1_000)),
+        OutcomeError::NotCurrent
+    );
+    assert_eq!(
+        require_error(outcome_sla_window(&quarter_sla, 299_999)),
+        OutcomeError::NotCurrent
+    );
+    assert_eq!(
+        require_error(outcome_sla_window(&quarter_sla, 300_000)),
+        OutcomeError::NotCurrent
+    );
     Ok(())
 }
 
@@ -1580,7 +1643,12 @@ fn representative_artifacts_match_strict_schemas_and_versions() -> TestResult {
     let canonical_verdict = String::from_utf8(canonical_outcome_bytes(&verdict_value)?)?;
     let out_of_ijson = canonical_verdict.replacen("\"units\":250", "\"units\":9007199254740992", 1);
     assert_ne!(out_of_ijson, canonical_verdict);
-    assert!(load_canonical_outcome_json::<OutcomeVerdictV1>(out_of_ijson.as_bytes()).is_err());
+    assert_eq!(
+        input_code(require_error(
+            load_canonical_outcome_json::<OutcomeVerdictV1>(out_of_ijson.as_bytes())
+        )),
+        "urn:chio:error:attest:signed-json-canonicalization"
+    );
 
     assert_unknown_schema_rejected("request.schema.json", &request)?;
     assert_unknown_schema_rejected("predicate.schema.json", &fixture.signed_predicate)?;
