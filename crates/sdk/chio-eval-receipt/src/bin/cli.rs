@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::process::ExitCode;
 
 use chio_eval_receipt::{verify_bundle, verify_fixture_bundle, BundleError, VerifiedBundle};
@@ -30,6 +31,15 @@ const ALLOWED_SIGNATURE_FIELDS: &[&str] = &[
     "memo_sha256",
     "signature",
 ];
+
+/// Largest bundle file `verify` and `verify-fixture` read.
+const MAX_BUNDLE_BYTES: u64 = 16 * 1024 * 1024;
+
+/// Largest memo file `verify-memo` reads.
+const MAX_MEMO_BYTES: u64 = 4 * 1024 * 1024;
+
+/// Largest detached signature file `verify-memo` reads.
+const MAX_SIGNATURE_BYTES: u64 = 64 * 1024;
 
 fn main() -> ExitCode {
     match run() {
@@ -72,7 +82,7 @@ fn verify_bundle_path_with(
     bundle_path: &str,
     verifier: fn(&str) -> Result<VerifiedBundle, BundleError>,
 ) -> Result<String, String> {
-    let bundle_json = fs::read_to_string(bundle_path)
+    let bundle_json = String::from_utf8(read_bounded(bundle_path, MAX_BUNDLE_BYTES)?)
         .map_err(|err| format!("failed to read {bundle_path}: {err}"))?;
     let verified =
         verifier(&bundle_json).map_err(|err| format!("failed to verify {bundle_path}: {err}"))?;
@@ -86,11 +96,10 @@ fn verify_bundle_path_with(
 }
 
 fn verify_memo_path(memo_path: &str, sig_path: &str) -> Result<String, String> {
-    let memo_bytes =
-        fs::read(memo_path).map_err(|err| format!("failed to read {memo_path}: {err}"))?;
+    let memo_bytes = read_bounded(memo_path, MAX_MEMO_BYTES)?;
     let memo_sha256 = sha256_hex(&memo_bytes);
-    let sig =
-        fs::read_to_string(sig_path).map_err(|err| format!("failed to read {sig_path}: {err}"))?;
+    let sig = String::from_utf8(read_bounded(sig_path, MAX_SIGNATURE_BYTES)?)
+        .map_err(|err| format!("failed to read {sig_path}: {err}"))?;
     let fields = parse_signature_fields(&sig)?;
 
     require_field(&fields, "signature_format", "chio-memo-signature.v1")?;
@@ -117,6 +126,24 @@ fn verify_memo_path(memo_path: &str, sig_path: &str) -> Result<String, String> {
     Ok(format!(
         "verified memo {memo_path} signer={signer} sha256={memo_sha256} scheme={scheme}"
     ))
+}
+
+fn read_bounded(path: &str, limit: u64) -> Result<Vec<u8>, String> {
+    let file = fs::File::open(path).map_err(|err| format!("failed to read {path}: {err}"))?;
+    let metadata = file
+        .metadata()
+        .map_err(|err| format!("failed to read {path}: {err}"))?;
+    if !metadata.is_file() {
+        return Err(format!("failed to read {path}: not a regular file"));
+    }
+    let mut bytes = Vec::new();
+    file.take(limit.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|err| format!("failed to read {path}: {err}"))?;
+    if bytes.len() as u64 > limit {
+        return Err(format!("failed to read {path}: exceeds {limit} byte limit"));
+    }
+    Ok(bytes)
 }
 
 fn parse_signature_fields(sig: &str) -> Result<Vec<(&str, &str)>, String> {
@@ -183,7 +210,10 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{memo_signature, sha256_hex, verify_memo_path, SYNTHETIC_TEST_SAMPLE};
+    use super::{
+        memo_signature, read_bounded, sha256_hex, verify_bundle_path, verify_memo_path,
+        MAX_BUNDLE_BYTES, MAX_MEMO_BYTES, MAX_SIGNATURE_BYTES, SYNTHETIC_TEST_SAMPLE,
+    };
     use std::fs;
     use std::io::Write;
     use std::path::{Path, PathBuf};
@@ -393,6 +423,73 @@ mod tests {
         assert!(
             err.contains("scheme mismatch"),
             "expected scheme mismatch error, got: {err}"
+        );
+        Ok(())
+    }
+
+    fn oversize_error(path: &Path, limit: u64) -> Result<String, String> {
+        let path = path_str(path)?;
+        Ok(format!("failed to read {path}: exceeds {limit} byte limit"))
+    }
+
+    #[test]
+    fn verify_rejects_oversize_bundle() -> Result<(), String> {
+        let bundle = write_temp(
+            "oversize-bundle.json",
+            &vec![0u8; MAX_BUNDLE_BYTES as usize + 1],
+        )?;
+        let result = verify_bundle_path(path_str(&bundle)?);
+        let expected = oversize_error(&bundle, MAX_BUNDLE_BYTES);
+        let _ = fs::remove_file(&bundle);
+        assert_eq!(result.err(), Some(expected?));
+        Ok(())
+    }
+
+    #[test]
+    fn verify_memo_rejects_oversize_memo() -> Result<(), String> {
+        let memo = write_temp("oversize-memo.md", &vec![0u8; MAX_MEMO_BYTES as usize + 1])?;
+        let sig = write_temp("oversize-memo.sig", b"")?;
+        let result = verify_memo_path(path_str(&memo)?, path_str(&sig)?);
+        let expected = oversize_error(&memo, MAX_MEMO_BYTES);
+        let _ = fs::remove_file(&memo);
+        let _ = fs::remove_file(&sig);
+        assert_eq!(result.err(), Some(expected?));
+        Ok(())
+    }
+
+    #[test]
+    fn verify_memo_rejects_oversize_sig() -> Result<(), String> {
+        let memo = write_temp("oversize-sig-memo.md", b"memo\n")?;
+        let sig = write_temp(
+            "oversize-sig.sig",
+            &vec![0u8; MAX_SIGNATURE_BYTES as usize + 1],
+        )?;
+        let result = verify_memo_path(path_str(&memo)?, path_str(&sig)?);
+        let expected = oversize_error(&sig, MAX_SIGNATURE_BYTES);
+        let _ = fs::remove_file(&memo);
+        let _ = fs::remove_file(&sig);
+        assert_eq!(result.err(), Some(expected?));
+        Ok(())
+    }
+
+    #[test]
+    fn read_bounded_accepts_file_at_limit() -> Result<(), String> {
+        let path = write_temp("at-limit.bin", &[7u8; 16])?;
+        let result = read_bounded(path_str(&path)?, 16);
+        let over = read_bounded(path_str(&path)?, 15);
+        let _ = fs::remove_file(&path);
+        assert_eq!(result, Ok(vec![7u8; 16]));
+        assert_eq!(over.err(), Some(oversize_error(&path, 15)?));
+        Ok(())
+    }
+
+    #[test]
+    fn read_bounded_rejects_directory() -> Result<(), String> {
+        let dir = std::env::temp_dir();
+        let dir = path_str(&dir)?;
+        assert_eq!(
+            read_bounded(dir, 16).err(),
+            Some(format!("failed to read {dir}: not a regular file"))
         );
         Ok(())
     }
