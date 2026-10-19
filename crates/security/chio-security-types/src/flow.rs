@@ -737,6 +737,7 @@ mod tests {
     };
     use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::format;
+    use alloc::string::ToString;
     use alloc::vec::Vec;
     use serde_json::{from_str, json, to_string, Value};
 
