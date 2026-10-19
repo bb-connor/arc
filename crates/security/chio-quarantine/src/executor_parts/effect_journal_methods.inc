@@ -448,33 +448,6 @@ impl<
             .map_err(ExecutorError::EffectQuery)
     }
 
-    fn validate_work(
-        &self,
-        snapshot: &ResponseSnapshot,
-        work: &ScheduledWork,
-        now_unix_ms: u64,
-    ) -> Result<(), ExecutorError> {
-        if work.tenant_id != snapshot.plan.tenant_id || work.action_id != snapshot.plan.action_id {
-            return Err(ExecutorError::WorkMismatch);
-        }
-        if work.lease_expires_at_unix_ms <= now_unix_ms {
-            return Err(ExecutorError::StaleLease);
-        }
-        self.require_live_lease(work)
-    }
-
-    /// Names a lost lease before any write. The scheduled CAS still checks the
-    /// exact live lease in its own transaction and stays the authoritative fence.
-    fn require_live_lease(&self, work: &ScheduledWork) -> Result<(), ExecutorError> {
-        self.store.validate_lease(work).map_err(|error| {
-            if error.kind() == PortErrorKind::Conflict {
-                ExecutorError::StaleLease
-            } else {
-                ExecutorError::Store(error)
-            }
-        })
-    }
-
     fn state_machine(&self) -> ResponseStateMachine<S> {
         ResponseStateMachine::new(Arc::clone(&self.store))
     }
