@@ -210,7 +210,7 @@ async fn handle_admin_rotate_authority(
                 "trustedPublicKeys": status.trusted_public_keys,
             }))
             .into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
 
@@ -229,7 +229,7 @@ async fn handle_admin_rotate_authority(
                 "trustedPublicKeys": status.trusted_public_keys.into_iter().map(|key| key.to_hex()).collect::<Vec<_>>(),
             }))
             .into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
 
@@ -250,7 +250,7 @@ async fn handle_admin_rotate_authority(
             "trustedPublicKeys": vec![public_key.to_hex()],
         }))
         .into_response(),
-        Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        Err(error) => admin_backend_failure(error),
     }
 }
 
@@ -276,7 +276,7 @@ async fn handle_admin_tool_receipts(
             limit: Some(admin_list_limit(query.limit)),
         }) {
             Ok(response) => Json(response).into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
     let store = match open_receipt_store(&state) {
@@ -294,7 +294,7 @@ async fn handle_admin_tool_receipts(
     ) {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
     let receipts = match receipts
@@ -304,7 +304,7 @@ async fn handle_admin_tool_receipts(
     {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
 
@@ -347,7 +347,7 @@ async fn handle_admin_child_receipts(
             limit: Some(admin_list_limit(query.limit)),
         }) {
             Ok(response) => Json(response).into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
     let store = match open_receipt_store(&state) {
@@ -366,7 +366,7 @@ async fn handle_admin_child_receipts(
     ) {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
     let receipts = match receipts
@@ -376,7 +376,7 @@ async fn handle_admin_child_receipts(
     {
         Ok(receipts) => receipts,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
 
@@ -415,7 +415,7 @@ async fn handle_admin_budgets(
             limit: Some(admin_list_limit(query.limit)),
         }) {
             Ok(response) => Json(response).into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
 
@@ -430,7 +430,7 @@ async fn handle_admin_budgets(
     ) {
         Ok(usages) => usages,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
 
@@ -467,7 +467,7 @@ async fn handle_admin_revocations(
             limit: Some(admin_list_limit(query.limit)),
         }) {
             Ok(response) => Json(response).into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
     let store = match open_revocation_store(&state) {
@@ -480,7 +480,7 @@ async fn handle_admin_revocations(
     ) {
         Ok(revocations) => revocations,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
     let revoked = query
@@ -488,7 +488,7 @@ async fn handle_admin_revocations(
         .as_deref()
         .map(|capability_id| store.is_revoked(capability_id))
         .transpose()
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()));
+        .map_err(admin_backend_failure);
     let revoked = match revoked {
         Ok(revoked) => revoked,
         Err(response) => return response,
@@ -525,7 +525,7 @@ async fn handle_admin_revoke_capability(
     } {
         return match client.revoke_capability(&payload.capability_id) {
             Ok(response) => Json(response).into_response(),
-            Err(error) => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+            Err(error) => admin_backend_failure(error),
         };
     }
     let store = match open_revocation_store(&state) {
@@ -535,7 +535,7 @@ async fn handle_admin_revoke_capability(
     let newly_revoked = match store.revoke(&payload.capability_id) {
         Ok(revoked) => revoked,
         Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string());
+            return admin_backend_failure(error);
         }
     };
 
@@ -796,6 +796,16 @@ fn control_client(
         })
 }
 
+/// A trust backend failure answers the fixed 500 URN. The cause stays in the
+/// server log because it can name store paths, peer URLs and backend bodies.
+fn admin_backend_failure(error: impl std::fmt::Display) -> Response {
+    error!(error = %error, "remote MCP admin backend operation failed");
+    plain_http_error(
+        StatusCode::INTERNAL_SERVER_ERROR,
+        chio_errors::_generated::error_codes::TRANSPORT_ADMIN_BACKEND_FAILED.urn,
+    )
+}
+
 fn open_receipt_store(
     state: &RemoteAppState,
 ) -> Result<chio_store_sqlite::SqliteReceiptStore, Response> {
@@ -855,15 +865,12 @@ fn open_budget_store(
             "remote budget admin requires durable budget state",
         ));
     };
-    chio_store_sqlite::SqliteBudgetStore::open(path)
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))
+    chio_store_sqlite::SqliteBudgetStore::open(path).map_err(admin_backend_failure)
 }
 
 fn load_authority_status(state: &RemoteAppState) -> Result<Value, Response> {
     if let Some(client) = control_client(state)? {
-        let status = client.authority_status().map_err(|error| {
-            plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        })?;
+        let status = client.authority_status().map_err(admin_backend_failure)?;
         return Ok(json!({
             "configured": status.configured,
             "backend": status.backend,
@@ -878,9 +885,7 @@ fn load_authority_status(state: &RemoteAppState) -> Result<Value, Response> {
     if let Some(path) = state.factory.config.authority_db_path.as_deref() {
         let status = chio_store_sqlite::SqliteCapabilityAuthority::open(path)
             .and_then(|authority| authority.status())
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
+            .map_err(admin_backend_failure)?;
         return Ok(json!({
             "configured": true,
             "backend": "sqlite",
@@ -917,10 +922,7 @@ fn load_authority_status(state: &RemoteAppState) -> Result<Value, Response> {
             "appliesToFutureSessionsOnly": true,
             "trustedPublicKeys": Vec::<String>::new(),
         })),
-        Err(error) => Err(plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            &error.to_string(),
-        )),
+        Err(error) => Err(admin_backend_failure(error)),
     }
 }
 
@@ -945,9 +947,7 @@ fn load_session_revocation_status(
                             "revoked": response.revoked.unwrap_or(false),
                         })
                     })
-                    .map_err(|error| {
-                        plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                    })
+                    .map_err(admin_backend_failure)
             })
             .collect();
     }
@@ -966,9 +966,7 @@ fn load_session_revocation_status(
                         "revoked": revoked,
                     })
                 })
-                .map_err(|error| {
-                    plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-                })
+                .map_err(admin_backend_failure)
         })
         .collect()
 }

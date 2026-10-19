@@ -3782,6 +3782,72 @@ pub const TRANSPORT_SESSION_SPAWN_FAILED: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-mcp-remote"],
 };
 
+pub const TRANSPORT_ADMIN_BACKEND_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:admin-backend-failed",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "A remote MCP admin request could not complete against its trust backend.",
+    help: "Retry later; the operator must inspect the server log for the backend failure.",
+    string_code: "CHIO-TRANSPORT-ADMIN-BACKEND-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_SESSION_SEND_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:session-send-failed",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The remote MCP edge could not deliver an admitted message to its session.",
+    help: "Retry the request; the operator must inspect the server log for the delivery failure.",
+    string_code: "CHIO-TRANSPORT-SESSION-SEND-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_APPROVAL_STORAGE_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:approval-storage-failed",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The remote MCP edge could not read, write, or sign an operator approval record.",
+    help: "Retry later; the operator must inspect the server log for the storage failure.",
+    string_code: "CHIO-TRANSPORT-APPROVAL-STORAGE-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_APPROVAL_INTENT_UNBOUND: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:approval-intent-unbound",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The session kernel could not bind the operator approval request to its current policy and runtime authority.",
+    help: "Re-establish the session under the current policy before requesting approval; the server log carries the binding failure.",
+    string_code: "CHIO-TRANSPORT-APPROVAL-INTENT-UNBOUND",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
+pub const TRANSPORT_TOKEN_INTROSPECTION_UNAVAILABLE: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:token-introspection-unavailable",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary:
+        "The remote MCP edge could not complete token introspection with its authorization server.",
+    help: "Retry later; the operator must inspect the server log for the introspection failure.",
+    string_code: "CHIO-TRANSPORT-TOKEN-INTROSPECTION-UNAVAILABLE",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -4065,6 +4131,11 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSPORT_UNTRUSTED_PROXY,
     TRANSPORT_INVALID_PROXY_HEADER,
     TRANSPORT_SESSION_SPAWN_FAILED,
+    TRANSPORT_ADMIN_BACKEND_FAILED,
+    TRANSPORT_SESSION_SEND_FAILED,
+    TRANSPORT_APPROVAL_STORAGE_FAILED,
+    TRANSPORT_APPROVAL_INTENT_UNBOUND,
+    TRANSPORT_TOKEN_INTROSPECTION_UNAVAILABLE,
 ];
 
 #[must_use]
