@@ -188,7 +188,9 @@ jobs:
         run: cargo xtask gen proof-coverage --check
 
       - name: Static formal contract guard
-        run: python3 scripts/check-apalache-formal-slice.py
+        run: |
+          python3 scripts/check-apalache-formal-slice.py
+          python3 scripts/tests/check-apalache-formal-slice.test.py
 
       - name: Adapter mediation inventory
         run: cargo xtask check adapter-no-bypass
@@ -239,6 +241,7 @@ jobs:
           run_gate python3 scripts/check-rust-public-surface.py
           run_gate bash scripts/tests/check-rust-public-surface.test.sh
           run_gate python3 scripts/check-architecture-docs.py
+          run_gate python3 scripts/tests/check-architecture-docs.test.py
           run_gate bash ./scripts/check-security-provenance.sh
           run_gate python3 ./scripts/check-enterprise-provenance.py
           run_gate python3 ./scripts/check-linux-enforcement-stack.py
