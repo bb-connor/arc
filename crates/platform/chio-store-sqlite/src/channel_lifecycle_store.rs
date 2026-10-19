@@ -990,6 +990,9 @@ fn admission_error(error: AdmissionOperationStoreError) -> ChannelLifecycleStore
         AdmissionOperationStoreError::OutcomeUnknown(detail) => {
             ChannelLifecycleStoreError::OutcomeUnknown(detail)
         }
+        AdmissionOperationStoreError::KernelStopped => {
+            invalid("durable output release is withheld while the kernel is stopped")
+        }
         AdmissionOperationStoreError::Operation(error) => invalid(error.to_string()),
     }
 }

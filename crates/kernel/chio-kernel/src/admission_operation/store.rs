@@ -30,6 +30,8 @@ pub enum AdmissionOperationStoreError {
     Unavailable(String),
     #[error("admission operation mutation was fenced")]
     Fenced,
+    #[error("admission operation output is withheld while the kernel is stopped")]
+    KernelStopped,
     #[error("admission operation was not found")]
     NotFound,
     #[error("admission operation invariant failed: {0}")]

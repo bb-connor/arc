@@ -153,14 +153,10 @@ impl ChioKernel {
         returned: &DurableToolReturn,
         request: &ToolCallRequest,
     ) -> Result<(), KernelError> {
+        if self.is_emergency_stopped() {
+            return Err(KernelError::OutputWithheld);
+        }
         if returned.caller_report_digest().is_some() {
-            // A persisted checkpoint authenticates the original output. It
-            // does not exempt a later delivery from the current stop state.
-            if self.is_emergency_stopped() {
-                return Err(KernelError::GuardDenied(
-                    EMERGENCY_STOP_DENY_REASON.to_string(),
-                ));
-            }
             self.check_revocation(&request.capability)?;
             #[cfg(feature = "delegation")]
             super::super::delegation::consult_revocation_view(
@@ -346,6 +342,9 @@ impl ChioKernel {
         admission: &DurableToolAdmission,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
+        if self.is_emergency_stopped() {
+            return Err(KernelError::OutputWithheld);
+        }
         let runtime = self.durable_runtime()?;
         let tool_return = match self.load_retained_durable_tool_return(admission)? {
             RetainedDurableToolReturn::Present(tool_return) => *tool_return,
@@ -1702,7 +1701,7 @@ impl ChioKernel {
             let terminal = runtime
                 .store
                 .commit_admission_projection(&projection)
-                .map_err(KernelError::ReceiptPersistence)?;
+                .map_err(terminal_receipt_error)?;
             (terminal, AdmissionOperationState::DeniedAfterDelivery)
         } else {
             let projection =
@@ -1741,12 +1740,17 @@ impl ChioKernel {
                     &runtime.fence,
                     trusted_now_unix_ms,
                 )
-                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
+                .map_err(|error| match error {
+                    crate::admission_operation::ChannelTerminalAuthorityError::OutputWithheld => {
+                        KernelError::OutputWithheld
+                    }
+                    error => KernelError::DurableAdmission(error.to_string()),
+                })?
             } else {
                 runtime
                     .store
                     .commit_admission_projection(&projection)
-                    .map_err(KernelError::ReceiptPersistence)?
+                    .map_err(terminal_receipt_error)?
             };
             (terminal, AdmissionOperationState::Completed)
         };
@@ -1851,6 +1855,13 @@ impl ChioKernel {
             receipt: projected_receipt,
             execution_nonce,
         })
+    }
+}
+
+fn terminal_receipt_error(error: crate::receipt_store::ReceiptStoreError) -> KernelError {
+    match error {
+        crate::receipt_store::ReceiptStoreError::OutputWithheld => KernelError::OutputWithheld,
+        error => KernelError::ReceiptPersistence(error),
     }
 }
 

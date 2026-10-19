@@ -1898,9 +1898,14 @@ fn invocation_output_to_server_output(output: &InvocationOutputV1) -> ToolServer
 fn durable_store_error(
     error: crate::admission_operation::AdmissionOperationStoreError,
 ) -> KernelError {
-    KernelError::AdmissionRecovery(Box::new(
-        crate::admission_operation::AdmissionRecoveryError::Store(error),
-    ))
+    match error {
+        crate::admission_operation::AdmissionOperationStoreError::KernelStopped => {
+            KernelError::OutputWithheld
+        }
+        error => KernelError::AdmissionRecovery(Box::new(
+            crate::admission_operation::AdmissionRecoveryError::Store(error),
+        )),
+    }
 }
 
 fn durable_outcome_store_error(error: ToolOutcomeStoreError) -> KernelError {

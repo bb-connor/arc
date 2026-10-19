@@ -493,6 +493,9 @@ fn admission_error(error: AdmissionOperationStoreError) -> FindingRecoveryStoreE
         AdmissionOperationStoreError::Invariant(detail) => {
             FindingRecoveryStoreError::Invariant(detail)
         }
+        AdmissionOperationStoreError::KernelStopped => {
+            invariant("durable output release is withheld while the kernel is stopped")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

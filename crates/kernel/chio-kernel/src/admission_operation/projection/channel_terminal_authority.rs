@@ -7,6 +7,8 @@ use chio_settle::channel::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum ChannelTerminalAuthorityError {
+    #[error("durable channel output is withheld while the kernel is stopped")]
+    OutputWithheld,
     #[error("channel terminal authority is unavailable: {0}")]
     Unavailable(String),
     #[error("channel terminal reservation was not found")]

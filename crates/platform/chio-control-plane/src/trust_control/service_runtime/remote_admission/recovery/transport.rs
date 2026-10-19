@@ -108,6 +108,9 @@ fn decode_recovery_response<T: DeserializeOwned>(
                 | AdmissionAuthorityErrorCode::Unsupported
                 | AdmissionAuthorityErrorCode::Timeout
                 | AdmissionAuthorityErrorCode::Stopped => RemoteRecoveryFailureKind::Unavailable,
+                AdmissionAuthorityErrorCode::OutputWithheld => {
+                    RemoteRecoveryFailureKind::OutputWithheld
+                }
                 AdmissionAuthorityErrorCode::Fenced => RemoteRecoveryFailureKind::Fenced,
                 AdmissionAuthorityErrorCode::NotFound => RemoteRecoveryFailureKind::NotFound,
                 AdmissionAuthorityErrorCode::Conflict
