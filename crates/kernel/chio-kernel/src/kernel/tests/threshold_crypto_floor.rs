@@ -2,12 +2,48 @@
 
 use super::*;
 use crate::threshold_approval::{
-    verify_threshold_approval_set, ThresholdApprovalVerificationInput,
+    verify_threshold_approval_set, ThresholdApprovalVerificationError,
+    ThresholdApprovalVerificationInput,
 };
 use chio_core::{Ed25519Backend, SigningAlgorithm, SigningBackend};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+const PROPOSAL_ALGORITHM: &str = "threshold proposal algorithm is not permitted or consistent";
+const TOKEN_SIGNER: &str = "approval token signer is not valid";
+
+#[track_caller]
+fn assert_tool_denied<T: std::fmt::Debug>(result: Result<T, KernelError>, expected: &str) {
+    match result {
+        Err(KernelError::GovernedTransactionDenied(message)) => assert_eq!(message, expected),
+        other => panic!("expected GovernedTransactionDenied({expected:?}), got {other:?}"),
+    }
+}
+
+#[track_caller]
+fn assert_tool_verification_denied<T: std::fmt::Debug>(
+    result: Result<T, KernelError>,
+    expected: &str,
+) {
+    assert_tool_denied(
+        result,
+        &format!("threshold approval verification denied: {expected}"),
+    );
+}
+
+#[track_caller]
+fn assert_shared_denied<T: std::fmt::Debug>(result: TestResult<T>, expected: &str) {
+    match result {
+        Err(error) => match error.downcast_ref::<ThresholdApprovalVerificationError>() {
+            Some(ThresholdApprovalVerificationError::Denied(message)) => {
+                assert_eq!(message, expected);
+            }
+            _ => panic!("expected Denied({expected:?}), got {error:?}"),
+        },
+        Ok(value) => panic!("expected Denied({expected:?}), got Ok({value:?})"),
+    }
+}
 
 pub(super) struct Fixture {
     pub(super) kernel: ChioKernel,
@@ -249,10 +285,7 @@ fn tool_threshold_verifier_enforces_pq_floor_independently() -> TestResult {
     fixture
         .kernel
         .set_capability_crypto_floor(KernelCryptoFloor::PqRequired);
-    assert!(
-        fixture.verify_tool().is_err(),
-        "threshold validator ignored the required PQ floor"
-    );
+    assert_tool_verification_denied(fixture.verify_tool(), PROPOSAL_ALGORITHM);
     Ok(())
 }
 
@@ -267,11 +300,9 @@ fn shared_threshold_rejects_proposal_algorithm_metadata_substitution() -> TestRe
     proposal.algorithm = Some(SigningAlgorithm::P256);
     assert!(proposal.verify_signature()?);
     fixture.rebind_vote_to_proposal()?;
-    assert!(
-        fixture
-            .verify_shared(&[SigningAlgorithm::Ed25519, SigningAlgorithm::P256])
-            .is_err(),
-        "proposal algorithm metadata did not match its signing key and signature"
+    assert_shared_denied(
+        fixture.verify_shared(&[SigningAlgorithm::Ed25519, SigningAlgorithm::P256]),
+        PROPOSAL_ALGORITHM,
     );
     Ok(())
 }
@@ -287,10 +318,7 @@ fn tool_threshold_rejects_proposal_algorithm_metadata_substitution() -> TestResu
     proposal.algorithm = Some(SigningAlgorithm::P256);
     assert!(proposal.verify_signature()?);
     fixture.rebind_vote_to_proposal()?;
-    assert!(
-        fixture.verify_tool().is_err(),
-        "proposal algorithm metadata substitution admitted"
-    );
+    assert_tool_verification_denied(fixture.verify_tool(), PROPOSAL_ALGORITHM);
     Ok(())
 }
 
@@ -301,10 +329,7 @@ fn tool_threshold_rejects_vote_algorithm_metadata_substitution() -> TestResult {
         token.algorithm = Some(SigningAlgorithm::P256);
         assert!(token.verify_signature()?);
     }
-    assert!(
-        fixture.verify_tool().is_err(),
-        "vote algorithm metadata substitution admitted"
-    );
+    assert_tool_verification_denied(fixture.verify_tool(), TOKEN_SIGNER);
     Ok(())
 }
 
@@ -320,11 +345,11 @@ fn pq_capability_cannot_authorize_classical_threshold_votes() -> TestResult {
         None,
         fixture.now,
     )?;
-    assert!(
-        fixture.verify_tool().is_err(),
-        "classical vote admitted with a valid PQ capability"
+    assert_tool_verification_denied(fixture.verify_tool(), TOKEN_SIGNER);
+    assert_shared_denied(
+        fixture.verify_shared(&[SigningAlgorithm::Hybrid]),
+        TOKEN_SIGNER,
     );
-    assert!(fixture.verify_shared(&[SigningAlgorithm::Hybrid]).is_err());
     Ok(())
 }
 
@@ -332,9 +357,9 @@ fn pq_capability_cannot_authorize_classical_threshold_votes() -> TestResult {
 #[test]
 fn shared_threshold_verifier_rejects_classical_proposal_with_hybrid_votes() -> TestResult {
     let fixture = Fixture::new(false, true)?;
-    assert!(
-        fixture.verify_shared(&[SigningAlgorithm::Hybrid]).is_err(),
-        "hybrid votes laundered a classical proposal through a PQ-only allowlist"
+    assert_shared_denied(
+        fixture.verify_shared(&[SigningAlgorithm::Hybrid]),
+        PROPOSAL_ALGORITHM,
     );
     Ok(())
 }
@@ -351,10 +376,7 @@ fn tool_threshold_verifier_rejects_classical_proposal_with_hybrid_votes() -> Tes
         None,
         fixture.now,
     )?;
-    assert!(
-        fixture.verify_tool().is_err(),
-        "hybrid votes laundered a classical proposal"
-    );
+    assert_tool_verification_denied(fixture.verify_tool(), PROPOSAL_ALGORITHM);
     Ok(())
 }
 
@@ -464,7 +486,13 @@ fn tool_threshold_rejects_empty_and_oversized_sets_before_policy_lookup() -> Tes
         chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS + 1,
     ] {
         fixture.request.approval_tokens = vec![token.clone(); size];
-        assert!(fixture.verify_tool().is_err());
+        assert_tool_denied(
+            fixture.verify_tool(),
+            &format!(
+                "threshold approval set must contain between 1 and {} tokens",
+                chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
+            ),
+        );
         assert_eq!(calls.load(Ordering::SeqCst), 0);
     }
     Ok(())
@@ -479,12 +507,13 @@ fn shared_threshold_rejects_oversized_set_before_policy_lookup() -> TestResult {
         chio_core::capability::threshold_approval::MAX_THRESHOLD_APPROVAL_TOKENS
             + 1
     ];
-    assert!(fixture
-        .verify_shared_with_resolver(
+    assert_shared_denied(
+        fixture.verify_shared_with_resolver(
             &[SigningAlgorithm::Ed25519],
             &counting_resolver(fixture.requirement.clone(), StdArc::clone(&calls)),
-        )
-        .is_err());
+        ),
+        "approval token set exceeds the protocol ceiling",
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     Ok(())
 }
@@ -531,15 +560,19 @@ fn shared_threshold_rejects_vote_algorithm_metadata_substitution() -> TestResult
     let mut fixture = Fixture::new(false, false)?;
     fixture.request.approval_tokens[0].algorithm = Some(SigningAlgorithm::P256);
     assert!(fixture.request.approval_tokens[0].verify_signature()?);
-    assert!(fixture
-        .verify_shared(&[SigningAlgorithm::Ed25519, SigningAlgorithm::P256])
-        .is_err());
+    assert_shared_denied(
+        fixture.verify_shared(&[SigningAlgorithm::Ed25519, SigningAlgorithm::P256]),
+        TOKEN_SIGNER,
+    );
     Ok(())
 }
 
 #[test]
 fn empty_algorithm_allowlist_denies() -> TestResult {
-    assert!(Fixture::new(false, false)?.verify_shared(&[]).is_err());
+    assert_shared_denied(
+        Fixture::new(false, false)?.verify_shared(&[]),
+        PROPOSAL_ALGORITHM,
+    );
     Ok(())
 }
 
@@ -565,10 +598,16 @@ fn hybrid_envelopes_require_explicit_consistent_metadata() -> TestResult {
                 fixture.request.approval_tokens[0].algorithm = algorithm;
                 assert!(fixture.request.approval_tokens[0].verify_signature()?);
             }
-            assert!(fixture.verify_tool().is_err());
-            assert!(fixture
-                .verify_shared(KernelCryptoFloor::AllowHybrid.allowed_signing_algorithms())
-                .is_err());
+            let expected = if mutate_proposal {
+                PROPOSAL_ALGORITHM
+            } else {
+                TOKEN_SIGNER
+            };
+            assert_tool_verification_denied(fixture.verify_tool(), expected);
+            assert_shared_denied(
+                fixture.verify_shared(KernelCryptoFloor::AllowHybrid.allowed_signing_algorithms()),
+                expected,
+            );
         }
     }
     Ok(())
@@ -585,9 +624,10 @@ fn allow_classical_rejects_hybrid_threshold_artifacts() -> TestResult {
     fixture
         .kernel
         .set_capability_crypto_floor(KernelCryptoFloor::AllowClassical);
-    assert!(fixture.verify_tool().is_err());
-    assert!(fixture
-        .verify_shared(KernelCryptoFloor::AllowClassical.allowed_signing_algorithms())
-        .is_err());
+    assert_tool_verification_denied(fixture.verify_tool(), PROPOSAL_ALGORITHM);
+    assert_shared_denied(
+        fixture.verify_shared(KernelCryptoFloor::AllowClassical.allowed_signing_algorithms()),
+        PROPOSAL_ALGORITHM,
+    );
     Ok(())
 }

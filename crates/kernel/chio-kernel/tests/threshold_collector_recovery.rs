@@ -17,11 +17,51 @@ use chio_kernel::approval::{
 use chio_kernel::threshold_approval::{
     InMemoryThresholdApprovalCollectorStore, ThresholdApprovalCollector,
     ThresholdApprovalCollectorProposal, ThresholdApprovalCollectorState,
-    ThresholdApprovalCollectorStore,
+    ThresholdApprovalCollectorStore, ThresholdApprovalCollectorStoreError,
 };
 use chio_kernel::ThresholdApprovalContextResolver;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+const SIGNER_NOT_TRUSTED: &str = "threshold approval proposal signer or signature is not trusted";
+const TOKEN_UNVERIFIED: &str = "threshold approval token signature did not verify";
+const TOKEN_NOT_UNIQUE: &str = "threshold approval token id, digest, and signer must be unique";
+const TOKEN_PROPOSAL_MISMATCH: &str = "threshold approval token does not match the signed proposal";
+const STATE_VOTES_MISMATCH: &str = "threshold approval state does not match its collected votes";
+const VERSION_OVERFLOW: &str = "proposal version overflowed";
+const AUTHORITY_UNAVAILABLE: &str = "authority unavailable";
+const REQUEST_BINDINGS: &str =
+    "approval state conflict: threshold proposal does not match the authenticated request bindings";
+const AUTHORITY_BOUNDS: &str =
+    "approval state conflict: threshold proposal deadline does not match authenticated authority bounds";
+const ROUTE_OR_REQUIREMENT_CHANGED: &str =
+    "threshold approval request route or policy requirement changed";
+
+#[track_caller]
+fn assert_conflict<T: std::fmt::Debug>(
+    result: Result<T, ThresholdApprovalCollectorStoreError>,
+    expected: &str,
+) {
+    match result {
+        Err(ThresholdApprovalCollectorStoreError::Conflict(message)) => {
+            assert_eq!(message, expected);
+        }
+        other => panic!("expected Conflict({expected:?}), got {other:?}"),
+    }
+}
+
+#[track_caller]
+fn assert_backend<T: std::fmt::Debug>(
+    result: Result<T, ThresholdApprovalCollectorStoreError>,
+    expected: &str,
+) {
+    match result {
+        Err(ThresholdApprovalCollectorStoreError::Backend(message)) => {
+            assert_eq!(message, expected);
+        }
+        other => panic!("expected Backend({expected:?}), got {other:?}"),
+    }
+}
 
 struct Fixture {
     authority: Keypair,
@@ -153,14 +193,15 @@ impl Fixture {
         }
     }
 
-    fn assert_recovery_rejected(&self) -> TestResult {
+    fn assert_recovery_rejected(&self, expected: &str) -> TestResult {
         let (store, collector) = self.restore()?;
-        assert!(collector.get_proposal("proposal-1", 120).is_err());
-        assert!(collector.deliver("proposal-1", 120).is_err());
-        assert!(collector
-            .submit_token("proposal-1", self.token(0, "fresh")?, 120)
-            .is_err());
-        assert!(collector.cancel("proposal-1", 120).is_err());
+        assert_conflict(collector.get_proposal("proposal-1", 120), expected);
+        assert_conflict(collector.deliver("proposal-1", 120), expected);
+        assert_conflict(
+            collector.submit_token("proposal-1", self.token(0, "fresh")?, 120),
+            expected,
+        );
+        assert_conflict(collector.cancel("proposal-1", 120), expected);
         assert_eq!(store.get("proposal-1")?, Some(self.record.clone()));
         Ok(())
     }
@@ -170,50 +211,68 @@ impl Fixture {
 fn recovery_rejects_a_tampered_proposal_without_changing_state() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.record.proposal.body.request_id = "different-request".into();
-    fixture.assert_recovery_rejected()
+    fixture.assert_recovery_rejected(SIGNER_NOT_TRUSTED)
 }
 
 #[test]
 fn recovery_rejects_a_tampered_vote_without_changing_state() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.record.tokens[0].expires_at -= 1;
-    fixture.assert_recovery_rejected()
+    fixture.assert_recovery_rejected(TOKEN_UNVERIFIED)
 }
 
 #[test]
 fn recovery_rejects_distinct_tokens_from_the_same_approver() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.record.tokens[1] = fixture.token(0, "duplicate-approver")?;
-    fixture.assert_recovery_rejected()
+    fixture.assert_recovery_rejected(TOKEN_NOT_UNIQUE)
 }
 
 #[test]
 fn recovery_rejects_duplicate_token_ids_from_distinct_approvers() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.record.tokens[1] = fixture.token(1, "alice")?;
-    fixture.assert_recovery_rejected()
+    fixture.assert_recovery_rejected(TOKEN_NOT_UNIQUE)
 }
 
 #[test]
 fn recovery_rejects_rebound_and_noncanonical_requirements() -> TestResult {
     for mutation in 0..3 {
         let mut fixture = Fixture::new()?;
-        match mutation {
-            0 => fixture.record.requirement.threshold = 1,
-            1 => fixture.record.requirement.eligible_approvers.reverse(),
-            _ => fixture.record.requirement.timeout_seconds = 50,
-        }
-        fixture.assert_recovery_rejected()?;
+        let expected = match mutation {
+            0 => {
+                fixture.record.requirement.threshold = 1;
+                "threshold approval proposal does not match its approver requirement"
+            }
+            1 => {
+                fixture.record.requirement.eligible_approvers.reverse();
+                "threshold approval requirement is not canonical"
+            }
+            _ => {
+                fixture.record.requirement.timeout_seconds = 50;
+                "threshold approval proposal exceeds its policy timeout"
+            }
+        };
+        fixture.assert_recovery_rejected(expected)?;
     }
     Ok(())
 }
 
 #[test]
 fn recovery_rejects_missing_submitter_and_self_approval() -> TestResult {
-    for submitter in [None, Some(0)] {
+    for (submitter, expected) in [
+        (
+            None,
+            "threshold approval separation requires an authenticated submitter",
+        ),
+        (
+            Some(0),
+            "threshold approval submitter cannot approve their own proposal",
+        ),
+    ] {
         let mut fixture = Fixture::new()?;
         fixture.record.submitter = submitter.map(|index| fixture.approvers[index].public_key());
-        fixture.assert_recovery_rejected()?;
+        fixture.assert_recovery_rejected(expected)?;
     }
     Ok(())
 }
@@ -222,12 +281,14 @@ fn recovery_rejects_missing_submitter_and_self_approval() -> TestResult {
 fn recovery_rejects_algorithm_metadata_substitution() -> TestResult {
     for proposal in [false, true] {
         let mut fixture = Fixture::new()?;
-        if proposal {
+        let expected = if proposal {
             fixture.record.proposal.algorithm = Some(SigningAlgorithm::P256);
+            SIGNER_NOT_TRUSTED
         } else {
             fixture.record.tokens[0].algorithm = Some(SigningAlgorithm::P256);
-        }
-        fixture.assert_recovery_rejected()?;
+            TOKEN_UNVERIFIED
+        };
+        fixture.assert_recovery_rejected(expected)?;
     }
     Ok(())
 }
@@ -236,25 +297,26 @@ fn recovery_rejects_algorithm_metadata_substitution() -> TestResult {
 fn recovery_rejects_state_that_precedes_its_votes() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.record.updated_at = 100;
-    fixture.assert_recovery_rejected()
+    fixture.assert_recovery_rejected("threshold approval state precedes a collected token")
 }
 
 #[test]
 fn recovery_rechecks_current_authority_and_policy() -> TestResult {
     let fixture = Fixture::new()?;
     let (store, _) = fixture.restore()?;
-    for (policy, authorities) in [
-        (sha256_hex(b"policy"), Vec::new()),
+    for (policy, authorities, expected) in [
+        (sha256_hex(b"policy"), Vec::new(), SIGNER_NOT_TRUSTED),
         (
             sha256_hex(b"new-policy"),
             vec![fixture.authority.public_key()],
+            "threshold approval proposal is stale for the active policy",
         ),
     ] {
         let collector =
             ThresholdApprovalCollector::new(store.clone(), policy, authorities, fixture.resolver());
-        assert!(collector.get_proposal("proposal-1", 120).is_err());
-        assert!(collector.deliver("proposal-1", 120).is_err());
-        assert!(collector.cancel("proposal-1", 120).is_err());
+        assert_conflict(collector.get_proposal("proposal-1", 120), expected);
+        assert_conflict(collector.deliver("proposal-1", 120), expected);
+        assert_conflict(collector.cancel("proposal-1", 120), expected);
         assert_eq!(store.get("proposal-1")?, Some(fixture.record.clone()));
     }
     Ok(())
@@ -284,8 +346,9 @@ fn recovery_preserves_original_tokens_and_durable_delivery() -> TestResult {
 fn collector_rejects_clock_regression_without_changing_state() -> TestResult {
     let fixture = Fixture::new()?;
     let (store, collector) = fixture.restore()?;
-    assert!(collector.deliver("proposal-1", 109).is_err());
-    assert!(collector.cancel("proposal-1", 109).is_err());
+    let expected = "threshold approval update precedes its persisted state";
+    assert_conflict(collector.deliver("proposal-1", 109), expected);
+    assert_conflict(collector.cancel("proposal-1", 109), expected);
     assert_eq!(store.get("proposal-1")?, Some(fixture.record.clone()));
     Ok(())
 }
@@ -313,7 +376,7 @@ fn in_memory_version_overflow_does_not_partially_mutate_state() -> TestResult {
                 120,
             )
         };
-        assert!(result.is_err());
+        assert_conflict(result, VERSION_OVERFLOW);
         assert_eq!(store.get("proposal-1")?, Some(fixture.record.clone()));
     }
     Ok(())
@@ -321,7 +384,13 @@ fn in_memory_version_overflow_does_not_partially_mutate_state() -> TestResult {
 
 #[test]
 fn creation_rejects_missing_separation_identity_and_excessive_timeout() -> TestResult {
-    for missing_submitter in [false, true] {
+    for (missing_submitter, expected) in [
+        (false, AUTHORITY_BOUNDS),
+        (
+            true,
+            "invalid approval reservation: separation of duties requires an authenticated submitter",
+        ),
+    ] {
         let fixture = Fixture::new()?;
         let store = Arc::new(InMemoryThresholdApprovalCollectorStore::new());
         let mut parameters = fixture.parameters();
@@ -338,9 +407,10 @@ fn creation_rejects_missing_separation_identity_and_excessive_timeout() -> TestR
                 ThresholdApprovalProposalCreationContext::new(parameters.clone())
             }),
         );
-        assert!(collector
-            .create_proposal(fixture.record.proposal, 100)
-            .is_err());
+        assert_conflict(
+            collector.create_proposal(fixture.record.proposal, 100),
+            expected,
+        );
         assert!(store.get("proposal-1")?.is_none());
     }
     Ok(())
@@ -358,7 +428,7 @@ fn recovery_rejects_quorum_and_version_metadata_inconsistent_with_votes() -> Tes
             2 => fixture.record.version = 0,
             _ => fixture.record.updated_at = 199,
         }
-        fixture.assert_recovery_rejected()?;
+        fixture.assert_recovery_rejected(STATE_VOTES_MISMATCH)?;
     }
     Ok(())
 }
@@ -376,7 +446,7 @@ fn recovery_rejects_signed_votes_bound_to_different_operations() -> TestResult {
             _ => body.expires_at = 201,
         }
         fixture.record.tokens[0] = GovernedApprovalToken::sign(body, &fixture.approvers[0])?;
-        fixture.assert_recovery_rejected()?;
+        fixture.assert_recovery_rejected(TOKEN_PROPOSAL_MISMATCH)?;
     }
     Ok(())
 }
@@ -385,7 +455,10 @@ fn recovery_rejects_signed_votes_bound_to_different_operations() -> TestResult {
 fn expired_history_is_readable_but_cannot_be_delivered() -> TestResult {
     let fixture = Fixture::new()?;
     let (_, collector) = fixture.restore()?;
-    assert!(collector.deliver("proposal-1", 200).is_err());
+    assert_conflict(
+        collector.deliver("proposal-1", 200),
+        "capability expired at 200",
+    );
     assert_eq!(
         collector.get_proposal("proposal-1", 120)?,
         Some(fixture.record)
@@ -398,17 +471,26 @@ fn expired_history_is_readable_but_cannot_be_delivered() -> TestResult {
 
 #[test]
 fn collector_reloads_trusted_context_before_every_operation() -> TestResult {
-    for field in [
-        "request",
-        "route",
-        "intent",
-        "capability",
-        "capability_expiry",
-        "operation_expiry",
-        "subject",
-        "submitter",
-        "separation",
-        "policy",
+    for (field, expected) in [
+        (
+            "request",
+            "threshold approval context resolved a different request",
+        ),
+        ("route", ROUTE_OR_REQUIREMENT_CHANGED),
+        ("intent", REQUEST_BINDINGS),
+        ("capability", REQUEST_BINDINGS),
+        ("capability_expiry", AUTHORITY_BOUNDS),
+        ("operation_expiry", AUTHORITY_BOUNDS),
+        ("subject", REQUEST_BINDINGS),
+        (
+            "submitter",
+            "approval state conflict: threshold proposal authenticated submitter changed",
+        ),
+        (
+            "separation",
+            "approval state conflict: threshold proposal separation-of-duties policy changed",
+        ),
+        ("policy", ROUTE_OR_REQUIREMENT_CHANGED),
     ] {
         let fixture = Fixture::new()?;
         let parameters = Arc::new(RwLock::new(fixture.parameters()));
@@ -449,21 +531,16 @@ fn collector_reloads_trusted_context_before_every_operation() -> TestResult {
                 _ => return Err("unknown context mutation".into()),
             }
         }
-        assert!(
-            collector.get_proposal("proposal-1", 120).is_err(),
-            "{field}"
+        assert_conflict(collector.get_proposal("proposal-1", 120), expected);
+        assert_conflict(collector.deliver("proposal-1", 120), expected);
+        assert_conflict(
+            collector.submit_token("proposal-1", fixture.token(0, "fresh")?, 120),
+            expected,
         );
-        assert!(collector.deliver("proposal-1", 120).is_err(), "{field}");
-        assert!(
-            collector
-                .submit_token("proposal-1", fixture.token(0, "fresh")?, 120)
-                .is_err(),
-            "{field}"
-        );
-        assert!(collector.cancel("proposal-1", 120).is_err(), "{field}");
-        assert!(
-            collector.bind_existing_proposal("proposal-1", 120).is_err(),
-            "{field}"
+        assert_conflict(collector.cancel("proposal-1", 120), expected);
+        assert_conflict(
+            collector.bind_existing_proposal("proposal-1", 120),
+            expected,
         );
         assert_eq!(store.get("proposal-1")?, Some(fixture.record));
     }
@@ -482,13 +559,17 @@ fn unavailable_context_never_falls_back_to_signed_proposal_fields() -> TestResul
             Err(ApprovalStoreError::Backend("authority unavailable".into()))
         }),
     );
-    assert!(collector
-        .create_proposal(fixture.record.proposal.clone(), 100)
-        .is_err());
+    assert_backend(
+        collector.create_proposal(fixture.record.proposal.clone(), 100),
+        AUTHORITY_UNAVAILABLE,
+    );
     assert!(store.get("proposal-1")?.is_none());
     store.create(&fixture.record)?;
-    assert!(collector.get_proposal("proposal-1", 120).is_err());
-    assert!(collector.deliver("proposal-1", 120).is_err());
+    assert_backend(
+        collector.get_proposal("proposal-1", 120),
+        AUTHORITY_UNAVAILABLE,
+    );
+    assert_backend(collector.deliver("proposal-1", 120), AUTHORITY_UNAVAILABLE);
     assert_eq!(store.get("proposal-1")?, Some(fixture.record));
     Ok(())
 }
@@ -497,7 +578,9 @@ fn unavailable_context_never_falls_back_to_signed_proposal_fields() -> TestResul
 fn unbound_legacy_record_cannot_gain_authority_from_a_matching_live_context() -> TestResult {
     let mut fixture = Fixture::new()?;
     fixture.record.request_route = None;
-    fixture.assert_recovery_rejected()
+    fixture.assert_recovery_rejected(
+        "threshold approval proposal requires authenticated context migration",
+    )
 }
 
 #[test]
@@ -579,7 +662,12 @@ fn explicit_context_migration_denies_changed_or_unavailable_authority() -> TestR
                 }
             }),
         );
-        assert!(collector.bind_existing_proposal("proposal-1", 120).is_err());
+        let result = collector.bind_existing_proposal("proposal-1", 120);
+        if unavailable {
+            assert_backend(result, AUTHORITY_UNAVAILABLE);
+        } else {
+            assert_conflict(result, REQUEST_BINDINGS);
+        }
         assert_eq!(store.get("proposal-1")?, Some(fixture.record));
     }
     Ok(())
@@ -591,7 +679,10 @@ fn explicit_context_migration_version_overflow_preserves_unbound_history() -> Te
     fixture.record.request_route = None;
     fixture.record.version = u64::MAX;
     let (store, collector) = fixture.restore()?;
-    assert!(collector.bind_existing_proposal("proposal-1", 120).is_err());
+    assert_conflict(
+        collector.bind_existing_proposal("proposal-1", 120),
+        VERSION_OVERFLOW,
+    );
     assert_eq!(store.get("proposal-1")?, Some(fixture.record));
     Ok(())
 }
@@ -601,7 +692,7 @@ fn restored_votes_must_fit_the_execution_replay_identifier_contract() -> TestRes
     for id in ["x".repeat(513), "embedded\u{0000}nul".to_string()] {
         let mut fixture = Fixture::new()?;
         fixture.record.tokens[0] = fixture.token(0, &id)?;
-        fixture.assert_recovery_rejected()?;
+        fixture.assert_recovery_rejected(TOKEN_PROPOSAL_MISMATCH)?;
     }
     Ok(())
 }
@@ -626,7 +717,10 @@ fn delivery_retry_never_shrinks_the_original_set_when_a_surplus_vote_expires() -
     let delivered = collector.deliver("proposal-1", 120)?;
     assert_eq!(delivered.tokens.len(), 2);
     assert_eq!(collector.deliver("proposal-1", 129)?, delivered);
-    assert!(collector.deliver("proposal-1", 130).is_err());
+    assert_conflict(
+        collector.deliver("proposal-1", 130),
+        "threshold approval quorum is no longer satisfied",
+    );
     let persisted = store.get("proposal-1")?.ok_or("missing proposal")?;
     assert_eq!(persisted.updated_at, 120);
     assert_eq!(persisted.version, 3);
