@@ -1,10 +1,10 @@
-use std::fs;
 use std::path::Path;
 
 use chio_attest_buyer_core::report::VerifierReport;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use serde::Serialize;
 
+use crate::bounded_read::read_bounded_file;
 use crate::validation::validate_relative_evidence_path;
 use crate::{
     validate_runtime_evidence_manifest, validate_runtime_orchestration_profile,
@@ -13,6 +13,9 @@ use crate::{
     RuntimeOrchestrationProfile, RuntimeProofRegenerationReport, RuntimeProofSourceRecord,
     RuntimeRunContract, RuntimeStepEvidence, RuntimeWorkflowRunReport,
 };
+
+/// Largest runtime evidence JSON file read from an evidence directory.
+const MAX_RUNTIME_EVIDENCE_JSON_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeOrchestrationEvidence {
@@ -76,9 +79,9 @@ pub fn load_runtime_orchestration_evidence(
     let workflow_report_path = evidence_dir.join("workflow-run-report.json");
     let proof_report_path = evidence_dir.join("proof-regeneration-report.json");
     let manifest_path = evidence_dir.join("runtime-evidence-manifest.json");
-    let workflow_json = read_utf8_json_file(&workflow_report_path, "Chio runtime workflow report")?;
-    let proof_json = read_utf8_json_file(&proof_report_path, "Chio runtime proof report")?;
-    let manifest_json = read_utf8_json_file(&manifest_path, "Chio runtime evidence manifest")?;
+    let workflow_json = read_bounded_file(&workflow_report_path, MAX_RUNTIME_EVIDENCE_JSON_BYTES)?;
+    let proof_json = read_bounded_file(&proof_report_path, MAX_RUNTIME_EVIDENCE_JSON_BYTES)?;
+    let manifest_json = read_bounded_file(&manifest_path, MAX_RUNTIME_EVIDENCE_JSON_BYTES)?;
     let workflow_run_report: RuntimeWorkflowRunReport =
         parse_json(&workflow_json, "Chio runtime workflow report")?;
     let proof_regeneration_report: RuntimeProofRegenerationReport =
@@ -92,9 +95,9 @@ pub fn load_runtime_orchestration_evidence(
     let verifier_report_required = proof_regeneration_report.accepted
         || proof_regeneration_report.verifier_report_sha256.is_some();
     let verifier_json = if verifier_report_path.is_file() || verifier_report_required {
-        Some(read_utf8_json_file(
+        Some(read_bounded_file(
             &verifier_report_path,
-            "Chio verifier report",
+            MAX_RUNTIME_EVIDENCE_JSON_BYTES,
         )?)
     } else {
         None
@@ -434,7 +437,7 @@ fn load_runtime_json_artifact_hashes(
 ) -> Result<RuntimeJsonArtifactHashes, ChioRuntimeError> {
     validate_relative_evidence_path(&entry.path, "runtime_evidence_manifest_invalid_path")?;
     let path = evidence_dir.join(&entry.path);
-    let bytes = fs::read(&path).map_err(ChioRuntimeError::Io)?;
+    let bytes = read_bounded_file(&path, MAX_RUNTIME_EVIDENCE_JSON_BYTES)?;
     let byte_count = u64::try_from(bytes.len()).map_err(|error| {
         ChioRuntimeError::Store(format!("Chio runtime {role} artifact byte count: {error}"))
     })?;
@@ -445,10 +448,12 @@ fn load_runtime_json_artifact_hashes(
         });
     }
     let file_sha256 = sha256_hex(&bytes);
-    let value: serde_json::Value =
-        chio_core_types::canonical::UntrustedJsonText::from_wire(&bytes, 64 * 1024 * 1024)
-            .and_then(|input| input.decode_signed())
-            .map_err(ChioRuntimeError::from)?;
+    let value: serde_json::Value = chio_core_types::canonical::UntrustedJsonText::from_wire(
+        &bytes,
+        MAX_RUNTIME_EVIDENCE_JSON_BYTES,
+    )
+    .and_then(|input| input.decode_signed())
+    .map_err(ChioRuntimeError::from)?;
     let canonical_sha256 = canonical_sha256(&value)?;
     Ok(RuntimeJsonArtifactHashes {
         manifest_sha256: entry.sha256.clone(),
@@ -487,15 +492,11 @@ fn proof_package_missing_failure() -> RuntimeOrchestrationEvidenceFailure {
     )
 }
 
-fn read_utf8_json_file(path: &Path, _label: &str) -> Result<String, ChioRuntimeError> {
-    fs::read_to_string(path).map_err(ChioRuntimeError::Io)
-}
-
 fn parse_json<T: serde::de::DeserializeOwned>(
-    json: &str,
+    json: &[u8],
     _label: &str,
 ) -> Result<T, ChioRuntimeError> {
-    chio_core_types::canonical::UntrustedJsonText::from_wire((json).as_bytes(), 64 * 1024 * 1024)
+    chio_core_types::canonical::UntrustedJsonText::from_wire(json, MAX_RUNTIME_EVIDENCE_JSON_BYTES)
         .and_then(|input| input.decode_signed())
         .map_err(ChioRuntimeError::from)
 }

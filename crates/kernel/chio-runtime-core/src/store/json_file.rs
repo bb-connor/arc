@@ -1,3 +1,4 @@
+use crate::bounded_read::read_bounded_file;
 use crate::*;
 
 /// Largest runtime JSON store file. Writers refuse what readers would reject.
@@ -6,7 +7,7 @@ const MAX_JSON_STORE_BYTES: usize = 64 * 1024 * 1024;
 pub(super) fn read_json_store<T: serde::de::DeserializeOwned>(
     path: &Path,
 ) -> Result<T, ChioRuntimeError> {
-    let json = fs::read(path).map_err(ChioRuntimeError::Io)?;
+    let json = read_bounded_file(path, MAX_JSON_STORE_BYTES)?;
     chio_core_types::canonical::UntrustedJsonText::from_wire(&json, MAX_JSON_STORE_BYTES)
         .and_then(|input| input.decode_signed())
         .map_err(ChioRuntimeError::from)
