@@ -58,8 +58,8 @@ impl SqliteAdmissionOperationStore {
             .ok_or_else(|| invalid("native dispatch ledger selected an unmatched grant"))?;
         if let Some(existing) = storage::load(&tx, operation.binding().operation_id().as_str())? {
             if existing.schema != SCHEMA
-                || existing.original_dispatch_commitment_id.as_ref()
-                    != Some(original_dispatch.dispatch_commitment_id())
+                || &existing.original_dispatch_commitment_id
+                    != original_dispatch.dispatch_commitment_id()
                 || existing.policy != policy_value
                 || existing.grant_index != grant_index
                 || existing.live_request_digest != live_request_digest
@@ -111,9 +111,7 @@ impl SqliteAdmissionOperationStore {
                 sha256_hex(&canonical_json_bytes(grant).map_err(invalid)?),
             )?,
             live_request_digest,
-            original_dispatch_commitment_id: Some(
-                original_dispatch.dispatch_commitment_id().clone(),
-            ),
+            original_dispatch_commitment_id: original_dispatch.dispatch_commitment_id().clone(),
             policy: policy_value,
             join_digest: AdmissionDigest::try_new("native_dispatch_join", joined.digest()?)?,
             egress_acquisition: egress

@@ -52,8 +52,7 @@ pub use identity::*;
 pub use native_caller_custody::{NativeCallerReleaseCustodyV1, CALLER_RETURN_CONTEXT_SCHEMA};
 pub(crate) use native_dispatch_binding::valid_dispatch_commitment_id;
 pub use native_dispatch_binding::{
-    NativeSecurityDispatchRequestBindingV1, NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA,
-    NATIVE_DISPATCH_LEDGER_SCHEMA,
+    NativeSecurityDispatchRequestBindingV1, NATIVE_DISPATCH_LEDGER_SCHEMA,
 };
 pub use native_dispatch_ledger::{
     NativeSecurityDispatchLedgerContext, NativeSecurityDispatchLedgerRecordV1,

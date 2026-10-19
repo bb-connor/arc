@@ -253,7 +253,7 @@ fn retained_native_ledger_diagnostic_refusal(kind: &str) -> TestResult {
         .ok_or("actual retained native ledger")?;
     let original: serde_json::Value = serde_json::from_slice(&ledger.canonical_record)?;
     let context: SecurityInvocationContext = serde_json::from_value(original["context"].clone())?;
-    assert!(NativeSecurityDispatchRequestBindingV1::from_ledger(&ledger, &context)?.is_some());
+    NativeSecurityDispatchRequestBindingV1::from_ledger(&ledger, &context)?;
     let before = snapshot(&fixture, &captured.operation_id)?;
     let before_operation = store.load_by_operation_id(&captured.operation_id)?;
     let mut malformed = ledger.clone();

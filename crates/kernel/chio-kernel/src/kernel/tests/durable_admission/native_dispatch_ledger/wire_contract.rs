@@ -14,6 +14,7 @@ fn record_with_schema(
         &request,
         &context,
     )?;
+    let context = prepared.security_context().clone();
     let record = prepared.retain_dispatch_ledger(0, b"{}")?;
     let mut value: serde_json::Value = serde_json::from_slice(&record.canonical_record)?;
     value["schema"] = serde_json::json!(schema);
@@ -38,7 +39,8 @@ fn record_with_schema(
 fn native_ledger_v1_accepts_required_original_commitment() -> TestResult {
     let (record, context) =
         record_with_schema("chio.native-dispatch-preparation-ledger.v1", false)?;
-    assert!(NativeSecurityDispatchRequestBindingV1::from_ledger(&record, &context).is_ok());
+    let result = NativeSecurityDispatchRequestBindingV1::from_ledger(&record, &context).map(|_| ());
+    assert!(result.is_ok(), "{result:?}");
     Ok(())
 }
 
@@ -46,21 +48,29 @@ fn native_ledger_v1_accepts_required_original_commitment() -> TestResult {
 fn native_ledger_v1_rejects_v2_with_original_commitment() -> TestResult {
     let (record, context) =
         record_with_schema("chio.native-dispatch-preparation-ledger.v2", false)?;
-    assert!(matches!(
-        NativeSecurityDispatchRequestBindingV1::from_ledger(&record, &context),
-        Err(AdmissionOperationStoreError::Invariant(detail))
-            if detail == "original native ledger schema is invalid"
-    ));
+    let result = NativeSecurityDispatchRequestBindingV1::from_ledger(&record, &context).map(|_| ());
+    assert!(
+        matches!(
+            &result,
+            Err(AdmissionOperationStoreError::Invariant(detail))
+                if detail == "original native ledger schema is invalid"
+        ),
+        "{result:?}"
+    );
     Ok(())
 }
 
 #[test]
 fn native_ledger_v1_rejects_missing_original_commitment() -> TestResult {
     let (record, context) = record_with_schema("chio.native-dispatch-preparation-ledger.v1", true)?;
-    assert!(matches!(
-        NativeSecurityDispatchRequestBindingV1::from_ledger(&record, &context),
-        Err(AdmissionOperationStoreError::Operation(AdmissionOperationError::UntrustedInput(error)))
-            if error.code() == "urn:chio:error:attest:signed-json-invalid-shape"
-    ));
+    let result = NativeSecurityDispatchRequestBindingV1::from_ledger(&record, &context).map(|_| ());
+    assert!(
+        matches!(
+            &result,
+            Err(AdmissionOperationStoreError::Operation(AdmissionOperationError::UntrustedInput(error)))
+                if error.code() == "urn:chio:error:attest:signed-json-invalid-shape"
+        ),
+        "{result:?}"
+    );
     Ok(())
 }

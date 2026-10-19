@@ -218,7 +218,7 @@ fn native_dispatch_ledger_retains_exact_policy_and_custody_after_compensation() 
         let record: serde_json::Value = serde_json::from_slice(&ledger.canonical_record)?;
         assert_eq!(
             record["schema"],
-            "chio.native-dispatch-preparation-ledger.v2"
+            "chio.native-dispatch-preparation-ledger.v1"
         );
         let context: chio_kernel::SecurityInvocationContext =
             serde_json::from_value(record["context"].clone())?;
@@ -301,6 +301,10 @@ pub(super) use faults::{LedgerFailureProbe, WriteFault};
 fn native_dispatch_ledger_corruption_or_missing_global_coverage_denies_reopen() -> TestResult {
     for (mutation, reason) in [
         ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST('{}' AS BLOB)", "admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape"),
+        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST(json_remove(CAST(canonical_record AS TEXT), '$.original_dispatch_commitment_id') AS BLOB)", "admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape"),
+        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST(json_set(CAST(canonical_record AS TEXT), '$.original_dispatch_commitment_id', NULL) AS BLOB)", "admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape"),
+        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST(json_remove(CAST(canonical_record AS TEXT), '$.live_request_digest') AS BLOB)", "admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape"),
+        ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = CAST(json_set(CAST(canonical_record AS TEXT), '$.live_request_digest', NULL) AS BLOB)", "admission operation invariant failed: native security state: urn:chio:error:attest:signed-json-invalid-shape"),
         ("UPDATE admission_operation_native_dispatch_ledger SET canonical_record = zeroblob(1048577)", "admission operation invariant failed: native security state: native dispatch ledger record exceeds its physical bound"),
         ("DELETE FROM admission_operation_native_dispatch_ledger", "admission operation invariant failed: native security state: native dispatch ledger lost its exact global commitment"),
     ] {

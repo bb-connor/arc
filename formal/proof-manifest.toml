@@ -1548,13 +1548,13 @@ rust_source = "crates/kernel/chio-kernel/src/kernel/admission_coordinator/return
 rust_symbols = ["CallerReturnWire", "ChioKernel::frame_caller_return_context", "ChioKernel::restore_caller_return_context", "ChioKernel::decode_caller_return_context", "ChioKernel::decode_caller_return_payload",
   "ChioKernel::frame_caller_return_context_with_native",
 ]
-normalized_sha256 = "ce3ad4e91d21fb55ac0444dec920c572e534da07775ccb9ab268db92c4419310"
+normalized_sha256 = "f206069e221b127038ed44f7b03caa16ea6ea1a4923048d4694a037abbd74ebe"
 symbol_sha256 = [
   { symbol = "CallerReturnWire", sha256 = "6f98c93e31135def309745073538cbe702bcfe69454faa758046e85bc882eb00" },
   { symbol = "ChioKernel::frame_caller_return_context", sha256 = "9a05135367e81037462f8f397001628ef8f0a207cc39e1cffa7f5132f6882a56" },
   { symbol = "ChioKernel::restore_caller_return_context", sha256 = "b4b83d1c6d03e63b80790a37aea2f11c2c977e17399091eab36424aa21e7cc10" },
   { symbol = "ChioKernel::decode_caller_return_context", sha256 = "28d387eb093ef79454dbc2f0abedad55d18341e3116285488b288d7eec2388bc" },
-  { symbol = "ChioKernel::decode_caller_return_payload", sha256 = "8c327b0f8baa4a39c1aa6102a02a47abbb72ffe43a8ced261ba9ec2481505b1b" },
+  { symbol = "ChioKernel::decode_caller_return_payload", sha256 = "baf5ee167158f41004b023a589cd61e86aa120119b1644d9dfe76d94d4581e45" },
   { symbol = "ChioKernel::frame_caller_return_context_with_native", sha256 = "1343cbfe09a08f2f4e471eaf27b32b93a8f99b724b03ee172f19d290de55d385" },
 ]
 
@@ -3233,14 +3233,14 @@ rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/s
 rust_symbols = ["Record","Record::bytes","Record::digest","Record::evidence","Record::validate",
   "Record::validate_initialized",
 ]
-normalized_sha256 = "10467566deb3267bd4fde3f61bbd6b06e3b271714ccc669bed4aebccff3fb60e"
+normalized_sha256 = "b76a38eefd396e14e159ca4919f84068d1a6655a204c4b279309be83c1c2011f"
 symbol_sha256 = [
-  { symbol = "Record", sha256 = "0d98b816fa30b1b277054dde0e3e4c69cd0c56bb19889528df76b84d6249327a" },
+  { symbol = "Record", sha256 = "c0eecddd5b9de828910dd4d20bb53f6a323ef71ebfe30bfb112189baf710c0cb" },
   { symbol = "Record::bytes", sha256 = "505f7994eb251645f6e219b0eb04379faf02626211c224fa64b13cdcf086ded3" },
   { symbol = "Record::digest", sha256 = "287dcf65c24bbd7942ffc572e8082f2d4d0326cbe367bcf664efddb70b36a739" },
   { symbol = "Record::evidence", sha256 = "938490e4fcdde8f2b609770de67c895d1ad03b18263aeccd492872b94e1f5ff2" },
   { symbol = "Record::validate", sha256 = "ff73d20837a1fbe71c02c0722a8bcbebec925265b9640f0f859176d4259e2a0a" },
-  { symbol = "Record::validate_initialized", sha256 = "66ea7f9c839e1f5d917d36dd6807e4f49b922ee02d722cf774d5bb83c3cddc9d" },
+  { symbol = "Record::validate_initialized", sha256 = "593fd42800348bbcbfeb8de7898370c0944bbf7adf1f6448e6094b8bd3d1e6d9" },
 ]
 
 [[mirror]]
@@ -3264,9 +3264,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/dispatch_ledger/write.rs"
 rust_symbols = ["SqliteAdmissionOperationStore::retain_native_dispatch_ledger"]
-normalized_sha256 = "3119243ead32678bd35dc4053752735c0428c1c0757ad531f69e09ab0b3c1276"
+normalized_sha256 = "799160aa68f6b0128ecca475d79a26e738d7ed58fdfe84e041cda2f74ac38042"
 symbol_sha256 = [
-  { symbol = "SqliteAdmissionOperationStore::retain_native_dispatch_ledger", sha256 = "0c0f150b7e1d6b915ec3a858d650acb4ca8bed4624945a19b4b1c1b2073b210f" },
+  { symbol = "SqliteAdmissionOperationStore::retain_native_dispatch_ledger", sha256 = "2d78968f4ccaebc7b1cc5afcbf18dc140cc541318086a412cf065e4532763c28" },
 ]
 
 [[mirror]]
@@ -3495,11 +3495,11 @@ rust_symbols = [
   "verify_capture_attachment_initialized",
   "verify_capture_record",
 ]
-normalized_sha256 = "c3b48d1a26edfc2d913e16a21cb5d0d5c32f7ff19b4759bcbbd2b15e44f75504"
+normalized_sha256 = "01aade352f660acf2a7bc12486b9af1674b3f045264cf60f0f1fd256b8ae7c16"
 symbol_sha256 = [
   { symbol = "NativeCaptureBinding", sha256 = "c5643577292db72c4dade8c727982a81f9f40e35b72d5556edc80950816c3624" },
   { symbol = "VerifiedNativeCapture", sha256 = "de0e7b7fabeb60ee0b1b0773c3c421b1b0ad790fae615f14e5b9501428129bc8" },
-  { symbol = "VerifiedNativeCapture::verify", sha256 = "df9763196511709433a3fc517a914a4ce0701084d62fd9417b3ab8344e7c8a7c" },
+  { symbol = "VerifiedNativeCapture::verify", sha256 = "2709ff0e23794b88ffb4aed6b4da4ed5c33a957941e478756105476c4033d5b6" },
   { symbol = "VerifiedNativeCapture::verify_owner", sha256 = "73540fe845fffe27990a2834f3e39162dec1ce413352a26020c610127a96df98" },
   { symbol = "VerifiedNativeCapture::verify_transition", sha256 = "08e8452fef5224cfcd506723a989c68c07a42d37ec75e24b80561a3bc6715d75" },
   { symbol = "VerifiedNativeCapture::verify_deadline", sha256 = "560be21c925ce35eead41fefda57bae3869bd308adcf236ccbfd1738ce8136f8" },
@@ -4282,16 +4282,14 @@ relationship = "abstraction_anchor"
 rust_source = "crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs"
 rust_symbols = [
   "NATIVE_DISPATCH_LEDGER_SCHEMA",
-  "NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA",
   "NativeSecurityDispatchRequestBindingV1::from_live_request",
   "NativeSecurityDispatchRequestBindingV1::from_ledger",
 ]
-normalized_sha256 = "7a09c5d87f3d4d49062ae976fd7bed7dfeec95948a4b9ac6dfc4f99a6853d270"
+normalized_sha256 = "cb6784e57a01fadefc081f33e04b27f0c242df6299d7c44ce2972159d088c2f1"
 symbol_sha256 = [
-  { symbol = "NATIVE_DISPATCH_LEDGER_SCHEMA", sha256 = "6aa2bdf2f13f21763b6b2bc74d0bd5fe74080c77e63f4cb066f5046557d28de0" },
-  { symbol = "NATIVE_DISPATCH_LEDGER_LEGACY_SCHEMA", sha256 = "f25bdf30bf430b269aa1dd245671887883ae9164deb66eb871fc049ab8f4e0d0" },
+  { symbol = "NATIVE_DISPATCH_LEDGER_SCHEMA", sha256 = "059e65736327f0a2ba002ab3b2f6a53495e073b89a51e9124f4916ff616141ab" },
   { symbol = "NativeSecurityDispatchRequestBindingV1::from_live_request", sha256 = "4865d959a05f7ec49b1759a1fb481a82879413c2e7c81ca8fb7c05e0832186a0" },
-  { symbol = "NativeSecurityDispatchRequestBindingV1::from_ledger", sha256 = "88bb7760cfd384fa2ec3a3787519bf72170714ad58db6116e76409b7143e6e6c" },
+  { symbol = "NativeSecurityDispatchRequestBindingV1::from_ledger", sha256 = "bee847754a4fcb55192146ee18c3ef5ce462e8c2b68465e4c5cd4d7f7a863517" },
 ]
 
 [[mirror]]
