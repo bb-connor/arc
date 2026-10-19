@@ -254,8 +254,18 @@ fn charter_rejects_invalid_threshold_durations_expiry_and_lineage() {
             value
         },
     ];
-    for case in cases {
-        assert!(case.build_body().is_err());
+    let expected = [
+        FiscalError::InvalidField("approval_threshold"),
+        FiscalError::InvalidField("approval_threshold"),
+        FiscalError::InvalidField("durations"),
+        FiscalError::InvalidField("proposal_ttl_seconds"),
+        FiscalError::InvalidField("expires_at"),
+        FiscalError::InvalidLineage,
+        FiscalError::InvalidLineage,
+    ];
+    assert_eq!(cases.len(), expected.len());
+    for (case, expected) in cases.into_iter().zip(expected) {
+        assert_eq!(case.build_body().err(), Some(expected));
     }
 }
 
@@ -303,31 +313,46 @@ fn params_reject_currency_and_numeric_contract_violations() {
             behavioral_penalty_cap: 250,
         },
     ];
-    for params in invalid {
-        assert!(params.validate().is_err());
+    let expected = [
+        FiscalError::InvalidField("params.ceilings.currency"),
+        FiscalError::InvalidField("params.ceilings.order"),
+        FiscalError::InvalidField("params.discounts.range"),
+        FiscalError::InvalidField("params.discounts.order"),
+        FiscalError::InvalidField("params.approve.order"),
+        FiscalError::InvalidField("params.reduce_ceiling.minimum"),
+        FiscalError::InvalidField("params.premium_floors"),
+        FiscalError::InvalidField("params.score_adjustments_bps.order"),
+    ];
+    assert_eq!(invalid.len(), expected.len());
+    for (params, expected) in invalid.into_iter().zip(expected) {
+        assert_eq!(params.validate().err(), Some(expected));
     }
 }
 
 #[test]
 fn schedule_rejects_domain_charter_expiry_and_currency_mismatch() {
     let charter = verified_charter();
-    assert!(
+    assert!(matches!(
         schedule_builder(FiscalDomain::InsurancePremiumSchedule, tier_params())
-            .build_body(&charter, None)
-            .is_err()
-    );
+            .build_body(&charter, None),
+        Err(FiscalError::InvalidField("domain"))
+    ));
 
     let mut invalid_currency = tier_params();
     if let FiscalParams::TierLimits { ceilings } = &mut invalid_currency {
         ceilings[0].currency = "usd".to_string();
     }
-    assert!(schedule_builder(FiscalDomain::TierLimits, invalid_currency)
-        .build_body(&charter, None)
-        .is_err());
+    assert!(matches!(
+        schedule_builder(FiscalDomain::TierLimits, invalid_currency).build_body(&charter, None),
+        Err(FiscalError::InvalidField("params.ceilings.currency"))
+    ));
 
     let mut expired = schedule_builder(FiscalDomain::TierLimits, tier_params());
     expired.valid_until = charter.body().expires_at + 1;
-    assert!(expired.build_body(&charter, None).is_err());
+    assert!(matches!(
+        expired.build_body(&charter, None),
+        Err(FiscalError::InvalidField("schedule.validity"))
+    ));
 
     let schedule = verified_tier_schedule(&charter);
     let mut wrong_charter = schedule.body().clone();
@@ -362,14 +387,16 @@ fn schedule_rejects_lineage_gaps_and_cross_domain_predecessors() {
         Err(FiscalError::InvalidLineage)
     ));
 
-    assert!(schedule_builder(
-        FiscalDomain::MarketplaceDiscountPerHundred,
-        FiscalParams::MarketplaceDiscountPerHundred {
-            discounts: [0, 10, 20, 30],
-        },
-    )
-    .build_body(&charter, Some(&predecessor))
-    .is_err());
+    assert!(matches!(
+        schedule_builder(
+            FiscalDomain::MarketplaceDiscountPerHundred,
+            FiscalParams::MarketplaceDiscountPerHundred {
+                discounts: [0, 10, 20, 30],
+            },
+        )
+        .build_body(&charter, Some(&predecessor)),
+        Err(FiscalError::InvalidLineage)
+    ));
 
     let mut successor_builder = charter_builder();
     successor_builder.sequence = 2;
@@ -396,9 +423,11 @@ fn schedule_rejects_lineage_gaps_and_cross_domain_predecessors() {
     unrelated_builder.predecessor_charter_digest = Some("1".repeat(64));
     let unrelated =
         VerifiedFiscalCharter::verify(unrelated_builder.sign(&key(9)).test_unwrap()).test_unwrap();
-    assert!(schedule_builder(FiscalDomain::TierLimits, tier_params())
-        .build_rotation_replacement(&unrelated, &predecessor)
-        .is_err());
+    assert!(matches!(
+        schedule_builder(FiscalDomain::TierLimits, tier_params())
+            .build_rotation_replacement(&unrelated, &predecessor),
+        Err(FiscalError::InvalidLineage)
+    ));
 }
 
 #[test]
@@ -412,28 +441,32 @@ fn open_market_schedule_requires_exact_operator_and_time_binding() {
     .test_unwrap();
     assert_eq!(valid.domain, FiscalDomain::OpenMarketFeeAndBondSchedule);
 
-    assert!(schedule_builder(
-        FiscalDomain::OpenMarketFeeAndBondSchedule,
-        open_market_params(19, Some(90)),
-    )
-    .build_body(&charter, None)
-    .is_err());
-    assert!(schedule_builder(
-        FiscalDomain::OpenMarketFeeAndBondSchedule,
-        open_market_params(20, None),
-    )
-    .build_body(&charter, None)
-    .is_err());
+    assert!(matches!(
+        schedule_builder(
+            FiscalDomain::OpenMarketFeeAndBondSchedule,
+            open_market_params(19, Some(90)),
+        )
+        .build_body(&charter, None),
+        Err(FiscalError::InvalidField("params.open_market_binding"))
+    ));
+    assert!(matches!(
+        schedule_builder(
+            FiscalDomain::OpenMarketFeeAndBondSchedule,
+            open_market_params(20, None),
+        )
+        .build_body(&charter, None),
+        Err(FiscalError::InvalidField("params.open_market_binding"))
+    ));
 
     let mut wrong_operator = open_market_params(20, Some(90));
     if let FiscalParams::OpenMarketFeeAndBondSchedule { fee_schedule } = &mut wrong_operator {
         fee_schedule.governing_operator_id = "attacker.example".to_string();
     }
-    assert!(
+    assert!(matches!(
         schedule_builder(FiscalDomain::OpenMarketFeeAndBondSchedule, wrong_operator,)
-            .build_body(&charter, None)
-            .is_err()
-    );
+            .build_body(&charter, None),
+        Err(FiscalError::InvalidField("params.open_market_binding"))
+    ));
 }
 
 #[test]
