@@ -17,7 +17,7 @@
 //!    `kernel_id` BEFORE any [`ProtocolHandler::accept`] runs (DoS rejection /
 //!    defense in depth, NOT a replacement for the signature check).
 //! 3. Org B `open_bi()`, writes one length-delimited canonical
-//!    [`WireDsseCoSigningRequest`], then half-closes its send half (`finish()`).
+//!    `WireDsseCoSigningRequest`, then half-closes its send half (`finish()`).
 //! 4. Org A ([`BilateralCoSignHandler`]) asserts its directory-resolved
 //!    `EndpointId == request.org_b_kernel_id`, verifies `org_b_signature` over the
 //!    exact `pae_bytes` against Org B's DIRECTORY-BOUND passport key (the key the
@@ -40,9 +40,9 @@
 //!
 //! | contracts type ([`chio_federation::bilateral`]) | adapter wire mirror |
 //! | --- | --- |
-//! | `DsseCoSigningRequest { schema, org_a_kernel_id, org_b_kernel_id, pae_bytes, org_b_signature }` | [`WireDsseCoSigningRequest`] with the identical five fields |
-//! | `DsseCoSigningResponse { schema, org_a_signature }` | [`WireReply::Ok`] `{ schema, org_a_signature }` |
-//! | `BilateralCoSigningError` (server-produced subset) | [`WireReply::Err`] `{ code, detail }` tagged by [`WireErrorCode`] |
+//! | `DsseCoSigningRequest { schema, org_a_kernel_id, org_b_kernel_id, pae_bytes, org_b_signature }` | `WireDsseCoSigningRequest` with the identical five fields |
+//! | `DsseCoSigningResponse { schema, org_a_signature }` | `WireReply::Ok` `{ schema, org_a_signature }` |
+//! | `BilateralCoSigningError` (server-produced subset) | `WireReply::Err` `{ code, detail }` tagged by `WireErrorCode` |
 //!
 //! [`chio_core_types::Signature`] already implements serde (algorithm-tagged hex
 //! via `to_hex`/`from_hex`), so the mirror carries it verbatim and every passport
@@ -311,7 +311,7 @@ enum WireError {
 }
 
 /// Fail-closed accept-side failures that RESET the bilateral stream (as opposed
-/// to a co-sign rejection, which is delivered in-band as a typed [`WireReply::Err`]
+/// to a co-sign rejection, which is delivered in-band as a typed `WireReply::Err`
 /// and is NOT an error here). Groups the raw framing, codec, transport, and
 /// accept-limit (slowloris timeout / saturation shed) failures so the accept
 /// handler can close with the right code in one place.
@@ -766,7 +766,7 @@ impl BilateralCoSignHandler {
 impl BilateralCoSignHandler {
     /// One bounded request/response exchange. Every peer-dependent await is
     /// bounded (accept_bi, the request-frame read, the reply write). A co-sign
-    /// REJECTION is delivered IN-BAND as a typed [`WireReply::Err`] (never a
+    /// REJECTION is delivered IN-BAND as a typed `WireReply::Err` (never a
     /// signature) and returns `Ok`; only genuine transport / codec / timeout
     /// failures return `Err` and reset the stream.
     async fn serve(&self, connection: &Connection) -> Result<(), BilateralAcceptError> {

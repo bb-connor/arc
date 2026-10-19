@@ -49,6 +49,7 @@ use chio_federation::revocation_gossip::RevocationCatchupResponse;
 use chio_federation::revocation_gossip::RevocationGossipBatch;
 use chio_federation::revocation_gossip::RevocationGossipError;
 use chio_revocation_oracle::Ed25519RootVerifier;
+#[cfg(test)]
 use chio_revocation_oracle::EpochRootVerifier;
 use chio_revocation_oracle::SignedEpochRoot;
 use iroh::endpoint::Connection;
@@ -119,9 +120,7 @@ pub struct SignerBinding {
 /// [`VerifiedDirectory::signer_directory`](crate::identity::VerifiedDirectory::signer_directory).
 /// The duplicate-`signer_id` and `signer_id`-vs-key consistency rules are enforced
 /// during bundle verification (consistent by construction, since the verifier is
-/// built from the same `signer_id`). The `from_bindings` constructor is
-/// crate-internal (test / explicit construction only) and re-checks both rules
-/// fail-closed; production directories come solely from `verify_bundle`.
+/// built from the same `signer_id`). Production directories come solely from `verify_bundle`.
 #[derive(Debug, Clone, Default)]
 pub struct VerifiedSignerDirectory {
     by_signer: HashMap<String, SignerBinding>,
@@ -133,11 +132,7 @@ impl VerifiedSignerDirectory {
     /// Rejects a duplicate `signer_id` fail-closed and rejects a binding whose
     /// pinned verifier `signer_id` disagrees with its map key (the two identify
     /// the same signer and must not drift).
-    // Retained as a crate-internal explicit/test constructor (used by the unit
-    // tests below). Production directories come solely from `verify_bundle` via
-    // `from_verified_map`, so this has no non-test caller: allow dead_code rather
-    // than expose it publicly again.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn from_bindings(
         bindings: impl IntoIterator<Item = (String, SignerBinding)>,
     ) -> Result<Self, RevocationLaneError> {
@@ -279,9 +274,9 @@ pub trait RevocationRootSink: std::fmt::Debug + Send + Sync {
     ///
     /// # Fail-closed default (no partial cache advance)
     ///
-    /// The default here deliberately does NOT loop [`merge_root`]. A per-root loop
+    /// The default here deliberately does NOT loop `merge_root`. A per-root loop
     /// would leave earlier roots applied when a later root fails, advancing the
-    /// revocation cache partially while [`RevocationHandler::handle_request`]
+    /// revocation cache partially while `RevocationHandler::handle_request`
     /// reports the whole batch rejected - the exact all-or-nothing violation this
     /// contract forbids. A generic default cannot roll back an arbitrary sink, so
     /// instead of risking a silent partial apply it FAILS CLOSED: it merges nothing
@@ -591,7 +586,7 @@ impl RevocationHandler {
     /// the wire unless the caller has ALREADY published every advertised root into the
     /// store the authority's `BlobsProtocol` serves; otherwise a follower fetches a
     /// hash the authority never stored and catch-up fails. The lane's served manifest
-    /// path uses [`respond_catchup_manifest_published`](Self::respond_catchup_manifest_published)
+    /// path uses `respond_catchup_manifest_published`
     /// (which publishes as it advertises) and this remains a lower-level builder for
     /// callers that manage publishing themselves.
     pub fn respond_catchup_manifest(

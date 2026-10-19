@@ -14,7 +14,7 @@
 //! ABOVE the transport, unchanged.
 //!
 //! Defense in depth (ADAPTER-SPEC section 5, ADR-0014 Drop-In Seam step 3): the
-//! accept-time [`DirectoryGate`](crate::admission::DirectoryGate) rejects
+//! accept-time [`DirectoryGate`] rejects
 //! unbound endpoints at `after_handshake` BEFORE any handler runs, AND the
 //! handler re-resolves `conn.remote_id()` (fail-closed) before feeding the
 //! per-frame verifier. Both layers are kept.
@@ -818,7 +818,7 @@ impl ProtocolHandler for PheromoneBatchHandler {
 }
 
 /// Mount the pheromone lane on its own ALPN. The admission
-/// [`DirectoryGate`](crate::admission::DirectoryGate) must already be installed
+/// [`DirectoryGate`] must already be installed
 /// on `endpoint` via `Endpoint::builder(..).hooks(gate)` so unbound endpoints
 /// are rejected at `after_handshake` before this handler runs.
 #[must_use]

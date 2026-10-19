@@ -4,7 +4,7 @@
 //! `after_handshake`, once iroh has cryptographically authenticated the remote
 //! `EndpointId`, and BEFORE any `ProtocolHandler::accept` runs. It resolves the
 //! authenticated `EndpointId` through a load-time-verified
-//! [`VerifiedDirectory`](crate::identity::VerifiedDirectory) and rejects (403)
+//! [`VerifiedDirectory`] and rejects (403)
 //! any endpoint not bound to an admitted, non-removed `kernel_id`.
 //!
 //! This is a cheap DoS-rejection / defense-in-depth layer, NOT a replacement for
