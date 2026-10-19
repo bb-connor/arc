@@ -61,8 +61,8 @@ There is no facade feature for disabling `std`.
 ## Verification
 
 `src/extension/tests.rs` and `src/identity_network/tests.rs` exercise local rules.
-`tests/forward_compat.rs` checks additive fields in compatible artifacts and
-closed signed-manifest boundaries.
+`tests/unknown_fields.rs` checks ignored members on receipts and the closed
+capability and signed-manifest boundaries.
 `tests/property_invariants.rs` exercises protocol invariant properties.
 `benches/core_primitives.rs` measures canonicalization, signing, capabilities,
 and Merkle operations through the facade.
