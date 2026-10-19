@@ -254,7 +254,13 @@ pub(crate) enum SensitiveJsonRefusal {
 }
 
 pub(crate) enum SensitiveJsonFailure {
-    Refused(SensitiveJsonRefusal),
+    Refused(
+        #[cfg_attr(
+            not(test),
+            expect(dead_code, reason = "only in-crate decode tests read the refusal rule")
+        )]
+        SensitiveJsonRefusal,
+    ),
     Broker(BrokerError),
 }
 
