@@ -1,6 +1,8 @@
 // The A2A edge server, its deferred-task state, and the explicit
 // kernel-mediated dispatch.
 
+const A2A_INTERNAL_ERROR_MESSAGE: &str = "internal error";
+
 #[derive(Debug, Clone)]
 struct DeferredA2aTask {
     owner_agent_id: String,
@@ -311,22 +313,49 @@ impl ChioA2aEdge {
     }
 
     fn jsonrpc_error_response(id: Value, error: A2aEdgeError) -> A2aJsonRpcResponse {
-        let (code, message) = match &error {
-            A2aEdgeError::UntrustedInput(error) => (-32602, error.code().to_string()),
+        let (code, message) = Self::jsonrpc_error_fields(&error);
+        A2aJsonRpcResponse::with_error(Self::jsonrpc_error_payload(id, code, &message), error)
+    }
+
+    fn jsonrpc_error_fields(error: &A2aEdgeError) -> (i64, String) {
+        match error {
+            A2aEdgeError::UntrustedInput(error)
+            | A2aEdgeError::Bridge(BridgeError::UntrustedInput(error)) => {
+                (-32602, error.code().to_string())
+            }
+            A2aEdgeError::Clock(clock_error) => (-32603, clock_error.code().to_string()),
             A2aEdgeError::TaskCapacity => (
                 -32602,
                 "urn:chio:error:transport:task-capacity-exceeded".to_string(),
             ),
-            A2aEdgeError::ToolNotFound(message) | A2aEdgeError::InvalidRequest(message) => {
+            A2aEdgeError::ToolNotFound(message)
+            | A2aEdgeError::InvalidRequest(message)
+            | A2aEdgeError::Bridge(BridgeError::InvalidRequest(message)) => {
                 (-32602, message.clone())
             }
             A2aEdgeError::UnsupportedOperation(message) => (-32004, (*message).to_string()),
             A2aEdgeError::TaskNotFound(_) => (-32001, "task not found".to_string()),
             A2aEdgeError::TaskNotCancelable(_) => (-32002, "task is not cancelable".to_string()),
-            other => (-32603, other.to_string()),
-        };
+            A2aEdgeError::Bridge(BridgeError::CapabilityRefMismatch { .. }) => {
+                (-32602, "capability reference mismatch".to_string())
+            }
+            A2aEdgeError::Bridge(BridgeError::UnsupportedTargetProtocol(_)) => {
+                (-32004, "unsupported target protocol".to_string())
+            }
+            A2aEdgeError::Bridge(BridgeError::Kernel(kernel_error)) => {
+                Self::internal_jsonrpc_error_fields(error, kernel_error.report().code)
+            }
+            A2aEdgeError::Bridge(BridgeError::InvalidAttenuation(_) | BridgeError::Canonical(_))
+            | A2aEdgeError::Kernel(_)
+            | A2aEdgeError::Manifest(_) => {
+                Self::internal_jsonrpc_error_fields(error, A2A_INTERNAL_ERROR_MESSAGE.to_string())
+            }
+        }
+    }
 
-        A2aJsonRpcResponse::with_error(Self::jsonrpc_error_payload(id, code, &message), error)
+    fn internal_jsonrpc_error_fields(error: &A2aEdgeError, message: String) -> (i64, String) {
+        tracing::error!(error = %error, "A2A request failed internally");
+        (-32603, message)
     }
 
     fn jsonrpc_error_payload(id: Value, code: i64, message: &str) -> Value {

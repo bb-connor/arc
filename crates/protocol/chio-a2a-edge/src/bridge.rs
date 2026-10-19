@@ -58,7 +58,7 @@ impl CapabilityBridge for A2aCapabilityBridge {
         chio_metadata.insert(
             "capabilityRef".to_string(),
             serde_json::to_value(cap_ref)
-                .map_err(|error| BridgeError::InvalidRequest(error.to_string()))?,
+                .map_err(|error| BridgeError::Canonical(error.to_string()))?,
         );
         Ok(())
     }
