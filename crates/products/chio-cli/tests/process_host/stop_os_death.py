@@ -138,17 +138,23 @@ def c6(binary, root):
     control.write_text("hold-after")
     first = Serving(node, "first")
     outcome = {}
-    caller = threading.Thread(
-        target=lambda: outcome.update(
-            response=invoke_withheld(first.client, "c6-append", "append", {"report": "C6"})
-        )
-    )
+    def held_call():
+        try:
+            outcome["response"] = invoke_withheld(
+                first.client, "c6-append", "append", {"report": "C6"}
+            )
+        except Exception as failure:
+            outcome["failure"] = failure
+
+    caller = threading.Thread(target=held_call)
     caller.start()
     wait_for_hold(node.publications.with_suffix(".held"), first.host)
     epoch = stop(node)
     control.write_text("ready")
     caller.join(timeout=90)
     assert not caller.is_alive(), "held call never returned under the stop"
+    if "failure" in outcome:
+        raise outcome["failure"]
     during = outcome["response"]
     assert during is None, during
     assert ready_state(first)["withheld_operations"] == 1
