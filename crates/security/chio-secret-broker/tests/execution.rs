@@ -104,7 +104,9 @@ fn canonical_wire_round_trip_and_unknown_field_rejection() {
     );
     let mut value: serde_json::Value = serde_json::from_slice(&bytes).test_expect("value");
     value["unknown"] = serde_json::json!(true);
-    assert!(decode_execute_request(&serde_json::to_vec(&value).test_expect("encode")).is_err());
+    malformed_shape(decode_execute_request(
+        &serde_json::to_vec(&value).test_expect("encode"),
+    ));
 }
 
 #[test]
@@ -123,20 +125,23 @@ fn capability_and_proof_reject_single_field_tampering() {
 
     let mut changed = request.clone();
     changed.request.options.timeout_ms = 499;
-    assert!(
-        verify_request_proof(&changed.proof, &changed.capability, &changed.request, 20, 1).is_err()
+    denied(
+        verify_request_proof(&changed.proof, &changed.capability, &changed.request, 20, 1),
+        PROOF_UNBOUND,
     );
 
     let mut changed = request;
     changed.capability.body.credential.version = 2;
-    assert!(verify_capability(
-        &changed.capability,
-        &issuer.public_key(),
-        "broker-service",
-        20,
-        true
-    )
-    .is_err());
+    denied(
+        verify_capability(
+            &changed.capability,
+            &issuer.public_key(),
+            "broker-service",
+            20,
+            true,
+        ),
+        CAPABILITY_SIGNATURE,
+    );
 }
 
 #[test]
@@ -246,10 +251,13 @@ fn capability_signature_rejects_each_bound_field_tamper() {
         let mut value = original.clone();
         *value.pointer_mut(pointer).test_expect("pointer") = replacement;
         let mutated = serde_json::from_value(value).test_expect("mutated capability");
-        assert!(
-            verify_capability(&mutated, &issuer.public_key(), "broker-service", 20, true).is_err(),
-            "tamper survived at {pointer}"
-        );
+        let result = verify_capability(&mutated, &issuer.public_key(), "broker-service", 20, true);
+        match pointer {
+            "/body/schema" => invalid(result, "unsupported broker capability schema"),
+            "/body/issuer" | "/body/audience" => denied(result, CAPABILITY_TRUST),
+            "/body/subject" | "/body/proof/callerPublicKey" => invalid(result, CAPABILITY_BOUNDS),
+            _ => denied(result, CAPABILITY_SIGNATURE),
+        }
     }
 }
 
@@ -260,19 +268,31 @@ fn proof_rejects_body_path_header_option_key_stale_and_future_changes() {
 
     let mut changed = request.request.clone();
     changed.body.push(0);
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut changed = request.request.clone();
     changed.destination.exact_path_and_query = "/v1?x=2".to_string();
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut changed = request.request.clone();
     changed.headers[0].value = b"text/plain".to_vec();
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut changed = request.request.clone();
     changed.headers.clear();
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut changed = request.request.clone();
     changed.headers.push(
@@ -281,24 +301,40 @@ fn proof_rejects_body_path_header_option_key_stale_and_future_changes() {
     changed
         .headers
         .sort_by(|left, right| left.name.cmp(&right.name));
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut changed = request.request.clone();
     changed.options.streaming = true;
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut changed = request.request.clone();
     changed.options.timeout_ms = 499;
-    assert!(verify_request_proof(proof, &request.capability, &changed, 20, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &changed, 20, 1),
+        PROOF_UNBOUND,
+    );
 
     let mut wrong_key = request.proof.clone();
     wrong_key.body.authority_key = Keypair::from_seed(&[9; 32]).public_key();
-    assert!(
-        verify_request_proof(&wrong_key, &request.capability, &request.request, 20, 1).is_err()
+    denied(
+        verify_request_proof(&wrong_key, &request.capability, &request.request, 20, 1),
+        PROOF_UNBOUND,
     );
 
-    assert!(verify_request_proof(proof, &request.capability, &request.request, 51, 1).is_err());
-    assert!(verify_request_proof(proof, &request.capability, &request.request, 10, 1).is_err());
+    denied(
+        verify_request_proof(proof, &request.capability, &request.request, 51, 1),
+        PROOF_WINDOW,
+    );
+    denied(
+        verify_request_proof(proof, &request.capability, &request.request, 10, 1),
+        PROOF_WINDOW,
+    );
 }
 
 #[test]
@@ -306,16 +342,71 @@ fn duplicate_reordered_and_unknown_option_inputs_fail_closed() {
     let (_, _, request) = fixture();
     let mut duplicate = request.request.clone();
     duplicate.headers.push(duplicate.headers[0].clone());
-    assert!(duplicate.validate_bounds().is_err());
+    invalid(duplicate.validate_bounds(), HEADER_ORDER);
 
     let mut reordered = request.request.clone();
     reordered.headers.push(
         HeaderField::normalized("accept", b"application/json").test_expect("additional header"),
     );
-    assert!(reordered.validate_bounds().is_err());
+    invalid(reordered.validate_bounds(), HEADER_ORDER);
 
     let mut value = serde_json::to_value(&request).test_expect("value");
     value["request"]["options"]["unknownTransportBehavior"] = serde_json::json!(true);
-    assert!(decode_execute_request(&serde_json::to_vec(&value).test_expect("wire")).is_err());
-    assert!(decode_execute_request(&vec![b' '; MAX_WIRE_BYTES + 1]).is_err());
+    malformed_shape(decode_execute_request(
+        &serde_json::to_vec(&value).test_expect("wire"),
+    ));
+    invalid(
+        decode_execute_request(&vec![b' '; MAX_WIRE_BYTES + 1]),
+        "broker execute frame is empty or oversized",
+    );
 }
+
+#[track_caller]
+fn refusal<T>(result: Result<T, BrokerError>, code: &str) -> BrokerError {
+    match result {
+        Err(error) => {
+            assert_eq!(error.diagnostic_code(), code, "{error:?}");
+            error
+        }
+        Ok(_) => panic!("operation was accepted"),
+    }
+}
+
+#[track_caller]
+fn denied<T>(result: Result<T, BrokerError>, message: &str) {
+    let error = refusal(result, "authorization_denied");
+    assert!(
+        matches!(&error, BrokerError::AuthorizationDenied(actual) if actual == message),
+        "{error:?}"
+    );
+}
+
+#[track_caller]
+fn invalid<T>(result: Result<T, BrokerError>, message: &str) {
+    let error = refusal(result, "invalid_request");
+    assert!(
+        matches!(&error, BrokerError::InvalidRequest(actual) if actual == message),
+        "{error:?}"
+    );
+}
+
+#[track_caller]
+fn malformed_shape<T>(result: Result<T, BrokerError>) {
+    let error = refusal(result, "signed_json_invalid_shape");
+    assert!(
+        matches!(
+            &error,
+            BrokerError::UntrustedInput(chio_core_types::canonical::UntrustedJsonError::Decode(_))
+        ),
+        "{error:?}"
+    );
+}
+
+const PROOF_UNBOUND: &str = "request proof does not bind the complete request";
+const PROOF_WINDOW: &str =
+    "request proof is outside the capability interval, stale, or from the future";
+const CAPABILITY_SIGNATURE: &str = "broker capability signature is invalid";
+const CAPABILITY_TRUST: &str = "broker capability issuer, algorithm, or audience is invalid";
+const CAPABILITY_BOUNDS: &str =
+    "broker capability identity, time, adapter, or execution bound is invalid";
+const HEADER_ORDER: &str = "caller headers must be strictly sorted without duplicates";
