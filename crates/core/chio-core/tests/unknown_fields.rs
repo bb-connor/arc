@@ -1,14 +1,8 @@
-// Unknown-field tolerance integration tests for compatible chio-core types.
+// Unknown-member handling for chio-core signed artifacts.
 //
-// Most tests prove that additive metadata remains forward-compatible. Signed
-// manifests are the deliberate exception: their normative policy layers are
-// closed and require an explicit schema migration before new fields are
-// admitted.
-//
-// Strategy for each test: (1) create a valid instance, (2) serialize to
-// serde_json::Value, (3) inject unknown fields, (4) re-serialize to string,
-// (5) deserialize to the target type, (6) assert known fields survived and
-// that signature verification still works.
+// Receipts and child receipts sign their body and ignore members outside it.
+// The capability tree and signed manifests are closed: an unknown member at
+// any layer fails to decode with serde's `unknown field` error.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -154,10 +148,6 @@ fn make_child_receipt_body(kp: &Keypair) -> ChildRequestReceiptBody {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Test 1: token_round_trips
-// Proves basic round-trip still works with no unknown fields injected.
-// ---------------------------------------------------------------------------
 #[test]
 fn token_round_trips() {
     let kp = Keypair::generate();
@@ -175,56 +165,25 @@ fn token_round_trips() {
     assert!(restored.verify_signature().unwrap());
 }
 
-// ---------------------------------------------------------------------------
-// Test 2: token_with_unknown_fields_accepted
-// Proves unknown fields injected at the top level and inside ToolGrant are
-// silently ignored during deserialization.
-// ---------------------------------------------------------------------------
 #[test]
-fn token_with_unknown_fields_accepted() {
+fn token_refuses_unknown_members() {
     let kp = Keypair::generate();
-    let body = make_token_body(&kp);
-    let original_id = body.id.clone();
-    let token = CapabilityToken::sign(body, &kp).unwrap();
+    let token = CapabilityToken::sign(make_token_body(&kp), &kp).unwrap();
+    let value = serde_json::to_value(&token).unwrap();
 
-    // Serialize to Value, inject unknown fields at multiple levels.
-    let mut value: serde_json::Value = serde_json::to_value(&token).unwrap();
+    let mut envelope = value.clone();
+    envelope["future_data"] = serde_json::json!({"nested_key": true});
+    assert_unknown_field_refused::<CapabilityToken>(envelope, "future_data");
 
-    // Inject at the top level.
-    value["future_field"] = serde_json::Value::String("some_future_value".to_string());
-    value["future_data"] = serde_json::json!({"nested_key": true, "count": 42});
+    let mut scope = value.clone();
+    scope["scope"]["future_scope"] = serde_json::json!([]);
+    assert_unknown_field_refused::<CapabilityToken>(scope, "future_scope");
 
-    // Inject inside scope.grants[0].
-    if let Some(grant) = value["scope"]["grants"].get_mut(0) {
-        grant["future_billing_ref"] = serde_json::json!("billing-acct-001");
-        grant["future_priority"] = serde_json::Value::Number(serde_json::Number::from(5));
-    }
-
-    let json_with_unknowns = serde_json::to_string(&value).unwrap();
-
-    // Must deserialize without error
-    let restored: CapabilityToken = serde_json::from_str(&json_with_unknowns)
-        .expect("CapabilityToken must accept unknown fields");
-
-    // Known fields must survive intact
-    assert_eq!(original_id, restored.id);
-    assert_eq!(token.issuer, restored.issuer);
-    assert_eq!(token.issued_at, restored.issued_at);
-    assert_eq!(token.expires_at, restored.expires_at);
-    assert_eq!(token.signature.to_hex(), restored.signature.to_hex());
-
-    // Signature verification must still succeed using the body (which does not
-    // include the unknown fields injected in the raw JSON input).
-    assert!(
-        restored.verify_signature().unwrap(),
-        "signature verification must pass after round-trip with unknown fields"
-    );
+    let mut grant = value;
+    grant["scope"]["grants"][0]["future_priority"] = serde_json::json!(5);
+    assert_unknown_field_refused::<CapabilityToken>(grant, "future_priority");
 }
 
-// ---------------------------------------------------------------------------
-// Test 3: receipt_with_unknown_fields_accepted
-// Proves receipts tolerate unknown fields at multiple nesting levels.
-// ---------------------------------------------------------------------------
 #[test]
 fn receipt_with_unknown_fields_accepted() {
     let kp = Keypair::generate();
@@ -259,121 +218,73 @@ fn receipt_with_unknown_fields_accepted() {
     assert!(restored.verify_signature().unwrap());
 }
 
-// ---------------------------------------------------------------------------
-// Test 4: manifest_unknown_fields_rejected_at_every_policy_layer
-// Proves signed manifest policy never silently drops unknown fields.
-// ---------------------------------------------------------------------------
 #[test]
-fn manifest_unknown_fields_rejected_at_every_policy_layer() {
+fn manifest_refuses_unknown_members_at_every_policy_layer() {
     let kp = Keypair::generate();
-    let body = make_manifest_body(&kp);
-    let manifest = ToolManifest::sign(body, &kp).unwrap();
+    let manifest = ToolManifest::sign(make_manifest_body(&kp), &kp).unwrap();
     let value = serde_json::to_value(&manifest).unwrap();
 
     let mut envelope = value.clone();
     envelope["future_billing_account"] = serde_json::json!("acct-xyz");
-    assert_manifest_unknown_field_rejected(envelope, "manifest envelope");
+    assert_unknown_field_refused::<ToolManifest>(envelope, "future_billing_account");
 
     let mut definition = value.clone();
     definition["tools"][0]["rate_limit"] = serde_json::json!({"per_minute": 60});
-    assert_manifest_unknown_field_rejected(definition, "tool definition");
+    assert_unknown_field_refused::<ToolManifest>(definition, "rate_limit");
 
     let mut annotations = value.clone();
     annotations["tools"][0]["annotations"]["sandboxed"] = serde_json::json!(true);
-    assert_manifest_unknown_field_rejected(annotations, "tool annotations");
+    assert_unknown_field_refused::<ToolManifest>(annotations, "sandboxed");
 
     let mut pricing = value;
     pricing["tools"][0]["pricing"] = serde_json::json!({
         "pricing_model": "flat",
         "future_cost_basis": "compute"
     });
-    assert_manifest_unknown_field_rejected(pricing, "tool pricing");
+    assert_unknown_field_refused::<ToolManifest>(pricing, "future_cost_basis");
 
     let mut body = serde_json::to_value(manifest.body()).unwrap();
     body["future_policy"] = serde_json::json!(true);
-    let error = serde_json::from_value::<ToolManifestBody>(body)
-        .expect_err("manifest body must reject unknown policy fields");
-    assert!(
-        error.to_string().contains("unknown field"),
-        "manifest body rejected for an unexpected reason: {error}"
-    );
+    assert_unknown_field_refused::<ToolManifestBody>(body, "future_policy");
 }
 
-fn assert_manifest_unknown_field_rejected(value: serde_json::Value, layer: &str) {
-    let error = serde_json::from_value::<ToolManifest>(value)
-        .expect_err("signed manifest must reject unknown policy fields");
-    assert!(
-        error.to_string().contains("unknown field"),
-        "{layer} rejected for an unexpected reason: {error}"
-    );
-}
-
-// ---------------------------------------------------------------------------
-// Test 5: unknown_fields_not_preserved_on_reserialize
-// Proves that unknown fields absorbed during deserialization are NOT present
-// in the re-serialized output (no data leakage, no ghost fields).
-// ---------------------------------------------------------------------------
 #[test]
-fn unknown_fields_not_preserved_on_reserialize() {
-    let kp = Keypair::generate();
-    let body = make_token_body(&kp);
-    let token = CapabilityToken::sign(body, &kp).unwrap();
-
-    let mut value: serde_json::Value = serde_json::to_value(&token).unwrap();
-    value["ghost_field"] = serde_json::Value::String("should_disappear".to_string());
-
-    let json_with_ghost = serde_json::to_string(&value).unwrap();
-    let restored: CapabilityToken = serde_json::from_str(&json_with_ghost).unwrap();
-
-    // Re-serialize the restored struct
-    let reserialzied = serde_json::to_string(&restored).unwrap();
-    let output_value: serde_json::Value = serde_json::from_str(&reserialzied).unwrap();
-
-    // Unknown field must NOT be present in the output
-    assert!(
-        output_value.get("ghost_field").is_none(),
-        "ghost_field should not be present after round-trip through struct"
-    );
-
-    // Known fields must still be present
-    assert!(output_value.get("id").is_some());
-    assert!(output_value.get("signature").is_some());
-}
-
-// ---------------------------------------------------------------------------
-// Test 6: delegation_link_with_unknown_fields
-// Proves delegation chain links tolerate unknown fields.
-// ---------------------------------------------------------------------------
-#[test]
-fn delegation_link_with_unknown_fields() {
+fn delegation_link_refuses_unknown_members() {
     let delegator_kp = Keypair::generate();
     let delegatee_kp = Keypair::generate();
     let link = make_delegation_link(&delegator_kp, &delegatee_kp);
 
-    let mut value: serde_json::Value = serde_json::to_value(&link).unwrap();
-
-    // Inject unknown fields that a later delegation profile might add.
+    let mut value = serde_json::to_value(&link).unwrap();
     value["expiry_override"] = serde_json::json!(1_999_999);
-    value["future_reason"] = serde_json::json!("sub-agent spawn");
-    value["future_audit_id"] = serde_json::json!("aud-00123");
+    assert_unknown_field_refused::<DelegationLink>(value.clone(), "expiry_override");
 
-    let json_with_unknowns = serde_json::to_string(&value).unwrap();
-
-    let restored: DelegationLink = serde_json::from_str(&json_with_unknowns)
-        .expect("DelegationLink must accept unknown fields");
-
-    assert_eq!(link.capability_id, restored.capability_id);
-    assert_eq!(link.delegator, restored.delegator);
-    assert_eq!(link.delegatee, restored.delegatee);
-    assert_eq!(link.timestamp, restored.timestamp);
-    assert_eq!(link.signature.to_hex(), restored.signature.to_hex());
-    assert!(restored.verify_signature().unwrap());
+    let mut token_value = serde_json::to_value(
+        CapabilityToken::sign(
+            CapabilityTokenBody {
+                delegation_chain: vec![link],
+                ..make_token_body(&delegator_kp)
+            },
+            &delegator_kp,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    token_value["delegation_chain"][0] = value;
+    assert_unknown_field_refused::<CapabilityToken>(token_value, "expiry_override");
 }
 
-// ---------------------------------------------------------------------------
-// Test 7: child_receipt_with_unknown_fields
-// Proves child request receipts tolerate unknown fields.
-// ---------------------------------------------------------------------------
+fn assert_unknown_field_refused<T: serde::de::DeserializeOwned>(
+    value: serde_json::Value,
+    member: &str,
+) {
+    let error = serde_json::from_value::<T>(value)
+        .err()
+        .map(|error| error.to_string())
+        .unwrap_or_default();
+    let expected = format!("unknown field `{member}`, expected");
+    assert!(error.starts_with(&expected), "`{member}`: {error}");
+}
+
 #[test]
 fn child_receipt_with_unknown_fields() {
     let kp = Keypair::generate();
