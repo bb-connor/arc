@@ -16,6 +16,7 @@ use super::token::{CapabilityToken, CapabilityTokenAttenuationBody, CapabilityTo
 use crate::canonical::canonical_json_bytes;
 use crate::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
 use crate::delegation_receipt::ScopeAttenuation;
+use crate::error::Error;
 
 type TestResult = core::result::Result<(), Box<dyn std::error::Error>>;
 
@@ -124,6 +125,31 @@ fn binding_for_grant(
 
 type TestResultValue<T> = core::result::Result<T, Box<dyn std::error::Error>>;
 
+const ROOT_MISMATCH: &str = "cumulative approval root binding does not match the direct root token";
+const FIXED_FIELDS: &str =
+    "cumulative approval constraint changed fields fixed by its root binding";
+
+fn refusal<T>(result: crate::error::Result<T>) -> TestResultValue<Error> {
+    match result {
+        Err(error) => Ok(error),
+        Ok(_) => Err(std::io::Error::other("operation was accepted").into()),
+    }
+}
+
+#[track_caller]
+fn assert_violation(error: &Error, expected: &str) {
+    match error {
+        Error::AttenuationViolation { reason } => assert_eq!(reason, expected),
+        other => panic!("expected AttenuationViolation({expected:?}), got {other:?}"),
+    }
+}
+
+#[track_caller]
+fn refused_with<T>(result: crate::error::Result<T>, expected: &str) -> TestResult {
+    assert_violation(&refusal(result)?, expected);
+    Ok(())
+}
+
 fn child_token(
     root: &CapabilityToken,
     root_subject: &Keypair,
@@ -175,7 +201,7 @@ fn mutation_rejected(
     token_signer: &Keypair,
     binding_signer: &Keypair,
     mutate: impl FnOnce(&mut CumulativeApprovalRootBindingBody),
-) -> TestResultValue<bool> {
+) -> TestResultValue<Error> {
     let mut body = root.body();
     let constraint = body
         .scope
@@ -193,7 +219,7 @@ fn mutation_rejected(
         binding_body,
         binding_signer,
     )?))?;
-    Ok(CapabilityToken::sign(body, token_signer).is_err())
+    refusal(CapabilityToken::sign(body, token_signer))
 }
 
 #[test]
@@ -228,7 +254,10 @@ fn cumulative_approval_delegable_direct_signing_requires_family_helper() -> Test
         tool_scope(true, Some(100)),
     );
 
-    assert!(CapabilityToken::sign(body, &issuer).is_err());
+    refused_with(
+        CapabilityToken::sign(body, &issuer),
+        "delegable or delegated cumulative approval constraint requires a root binding",
+    )?;
     Ok(())
 }
 
@@ -270,7 +299,13 @@ fn aggregate_and_cumulative_roots_require_a_joint_binding() -> TestResult {
 fn cumulative_approval_wire_rejects_unknown_fields() -> TestResult {
     let mut value = serde_json::to_value(cumulative_constraint(100))?;
     value["value"]["rogue"] = serde_json::Value::Bool(true);
-    assert!(serde_json::from_value::<Constraint>(value).is_err());
+    let error = serde_json::from_value::<Constraint>(value)
+        .err()
+        .ok_or_else(|| std::io::Error::other("unknown field was accepted"))?;
+    assert!(
+        error.to_string().starts_with("unknown field `rogue`"),
+        "unexpected error: {error}"
+    );
     Ok(())
 }
 
@@ -345,16 +380,18 @@ fn cumulative_approval_delegation_rejects_omission() -> TestResult {
     let root_subject = Keypair::generate();
     let root = family_root(&issuer, &root_subject)?;
 
-    assert!(delegate(
-        &root,
-        &tool_scope(false, None),
-        &root_subject,
-        &Keypair::generate().public_key(),
-        ScopeAttenuation::empty(),
-        200,
-        [1_u8; 16],
-    )
-    .is_err());
+    refused_with(
+        delegate(
+            &root,
+            &tool_scope(false, None),
+            &root_subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            200,
+            [1_u8; 16],
+        ),
+        "child scope is not a subset of parent scope",
+    )?;
     Ok(())
 }
 
@@ -368,16 +405,18 @@ fn cumulative_approval_delegation_rejects_binding_mutation() -> TestResult {
     changed.body.approval_budget_epoch += 1;
     child_scope.grants[0].constraints[0].set_cumulative_approval_root_binding(Some(changed))?;
 
-    assert!(delegate(
-        &root,
-        &child_scope,
-        &root_subject,
-        &Keypair::generate().public_key(),
-        ScopeAttenuation::empty(),
-        200,
-        [2_u8; 16],
-    )
-    .is_err());
+    refused_with(
+        delegate(
+            &root,
+            &child_scope,
+            &root_subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            200,
+            [2_u8; 16],
+        ),
+        "child scope is not a subset of parent scope",
+    )?;
     Ok(())
 }
 
@@ -396,16 +435,18 @@ fn cumulative_approval_delegation_rejects_fresh_constraint() -> TestResult {
     )?;
     let child_scope = tool_scope(false, Some(100));
 
-    assert!(delegate(
-        &root,
-        &child_scope,
-        &root_subject,
-        &Keypair::generate().public_key(),
-        ScopeAttenuation::empty(),
-        200,
-        [3_u8; 16],
-    )
-    .is_err());
+    refused_with(
+        delegate(
+            &root,
+            &child_scope,
+            &root_subject,
+            &Keypair::generate().public_key(),
+            ScopeAttenuation::empty(),
+            200,
+            [3_u8; 16],
+        ),
+        "child scope is not a subset of parent scope",
+    )?;
     Ok(())
 }
 
@@ -426,12 +467,10 @@ fn cumulative_approval_verifier_rejects_unrelated_root_evidence() -> TestResult 
         &issuer,
     )?;
 
-    assert!(verify_cumulative_approval_constraints(
-        &child,
-        &[issuer.public_key()],
-        Some(&unrelated),
-    )
-    .is_err());
+    refused_with(
+        verify_cumulative_approval_constraints(&child, &[issuer.public_key()], Some(&unrelated)),
+        "delegation chain does not originate from the authenticated root token",
+    )?;
     Ok(())
 }
 
@@ -541,7 +580,7 @@ fn cumulative_approval_grafted_grant_binding_rejects() -> TestResult {
     body.scope.grants[1].constraints[0]
         .set_cumulative_approval_root_binding(Some(first_binding))?;
 
-    assert!(CapabilityToken::sign(body, &issuer).is_err());
+    refused_with(CapabilityToken::sign(body, &issuer), ROOT_MISMATCH)?;
     Ok(())
 }
 
@@ -600,45 +639,84 @@ fn cumulative_approval_rejects_every_root_binding_field_mutation() -> TestResult
     let root = family_root(&issuer, &subject)?;
     let other = Keypair::generate();
 
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.schema = "chio.cumulative-approval-root.invalid".to_string();
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.signer_key_epoch += 1;
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.root_capability_id.push_str("-changed");
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.root_capability_hash = "00".repeat(32);
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &other, |body| {
-        body.root_issuer = other.public_key();
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.root_subject = Keypair::generate().public_key();
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.root_scope_hash = "11".repeat(32);
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.root_grant_hash = "22".repeat(32);
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.approval_budget_id.push_str("-changed");
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.approval_budget_epoch += 1;
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.threshold.units += 1;
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.threshold.currency = "EUR".to_string();
-    })?);
-    assert!(mutation_rejected(&root, &issuer, &issuer, |body| {
-        body.root_expires_at += 1;
-    })?);
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.schema = "chio.cumulative-approval-root.invalid".to_string();
+        })?,
+        "unsupported cumulative approval root schema chio.cumulative-approval-root.invalid",
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.signer_key_epoch += 1;
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.root_capability_id.push_str("-changed");
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.root_capability_hash = "00".repeat(32);
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &other, |body| {
+            body.root_issuer = other.public_key();
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.root_subject = Keypair::generate().public_key();
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.root_scope_hash = "11".repeat(32);
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.root_grant_hash = "22".repeat(32);
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.approval_budget_id.push_str("-changed");
+        })?,
+        FIXED_FIELDS,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.approval_budget_epoch += 1;
+        })?,
+        FIXED_FIELDS,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.threshold.units += 1;
+        })?,
+        ROOT_MISMATCH,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.threshold.currency = "EUR".to_string();
+        })?,
+        FIXED_FIELDS,
+    );
+    assert_violation(
+        &mutation_rejected(&root, &issuer, &issuer, |body| {
+            body.root_expires_at += 1;
+        })?,
+        ROOT_MISMATCH,
+    );
     Ok(())
 }
 
@@ -820,7 +898,10 @@ fn cumulative_approval_marker_is_bounded_sorted_and_deduplicated() -> TestResult
     let reversed: CumulativeApprovalDelegationMarker = serde_json::from_value(reversed_value)?;
     let mut reversed_body = receipt.link.body();
     reversed_body.cumulative_approval = Some(reversed);
-    assert!(DelegationLink::sign(reversed_body, &subject).is_err());
+    refused_with(
+        DelegationLink::sign(reversed_body, &subject),
+        "cumulative approval delegation bindings must be sorted and unique",
+    )?;
 
     let entry = value["bindings"][0].clone();
     let oversized_value = serde_json::json!({
@@ -829,11 +910,20 @@ fn cumulative_approval_marker_is_bounded_sorted_and_deduplicated() -> TestResult
     let oversized: CumulativeApprovalDelegationMarker = serde_json::from_value(oversized_value)?;
     let mut oversized_body = receipt.link.body();
     oversized_body.cumulative_approval = Some(oversized);
-    assert!(DelegationLink::sign(oversized_body, &subject).is_err());
+    refused_with(
+        DelegationLink::sign(oversized_body, &subject),
+        &format!("cumulative approval delegation marker must contain 1 to {MAX_CUMULATIVE_APPROVAL_BINDINGS_PER_MARKER} bindings"),
+    )?;
 
     let mut unknown_value = value;
     unknown_value["bindings"][0]["rogue"] = serde_json::Value::Bool(true);
-    assert!(serde_json::from_value::<CumulativeApprovalDelegationMarker>(unknown_value).is_err());
+    let error = serde_json::from_value::<CumulativeApprovalDelegationMarker>(unknown_value)
+        .err()
+        .ok_or_else(|| std::io::Error::other("unknown field was accepted"))?;
+    assert!(
+        error.to_string().starts_with("unknown field `rogue`"),
+        "unexpected error: {error}"
+    );
     Ok(())
 }
 
@@ -871,7 +961,10 @@ fn cumulative_approval_rejects_link_witness_and_receipt_projection_changes() -> 
         child_scope.clone(),
     );
     omitted_token_body.delegation_chain = vec![omitted_link];
-    assert!(CapabilityToken::sign(omitted_token_body, &issuer).is_err());
+    refused_with(
+        CapabilityToken::sign(omitted_token_body, &issuer),
+        "final delegation link changed or omitted cumulative approval markers",
+    )?;
 
     let mut changed_link_body = receipt.link.body();
     changed_link_body.cumulative_approval = Some(changed_marker.clone());
@@ -883,7 +976,10 @@ fn cumulative_approval_rejects_link_witness_and_receipt_projection_changes() -> 
         child_scope.clone(),
     );
     changed_token_body.delegation_chain = vec![changed_link];
-    assert!(CapabilityToken::sign(changed_token_body, &issuer).is_err());
+    refused_with(
+        CapabilityToken::sign(changed_token_body, &issuer),
+        "final delegation link changed or omitted cumulative approval markers",
+    )?;
 
     let proof = AttenuationProof {
         parent_scope_hash: scope_hash(&root.scope)?,
@@ -910,18 +1006,27 @@ fn cumulative_approval_rejects_link_witness_and_receipt_projection_changes() -> 
         .attenuation_proof
         .normalized_subset_proof
         .cumulative_approval = None;
-    assert!(CapabilityToken::sign_attenuated(omitted_witness, &issuer).is_err());
+    refused_with(
+        CapabilityToken::sign_attenuated(omitted_witness, &issuer),
+        "attenuation witness changed or omitted cumulative approval markers",
+    )?;
 
     let mut changed_witness = attenuated_body;
     changed_witness
         .attenuation_proof
         .normalized_subset_proof
         .cumulative_approval = Some(changed_marker);
-    assert!(CapabilityToken::sign_attenuated(changed_witness, &issuer).is_err());
+    refused_with(
+        CapabilityToken::sign_attenuated(changed_witness, &issuer),
+        "attenuation witness changed or omitted cumulative approval markers",
+    )?;
 
     let mut changed_receipt = receipt;
     changed_receipt.cumulative_approval = None;
-    assert!(changed_receipt.canonical_bytes().is_err());
+    refused_with(
+        changed_receipt.canonical_bytes(),
+        "delegation receipt cumulative approval marker does not match its signed link",
+    )?;
     Ok(())
 }
 
@@ -1021,10 +1126,9 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
         child_scope,
     );
     leaf_body.delegation_chain = vec![grafted_first, second];
+    leaf_body.issued_at = 300;
     let leaf = CapabilityToken::sign(leaf_body, &issuer)?;
-    assert!(
-        verify_cumulative_approval_constraints(&leaf, &[issuer.public_key()], Some(&root)).is_err()
-    );
+    refused_with(verify_cumulative_approval_constraints(&leaf, &[issuer.public_key()], Some(&root)), "multi-hop cumulative approval family delegation requires per-hop signed child-scope witnesses")?;
 
     let grafted_binding_link = DelegationLink::sign(
         DelegationLinkBody {
@@ -1046,12 +1150,15 @@ fn cumulative_approval_rejects_root_binding_and_first_marker_grafts() -> TestRes
         other_child_scope,
     );
     grafted_binding_body.delegation_chain = vec![grafted_binding_link];
+    grafted_binding_body.issued_at = 200;
     let grafted_binding = CapabilityToken::sign(grafted_binding_body, &issuer)?;
-    assert!(verify_cumulative_approval_constraints(
-        &grafted_binding,
-        &[issuer.public_key()],
-        Some(&root)
-    )
-    .is_err());
+    refused_with(
+        verify_cumulative_approval_constraints(
+            &grafted_binding,
+            &[issuer.public_key()],
+            Some(&root),
+        ),
+        "first delegation link carries cumulative approval bindings outside the authenticated root",
+    )?;
     Ok(())
 }
