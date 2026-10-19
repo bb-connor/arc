@@ -121,11 +121,11 @@ fn delegation_refuses_missing_signed_ancestor_evidence() -> TestResult {
             URI,
         );
         let expected = format!(
-            "delegation ancestor {} has no signed tenant and lineage evidence",
+            "capability root snapshot {} has no signed token evidence",
             fixture.root.id
         );
         assert!(
-            matches!(&result, Err(KernelError::CapabilityIssuanceDenied(reason)) if *reason == expected),
+            matches!(&result, Err(KernelError::GuardDenied(reason)) if *reason == expected),
             "delegation requires its signed ancestor evidence, bound={bound}: {result:?}"
         );
         assert!(!fixture

@@ -43,6 +43,19 @@ impl Guard for CapabilitySetSuspensionGuard {
         GUARD_NAME
     }
 
+    fn requires_dispatch_revalidation(&self) -> bool {
+        true
+    }
+
+    fn revalidate_before_dispatch(&self, context: &GuardContext<'_>) -> Result<(), KernelError> {
+        match self.evaluate(context)?.verdict {
+            chio_kernel::Verdict::Allow => Ok(()),
+            chio_kernel::Verdict::Deny | chio_kernel::Verdict::PendingApproval => Err(
+                KernelError::GuardDenied(format!("{GUARD_NAME} dispatch revalidation denied")),
+            ),
+        }
+    }
+
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         let Some(security) = context.security_context().map(|value| value.as_v1()) else {
             return Ok(if self.missing_context.denies() {
