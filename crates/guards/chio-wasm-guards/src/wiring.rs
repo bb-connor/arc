@@ -30,7 +30,7 @@ use crate::abi::WasmGuardAbi;
 use crate::error::WasmGuardError;
 use crate::manifest;
 use crate::runtime::guard::WasmGuard;
-use crate::runtime::wasmtime_backend::WasmtimeBackend;
+use crate::runtime::wasmtime_backend::{WasmtimeBackend, DEFAULT_MAX_MODULE_SIZE};
 
 /// Load WASM guards from [`WasmGuardEntry`] configs with manifest verification.
 ///
@@ -53,10 +53,12 @@ pub fn load_wasm_guards(
         let guard_manifest = manifest::load_manifest(&entry.path)?;
         manifest::verify_abi_version(&guard_manifest.abi_version)?;
 
-        let wasm_bytes = std::fs::read(&entry.path).map_err(|e| WasmGuardError::ModuleLoad {
-            path: entry.path.clone(),
-            reason: e.to_string(),
-        })?;
+        let wasm_bytes =
+            crate::input::read_file(std::path::Path::new(&entry.path), DEFAULT_MAX_MODULE_SIZE)
+                .map_err(|source| WasmGuardError::InputFile {
+                    path: entry.path.clone().into(),
+                    source,
+                })?;
 
         manifest::verify_wasm_hash(&wasm_bytes, &guard_manifest.wasm_sha256)?;
         manifest::verify_guard_signature(&entry.path, &wasm_bytes, &guard_manifest)?;
@@ -501,5 +503,59 @@ mod tests {
 
         assert_eq!(pipeline.len(), 1);
         assert_eq!(pipeline[0].name(), "hushspec-only");
+    }
+
+    fn load_refused_module(entry_path: &std::path::Path) -> std::io::Error {
+        let entries = vec![make_entry(
+            "bounded-module",
+            entry_path.to_str().unwrap(),
+            100,
+            false,
+        )];
+        match load_wasm_guards(&entries, Arc::new(Engine::default())) {
+            Err(WasmGuardError::InputFile { path, source }) => {
+                assert_eq!(path, entry_path);
+                source
+            }
+            other => panic!("expected InputFile, got: {:?}", other.map(|g| g.len())),
+        }
+    }
+
+    #[test]
+    fn load_wasm_guards_refuses_module_over_size_bound() {
+        let (_dir, path, _) = create_guard_dir("oversized");
+        let file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.set_len(u64::try_from(DEFAULT_MAX_MODULE_SIZE).unwrap() + 1)
+            .unwrap();
+
+        let source = load_refused_module(std::path::Path::new(&path));
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_wasm_guards_refuses_symlinked_module() {
+        let (dir, path, _) = create_guard_dir("symlink");
+        let target = dir.path().join("real.wasm");
+        std::fs::rename(&path, &target).unwrap();
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+
+        let source = load_refused_module(std::path::Path::new(&path));
+        assert_eq!(source.raw_os_error(), Some(libc::ELOOP));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_wasm_guards_refuses_fifo_module() {
+        let (_dir, path, _) = create_guard_dir("fifo");
+        std::fs::remove_file(&path).unwrap();
+        let created = std::process::Command::new("mkfifo")
+            .arg(&path)
+            .status()
+            .unwrap();
+        assert!(created.success());
+
+        let source = load_refused_module(std::path::Path::new(&path));
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidInput);
     }
 }

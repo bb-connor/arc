@@ -886,4 +886,72 @@ mod tests {
         let evidence = guard.guard_evidence_metadata();
         assert!(evidence["manifest_sha256"].is_null());
     }
+
+    fn module_config(path: &std::path::Path, max_module_size: usize) -> crate::WasmGuardConfig {
+        crate::WasmGuardConfig {
+            name: "bounded-module".to_string(),
+            path: path.to_str().unwrap().to_string(),
+            fuel_limit: 1_000,
+            priority: 1,
+            advisory: false,
+            max_memory_bytes: 16 * 1024 * 1024,
+            max_module_size,
+        }
+    }
+
+    fn load_refused_before_factory(config: &crate::WasmGuardConfig) -> std::io::Error {
+        let mut runtime = WasmGuardRuntime::new();
+        let mut factory_ran = false;
+        let result = runtime.load_guard(config, |_, _| {
+            factory_ran = true;
+            Err(WasmGuardError::BackendUnavailable)
+        });
+        assert!(!factory_ran);
+        assert_eq!(runtime.guard_count(), 0);
+        match result {
+            Err(WasmGuardError::InputFile { path, source }) => {
+                assert_eq!(path, std::path::PathBuf::from(&config.path));
+                source
+            }
+            other => panic!("expected InputFile, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_guard_refuses_module_over_configured_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("guard.wasm");
+        std::fs::write(&path, b"\x00asm\x01\x00\x00\x00").unwrap();
+
+        let source = load_refused_before_factory(&module_config(&path, 7));
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidData);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_guard_refuses_symlinked_module() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("real.wasm");
+        std::fs::write(&target, b"\x00asm\x01\x00\x00\x00").unwrap();
+        let link = dir.path().join("guard.wasm");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+
+        let source = load_refused_before_factory(&module_config(&link, 1024));
+        assert_eq!(source.raw_os_error(), Some(libc::ELOOP));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_guard_refuses_fifo_module() {
+        let dir = tempfile::tempdir().unwrap();
+        let fifo = dir.path().join("guard.wasm");
+        let created = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(created.success());
+
+        let source = load_refused_before_factory(&module_config(&fifo, 1024));
+        assert_eq!(source.kind(), std::io::ErrorKind::InvalidInput);
+    }
 }
