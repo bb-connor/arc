@@ -25,6 +25,21 @@ fn required<T, E: Debug>(result: Result<T, E>, context: &str) -> T {
     }
 }
 
+fn refusal<T, E: Debug>(result: Result<T, E>) -> E {
+    match result {
+        Ok(_) => panic!("input was accepted"),
+        Err(error) => error,
+    }
+}
+
+fn binding_mismatch(field: &'static str) -> ParametricClaimError {
+    ParametricClaimError::Contract(ParametricContractError::BindingMismatch(field))
+}
+
+fn invalid_field(field: &'static str) -> ParametricClaimError {
+    ParametricClaimError::Contract(ParametricContractError::InvalidField(field))
+}
+
 fn present<T>(value: Option<T>, context: &str) -> T {
     match value {
         Some(value) => value,
@@ -482,15 +497,17 @@ fn signed_pre_reservation_intent_pins_current_capital_trust() {
         "verified payout intent",
     );
 
-    assert!(
-        ValidatedPreReservationParametricPayoutIntentV1::validate_pre_reservation(
-            fixture.signed_intent(),
-            &fixture.intent_signer.public_key(),
-            &fixture.trust_at(31),
-            &fixture.claim,
-            &fixture.preparation,
-        )
-        .is_err()
+    assert_eq!(
+        refusal(
+            ValidatedPreReservationParametricPayoutIntentV1::validate_pre_reservation(
+                fixture.signed_intent(),
+                &fixture.intent_signer.public_key(),
+                &fixture.trust_at(31),
+                &fixture.claim,
+                &fixture.preparation,
+            )
+        ),
+        ParametricClaimError::CapitalInstructionWindowClosed
     );
 }
 
@@ -500,39 +517,45 @@ fn pre_reservation_intent_rejects_each_continuity_substitution() {
 
     let mut changed = fixture.intent.clone();
     changed.binding.operation_id = digest("e");
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_binding.effect_slot.operation_id")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.request.request_id = "request-2".to_string();
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_binding.effect_slot.request")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_slot.target.target_key_epoch += 1;
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        invalid_field("payout_binding.capital_authority_epoch")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_idempotency_key = digest("f");
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_binding.effect_slot.identity")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.coverage_head_digest = digest("0");
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_binding.effect_slot.coverage_head")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.claim_id = digest("9");
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_preparation.capital_instruction_id")
+    );
 }
 
 #[test]
@@ -604,11 +627,17 @@ fn payout_preparation_rejects_action_target_frost_and_resource_substitution() {
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_slot.action_digest = digest("a");
-    assert!(changed.validate().is_err());
+    assert_eq!(
+        refusal(changed.validate()),
+        binding_mismatch("payout_binding.effect_slot.action_digest")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_slot.target.qualification_digest = digest("a");
-    assert!(changed.validate().is_err());
+    assert_eq!(
+        refusal(changed.validate()),
+        binding_mismatch("payout_binding.effect_slot.target_qualification_digest")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_slot.frost = Some(EconomicFrostBindingV1 {
@@ -617,7 +646,10 @@ fn payout_preparation_rejects_action_target_frost_and_resource_substitution() {
         action_digest: changed.binding.effect_slot.action_digest.clone(),
         signed_envelope_digest: digest("c"),
     });
-    assert!(changed.validate().is_err());
+    assert_eq!(
+        refusal(changed.validate()),
+        binding_mismatch("payout_binding.effect_slot.state")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_slot.namespace = "other".to_string();
@@ -626,7 +658,10 @@ fn payout_preparation_rejects_action_target_frost_and_resource_substitution() {
         "substituted namespace slot id",
     );
     changed.binding.effect_slot_id = changed.binding.effect_slot.slot_id.clone();
-    assert!(changed.validate().is_err());
+    assert_eq!(
+        refusal(changed.validate()),
+        binding_mismatch("payout_binding.effect_slot.effect_kind")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.effect_slot.resource_key.resource_family = "other".to_string();
@@ -635,7 +670,10 @@ fn payout_preparation_rejects_action_target_frost_and_resource_substitution() {
         "substituted resource slot id",
     );
     changed.binding.effect_slot_id = changed.binding.effect_slot.slot_id.clone();
-    assert!(changed.validate().is_err());
+    assert_eq!(
+        refusal(changed.validate()),
+        binding_mismatch("payout_binding.effect_slot.effect_kind")
+    );
 }
 
 #[test]
@@ -661,6 +699,10 @@ fn preparation_ids_do_not_rebind_across_claims() {
     assert_ne!(
         other.binding.effect_idempotency_key,
         fixture.intent.binding.effect_idempotency_key
+    );
+    assert_eq!(
+        refusal(other.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_binding.claim_id")
     );
     let signed = required(
         SignedParametricPayoutIntentV1::sign(other.clone(), &fixture.intent_signer),
@@ -704,14 +746,20 @@ fn preparation_ids_do_not_rebind_across_claims() {
         .binding
         .capital_instruction_body_digest
         .clone();
-    assert!(reused_instruction.validate().is_err());
+    assert_eq!(
+        refusal(reused_instruction.validate()),
+        binding_mismatch("payout_preparation.capital_instruction_id")
+    );
 
     let mut reused_idempotency = other;
     reused_idempotency.binding.effect_idempotency_key =
         fixture.intent.binding.effect_idempotency_key.clone();
     reused_idempotency.binding.effect_slot.idempotency_key =
         reused_idempotency.binding.effect_idempotency_key.clone();
-    assert!(reused_idempotency.validate().is_err());
+    assert_eq!(
+        refusal(reused_idempotency.validate()),
+        binding_mismatch("payout_binding.effect_slot.idempotency_key")
+    );
 }
 
 #[test]
@@ -720,27 +768,31 @@ fn payout_intent_rejects_capital_instruction_and_trust_substitution() {
 
     let mut changed = fixture.intent.clone();
     changed.binding.capital_instruction_id = "instruction-2".to_string();
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_preparation.capital_instruction_id")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.governed_receipt_id = "receipt-2".to_string();
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_intent.capital_instruction.governed_receipt_id")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.completion_flow_row_id = "completion-2".to_string();
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_intent.capital_instruction.completion_flow_row_id")
+    );
 
     let mut changed = fixture.intent.clone();
     changed.binding.source_account_digest = digest("a");
-    assert!(changed
-        .validate_against_eligible_claim(&fixture.claim)
-        .is_err());
+    assert_eq!(
+        refusal(changed.validate_against_eligible_claim(&fixture.claim)),
+        binding_mismatch("payout_intent.capital_instruction.source_account_ref")
+    );
 
     let alternate_instruction_signer = Keypair::from_seed(&[31; 32]);
     let mut changed = fixture.intent.clone();
@@ -759,15 +811,17 @@ fn payout_intent_rejects_capital_instruction_and_trust_substitution() {
         SignedParametricPayoutIntentV1::sign(changed, &fixture.intent_signer),
         "changed signed intent",
     );
-    assert!(
-        ValidatedPreReservationParametricPayoutIntentV1::validate_pre_reservation(
-            signed,
-            &fixture.intent_signer.public_key(),
-            &fixture.trust_at(20),
-            &fixture.claim,
-            &fixture.preparation,
-        )
-        .is_err()
+    assert_eq!(
+        refusal(
+            ValidatedPreReservationParametricPayoutIntentV1::validate_pre_reservation(
+                signed,
+                &fixture.intent_signer.public_key(),
+                &fixture.trust_at(20),
+                &fixture.claim,
+                &fixture.preparation,
+            )
+        ),
+        ParametricClaimError::UntrustedCapitalInstruction
     );
 
     let mut changed = fixture.intent.clone();
