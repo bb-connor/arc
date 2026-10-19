@@ -306,7 +306,10 @@ fn approval_signers_reject_embedded_approver_mismatches() -> chio_core_types::Re
         &embedded_approver,
     )?;
 
-    assert_ne!(embedded_approver.public_key(), backend.keypair().public_key());
+    assert_ne!(
+        embedded_approver.public_key(),
+        backend.keypair().public_key()
+    );
     assert_signer_mismatch(
         GovernedApprovalToken::sign_with_backend(
             approval_token_body(embedded_approver.public_key(), subject.public_key()),
