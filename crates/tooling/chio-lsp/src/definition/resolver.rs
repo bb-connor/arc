@@ -1,10 +1,16 @@
 //! URN resolution helpers for the go-to-definition provider.
 
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use tower_lsp::lsp_types::{Location, Position, Range, Url};
 
 use crate::position::{byte_to_utf16_column, utf16_to_byte_offset};
+
+/// Upper bound on the bytes read from a followed manifest. A manifest
+/// that exceeds it is treated as unreadable.
+const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 
 /// Extract the URN spanning `position` in `text`. Returns `None` if
 /// the cursor is not on a `urn:chio:*` token.
@@ -108,13 +114,37 @@ fn manifest_path_in(text: &str) -> Option<PathBuf> {
 ///   (`*.chio-manifest.yaml` / `*.chio-manifest.yml` / `chio-manifest.yaml`)
 ///   are followed. The LSP server does not behave like a generic file
 ///   reader.
+/// - The target must be a regular file and is read through a
+///   [`MAX_MANIFEST_BYTES`] bound; FIFOs, directories and oversize
+///   files yield `None`.
 fn locate_in_file(doc_uri: &Url, manifest_path: &Path, urn: &str) -> Option<Location> {
     let doc_dir = doc_uri.to_file_path().ok()?.parent()?.to_path_buf();
     let resolved = scoped_manifest_path(&doc_dir, manifest_path)?;
-    let body = std::fs::read_to_string(&resolved).ok()?;
+    let body = read_bounded_manifest(&resolved)?;
     let range = locate_in_text(doc_uri, &body, urn)?;
     let target = Url::from_file_path(&resolved).ok()?;
     Some(Location { uri: target, range })
+}
+
+/// Read a regular file of at most [`MAX_MANIFEST_BYTES`] as UTF-8.
+/// The path is checked before it is opened so a FIFO cannot block the
+/// open, and the opened handle is checked again.
+fn read_bounded_manifest(path: &Path) -> Option<String> {
+    if !std::fs::metadata(path).ok()?.is_file() {
+        return None;
+    }
+    let file = File::open(path).ok()?;
+    if !file.metadata().ok()?.is_file() {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_MANIFEST_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() as u64 > MAX_MANIFEST_BYTES {
+        return None;
+    }
+    String::from_utf8(bytes).ok()
 }
 
 /// Resolve `manifest_path` against `doc_dir`, rejecting absolute paths
@@ -293,5 +323,122 @@ mod tests {
         // 'urn:chio:scope:tool.read' is 24 ASCII chars, so end column
         // is 5 + 24 = 29 in UTF-16 units.
         assert_eq!(range.end.character, 29);
+    }
+
+    const URN: &str = "urn:chio:scope:tool.read";
+
+    fn doc_uri(dir: &Path) -> Url {
+        Url::from_file_path(dir.join("chio.yaml")).unwrap()
+    }
+
+    fn canonical_tmp() -> (tempfile::TempDir, PathBuf) {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = std::fs::canonicalize(tmp.path()).unwrap();
+        (tmp, dir)
+    }
+
+    #[test]
+    fn locate_in_file_reads_regular_manifest() {
+        let (_tmp, dir) = canonical_tmp();
+        std::fs::write(dir.join("a.chio-manifest.yaml"), format!("x:\n  - {URN}\n")).unwrap();
+        let loc = locate_in_file(&doc_uri(&dir), Path::new("a.chio-manifest.yaml"), URN).unwrap();
+        assert_eq!(loc.range.start.line, 1);
+        assert_eq!(
+            loc.uri,
+            Url::from_file_path(dir.join("a.chio-manifest.yaml")).unwrap()
+        );
+    }
+
+    #[test]
+    fn locate_in_file_accepts_manifest_at_exact_bound() {
+        let (_tmp, dir) = canonical_tmp();
+        let line = format!("{URN}\n");
+        let mut body = line.clone();
+        body.push_str(&" ".repeat(MAX_MANIFEST_BYTES as usize - line.len()));
+        assert_eq!(body.len() as u64, MAX_MANIFEST_BYTES);
+        std::fs::write(dir.join("a.chio-manifest.yaml"), body).unwrap();
+        let loc = locate_in_file(&doc_uri(&dir), Path::new("a.chio-manifest.yaml"), URN).unwrap();
+        assert_eq!(loc.range.start.line, 0);
+    }
+
+    #[test]
+    fn locate_in_file_rejects_oversize_manifest() {
+        let (_tmp, dir) = canonical_tmp();
+        let line = format!("{URN}\n");
+        let mut body = line.clone();
+        body.push_str(&" ".repeat(MAX_MANIFEST_BYTES as usize + 1 - line.len()));
+        assert_eq!(body.len() as u64, MAX_MANIFEST_BYTES + 1);
+        std::fs::write(dir.join("a.chio-manifest.yaml"), body).unwrap();
+        assert_eq!(
+            locate_in_file(&doc_uri(&dir), Path::new("a.chio-manifest.yaml"), URN),
+            None
+        );
+    }
+
+    #[test]
+    fn locate_in_file_rejects_directory_named_like_manifest() {
+        let (_tmp, dir) = canonical_tmp();
+        std::fs::create_dir(dir.join("a.chio-manifest.yaml")).unwrap();
+        assert_eq!(
+            locate_in_file(&doc_uri(&dir), Path::new("a.chio-manifest.yaml"), URN),
+            None
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn locate_in_file_rejects_fifo_without_blocking() {
+        let (_tmp, dir) = canonical_tmp();
+        let fifo = dir.join("a.chio-manifest.yaml");
+        let status = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert_eq!(
+            locate_in_file(&doc_uri(&dir), Path::new("a.chio-manifest.yaml"), URN),
+            None
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn locate_in_file_rejects_symlink_escaping_document_dir() {
+        let (_tmp, dir) = canonical_tmp();
+        let (_outside_tmp, outside) = canonical_tmp();
+        std::fs::write(outside.join("real.chio-manifest.yaml"), format!("{URN}\n")).unwrap();
+        let doc_dir = dir.join("docs");
+        std::fs::create_dir(&doc_dir).unwrap();
+        std::os::unix::fs::symlink(
+            outside.join("real.chio-manifest.yaml"),
+            doc_dir.join("link.chio-manifest.yaml"),
+        )
+        .unwrap();
+        assert_eq!(
+            locate_in_file(
+                &doc_uri(&doc_dir),
+                Path::new("link.chio-manifest.yaml"),
+                URN
+            ),
+            None
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn locate_in_file_follows_symlink_to_canonical_path_inside_document_dir() {
+        let (_tmp, dir) = canonical_tmp();
+        std::fs::write(dir.join("real.chio-manifest.yaml"), format!("{URN}\n")).unwrap();
+        std::os::unix::fs::symlink(
+            dir.join("real.chio-manifest.yaml"),
+            dir.join("link.chio-manifest.yaml"),
+        )
+        .unwrap();
+        let loc =
+            locate_in_file(&doc_uri(&dir), Path::new("link.chio-manifest.yaml"), URN).unwrap();
+        assert_eq!(
+            loc.uri,
+            Url::from_file_path(dir.join("real.chio-manifest.yaml")).unwrap()
+        );
     }
 }
