@@ -5,6 +5,19 @@ use super::yaml_safety::{
 };
 use super::*;
 
+const MAPPING_REQUIRED: &str = "YAML policy must start with a mapping";
+const UNTERMINATED_QUOTE: &str = "YAML contains an unterminated double-quoted scalar";
+const WHITESPACE_RUN: &str = "YAML contains an unsupported scalar whitespace run";
+const SERDE_UNKNOWN: &str = "unknown field `hushnarrspec`, expected one of `hushspec`, `name`, `description`, `extends`, `merge_strategy`, `rules`, `extensions`, `metadata`";
+const LIBYML_MAPPING: &str = "mapping values are not allowed in this context at line 3 column 60";
+
+fn parse_error(input: &str) -> String {
+    match HushSpec::parse(input) {
+        Ok(_) => panic!("policy should be refused"),
+        Err(err) => err.to_string(),
+    }
+}
+
 #[test]
 fn regression_fuzz_policy_parse_compile_bbaf353() {
     let input = concat!(
@@ -13,7 +26,7 @@ fn regression_fuzz_policy_parse_compile_bbaf353() {
         "scription: Allow a narro     - r      - \"**/.git/*ist_directory\n",
     );
 
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), SERDE_UNKNOWN);
 }
 
 #[test]
@@ -26,7 +39,7 @@ fn regression_fuzz_policy_parse_compile_2c7fd63() {
         "    default: block\n",
     );
 
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), LIBYML_MAPPING);
 }
 
 #[test]
@@ -81,7 +94,7 @@ fn regression_fuzz_policy_parse_compile_67a1282() {
     );
 
     assert!(has_unclosed_double_quoted_value_scalar(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), UNTERMINATED_QUOTE);
 }
 
 #[test]
@@ -101,7 +114,7 @@ fn regression_fuzz_policy_parse_compile_e8a595c() {
     );
 
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -128,7 +141,7 @@ fn parse_rejects_plain_root_scalar_before_libyml() {
 
     assert!(has_non_mapping_document_start(input));
     assert!(has_libyml_scalar_join_overflow_risk(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), MAPPING_REQUIRED);
 }
 
 #[test]
@@ -136,7 +149,7 @@ fn parse_rejects_plain_root_url_before_libyml() {
     let input = "https://example.com/policy\n";
 
     assert!(has_non_mapping_document_start(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), MAPPING_REQUIRED);
 }
 
 #[test]
@@ -145,7 +158,7 @@ fn parse_rejects_plain_mapping_key_join_before_libyml() {
 
     assert!(!has_non_mapping_document_start(input));
     assert!(has_libyml_scalar_join_overflow_risk(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -157,7 +170,7 @@ fn parse_rejects_plain_mapping_value_join_before_libyml() {
 
     assert!(!has_non_mapping_document_start(&input));
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -241,7 +254,7 @@ fn parse_rejects_plain_mapping_value_continuation_join_before_libyml() {
 
     assert!(!has_non_mapping_document_start(&input));
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -361,7 +374,7 @@ fn single_quoted_whitespace_overflow_rejected_before_libyml() {
     );
 
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -375,7 +388,7 @@ fn quoted_whitespace_overflow_counts_folded_line_break() {
     );
 
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -388,7 +401,7 @@ fn quoted_whitespace_overflow_resets_escaped_line_break() {
     );
 
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -401,7 +414,7 @@ fn overflow_precheck_resumes_after_single_quoted_scalar() {
     );
 
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -415,7 +428,7 @@ fn unclosed_double_quote_precheck_detects_nested_sequence_items() {
     );
 
     assert!(has_unclosed_double_quoted_value_scalar(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), UNTERMINATED_QUOTE);
 }
 
 #[test]
@@ -430,7 +443,7 @@ fn quoted_whitespace_overflow_rejected_in_nested_sequence_item() {
     );
 
     assert!(has_libyml_scalar_join_overflow_risk(&input));
-    assert!(HushSpec::parse(&input).is_err());
+    assert_eq!(parse_error(&input), WHITESPACE_RUN);
 }
 
 #[test]
@@ -458,7 +471,7 @@ fn quote_precheck_scans_after_closed_scalar_on_same_line() {
     );
 
     assert!(has_unclosed_double_quoted_value_scalar(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), UNTERMINATED_QUOTE);
     assert!(!has_unclosed_double_quoted_value_scalar(
         "description: \"closed\" # \"comment text\n"
     ));
@@ -472,7 +485,7 @@ fn quote_precheck_handles_double_quoted_mapping_key() {
     let input = concat!("hushspec: \"0.1.0\"\n", "\"name\": \"unclosed-policy\n",);
 
     assert!(has_unclosed_double_quoted_value_scalar(input));
-    assert!(HushSpec::parse(input).is_err());
+    assert_eq!(parse_error(input), UNTERMINATED_QUOTE);
 }
 
 #[test]
