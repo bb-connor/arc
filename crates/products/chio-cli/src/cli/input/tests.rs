@@ -1,5 +1,50 @@
 use super::*;
+use crate::CliError;
 use std::error::Error;
+
+fn causes(error: &dyn Error) -> String {
+    let mut chain = vec![error.to_string()];
+    let mut source = error.source();
+    while let Some(cause) = source {
+        chain.push(cause.to_string());
+        source = cause.source();
+    }
+    chain.join(" <- ")
+}
+
+fn assert_registry(error: CliError, code: &str, message: &str) {
+    assert!(matches!(error, CliError::Chio(_)), "{error:?}");
+    let text = error.to_string();
+    assert!(
+        text.starts_with(&format!("{code} [cli:error]: {message} (")),
+        "{text}"
+    );
+}
+
+fn assert_signed_input(error: CliError) {
+    assert!(
+        matches!(
+            error,
+            CliError::SignedJson(UntrustedJsonError::SignedInput(_))
+        ),
+        "{error:?}"
+    );
+    assert_eq!(
+        error.to_string(),
+        "urn:chio:error:attest:signed-json-invalid-input"
+    );
+}
+
+fn assert_yaml_cause(error: CliError, cause: &str) {
+    assert!(matches!(error, CliError::RegisteredSource(_)), "{error:?}");
+    let chain = causes(&error);
+    assert!(chain.starts_with("urn:chio:error:cli:yaml <- "), "{chain}");
+    assert!(chain.contains(cause), "{chain}");
+}
+
+fn assert_io_message(error: CliError, message: &str) {
+    assert_registry(error, "urn:chio:error:cli:io", message);
+}
 
 #[test]
 fn selected_formats_never_fall_back_after_ambiguous_json() {
@@ -14,12 +59,19 @@ fn selected_formats_never_fall_back_after_ambiguous_json() {
     assert!(error.source().is_some());
     assert!(!error.to_string().contains("private-marker"));
     std::fs::write(&json, b"rule: allow").unwrap();
-    assert!(config::load::<serde_json::Value>(&json).is_err());
+    assert_signed_input(config::load::<serde_json::Value>(&json).unwrap_err());
     let yaml = dir.path().join("policy.yaml");
     std::fs::write(&yaml, "rule:\n  action: allow\n  action: deny\n").unwrap();
-    assert!(config::load::<serde_json::Value>(&yaml).is_err());
+    assert_yaml_cause(
+        config::load::<serde_json::Value>(&yaml).unwrap_err(),
+        "duplicate configuration key",
+    );
     std::fs::write(&yaml, "rule: allow\n---\nrule: deny\n").unwrap();
-    assert!(config::load::<serde_json::Value>(&yaml).is_err());
+    assert_registry(
+        config::load::<serde_json::Value>(&yaml).unwrap_err(),
+        "urn:chio:error:cli:other",
+        "configuration must contain one document",
+    );
     std::fs::write(&yaml, "count: 18446744073709551615\nrule: allow\n").unwrap();
     assert_eq!(
         config::load::<serde_json::Value>(&yaml).unwrap()["count"].as_u64(),
@@ -35,8 +87,15 @@ fn enums_are_literals_and_not_json_fragments() {
         Allow,
     }
     assert_eq!(literal::<Rule>("allow").unwrap(), Rule::Allow);
-    assert!(literal::<Rule>(r"\u0061llow").is_err());
-    assert!(literal::<Rule>("allow\" ").is_err());
+    let escaped = format!("{}u0061llow", '\\');
+    assert_eq!(
+        literal::<Rule>(&escaped).unwrap_err().to_string(),
+        format!("unknown variant `{escaped}`, expected `allow`")
+    );
+    assert_eq!(
+        literal::<Rule>("allow\" ").unwrap_err().to_string(),
+        "unknown variant `allow\" `, expected `allow`"
+    );
 }
 
 #[test]
@@ -64,9 +123,15 @@ fn yaml_expansion_and_depth_have_shared_bounds() {
         document.push_str("  - *base\n");
     }
     std::fs::write(&path, document).unwrap();
-    assert!(config::load::<serde_json::Value>(&path).is_err());
+    assert_yaml_cause(
+        config::load::<serde_json::Value>(&path).unwrap_err(),
+        "configuration expanded string limit",
+    );
     std::fs::write(&path, format!("x: {}0{}", "[".repeat(80), "]".repeat(80))).unwrap();
-    assert!(config::load::<serde_json::Value>(&path).is_err());
+    assert_yaml_cause(
+        config::load::<serde_json::Value>(&path).unwrap_err(),
+        "configuration nesting limit",
+    );
 }
 
 #[test]
@@ -130,7 +195,18 @@ fn collection_limits_charge_retained_bytes_entries_and_depth() {
     std::fs::write(&path, b"1234").unwrap();
     let mut budget = collection::Budget::default();
     budget.charge(collection::MAX_BYTES - 3).unwrap();
-    assert!(budget.read(&path).is_err());
+    let error = budget.read(&path).unwrap_err();
+    let CliError::Io(io) = &error else {
+        panic!("{error:?}");
+    };
+    assert!(matches!(
+        io.get_ref().unwrap().downcast_ref::<UntrustedJsonError>(),
+        Some(UntrustedJsonError::TooLarge { bytes: 4, bound: 3 })
+    ));
+    assert_eq!(
+        budget.read(&path).unwrap_err().to_string(),
+        "urn:chio:error:cli:other [cli:error]: artifact collection byte budget exhausted (Preserve the original message and migrate the call site to a specific registry code when touched.)"
+    );
 }
 
 #[cfg(unix)]
@@ -144,8 +220,11 @@ fn collection_rejects_symlinks_and_nonregular_files() {
         .unwrap_err()
         .to_string()
         .contains("regular files"));
-    assert!(read(dir.path()).is_err());
-    assert!(read(dir.path().join("alias")).is_err());
+    let directory = read(dir.path()).unwrap_err();
+    assert_eq!(directory.to_string(), "input must be a regular file");
+    assert_eq!(directory.kind(), std::io::ErrorKind::Other);
+    let alias = read(dir.path().join("alias")).unwrap_err();
+    assert_eq!(alias.raw_os_error(), Some(libc::ELOOP));
 }
 
 #[cfg(unix)]
@@ -154,7 +233,11 @@ fn signing_custody_is_existing_private_bounded_and_not_aliased() {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("seed");
-    assert!(crate::load_existing_authority_keypair(&path).is_err());
+    let missing = crate::load_existing_authority_keypair(&path).err().unwrap();
+    assert!(
+        matches!(&missing, CliError::Io(io) if io.kind() == std::io::ErrorKind::NotFound),
+        "{missing:?}"
+    );
     assert!(!path.exists());
     let signer = chio_core::Keypair::from_seed(&[51; 32]);
     std::fs::write(&path, signer.seed_hex()).unwrap();
@@ -165,16 +248,28 @@ fn signing_custody_is_existing_private_bounded_and_not_aliased() {
             .public_key(),
         signer.public_key()
     );
-    assert!(chio_control_plane::read_private_signing_custody(&path, 63).is_err());
+    assert_io_message(
+        chio_control_plane::read_private_signing_custody(&path, 63).unwrap_err(),
+        "authority seed exceeds its byte limit",
+    );
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
-    assert!(crate::load_existing_authority_keypair(&path).is_err());
+    assert_io_message(
+        crate::load_existing_authority_keypair(&path).err().unwrap(),
+        "authority seed must be singly linked with mode 0600 or stricter",
+    );
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     let alias = dir.path().join("alias");
     std::fs::hard_link(&path, &alias).unwrap();
-    assert!(crate::load_existing_authority_keypair(&path).is_err());
+    assert_io_message(
+        crate::load_existing_authority_keypair(&path).err().unwrap(),
+        "authority seed must be singly linked with mode 0600 or stricter",
+    );
     std::fs::remove_file(&alias).unwrap();
     std::os::unix::fs::symlink(&path, &alias).unwrap();
-    assert!(crate::load_existing_authority_keypair(&alias).is_err());
+    assert_io_message(
+        crate::load_existing_authority_keypair(&alias).err().unwrap(),
+        "authority seed must be a regular file",
+    );
 }
 
 #[test]
@@ -227,7 +322,7 @@ fn unsigned_runtime_attestation_evidence_accepts_operator_numbers(
                 "\"measurement\":1,\"measurement\":2",
             ),
         )?;
-        assert!(crate::load_runtime_attestation_evidence(&json).is_err());
+        assert_signed_input(crate::load_runtime_attestation_evidence(&json).unwrap_err());
     }
     Ok(())
 }
