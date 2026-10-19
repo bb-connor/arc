@@ -136,7 +136,7 @@ mod tests {
                 claim_deadline_unix_ms TEXT NOT NULL, \
                 claimed_at_unix_ms TEXT\
              ) STRICT; \
-             CREATE INDEX finding_pool_debits_expiration_reclamation_v2 \
+             CREATE INDEX finding_pool_debits_unclaimed_deadline \
              ON finding_pool_debits(\
                  allocation_envelope_sha256, length(claim_deadline_unix_ms), \
                  claim_deadline_unix_ms, purchase_id\
