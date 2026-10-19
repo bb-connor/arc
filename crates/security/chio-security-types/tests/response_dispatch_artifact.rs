@@ -101,3 +101,45 @@ fn execution_binding_refuses_null_artifact_fingerprint() {
         "invalid type: null, expected an array of length 32",
     );
 }
+
+#[test]
+fn execution_binding_accepts_required_v1_artifact() {
+    let mut value = dispatch_binding();
+    value["admission_artifact_fingerprint"] = json!(([7u8; 32]));
+    let binding: ResponseExecutionDispatchBinding = serde_json::from_value(value)
+        .unwrap_or_else(|error| panic!("bound v1 fixture failed to decode: {error}"));
+    assert_eq!(
+        binding.validate_for_response(
+            &binding.tenant_id,
+            &binding.action_id,
+            &binding.plan_hash,
+            50_000,
+        ),
+        Ok(())
+    );
+}
+
+#[test]
+fn execution_binding_refuses_unsupported_artifact_schemas() {
+    for schema in [0, 2, u8::MAX] {
+        let mut value = dispatch_binding();
+        value["schema_version"] = json!(schema);
+        value["admission_artifact_fingerprint"] = json!(([7u8; 32]));
+        let binding: ResponseExecutionDispatchBinding = serde_json::from_value(value)
+            .unwrap_or_else(|error| panic!("schema fixture failed to decode: {error}"));
+        assert_eq!(
+            binding.validate_for_response(
+                &binding.tenant_id,
+                &binding.action_id,
+                &binding.plan_hash,
+                50_000,
+            ),
+            Err(
+                chio_security_types::ResponseExecutionDispatchBindingError::Invalid(
+                    "unsupported or unbound artifact schema"
+                )
+            ),
+            "schema {schema}"
+        );
+    }
+}
