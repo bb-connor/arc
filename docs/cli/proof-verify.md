@@ -11,6 +11,10 @@ message is never read. A rejection that carries a `transaction:*` registry code,
 or one of the parse codes listed for 30, exits with that code's class. Any other
 error exits 1.
 
+Exit 20 means the evidence presented for verification failed integrity. A
+failure of the verifier's own configured trust context, such as a bad signature
+on a deployment-supplied trust document, exits 50.
+
 | Code | Class | Registry codes |
 | ---- | ----- | -------------- |
 | 0 | verified | none |

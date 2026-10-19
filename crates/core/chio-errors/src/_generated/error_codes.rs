@@ -267,7 +267,7 @@ pub const TRANSACTION_VERIFIER_CONTEXT_INVALID: ErrorCodeSpec = ErrorCodeSpec {
     summary: "The trust context pinned for the verifier is malformed or inconsistent.",
     help: "Correct the pinned verifier trust context (keys, digests, authority documents, or settlement settings) and rerun the verifier.",
     string_code: "CHIO-TRANSACTION-VERIFIER-CONTEXT-INVALID",
-    jsonrpc_code: None,
+    jsonrpc_code: Some(7119),
     since: "0.1.0",
     stability: "stable",
     consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],

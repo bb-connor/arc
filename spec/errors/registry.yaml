@@ -309,6 +309,7 @@ codes:
     summary: "The trust context pinned for the verifier is malformed or inconsistent."
     help: "Correct the pinned verifier trust context (keys, digests, authority documents, or settlement settings) and rerun the verifier."
     string_code: "CHIO-TRANSACTION-VERIFIER-CONTEXT-INVALID"
+    jsonrpc_code: 7119
     since: "0.1.0"
     stability: stable
     consumed_by:
