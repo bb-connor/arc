@@ -117,10 +117,10 @@ fn unknown_or_inactive_verifier_epoch_is_rejected() -> TestResult {
         ));
     }
     let active = verifier_registry(&verifier, "verifier-a", 5, TrustedKeyStatus::Active)?;
-    assert!(
-        verify_financial_cross_issuer_trust_pack(&signed, &active, signed.body.expires_at,)
-            .is_err()
-    );
+    assert!(matches!(
+        verify_financial_cross_issuer_trust_pack(&signed, &active, signed.body.expires_at),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "cross-issuer trust pack is outside validity"
+    ));
     Ok(())
 }
 
@@ -146,9 +146,10 @@ fn manifest_authority_resolves_independently_to_one_active_local_key() -> TestRe
             .key_epoch,
         9
     );
-    assert!(registry
-        .manifest_issuer_key(&issuer_did, &Keypair::from_seed(&[75; 32]).public_key())
-        .is_err());
+    assert!(matches!(
+        registry.manifest_issuer_key(&issuer_did, &Keypair::from_seed(&[75; 32]).public_key()),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "source manifest signer does not resolve to one active local issuer key"
+    ));
 
     let ambiguous = CrossIssuerTrustRegistry::new(CrossIssuerTrustRegistryConfig {
         issuer_keys: vec![
@@ -169,9 +170,10 @@ fn manifest_authority_resolves_independently_to_one_active_local_key() -> TestRe
         ],
         ..CrossIssuerTrustRegistryConfig::default()
     })?;
-    assert!(ambiguous
-        .manifest_issuer_key(&issuer_did, &issuer.public_key())
-        .is_err());
+    assert!(matches!(
+        ambiguous.manifest_issuer_key(&issuer_did, &issuer.public_key()),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "source manifest signer does not resolve to one active local issuer key"
+    ));
     Ok(())
 }
 
@@ -521,23 +523,31 @@ fn policy_resolution_pins_exact_pointer_generation_scope_and_time() -> TestResul
             .body_digest(),
         policy.body_digest
     );
-    assert!(registry.resolve("tenant-a", "verifier-b", NOW).is_err());
-    assert!(registry
-        .resolve("tenant-a", "verifier-a", policy.not_before - 1)
-        .is_err());
-    assert!(registry
-        .resolve("tenant-a", "verifier-a", policy.expires_at)
-        .is_err());
+    assert!(matches!(
+        registry.resolve("tenant-a", "verifier-b", NOW),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "active financial verifier policy is unavailable"
+    ));
+    assert!(matches!(
+        registry.resolve("tenant-a", "verifier-a", policy.not_before - 1),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "financial verifier policy is not yet valid"
+    ));
+    assert!(matches!(
+        registry.resolve("tenant-a", "verifier-a", policy.expires_at),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "financial verifier policy has expired"
+    ));
 
     let mut wrong_generation = activation.clone();
     wrong_generation.configuration_generation += 1;
-    assert!(
-        FinancialVerifierPolicyRegistry::new(vec![policy.clone()], vec![wrong_generation],)
-            .is_err()
-    );
+    assert!(matches!(
+        FinancialVerifierPolicyRegistry::new(vec![policy.clone()], vec![wrong_generation]),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "active financial policy body is missing"
+    ));
     let mut wrong_body = activation;
     wrong_body.body_digest = digest(99);
-    assert!(FinancialVerifierPolicyRegistry::new(vec![policy], vec![wrong_body]).is_err());
+    assert!(matches!(
+        FinancialVerifierPolicyRegistry::new(vec![policy], vec![wrong_body]),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "active financial policy pointer does not match its pinned body"
+    ));
     Ok(())
 }
 
@@ -580,9 +590,15 @@ fn generation_rollback_and_same_generation_conflict_deny_before_lookup() -> Test
     fixture.set_status(2, 10, CrossIssuerLifecycleStatus::Active, None)?;
     fixture.resolve()?;
     fixture.set_status(1, 11, CrossIssuerLifecycleStatus::Active, None)?;
-    assert!(fixture.resolve().is_err());
+    assert!(matches!(
+        fixture.resolve(),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "lifecycle generation anchor rejected a stale value"
+    ));
     fixture.set_status(2, 12, CrossIssuerLifecycleStatus::Active, None)?;
-    assert!(fixture.resolve().is_err());
+    assert!(matches!(
+        fixture.resolve(),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "lifecycle generation anchor rejected a conflicting value"
+    ));
     Ok(())
 }
 
@@ -591,10 +607,16 @@ fn resolver_and_high_water_outage_fail_closed() -> TestResult {
     let fixture = LifecycleFixture::new()?;
     fixture.set_status(1, 10, CrossIssuerLifecycleStatus::Active, None)?;
     *fixture.resolver.unavailable.borrow_mut() = true;
-    assert!(fixture.resolve().is_err());
+    assert!(matches!(
+        fixture.resolve(),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "lifecycle resolver checkpoint is unavailable"
+    ));
     *fixture.resolver.unavailable.borrow_mut() = false;
     *fixture.high_water.unavailable.borrow_mut() = true;
-    assert!(fixture.resolve().is_err());
+    assert!(matches!(
+        fixture.resolve(),
+        Err(CredentialError::FinancialAuthority(reason)) if reason == "lifecycle high-water store is unavailable"
+    ));
     Ok(())
 }
 
