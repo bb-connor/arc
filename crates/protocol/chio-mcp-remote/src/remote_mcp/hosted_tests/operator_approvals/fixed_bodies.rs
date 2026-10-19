@@ -1,6 +1,6 @@
 //! Approval binding and storage failures answer fixed URN bodies. Each cause
 //! can name policy parse or store schema detail, so it stays in the server log.
-use super::fixture::{config, headers, open, stop, TestResult};
+use super::fixture::{config, headers, open, stop, submit, TestResult};
 use crate::*;
 use std::sync::atomic::AtomicUsize;
 
@@ -68,5 +68,38 @@ async fn an_approval_store_failure_answers_the_fixed_urn_without_its_schema_deta
     assert_eq!(body, STORAGE_FAILED);
     assert!(!body.contains("signed_record"));
     assert!(!body.contains(&directory.path().to_string_lossy().into_owned()));
+    stop(state, session).await
+}
+
+#[tokio::test]
+async fn a_moved_approval_record_answers_the_fixed_integrity_conflict() -> TestResult {
+    let directory = chio_test_support::private_tempdir()?;
+    let approver = Keypair::generate();
+    let config = config(directory.path(), &approver, Arc::new(AtomicUsize::new(0)))?;
+    let (state, session) = open(config.clone(), None).await?;
+    let pending = submit(&state, &session, "ap23-integrity").await?;
+    let original = pending["record"]["id"].as_str().ok_or("approval id")?;
+    let session_db = config
+        .session_db_path
+        .as_deref()
+        .ok_or("session database")?;
+    let moved = rusqlite::Connection::open(session_db)?.execute(
+        "UPDATE remote_operator_approvals SET id = 'ap23-moved-record' WHERE id = ?1",
+        [original],
+    )?;
+    assert_eq!(moved, 1);
+    let body = text(
+        crate::remote_mcp_approvals::get_record(
+            State(state.clone()),
+            AxumPath("ap23-moved-record".into()),
+            headers()?,
+        )
+        .await,
+        StatusCode::CONFLICT,
+    )
+    .await?;
+    assert_eq!(body, "approval record integrity check failed");
+    assert!(!body.contains(original));
+    assert!(!body.contains("ap23-moved-record"));
     stop(state, session).await
 }
