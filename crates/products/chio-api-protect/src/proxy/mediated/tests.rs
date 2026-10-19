@@ -1,6 +1,7 @@
 use super::*;
 use crate::evaluator::DurableAdmissionStores;
 use chio_kernel::budget_store::{BudgetStore, InMemoryBudgetStore};
+use chio_kernel::CallerExecutionReport;
 use chio_test_support::prelude::*;
 use tower::ServiceExt;
 

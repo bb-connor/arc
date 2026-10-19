@@ -1,6 +1,6 @@
 //! Caller execution separates preparation, committed start and authenticated
-//! return. Reservation never authorizes an effect. Historical signed reports
-//! enter the original finalization path without repeating admission.
+//! return. Reservation never authorizes an effect. Signed delivery resumes
+//! original finalization without repeating admission.
 
 use super::evaluation_helpers::ExecutionNonceReservingResponse;
 use super::*;

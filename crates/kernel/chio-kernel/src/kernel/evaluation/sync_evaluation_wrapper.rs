@@ -238,7 +238,7 @@ impl ChioKernel {
             extra_metadata,
             None,
             None,
-            EvaluationDisposition::legacy_reservation(),
+            EvaluationDisposition::preflight_reservation(),
         ))
     }
 }

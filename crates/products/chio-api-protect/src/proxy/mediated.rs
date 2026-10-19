@@ -1,8 +1,5 @@
 use super::*;
 
-#[cfg(test)]
-use chio_kernel::CallerExecutionReport;
-
 use chio_core_types::capability::governance::GovernedTransactionIntent;
 use chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
@@ -652,16 +649,9 @@ pub(crate) struct SidecarReconcileRequest {
 /// agent that called `/v1/evaluate` must not reach this endpoint, or it could
 /// settle its own reservation at cost zero and defeat the cumulative spend cap.
 ///
-/// The presented nonce is the credential: the shared kernel that minted it
-/// verifies its signature and operation binding under the configured profile,
-/// settles the exact reserved hold at `min(realized, reserved)`, releases the
-/// difference back to the grant, and signs a completed authoritative receipt.
-/// The `realized_cost` is the tool server's own report of what the call cost;
-/// binding it to an attested oracle cost is a later concern. Invalid credentials
-/// or mismatched arguments cannot authorize a settlement. Non-durable admission
-/// rejects a consumed nonce. Durable admission can redeliver a completed
-/// operation's retained receipt without settling again; that replay never
-/// authorizes a second external execution.
+/// Non-durable admission verifies the nonce and arguments, settles its reserved
+/// hold and refuses nonce replay. Durable admission refuses unsigned reports;
+/// it requires `/v1/caller/start` and `/v1/caller/report`.
 pub(crate) async fn sidecar_reconcile_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
