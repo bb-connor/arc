@@ -1385,11 +1385,6 @@ files = ["crates/kernel/chio-kernel/src/dpop.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
-value = "chio.dpop_proof.v2"
-files = ["crates/kernel/chio-kernel/src/dpop/authority.rs"]
-first_seen = "7e54c14a60"
-
-[[schema]]
 value = "chio.economic-completion-flow.v1"
 files = ["crates/kernel/chio-kernel/src/operator_report/constants.rs"]
 first_seen = "11e573d2d7"
@@ -5946,11 +5941,6 @@ first_seen = "d299a87e8b"
 
 [[schema]]
 value = "chio_attestation_binding_v1"
-files = ["crates/kernel/chio-kernel/src/operator_report/constants.rs"]
-first_seen = "11e573d2d7"
-
-[[schema]]
-value = "chio_dpop_v1"
 files = ["crates/kernel/chio-kernel/src/operator_report/constants.rs"]
 first_seen = "11e573d2d7"
 

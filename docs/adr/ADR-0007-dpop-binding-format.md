@@ -21,11 +21,12 @@ binding fields are not applicable.
 Chio implements its own DPoP format, `chio.dpop_proof.v1`, designed for the
 Chio wire protocol rather than HTTP.
 
-### Proof Body (8 fields)
+### Proof Body (9 fields)
 
 ```rust
 pub struct DpopProofBody {
-    pub schema:        String,    // "chio.dpop_proof.v1" (forward-compat guard)
+    pub schema:        String,    // Must equal "chio.dpop_proof.v1"
+    pub replay_authority: DpopReplayAuthority, // Independently selected replay domain
     pub capability_id: String,    // ID of the capability token being used
     pub tool_server:   String,    // server_id of the target tool server
     pub tool_name:     String,    // Name of the tool being called
@@ -37,42 +38,51 @@ pub struct DpopProofBody {
 ```
 
 The proof body is serialized to canonical JSON (RFC 8785) and signed with
-Ed25519. The signature covers all 8 fields; none are mutable after signing.
+Ed25519 by default, or the configured signing backend. The signature covers
+all 9 fields; none are mutable after signing. `replay_authority` binds the
+destination store UUID, authority ID, source expectation digest, proof TTL
+and maximum clock skew. The verifier selects this authority independently
+and requires its durable activation before accepting an invocation.
 
-### Verification Steps (in order)
+### Verification Checks
 
-1. **Schema check** -- `schema` must equal `"chio.dpop_proof.v1"`. Unknown
-   schema strings are rejected to allow future protocol evolution.
-2. **Sender constraint** -- `agent_key` must equal `capability.subject`. This
+1. **Resource bounds** -- replay identities must fit the configured byte bounds.
+2. **Schema and authority** -- `schema` must equal `"chio.dpop_proof.v1"`, and
+   `replay_authority` must equal the independently configured, activated domain.
+   Unknown schemas and missing or mismatched authority are rejected.
+3. **Sender constraint** -- `agent_key` must equal `capability.subject`. This
    binds the proof to the key the CA authorized.
-3. **Binding fields** -- `capability_id`, `tool_server`, `tool_name`, and
+4. **Binding fields** -- `capability_id`, `tool_server`, `tool_name`, and
    `action_hash` must all match the actual invocation context. A stolen proof
    cannot be replayed for a different tool or different arguments.
-4. **Freshness** -- `issued_at + proof_ttl_secs >= now` and
-   `issued_at <= now + max_clock_skew_secs`. Default TTL is 300 seconds.
-   Default clock skew tolerance is 30 seconds.
-5. **Signature** -- Ed25519 signature over canonical JSON of the proof body.
-6. **Nonce replay** -- the `(nonce, capability_id)` pair must not have been
-   consumed during the proof's signed validity window. The process-scoped
-   store retains each live marker through that full horizon.
+5. **Freshness** -- `issued_at + proof_ttl_secs >= now` and
+   `issued_at <= now + max_clock_skew_secs`, using the authority's policy and
+   trusted clock. An unrepresentable validity deadline is rejected.
+6. **Signature** -- signature verification over canonical JSON of the proof body.
+7. **Durable replay custody** -- admission must acquire an operation-owned
+   claim for the authority, capability and nonce, bound to the exact proof,
+   invocation and admitted grant. A spent identity cannot authorize a different
+   operation.
 
-All six steps must pass. The first failure returns an error; the Kernel denies
+All seven checks must pass. The first failure returns an error; the Kernel denies
 fail-closed.
 
-### Signed-Horizon Nonce Store
+### Durable Replay Custody
 
-The nonce store uses an in-memory `LruCache` internally, keyed by
-`(nonce, capability_id)`, but live markers are never evicted. Direct
-verification calls `check_and_insert_through`; kernel dispatch calls the
-owner-qualified `reserve_for_dispatch_through` path. Both retain a marker
-through the inclusive `issued_at + proof_ttl_secs` horizon. Expired markers
-are reclaimed, while exhaustion of the default 8192-entry capacity denies new
-proofs fail-closed. Deployments must size the store for peak proof volume over
-the full validity window, including tolerated future clock skew.
+`verify_dpop_proof_stateless` checks the signed evidence against a supplied
+authority. The kernel's permission preview also verifies that authority's
+activation. Neither step claims a nonce. Dispatch requires the durable
+admission operation's exact replay claim; release before dispatch retains the
+spent proof history, and dispatch commit retains custody across restart.
 
-The current DPoP nonce store is process-scoped. Restarting the Kernel clears
-its markers, so this implementation does not provide restart-durable replay
-protection for a proof whose signed validity window is still open.
+`DpopNonceStore` retains bounded source inventory for explicit sealing and
+import. Its insertion APIs enforce marker, per-capability and byte capacity,
+and preserve live markers under pressure. Signed markers expire only after
+both wall and monotonic deadlines; local TTL markers use their monotonic
+deadline. Sealing binds the exact instance and inventory and
+forbids further insertion or pruning. Source inventory carries no dispatch
+owner or release handle; an imported marker remains conservative blocking
+evidence. A source seal alone does not activate an authority or grant dispatch.
 
 ### DPoP Opt-In
 
@@ -97,20 +107,19 @@ invocation model.
   channel (typically a local pipe or UDS that is not TCP).
 - Binding to `action_hash` means a proof cannot be replayed for a different
   set of arguments, even with the same token.
-- Schema versioning (`chio.dpop_proof.v1`) allows the format to evolve without
-  breaking existing verifiers.
+- The signed replay domain binds every proof to one activated durable authority.
 
 ### Negative
 
 - Agents must generate an Ed25519 keypair per session and sign a proof for
   every invocation where `dpop_required = true`. This adds latency for
   CPU-constrained agents.
-- The in-memory nonce store is lost on Kernel restart. Brief restart windows
-  allow a narrow replay opportunity if a proof was issued just before restart.
-  The remaining signed DPoP validity window bounds the attack window.
+- DPoP-required dispatch needs an activated durable store. Missing authority,
+  unavailable custody, and capacity exhaustion deny the invocation.
 
 ## Required Follow-up
 
 - Provide reference DPoP proof construction in SDK clients (Rust, TypeScript,
   Python).
-- Document the nonce store restart caveat in operator security guidance.
+- Document authority provisioning, source sealing, activation and restart
+  fencing in operator security guidance.

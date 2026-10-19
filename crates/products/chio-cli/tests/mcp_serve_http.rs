@@ -5698,9 +5698,8 @@ fn mcp_serve_http_rejects_jwt_with_wrong_audience() {
         .iter()
         .any(|scope| scope.as_str() == Some("mcp:invoke")));
     assert_eq!(
-        metadata["chio_authorization_profile"]["senderConstraints"]["proofTypesSupported"][0]
-            .as_str(),
-        Some("chio_dpop_v1")
+        metadata["chio_authorization_profile"]["senderConstraints"]["proofTypesSupported"],
+        json!(["chio_mtls_thumbprint_v1", "chio_attestation_binding_v1"])
     );
 }
 
@@ -5779,9 +5778,8 @@ fn mcp_serve_http_serves_oauth_authorization_server_metadata_for_local_issuer() 
         Some("chio-governed-rar-v1")
     );
     assert_eq!(
-        auth_metadata["chio_authorization_profile"]["senderConstraints"]["proofTypesSupported"][0]
-            .as_str(),
-        Some("chio_dpop_v1")
+        auth_metadata["chio_authorization_profile"]["senderConstraints"]["proofTypesSupported"],
+        json!(["chio_mtls_thumbprint_v1", "chio_attestation_binding_v1"])
     );
 }
 

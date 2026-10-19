@@ -1972,3 +1972,26 @@ extensions:
 
 #[path = "tests/runtime_policy_wire.rs"]
 mod runtime_policy_wire;
+
+#[test]
+fn policy_cannot_carry_a_dpop_replay_authority() {
+    let policy = serde_json::json!({
+        "kernel": {
+            "dpop_replay_authority": {
+                "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+                "dpop_authority_id": "configured-dpop",
+                "expectation_id": "a".repeat(64),
+                "proof_ttl_secs": 300,
+                "max_clock_skew_secs": 30
+            }
+        }
+    });
+    let error = parse_policy(&policy.to_string())
+        .err()
+        .map(|error| error.to_string())
+        .unwrap_or_default();
+    assert!(
+        error.contains("unknown field `dpop_replay_authority`"),
+        "{error}"
+    );
+}

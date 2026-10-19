@@ -37,7 +37,7 @@ mod dispatch_commit_failure;
 #[path = "durable_admission/dispatch_elapsed.rs"]
 mod dispatch_elapsed;
 #[path = "durable_admission/dpop_acquisition.rs"]
-mod dpop_acquisition;
+pub(super) mod dpop_acquisition;
 #[path = "durable_admission/federation_context.rs"]
 mod federation_context;
 #[path = "durable_admission/governed_acquisition.rs"]

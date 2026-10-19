@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: 8fd2dc945c403527957fdee645503c30211940f9393f37c043b244ed2c5ed102
+# Schema sha256: a2e478710c7df7c8aa19631f97c0ee5f72fd435e2d6c0963be6f0ab8122ed548
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -21,7 +21,6 @@ from ..capability import governed_approval_token_schema
 
 class Schema(Enum):
     chio_dpop_proof_v1 = "chio.dpop_proof.v1"
-    chio_dpop_proof_v2 = "chio.dpop_proof.v2"
 
 
 class ReplayAuthority(BaseModel):
@@ -40,7 +39,7 @@ class Body(BaseModel):
         extra="forbid",
     )
     schema_: Schema = Field(..., alias="schema")
-    replay_authority: ReplayAuthority | None = None
+    replay_authority: ReplayAuthority
     capability_id: constr(min_length=1)
     tool_server: constr(min_length=1)
     tool_name: constr(min_length=1)

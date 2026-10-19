@@ -1681,6 +1681,7 @@ pub mod agent_tool_call_request {
     ///            "capability_id",
     ///            "issued_at",
     ///            "nonce",
+    ///            "replay_authority",
     ///            "schema",
     ///            "tool_name",
     ///            "tool_server"
@@ -1745,8 +1746,7 @@ pub mod agent_tool_call_request {
     ///            },
     ///            "schema": {
     ///              "enum": [
-    ///                "chio.dpop_proof.v1",
-    ///                "chio.dpop_proof.v2"
+    ///                "chio.dpop_proof.v1"
     ///              ]
     ///            },
     ///            "tool_name": {
@@ -6320,6 +6320,7 @@ pub mod agent_tool_call_request {
     ///        "capability_id",
     ///        "issued_at",
     ///        "nonce",
+    ///        "replay_authority",
     ///        "schema",
     ///        "tool_name",
     ///        "tool_server"
@@ -6384,8 +6385,7 @@ pub mod agent_tool_call_request {
     ///        },
     ///        "schema": {
     ///          "enum": [
-    ///            "chio.dpop_proof.v1",
-    ///            "chio.dpop_proof.v2"
+    ///            "chio.dpop_proof.v1"
     ///          ]
     ///        },
     ///        "tool_name": {
@@ -6432,6 +6432,7 @@ pub mod agent_tool_call_request {
     ///    "capability_id",
     ///    "issued_at",
     ///    "nonce",
+    ///    "replay_authority",
     ///    "schema",
     ///    "tool_name",
     ///    "tool_server"
@@ -6496,8 +6497,7 @@ pub mod agent_tool_call_request {
     ///    },
     ///    "schema": {
     ///      "enum": [
-    ///        "chio.dpop_proof.v1",
-    ///        "chio.dpop_proof.v2"
+    ///        "chio.dpop_proof.v1"
     ///      ]
     ///    },
     ///    "tool_name": {
@@ -6521,9 +6521,7 @@ pub mod agent_tool_call_request {
         pub capability_id: ChioInvocationProofOfPossessionBodyCapabilityId,
         pub issued_at: u64,
         pub nonce: ChioInvocationProofOfPossessionBodyNonce,
-        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
-        pub replay_authority:
-            ::std::option::Option<ChioInvocationProofOfPossessionBodyReplayAuthority>,
+        pub replay_authority: ChioInvocationProofOfPossessionBodyReplayAuthority,
         pub schema: ChioInvocationProofOfPossessionBodySchema,
         pub tool_name: ChioInvocationProofOfPossessionBodyToolName,
         pub tool_server: ChioInvocationProofOfPossessionBodyToolServer,
@@ -7108,8 +7106,7 @@ pub mod agent_tool_call_request {
     /// ```json
     ///{
     ///  "enum": [
-    ///    "chio.dpop_proof.v1",
-    ///    "chio.dpop_proof.v2"
+    ///    "chio.dpop_proof.v1"
     ///  ]
     ///}
     /// ```
@@ -7129,8 +7126,6 @@ pub mod agent_tool_call_request {
     pub enum ChioInvocationProofOfPossessionBodySchema {
         #[serde(rename = "chio.dpop_proof.v1")]
         ChioDpopProofV1,
-        #[serde(rename = "chio.dpop_proof.v2")]
-        ChioDpopProofV2,
     }
     impl ::std::convert::From<&Self> for ChioInvocationProofOfPossessionBodySchema {
         fn from(value: &ChioInvocationProofOfPossessionBodySchema) -> Self {
@@ -7141,7 +7136,6 @@ pub mod agent_tool_call_request {
         fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
             match *self {
                 Self::ChioDpopProofV1 => f.write_str("chio.dpop_proof.v1"),
-                Self::ChioDpopProofV2 => f.write_str("chio.dpop_proof.v2"),
             }
         }
     }
@@ -7150,7 +7144,6 @@ pub mod agent_tool_call_request {
         fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
             match value {
                 "chio.dpop_proof.v1" => Ok(Self::ChioDpopProofV1),
-                "chio.dpop_proof.v2" => Ok(Self::ChioDpopProofV2),
                 _ => Err("invalid value".into()),
             }
         }

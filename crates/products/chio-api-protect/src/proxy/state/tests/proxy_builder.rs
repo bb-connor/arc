@@ -404,6 +404,7 @@ fn minimal_config() -> ProtectConfig {
         receipt_db: None,
         allow_ephemeral_receipts: true,
         sidecar_control_token: None,
+        dpop_replay_authority: None,
         receipt_retention: None,
         signer_seed_file: None,
         signer_seed_hex: None,

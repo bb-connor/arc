@@ -109,7 +109,21 @@ pub(crate) fn configured_kernel(
         },
         chio_test_support::clock::clock(),
     );
-    runtime.attach(&mut kernel)?;
+    let domain = runtime
+        .local_authority_store()
+        .map(|authority| {
+            crate::initialize_local_dpop_authority(
+                &authority,
+                &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                    "dpop_authority",
+                    "payload-maintenance-dpop",
+                )?,
+                &chio_kernel::DpopConfig::default(),
+                kernel.authority_clock(),
+            )
+        })
+        .transpose()?;
+    runtime.attach(&mut kernel, domain.as_ref())?;
     kernel.set_governed_approval_policy(
         "payload-maintenance-test-tenant".into(),
         vec![runtime.kernel_keypair().public_key()],
@@ -175,7 +189,10 @@ fn request_with_constraints(
         dpop_proof: Some(DpopProof::sign(
             DpopProofBody {
                 schema: DPOP_SCHEMA.into(),
-                replay_authority: None,
+                replay_authority: kernel
+                    .operation_owned_dpop_authority()
+                    .ok_or("missing fixture DPoP authority")?
+                    .clone(),
                 capability_id: capability.id.clone(),
                 tool_server: "maintenance-server".into(),
                 tool_name: "mutate".into(),

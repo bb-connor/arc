@@ -686,37 +686,62 @@ async fn evaluate_nested_payment_ambiguity_request(
         .await
 }
 
+struct DurableDeclinedPaymentAdapter(PaymentAmbiguityCounters);
+
+impl PaymentAdapter for DurableDeclinedPaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "test-dpop-payment"
+    }
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::ReversibleHold)
+    }
+    fn authorize(&self, _: &PaymentAuthorizeRequest) -> Result<PaymentAuthorization, PaymentError> {
+        self.0.authorizations.fetch_add(1, Ordering::SeqCst);
+        Err(PaymentError::Declined(
+            "authorization was cleanly declined".into(),
+        ))
+    }
+    fn capture(&self, _: &str, _: u64, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
+        panic!("declined authorization cannot be captured")
+    }
+    fn release(&self, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
+        panic!("declined authorization has no hold to release")
+    }
+    fn refund(&self, _: &str, _: u64, _: &str, _: &str) -> Result<PaymentResult, PaymentError> {
+        panic!("declined authorization cannot be refunded")
+    }
+    fn settlement_state(
+        &self,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<crate::payment::RailSettlementState, PaymentError> {
+        Ok(crate::payment::RailSettlementState::NoAuthorization)
+    }
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let counters = PaymentAmbiguityCounters::default();
     let invocations = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
-    let mut kernel = make_kernel(make_monetary_config());
-    kernel.register_tool_server(Box::new(CountingMonetaryServer {
-        id: "dpop-only-payment-server".to_string(),
-        invocations: std::sync::Arc::clone(&invocations),
-    }));
-    kernel.set_payment_adapter(Box::new(PaymentAmbiguityAdapter {
-        mode: PaymentAmbiguityMode::AuthorizeDeclined,
-        counters: counters.clone(),
-    }));
-    kernel
-        .set_dpop_store(
-            dpop::DpopNonceStore::new(1024, std::time::Duration::from_secs(300))
-                .expect("positive replay store test capacities"),
-            dpop::DpopConfig::default(),
-        )
-        .unwrap_or_else(|error| panic!("DPoP fixture installation: {error}"));
-
-    let agent = make_keypair();
-    let mut grant = make_monetary_grant("dpop-only-payment-server", "compute", 100, 500, "USD");
-    grant.dpop_required = Some(true);
-    let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
-
     for (request_id, proof_nonce) in [
         ("dpop-only-payment-one", "dpop-only-payment-proof-one"),
         ("dpop-only-payment-two", "dpop-only-payment-proof-two"),
     ] {
+        let mut config = make_monetary_config();
+        config.policy_hash = chio_core::crypto::sha256_hex(b"dpop-payment-policy");
+        let mut kernel = make_kernel(config);
+        super::durable_admission::dpop_acquisition::install_fixture_authority(&mut kernel);
+        kernel.register_tool_server(Box::new(CountingMonetaryServer {
+            id: "dpop-only-payment-server".to_string(),
+            invocations: std::sync::Arc::clone(&invocations),
+        }));
+        kernel.set_payment_adapter(Box::new(DurableDeclinedPaymentAdapter(counters.clone())));
+        let agent = make_keypair();
+        let mut grant = make_monetary_grant("dpop-only-payment-server", "compute", 100, 500, "USD");
+        grant.dpop_required = Some(true);
+        let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+
         let mut request = make_request(
             request_id,
             &capability,
@@ -738,6 +763,11 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
             .reason
             .as_deref()
             .is_some_and(|reason| reason.contains("payment authorization failed")));
+        let usage = kernel
+            .budget_store
+            .get_usage(&capability.id, 0)?
+            .ok_or_else(|| std::io::Error::other("DPoP-only budget usage missing"))?;
+        assert_eq!(usage.committed_cost_units()?, 0);
     }
 
     assert_eq!(
@@ -747,11 +777,6 @@ async fn non_strict_dpop_only_payment_requests_reach_the_external_rail(
         2
     );
     assert_eq!(invocations.load(std::sync::atomic::Ordering::SeqCst), 0);
-    let usage = kernel
-        .budget_store
-        .get_usage(&capability.id, 0)?
-        .ok_or_else(|| std::io::Error::other("DPoP-only budget usage missing"))?;
-    assert_eq!(usage.committed_cost_units()?, 0);
     Ok(())
 }
 

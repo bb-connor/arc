@@ -431,7 +431,34 @@ fn inbound_authority_check_signs_with_its_owned_subject_key() {
     )
     .unwrap();
     let (_stores, receipt_db, session_db) = private_store_paths();
+    let authority_path = directory.path().join("dpop-authority.json");
+    {
+        let clock = chio_test_support::clock::clock();
+        let runtime = chio_control_plane::DurableAdmissionRuntime::open_with_clock(
+            &session_db,
+            clock.clone(),
+        )
+        .unwrap();
+        let store = runtime.local_authority_store().unwrap();
+        let authority = chio_control_plane::initialize_local_dpop_authority(
+            &store,
+            &chio_kernel::admission_operation::AdmissionIdentifier::try_new(
+                "dpop_authority",
+                "check-dpop",
+            )
+            .unwrap(),
+            &chio_kernel::DpopConfig::default(),
+            clock,
+        )
+        .unwrap();
+        std::fs::write(
+            &authority_path,
+            chio_core::canonical::canonical_json_bytes(&authority).unwrap(),
+        )
+        .unwrap();
+    }
     let output = Command::new(chio_cli_binary())
+        .env("CHIO_DPOP_REPLAY_AUTHORITY_FILE", &authority_path)
         .args(["--format", "json", "check", "--policy"])
         .arg(&policy)
         .arg("--receipt-db")
@@ -456,4 +483,44 @@ fn inbound_authority_check_signs_with_its_owned_subject_key() {
     );
     let body: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(body["verdict"], "ALLOW");
+}
+
+#[test]
+fn proof_policy_without_a_replay_authority_file_refuses_startup() {
+    let directory = tempfile::tempdir().unwrap();
+    let policy = directory.path().join("proof.yaml");
+    std::fs::write(
+        &policy,
+        "hushspec: '0.1.0'\nrules:\n  tool_access:\n    default: block\n    allow: ['*']\n    dpop_required: true\n",
+    )
+    .unwrap();
+    let (_stores, receipt_db, session_db) = private_store_paths();
+    let output = Command::new(chio_cli_binary())
+        .env_remove("CHIO_DPOP_REPLAY_AUTHORITY_FILE")
+        .args(["--format", "json", "check", "--policy"])
+        .arg(&policy)
+        .arg("--receipt-db")
+        .arg(receipt_db)
+        .arg("--session-db")
+        .arg(session_db)
+        .args([
+            "--server",
+            "proof-srv",
+            "--tool",
+            "read_file",
+            "--params",
+            r#"{"path":"README.md"}"#,
+        ])
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "stdout={}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    assert!(
+        stderr.contains("a DPoP-required policy needs CHIO_DPOP_REPLAY_AUTHORITY_FILE"),
+        "stderr={stderr}"
+    );
 }

@@ -63,6 +63,7 @@ async fn f069_invalid_extension_never_activates_issuance_or_proxy_listener() -> 
         signer_seed_file: None,
         signer_seed_hex: None,
         trusted_capability_issuers: Vec::new(),
+        dpop_replay_authority: None,
         approval: None,
         control_url: None,
         control_token: None,

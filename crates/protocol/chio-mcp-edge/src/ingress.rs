@@ -63,14 +63,18 @@ pub fn decode_mcp_request(bytes: &[u8], bound: usize) -> Result<Value, Untrusted
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn inbound_authority_original_proof_preserves_integers_and_rejects_duplicates(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn signed_proof() -> Result<chio_kernel::DpopProof, Box<dyn std::error::Error>> {
         let key = chio_core::crypto::Keypair::generate();
-        let proof = chio_kernel::DpopProof::sign(
+        Ok(chio_kernel::DpopProof::sign(
             chio_kernel::DpopProofBody {
                 schema: chio_kernel::DPOP_SCHEMA.into(),
-                replay_authority: None,
+                replay_authority: serde_json::from_value(serde_json::json!({
+                    "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+                    "dpop_authority_id": "projection-test-dpop",
+                    "expectation_id": "a".repeat(64),
+                    "proof_ttl_secs": 300,
+                    "max_clock_skew_secs": 30
+                }))?,
                 capability_id: "cap".into(),
                 tool_server: "srv".into(),
                 tool_name: "read".into(),
@@ -80,7 +84,13 @@ mod tests {
                 agent_key: key.public_key(),
             },
             &key,
-        )?;
+        )?)
+    }
+
+    #[test]
+    fn inbound_authority_original_proof_preserves_integers_and_rejects_duplicates(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let proof = signed_proof()?;
         let honest_proof = serde_json::to_string(
             &serde_json::json!({"params":{"_meta":{"chioDpopProof":proof}}}),
         )?;
@@ -104,6 +114,37 @@ mod tests {
         assert!(decode_mcp_request(duplicate, 4096).is_err());
         let honest = br#"{"params":{"arguments":{"ratio":0.50,"tiny":1e-5}}}"#;
         assert!(decode_mcp_request(honest, 4096).is_ok());
+        Ok(())
+    }
+    #[test]
+    fn inbound_authority_rejects_missing_and_null_dpop_replay_authority(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let proof = signed_proof()?;
+        for authority in [None, Some(Value::Null)] {
+            let mut proof = serde_json::to_value(&proof)?;
+            let body = proof["body"]
+                .as_object_mut()
+                .ok_or("proof body must be an object")?;
+            match authority {
+                None => {
+                    body.remove("replay_authority");
+                }
+                Some(value) => {
+                    body.insert("replay_authority".into(), value);
+                }
+            }
+            let bytes = serde_json::to_vec(&serde_json::json!({
+                "params": {"_meta": {"chioDpopProof": proof}}
+            }))?;
+            let error = decode_mcp_request(&bytes, 4096)
+                .err()
+                .ok_or("an authority-free DPoP proof entered dispatch")?;
+            assert!(matches!(&error, UntrustedJsonError::Decode(_)));
+            assert_eq!(
+                error.code(),
+                "urn:chio:error:attest:signed-json-invalid-shape"
+            );
+        }
         Ok(())
     }
 }

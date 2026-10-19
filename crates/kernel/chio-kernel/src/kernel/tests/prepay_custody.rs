@@ -60,6 +60,14 @@ struct PrepaymentAdapter {
 }
 
 impl PaymentAdapter for PrepaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "test-prepayment-custody"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::ReversibleHold)
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,
@@ -162,13 +170,14 @@ impl Fixture {
     }
 
     fn with_dpop(mode: Mode, dpop_required: bool) -> Result<Self, Box<dyn std::error::Error>> {
-        let mut kernel = make_kernel(make_monetary_config());
+        let mut config = make_monetary_config();
+        if dpop_required {
+            config.policy_hash = chio_core::crypto::sha256_hex(b"prepayment-custody-policy");
+        }
+        let mut kernel = make_kernel(config);
         install_strict_nonce_store(&mut kernel);
         if dpop_required {
-            kernel.set_dpop_store(
-                dpop::DpopNonceStore::new(1024, Duration::from_secs(300))?,
-                dpop::DpopConfig::default(),
-            )?;
+            super::durable_admission::dpop_acquisition::install_fixture_authority(&mut kernel);
         }
         let counters = Counters::default();
         kernel.set_payment_adapter(Box::new(PrepaymentAdapter {
@@ -330,26 +339,39 @@ fn captured_then_lost_ack_retains_custody_without_execution_nonce() -> TestResul
 }
 
 #[test]
-fn replayed_prepayment_hold_survives_approval_and_dpop_denial() -> TestResult {
-    for dpop_required in [false, true] {
-        let fixture =
-            Fixture::with_dpop(Mode::CaptureError(ErrorKind::Unavailable), dpop_required)?;
-        let first = fixture.reserve()?;
-        assert_eq!(first.verdict, Verdict::Deny);
-        assert_eq!(fixture.exposure()?, 100);
-        let retry = fixture.reserve()?;
-        assert_eq!(retry.verdict, Verdict::Deny);
-        assert!(retry.execution_nonce.is_none());
-        assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 1);
-        assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 1);
-        assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
-        assert_eq!(fixture.counters.refunds.load(Ordering::SeqCst), 0);
-        assert_eq!(
-            fixture.exposure()?,
-            100,
-            "credential denial cannot reverse a prior hold (DPoP={dpop_required})"
-        );
-    }
+fn replayed_prepayment_hold_survives_approval_denial() -> TestResult {
+    let fixture = Fixture::with_dpop(Mode::CaptureError(ErrorKind::Unavailable), false)?;
+    let first = fixture.reserve()?;
+    assert_eq!(first.verdict, Verdict::Deny);
+    assert_eq!(fixture.exposure()?, 100);
+    let retry = fixture.reserve()?;
+    assert_eq!(retry.verdict, Verdict::Deny);
+    assert!(retry.execution_nonce.is_none());
+    assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 1);
+    assert_eq!(fixture.counters.releases.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.counters.refunds.load(Ordering::SeqCst), 0);
+    assert_eq!(
+        fixture.exposure()?,
+        100,
+        "credential denial cannot reverse a prior hold"
+    );
+    Ok(())
+}
+
+#[test]
+fn dpop_prepayment_without_a_nonce_participant_denies_before_the_rail() -> TestResult {
+    let fixture = Fixture::with_dpop(Mode::CaptureError(ErrorKind::Unavailable), true)?;
+    let response = fixture.reserve()?;
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("durable admission failed: admission store lacks the operation-owned execution nonce participant")
+    );
+    assert!(response.execution_nonce.is_none());
+    assert_eq!(fixture.counters.authorizations.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.counters.captures.load(Ordering::SeqCst), 0);
+    assert_eq!(fixture.counters.invocations.load(Ordering::SeqCst), 0);
     Ok(())
 }
 

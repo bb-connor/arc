@@ -19,9 +19,9 @@ use chio_kernel::finding_purchase::{
     FINDING_PURCHASE_CONTEXT_KEY, FINDING_STATUS_PROOF_CONTEXT_KEY,
 };
 use chio_kernel::{
-    ChioKernel, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, KernelConfig, ReceiptStore,
-    ToolCallOutput, ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE,
-    DEFAULT_MAX_STREAM_DURATION_SECS, DEFAULT_MAX_STREAM_TOTAL_BYTES, DPOP_SCHEMA,
+    ChioKernel, DpopProof, DpopProofBody, KernelConfig, ReceiptStore, ToolCallOutput,
+    ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    DEFAULT_MAX_STREAM_TOTAL_BYTES, DPOP_SCHEMA,
 };
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, SignedAcceptedBid, SignedAskResponse,
@@ -134,6 +134,7 @@ pub struct FindingOperatorPurchaseKeys {
 
 /// Durable paths and private payload scope used to compose the executor.
 pub struct FindingOperatorPurchaseStorage {
+    pub dpop_authority: chio_kernel::dpop::authority::DpopReplayAuthority,
     pub authority: Arc<SqliteAuthorityStore>,
     pub operator_db_path: PathBuf,
     pub receipt_db_path: PathBuf,
@@ -143,6 +144,7 @@ pub struct FindingOperatorPurchaseStorage {
 
 /// Production executor backed only by restart-safe stores and explicit keys.
 pub struct FindingOperatorPurchaseExecutor {
+    dpop_authority: chio_kernel::dpop::authority::DpopReplayAuthority,
     authority: Arc<SqliteAuthorityStore>,
     bundle_store: SqliteFindingOperatorBundleStore,
     payload_store: Arc<SqliteFindingPayloadStore>,
@@ -183,6 +185,18 @@ impl FindingOperatorPurchaseExecutor {
         global_service_token: &str,
     ) -> Result<Self, String> {
         market.validate().map_err(|error| error.to_string())?;
+        storage
+            .authority
+            .admission_operation_store()
+            .load_dpop_replay_activation(
+                &storage.dpop_authority,
+                &storage.authority.mutation_fence(),
+                unix_timestamp_now()
+                    .map_err(|error| error.to_string())?
+                    .checked_mul(1000)
+                    .ok_or("DPoP authority clock exceeds its range")?,
+            )
+            .map_err(|error| error.to_string())?;
         if keys.listing.public_key() != market.listing.key().map_err(|e| e.to_string())?
             || keys.purchase.public_key() != market.purchase.key().map_err(|e| e.to_string())?
             || keys.failed_delivery.public_key()
@@ -252,6 +266,7 @@ impl FindingOperatorPurchaseExecutor {
         Ok(Self {
             stop: TrustStop::for_authority(Some(&storage.authority)),
             authority: storage.authority,
+            dpop_authority: storage.dpop_authority,
             bundle_store,
             payload_store,
             payment_adapter,
@@ -513,16 +528,8 @@ impl FindingOperatorPurchaseExecutor {
             bundle.admission.body.server_id.clone(),
             Arc::new(resolver),
         )));
-        let dpop = DpopConfig::default();
         kernel
-            .set_dpop_store(
-                DpopNonceStore::new(
-                    dpop.nonce_store_capacity,
-                    std::time::Duration::from_secs(dpop.proof_ttl_secs),
-                )
-                .map_err(execution_internal)?,
-                dpop,
-            )
+            .set_operation_owned_dpop_authority(self.dpop_authority.clone())
             .map_err(execution_internal)?;
         kernel.set_finding_purchase_verifier(Arc::new(MarketFindingPurchaseVerifier::new(
             PurchaseVerificationAuthorities {
@@ -1378,7 +1385,7 @@ impl FindingOperatorPurchaseExecutor {
         let capability = ask.body.token_offer.clone();
         let dpop = DpopProof::sign(
             DpopProofBody {
-                replay_authority: None,
+                replay_authority: self.dpop_authority.clone(),
                 schema: DPOP_SCHEMA.to_owned(),
                 capability_id: capability.id.clone(),
                 tool_server: bundle.admission.body.server_id.clone(),

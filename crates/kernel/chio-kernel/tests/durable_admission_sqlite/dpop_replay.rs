@@ -1,16 +1,17 @@
 //! A proof released before dispatch stays spent for every other operation.
 use super::*;
+
+#[path = "dpop_replay/inbound.rs"]
+mod inbound;
 use chio_kernel::admission_operation::dpop_claim::{
     DpopReplayClaimDisposition, DpopReplayClaimHistoryV1, DpopReplayClaimPhase,
 };
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationV1,
 };
-use chio_kernel::dpop::authority::{
-    DpopReplayAuthorityInputV1, DpopReplayAuthorityV1, DPOP_AUTHORITY_SCHEMA,
-};
+use chio_kernel::dpop::authority::{DpopReplayAuthority, DpopReplayAuthorityInput};
 use chio_kernel::dpop::replay_source::{DpopReplaySourceBinding, DpopReplaySourcePort};
-use chio_kernel::dpop::{DpopNonceStore, DpopProof, DpopProofBody};
+use chio_kernel::dpop::{DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA};
 use chio_store_sqlite::SqliteAdmissionOperationStore;
 
 const SERVER: &str = "sqlite-dpop-server";
@@ -61,7 +62,7 @@ struct DpopRoute {
     _authority: SqliteAuthorityStore,
     operations: Arc<SqliteAdmissionOperationStore>,
     fence: StoreMutationFence,
-    domain: DpopReplayAuthorityV1,
+    domain: DpopReplayAuthority,
     kernel: ChioKernel,
     agent: Keypair,
     capability: CapabilityToken,
@@ -137,8 +138,8 @@ impl DpopRoute {
     fn proof(&self, nonce: &str) -> Result<DpopProof, Box<dyn Error>> {
         Ok(DpopProof::sign(
             DpopProofBody {
-                schema: DPOP_AUTHORITY_SCHEMA.into(),
-                replay_authority: Some(self.domain.clone()),
+                schema: DPOP_SCHEMA.into(),
+                replay_authority: self.domain.clone(),
                 capability_id: self.capability.id.clone(),
                 tool_server: SERVER.into(),
                 tool_name: TOOL.into(),
@@ -200,7 +201,7 @@ fn arguments() -> serde_json::Value {
 fn activate_domain(
     operations: &SqliteAdmissionOperationStore,
     fence: &StoreMutationFence,
-) -> Result<DpopReplayAuthorityV1, Box<dyn Error>> {
+) -> Result<DpopReplayAuthority, Box<dyn Error>> {
     let source = DpopNonceStore::new(8, std::time::Duration::from_secs(3600))?;
     let authority_id = AdmissionIdentifier::try_new("dpop_authority", "sqlite-dpop-authority")?;
     let snapshot = source.preview_unsealed(&DpopReplaySourceBinding {
@@ -221,7 +222,7 @@ fn activate_domain(
         fence,
         now,
     )?;
-    let domain = DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+    let domain = DpopReplayAuthority::new(DpopReplayAuthorityInput {
         destination_store_uuid: AdmissionIdentifier::try_new(
             "destination",
             imported.snapshot().destination_authority_id(),
@@ -280,6 +281,16 @@ fn sqlite_released_dpop_proof_is_refused_for_a_different_operation() -> Result<(
         .evaluate_tool_call_blocking(&route.request("dpop-other-operation", &proof))?;
     assert_eq!(replay.verdict, Verdict::Deny, "{:?}", replay.reason);
     assert_eq!(replay.reason.as_deref(), Some(SPENT_PROOF_REASON));
+    assert!(replay.receipt.verify_signature()?);
+    assert_eq!(
+        replay
+            .receipt
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.pointer("/chio_kernel/rejection_code"))
+            .and_then(serde_json::Value::as_str),
+        Some("CHIO-KERNEL-DURABLE-ADMISSION")
+    );
     assert_eq!(route.prepares.load(Ordering::SeqCst), 1);
     assert_eq!(route.invocations.load(Ordering::SeqCst), 0);
     let (other, other_history) = route.history("dpop-other-operation")?;

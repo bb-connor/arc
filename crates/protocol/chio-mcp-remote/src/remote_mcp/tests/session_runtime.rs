@@ -167,7 +167,7 @@ fn remote_session_factory_rejects_admission_sidecar_aliases() {
 }
 
 #[test]
-fn inbound_authority_factory_binds_caller_key_and_rejects_unbound_proof_policy() {
+fn serve_http_refuses_a_proof_policy_without_a_replay_authority_file() {
     #[derive(Debug)]
     struct ReadTransport;
 
@@ -206,47 +206,14 @@ fn inbound_authority_factory_binds_caller_key_and_rejects_unbound_proof_policy()
     config.receipt_db_path = Some(directory.join("receipts.sqlite3"));
     config.resume_hmac_keyring_path = Some(write_test_resume_hmac_keyring(&directory));
     configure_signed_manifest(&mut config, &directory);
-    let factory = RemoteSessionFactory::new(config.clone()).unwrap();
-    let auth = SessionAuthContext::streamable_http_static_bearer("unbound", "token", None);
-    let error = factory.spawn_session(auth).err().unwrap();
+    let error = RemoteSessionFactory::new(config.clone())
+        .err()
+        .expect("a proof-required policy without a replay authority starts");
     assert!(
-        error.to_string().contains("authenticated Chio sender key"),
+        error
+            .to_string()
+            .contains(chio_control_plane::DPOP_REPLAY_AUTHORITY_REQUIRED),
         "{error:?}"
     );
-    let sender = Keypair::generate();
-    let auth = SessionAuthContext::streamable_http_oauth_bearer_with_claims(
-        chio_core::OAuthBearerSessionAuthInput {
-            principal: Some("verified-sender".into()),
-            issuer: Some("https://issuer.example".into()),
-            subject: Some("sender".into()),
-            audience: None,
-            scopes: vec![],
-            federated_claims: OAuthBearerFederatedClaims {
-                sender_public_key: Some(sender.public_key()),
-                ..Default::default()
-            },
-            enterprise_identity: None,
-            token_fingerprint: Some("fingerprint".into()),
-            origin: None,
-        },
-    );
-    let session = factory.spawn_session(auth.clone()).unwrap();
-    assert_eq!(session.agent_id, sender.public_key().to_hex());
-    assert!(!session.issued_capabilities.is_empty());
-    for cap in &session.issued_capabilities {
-        assert_eq!(cap.subject, sender.public_key());
-        assert!(cap
-            .scope
-            .grants
-            .iter()
-            .all(|grant| grant.dpop_required == Some(true)));
-    }
-    assert_eq!(
-        expected_resume_agent_id(&config, &auth).unwrap(),
-        Some(session.agent_id.clone())
-    );
-    session.shutdown_upstream_transport().unwrap();
-    drop(session);
-    drop(factory);
     std::fs::remove_dir_all(directory).unwrap();
 }

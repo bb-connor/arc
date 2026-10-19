@@ -10,7 +10,7 @@ fn caller_custody_rejects_each_selected_family_without_its_physical_ledger() -> 
         runtime_participant::RuntimeParticipantAuthorityBindingV1, AdmissionAuthorityProfileV1,
         AdmissionAuthoritySelectionV1,
     };
-    use crate::dpop::authority::{DpopReplayAuthorityInputV1, DpopReplayAuthorityV1};
+    use crate::dpop::authority::{DpopReplayAuthority, DpopReplayAuthorityInput};
     for selected in 0_u8..8 {
         let mut fixture = fixture()?;
         let id = |value: &str| AdmissionIdentifier::try_new("test", value.to_owned());
@@ -39,7 +39,7 @@ fn caller_custody_rejects_each_selected_family_without_its_physical_ledger() -> 
                 })
                 .transpose()?,
             dpop: if dpop {
-                Some(DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+                Some(DpopReplayAuthority::new(DpopReplayAuthorityInput {
                     destination_store_uuid: id("d70c4490-9782-4d9c-a5a0-7990ba4c2836")?,
                     dpop_authority_id: id("dpop")?,
                     expectation_id: AdmissionDigest::try_new("generation", "a".repeat(64))?,

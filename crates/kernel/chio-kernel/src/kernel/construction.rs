@@ -347,8 +347,6 @@ impl ChioKernel {
             checkpoint_batch_size,
             checkpoint_seq_counter: AtomicU64::new(0),
             last_checkpoint_seq: AtomicU64::new(0),
-            dpop_nonce_store: None,
-            dpop_config: None,
             dpop_authority: None,
             execution_nonce_config: None,
             execution_nonce_store: None,
@@ -666,9 +664,8 @@ impl ChioKernel {
     }
 
     /// Install (or replace) the recursive-delegation oracle handle.
-    /// Default deployments leave this `None` and rely on the compatibility
-    /// per-row `RevocationStore` lookup. Installing a
-    /// [`chio_kernel_core::RevocationView`] here causes the verifier to
+    /// Without a view, revocation checks use per-row `RevocationStore` lookups.
+    /// Installing a [`chio_kernel_core::RevocationView`] makes the verifier
     /// consult it on every delegated dispatch.
     ///
     /// The handle is `Arc`-shared so federation gossip can install
@@ -802,11 +799,11 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Enable legacy financial dispatch without durable admission recovery.
+    /// Enable non-durable financial dispatch for development.
     ///
-    /// This is an unsafe development compatibility switch. Ambiguous connector
-    /// outcomes can retain budget or rail holds permanently because no recovery
-    /// operation survives restart. Production deployments should install a
+    /// This is an unsafe opt-in. Ambiguous connector outcomes can retain budget
+    /// or rail holds permanently because no recovery operation survives restart.
+    /// Production deployments should install a
     /// qualified durable admission store instead.
     pub fn enable_unsafe_ephemeral_financial_dispatch_for_development(&mut self) {
         self.unsafe_ephemeral_financial_dispatch = true;
@@ -885,8 +882,8 @@ impl ChioKernel {
             // Fail-closed: a store that claims checkpoint capability but did
             // not install a background signer (default hook returns
             // `Ok(false)`) would append forever without producing kernel-signed
-            // Web3 checkpoints now that the synchronous trigger is gone. Reject
-            // the attach rather than serve silently-checkpointless.
+            // Web3 checkpoints. Checkpoint production requires that background
+            // signer, so reject an attachment that does not install it.
             if !background_enabled {
                 return Err(KernelError::Internal(
                     "receipt store reports kernel-signed checkpoint support but did not install a \
@@ -1696,49 +1693,6 @@ impl ChioKernel {
     #[must_use]
     pub fn emergency_stop_reason(&self) -> Option<String> {
         self.stop_control.heads().host_reason()
-    }
-
-    /// Install bounded volatile replay custody only when no store is configured.
-    /// This preserves existing history and does not activate durable replay authority.
-    pub fn install_default_dpop_store(&mut self) {
-        if self.dpop_nonce_store.is_none() {
-            self.dpop_nonce_store = Some(dpop::DpopNonceStore::defaults_with_clock(
-                self.clock.clone(),
-            ));
-            self.dpop_config = Some(dpop::DpopConfig::default());
-        }
-    }
-
-    /// Install a DPoP nonce replay store and verification config.
-    ///
-    /// Once installed, any invocation whose matched grant has `dpop_required == Some(true)`
-    /// must carry a valid `DpopProof` on the `ToolCallRequest`. Requests that lack a proof
-    /// or whose proof fails verification are denied fail-closed.
-    /// The store must be pristine so its clock can be bound to the kernel without
-    /// replacing an observed replay history or its time domain.
-    pub fn set_dpop_store(
-        &mut self,
-        mut nonce_store: dpop::DpopNonceStore,
-        config: dpop::DpopConfig,
-    ) -> Result<(), KernelError> {
-        nonce_store.bind_clock(self.clock.clone())?;
-        self.dpop_nonce_store = Some(nonce_store);
-        self.dpop_config = Some(config);
-        Ok(())
-    }
-
-    /// Access the actual configured volatile source for explicit retirement.
-    /// A preview is data only. Operators must pin its instance and quiesce
-    /// legacy consumers before sealing. This neither imports history nor
-    /// enables a restart-safe authority; replacing the store cannot verify
-    /// a previously pinned seal.
-    pub fn dpop_replay_source(
-        &self,
-    ) -> Result<&dyn dpop::replay_source::DpopReplaySourcePort, KernelError> {
-        self.dpop_nonce_store
-            .as_ref()
-            .map(|store| -> &dyn dpop::replay_source::DpopReplaySourcePort { store })
-            .ok_or_else(|| KernelError::Dpop(crate::dpop::DpopError::MissingStore))
     }
 
     pub fn requires_web3_evidence(&self) -> bool {

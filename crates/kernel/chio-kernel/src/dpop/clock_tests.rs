@@ -30,31 +30,27 @@ fn injected_time_preserves_inclusive_horizon_and_retry_window() {
     assert_eq!(store.utilization().unwrap().0, 1);
 }
 #[test]
-fn failure_and_regression_preserve_custody_and_exact_owner_cleanup() {
+fn failure_and_regression_preserve_retained_markers() {
     let clock = Arc::new(TestClock::new(100));
     let store = store(clock.clone(), 2);
-    assert!(store
-        .reserve_for_dispatch_through("nonce", "cap", 110, "owner")
-        .unwrap());
+    assert!(store.check_and_insert_through("nonce", "cap", 110).unwrap());
+    let charged = store.identity_byte_utilization().unwrap();
     clock.fail();
     assert!(matches!(
         store.check_and_insert_through("other", "cap", 110),
         Err(KernelError::Clock(ClockError::Unavailable))
     ));
-    assert!(!store
-        .rollback_dispatch_reservation("nonce", "cap", "other")
-        .unwrap());
     assert_eq!(store.utilization().unwrap().0, 1);
+    assert_eq!(store.identity_byte_utilization().unwrap(), charged);
     clock.set(99, 1);
     assert!(matches!(
         store.check_and_insert_through("other", "cap", 110),
         Err(KernelError::Clock(ClockError::WallClockRegression))
     ));
-    clock.fail();
-    assert!(store
-        .rollback_dispatch_reservation("nonce", "cap", "owner")
-        .unwrap());
-    assert_eq!(store.utilization().unwrap().0, 0);
+    assert_eq!(store.utilization().unwrap().0, 1);
+    assert_eq!(store.identity_byte_utilization().unwrap(), charged);
+    clock.set(101, 1);
+    assert!(!store.check_and_insert_through("nonce", "cap", 120).unwrap());
 }
 #[test]
 fn first_clock_failure_does_not_publish_a_source_or_marker() {
@@ -129,30 +125,4 @@ fn suspend_rebaseline_cannot_reopen_a_live_marker() {
     clock.set(3701, 2);
     assert!(store.check_and_insert("probe", "cap").unwrap());
     assert!(!store.check_and_insert_until("nonce", "cap", 10000).unwrap());
-}
-
-#[test]
-fn commit_disables_owner_rollback_without_sampling_an_unavailable_clock() {
-    let clock = Arc::new(TestClock::new(100));
-    let store = store(clock.clone(), 1);
-    assert!(store
-        .reserve_for_dispatch_through("nonce", "cap", 110, "owner")
-        .unwrap());
-    let bytes = store.identity_byte_utilization().unwrap().0;
-    clock.fail();
-    assert!(!store
-        .commit_dispatch_reservation("nonce", "cap", "wrong")
-        .unwrap());
-    assert!(store
-        .commit_dispatch_reservation("nonce", "cap", "owner")
-        .unwrap());
-    assert!(!store
-        .rollback_dispatch_reservation("nonce", "cap", "owner")
-        .unwrap());
-    assert_eq!(
-        store.identity_byte_utilization().unwrap().0,
-        bytes - "owner".len()
-    );
-    clock.set(101, 1);
-    assert!(!store.check_and_insert_through("nonce", "cap", 120).unwrap());
 }

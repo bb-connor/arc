@@ -3,7 +3,7 @@
 // Source:     spec/schemas/chio-wire/v1/**/*.schema.json
 // Tool:       json-schema-to-typescript 15.0.4 (see xtask/codegen-tools.lock.toml)
 // Pin file:   sdks/typescript/scripts/package.json
-// Schema SHA: f420a036c34171ed68c51d1524c76c310f13b7aaec2f9e1ea06f58513db6dafa
+// Schema SHA: ceb4a201ba3beb55c2923ab3bad4f695ae5bf8b354583b8868007ce63a4d1687
 //
 // The schema-sha above is sha256 of `<rel-path>\0<bytes>\0` for every
 // schema in lex order. It changes whenever any schema under
@@ -576,7 +576,21 @@ export namespace Agent_ToolCallRequest {
   export interface ChioInvocationProofOfPossession {
     signature: string;
     body: {
-      [k: string]: unknown;
+      schema: "chio.dpop_proof.v1";
+      replay_authority: {
+        destination_store_uuid: string;
+        dpop_authority_id: string;
+        expectation_id: string;
+        proof_ttl_secs: number;
+        max_clock_skew_secs: number;
+      };
+      capability_id: string;
+      tool_server: string;
+      tool_name: string;
+      action_hash: string;
+      nonce: string;
+      issued_at: number;
+      agent_key: string;
     };
   }
   export interface ChioSignedExecutionNonce {
@@ -2572,7 +2586,21 @@ export namespace Kernel_DpopProof {
   export interface ChioInvocationProofOfPossession {
     signature: string;
     body: {
-      [k: string]: unknown;
+      schema: "chio.dpop_proof.v1";
+      replay_authority: {
+        destination_store_uuid: string;
+        dpop_authority_id: string;
+        expectation_id: string;
+        proof_ttl_secs: number;
+        max_clock_skew_secs: number;
+      };
+      capability_id: string;
+      tool_server: string;
+      tool_name: string;
+      action_hash: string;
+      nonce: string;
+      issued_at: number;
+      agent_key: string;
     };
   }
 }

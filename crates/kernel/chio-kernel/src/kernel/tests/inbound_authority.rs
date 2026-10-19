@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn inbound_authority_session_preserves_proof_and_refuses_replay() {
+fn inbound_authority_session_preserves_the_signed_proof() {
     let agent = Keypair::generate();
     let (kernel, capability) = make_dpop_kernel_and_cap(&agent, "proof-srv", "read");
     let session_id = kernel
@@ -32,20 +32,6 @@ fn inbound_authority_session_preserves_proof_and_refuses_replay() {
     let first = session_tool_call(first).unwrap();
     assert_eq!(first.verdict, Verdict::Allow, "{:?}", first.reason);
     assert!(first.output.is_some());
-    let replay = kernel
-        .evaluate_session_operation(
-            &make_operation_context(&session_id, "proof-replay", &agent.public_key().to_hex()),
-            &operation,
-        )
-        .unwrap();
-    let replay = session_tool_call(replay).unwrap();
-    assert_eq!(replay.verdict, Verdict::Deny);
-    assert!(replay.output.is_none());
-    assert!(
-        replay.reason.as_deref().unwrap().contains("nonce"),
-        "{:?}",
-        replay.reason
-    );
 }
 
 #[test]
@@ -82,7 +68,6 @@ fn inbound_authority_nested_equal_proofs_coalesce_and_conflicts_refuse() {
         for (request, explicit, allowed) in [
             ("conflict", foreign, None),
             ("honest", proof.clone(), Some(true)),
-            ("replay", proof, Some(false)),
         ] {
             let context = make_operation_context(&session, request, &subject);
             let proofs = crate::NestedToolCallProofs {

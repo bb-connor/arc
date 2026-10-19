@@ -8,7 +8,7 @@ use chio_kernel::dpop::replay_source::{
 };
 
 use super::*;
-use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
+use chio_kernel::dpop::authority::DpopReplayAuthority;
 
 mod activation;
 mod bounds;
@@ -39,7 +39,7 @@ pub struct DpopReplayMigrationRecordV1 {
     expectation_id: AdmissionIdentifier,
     expectation_digest: String,
     events: Vec<MigrationEvent>,
-    authority: Option<DpopReplayAuthorityV1>,
+    authority: Option<DpopReplayAuthority>,
 }
 
 impl DpopReplayMigrationRecordV1 {
@@ -67,7 +67,7 @@ impl DpopReplayMigrationRecordV1 {
         self.events.len() == 3 && self.authority.is_some()
     }
 
-    pub fn authority(&self) -> Option<&DpopReplayAuthorityV1> {
+    pub fn authority(&self) -> Option<&DpopReplayAuthority> {
         self.authority.as_ref()
     }
 

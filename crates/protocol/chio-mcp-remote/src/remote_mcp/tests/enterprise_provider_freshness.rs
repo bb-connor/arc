@@ -83,7 +83,7 @@ fn jwt_verifier(config: &RemoteServeHttpConfig) -> Arc<JwtBearerVerifier> {
 }
 
 fn authenticate(verifier: &JwtBearerVerifier, token: &str) -> Result<SessionAuthContext, Response> {
-    verifier.authenticate_token(token, &empty_header_map(), None, None, "POST", "chio-mcp")
+    verifier.authenticate_token(token, &empty_header_map(), None, None)
 }
 
 fn provider_record_id(auth_context: &SessionAuthContext) -> Option<String> {

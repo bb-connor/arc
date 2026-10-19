@@ -975,30 +975,30 @@ Internet-Draft                Chio Protocol               September 2026
 
    The Chio invocation proof object below is distinct from the hosted
    HTTP DPoP proof.  The native tool_call_request has no field carrying
-   it; the ordinary session bridge supplies no invocation proof.  Hosted
-   HTTP sender proof authenticates the edge session and is not forwarded
-   as this kernel invocation proof.  A grant requiring invocation-level
-   DPoP therefore needs a surface that carries the object; neither
-   transport silently supplies it.
+   it; the ordinary session bridge supplies no invocation proof.  The
+   hosted HTTP edge accepts no DPoP sender proof (Section 11.2).  A
+   grant requiring invocation-level DPoP therefore needs a surface that
+   carries the object; neither transport silently supplies it.
 
    When any matching tool grant has dpop_required: true, the hosted
    kernel requires a valid proof before invocation.  The native proof is
    {body,signature}. Its body has schema (chio.dpop_proof.v1),
-   capability_id, tool_server, tool_name, action_hash, nonce, issued_at
-   (Unix seconds), and agent_key.  The subject signs canonical JSON of
-   that body, without a prefix. action_hash hashes canonical arguments
-   only.  This is capability/action proof of possession; it is distinct
-   from the HTTP-method and URI JWT binding in [RFC9449].
+   replay_authority, capability_id, tool_server, tool_name, action_hash,
+   nonce, issued_at (Unix seconds), and agent_key. replay_authority
+   names the durable replay domain the verifier selects independently of
+   the proof: destination_store_uuid, dpop_authority_id, expectation_id,
+   proof_ttl_secs, and max_clock_skew_secs.  All members are required.
+   The subject signs canonical JSON of that body, without a prefix.
+   action_hash hashes canonical arguments only.  This is capability/
+   action proof of possession; it is distinct from the HTTP-method and
+   URI JWT binding in [RFC9449].
 
-   The kernel checks schema, subject key, capability/server/tool/action
-   bindings, freshness, signature, and nonce replay state.  The default
-   freshness window is 300 seconds with 30 seconds future-clock
-   allowance; the expiration comparison is inclusive.  The nonce's
-   replay identity is (nonce, capability_id) and is retained through its
-   signed expiry.  Preview and dispatch revalidation can be stateless;
-   dispatch credential reservation reserves the nonce.  A required proof
-   with unavailable replay state fails closed.  Hosted HTTP sender
-   constraint is a separate binding specified in Section 11.2.
+
+
+
+
+
+
 
 
 
@@ -1009,6 +1009,17 @@ Whelan                    Expires 3 April 2027                 [Page 18]
 
 Internet-Draft                Chio Protocol               September 2026
 
+
+   The kernel checks schema, that replay_authority equals its activated
+   authority, subject key, capability/server/tool/action bindings,
+   freshness, signature, and durable nonce replay state.  Freshness uses
+   the authority's proof_ttl_secs and max_clock_skew_secs; the
+   expiration comparison is inclusive.  The nonce's replay identity is
+   (nonce, capability_id) within that authority and is retained through
+   its signed expiry.  Preview and dispatch revalidation can be
+   stateless; dispatch credential acquisition claims the nonce in
+   durable custody.  A kernel with no activated replay authority refuses
+   every required proof.
 
 5.5.  Delegation
 
@@ -1032,17 +1043,6 @@ Internet-Draft                Chio Protocol               September 2026
 
    Signed attenuation arrays use internally tagged objects.  Members
    below are beside type, rather than nested inside a value member:
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -5071,9 +5071,8 @@ Internet-Draft                Chio Protocol               September 2026
     | Last-Event-ID        | GET        | Replay cursor               |
     |                      |            | (Section 11.5)              |
     +----------------------+------------+-----------------------------+
-    | DPoP                 | any        | Sender proof, when the      |
-    |                      | request    | access token requires one   |
-    |                      |            | (Section 11.2)              |
+    | DPoP                 | any        | Refused with 401            |
+    |                      | request    | (Section 11.2)              |
     +----------------------+------------+-----------------------------+
 
                       Table 38: Hosted Request Headers
@@ -5089,6 +5088,7 @@ Internet-Draft                Chio Protocol               September 2026
 
    3.  Accept lacks either media type: 406.  Content-Type does not begin
        with application/json: 415.
+
 
 
 
@@ -5175,20 +5175,13 @@ Internet-Draft                Chio Protocol               September 2026
    The edge has no unauthenticated mode.
 
    A JWT or introspected token can bind the request to a sender through
-   members of its cnf claim.  For chioSenderKey, the request MUST carry
-   a DPoP header whose value is the base64url encoding without padding
-   [RFC4648] of a Chio sender proof (Section 5.4) signed by that key.
-   The proof binds capability_id to the token's jti claim, tool_server
-   to the edge's resource identifier (its protected resource, or /mcp),
-   tool_name to the HTTP method, and action_hash to the SHA-256 hash of
-   the empty octet string.  The edge rejects a stale proof, a proof
-   issued too far in the future, and a proof whose nonce it has already
-   seen for the same jti.  For x5t#S256 and chioAttestationSha256, the
-   request MUST carry the header x-chio-mtls-thumbprint-sha256 or x-
+   members of its cnf claim.  For x5t#S256 and chioAttestationSha256,
+   the request MUST carry the header x-chio-mtls-thumbprint-sha256 or x-
    chio-runtime-attestation-sha256, respectively, with a value equal to
-   the claim.  A failed check is 401.  These checks authenticate HTTP
-   requests; the edge does not pass the proof to the kernel
-   (Section 11.6).
+   the claim.  A failed check is 401.  This edge refuses Chio DPoP
+   sender binding: it MUST reject with 401 a token whose cnf carries
+   chioSenderKey and any request that carries a DPoP header, and MUST
+   NOT admit either as a bearer.
 
    The edge binds the authentication context of initialize to the
    session.  Every later request of the session MUST present the same
@@ -5202,6 +5195,13 @@ Internet-Draft                Chio Protocol               September 2026
 
    A client opens a session as follows:
 
+   1.  The client sends an initialize request in a POST without an MCP-
+       Session-Id header.  The edge answers 400, with JSON-RPC code
+       -32600, if the message has no id or if the POST carries an MCP-
+       Session-Id header with any value.  It creates no session in
+       either case.
+
+
 
 
 
@@ -5209,12 +5209,6 @@ Whelan                    Expires 3 April 2027                 [Page 93]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   1.  The client sends an initialize request in a POST without an MCP-
-       Session-Id header.  The edge answers 400, with JSON-RPC code
-       -32600, if the message has no id or if the POST carries an MCP-
-       Session-Id header with any value.  It creates no session in
-       either case.
 
    2.  The edge creates a session in state initializing, with a new
        session identifier, a new kernel session, an agent key, and
@@ -5259,6 +5253,12 @@ Internet-Draft                Chio Protocol               September 2026
                       +-------------------------------+
                               grace period ends
 
+                      Figure 5: Hosted Session States
+
+   A ready session becomes expired when no request has been accepted for
+   the idle period, which is 15 minutes by default.  Each POST or GET
+   that the edge accepts restarts the idle period; an open stream does
+
 
 
 Whelan                    Expires 3 April 2027                 [Page 94]
@@ -5266,11 +5266,6 @@ Whelan                    Expires 3 April 2027                 [Page 94]
 Internet-Draft                Chio Protocol               September 2026
 
 
-                      Figure 5: Hosted Session States
-
-   A ready session becomes expired when no request has been accepted for
-   the idle period, which is 15 minutes by default.  Each POST or GET
-   that the edge accepts restarts the idle period; an open stream does
    not.  An operator can drain a ready session, which then becomes
    deleted when a grace period ends, 5 seconds by default.  A DELETE
    moves any session that is not in a terminal state to deleted, and an
@@ -5314,6 +5309,11 @@ Internet-Draft                Chio Protocol               September 2026
    is allocated when the edge creates an event, so its value does not
    establish delivery order across streams or buffered events.  For a
    non-priming event, data is one JSON-RPC message; a priming event has
+   empty data.  The edge sets no event field.  The edge retains the last
+   64 notifications for replay and retains no other events.  Delivery on
+   an open stream is best effort: the edge drops events, without notice,
+   for a reader that falls too far behind.
+
 
 
 
@@ -5321,11 +5321,6 @@ Whelan                    Expires 3 April 2027                 [Page 95]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   empty data.  The edge sets no event field.  The edge retains the last
-   64 notifications for replay and retains no other events.  Delivery on
-   an open stream is best effort: the edge drops events, without notice,
-   for a reader that falls too far behind.
 
    A GET with a Last-Event-ID header asks the edge to replay the
    notifications that followed that event.  The edge splits the value at
@@ -5365,7 +5360,12 @@ Internet-Draft                Chio Protocol               September 2026
    (Section 5.8).  The submission carries no sender proof: the kernel
    denies a call for which a matching grant requires one (Section 5.4).
 
-
+   The members of params._meta in Table 39 carry the other inputs of a
+   native request (Table 31). _meta has to be an object, and each member
+   has to have the structure of its native equivalent; the edge answers
+   -32602 otherwise.  The edge also answers -32602 to a member name
+   without its chio prefix (for example approvalToken) and to
+   route_selection.
 
 
 
@@ -5377,13 +5377,6 @@ Whelan                    Expires 3 April 2027                 [Page 96]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   The members of params._meta in Table 39 carry the other inputs of a
-   native request (Table 31). _meta has to be an object, and each member
-   has to have the structure of its native equivalent; the edge answers
-   -32602 otherwise.  The edge also answers -32602 to a member name
-   without its chio prefix (for example approvalToken) and to
-   route_selection.
 
       +===============================+=============================+
       | Member                        | Native equivalent           |
@@ -5421,6 +5414,13 @@ Internet-Draft                Chio Protocol               September 2026
    metadata as route_selection.
 
    The following request is illustrative.
+
+
+
+
+
+
+
 
 
 
@@ -6957,10 +6957,6 @@ Internet-Draft                Chio Protocol               September 2026
               (CRL) Profile", RFC 3279, DOI 10.17487/RFC3279, May 2002,
               <https://www.rfc-editor.org/rfc/rfc3279>.
 
-   [RFC4648]  Josefsson, S., "The Base16, Base32, and Base64 Data
-              Encodings", RFC 4648, DOI 10.17487/RFC4648, October 2006,
-              <https://www.rfc-editor.org/rfc/rfc4648>.
-
    [RFC7519]  Jones, M., Bradley, J., and N. Sakimura, "JSON Web Token
               (JWT)", RFC 7519, DOI 10.17487/RFC7519, May 2015,
               <https://www.rfc-editor.org/rfc/rfc7519>.
@@ -6992,6 +6988,10 @@ Internet-Draft                Chio Protocol               September 2026
               Version 1.3", RFC 8446, DOI 10.17487/RFC8446, August 2018,
               <https://www.rfc-editor.org/rfc/rfc8446>.
 
+   [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
+              Canonicalization Scheme (JCS)", RFC 8785,
+              DOI 10.17487/RFC8785, June 2020,
+              <https://www.rfc-editor.org/rfc/rfc8785>.
 
 
 
@@ -7001,11 +7001,6 @@ Whelan                    Expires 3 April 2027                [Page 125]
 
 Internet-Draft                Chio Protocol               September 2026
 
-
-   [RFC8785]  Rundgren, A., Jordan, B., and S. Erdtman, "JSON
-              Canonicalization Scheme (JCS)", RFC 8785,
-              DOI 10.17487/RFC8785, June 2020,
-              <https://www.rfc-editor.org/rfc/rfc8785>.
 
    [RFC9110]  Fielding, R., Ed., Nottingham, M., Ed., and J. Reschke,
               Ed., "HTTP Semantics", STD 97, RFC 9110,
@@ -7044,20 +7039,6 @@ Internet-Draft                Chio Protocol               September 2026
               attenuation and decentralized verification",
               <https://doc.biscuitsec.org/reference/specifications>.
 
-
-
-
-
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 126]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    [I-D.ietf-wimse-arch-08]
               Salowey, J. A., Rosomakho, Y., and H. Tschofenig,
               "Workload Identity in a Multi System Environment (WIMSE)
@@ -7069,6 +7050,14 @@ Internet-Draft                Chio Protocol               September 2026
    [MACAROONS]
               Birgisson, A., Politz, J. G., Erlingsson, U., Taly, A.,
               Vrable, M., and M. Lentczner, "Macaroons: Cookies with
+
+
+
+Whelan                    Expires 3 April 2027                [Page 126]
+
+Internet-Draft                Chio Protocol               September 2026
+
+
               Contextual Caveats for Decentralized Authorization in the
               Cloud", Network and Distributed System Security
               Symposium NDSS 2014, February 2014, <https://www.ndss-
@@ -7104,16 +7093,6 @@ Internet-Draft                Chio Protocol               September 2026
               Architecture", RFC 9334, DOI 10.17487/RFC9334, January
               2023, <https://www.rfc-editor.org/rfc/rfc9334>.
 
-
-
-
-
-
-Whelan                    Expires 3 April 2027                [Page 127]
-
-Internet-Draft                Chio Protocol               September 2026
-
-
    [RFC9396]  Lodderstedt, T., Richer, J., and B. Campbell, "OAuth 2.0
               Rich Authorization Requests", RFC 9396,
               DOI 10.17487/RFC9396, May 2023,
@@ -7123,6 +7102,17 @@ Internet-Draft                Chio Protocol               September 2026
               Authorization Protocol (GNAP)", RFC 9635,
               DOI 10.17487/RFC9635, October 2024,
               <https://www.rfc-editor.org/rfc/rfc9635>.
+
+
+
+
+
+
+
+Whelan                    Expires 3 April 2027                [Page 127]
+
+Internet-Draft                Chio Protocol               September 2026
+
 
    [RFC9943]  Birkholz, H., Delignat-Lavaud, A., Fournet, C., Deshpande,
               Y., and S. Lasker, "An Architecture for Trustworthy and
@@ -7154,6 +7144,16 @@ A.1.  Capability Token
    a directly issued token with no delegation chain and one tool grant,
    pretty-printed here for reading.  Capability tokens are defined in
    Section 5.
+
+
+
+
+
+
+
+
+
+
 
 
 

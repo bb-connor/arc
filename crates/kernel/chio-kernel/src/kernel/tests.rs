@@ -275,6 +275,8 @@ mod receipt_identity;
 #[path = "tests/receipt_scope_isolation.rs"]
 mod receipt_scope_isolation;
 use federation_cosign::{handshake_and_pin, CountingRejectingCosigner, FailingAppendReceiptStore};
+#[path = "tests/dpop_required_authority.rs"]
+mod dpop_required_authority;
 #[path = "tests/durable_admission.rs"]
 mod durable_admission;
 #[path = "tests/revocation_durability.rs"]

@@ -131,11 +131,8 @@ async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() 
     let seed: [u8; 32] = hasher.finalize().into();
     let public_seed_attacker = Keypair::from_seed(&seed);
     let unrelated = Keypair::generate();
-    let state = mediated_test_state(
-        Keypair::generate(),
-        Arc::new(InMemoryBudgetStore::new()),
-        Vec::new(),
-    );
+    let fixture = DpopFixture::new(Keypair::generate());
+    let state = fixture.state.clone();
     let token = mint(
         Arc::clone(&state),
         "/v1/capabilities",
@@ -144,7 +141,14 @@ async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() 
     .await;
     let params = serde_json::json!({"path": "safe.txt"});
     // A thief advertising the caller public key still needs its private signer.
-    let mut forged = dpop_proof_for(&public_seed_attacker, &token, "filesystem", "read", &params);
+    let mut forged = dpop_proof_for(
+        &public_seed_attacker,
+        &token,
+        "filesystem",
+        "read",
+        &params,
+        &fixture.domain,
+    );
     forged.body.agent_key = agent.public_key();
     let (_, denied) = post_evaluate(
         Arc::clone(&state),
@@ -173,6 +177,7 @@ async fn subject_identity_dpop_refuses_public_seed_wrong_key_and_stolen_token() 
                 "filesystem",
                 "read",
                 &params,
+                &fixture.domain,
             ))
             .test_unwrap();
         }

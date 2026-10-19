@@ -429,14 +429,7 @@ fn build_federated_claims(
     claims: &JwtClaims,
     _provider_profile: JwtProviderProfile,
 ) -> Result<OAuthBearerFederatedClaims, chio_core::Error> {
-    let sender_public_key = claims
-        .cnf
-        .as_ref()
-        .and_then(|confirmation| confirmation.chio_sender_key.as_deref())
-        .map(PublicKey::from_hex)
-        .transpose()?;
     Ok(OAuthBearerFederatedClaims {
-        sender_public_key,
         client_id: claims
             .client_id
             .clone()

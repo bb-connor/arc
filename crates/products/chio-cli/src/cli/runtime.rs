@@ -1,4 +1,8 @@
 use super::*;
+#[path = "runtime/dpop_authority.rs"]
+mod dpop_authority;
+use dpop_authority::attach_durable_admission_runtime;
+pub(crate) use dpop_authority::{configured_dpop_replay_authority, policy_dpop_replay_authority};
 #[path = "runtime/session_subject.rs"]
 mod session_subject;
 use chio_api_protect::DEFAULT_UPSTREAM_REQUEST_TIMEOUT;
@@ -125,6 +129,8 @@ pub(crate) fn cmd_run(
     let agent_pk = resolve_agent_subject(agent_public_key, &default_capabilities)?;
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let dpop_authority =
+        policy_dpop_replay_authority(&loaded_policy)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -154,7 +160,11 @@ pub(crate) fn cmd_run(
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
         opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
-    attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
+    attach_durable_admission_runtime(
+        &mut kernel,
+        durable_admission.as_ref(),
+        dpop_authority.as_ref(),
+    )?;
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,
@@ -363,24 +373,6 @@ pub(crate) struct McpEdgeStores<'a> {
     pub control_token: Option<&'a str>,
 }
 
-fn attach_durable_admission_runtime(
-    kernel: &mut ChioKernel,
-    runtime: Option<&DurableAdmissionRuntime>,
-) -> Result<(), CliError> {
-    if kernel.durable_admission_mode()
-        == chio_kernel::admission_operation::DurableAdmissionMode::Off
-    {
-        return Ok(());
-    }
-    runtime
-        .ok_or_else(|| {
-            CliError::cli_other_error(
-                "durable admission runtime is unavailable for an enabled policy".to_string(),
-            )
-        })?
-        .attach(kernel)
-}
-
 /// Build the kernel that backs the long-running `chio mcp serve` edge.
 ///
 /// Unlike the one-shot `chio run` / `chio check` sessions, the MCP edge outlives
@@ -399,6 +391,8 @@ pub(crate) fn build_mcp_edge_kernel(
 ) -> Result<ChioKernel, CliError> {
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let dpop_authority =
+        policy_dpop_replay_authority(&loaded_policy)?;
     let mut kernel = build_kernel(loaded_policy, kernel_kp);
     configure_receipt_store(
         &mut kernel,
@@ -414,7 +408,11 @@ pub(crate) fn build_mcp_edge_kernel(
             stores.control_token,
         )?;
     }
-    attach_durable_admission_runtime(&mut kernel, stores.durable_admission)?;
+    attach_durable_admission_runtime(
+        &mut kernel,
+        stores.durable_admission,
+        dpop_authority.as_ref(),
+    )?;
     configure_capability_authority(
         &mut kernel,
         kernel_kp,
@@ -517,6 +515,7 @@ pub(crate) fn cmd_api_protect(
             signer_seed_hex: None,
             trusted_capability_issuers,
             approval: load_sidecar_approval_config()?,
+            dpop_replay_authority: configured_dpop_replay_authority()?,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -626,6 +625,7 @@ pub(crate) fn cmd_start(
             signer_seed_hex: None,
             trusted_capability_issuers,
             approval: load_sidecar_approval_config()?,
+            dpop_replay_authority: configured_dpop_replay_authority()?,
             control_url: control_url.map(str::to_string),
             control_token: control_token.map(str::to_string),
             budget_db: budget_db.map(|path| path.display().to_string()),
@@ -746,6 +746,8 @@ pub(crate) fn cmd_check(
     let default_capabilities = loaded_policy.default_capabilities.clone();
     let issuance_policy = loaded_policy.issuance_policy.clone();
     let runtime_assurance_policy = loaded_policy.runtime_assurance_policy.clone();
+    let dpop_authority =
+        policy_dpop_replay_authority(&loaded_policy)?;
     let durable_admission = open_cli_durable_admission_runtime(
         loaded_policy.kernel.durable_admission_mode,
         session_db_path,
@@ -767,7 +769,11 @@ pub(crate) fn cmd_check(
         configure_revocation_store(&mut kernel, revocation_db_path, control_url, control_token)?;
         opt_in_ephemeral_revocation_for_local_session(&mut kernel, revocation_db_path, control_url);
     }
-    attach_durable_admission_runtime(&mut kernel, durable_admission.as_ref())?;
+    attach_durable_admission_runtime(
+        &mut kernel,
+        durable_admission.as_ref(),
+        dpop_authority.as_ref(),
+    )?;
     configure_capability_authority(
         &mut kernel,
         &kernel_kp,
@@ -810,7 +816,9 @@ pub(crate) fn cmd_check(
         let proof = chio_kernel::dpop::DpopProof::sign(
             chio_kernel::dpop::DpopProofBody {
                 schema: chio_kernel::DPOP_SCHEMA.to_string(),
-                replay_authority: None,
+                replay_authority: kernel.operation_owned_dpop_authority().cloned().ok_or(
+                    chio_kernel::KernelError::Dpop(chio_kernel::dpop::DpopError::MissingAuthority),
+                )?,
                 capability_id: cap.id.clone(),
                 tool_server: server.to_string(),
                 tool_name: tool.to_string(),
@@ -1297,6 +1305,7 @@ pub(crate) fn cmd_mcp_serve_http(
     )?);
 
     remote_mcp::serve_http(remote_mcp::RemoteServeHttpConfig {
+        dpop_replay_authority: configured_dpop_replay_authority()?,
         transport,
         trusted_proxy: trusted_proxy_token_file
             .map(|path| {

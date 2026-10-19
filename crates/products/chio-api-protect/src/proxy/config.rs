@@ -48,6 +48,9 @@ pub struct ProtectConfig {
     pub signer_seed_hex: Option<String>,
     /// Explicit capability issuers trusted by the HTTP authority.
     pub trusted_capability_issuers: Vec<PublicKey>,
+    /// Independently trusted DPoP domain, already activated in the durable
+    /// admission authority. Absent configuration refuses DPoP-required calls.
+    pub dpop_replay_authority: Option<chio_kernel::dpop::authority::DpopReplayAuthority>,
     /// Explicit ordinary approval authority and authenticated executor.
     pub approval: Option<super::approval_authority::ProtectApprovalConfig>,
     /// Control-plane URL. When set, budget holds go through a `RemoteBudgetStore`.
@@ -109,6 +112,7 @@ impl std::fmt::Debug for ProtectConfig {
                 "trusted_capability_issuers",
                 &self.trusted_capability_issuers,
             )
+            .field("dpop_replay_authority", &self.dpop_replay_authority)
             .field("control_url", &self.control_url)
             .field("budget_db", &self.budget_db)
             .field("revocation_db", &self.revocation_db)

@@ -61,7 +61,7 @@ opening admission state. It builds/configures a kernel, registers a
 policy's default capabilities. If no capability matches, it issues an empty
 scope that leaves rejection to kernel evaluation. Where required, it signs a
 DPoP proof bound to the capability, server, tool, canonical argument hash,
-nonce, time, and generated agent key.
+nonce, time, generated agent key, and configured activated replay authority.
 
 The command opens and activates a session, constructs a `ToolCallOperation`,
 and calls `evaluate_session_operation`. It drains and closes the session
@@ -95,7 +95,14 @@ operation does not reconstruct policy execution or prove log completeness.
 
 `open_cli_durable_admission_runtime` validates participant paths and, when
 applicable, distinct database paths before opening local or remote admission
-state. A remote runtime requires a control token. The default admission mode
+state. `CHIO_DPOP_REPLAY_AUTHORITY_FILE` is the one DPoP authority
+configuration point for `run`, `check`, `mcp serve`, `mcp serve-http`, `api
+protect` and the process host. The loader bounds a regular input to 4096 bytes
+and rejects duplicate fields. A policy whose default grants require DPoP
+refuses startup when the file is unset.
+Attachment verifies the selected descriptor against the active durable store.
+A configured descriptor with admission disabled refuses startup.
+A remote runtime requires a control token. The default admission mode
 is `SideEffecting`; enabled modes require a session/admission database path. `run` and
 `check` call `opt_in_ephemeral_revocation_for_local_session` only when they
 have no durable admission runtime; it opts in when no durable revocation

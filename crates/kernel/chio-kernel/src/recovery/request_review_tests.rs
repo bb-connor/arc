@@ -138,7 +138,7 @@ fn authorization_variants(
     changed.dpop_proof = Some(DpopProof::sign(
         crate::dpop::DpopProofBody {
             schema: crate::dpop::DPOP_SCHEMA.into(),
-            replay_authority: None,
+            replay_authority: crate::dpop::test_authority(),
             capability_id: request.capability.id.clone(),
             tool_server: request.server_id.clone(),
             tool_name: request.tool_name.clone(),

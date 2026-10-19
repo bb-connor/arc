@@ -3,10 +3,10 @@
 pub enum DpopError {
     #[error("invalid DPoP nonce store capacity: {0}")]
     InvalidCapacity(&'static str),
-    #[error("DPoP reservation ownership unconfirmed at commit; marker retained")]
-    ReservationOwnership,
-    #[error("unsupported DPoP schema or replay domain")]
+    #[error("unsupported DPoP schema")]
     Schema,
+    #[error("DPoP replay authority does not match the configured authority")]
+    AuthorityMismatch,
     #[error("DPoP sender constraint mismatch")]
     Sender,
     #[error("DPoP capability binding mismatch")]
@@ -45,10 +45,8 @@ pub enum DpopError {
     Malformed(#[source] serde_json::Error),
     #[error("required DPoP proof missing")]
     MissingProof,
-    #[error("DPoP nonce store not configured")]
-    MissingStore,
-    #[error("DPoP verification policy not configured")]
-    MissingConfiguration,
+    #[error("DPoP replay authority not configured")]
+    MissingAuthority,
     #[error("DPoP canonical encoding failed: {0}")]
     Encoding(#[source] Box<dyn std::error::Error + Send + Sync>),
     #[error("DPoP signing failed: {0}")]
@@ -58,8 +56,8 @@ impl DpopError {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::InvalidCapacity(..) => "urn:chio:error:kernel:dpop-invalid-capacity",
-            Self::ReservationOwnership => "urn:chio:error:kernel:dpop-reservation-ownership",
             Self::Schema => "urn:chio:error:kernel:dpop-schema",
+            Self::AuthorityMismatch => "urn:chio:error:kernel:dpop-authority-mismatch",
             Self::Sender => "urn:chio:error:kernel:dpop-sender",
             Self::Capability => "urn:chio:error:kernel:dpop-capability",
             Self::Server => "urn:chio:error:kernel:dpop-server",
@@ -79,8 +77,7 @@ impl DpopError {
             Self::Unavailable => "urn:chio:error:kernel:dpop-unavailable",
             Self::Malformed(..) => "urn:chio:error:kernel:dpop-malformed",
             Self::MissingProof => "urn:chio:error:kernel:dpop-missing-proof",
-            Self::MissingStore => "urn:chio:error:kernel:dpop-missing-store",
-            Self::MissingConfiguration => "urn:chio:error:kernel:dpop-missing-configuration",
+            Self::MissingAuthority => "urn:chio:error:kernel:dpop-missing-configuration",
             Self::Encoding(..) => "urn:chio:error:kernel:dpop-encoding",
             Self::Signing(..) => "urn:chio:error:kernel:dpop-signing",
         }

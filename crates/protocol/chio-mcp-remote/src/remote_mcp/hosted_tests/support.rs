@@ -606,6 +606,7 @@ pub fn base_remote_config(dir: &Path, listen: SocketAddr) -> RemoteServeHttpConf
             .expect("secure remote session HMAC keyring");
     }
     RemoteServeHttpConfig {
+        dpop_replay_authority: None,
         transport: Default::default(),
         trusted_proxy: None,
         clock: Default::default(),

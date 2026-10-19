@@ -19,6 +19,13 @@ impl ChioKernel {
         dpop_required: bool,
         mut admission: Option<&mut DurableToolAdmission>,
     ) -> RuntimeAdmissionDecision {
+        if dpop_required && self.operation_owned_dpop_authority().is_none() {
+            let error = KernelError::Dpop(crate::dpop::DpopError::MissingAuthority);
+            return RuntimeAdmissionDecision::deny(
+                error.to_string(),
+                error.rejection_metadata(None),
+            );
+        }
         if let Err(error) = self.validate_live_admission_authority_profile(admission.as_deref()) {
             return RuntimeAdmissionDecision::deny(
                 error.to_string(),
@@ -27,7 +34,7 @@ impl ChioKernel {
         }
         let prepared = if (self.governed_approval_authority.is_some()
             && request.approval_token.is_some())
-            || (self.dpop_authority.is_some() && dpop_required)
+            || dpop_required
         {
             let Some(operation) = admission.as_deref() else {
                 return RuntimeAdmissionDecision::deny(
@@ -100,7 +107,10 @@ impl ChioKernel {
                     prepared.claim_for_admission(admission, grant_index, now_unix_ms)
                 });
             if let Err(error) = result {
-                return RuntimeAdmissionDecision::deny(error.to_string(), decision.metadata);
+                return RuntimeAdmissionDecision::deny(
+                    error.to_string(),
+                    error.rejection_metadata(decision.metadata),
+                );
             }
         }
         decision
@@ -234,9 +244,7 @@ impl<'kernel> PreparedDispatchCredentials<'kernel, '_> {
             .dpop_credential()
             .map(|credential| {
                 let admission = admission.ok_or_else(|| {
-                    KernelError::DurableAdmission(
-                        "operation-owned DPoP cannot fall back to the legacy replay store".into(),
-                    )
+                    KernelError::DurableAdmission("DPoP requires durable admission custody".into())
                 })?;
                 prepared
                     .kernel

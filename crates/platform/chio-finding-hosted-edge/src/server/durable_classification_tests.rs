@@ -179,8 +179,7 @@ async fn auth_case(
             public_endpoint: "https://market.example".into(),
             capability_authorities: vec![state.config.kernel_receipt_key.clone()],
             maximum_capability_ttl_secs: 300,
-            dpop_proof_ttl_secs: 30,
-            dpop_clock_skew_secs: 5,
+            dpop_replay_authority: None,
             dpop_nonce_capacity_per_tenant: 1000,
             tenant_policies: vec![HostedTenantAuthPolicy {
                 tenant_id: tenant.clone(),

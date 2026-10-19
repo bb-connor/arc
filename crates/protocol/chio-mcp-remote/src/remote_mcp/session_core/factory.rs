@@ -7,6 +7,11 @@ impl RemoteSessionFactory {
             proxy.validate_separation(&config)?;
         }
         let loaded_policy = load_policy(&config.policy_path)?;
+        chio_control_plane::require_configured_dpop_replay_authority(
+            &loaded_policy,
+            config.dpop_replay_authority.as_ref(),
+        )?;
+        let dpop_authority = config.dpop_replay_authority.clone();
         let signed_manifest_path = config.signed_manifest_path.as_deref().ok_or_else(|| {
             CliError::cli_other_error(
                 "remote MCP requires an existing publisher-signed manifest file".to_string(),
@@ -128,7 +133,7 @@ impl RemoteSessionFactory {
                 &keypair,
                 Arc::new(factory.config.clock.clone()),
             );
-            factory.attach_durable_admission(&mut kernel)?;
+            factory.attach_durable_admission(&mut kernel, dpop_authority.as_ref())?;
             remote_mcp_approval_policy::configure(&mut kernel, approval)?;
         }
         Ok(factory)
@@ -145,6 +150,7 @@ impl RemoteSessionFactory {
             CliError::cli_other_error("explicit approval authority is required".to_string())
         })?;
         let loaded_policy = load_policy(&self.config.policy_path)?;
+        let dpop_authority = self.config.dpop_replay_authority.clone();
         if fingerprint_remote_policy_contract(&loaded_policy)? != session.policy_fingerprint
             || self.runtime_contract_fingerprint != session.runtime_contract_fingerprint
         {
@@ -160,7 +166,7 @@ impl RemoteSessionFactory {
             &keypair,
             Arc::new(self.config.clock.clone()),
         );
-        self.attach_durable_admission(&mut kernel)?;
+        self.attach_durable_admission(&mut kernel, dpop_authority.as_ref())?;
         self.configure_session_capability_authority(&mut kernel, &keypair, issuance, assurance)?;
         remote_mcp_approval_policy::configure(&mut kernel, approval)?;
         kernel
@@ -183,7 +189,11 @@ impl RemoteSessionFactory {
         }
     }
 
-    fn attach_durable_admission(&self, kernel: &mut ChioKernel) -> Result<(), CliError> {
+    fn attach_durable_admission(
+        &self,
+        kernel: &mut ChioKernel,
+        dpop_authority: Option<&chio_kernel::dpop::authority::DpopReplayAuthority>,
+    ) -> Result<(), CliError> {
         kernel.set_stop_control(self.stop.clone());
         if kernel.durable_admission_mode()
             == chio_kernel::admission_operation::DurableAdmissionMode::Off
@@ -197,7 +207,7 @@ impl RemoteSessionFactory {
                     "hosted MCP durable admission runtime is unavailable".to_string(),
                 )
             })?
-            .attach(kernel)
+            .attach(kernel, dpop_authority)
     }
 
     fn configure_session_capability_authority(
@@ -282,7 +292,9 @@ impl RemoteSessionFactory {
                     server_version: self.config.server_version.clone(),
                     public_key: admitted_manifest.manifest.public_key.clone(),
                 },
-                Box::new(chio_mcp_adapter::adapter::SerializedMcpTransport::from_arc(Arc::clone(transport))),
+                Box::new(chio_mcp_adapter::adapter::SerializedMcpTransport::from_arc(
+                    Arc::clone(transport),
+                )),
             );
             return Ok(Arc::new(AdaptedMcpServer::new_with_manifest_registry(
                 adapter,
@@ -359,6 +371,7 @@ impl RemoteSessionFactory {
     ) -> Result<Arc<RemoteSession>, CliError> {
         let session_id = Keypair::generate().public_key().to_hex();
         let loaded_policy = load_policy(&self.config.policy_path)?;
+        let dpop_authority = self.config.dpop_replay_authority.clone();
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
@@ -404,7 +417,7 @@ impl RemoteSessionFactory {
                 self.config.control_token.as_deref(),
             )?;
         }
-        self.attach_durable_admission(&mut kernel)?;
+        self.attach_durable_admission(&mut kernel, dpop_authority.as_ref())?;
         if let Some(approval) = &self.config.approval {
             remote_mcp_approval_policy::configure(&mut kernel, approval)?;
         }
@@ -562,6 +575,7 @@ impl RemoteSessionFactory {
         }
 
         let loaded_policy = load_policy(&self.config.policy_path)?;
+        let dpop_authority = self.config.dpop_replay_authority.clone();
         let auth_mode_fingerprint = fingerprint_remote_auth_contract(&self.config)?;
         let policy_fingerprint = fingerprint_remote_policy_contract(&loaded_policy)?;
         let default_capabilities = loaded_policy.default_capabilities.clone();
@@ -570,8 +584,7 @@ impl RemoteSessionFactory {
                 .grants
                 .iter()
                 .any(|grant| grant.dpop_required == Some(true))
-        }) && authenticated_sender_key(&record.auth_context).is_none()
-        {
+        }) {
             return Ok(None);
         }
         match record.auth_mode_fingerprint.as_deref() {
@@ -611,7 +624,7 @@ impl RemoteSessionFactory {
                 self.config.control_token.as_deref(),
             )?;
         }
-        self.attach_durable_admission(&mut kernel)?;
+        self.attach_durable_admission(&mut kernel, dpop_authority.as_ref())?;
         if let Some(approval) = &self.config.approval {
             remote_mcp_approval_policy::configure(&mut kernel, approval)?;
         }

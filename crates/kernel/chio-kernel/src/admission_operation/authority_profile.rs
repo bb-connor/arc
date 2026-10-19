@@ -3,7 +3,7 @@
 use super::governed_approval_claim::GovernedApprovalAuthorityBindingV1;
 use super::runtime_participant::RuntimeParticipantAuthorityBindingV1;
 use super::AdmissionOperationStoreError;
-use crate::dpop::authority::DpopReplayAuthorityV1;
+use crate::dpop::authority::DpopReplayAuthority;
 use crate::supplemental_admission::SupplementalAdmissionAuthorityBindingV1;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -26,7 +26,7 @@ pub struct AdmissionAuthoritySelectionV1 {
     #[serde(deserialize_with = "required_option")]
     pub approval: Option<GovernedApprovalAuthorityBindingV1>,
     #[serde(deserialize_with = "required_option")]
-    pub dpop: Option<DpopReplayAuthorityV1>,
+    pub dpop: Option<DpopReplayAuthority>,
 }
 
 // A missing selection field is not evidence of an explicitly absent selection.
@@ -100,7 +100,7 @@ impl TryFrom<Wire> for AdmissionAuthorityProfileV1 {
 }
 
 impl AdmissionAuthorityProfileV1 {
-    /// Complete original configuration, including legacy hook presence. The
+    /// Complete original configuration, including runtime-hook presence. The
     /// absence of an owned binding alone does not prove absence of authority.
     #[must_use]
     pub fn selection(&self) -> &AdmissionAuthoritySelectionV1 {
@@ -178,7 +178,7 @@ impl AdmissionAuthorityProfileV1 {
     }
 
     #[must_use]
-    pub fn dpop(&self) -> Option<&DpopReplayAuthorityV1> {
+    pub fn dpop(&self) -> Option<&DpopReplayAuthority> {
         self.selection.dpop.as_ref()
     }
 

@@ -1,83 +1,70 @@
-//! DPoP proof-of-possession tests.
-//!
-//! Tests verify all six verification steps: schema, sender constraint,
-//! binding fields, freshness, signature, and nonce replay.
+//! DPoP verification and volatile source-retention boundaries.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use chio_core::capability::{
     scope::ChioScope,
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_kernel::dpop::DpopError;
-use chio_kernel::KernelError;
+use chio_kernel::dpop::authority::DpopReplayAuthority;
+use chio_kernel::dpop::{DpopError, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
 use chio_kernel::{
-    verify_dpop_proof, DpopConfig, DpopNonceStore, DpopProof, DpopProofBody, DPOP_SCHEMA,
+    verify_dpop_proof_stateless, DpopNonceStore, DpopProof, DpopProofBody, KernelError, DPOP_SCHEMA,
 };
 
-/// Helper: create a signed capability where `subject` is the provided public key.
-fn make_capability(agent_kp: &Keypair) -> CapabilityToken {
-    let issuer_kp = Keypair::generate();
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let body = CapabilityTokenBody {
-        id: "cap-dpop-test-01".to_string(),
-        issuer: issuer_kp.public_key(),
-        subject: agent_kp.public_key(),
-        scope: ChioScope::default(),
-        issued_at: now,
-        expires_at: now + 3600,
-        delegation_chain: vec![],
-        aggregate_invocation_budget: None,
-    };
-    CapabilityToken::sign(body, &issuer_kp).expect("sign capability")
+const NOW: u64 = 1_800_000_000;
+
+fn authority() -> DpopReplayAuthority {
+    serde_json::from_value(serde_json::json!({
+        "destination_store_uuid": "018f9878-7047-7abc-8c98-120dc65700ea",
+        "dpop_authority_id": "configured-dpop",
+        "expectation_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "proof_ttl_secs": 300,
+        "max_clock_skew_secs": 30
+    }))
+    .unwrap()
 }
 
-/// Helper: build a valid DPoP proof body.
-fn make_proof_body(capability: &CapabilityToken, agent_kp: &Keypair) -> DpopProofBody {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
+fn make_capability(agent: &Keypair) -> CapabilityToken {
+    let issuer = Keypair::generate();
+    CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: "cap-dpop-test-01".into(),
+            issuer: issuer.public_key(),
+            subject: agent.public_key(),
+            scope: ChioScope::default(),
+            issued_at: NOW,
+            expires_at: NOW + 3600,
+            delegation_chain: vec![],
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .unwrap()
+}
+
+fn make_proof_body(capability: &CapabilityToken, agent: &Keypair) -> DpopProofBody {
     DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
+        replay_authority: authority(),
+        schema: DPOP_SCHEMA.into(),
         capability_id: capability.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
+        tool_server: "srv-a".into(),
+        tool_name: "read_file".into(),
         action_hash: sha256_hex(b"{}"),
-        nonce: "nonce-abc-123".to_string(),
-        issued_at: now,
-        agent_key: agent_kp.public_key(),
+        nonce: "nonce-abc-123".into(),
+        issued_at: NOW,
+        agent_key: agent.public_key(),
     }
 }
 
-/// Helper: default DPoP config.
-fn default_config() -> DpopConfig {
-    DpopConfig::default()
-}
-
-/// Helper: default nonce store.
-fn default_store(config: &DpopConfig) -> DpopNonceStore {
-    DpopNonceStore::new(
-        config.nonce_store_capacity,
-        Duration::from_secs(config.proof_ttl_secs),
-    )
-    .expect("positive replay store test capacities")
-}
-
 #[test]
-fn dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification() {
-    use chio_kernel::dpop::{verify_dpop_proof_stateless, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
+fn dpop_identity_byte_limit_is_shared_by_verification_and_source_retention() {
     let key = Keypair::generate();
     let capability = make_capability(&key);
-    let config = default_config();
-    let store = default_store(&config);
+    let source = DpopNonceStore::new(8, Duration::from_secs(60)).unwrap();
     for (nonce, admitted) in [
         ("é".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES / 2), true),
         (
@@ -86,417 +73,162 @@ fn dpop_identity_byte_limit_is_shared_by_stateless_and_consuming_verification() 
         ),
     ] {
         let mut body = make_proof_body(&capability, &key);
-        body.nonce = nonce;
+        body.nonce = nonce.clone();
         let proof = DpopProof::sign(body, &key).unwrap();
-        let preview = verify_dpop_proof_stateless(
+        let verified = verify_dpop_proof_stateless(
             &proof,
             &capability,
             "srv-a",
             "read_file",
-            &proof.body.action_hash,
-            &config,
-            chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock)
-                .unwrap(),
+            &sha256_hex(b"{}"),
+            &authority(),
+            NOW,
         );
-        assert_eq!(preview.is_ok(), admitted);
-        let execution = verify_dpop_proof(
-            &proof,
-            &capability,
-            "srv-a",
-            "read_file",
-            &proof.body.action_hash,
-            &store,
-            &config,
+        assert_eq!(verified.is_ok(), admitted);
+        assert_eq!(
+            source.check_and_insert(&nonce, &capability.id).is_ok(),
+            admitted
         );
-        assert_eq!(execution.is_ok(), admitted);
     }
-    assert_eq!(store.utilization().unwrap().0, 1);
+    assert_eq!(source.utilization().unwrap().0, 1);
 }
 
 #[test]
 fn dpop_oversized_identity_is_refused_before_signature_canonicalization() {
-    use chio_kernel::dpop::{verify_dpop_proof_stateless, MAX_DPOP_REPLAY_IDENTITY_PART_BYTES};
     let key = Keypair::generate();
     let capability = make_capability(&key);
-    let config = default_config();
     let mut proof = DpopProof::sign(make_proof_body(&capability, &key), &key).unwrap();
-    // Deliberately invalidate the signature as well. The bounded shape gate
-    // must be the first rejection, before canonicalizing attacker-sized text.
     proof.body.nonce = "n".repeat(MAX_DPOP_REPLAY_IDENTITY_PART_BYTES + 1);
+    assert!(matches!(
+        verify_dpop_proof_stateless(
+            &proof,
+            &capability,
+            "srv-a",
+            "read_file",
+            &sha256_hex(b"{}"),
+            &authority(),
+            NOW
+        ),
+        Err(KernelError::Dpop(DpopError::IdentityLimit))
+    ));
+}
+
+#[test]
+fn dpop_valid_proof_yields_repeatable_evidence_without_replay_custody() {
+    let key = Keypair::generate();
+    let capability = make_capability(&key);
+    let proof = DpopProof::sign(make_proof_body(&capability, &key), &key).unwrap();
+    for _ in 0..2 {
+        let verified = verify_dpop_proof_stateless(
+            &proof,
+            &capability,
+            "srv-a",
+            "read_file",
+            &sha256_hex(b"{}"),
+            &authority(),
+            NOW,
+        )
+        .unwrap();
+        assert_eq!(verified.authority(), &authority());
+        assert_eq!(verified.valid_through_unix_secs(), NOW + 300);
+    }
+}
+
+fn assert_binding_mismatch(field: usize, expected: DpopError) {
+    let key = Keypair::generate();
+    let capability = make_capability(&key);
+    let mut body = make_proof_body(&capability, &key);
+    match field {
+        0 => body.capability_id = "another-capability".into(),
+        1 => body.tool_server = "another-server".into(),
+        2 => body.tool_name = "another-tool".into(),
+        3 => body.action_hash = sha256_hex(b"changed"),
+        4 => body.agent_key = Keypair::generate().public_key(),
+        _ => unreachable!(),
+    }
+    let proof = DpopProof::sign(body, &key).unwrap();
     let error = verify_dpop_proof_stateless(
         &proof,
         &capability,
         "srv-a",
         "read_file",
-        &proof.body.action_hash,
-        &config,
-        chio_security_types::clock::Clock::read(&chio_security_types::clock::SystemClock).unwrap(),
+        &sha256_hex(b"{}"),
+        &authority(),
+        NOW,
     )
     .unwrap_err();
-    assert!(error.to_string().contains("4096-byte limit"));
-}
-
-// ---------------------------------------------------------------------------
-// Test 1: Valid proof is accepted
-// ---------------------------------------------------------------------------
-
-#[test]
-fn dpop_valid_proof_accepted() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-    let body = make_proof_body(&cap, &agent_kp);
-    let proof = DpopProof::sign(body, &agent_kp).expect("sign proof");
-
-    let config = default_config();
-    let store = default_store(&config);
-
-    let result = verify_dpop_proof(
-        &proof,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-
-    assert!(result.is_ok(), "valid proof should be accepted: {result:?}");
-}
-
-// ---------------------------------------------------------------------------
-// Test 2: Wrong action_hash is rejected (cross-invocation replay)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn dpop_wrong_action_hash_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-    let body = make_proof_body(&cap, &agent_kp);
-    let proof = DpopProof::sign(body, &agent_kp).expect("sign proof");
-
-    let config = default_config();
-    let store = default_store(&config);
-
-    // Provide a different action_hash than what the proof was signed over.
-    let wrong_hash = sha256_hex(b"{\"different\": \"args\"}");
-    let result = verify_dpop_proof(
-        &proof,
-        &cap,
-        "srv-a",
-        "read_file",
-        &wrong_hash,
-        &store,
-        &config,
-    );
-
-    assert!(
-        matches!(result, Err(KernelError::Dpop(DpopError::Action))),
-        "{result:?}"
-    );
-}
-
-fn assert_dpop_binding_mismatch_rejected(
-    body: DpopProofBody,
-    agent_kp: &Keypair,
-    cap: &CapabilityToken,
-    expected: DpopError,
-) {
-    let proof = DpopProof::sign(body, agent_kp).expect("sign proof");
-    let config = default_config();
-    let store = default_store(&config);
-
-    let result = verify_dpop_proof(
-        &proof,
-        cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-
-    let error = result.expect_err("binding mismatch");
     assert!(matches!(error, KernelError::Dpop(_)));
     assert_eq!(error.report().code, expected.code());
 }
 
 #[test]
 fn dpop_wrong_capability_id_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-    let mut body = make_proof_body(&cap, &agent_kp);
-    body.capability_id = "cap-other".to_string();
-
-    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap, DpopError::Capability);
+    assert_binding_mismatch(0, DpopError::Capability);
 }
-
 #[test]
 fn dpop_wrong_tool_server_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-    let mut body = make_proof_body(&cap, &agent_kp);
-    body.tool_server = "srv-b".to_string();
-
-    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap, DpopError::Server);
+    assert_binding_mismatch(1, DpopError::Server);
 }
-
 #[test]
 fn dpop_wrong_tool_name_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-    let mut body = make_proof_body(&cap, &agent_kp);
-    body.tool_name = "write_file".to_string();
-
-    assert_dpop_binding_mismatch_rejected(body, &agent_kp, &cap, DpopError::Tool);
+    assert_binding_mismatch(2, DpopError::Tool);
 }
-
-// ---------------------------------------------------------------------------
-// Test 3: Proof signed by wrong agent key is rejected
-// ---------------------------------------------------------------------------
-
+#[test]
+fn dpop_wrong_action_hash_rejected() {
+    assert_binding_mismatch(3, DpopError::Action);
+}
 #[test]
 fn dpop_wrong_agent_key_rejected() {
-    let agent_kp = Keypair::generate();
-    let attacker_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-
-    // Build a proof body that claims to be from the agent but is signed by attacker.
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let body = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: "nonce-attacker-001".to_string(),
-        issued_at: now,
-        // attacker sets their own key in the body
-        agent_key: attacker_kp.public_key(),
-    };
-    let proof = DpopProof::sign(body, &attacker_kp).expect("sign proof");
-
-    let config = default_config();
-    let store = default_store(&config);
-
-    let result = verify_dpop_proof(
-        &proof,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-
-    assert!(
-        matches!(result, Err(KernelError::Dpop(DpopError::Sender))),
-        "{result:?}"
-    );
+    assert_binding_mismatch(4, DpopError::Sender);
 }
-
-// ---------------------------------------------------------------------------
-// Test 4: Expired proof is rejected
-// ---------------------------------------------------------------------------
 
 #[test]
 fn dpop_expired_proof_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-
-    // issued_at = 0 is far in the past and will fail the freshness check.
-    let body = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: "nonce-expired-001".to_string(),
-        issued_at: 0,
-        agent_key: agent_kp.public_key(),
-    };
-    let proof = DpopProof::sign(body, &agent_kp).expect("sign proof");
-
-    let config = default_config();
-    let store = default_store(&config);
-
-    let result = verify_dpop_proof(
-        &proof,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-
-    assert!(
-        matches!(result, Err(KernelError::Dpop(DpopError::Expired))),
-        "{result:?}"
-    );
+    let key = Keypair::generate();
+    let capability = make_capability(&key);
+    let mut body = make_proof_body(&capability, &key);
+    body.issued_at = 0;
+    let proof = DpopProof::sign(body, &key).unwrap();
+    assert!(matches!(
+        verify_dpop_proof_stateless(
+            &proof,
+            &capability,
+            "srv-a",
+            "read_file",
+            &sha256_hex(b"{}"),
+            &authority(),
+            NOW
+        ),
+        Err(KernelError::Dpop(DpopError::Expired))
+    ));
 }
-
-// ---------------------------------------------------------------------------
-// Test 5: Nonce reuse within TTL window is rejected
-// ---------------------------------------------------------------------------
 
 #[test]
-fn dpop_nonce_replay_within_ttl_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-
-    let config = default_config();
-    // Large TTL so the nonce stays live between calls.
-    let store = DpopNonceStore::new(config.nonce_store_capacity, Duration::from_secs(3600))
-        .expect("positive replay store test capacities");
-
-    // First invocation -- different nonce each time.
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let shared_nonce = "nonce-replay-test-shared";
-
-    let body1 = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: shared_nonce.to_string(),
-        issued_at: now,
-        agent_key: agent_kp.public_key(),
-    };
-    let proof1 = DpopProof::sign(body1, &agent_kp).expect("sign proof 1");
-
-    let result1 = verify_dpop_proof(
-        &proof1,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-    assert!(
-        result1.is_ok(),
-        "first use of nonce should succeed: {result1:?}"
-    );
-
-    // Second invocation reusing the same nonce -- must be rejected.
-    let body2 = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: shared_nonce.to_string(),
-        issued_at: now,
-        agent_key: agent_kp.public_key(),
-    };
-    let proof2 = DpopProof::sign(body2, &agent_kp).expect("sign proof 2");
-
-    let result2 = verify_dpop_proof(
-        &proof2,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-    assert!(result2.is_err(), "replay within TTL should be rejected");
-    let err_msg = result2.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("nonce replayed"),
-        "unexpected error message: {err_msg}"
-    );
+fn volatile_source_rejects_duplicate_markers_within_its_retention_window() {
+    let source = DpopNonceStore::new(8, Duration::from_secs(3600)).unwrap();
+    assert!(source.check_and_insert("nonce", "capability").unwrap());
+    assert!(!source.check_and_insert("nonce", "capability").unwrap());
+    assert_eq!(source.utilization().unwrap().0, 1);
 }
-
-// ---------------------------------------------------------------------------
-// Test 6: Signed proof validity retains a nonce beyond the local store TTL
-// ---------------------------------------------------------------------------
 
 #[test]
-fn dpop_nonce_replay_after_local_ttl_is_rejected() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-
-    let config = default_config();
-    // A zero local TTL must not shorten the signed proof-validity horizon.
-    let store = DpopNonceStore::new(config.nonce_store_capacity, Duration::from_secs(0))
-        .expect("positive replay store test capacities");
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let reused_nonce = "nonce-after-ttl-001";
-
-    // First use.
-    let body1 = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: reused_nonce.to_string(),
-        issued_at: now,
-        agent_key: agent_kp.public_key(),
-    };
-    let proof1 = DpopProof::sign(body1, &agent_kp).expect("sign proof 1");
-    let result1 = verify_dpop_proof(
-        &proof1,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-    assert!(result1.is_ok(), "first use should succeed: {result1:?}");
-
-    // The second use remains a replay while the signed proof is valid.
-    let body2 = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: reused_nonce.to_string(),
-        issued_at: now,
-        agent_key: agent_kp.public_key(),
-    };
-    let proof2 = DpopProof::sign(body2, &agent_kp).expect("sign proof 2");
-    let result2 = verify_dpop_proof(
-        &proof2,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-    let err_msg = result2
-        .expect_err("nonce reuse during the proof-validity horizon must fail closed")
-        .to_string();
-    assert!(
-        err_msg.contains("nonce replayed"),
-        "unexpected error message: {err_msg}"
-    );
+fn volatile_source_signed_horizon_is_not_shortened_by_its_local_ttl() {
+    let source = DpopNonceStore::with_clock(
+        8,
+        8,
+        chio_kernel::dpop::DEFAULT_DPOP_IDENTITY_BYTE_CAPACITY,
+        Duration::ZERO,
+        std::sync::Arc::new(chio_security_types::clock::FixedClock::new(NOW)),
+    )
+    .unwrap();
+    let now = NOW;
+    assert!(source
+        .check_and_insert_through("nonce", "capability", now + 300)
+        .unwrap());
+    assert!(!source
+        .check_and_insert_through("nonce", "capability", now + 300)
+        .unwrap());
 }
-
-// ---------------------------------------------------------------------------
-// Test 7: dpop_required field roundtrip on ToolGrant
-// ---------------------------------------------------------------------------
 
 #[test]
 fn dpop_required_field_roundtrip() {
@@ -545,39 +277,22 @@ fn dpop_required_field_roundtrip() {
 }
 
 #[test]
-fn dpop_issued_at_u64_max_rejected_as_future_dated() {
-    let agent_kp = Keypair::generate();
-    let cap = make_capability(&agent_kp);
-
-    // u64::MAX is astronomically far in the future -- must exceed the clock-skew window.
-    let body = DpopProofBody {
-        replay_authority: None,
-        schema: DPOP_SCHEMA.to_string(),
-        capability_id: cap.id.clone(),
-        tool_server: "srv-a".to_string(),
-        tool_name: "read_file".to_string(),
-        action_hash: sha256_hex(b"{}"),
-        nonce: "nonce-u64-max-001".to_string(),
-        issued_at: u64::MAX,
-        agent_key: agent_kp.public_key(),
-    };
-    let proof = DpopProof::sign(body, &agent_kp).expect("sign proof");
-
-    let config = default_config();
-    let store = default_store(&config);
-
-    let result = verify_dpop_proof(
-        &proof,
-        &cap,
-        "srv-a",
-        "read_file",
-        &sha256_hex(b"{}"),
-        &store,
-        &config,
-    );
-
-    assert!(
-        matches!(result, Err(KernelError::Dpop(DpopError::WindowOverflow))),
-        "{result:?}"
-    );
+fn dpop_issued_at_u64_max_rejected_with_window_overflow() {
+    let key = Keypair::generate();
+    let capability = make_capability(&key);
+    let mut body = make_proof_body(&capability, &key);
+    body.issued_at = u64::MAX;
+    let proof = DpopProof::sign(body, &key).unwrap();
+    assert!(matches!(
+        verify_dpop_proof_stateless(
+            &proof,
+            &capability,
+            "srv-a",
+            "read_file",
+            &sha256_hex(b"{}"),
+            &authority(),
+            NOW
+        ),
+        Err(KernelError::Dpop(DpopError::WindowOverflow))
+    ));
 }

@@ -401,6 +401,7 @@
     "crates/products/chio-cli/src/cli/replay/reader.rs",
     "crates/products/chio-cli/src/cli/replay/validate.rs",
     "crates/products/chio-cli/src/cli/runtime.rs",
+    "crates/products/chio-cli/src/cli/runtime/dpop_authority.rs",
     "crates/products/chio-cli/src/cli/trust/credit.rs",
     "crates/products/chio-cli/src/cli/trust/liability.rs",
     "crates/products/chio-cli/src/cli/trust/receipt/explain.rs",
@@ -16527,9 +16528,8 @@
       "retained_typed_conversions": []
     },
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service_auth.rs": {
-      "contract": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion; sender-constraint JSON/base64 failures retain their local sources.",
+      "contract": "Authorization-details and transaction-context form JSON are bounded and duplicate-checked before typed conversion.",
       "migrations": [
-        "decode_sender_dpop_proof::from_slice",
         "parse_request_time_authorization_details::from_str",
         "parse_request_time_transaction_context::from_str"
       ],
@@ -17404,6 +17404,10 @@
     "crates/products/chio-cli/src/cli/runtime.rs": {
       "kind": "reviewed-bounded-input",
       "contract": "Bounded original JSON and regular-file reads precede existing owner validation. Diagnostic or fixture projections cannot grant authority."
+    },
+    "crates/products/chio-cli/src/cli/runtime/dpop_authority.rs": {
+      "kind": "reviewed-bounded-input",
+      "contract": "The selected DPoP descriptor file must be regular and is bounded to 4096 bytes; Unix opens disable symlink following. Original duplicate-aware signed JSON decoding precedes typed authority validation. Simultaneous policy and file selection refuses. Decoding does not activate authority; durable runtime attachment verifies the independently selected descriptor against the actual store and mutation fence."
     },
     "crates/products/chio-cli/src/cli/trust/credit.rs": {
       "kind": "reviewed-bounded-input",

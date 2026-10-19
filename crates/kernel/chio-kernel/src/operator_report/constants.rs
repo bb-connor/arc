@@ -37,8 +37,6 @@ pub const CHIO_OAUTH_AUTHORIZATION_METERED_BILLING_DETAIL_TYPE: &str =
     "chio_governed_metered_billing";
 /// Stable label for Chio's capability-subject sender binding.
 pub const CHIO_OAUTH_SENDER_BINDING_CAPABILITY_SUBJECT: &str = "capability_subject";
-/// Stable label for Chio's Chio-native DPoP proof requirement.
-pub const CHIO_OAUTH_SENDER_PROOF_CHIO_DPOP: &str = "chio_dpop_v1";
 /// Stable label for Chio's bounded mTLS-thumbprint sender adapter.
 pub const CHIO_OAUTH_SENDER_PROOF_CHIO_MTLS: &str = "chio_mtls_thumbprint_v1";
 /// Stable label for Chio's bounded attestation-bound sender adapter.

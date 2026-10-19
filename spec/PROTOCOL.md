@@ -910,21 +910,16 @@ The kernel and trust surfaces verify, at minimum:
 
 Any failure denies or rejects the action instead of widening access.
 
-The shipped Rust kernel and remote MCP sender profile bound DPoP replay nonce
-and binding identifiers to 4,096 UTF-8 bytes before signed-proof canonicalization
-or replay-key storage. Kernel reservation-owner identifiers have the same
-bound. The cache enforces marker limits and a separate retained-identity byte
-budget (16 MiB by default, explicitly configurable by the host). Capacity
-exhaustion denies admission without evicting unexpired replay markers. Sender
-proof markers retain through `issued_at + proof_ttl_secs`, inclusively, including
-tolerated future issue time; a local fallback TTL must not shorten signed
-validity. These are bounded runtime-profile requirements, not a changed DPoP
-signing preimage or a claim of restart-safe replay custody.
+DPoP replay nonce and binding identifiers are bounded to 4,096 UTF-8 bytes
+before signed-proof canonicalization or replay-key storage. Kernel reservation
+owner identifiers have the same bound. Capacity exhaustion denies admission
+without erasing spent replay identities. Signed validity includes
+`issued_at + proof_ttl_secs`; a local retention deadline cannot shorten it.
 
-#### 5.3.1 Explicit Durable DPoP Proof Domain
+#### 5.3.1 Durable DPoP Proof Domain
 
-The explicit durable profile uses `schema = "chio.dpop_proof.v2"` and includes
-`replay_authority` inside the signed proof body. Its fields are:
+The sole proof schema is `chio.dpop_proof.v1`. The signed body requires
+`replay_authority` with these fields:
 
 - `destination_store_uuid`: the exact canonical, non-nil destination UUID
 - `dpop_authority_id`: the independently configured authority name
@@ -943,26 +938,21 @@ The verifier selects its expected domain through authenticated configuration
 and the fenced, anchored durable store, never from the proof being evaluated.
 The proof's complete domain must match that selection exactly. A descriptor,
 valid signature or non-consuming verification result alone is not activation,
-a replay reservation or permission to execute.
+a replay reservation or permission to execute. Decoding MUST reject missing or
+null authority and unknown body or envelope fields. Verification MUST reject
+any other schema identifier. Altering the schema, generation or policy requires
+a new signature and cannot move a proof into another independently selected
+domain.
 
-V1 retains its original eight-field signing preimage when `replay_authority` is
-absent. Legacy Rust kernel and remote sender verifiers reject v2 and reject a
-non-null replay authority on v1; they do not upgrade a proof based on an extra
-field. Rust proof decoding rejects unknown body and envelope fields. Altering
-the schema, generation or policy requires a new signature and cannot move a
-proof into a different independently selected domain.
+Explicit deployment initialization activates a new authority. An existing
+record MUST already be active with the exact requested freshness policy; an
+inactive record MUST NOT be replaced by an empty source. Serving loads and
+verifies that configured activation without creating it. Activation and its
+source-generation evidence remain in the destination's global commit history.
+Kernel authority selection cannot activate a source or replace an installed
+selection. A missing authority denies DPoP-required admission.
 
-An explicit activation first requires the exact source's complete durable
-import and live retirement verification. It permanently binds the v2 domain
-and policy into the destination's migration and global commit history. Legacy
-proofs remain excluded; all imported legacy markers remain retained evidence,
-without translating process-relative deadlines into portable expiry. This
-domain transition does not assert that a prior empty volatile cache had no
-history. After a committed activation, exact durable readback may survive loss
-of the retired process-local source; a merely pending or inactive import still
-requires that source and cannot activate using a replacement.
-
-Operation-owned v2 custody MUST bind the activated authority, retained invocation,
+Operation-owned custody MUST bind the activated authority, retained invocation,
 selected grant and preflight or dispatch phase under the current operation lease.
 New budget authorization, nonce preflight and dispatch MUST require a fresh live
 claim. Expiry alone MUST NOT release ownership or erase spent replay identity.
@@ -971,25 +961,15 @@ An exact pre-dispatch release may end an episode; that episode cannot be reused.
 Releasing a pre-dispatch DPoP claim frees live reservation capacity but does not
 erase spent replay identity. Only the original admission operation may acquire a
 successor episode for that same (authority, capability, nonce); every other
-operation must reject it, including after release or expiry.
-A dispatch commitment permanently retains its claim. Recovery of a committed
-result checks authority at the recorded commit, not freshness at recovery time.
-Imported legacy-domain markers remain evidence and do not occupy the distinct
-v2 live-capacity budget. This separation never admits legacy proofs into v2.
+operation must reject it, including after release or expiry. A dispatch commitment
+permanently retains its claim. Recovery of a committed result checks authority
+at the recorded commit, not freshness at recovery time.
 
-The current implementation provides bounded proof verification, explicit SQLite
-activation, operation-owned storage ports, opt-in kernel acquisition and
-TypeScript/C++ signing entrypoints.
 Stored credential commitments omit the reusable proof signature; their decoding
-does not establish cryptographic verification or mutation authority. Kernel
-selection requires an independently configured, already activated domain from
-the qualified durable runtime. Normal, nested and strict-nonce preflight
-acquisition retain the original request and exact selected-grant claim before
-budget authorization. A configured domain cannot fall back to the legacy cache
-or be replaced on that kernel; selection itself never activates a source.
-Full caller/executor custody and authenticated external start remain separate
-requirements, not authority implied by this opt-in kernel profile. No legacy
-setter or import API silently enables it.
+does not establish cryptographic verification or mutation authority. Normal,
+nested and strict-nonce preflight acquisition retain the original request and
+exact selected-grant claim before budget authorization. Caller/executor custody
+and authenticated external start require their own authorization checks.
 
 #### Original Authority Selection For Retained Admission
 
@@ -3472,7 +3452,6 @@ semantics:
 - `senderConstraint.subjectKeySource`
 - `senderConstraint.matchedGrantIndex`
 - `senderConstraint.proofRequired`
-- optional `senderConstraint.proofType`
 - optional `senderConstraint.proofSchema`
 - `senderConstraint.runtimeAssuranceBound`
 - `senderConstraint.delegatedCallChainBound`
@@ -3514,7 +3493,6 @@ fragments fail closed before token issuance.
 The same gated path sketches one bounded sender-constrained continuation
 contract. The request may carry:
 
-- `chio_sender_dpop_public_key`
 - `chio_sender_mtls_thumbprint_sha256`
 - `chio_sender_attestation_sha256`
 
@@ -3522,16 +3500,18 @@ If that gated path approves the request, the resulting sender constraint is
 persisted on the authorization code and then projected into access tokens
 through `cnf`:
 
-- `cnf.chioSenderKey`
 - `cnf["x5t#S256"]`
 - `cnf.chioAttestationSha256`
+
+Chio DPoP sender binding is refused on this edge. A request carrying
+`chio_sender_dpop_public_key` is refused as `invalid_request`. A token whose
+`cnf` carries `chioSenderKey`, and any request presenting a `DPoP` header, is
+refused with `urn:chio:error:transport:dpop-sender-proof-unavailable` and is
+never admitted as a bearer.
 
 Runtime admission for the gated path then enforces the same bound sender proof
 continuity:
 
-- DPoP-bound flows must present a valid proof during token exchange and again
-  on protected-resource admission, including nonce, `jti`, `htm`, and `htu`
-  checks over the actual runtime request
 - mTLS-bound flows must present a matching
   `x-chio-mtls-thumbprint-sha256` header
 - attestation-bound flows must present a matching
@@ -3539,8 +3519,8 @@ continuity:
   `chio_transaction_context.runtimeAssuranceEvidenceSha256`
 
 Attestation alone never authorizes a sender. Chio only accepts the
-attestation-bound profile when it is paired with DPoP or mTLS continuity over
-the same request. Missing, stale, replayed, or mismatched sender proof fails
+attestation-bound profile when it is paired with mTLS continuity over the same
+request. Missing, stale, replayed, or mismatched sender proof fails
 closed as `invalid_request`, `invalid_grant`, or bearer denial depending on
 where the mismatch occurs.
 
@@ -5238,13 +5218,16 @@ is supported at the root and inherited unless explicitly overridden. Origin-spec
 requirements are refused until an origin-aware compiled guard is installed.
 
 `chio run` and `chio mcp serve` accept `--agent-public-key`. A policy requiring
-proofs requires this operator binding; the caller retains the private key. Remote
-sessions use the verified `cnf.chioSenderKey` as their capability subject and retain
-it in authenticated resume state. Static bearer and TLS-only authentication cannot
-bootstrap an invocation-proof policy without a Chio sender key. `chio check` owns
+proofs requires this operator binding; the caller retains the private key. Remote HTTP
+sessions carry no Chio sender key because sender DPoP binding is refused, so static
+bearer, OAuth and TLS-only authentication cannot bootstrap an invocation-proof policy
+and such policies deny over MCP HTTP. `chio check` owns
 its ephemeral test key and signs its own request. Unbound grants retain bearer
-semantics. Unsupported required-proof HTTP projections deny. Default kernel replay
-custody is bounded and process-local; it does not activate durable replay authority.
+semantics. Unsupported required-proof HTTP projections deny. Invocation-proof
+acceptance requires an independently configured, activated durable replay authority;
+without one, proof-required grants deny. The authority descriptor is configured only
+through `CHIO_DPOP_REPLAY_AUTHORITY_FILE`; a policy whose default grants require DPoP
+refuses to start when it is unset.
 
 MCP confirmation profiles are closed: unknown members (including unsupported
 RFC 9449 `jkt`), empty or null profiles, and empty bindings reject authentication.

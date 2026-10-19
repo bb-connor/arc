@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &state.path().join("admission.sqlite3"),
     )?;
     let mut kernel = build_kernel(policy, &admission.kernel_keypair());
-    admission.attach(&mut kernel)?;
+    admission.attach(&mut kernel, None)?;
     configure_receipt_store(
         &mut kernel,
         Some(&state.path().join("receipts.sqlite3")),
@@ -49,7 +49,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 The empty policy grants no default capabilities. `build_kernel` installs the
 native default guard profile and the loaded policy's pipelines.
 `DurableAdmissionRuntime::attach` supplies admission operations, tool outcomes,
-budget, and revocation ports under one mutation fence and reconciles startup.
+budget, and revocation ports under one mutation fence. It verifies any selected
+DPoP descriptor against the store's active authority before startup
+reconciliation. Deployment initialization must provision that authority before
+serving DPoP-required grants.
 Register tool servers and issue scoped capabilities before invoking tools.
 
 For HTTP hosting, construct a `trust_control::TrustServiceConfig` and pass it

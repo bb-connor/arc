@@ -407,14 +407,16 @@ pub(super) async fn authenticate_request(
     method: &str,
     target: &str,
 ) -> Result<(SessionAuthContext, Option<SessionCredential>), Response> {
+    sender_constraint::refuse_presented_dpop(
+        &headers,
+        state.protected_resource_metadata.as_deref(),
+    )?;
     let token = extract_bearer_token(&headers, state.protected_resource_metadata.as_deref())?;
     if !token.starts_with(PREFIX) {
         return authenticate_session_request(
             headers,
             &state.auth_mode,
             state.protected_resource_metadata.as_deref(),
-            method,
-            target,
         )
         .await
         .map(|context| (context, None));

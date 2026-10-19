@@ -1,6 +1,6 @@
 use super::*;
 use crate::admission_operation::{AdmissionDigest, AdmissionIdentifier};
-use crate::dpop::authority::DpopReplayAuthorityInputV1;
+use crate::dpop::authority::DpopReplayAuthorityInput;
 
 fn identifier(value: &str) -> AdmissionIdentifier {
     AdmissionIdentifier::try_new("profile", value).expect("fixture identifier")
@@ -21,7 +21,7 @@ fn profile() -> AdmissionAuthorityProfileV1 {
             identifier("approval-generation"),
         )),
         dpop: Some(
-            DpopReplayAuthorityV1::new(DpopReplayAuthorityInputV1 {
+            DpopReplayAuthority::new(DpopReplayAuthorityInput {
                 destination_store_uuid: identifier("11111111-1111-4111-8111-111111111111"),
                 dpop_authority_id: identifier("dpop"),
                 expectation_id: AdmissionDigest::try_new("dpop generation", "a".repeat(64))

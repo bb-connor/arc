@@ -6,12 +6,12 @@ use chio_kernel::admission_operation::runtime_participant::RuntimeParticipantAut
 use chio_kernel::admission_operation::{
     AdmissionAuthorityProfileV1, AdmissionAuthoritySelectionV1,
 };
-use chio_kernel::dpop::authority::DpopReplayAuthorityV1;
+use chio_kernel::dpop::authority::DpopReplayAuthority;
 
 pub(crate) fn selection(
     runtime: Option<RuntimeParticipantAuthorityBindingV1>,
     approval: Option<GovernedApprovalAuthorityBindingV1>,
-    dpop: Option<DpopReplayAuthorityV1>,
+    dpop: Option<DpopReplayAuthority>,
 ) -> TestResult<AdmissionAuthorityProfileV1> {
     Ok(AdmissionAuthorityProfileV1::new(
         AdmissionAuthoritySelectionV1 {

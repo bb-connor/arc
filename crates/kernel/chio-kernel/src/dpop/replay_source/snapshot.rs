@@ -39,14 +39,12 @@ pub enum DpopReplaySourceRetention {
     },
 }
 
-/// Private retained replay identity. Reservation text is historical data, not
-/// permission to release, commit or reconstruct an operation-owned handle.
+/// Private retained replay identity and its original retention bounds.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DpopReplaySourceMarker {
     pub nonce: String,
     pub capability_id: String,
-    pub dispatch_reservation_id: Option<String>,
     pub retention: DpopReplaySourceRetention,
 }
 
@@ -56,14 +54,7 @@ impl DpopReplaySourceMarker {
     }
 
     fn validate(&self) -> Result<(), KernelError> {
-        for part in [
-            Some(&self.nonce),
-            Some(&self.capability_id),
-            self.dispatch_reservation_id.as_ref(),
-        ]
-        .into_iter()
-        .flatten()
-        {
+        for part in [&self.nonce, &self.capability_id] {
             if part.len() > MAX_KEY_BYTES {
                 return Err(invalid("marker identity exceeds byte bound"));
             }
@@ -170,7 +161,7 @@ impl DpopReplaySourceSnapshot {
         &self.0.body.inventory.markers
     }
 
-    /// Check a trusted destination clock before retiring the legacy domain.
+    /// Check a trusted destination clock before retiring the source domain.
     /// This does not translate monotonic deadlines or expire any marker.
     pub fn validate_transition_time(&self, authority_now_unix_ms: u64) -> Result<(), KernelError> {
         let high = unsigned(&self.0.body.inventory.wall_clock_high_water_unix_ns)?;
@@ -186,8 +177,8 @@ impl DpopReplaySourceSnapshot {
         Ok(())
     }
 
-    /// Private migration data. Never expose nonce identities or historical
-    /// reservation IDs through receipts, diagnostics or agent-visible reports.
+    /// Private source data. Never expose nonce identities through receipts,
+    /// diagnostics or agent-visible reports.
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, KernelError> {
         let bytes =
             canonical_json_bytes(&self.0).map_err(|_| invalid("snapshot encoding failed"))?;
@@ -279,11 +270,8 @@ impl Body {
         let mut actual_bytes = 0_u128;
         for marker in &inventory.markers {
             marker.validate()?;
-            let bytes = crate::dpop::identity::retained_bytes(
-                &marker.nonce,
-                &marker.capability_id,
-                marker.dispatch_reservation_id.as_deref(),
-            )?;
+            let bytes =
+                crate::dpop::identity::retained_bytes(&marker.nonce, &marker.capability_id)?;
             actual_bytes = actual_bytes
                 .checked_add(
                     u128::try_from(bytes).map_err(|_| invalid("identity byte count overflow"))?,
