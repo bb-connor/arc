@@ -402,7 +402,7 @@ impl ChioKernel {
             }
         }
 
-        if let Some(denial) = self.reject_legacy_caller_reservation_for_durable_nonce(
+        if let Some(denial) = self.reject_preflight_reservation_for_durable_nonce(
             request,
             preflight_disposition,
             durable_admission.as_ref(),

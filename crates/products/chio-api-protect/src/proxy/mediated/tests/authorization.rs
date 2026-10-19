@@ -1325,7 +1325,17 @@ async fn durable_mediation_refuses_unsigned_reports_without_consuming_the_reserv
         );
     }
     let (status, retry) = post_evaluate(state, &body).await;
-    assert_eq!(status, StatusCode::OK, "{retry}");
-    assert_eq!(retry["status"], "reserved");
-    assert_eq!(retry["execution_nonce"], nonce_json);
+    assert_eq!(status, StatusCode::CONFLICT, "{retry}");
+    assert_eq!(
+        retry,
+        serde_json::json!({"error": "chio_request_id_reused"})
+    );
+    let quota = budget
+        .get_invocation_quota_usage(&quota_key)
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(
+        (quota.reserved_invocations, quota.captured_invocations),
+        (1, 0)
+    );
 }

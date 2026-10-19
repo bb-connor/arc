@@ -72,9 +72,8 @@ impl ChioKernel {
         )
     }
 
-    /// The legacy sidecar reservation response does not carry the qualified
-    /// nonce participant. Reject that composition before acquiring participants.
-    pub(super) fn reject_legacy_caller_reservation_for_durable_nonce(
+    /// Non-durable preflight reservation has no operation-owned nonce participant.
+    pub(super) fn reject_preflight_reservation_for_durable_nonce(
         &self,
         request: &ToolCallRequest,
         disposition: PreflightHoldDisposition,
