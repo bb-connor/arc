@@ -162,3 +162,67 @@ async fn a_stop_request_is_bounded_and_validated() {
     }
     assert!(!state.stop.heads().is_stopped());
 }
+
+#[tokio::test]
+async fn stop_routes_redact_failed_store_appends() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+    let database = directory.path().join("authority.db");
+    let locks = directory.path().join("locks");
+    std::fs::create_dir(&locks)?;
+    std::fs::set_permissions(&locks, std::fs::Permissions::from_mode(0o700))?;
+    chio_store_sqlite::SqliteAuthorityStore::provision(&database, &locks)?;
+    let authority = chio_store_sqlite::SqliteAuthorityStore::open_serving_with_clock(
+        &database,
+        &locks,
+        Arc::new(chio_security_types::clock::FixedClock::new(1_800_000_000)),
+    )?;
+    let store = Arc::new(authority.admission_operation_store());
+    let mut state = test_state(Vec::new(), "http://127.0.0.1:1".to_owned());
+    let inner = Arc::get_mut(&mut state).test_unwrap();
+    inner.stop = chio_kernel::stop::StopControl::durable(&store, authority.mutation_fence());
+    inner.sidecar_control_token = Some(TEST_CONTROL_TOKEN.to_owned());
+    let app = build_app(Arc::clone(&state));
+    let connection = rusqlite::Connection::open(&database)?;
+    let (status, stopped) = send(
+        &app,
+        control(
+            "POST",
+            "/chio/emergency-stop",
+            serde_json::json!({"reason": "incident"}),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    connection.execute_batch("CREATE TABLE stop_test_external_write (value INTEGER);")?;
+    let (status, body) = send(&app, control("POST", "/chio/emergency-resume",
+        serde_json::json!({"expected_epoch": {"chain_generation": stopped["head"]["chain_generation"], "epoch": stopped["head"]["epoch"]}}))).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        body,
+        serde_json::json!({"error": "resume_refused", "message": "Resume was refused.", "urn": "urn:chio:error:kernel:resume-refused"})
+    );
+    assert!(state.stop.heads().is_stopped());
+    let (status, body) = send(
+        &app,
+        control(
+            "POST",
+            "/chio/emergency-stop",
+            serde_json::json!({"reason": "incident"}),
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body["error"], "stop_not_durable");
+    assert_eq!(
+        body["message"],
+        "Stop holds in this process but could not be made durable."
+    );
+    assert_eq!(body["urn"], "urn:chio:error:kernel:stop-not-durable");
+    assert_eq!(body["status"]["stopped"], true);
+    assert_eq!(body["status"]["durability"], "process_only");
+    assert!(!body.to_string().contains("authority database changed"));
+    assert!(!body.to_string().contains("serving-owner"));
+    Ok(())
+}
