@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+
 import shutil
 import subprocess
 import tempfile
@@ -116,6 +117,38 @@ class SreMetricsRegistryTests(unittest.TestCase):
     def test_red_registry_prefix_is_not_a_match(self) -> None:
         self.write(KERNEL_SRC, 'chio@requests_total_bytes\n')
         self.assert_unregistered(self.run_check(), "chio@requests_total_bytes")
+
+    def test_git_grep_fallback_without_rg(self) -> None:
+        tools = Path(self.temp.name) / "tools-without-rg"
+        tools.mkdir()
+        for tool in ("git", "python3", "sort", "cut", "mktemp", "rm", "dirname", "grep", "cat"):
+            found = shutil.which(tool)
+            self.assertIsNotNone(found, tool)
+            (tools / tool).symlink_to(found)
+        self.assertIsNone(shutil.which("rg", path=str(tools)))
+        bash = shutil.which("bash")
+        self.write(KERNEL_SRC, 'counter("chio@requests_total");\n')
+        self.write("deploy/prometheus/rules.yml", "expr: chio@latency_seconds\n")
+        self.git("add", "-A")
+        env = {"PATH": str(tools), "HOME": self.temp.name}
+
+        def run() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [bash, "--noprofile", "--norc", "scripts/check-sre-metrics-registry.sh"],
+                cwd=self.root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+        green = run()
+        self.assertEqual(green.returncode, 0, green.stderr)
+        self.assertEqual(green.stdout.strip(), "SRE metric registry gate passed")
+        self.write(KERNEL_SRC, 'counter("chio@requests_total"); counter("chio@unknown_total");\n')
+        self.git("add", "-A")
+        red = run()
+        self.assert_unregistered(red, "chio@unknown_total")
 
 
 if __name__ == "__main__":
