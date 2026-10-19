@@ -24,11 +24,14 @@ use chio_core_types::{
     SessionAuthContext, SessionId, SigningBackend, ToolManifest, ToolManifestBody,
 };
 
-fn capability_body(issuer: &Keypair, subject: &Keypair) -> CapabilityTokenBody {
+fn capability_body(
+    issuer: chio_core_types::PublicKey,
+    subject: chio_core_types::PublicKey,
+) -> CapabilityTokenBody {
     CapabilityTokenBody {
         id: "cap-mismatch".to_string(),
-        issuer: issuer.public_key(),
-        subject: subject.public_key(),
+        issuer,
+        subject,
         scope: ChioScope::default(),
         issued_at: 1_710_000_000,
         expires_at: 1_710_003_600,
@@ -193,78 +196,139 @@ fn continuation_token_body(
     }
 }
 
+fn assert_signer_mismatch<T>(result: chio_core_types::Result<T>, artifact: &str, field: &str) {
+    match result {
+        Err(chio_core_types::Error::InvalidPublicKey(message)) => {
+            assert_eq!(
+                message,
+                format!("{artifact} {field} does not match signing key")
+            );
+        }
+        Err(other) => panic!("expected signer mismatch for {artifact} {field}, got {other:?}"),
+        Ok(_) => panic!("expected signer mismatch for {artifact} {field}, signing succeeded"),
+    }
+}
+
 #[test]
-fn capability_sign_rejects_embedded_issuer_mismatch() {
+fn capability_sign_rejects_embedded_issuer_mismatch() -> chio_core_types::Result<()> {
     let embedded_issuer = Keypair::generate();
     let actual_signer = Keypair::generate();
     let subject = Keypair::generate();
 
-    assert!(
-        CapabilityToken::sign(capability_body(&embedded_issuer, &subject), &actual_signer).is_err()
+    assert_signer_mismatch(
+        CapabilityToken::sign(
+            capability_body(embedded_issuer.public_key(), subject.public_key()),
+            &actual_signer,
+        ),
+        "capability token",
+        "issuer",
     );
+    CapabilityToken::sign(
+        capability_body(embedded_issuer.public_key(), subject.public_key()),
+        &embedded_issuer,
+    )?;
+    Ok(())
 }
 
 #[test]
-fn capability_backend_sign_rejects_embedded_issuer_mismatch() {
+fn capability_backend_sign_rejects_embedded_issuer_mismatch() -> chio_core_types::Result<()> {
     let embedded_issuer = Keypair::generate();
     let backend = Ed25519Backend::generate();
     let subject = Keypair::generate();
 
-    assert!(CapabilityToken::sign_with_backend(
-        capability_body(&embedded_issuer, &subject),
-        &backend
-    )
-    .is_err());
     assert_ne!(embedded_issuer.public_key(), backend.public_key());
+    assert_signer_mismatch(
+        CapabilityToken::sign_with_backend(
+            capability_body(embedded_issuer.public_key(), subject.public_key()),
+            &backend,
+        ),
+        "capability token",
+        "issuer",
+    );
+    CapabilityToken::sign_with_backend(
+        capability_body(backend.public_key(), subject.public_key()),
+        &backend,
+    )?;
+    Ok(())
 }
 
 #[test]
-fn delegated_artifact_signers_reject_embedded_key_mismatches() {
+fn delegated_artifact_signers_reject_embedded_key_mismatches() -> chio_core_types::Result<()> {
     let embedded_signer = Keypair::generate();
     let actual_signer = Keypair::generate();
     let subject = Keypair::generate();
 
-    assert!(GovernedUpstreamCallChainProof::sign(
+    assert_signer_mismatch(
+        GovernedUpstreamCallChainProof::sign(
+            upstream_call_chain_proof_body(embedded_signer.public_key(), subject.public_key()),
+            &actual_signer,
+        ),
+        "call-chain proof",
+        "signer",
+    );
+    GovernedUpstreamCallChainProof::sign(
         upstream_call_chain_proof_body(embedded_signer.public_key(), subject.public_key()),
-        &actual_signer,
-    )
-    .is_err());
+        &embedded_signer,
+    )?;
 
-    assert!(CallChainContinuationToken::sign(
+    assert_signer_mismatch(
+        CallChainContinuationToken::sign(
+            continuation_token_body(embedded_signer.public_key(), subject.public_key()),
+            &actual_signer,
+        ),
+        "continuation token",
+        "signer",
+    );
+    CallChainContinuationToken::sign(
         continuation_token_body(embedded_signer.public_key(), subject.public_key()),
-        &actual_signer,
-    )
-    .is_err());
+        &embedded_signer,
+    )?;
+    Ok(())
 }
 
 #[test]
-fn approval_signers_reject_embedded_approver_mismatches() {
+fn approval_signers_reject_embedded_approver_mismatches() -> chio_core_types::Result<()> {
     let embedded_approver = Keypair::generate();
     let actual_signer = Keypair::generate();
     let backend = Ed25519Backend::generate();
     let subject = Keypair::generate();
 
-    assert!(GovernedApprovalToken::sign(
+    assert_signer_mismatch(
+        GovernedApprovalToken::sign(
+            approval_token_body(embedded_approver.public_key(), subject.public_key()),
+            &actual_signer,
+        ),
+        "governed approval token",
+        "approver",
+    );
+    GovernedApprovalToken::sign(
         approval_token_body(embedded_approver.public_key(), subject.public_key()),
-        &actual_signer,
-    )
-    .is_err());
+        &embedded_approver,
+    )?;
 
-    assert!(GovernedApprovalToken::sign_with_backend(
-        approval_token_body(embedded_approver.public_key(), subject.public_key()),
-        &backend,
-    )
-    .is_err());
     assert_ne!(embedded_approver.public_key(), backend.public_key());
+    assert_signer_mismatch(
+        GovernedApprovalToken::sign_with_backend(
+            approval_token_body(embedded_approver.public_key(), subject.public_key()),
+            &backend,
+        ),
+        "governed approval token",
+        "approver",
+    );
+    GovernedApprovalToken::sign_with_backend(
+        approval_token_body(backend.public_key(), subject.public_key()),
+        &backend,
+    )?;
+    Ok(())
 }
 
 #[test]
-fn delegation_link_sign_rejects_embedded_delegator_mismatch() {
+fn delegation_link_sign_rejects_embedded_delegator_mismatch() -> chio_core_types::Result<()> {
     let embedded_delegator = Keypair::generate();
     let actual_signer = Keypair::generate();
     let delegatee = Keypair::generate();
 
-    let body = DelegationLinkBody {
+    let body = || DelegationLinkBody {
         capability_id: "cap-parent".to_string(),
         delegator: embedded_delegator.public_key(),
         delegatee: delegatee.public_key(),
@@ -275,7 +339,13 @@ fn delegation_link_sign_rejects_embedded_delegator_mismatch() {
         cumulative_approval: None,
     };
 
-    assert!(DelegationLink::sign(body, &actual_signer).is_err());
+    assert_signer_mismatch(
+        DelegationLink::sign(body(), &actual_signer),
+        "delegation link",
+        "delegator",
+    );
+    DelegationLink::sign(body(), &embedded_delegator)?;
+    Ok(())
 }
 
 #[test]
@@ -283,42 +353,71 @@ fn receipt_sign_rejects_embedded_kernel_key_mismatch() -> chio_core_types::Resul
     let embedded_kernel = Keypair::generate();
     let actual_signer = Keypair::generate();
 
-    assert!(
-        ChioReceipt::sign(receipt_body(embedded_kernel.public_key())?, &actual_signer).is_err()
+    assert_signer_mismatch(
+        ChioReceipt::sign(receipt_body(embedded_kernel.public_key())?, &actual_signer),
+        "receipt",
+        "kernel_key",
     );
+    ChioReceipt::sign(
+        receipt_body(embedded_kernel.public_key())?,
+        &embedded_kernel,
+    )?;
     Ok(())
 }
 
 #[test]
-fn child_receipt_signers_reject_embedded_kernel_key_mismatches() {
+fn child_receipt_signers_reject_embedded_kernel_key_mismatches() -> chio_core_types::Result<()> {
     let embedded_kernel = Keypair::generate();
     let actual_signer = Keypair::generate();
     let backend = Ed25519Backend::generate();
 
-    assert!(ChildRequestReceipt::sign(
+    assert_signer_mismatch(
+        ChildRequestReceipt::sign(
+            child_request_receipt_body(embedded_kernel.public_key()),
+            &actual_signer,
+        ),
+        "child request receipt",
+        "kernel_key",
+    );
+    ChildRequestReceipt::sign(
         child_request_receipt_body(embedded_kernel.public_key()),
-        &actual_signer,
-    )
-    .is_err());
+        &embedded_kernel,
+    )?;
 
-    assert!(ChildRequestReceipt::sign_with_backend(
-        child_request_receipt_body(embedded_kernel.public_key()),
-        &backend,
-    )
-    .is_err());
     assert_ne!(embedded_kernel.public_key(), backend.public_key());
+    assert_signer_mismatch(
+        ChildRequestReceipt::sign_with_backend(
+            child_request_receipt_body(embedded_kernel.public_key()),
+            &backend,
+        ),
+        "child request receipt",
+        "kernel_key",
+    );
+    ChildRequestReceipt::sign_with_backend(
+        child_request_receipt_body(backend.public_key()),
+        &backend,
+    )?;
+    Ok(())
 }
 
 #[test]
-fn receipt_lineage_sign_rejects_embedded_kernel_key_mismatch() {
+fn receipt_lineage_sign_rejects_embedded_kernel_key_mismatch() -> chio_core_types::Result<()> {
     let embedded_kernel = Keypair::generate();
     let actual_signer = Keypair::generate();
 
-    assert!(ReceiptLineageStatement::sign(
+    assert_signer_mismatch(
+        ReceiptLineageStatement::sign(
+            receipt_lineage_statement_body(embedded_kernel.public_key()),
+            &actual_signer,
+        ),
+        "receipt lineage statement",
+        "kernel_key",
+    );
+    ReceiptLineageStatement::sign(
         receipt_lineage_statement_body(embedded_kernel.public_key()),
-        &actual_signer,
-    )
-    .is_err());
+        &embedded_kernel,
+    )?;
+    Ok(())
 }
 
 #[test]
@@ -326,27 +425,40 @@ fn session_anchor_sign_rejects_embedded_kernel_key_mismatch() -> chio_core_types
     let embedded_kernel = Keypair::generate();
     let actual_signer = Keypair::generate();
 
-    assert!(SessionAnchor::sign(
+    assert_signer_mismatch(
+        SessionAnchor::sign(
+            session_anchor_body(embedded_kernel.public_key())?,
+            &actual_signer,
+        ),
+        "session anchor",
+        "kernel_key",
+    );
+    SessionAnchor::sign(
         session_anchor_body(embedded_kernel.public_key())?,
-        &actual_signer
-    )
-    .is_err());
+        &embedded_kernel,
+    )?;
     Ok(())
 }
 
 #[test]
-fn manifest_sign_rejects_embedded_server_key_mismatch() {
+fn manifest_sign_rejects_embedded_server_key_mismatch() -> chio_core_types::Result<()> {
     let embedded_server = Keypair::generate();
     let actual_signer = Keypair::generate();
 
-    let body = ToolManifestBody {
+    let body = || ToolManifestBody {
         server_id: "srv-files".to_string(),
         server_key: embedded_server.public_key(),
         tools: Vec::new(),
         required_capabilities: Vec::new(),
     };
 
-    assert!(ToolManifest::sign(body, &actual_signer).is_err());
+    assert_signer_mismatch(
+        ToolManifest::sign(body(), &actual_signer),
+        "tool manifest",
+        "server_key",
+    );
+    ToolManifest::sign(body(), &embedded_server)?;
+    Ok(())
 }
 
 #[test]

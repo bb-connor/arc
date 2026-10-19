@@ -11,9 +11,73 @@ use std::process::Command;
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 const CHILD_TEST: &str = "CHIO_CRYPTO_WIRE_BOUNDS_CHILD";
 
+const WIRE_SIZE_LIMIT: &str = "crypto wire input exceeds its encoded size limit";
+const HEX_SIZE_LIMIT: &str = "crypto hex input exceeds its encoded size limit";
+const HEX_LENGTH: &str = "crypto hex input has an incorrect encoded length";
+const HEX_NON_HEX: &str = "crypto hex input contains non-hex characters";
+const HYBRID_NESTED: &str = "hybrid keys and signatures cannot be nested";
+const HYBRID_MISSING: &str = "hybrid wire input is missing a component";
+const HYBRID_EMPTY: &str = "hybrid wire input contains an empty component";
+const HYBRID_ALG_SET: &str = "hybrid algorithm set does not match its classical half";
+const UNKNOWN_CLASSICAL: &str = "unknown classical crypto wire algorithm";
+
+#[derive(Clone, Copy)]
+enum Material {
+    Key,
+    Signature,
+}
+
+#[derive(Clone, Copy)]
+enum Rejection {
+    NonHex,
+    Wire(&'static str),
+}
+
+impl Rejection {
+    fn error(self, material: Material) -> chio_core_types::Error {
+        match (self, material) {
+            (Self::NonHex, _) => chio_core_types::Error::InvalidHex(HEX_NON_HEX.into()),
+            (Self::Wire(message), Material::Key) => {
+                chio_core_types::Error::InvalidPublicKey(message.into())
+            }
+            (Self::Wire(message), Material::Signature) => {
+                chio_core_types::Error::InvalidSignature(message.into())
+            }
+        }
+    }
+}
+
+fn assert_rejected<T: std::fmt::Debug>(
+    actual: chio_core_types::Result<T>,
+    expected: chio_core_types::Error,
+    context: &str,
+) {
+    match actual {
+        Err(error) => assert_eq!(format!("{error:?}"), format!("{expected:?}"), "{context}"),
+        Ok(value) => panic!("{context}: expected {expected:?}, decoded {value:?}"),
+    }
+}
+
+fn assert_key_rejected(wire: &str, rejection: Rejection) {
+    assert_rejected(
+        PublicKey::from_hex(wire),
+        rejection.error(Material::Key),
+        wire,
+    );
+}
+
+fn assert_signature_rejected(wire: &str, rejection: Rejection) {
+    assert_rejected(
+        Signature::from_hex(wire),
+        rejection.error(Material::Signature),
+        wire,
+    );
+}
+
 fn assert_deep_wire_rejected(
     test_name: &str,
-    parse_rejects: impl FnOnce(&str) -> bool,
+    parse_error: impl FnOnce(&str) -> Option<String>,
+    expected: &str,
 ) -> TestResult {
     if std::env::var(CHILD_TEST).as_deref() == Ok(test_name) {
         // Short invalid inner components keep this below ordinary HTTP body
@@ -21,7 +85,13 @@ fn assert_deep_wire_rejected(
         let mut wire = "hybrid:".repeat(20_000);
         wire.push_str(&"00".repeat(64));
         wire.push_str(&":00:ed25519+mldsa65".repeat(20_000));
-        assert!(parse_rejects(&wire));
+        let message = parse_error(&wire);
+        assert!(
+            message
+                .as_deref()
+                .is_some_and(|message| message.contains(expected)),
+            "expected {expected:?}, got {message:?}",
+        );
         return Ok(());
     }
     let output = Command::new(std::env::current_exe()?)
@@ -47,7 +117,12 @@ fn assert_deep_wire_rejected(
 fn deeply_nested_key_wire_returns_an_error_without_crashing() -> TestResult {
     assert_deep_wire_rejected(
         "deeply_nested_key_wire_returns_an_error_without_crashing",
-        |wire| PublicKey::from_hex(wire).is_err(),
+        |wire| {
+            PublicKey::from_hex(wire)
+                .err()
+                .map(|error| error.to_string())
+        },
+        &format!("invalid public key: {WIRE_SIZE_LIMIT}"),
     )
 }
 
@@ -55,7 +130,12 @@ fn deeply_nested_key_wire_returns_an_error_without_crashing() -> TestResult {
 fn deeply_nested_signature_wire_returns_an_error_without_crashing() -> TestResult {
     assert_deep_wire_rejected(
         "deeply_nested_signature_wire_returns_an_error_without_crashing",
-        |wire| Signature::from_hex(wire).is_err(),
+        |wire| {
+            Signature::from_hex(wire)
+                .err()
+                .map(|error| error.to_string())
+        },
+        &format!("invalid signature: {WIRE_SIZE_LIMIT}"),
     )
 }
 
@@ -63,7 +143,12 @@ fn deeply_nested_signature_wire_returns_an_error_without_crashing() -> TestResul
 fn deeply_nested_key_json_returns_an_error_without_crashing() -> TestResult {
     assert_deep_wire_rejected(
         "deeply_nested_key_json_returns_an_error_without_crashing",
-        |wire| serde_json::from_str::<PublicKey>(&format!("\"{wire}\"")).is_err(),
+        |wire| {
+            serde_json::from_str::<PublicKey>(&format!("\"{wire}\""))
+                .err()
+                .map(|error| error.to_string())
+        },
+        &format!("invalid public key: {WIRE_SIZE_LIMIT}"),
     )
 }
 
@@ -71,22 +156,20 @@ fn deeply_nested_key_json_returns_an_error_without_crashing() -> TestResult {
 fn deeply_nested_signature_json_returns_an_error_without_crashing() -> TestResult {
     assert_deep_wire_rejected(
         "deeply_nested_signature_json_returns_an_error_without_crashing",
-        |wire| serde_json::from_str::<Signature>(&format!("\"{wire}\"")).is_err(),
+        |wire| {
+            serde_json::from_str::<Signature>(&format!("\"{wire}\""))
+                .err()
+                .map(|error| error.to_string())
+        },
+        &format!("invalid signature: {WIRE_SIZE_LIMIT}"),
     )
 }
 
 #[test]
 fn nested_hybrids_reject_before_decoding_inner_material() {
     let wire = "hybrid:hybrid:zz:00:ed25519+mldsa65:00:ed25519+mldsa65";
-    for error in [
-        PublicKey::from_hex(wire).err(),
-        Signature::from_hex(wire).err(),
-    ] {
-        assert!(
-            error.is_some_and(|error| error.to_string().contains("nested")),
-            "nested hybrid structure must reject before decoding its invalid inner hex",
-        );
-    }
+    assert_key_rejected(wire, Rejection::Wire(HYBRID_NESTED));
+    assert_signature_rejected(wire, Rejection::Wire(HYBRID_NESTED));
 }
 
 #[test]
@@ -95,7 +178,7 @@ fn oversized_ecdsa_wire_signatures_are_rejected() {
         let at_limit = format!("{prefix}{}", "00".repeat(max_der_bytes));
         assert!(Signature::from_hex(&at_limit).is_ok());
         let too_long = format!("{at_limit}00");
-        assert!(Signature::from_hex(&too_long).is_err(), "{prefix}");
+        assert_signature_rejected(&too_long, Rejection::Wire(HEX_SIZE_LIMIT));
     }
 }
 
@@ -237,18 +320,30 @@ fn ecdsa_and_hybrid_wire_bounds_preserve_maximal_encodings() -> TestResult {
             hybrid_signature.to_hex(),
             format!("hybrid:{signature_wire}:{pq_signature}:{alg_set}"),
         );
-        for malformed in [
-            format!("hybrid:{key_alias}:{pq_key}00:{alg_set}"),
-            format!("hybrid:{key_alias}:{}:{alg_set}", &pq_key[2..]),
-            format!("hybrid:{key_alias}:{pq_key}:ed25519+mldsa65"),
-            format!("hybrid:{key_alias}:0x{pq_key}:{alg_set}"),
+        for (malformed, rejection) in [
+            (
+                format!("hybrid:{key_alias}:{pq_key}00:{alg_set}"),
+                Rejection::Wire(HEX_SIZE_LIMIT),
+            ),
+            (
+                format!("hybrid:{key_alias}:{}:{alg_set}", &pq_key[2..]),
+                Rejection::Wire(HEX_LENGTH),
+            ),
+            (
+                format!("hybrid:{key_alias}:{pq_key}:ed25519+mldsa65"),
+                Rejection::Wire(HYBRID_ALG_SET),
+            ),
+            (
+                format!("hybrid:{key_alias}:0x{pq_key}:{alg_set}"),
+                Rejection::Wire(HEX_SIZE_LIMIT),
+            ),
         ] {
-            assert!(PublicKey::from_hex(&malformed).is_err());
+            assert_key_rejected(&malformed, rejection);
         }
-        assert!(Signature::from_hex(&format!(
-            "hybrid:{signature_alias}00:{pq_signature}:{alg_set}",
-        ))
-        .is_err());
+        assert_signature_rejected(
+            &format!("hybrid:{signature_alias}00:{pq_signature}:{alg_set}"),
+            Rejection::Wire(HEX_SIZE_LIMIT),
+        );
     }
     Ok(())
 }
@@ -351,32 +446,64 @@ fn serde_accepts_borrowed_and_owned_strings_without_requesting_a_copy() -> TestR
         serde_json::from_str::<PublicKey>(&format!("\"{escaped}\""))?,
         key
     );
-    for json in ["null", "1", "[]", "{}", "true"] {
-        assert!(serde_json::from_str::<PublicKey>(json).is_err());
-        assert!(serde_json::from_str::<Signature>(json).is_err());
+    for (json, found) in [
+        ("null", "invalid type: null"),
+        ("1", "invalid type: integer `1`"),
+        ("[]", "invalid type: sequence"),
+        ("{}", "invalid type: map"),
+        ("true", "invalid type: boolean `true`"),
+    ] {
+        for (error, expected) in [
+            (
+                serde_json::from_str::<PublicKey>(json).err(),
+                "expected an algorithm-aware public-key string",
+            ),
+            (
+                serde_json::from_str::<Signature>(json).err(),
+                "expected an algorithm-aware signature string",
+            ),
+        ] {
+            let message = error.map(|error| error.to_string());
+            assert!(
+                message
+                    .as_deref()
+                    .is_some_and(|message| message.contains(found) && message.contains(expected)),
+                "{json}: {message:?}",
+            );
+        }
     }
     Ok(())
 }
 
 #[test]
 fn malformed_unicode_and_prefixes_reject_without_panicking() {
-    for wire in [
-        "hybrid:",
-        "hybrid:::",
-        "hybrid:ed25519:00:00:ed25519+mldsa65",
-        "hybrid:p521:00:00:p521+mldsa65",
-        "p521:00",
-        "HYBRID:00",
-        "0X00",
-        "💥",
-        "hybrid:💥:💥:💥",
-        "p256:💥",
-        "p384:💥",
-        "00\u{0000}",
+    for (wire, rejection) in [
+        ("hybrid:", Rejection::Wire(HYBRID_MISSING)),
+        ("hybrid:::", Rejection::Wire(HYBRID_EMPTY)),
+        (
+            "hybrid:ed25519:00:00:ed25519+mldsa65",
+            Rejection::Wire(UNKNOWN_CLASSICAL),
+        ),
+        (
+            "hybrid:p521:00:00:p521+mldsa65",
+            Rejection::Wire(UNKNOWN_CLASSICAL),
+        ),
+        ("p521:00", Rejection::Wire(UNKNOWN_CLASSICAL)),
+        ("HYBRID:00", Rejection::Wire(UNKNOWN_CLASSICAL)),
+        ("0X00", Rejection::NonHex),
+        ("💥", Rejection::NonHex),
+        ("hybrid:💥:💥:💥", Rejection::Wire(HYBRID_ALG_SET)),
+        ("p256:💥", Rejection::NonHex),
+        ("p384:💥", Rejection::NonHex),
+        ("00\u{0000}", Rejection::NonHex),
     ] {
-        assert!(PublicKey::from_hex(wire).is_err(), "{wire}");
-        assert!(Signature::from_hex(wire).is_err(), "{wire}");
-        assert!(Keypair::from_seed_hex(wire).is_err(), "{wire}");
+        assert_key_rejected(wire, rejection);
+        assert_signature_rejected(wire, rejection);
+        assert_rejected(
+            Keypair::from_seed_hex(wire),
+            Rejection::NonHex.error(Material::Signature),
+            wire,
+        );
     }
 }
 
