@@ -2,7 +2,7 @@
 //! measures per-call latency percentiles plus resident-set growth, and reports
 //! a fail-closed budget verdict.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{mpsc, Arc, Barrier, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -140,6 +140,7 @@ pub fn run_sustained(
         let threads_ready = Arc::new(Barrier::new(thread_count));
         let dispatch_start = Arc::new(Barrier::new(thread_count));
         let shared_run_start = Arc::new(OnceLock::<Instant>::new());
+        let progress = Arc::new(DispatchProgress::default());
 
         let mut workers = Vec::with_capacity(worker_count);
         for _ in 0..worker_count {
@@ -147,9 +148,12 @@ pub fn run_sustained(
             let sender = result_sender.clone();
             let ready = Arc::clone(&threads_ready);
             let start = Arc::clone(&dispatch_start);
+            let worker_run_start = Arc::clone(&shared_run_start);
+            let worker_progress = Arc::clone(&progress);
             workers.push(scope.spawn(move || {
                 ready.wait();
                 start.wait();
+                let run_start = worker_run_start.get().copied();
                 loop {
                     let next = match receiver.lock() {
                         Ok(guard) => guard.recv(),
@@ -162,7 +166,11 @@ pub fn run_sustained(
                     };
                     match next {
                         Ok(()) => {
-                            let _ = sender.send(harness.dispatch_allow_once());
+                            let outcome = harness.dispatch_allow_once();
+                            if let Some(run_start) = run_start {
+                                worker_progress.record_completion(run_start.elapsed());
+                            }
+                            let _ = sender.send(outcome);
                         }
                         Err(_) => break,
                     }
@@ -242,11 +250,12 @@ pub fn run_sustained(
             match tick_sender.try_send(()) {
                 Ok(()) => attempted += 1,
                 Err(mpsc::TrySendError::Full(())) => {
-                    pacing_error = Some(LoadgenError::ArrivalRateMissed {
+                    pacing_error = Some(progress.saturated(
                         scheduled,
                         attempted,
-                        completed: 0,
-                    });
+                        worker_count.saturating_add(queue_capacity),
+                        run_start.elapsed(),
+                    ));
                     break;
                 }
                 Err(mpsc::TrySendError::Disconnected(())) => {
@@ -373,6 +382,51 @@ pub fn enforce_budget(report: &LoadReport, config: &LoadgenConfig) -> Result<(),
     }
 
     Ok(())
+}
+
+/// Completion progress shared by the dispatch workers, read by the pacer when
+/// the bounded backlog saturates. `last_completion_nanos` is the offset from
+/// run start of the most recent completed dispatch, meaningful only while
+/// `completed` is nonzero.
+#[derive(Default)]
+struct DispatchProgress {
+    completed: AtomicU64,
+    last_completion_nanos: AtomicU64,
+}
+
+impl DispatchProgress {
+    fn record_completion(&self, since_run_start: Duration) {
+        let nanos = u64::try_from(since_run_start.as_nanos()).unwrap_or(u64::MAX);
+        self.last_completion_nanos
+            .fetch_max(nanos, Ordering::Relaxed);
+        self.completed.fetch_add(1, Ordering::Release);
+    }
+
+    /// Typed denial for a backlog that filled every worker and queue slot. The
+    /// stall is measured from the last completion, or from run start when no
+    /// dispatch completed.
+    fn saturated(
+        &self,
+        scheduled: u64,
+        attempted: u64,
+        capacity: usize,
+        since_run_start: Duration,
+    ) -> LoadgenError {
+        let completed = self.completed.load(Ordering::Acquire);
+        let last_completion = if completed == 0 {
+            Duration::ZERO
+        } else {
+            Duration::from_nanos(self.last_completion_nanos.load(Ordering::Relaxed))
+        };
+        LoadgenError::DispatchBacklogSaturated {
+            scheduled,
+            attempted,
+            completed,
+            in_flight: attempted.saturating_sub(completed),
+            capacity: u64::try_from(capacity).unwrap_or(u64::MAX),
+            stalled_ms: since_run_start.saturating_sub(last_completion).as_millis(),
+        }
+    }
 }
 
 /// Exact number of tick instants in `[run_start, run_end)`. Fractional windows

@@ -52,6 +52,51 @@ fn slow_dispatches_do_not_collapse_the_open_loop_rate() {
 }
 
 #[test]
+fn backlog_saturation_reports_real_progress() {
+    let config = LoadgenConfig {
+        arrival_rate_hz: 200,
+        duration: Duration::from_secs(5),
+        tool_latency: Duration::ZERO,
+        store: StoreBacking::Memory,
+        p99_budget: Duration::from_millis(500),
+        rss_growth_budget_bytes: 256 * 1024 * 1024,
+    };
+
+    let harness = StackHarness::boot_smoke(&config).test_unwrap();
+    let error = std::thread::scope(|scope| {
+        scope.spawn(|| {
+            std::thread::sleep(Duration::from_millis(500));
+            harness.set_tool_latency_ms(2_000);
+        });
+        run_sustained(&harness, &config)
+    })
+    .test_unwrap_err();
+
+    // Dispatches complete until the tool stalls, then every worker and queue
+    // slot fills. The denial carries the completions observed before the stall.
+    match error {
+        LoadgenError::DispatchBacklogSaturated {
+            scheduled,
+            attempted,
+            completed,
+            in_flight,
+            capacity,
+            ..
+        } => {
+            assert_eq!(scheduled, 1_000);
+            assert_eq!(capacity, 96);
+            assert!(completed > 0, "dispatches before the stall completed");
+            assert!(completed < attempted);
+            assert_eq!(in_flight, attempted - completed);
+            assert!(in_flight <= capacity);
+        }
+        other => {
+            panic!("a stalled dispatch path must deny with DispatchBacklogSaturated, got {other:?}")
+        }
+    }
+}
+
+#[test]
 fn run_sustained_rejects_zero_arrival_rate() {
     let config = LoadgenConfig {
         arrival_rate_hz: 0,
