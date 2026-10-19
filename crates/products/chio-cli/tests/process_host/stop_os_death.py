@@ -38,6 +38,15 @@ def invoke(client, key, tool, arguments):
         raise AssertionError(f"{key} surfaced {failure.code} instead of a signed verdict") from None
 
 
+def invoke_withheld(client, key, tool, arguments):
+    try:
+        response = client.invoke(key, "reports", tool, arguments)
+    except WorkerError as failure:
+        assert failure.code == "output_withheld", failure.code
+        return
+    raise AssertionError(f"{key} released a response while stopped: {response}")
+
+
 def ready_state(serving):
     status = serving.readiness()
     assert status["via"] == "control_socket", status
@@ -131,7 +140,7 @@ def c6(binary, root):
     outcome = {}
     caller = threading.Thread(
         target=lambda: outcome.update(
-            response=invoke(first.client, "c6-append", "append", {"report": "C6"})
+            response=invoke_withheld(first.client, "c6-append", "append", {"report": "C6"})
         )
     )
     caller.start()
@@ -141,7 +150,7 @@ def c6(binary, root):
     caller.join(timeout=90)
     assert not caller.is_alive(), "held call never returned under the stop"
     during = outcome["response"]
-    assert during["verdict"] != "allow" and during["output"] is None, during
+    assert during is None, during
     assert ready_state(first)["withheld_operations"] == 1
     kill(first.host)
     assert node.lines() == 1
@@ -149,8 +158,8 @@ def c6(binary, root):
     status = ready_state(second)
     assert status["readiness"] == {"state": "ready_stopped"}, status
     assert status["withheld_operations"] == 1, status
-    retried = invoke(second.client, "c6-append", "append", {"report": "C6"})
-    assert retried["verdict"] != "allow" and retried["output"] is None, retried
+    retried = invoke_withheld(second.client, "c6-append", "append", {"report": "C6"})
+    assert retried is None, retried
     node.stop(second.host)
     resume_offline(node, epoch)
     third = Serving(node, "third")
@@ -162,7 +171,7 @@ def c6(binary, root):
     assert node.lines() == 1
     return {
         "cutpoint": "C6",
-        "receipts": [during["receipt_json"], released["receipt_json"]],
+        "receipts": [released["receipt_json"]],
         "kernel_key": node.kernel_key,
         "publications": node.lines(),
     }
