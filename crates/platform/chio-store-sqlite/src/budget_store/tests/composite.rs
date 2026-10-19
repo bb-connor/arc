@@ -239,62 +239,14 @@ fn denied_candidate_does_not_claim_the_operation_authorization_slot() {
 }
 
 #[test]
-fn v6_operation_authorization_index_migrates_to_ignore_denials() {
-    let path = unique_db_path("chio-composite-v6-operation-index");
-    let store = reopen(&path);
-    let mut denied = authorize_request("candidate-migration", 10, 2);
-    denied.max_cost_per_invocation = Some(1);
-    assert!(matches!(
-        store
-            .authorize_budget_hold(owned(&store, denied.clone()))
-            .expect("deny first candidate"),
-        BudgetAuthorizeHoldDecision::Denied(_)
-    ));
-    drop(store);
-
-    let database = path.join("authority.sqlite3");
-    let connection = Connection::open(&database).expect("open v7 database for downgrade fixture");
-    connection
-        .execute_batch(
-            r#"
-            DROP INDEX idx_budget_events_operation_authorize;
-            CREATE UNIQUE INDEX idx_budget_events_operation_authorize
-                ON budget_mutation_events(operation_id)
-                WHERE operation_id IS NOT NULL
-                  AND kind IN ('reserve_invocation', 'authorize_exposure');
-            "#,
-        )
-        .expect("install v6 operation index");
-    install_empty_legacy_payment_journal(&connection).expect("install predecessor payment catalog");
-    crate::stamp_schema_version(&connection, "budget", 6).expect("stamp v6 budget schema");
+fn budget_schema_refuses_stamp_six_without_mutation() {
+    let (_directory, path) =
+        super::schema_contract::populated_database().expect("create populated budget database");
+    let connection = Connection::open(&path).expect("open budget database");
+    crate::stamp_schema_version(&connection, "budget", 6).expect("stamp budget schema");
     drop(connection);
-
-    let store = reopen(&path);
-    let mut authorized = denied;
-    authorized.max_cost_per_invocation = Some(10);
-    authorized.hold_id = Some("hold-candidate-migration-fallback".to_string());
-    authorized.event_id = Some("event-candidate-migration-fallback".to_string());
-    assert!(matches!(
-        store
-            .authorize_budget_hold(owned(&store, authorized))
-            .expect("authorize fallback after v6 migration"),
-        BudgetAuthorizeHoldDecision::Authorized(_)
-    ));
-
-    let connection = store
-        .connection()
-        .expect("inspect migrated operation index");
-    let index_sql: String = connection
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = ?1",
-            params!["idx_budget_events_operation_authorize"],
-            |row| row.get(0),
-        )
-        .expect("load migrated operation index");
-    assert!(index_sql.contains("authorization_outcome IS NOT 'denied'"));
-    drop(connection);
-    drop(store);
-    let _ = fs::remove_dir_all(path);
+    super::schema_contract::assert_stale_without_mutation(&path, 6)
+        .expect("refuse stamp six without mutation");
 }
 
 #[test]
@@ -536,296 +488,42 @@ fn zero_limit_aggregate_quota_persists_and_replays_a_durable_denial() {
 }
 
 #[test]
-fn v9_event_quota_projection_migrates_without_losing_history() {
-    let path = unique_db_path("chio-composite-v9-event-quota");
-    let request = authorize_request("v9-event-quota", 0, 2);
-    let store = reopen(&path);
-    let authorized = store
-        .authorize_budget_hold(owned(&store, request.clone()))
-        .expect("seed v9 quota event");
-    assert!(matches!(
-        authorized,
-        BudgetAuthorizeHoldDecision::Authorized(_)
-    ));
-    drop(store);
-
-    let database = path.join("authority.sqlite3");
-    let connection = Connection::open(&database).expect("open v10 database for downgrade fixture");
-    connection
-        .execute_batch(
-            r#"
-            PRAGMA foreign_keys = OFF;
-            DROP TRIGGER IF EXISTS budget_event_quota_bounds_insert;
-            ALTER TABLE budget_event_quota_members
-                RENAME TO budget_event_quota_members_v10;
-            CREATE TABLE budget_event_quota_members (
-                event_id TEXT NOT NULL,
-                profile TEXT NOT NULL,
-                owner_id TEXT NOT NULL,
-                grant_index INTEGER NOT NULL,
-                max_invocations INTEGER NOT NULL CHECK (max_invocations > 0),
-                reserved_before INTEGER NOT NULL CHECK (reserved_before >= 0),
-                captured_before INTEGER NOT NULL CHECK (
-                    captured_before >= 0 AND reserved_before <= max_invocations
-                    AND captured_before <= max_invocations - reserved_before
-                ),
-                reserved_after INTEGER NOT NULL CHECK (reserved_after >= 0),
-                captured_after INTEGER NOT NULL CHECK (
-                    captured_after >= 0 AND reserved_after <= max_invocations
-                    AND captured_after <= max_invocations - reserved_after
-                ),
-                PRIMARY KEY (event_id, profile, owner_id, grant_index),
-                FOREIGN KEY (event_id) REFERENCES budget_mutation_events(event_id),
-                CHECK (owner_id <> ''),
-                CHECK (
-                    (profile = 'chio.grant-invocation.v1' AND grant_index >= 0)
-                    OR
-                    (profile IN (
-                        'chio.aggregate-capability-invocation.v1',
-                        'chio.aggregate-family-invocation.v1',
-                        'chio.broker-capability-execution.v1'
-                    ) AND grant_index = -1)
-                )
-            );
-            INSERT INTO budget_event_quota_members
-            SELECT * FROM budget_event_quota_members_v10;
-            DROP TABLE budget_event_quota_members_v10;
-            PRAGMA foreign_keys = ON;
-            "#,
-        )
-        .expect("install v9 event quota table");
-    install_empty_legacy_payment_journal(&connection).expect("install predecessor payment catalog");
-    crate::stamp_schema_version(&connection, "budget", 9).expect("stamp v9 budget schema");
+fn budget_schema_refuses_stamp_nine_without_mutation() {
+    let (_directory, path) =
+        super::schema_contract::populated_database().expect("create populated budget database");
+    let connection = Connection::open(&path).expect("open budget database");
+    crate::stamp_schema_version(&connection, "budget", 9).expect("stamp budget schema");
     drop(connection);
-
-    let migrated = reopen(&path);
-    let table_sql: String = migrated
-        .connection()
-        .expect("inspect migrated quota table")
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'budget_event_quota_members'",
-            [],
-            |row| row.get(0),
-        )
-        .expect("load event quota table definition");
-    assert!(table_sql.contains("max_invocations >= 0"));
-    super::cleanup_custody::assert_replayed_authorization(
-        authorized,
-        migrated
-            .authorize_budget_hold(owned(&migrated, request))
-            .expect("replay authorization after v9 migration"),
-    );
-    drop(migrated);
-    let _ = fs::remove_dir_all(path);
+    super::schema_contract::assert_stale_without_mutation(&path, 9)
+        .expect("refuse stamp nine without mutation");
 }
-
-const ORIGINAL_PAYMENT_JOURNAL_COLUMNS: &str = "operation_id, journal_version,
- request_namespace_digest, request_id, capability_id, grant_index, hold_id, rail, rail_mode,
- authorization_id, transaction_id, amount_units, settle_action, settle_amount_units,
- release_authority_kind, release_authority_evidence_id, release_authority_evidence_digest,
- release_authority_operation_version, currency, state, created_at_unix_ms, updated_at_unix_ms";
-
-/// Every original payment journal field rendered with its exact stored value and
-/// type, so a table rebuild that alters or drops a row is visible.
-fn payment_journal_rows(connection: &Connection) -> Vec<String> {
-    let mut statement = connection
-        .prepare(&format!(
-            "SELECT {ORIGINAL_PAYMENT_JOURNAL_COLUMNS} FROM payment_journal ORDER BY operation_id"
-        ))
-        .expect("prepare payment journal scan");
-    let column_count = statement.column_count();
-    statement
-        .query_map([], |row| {
-            let mut rendered = String::new();
-            for index in 0..column_count {
-                let value: rusqlite::types::Value = row.get(index)?;
-                rendered.push_str(&format!("{value:?};"));
-            }
-            Ok(rendered)
-        })
-        .expect("scan payment journal")
-        .collect::<Result<Vec<_>, _>>()
-        .expect("collect payment journal rows")
-}
-
-const V10_PAYMENT_JOURNAL_SCHEMA: &str = r#"
-PRAGMA foreign_keys = OFF;
-DROP TRIGGER IF EXISTS payment_journal_identity_immutable;
-DROP TRIGGER IF EXISTS payment_journal_no_delete;
-DROP INDEX IF EXISTS idx_payment_journal_request;
-DROP INDEX IF EXISTS idx_payment_journal_state;
-DROP TABLE payment_journal;
-
-CREATE TABLE payment_journal (
-    operation_id TEXT PRIMARY KEY CHECK (operation_id <> '' AND length(operation_id) <= 512),
-    journal_version INTEGER NOT NULL CHECK (
-        journal_version BETWEEN 1 AND 9007199254740991
-    ),
-    request_namespace_digest TEXT NOT NULL CHECK (
-        length(request_namespace_digest) = 64
-        AND request_namespace_digest NOT GLOB '*[^0-9a-f]*'
-    ),
-    request_id TEXT NOT NULL CHECK (request_id <> '' AND length(request_id) <= 512),
-    capability_id TEXT NOT NULL CHECK (capability_id <> '' AND length(capability_id) <= 512),
-    grant_index INTEGER NOT NULL CHECK (grant_index BETWEEN 0 AND 4294967295),
-    hold_id TEXT NOT NULL UNIQUE CHECK (hold_id <> '' AND length(hold_id) <= 512),
-    rail TEXT NOT NULL CHECK (
-        rail <> '' AND rail <> 'unspecified' AND length(rail) <= 512
-    ),
-    rail_mode TEXT NOT NULL CHECK (rail_mode IN ('reversible_hold', 'prepaid_final')),
-    authorization_id TEXT CHECK (
-        authorization_id IS NULL
-        OR (authorization_id <> '' AND length(authorization_id) <= 512)
-    ),
-    transaction_id TEXT CHECK (
-        transaction_id IS NULL
-        OR (transaction_id <> '' AND length(transaction_id) <= 512)
-    ),
-    amount_units INTEGER NOT NULL CHECK (
-        amount_units BETWEEN 1 AND 9007199254740991
-    ),
-    settle_action TEXT CHECK (settle_action IN ('capture', 'release')),
-    settle_amount_units INTEGER CHECK (
-        settle_amount_units BETWEEN 1 AND amount_units
-    ),
-    release_authority_kind TEXT CHECK (
-        release_authority_kind IN (
-            'pre_dispatch_no_effect',
-            'transport_not_accepted',
-            'contractual_zero_charge'
-        )
-    ),
-    release_authority_evidence_id TEXT CHECK (
-        release_authority_evidence_id IS NULL
-        OR (release_authority_evidence_id <> ''
-            AND length(release_authority_evidence_id) <= 512)
-    ),
-    release_authority_evidence_digest TEXT CHECK (
-        release_authority_evidence_digest IS NULL
-        OR (length(release_authority_evidence_digest) = 64
-            AND release_authority_evidence_digest NOT GLOB '*[^0-9a-f]*')
-    ),
-    release_authority_operation_version INTEGER CHECK (
-        release_authority_operation_version BETWEEN 1 AND 9007199254740991
-    ),
-    currency TEXT NOT NULL CHECK (
-        length(currency) = 3 AND currency NOT GLOB '*[^A-Z]*'
-    ),
-    state TEXT NOT NULL CHECK (state IN (
-        'hold_placed', 'authorized', 'settling', 'settled', 'closed',
-        'reconcile_failed'
-    )),
-    created_at_unix_ms INTEGER NOT NULL CHECK (
-        created_at_unix_ms BETWEEN 1 AND 9007199254740991
-    ),
-    updated_at_unix_ms INTEGER NOT NULL CHECK (
-        updated_at_unix_ms BETWEEN created_at_unix_ms AND 9007199254740991
-    ),
-    FOREIGN KEY (hold_id) REFERENCES budget_authorization_holds(hold_id),
-    CHECK (
-        (state = 'hold_placed'
-         AND authorization_id IS NULL AND transaction_id IS NULL
-         AND settle_action IS NULL AND settle_amount_units IS NULL
-         AND release_authority_kind IS NULL
-         AND release_authority_evidence_id IS NULL
-         AND release_authority_evidence_digest IS NULL
-         AND release_authority_operation_version IS NULL)
-        OR
-        (state = 'authorized' AND rail_mode = 'reversible_hold'
-         AND authorization_id IS NOT NULL AND transaction_id IS NULL
-         AND settle_action IS NULL AND settle_amount_units IS NULL
-         AND release_authority_kind IS NULL
-         AND release_authority_evidence_id IS NULL
-         AND release_authority_evidence_digest IS NULL
-         AND release_authority_operation_version IS NULL)
-        OR
-        (state = 'settling' AND rail_mode = 'reversible_hold'
-         AND authorization_id IS NOT NULL AND transaction_id IS NULL
-         AND (
-            (settle_action = 'capture' AND settle_amount_units IS NOT NULL
-             AND release_authority_kind IS NULL
-             AND release_authority_evidence_id IS NULL
-             AND release_authority_evidence_digest IS NULL
-             AND release_authority_operation_version IS NULL)
-            OR
-            (settle_action = 'release' AND settle_amount_units IS NULL
-             AND release_authority_kind IS NOT NULL
-             AND release_authority_evidence_id IS NOT NULL
-             AND release_authority_evidence_digest IS NOT NULL
-             AND release_authority_operation_version IS NOT NULL)
-         ))
-        OR
-        (state IN ('settled', 'closed') AND authorization_id IS NOT NULL
-         AND (
-            (rail_mode = 'prepaid_final' AND transaction_id IS NULL
-             AND settle_action IS NULL AND settle_amount_units IS NULL
-             AND release_authority_kind IS NULL
-             AND release_authority_evidence_id IS NULL
-             AND release_authority_evidence_digest IS NULL
-             AND release_authority_operation_version IS NULL)
-            OR
-            (rail_mode = 'reversible_hold' AND transaction_id IS NOT NULL
-             AND (
-                (settle_action = 'capture' AND settle_amount_units IS NOT NULL
-                 AND release_authority_kind IS NULL
-                 AND release_authority_evidence_id IS NULL
-                 AND release_authority_evidence_digest IS NULL
-                 AND release_authority_operation_version IS NULL)
-                OR
-                (settle_action = 'release' AND settle_amount_units IS NULL
-                 AND release_authority_kind IS NOT NULL
-                 AND release_authority_evidence_id IS NOT NULL
-                 AND release_authority_evidence_digest IS NOT NULL
-                 AND release_authority_operation_version IS NOT NULL)
-             ))
-         ))
-        OR state = 'reconcile_failed'
-    )
-);
-
-CREATE UNIQUE INDEX idx_payment_journal_request
-    ON payment_journal(request_namespace_digest, request_id);
-CREATE INDEX idx_payment_journal_state
-    ON payment_journal(state, updated_at_unix_ms);
-
-CREATE TRIGGER payment_journal_identity_immutable
-BEFORE UPDATE OF operation_id, request_namespace_digest, request_id,
-                 capability_id, grant_index, hold_id, rail, rail_mode,
-                 amount_units, currency, created_at_unix_ms
-ON payment_journal
-BEGIN
-    SELECT RAISE(ABORT, 'payment journal identity is immutable');
-END;
-
-CREATE TRIGGER payment_journal_no_delete
-BEFORE DELETE ON payment_journal
-BEGIN
-    SELECT RAISE(ABORT, 'payment journal is append-preserving');
-END;
-PRAGMA foreign_keys = ON;
-"#;
 
 const INSERT_PAYMENT_JOURNAL_ROW: &str = r#"
 INSERT INTO payment_journal (
     operation_id, journal_version, request_namespace_digest, request_id,
     capability_id, grant_index, hold_id, rail, rail_mode,
-    authorization_id, transaction_id, amount_units, settle_action,
-    settle_amount_units, release_authority_kind,
+    authorization_id, transaction_id, amount_units, authorized_amount_units,
+    authorization_attempt, settle_action, settle_amount_units, release_authority_kind,
     release_authority_evidence_id, release_authority_evidence_digest,
     release_authority_operation_version, currency, state,
     created_at_unix_ms, updated_at_unix_ms
 ) VALUES (
-    ?1, 1, ?2, ?3, 'cap-composite', 0, ?4, 'rail-test', 'reversible_hold',
-    ?5, NULL, 250, ?6, NULL, ?7, ?8, ?9, ?10, 'USD', ?11,
+    ?1, 2, ?2, ?3, 'cap-journal', 0, ?4, 'rail-test', 'reversible_hold',
+    ?5, NULL, 10, 10, ?12, ?6, NULL, ?7, ?8, ?9, ?10, 'USD', ?11,
     1700000000000, 1700000000001
 )
 "#;
 
-#[test]
-fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
-    let path = unique_db_path("chio-composite-v10-payment-journal");
-    secure_create_dir_all(&path, "create budget root");
-    let database = path.join("budget.sqlite3");
+const INSERT_PAYMENT_RELEASE_EVIDENCE: &str = r#"
+INSERT INTO payment_release_evidence (
+    operation_id, evidence_id, evidence_kind, operation_version,
+    canonical_bundle, bundle_digest, created_at_unix_ms
+) VALUES (?1, ?2, 'pre_dispatch_no_effect', 7, X'0102', ?3, 1700000000001)
+"#;
+
+fn populated_payment_database() -> (tempfile::TempDir, std::path::PathBuf) {
+    let directory = tempfile::tempdir().expect("create budget directory");
+    let database = directory.path().join("budget.sqlite3");
     let store = SqliteBudgetStore::open(&database).expect("open budget store");
     for id in [
         "journal-authorized",
@@ -853,21 +551,7 @@ fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
             BudgetAuthorizeHoldDecision::Authorized(_)
         ));
     }
-    let provisioned_sql: String = store
-        .connection()
-        .expect("inspect provisioned payment journal")
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'payment_journal'",
-            [],
-            |row| row.get(0),
-        )
-        .expect("load provisioned payment journal definition");
-    drop(store);
-
-    let connection = Connection::open(&database).expect("open v10 database for downgrade fixture");
-    connection
-        .execute_batch(V10_PAYMENT_JOURNAL_SCHEMA)
-        .expect("install v10 payment journal table");
+    let connection = store.connection().expect("open payment journal connection");
     connection
         .execute(
             INSERT_PAYMENT_JOURNAL_ROW,
@@ -883,6 +567,7 @@ fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
                 None::<String>,
                 None::<i64>,
                 "authorized",
+                "started",
             ],
         )
         .expect("seed authorized journal row");
@@ -901,121 +586,50 @@ fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
                 "c".repeat(64),
                 7_i64,
                 "settling",
+                "started",
             ],
         )
         .expect("seed releasing journal row");
     connection
         .execute(
-            r#"
-            INSERT INTO payment_release_evidence (
-                operation_id, evidence_id, evidence_kind, operation_version,
-                canonical_bundle, bundle_digest, created_at_unix_ms
-            ) VALUES (
-                'operation-journal-released', 'evidence-journal-released',
-                'pre_dispatch_no_effect', 7, X'0102', ?1, 1700000000001
-            )
-            "#,
-            params!["c".repeat(64)],
-        )
-        .expect("seed release evidence row");
-    let rejected = connection
-        .execute(
-            INSERT_PAYMENT_JOURNAL_ROW,
+            INSERT_PAYMENT_RELEASE_EVIDENCE,
             params![
-                "operation-journal-cancelled",
-                "d".repeat(64),
-                "request-journal-cancelled",
-                "hold-journal-cancelled",
-                None::<String>,
-                None::<String>,
-                None::<String>,
-                None::<String>,
-                None::<String>,
-                None::<i64>,
-                "closed",
+                "operation-journal-released",
+                "evidence-journal-released",
+                "c".repeat(64),
             ],
         )
-        .expect_err("v10 rejects a hold cancelled before authorization");
-    assert!(
-        rejected.to_string().contains("CHECK constraint failed"),
-        "unexpected v10 rejection: {rejected}"
-    );
-    let seeded = payment_journal_rows(&connection);
-    assert_eq!(seeded.len(), 2);
-    crate::stamp_schema_version(&connection, "budget", 10).expect("stamp v10 budget schema");
+        .expect("seed release evidence row");
     drop(connection);
+    drop(store);
+    (directory, database)
+}
 
-    let migrated = SqliteBudgetStore::open(&database).expect("reopen budget store");
-    let connection = migrated
-        .connection()
-        .expect("inspect migrated payment journal");
-    let table_sql: String = connection
-        .query_row(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'payment_journal'",
-            [],
-            |row| row.get(0),
-        )
-        .expect("load payment journal definition");
-    assert!(table_sql.contains("state = 'closed'"));
-    assert_eq!(table_sql, provisioned_sql);
-    assert_eq!(payment_journal_rows(&connection), seeded);
-    let invented_authorization_facts: i64 = connection
-        .query_row(
-            "SELECT COUNT(*) FROM payment_journal
-             WHERE authorized_amount_units IS NOT NULL OR authorization_attempt IS NOT NULL",
-            [],
-            |row| row.get(0),
-        )
-        .expect("inspect newly added authorization fields");
-    assert_eq!(invented_authorization_facts, 0);
-
-    let restored: Vec<String> = {
-        let mut statement = connection
-            .prepare(
-                "SELECT name FROM sqlite_master
-                 WHERE tbl_name = 'payment_journal' AND type IN ('index', 'trigger')
-                 ORDER BY name",
-            )
-            .expect("prepare payment journal object scan");
-        let names = statement
-            .query_map([], |row| row.get::<_, String>(0))
-            .expect("scan payment journal objects")
-            .collect::<Result<Vec<_>, _>>()
-            .expect("collect payment journal objects");
-        names
-    };
-    for object in [
-        "idx_payment_journal_request",
-        "idx_payment_journal_state",
-        "payment_journal_identity_immutable",
-        "payment_journal_no_delete",
-    ] {
-        assert!(
-            restored.iter().any(|name| name == object),
-            "payment journal rebuild lost `{object}`: {restored:?}"
-        );
+fn assert_sqlite_constraint(error: rusqlite::Error, code: i32, message: &str) {
+    match error {
+        rusqlite::Error::SqliteFailure(error, detail) => {
+            assert_eq!(error.extended_code, code);
+            assert_eq!(detail.as_deref(), Some(message));
+        }
+        other => panic!("unexpected payment constraint error: {other:?}"),
     }
+}
 
-    let evidence_sql: String = connection
-        .query_row(
-            "SELECT sql FROM sqlite_master
-             WHERE type = 'table' AND name = 'payment_release_evidence'",
-            [],
-            |row| row.get(0),
-        )
-        .expect("load release evidence definition");
-    assert!(evidence_sql.contains("REFERENCES payment_journal(operation_id)"));
-    let (evidence_rows, violations): (i64, i64) = connection
-        .query_row(
-            "SELECT (SELECT COUNT(*) FROM payment_release_evidence),
-                    (SELECT COUNT(*) FROM pragma_foreign_key_check)",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )
-        .expect("count release evidence and foreign key violations");
-    assert_eq!(evidence_rows, 1);
-    assert_eq!(violations, 0);
+#[test]
+fn budget_schema_refuses_stamp_ten_without_mutating_payment_facts() {
+    let (_directory, database) = populated_payment_database();
+    let connection = Connection::open(&database).expect("open budget database");
+    crate::stamp_schema_version(&connection, "budget", 10).expect("stamp budget schema");
+    drop(connection);
+    super::schema_contract::assert_stale_without_mutation(&database, 10)
+        .expect("refuse stamp ten without mutation");
+}
 
+#[test]
+fn payment_journal_preserves_cancellation_constraints_and_evidence_across_restart() {
+    let (_directory, database) = populated_payment_database();
+    let store = SqliteBudgetStore::open(&database).expect("open budget store");
+    let connection = store.connection().expect("inspect payment journal");
     connection
         .execute(
             INSERT_PAYMENT_JOURNAL_ROW,
@@ -1031,77 +645,171 @@ fn v10_payment_journal_migrates_to_accept_pre_authorization_cancellation() {
                 None::<String>,
                 None::<i64>,
                 "closed",
+                "not_started",
             ],
         )
-        .expect("v11 accepts a hold cancelled before authorization");
-    let append_preserving = connection
-        .execute(
-            "DELETE FROM payment_journal WHERE operation_id = 'operation-journal-cancelled'",
+        .expect("close a hold before payment authorization");
+    let counts: (i64, i64, i64) = connection
+        .query_row(
+            "SELECT (SELECT COUNT(*) FROM payment_journal),
+                    (SELECT COUNT(*) FROM payment_release_evidence),
+                    (SELECT COUNT(*) FROM pragma_foreign_key_check)",
             [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
         )
-        .expect_err("payment journal delete guard survives the rebuild");
-    assert!(
-        append_preserving
-            .to_string()
-            .contains("payment journal is append-preserving"),
-        "unexpected delete outcome: {append_preserving}"
-    );
-    let duplicate_request = connection
-        .execute(
-            INSERT_PAYMENT_JOURNAL_ROW,
-            params![
-                "operation-journal-duplicate",
-                "d".repeat(64),
-                "request-journal-cancelled",
-                "hold-journal-duplicate",
-                None::<String>,
-                None::<String>,
-                None::<String>,
-                None::<String>,
-                None::<String>,
-                None::<i64>,
-                "closed",
-            ],
-        )
-        .expect_err("request uniqueness survives the rebuild");
-    assert!(
-        duplicate_request.to_string().contains("UNIQUE"),
-        "unexpected duplicate outcome: {duplicate_request}"
-    );
-    let settled = payment_journal_rows(&connection);
-    assert_eq!(settled.len(), 3);
-    drop(connection);
-    drop(migrated);
+        .expect("inspect payment and evidence counts");
+    assert_eq!(counts, (3, 1, 0));
+    let before = super::schema_contract::snapshot(&connection).expect("snapshot payment facts");
 
-    let reopened = SqliteBudgetStore::open(&database).expect("reopen migrated budget store");
+    for (sql, message) in [
+        (
+            "DELETE FROM payment_journal WHERE operation_id = 'operation-journal-cancelled'",
+            "payment journal is append-preserving",
+        ),
+        (
+            "UPDATE payment_journal SET amount_units = 11
+             WHERE operation_id = 'operation-journal-authorized'",
+            "payment journal identity is immutable",
+        ),
+        (
+            "UPDATE payment_journal SET authorization_attempt = 'not_started'
+             WHERE operation_id = 'operation-journal-authorized'",
+            "payment authorization attempt is monotone",
+        ),
+        (
+            "UPDATE payment_release_evidence SET canonical_bundle = X'0304'
+             WHERE operation_id = 'operation-journal-released'",
+            "payment release evidence is immutable",
+        ),
+        (
+            "DELETE FROM payment_release_evidence
+             WHERE operation_id = 'operation-journal-released'",
+            "payment release evidence is immutable",
+        ),
+    ] {
+        assert_sqlite_constraint(
+            connection
+                .execute(sql, [])
+                .expect_err("refuse payment fact mutation"),
+            rusqlite::ffi::SQLITE_CONSTRAINT_TRIGGER,
+            message,
+        );
+    }
+
+    assert_sqlite_constraint(
+        connection
+            .execute(
+                INSERT_PAYMENT_JOURNAL_ROW,
+                params![
+                    "operation-journal-duplicate",
+                    "d".repeat(64),
+                    "request-journal-cancelled",
+                    "hold-journal-duplicate",
+                    None::<String>,
+                    None::<String>,
+                    None::<String>,
+                    None::<String>,
+                    None::<String>,
+                    None::<i64>,
+                    "closed",
+                    "not_started",
+                ],
+            )
+            .expect_err("refuse duplicate request identity"),
+        rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE,
+        "UNIQUE constraint failed: payment_journal.request_namespace_digest, payment_journal.request_id",
+    );
+    assert_sqlite_constraint(
+        connection
+            .execute(
+                INSERT_PAYMENT_JOURNAL_ROW,
+                params![
+                    "operation-journal-missing-hold",
+                    "e".repeat(64),
+                    "request-journal-missing-hold",
+                    "hold-journal-missing",
+                    None::<String>,
+                    None::<String>,
+                    None::<String>,
+                    None::<String>,
+                    None::<String>,
+                    None::<i64>,
+                    "closed",
+                    "not_started",
+                ],
+            )
+            .expect_err("refuse journal without a hold"),
+        rusqlite::ffi::SQLITE_CONSTRAINT_FOREIGNKEY,
+        "FOREIGN KEY constraint failed",
+    );
+
+    for (operation, evidence, code, message) in [
+        (
+            "operation-journal-authorized",
+            "evidence-journal-released",
+            rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE,
+            "UNIQUE constraint failed: payment_release_evidence.evidence_id",
+        ),
+        (
+            "operation-journal-released",
+            "evidence-journal-duplicate",
+            rusqlite::ffi::SQLITE_CONSTRAINT_PRIMARYKEY,
+            "UNIQUE constraint failed: payment_release_evidence.operation_id",
+        ),
+        (
+            "operation-journal-missing",
+            "evidence-journal-missing",
+            rusqlite::ffi::SQLITE_CONSTRAINT_FOREIGNKEY,
+            "FOREIGN KEY constraint failed",
+        ),
+    ] {
+        assert_sqlite_constraint(
+            connection
+                .execute(
+                    INSERT_PAYMENT_RELEASE_EVIDENCE,
+                    params![operation, evidence, "c".repeat(64)],
+                )
+                .expect_err("refuse unbound or duplicate release evidence"),
+            code,
+            message,
+        );
+    }
+    assert_eq!(
+        super::schema_contract::snapshot(&connection).expect("snapshot retained payment facts"),
+        before,
+    );
+    drop(connection);
+    drop(store);
+
+    let reopened = SqliteBudgetStore::open(&database).expect("reopen budget store");
     let connection = reopened
         .connection()
-        .expect("inspect twice-opened payment journal");
-    assert_eq!(payment_journal_rows(&connection), settled);
-    drop(connection);
-    drop(reopened);
-    let _ = fs::remove_dir_all(path);
+        .expect("inspect reopened payment journal");
+    assert_eq!(
+        super::schema_contract::snapshot(&connection).expect("snapshot reopened payment facts"),
+        before,
+    );
 }
 
 #[cfg(unix)]
 #[test]
-fn provision_refuses_populated_legacy_budget_state() {
-    let path = unique_db_path("chio-composite-legacy-quota");
-    secure_create_dir_all(&path, "create legacy authority root");
+fn provision_refuses_populated_standalone_budget_state() {
+    let path = unique_db_path("chio-composite-standalone-quota");
+    secure_create_dir_all(&path, "create standalone authority root");
     let database = path.join("authority.sqlite3");
     {
-        let legacy = SqliteBudgetStore::open(&database).expect("open legacy store");
-        assert!(legacy
+        let standalone = SqliteBudgetStore::open(&database).expect("open standalone store");
+        assert!(standalone
             .try_increment("cap-composite", 0, Some(2))
-            .expect("legacy increment"));
+            .expect("record standalone usage"));
     }
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))
-        .expect("secure legacy database mode");
+        .expect("secure standalone database mode");
     let lock_root = path.join("locks");
     secure_create_dir_all(&lock_root, "create lock root");
 
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
-        .expect_err("populated legacy safety state must not acquire an unproven baseline");
+        .expect_err("populated standalone safety state must not acquire an unproven baseline");
     assert!(
         error
             .to_string()

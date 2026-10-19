@@ -28,6 +28,9 @@ pub enum BudgetStoreError {
         actual_epoch: Option<u64>,
     },
 
+    #[error("database schema version {found} is not the current schema version {current}; refusing to open")]
+    StaleSchema { found: i32, current: i32 },
+
     #[error("budget state invariant violated: {0}")]
     Invariant(String),
 

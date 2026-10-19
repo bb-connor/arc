@@ -139,6 +139,8 @@ type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 #[derive(Debug, thiserror::Error)]
 pub enum SqliteServingOwnerError {
+    #[error("budget schema refused: {0}")]
+    BudgetSchema(#[source] BudgetStoreError),
     #[error(transparent)]
     UntrustedInput(#[from] chio_core::canonical::UntrustedJsonError),
     #[error("authority clock rejected: {0}")]
@@ -373,7 +375,7 @@ impl SqliteAuthorityStore {
             validate_open_lock_file(&lock_root, &lock_file, &record)?;
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
             relocation::refuse_exported(&connection)?;
-            initialize_offline_authority_schemas(&mut connection)?;
+            initialize_offline_authority_schemas(&mut connection, false)?;
             initialize_serving_lease_schema(&connection)?;
             relocation::initialize_serving_relocation_schema(&connection)?;
             crate::admission_operation_store::initialize_admission_operation_schema(
@@ -419,7 +421,7 @@ impl SqliteAuthorityStore {
             return Ok(());
         }
         verify_path_available_for_new_identity(&lock_root, &canonical_database_path)?;
-        initialize_offline_authority_schemas(&mut connection)?;
+        initialize_offline_authority_schemas(&mut connection, true)?;
         validate_database_identity(&canonical_database_path, &expected_database)?;
         let database_path = canonical_database_path;
         for (key, supported) in [
@@ -622,6 +624,8 @@ impl SqliteAuthorityStore {
         validate_open_lock_file(&lock_root, &lock_file, &record)?;
         validate_provisioning_record(&database_path, &lock_root, &record)?;
         relocation::refuse_exported(&connection)?;
+        SqliteBudgetStore::preflight_schema(&connection, false)
+            .map_err(SqliteServingOwnerError::BudgetSchema)?;
 
         connection.execute_batch(
             r#"
@@ -655,7 +659,6 @@ impl SqliteAuthorityStore {
         verify_global_commit_schema(&connection)?;
         reset_derived_budget_ack_cache(&connection)?;
         for (key, supported) in [
-            ("budget", BUDGET_STORE_SUPPORTED_SCHEMA_VERSION),
             ("revocation", REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION),
             (
                 "admission_operation",
@@ -711,6 +714,8 @@ impl SqliteAuthorityStore {
         })?;
         let lease_id = next_lease_id()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        SqliteBudgetStore::preflight_schema(&transaction, false)
+            .map_err(SqliteServingOwnerError::BudgetSchema)?;
         let current = load_provisioning_record_tx(&transaction)?.ok_or_else(|| {
             SqliteServingOwnerError::NotProvisioned(database_path.display().to_string())
         })?;
@@ -1027,7 +1032,10 @@ impl SqliteAuthorityStore {
 
 fn initialize_offline_authority_schemas(
     connection: &mut Connection,
+    allow_empty_budget: bool,
 ) -> Result<(), SqliteServingOwnerError> {
+    SqliteBudgetStore::preflight_schema(connection, allow_empty_budget)
+        .map_err(SqliteServingOwnerError::BudgetSchema)?;
     let has_revocation_schema = connection.query_row(
         r#"
         SELECT EXISTS(
@@ -1047,9 +1055,8 @@ fn initialize_offline_authority_schemas(
         )
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     }
-    SqliteBudgetStore::initialize_connection_offline(connection).map_err(|error| {
-        SqliteServingOwnerError::Invalid(format!("failed to initialize budget schema: {error}"))
-    })?;
+    SqliteBudgetStore::initialize_connection_offline(connection)
+        .map_err(SqliteServingOwnerError::BudgetSchema)?;
     initialize_revocation_schema(connection, true).map_err(|error| {
         SqliteServingOwnerError::Invalid(format!("failed to initialize revocation schema: {error}"))
     })?;

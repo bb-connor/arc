@@ -385,13 +385,13 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
             WHERE (previous_reserved IS NULL AND (
                     reserved_before <> 0 OR captured_before <> CASE
                         WHEN profile = 'chio.grant-invocation.v1' THEN COALESCE((
-                            SELECT legacy.invocation_count_after
-                            FROM budget_mutation_events AS legacy
-                            WHERE legacy.projection_kind = 'legacy'
-                              AND legacy.capability_id = ordered.owner_id
-                              AND legacy.grant_index = ordered.grant_index
-                              AND legacy.event_seq < ordered.event_seq
-                            ORDER BY legacy.event_seq DESC LIMIT 1
+                            SELECT standalone.invocation_count_after
+                            FROM budget_mutation_events AS standalone
+                            WHERE standalone.projection_kind = 'standalone'
+                              AND standalone.capability_id = ordered.owner_id
+                              AND standalone.grant_index = ordered.grant_index
+                              AND standalone.event_seq < ordered.event_seq
+                            ORDER BY standalone.event_seq DESC LIMIT 1
                         ), 0)
                         ELSE 0
                     END
@@ -458,22 +458,22 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
             SELECT event_id FROM first_grant_quota AS first
             WHERE rank = 1 AND (
                 (captured_before > 0 AND NOT EXISTS (
-                    SELECT 1 FROM budget_mutation_events AS legacy
-                    WHERE legacy.projection_kind = 'legacy'
-                      AND legacy.capability_id = first.owner_id
-                      AND legacy.grant_index = first.grant_index
-                      AND legacy.max_invocations IS NOT NULL
+                    SELECT 1 FROM budget_mutation_events AS standalone
+                    WHERE standalone.projection_kind = 'standalone'
+                      AND standalone.capability_id = first.owner_id
+                      AND standalone.grant_index = first.grant_index
+                      AND standalone.max_invocations IS NOT NULL
                 ))
                 OR EXISTS (
                     SELECT 1
-                    FROM budget_mutation_events AS legacy
-                    WHERE legacy.projection_kind = 'legacy'
-                      AND legacy.capability_id = first.owner_id
-                      AND legacy.grant_index = first.grant_index
-                      AND legacy.max_invocations IS NOT NULL
-                    GROUP BY legacy.capability_id, legacy.grant_index
-                    HAVING COUNT(DISTINCT legacy.max_invocations) <> 1
-                        OR MIN(legacy.max_invocations) <> first.max_invocations
+                    FROM budget_mutation_events AS standalone
+                    WHERE standalone.projection_kind = 'standalone'
+                      AND standalone.capability_id = first.owner_id
+                      AND standalone.grant_index = first.grant_index
+                      AND standalone.max_invocations IS NOT NULL
+                    GROUP BY standalone.capability_id, standalone.grant_index
+                    HAVING COUNT(DISTINCT standalone.max_invocations) <> 1
+                        OR MIN(standalone.max_invocations) <> first.max_invocations
                 )
             )
             UNION ALL
@@ -482,11 +482,11 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
             WHERE structured.projection_kind = 'composite_v1'
               AND structured.kind IN ('reserve_invocation', 'authorize_exposure')
               AND EXISTS (
-                  SELECT 1 FROM budget_mutation_events AS legacy
-                  WHERE legacy.projection_kind = 'legacy'
-                    AND legacy.capability_id = structured.capability_id
-                    AND legacy.grant_index = structured.grant_index
-                    AND legacy.max_invocations IS NOT NULL
+                  SELECT 1 FROM budget_mutation_events AS standalone
+                  WHERE standalone.projection_kind = 'standalone'
+                    AND standalone.capability_id = structured.capability_id
+                    AND standalone.grant_index = structured.grant_index
+                    AND standalone.max_invocations IS NOT NULL
               )
               AND NOT EXISTS (
                   SELECT 1 FROM budget_event_quota_members AS member
@@ -503,7 +503,7 @@ fn verify_quota_history(connection: &Connection) -> Result<(), BudgetStoreError>
         .optional()?;
     if let Some(event_id) = broken_bridge {
         return Err(BudgetStoreError::Invariant(format!(
-            "budget event `{event_id}` breaks the legacy grant quota bridge"
+            "budget event `{event_id}` breaks the standalone grant quota bridge"
         )));
     }
 

@@ -352,7 +352,7 @@ pub(super) fn legacy_grant_quota_limit(
                COUNT(DISTINCT max_invocations)
         FROM budget_mutation_events
         WHERE capability_id = ?1 AND grant_index = ?2
-          AND projection_kind = 'legacy' AND max_invocations IS NOT NULL
+          AND projection_kind = 'standalone' AND max_invocations IS NOT NULL
         "#,
         params![
             capability_id,
