@@ -308,20 +308,18 @@ pub struct CommerceEventAuthorityReceiptArtifact {
     pub receipt_bytes: Vec<u8>,
 }
 
-impl CommerceEventAuthorityReceiptArtifact {
-    /// Decode the routed receipt bytes as a closed `ChioReceipt`.
-    pub(crate) fn decode_receipt(
-        &self,
-        field: &'static str,
-    ) -> Result<chio_core_types::receipt::body::ChioReceipt, CommerceOrderError> {
-        if self.schema != chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA {
-            return Err(CommerceOrderError::UnsupportedSchema {
-                field,
-                schema: self.schema.clone(),
-            });
-        }
-        crate::input::decode(&self.receipt_bytes)
+/// Decode routed authority receipt bytes as a closed `ChioReceipt`.
+pub(crate) fn decode_authority_receipt(
+    artifact: &CommerceEventAuthorityReceiptArtifact,
+    field: &'static str,
+) -> Result<chio_core_types::receipt::body::ChioReceipt, CommerceOrderError> {
+    if artifact.schema != chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA {
+        return Err(CommerceOrderError::UnsupportedSchema {
+            field,
+            schema: artifact.schema.clone(),
+        });
     }
+    crate::input::decode(&artifact.receipt_bytes)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

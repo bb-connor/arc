@@ -16,8 +16,8 @@ use super::error::CommerceOrderError;
 use super::ids::COMMERCE_EVENT_LOG_SCHEMA_ID;
 use super::mandate::CommerceMandateLedger;
 use super::types::{
-    CommerceEventAuthorityReceiptArtifact, CommerceOrderContext, CommercePaymentLifecycle,
-    CommerceTrustMarketRequirement,
+    decode_authority_receipt, CommerceEventAuthorityReceiptArtifact, CommerceOrderContext,
+    CommercePaymentLifecycle, CommerceTrustMarketRequirement,
 };
 use super::validation::{parse_rfc3339_utc, require_non_empty, validate_sha256_hex};
 
@@ -274,7 +274,7 @@ fn authority_receipts_by_ref(
         }
         by_ref.insert(
             artifact.receipt_ref.as_str(),
-            artifact.decode_receipt("authority receipt")?,
+            decode_authority_receipt(artifact, "authority receipt")?,
         );
     }
     Ok(by_ref)

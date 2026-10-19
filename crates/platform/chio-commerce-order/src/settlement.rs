@@ -1,8 +1,8 @@
 use super::error::CommerceOrderError;
 use super::ids::COMMERCE_SETTLEMENT_PACKET_SCHEMA_ID;
 use super::types::{
-    CommerceEventAuthorityReceiptArtifact, CommerceOrderContext, CommercePaymentLifecycle,
-    CommerceSettlementPacket,
+    decode_authority_receipt, CommerceEventAuthorityReceiptArtifact, CommerceOrderContext,
+    CommercePaymentLifecycle, CommerceSettlementPacket,
 };
 use super::validation::{
     parse_rfc3339_utc, require_non_empty, validate_money, validate_sha256_hex,
@@ -143,7 +143,7 @@ fn validate_settlement_dispatch_receipt(
                 settlement.dispatch_receipt_ref
             ))
         })?;
-    let receipt = artifact.decode_receipt("settlement dispatch receipt")?;
+    let receipt = decode_authority_receipt(artifact, "settlement dispatch receipt")?;
     let replayed_dispatch_receipt_ref = replayed_dispatch_receipt_ref.ok_or_else(|| {
         CommerceOrderError::SettlementFailed(
             "settlement dispatch event missing from replay".to_string(),
