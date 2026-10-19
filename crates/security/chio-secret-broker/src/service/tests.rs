@@ -1587,3 +1587,25 @@ mod audit_reference_custody_cases;
 
 #[cfg(unix)]
 mod audit_codec_contract_cases;
+
+pub(super) fn assert_invalid_request<T>(result: Result<T>, message: &str) {
+    let Err(error) = result else {
+        panic!("expected an invalid request refusal");
+    };
+    assert!(
+        matches!(&error, BrokerError::InvalidRequest(actual) if actual == message),
+        "{error:?}"
+    );
+    assert_eq!(error.diagnostic_code(), "invalid_request");
+}
+
+pub(super) fn assert_authorization_denied<T>(result: Result<T>, message: &str) {
+    let Err(error) = result else {
+        panic!("expected an authorization denial");
+    };
+    assert!(
+        matches!(&error, BrokerError::AuthorizationDenied(actual) if actual == message),
+        "{error:?}"
+    );
+    assert_eq!(error.diagnostic_code(), "authorization_denied");
+}
