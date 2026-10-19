@@ -190,6 +190,10 @@ The edge serves the A2A v1.0.0 JSON-RPC methods `SendMessage`, `GetTask` and
 MUST NOT advertise streaming in its Agent Card, and MUST refuse
 `configuration.returnImmediately: true` with `UnsupportedOperationError`
 (`-32004`) before creating a task or dispatching to the kernel.
+Internal failures MUST return JSON-RPC error `-32603` with a fixed message
+and MUST NOT carry internal error text. A kernel failure carries its
+`KernelError` report code as the message; any other internal failure carries
+`internal error`.
 
 #### 2.4.1 SendMessage
 
