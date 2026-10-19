@@ -10,6 +10,19 @@ use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+fn assert_schema_violation(result: TestResult, fragment: &str) {
+    let error = result.err();
+    assert!(matches!(
+        error.as_deref().and_then(|error| error.downcast_ref::<chio_spec_validate::ValidateError>()),
+        Some(chio_spec_validate::ValidateError::SchemaViolation(_, _, violations))
+            if violations.iter().any(|violation| violation.contains(fragment))
+    ));
+}
+
+fn assert_json_error<T>(result: Result<T, serde_json::Error>, fragment: &str) {
+    assert!(matches!(result.err(), Some(error) if error.to_string().contains(fragment)));
+}
+
 const U128_MAX: &str = "340282366920938463463374607431768211455";
 const U128_OVERFLOW: &str = "340282366920938463463374607431768211456";
 const U64_MAX_CHAIN_ID: &str = "eip155:18446744073709551615";
@@ -535,7 +548,10 @@ fn channel_schemas_reject_unknown_fields_and_unsafe_integers() -> TestResult {
         .1
         .clone();
     unknown["unexpected"] = Value::Bool(true);
-    assert!(validate_schema("channel-close.v1.json", &unknown).is_err());
+    assert_schema_violation(
+        validate_schema("channel-close.v1.json", &unknown),
+        "Additional properties are not allowed",
+    );
 
     let mut unsafe_integer = artifacts
         .iter()
@@ -544,7 +560,10 @@ fn channel_schemas_reject_unknown_fields_and_unsafe_integers() -> TestResult {
         .1
         .clone();
     unsafe_integer["body"]["openedAtUnixMs"] = Value::from(9_007_199_254_740_992_u64);
-    assert!(validate_schema("channel-open.v1.json", &unsafe_integer).is_err());
+    assert_schema_violation(
+        validate_schema("channel-open.v1.json", &unsafe_integer),
+        "is greater than the maximum of 9007199254740991",
+    );
     Ok(())
 }
 
@@ -559,7 +578,10 @@ fn channel_schema_numeric_strings_match_rust_bounds() -> TestResult {
     ];
     for (schema, definition) in base_unit_schemas {
         schema_definition_accepts(schema, definition, U128_MAX)?;
-        assert!(schema_definition_accepts(schema, definition, U128_OVERFLOW).is_err());
+        assert_schema_violation(
+            schema_definition_accepts(schema, definition, U128_OVERFLOW),
+            "does not match",
+        );
     }
 
     let chain_id_schemas = [
@@ -569,7 +591,10 @@ fn channel_schema_numeric_strings_match_rust_bounds() -> TestResult {
     ];
     for schema in chain_id_schemas {
         schema_definition_accepts(schema, "chainId", U64_MAX_CHAIN_ID)?;
-        assert!(schema_definition_accepts(schema, "chainId", U64_OVERFLOW_CHAIN_ID).is_err());
+        assert_schema_violation(
+            schema_definition_accepts(schema, "chainId", U64_OVERFLOW_CHAIN_ID),
+            "does not match",
+        );
     }
 
     let mut maximum = funding_body();
@@ -584,11 +609,17 @@ fn channel_schema_numeric_strings_match_rust_bounds() -> TestResult {
     overflow.escrow_terms.max_token_base_units = U128_OVERFLOW.to_owned();
     overflow.escrow_state.deposited_token_base_units = U128_OVERFLOW.to_owned();
     overflow.creation_event.max_token_base_units = U128_OVERFLOW.to_owned();
-    assert!(overflow.validate().is_err());
+    assert_eq!(
+        overflow.validate().err(),
+        Some(ChannelError::InvalidField("token_base_units"))
+    );
     overflow = maximum;
     overflow.escrow_reference.chain_id = U64_OVERFLOW_CHAIN_ID.to_owned();
     overflow.asset_binding.chain_id = U64_OVERFLOW_CHAIN_ID.to_owned();
-    assert!(overflow.validate().is_err());
+    assert_eq!(
+        overflow.validate().err(),
+        Some(ChannelError::InvalidField("chain_id"))
+    );
     Ok(())
 }
 
@@ -623,8 +654,14 @@ fn signed_channel_artifacts_require_canonical_crypto_strings() -> TestResult {
         })?,
     ];
     for mutation in mutations {
-        assert!(validate_schema("channel-open-intent.v1.json", &mutation).is_err());
-        assert!(serde_json::from_value::<SignedChannelOpenIntentV1>(mutation).is_err());
+        assert_schema_violation(
+            validate_schema("channel-open-intent.v1.json", &mutation),
+            "does not match",
+        );
+        assert_json_error(
+            serde_json::from_value::<SignedChannelOpenIntentV1>(mutation),
+            "noncanonical",
+        );
     }
     Ok(())
 }
@@ -647,26 +684,41 @@ fn terminal_outcome_schema_and_wire_reject_noncanonical_or_unknown_fields() -> T
         mutate_string(&artifact, "/kernelSignature", |value| format!("0x{value}"))?,
     ];
     for mutation in crypto_mutations {
-        assert!(validate_schema("channel-terminal-outcome-commitment.v1.json", &mutation).is_err());
-        assert!(
-            serde_json::from_value::<SignedChannelTerminalOutcomeCommitmentV1>(mutation).is_err()
+        assert_schema_violation(
+            validate_schema("channel-terminal-outcome-commitment.v1.json", &mutation),
+            "does not match",
+        );
+        assert_json_error(
+            serde_json::from_value::<SignedChannelTerminalOutcomeCommitmentV1>(mutation),
+            "noncanonical",
         );
     }
 
     let mut wrong_schema = artifact.clone();
     wrong_schema["body"]["schema"] = Value::String("chio.channel.terminal-outcome.v9".to_owned());
-    assert!(validate_schema("channel-terminal-outcome-commitment.v1.json", &wrong_schema).is_err());
+    assert_schema_violation(
+        validate_schema("channel-terminal-outcome-commitment.v1.json", &wrong_schema),
+        "was expected",
+    );
     let mut unknown = artifact.clone();
     unknown["unexpected"] = Value::Bool(true);
-    assert!(validate_schema("channel-terminal-outcome-commitment.v1.json", &unknown).is_err());
-    assert!(serde_json::from_value::<SignedChannelTerminalOutcomeCommitmentV1>(unknown).is_err());
+    assert_schema_violation(
+        validate_schema("channel-terminal-outcome-commitment.v1.json", &unknown),
+        "Additional properties are not allowed",
+    );
+    assert_json_error(
+        serde_json::from_value::<SignedChannelTerminalOutcomeCommitmentV1>(unknown),
+        "unknown field `unexpected`",
+    );
     let mut unsafe_integer = artifact;
     unsafe_integer["body"]["terminalizedAtUnixMs"] = Value::from(9_007_199_254_740_992_u64);
-    assert!(validate_schema(
-        "channel-terminal-outcome-commitment.v1.json",
-        &unsafe_integer
-    )
-    .is_err());
+    assert_schema_violation(
+        validate_schema(
+            "channel-terminal-outcome-commitment.v1.json",
+            &unsafe_integer,
+        ),
+        "is greater than the maximum",
+    );
     Ok(())
 }
 
@@ -675,34 +727,52 @@ fn transition_replay_schema_rejects_unknown_format_version_kind_and_fields() -> 
     let replay = replay_schema_fixture(&artifacts()?)?;
     validate_schema("channel-transition-replay.v1.json", &replay)?;
 
-    for mutation in [
-        {
-            let mut value = replay.clone();
-            value["format"] = Value::String("chio.channel.transition-replay.v9".to_owned());
-            value
-        },
-        {
-            let mut value = replay.clone();
-            value["version"] = Value::from(2);
-            value
-        },
-        {
-            let mut value = replay.clone();
-            value["body"]["evidence"]["kind"] = Value::String("unknown".to_owned());
-            value
-        },
-        {
-            let mut value = replay.clone();
-            value["unexpected"] = Value::Bool(true);
-            value
-        },
-        {
-            let mut value = replay;
-            value["body"]["issuedAt"] = Value::from(9_007_199_254_740_992_u64);
-            value
-        },
+    for (mutation, fragment) in [
+        (
+            {
+                let mut value = replay.clone();
+                value["format"] = Value::String("chio.channel.transition-replay.v9".to_owned());
+                value
+            },
+            "was expected",
+        ),
+        (
+            {
+                let mut value = replay.clone();
+                value["version"] = Value::from(2);
+                value
+            },
+            "was expected",
+        ),
+        (
+            {
+                let mut value = replay.clone();
+                value["body"]["evidence"]["kind"] = Value::String("unknown".to_owned());
+                value
+            },
+            "is not valid under any of the schemas",
+        ),
+        (
+            {
+                let mut value = replay.clone();
+                value["unexpected"] = Value::Bool(true);
+                value
+            },
+            "Additional properties are not allowed",
+        ),
+        (
+            {
+                let mut value = replay;
+                value["body"]["issuedAt"] = Value::from(9_007_199_254_740_992_u64);
+                value
+            },
+            "is greater than the maximum",
+        ),
     ] {
-        assert!(validate_schema("channel-transition-replay.v1.json", &mutation).is_err());
+        assert_schema_violation(
+            validate_schema("channel-transition-replay.v1.json", &mutation),
+            fragment,
+        );
     }
     Ok(())
 }
@@ -717,8 +787,14 @@ fn channel_wire_rejects_explicit_null_for_omittable_fields() -> TestResult {
         .1
         .clone();
     close["payerSignature"] = Value::Null;
-    assert!(validate_schema("channel-close.v1.json", &close).is_err());
-    assert!(serde_json::from_value::<SignedChannelCloseV1>(close).is_err());
+    assert_schema_violation(
+        validate_schema("channel-close.v1.json", &close),
+        "null is not of type",
+    );
+    assert_json_error(
+        serde_json::from_value::<SignedChannelCloseV1>(close),
+        "invalid type: null",
+    );
 
     let initial = ChannelStateBodyV1::initial(
         digest("null-state-channel"),
@@ -727,6 +803,9 @@ fn channel_wire_rejects_explicit_null_for_omittable_fields() -> TestResult {
     )?;
     let mut initial = serde_json::to_value(initial)?;
     initial["prevStateDigest"] = Value::Null;
-    assert!(serde_json::from_value::<ChannelStateBodyV1>(initial).is_err());
+    assert_json_error(
+        serde_json::from_value::<ChannelStateBodyV1>(initial),
+        "invalid type: null",
+    );
     Ok(())
 }

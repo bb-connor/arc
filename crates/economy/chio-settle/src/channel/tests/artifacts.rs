@@ -34,19 +34,28 @@ fn channel_asset_conversion_rejects_drift_and_noncanonical_units() {
         binding.token_base_units(&unrepresentable),
         Err(ChannelError::InexactAmount)
     );
-    assert!(binding.monetary_amount("01").is_err());
-    assert!(binding
-        .token_base_units(&MonetaryAmount {
-            units: 100,
-            currency: "EUR".to_owned(),
-        })
-        .is_err());
-    assert!(binding
-        .token_base_units(&MonetaryAmount {
-            units: super::validation::I_JSON_MAX_SAFE_INTEGER + 1,
-            currency: "USD".to_owned(),
-        })
-        .is_err());
+    assert_eq!(
+        binding.monetary_amount("01").err(),
+        Some(ChannelError::InvalidField("token_base_units"))
+    );
+    assert_eq!(
+        binding
+            .token_base_units(&MonetaryAmount {
+                units: 100,
+                currency: "EUR".to_owned(),
+            })
+            .err(),
+        Some(ChannelError::InvalidField("amount_currency"))
+    );
+    assert_eq!(
+        binding
+            .token_base_units(&MonetaryAmount {
+                units: super::validation::I_JSON_MAX_SAFE_INTEGER + 1,
+                currency: "USD".to_owned(),
+            })
+            .err(),
+        Some(ChannelError::InvalidField("amount_units"))
+    );
 }
 
 #[test]
@@ -68,15 +77,24 @@ fn funding_evidence_binds_terms_event_operator_asset_and_finality() -> Result<()
     let mut mismatched = evidence.clone();
     mismatched.body.creation_event.beneficiary =
         "0x7777777777777777777777777777777777777777".to_owned();
-    assert!(verify_channel_funding_evidence(&mismatched, &trust).is_err());
+    assert_eq!(
+        verify_channel_funding_evidence(&mismatched, &trust).err(),
+        Some(ChannelError::InvalidField("funding_evidence_binding"))
+    );
 
     let mut stale = trust.clone();
     stale.trusted_time_unix_ms = 1_901;
-    assert!(verify_channel_funding_evidence(&evidence, &stale).is_err());
+    assert_eq!(
+        verify_channel_funding_evidence(&evidence, &stale).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut exact_expiry = stale.clone();
     exact_expiry.trusted_time_unix_ms = 1_900;
-    assert!(verify_channel_funding_evidence(&evidence, &exact_expiry).is_err());
+    assert_eq!(
+        verify_channel_funding_evidence(&evidence, &exact_expiry).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_contract_body = evidence.body.clone();
     wrong_contract_body.creation_event.transaction_to =
@@ -90,7 +108,10 @@ fn funding_evidence_binds_terms_event_operator_asset_and_finality() -> Result<()
         )?,
         body: wrong_contract_body,
     };
-    assert!(verify_channel_funding_evidence(&wrong_contract, &trust).is_err());
+    assert_eq!(
+        verify_channel_funding_evidence(&wrong_contract, &trust).err(),
+        Some(ChannelError::InvalidField("funding_evidence_binding"))
+    );
 
     let mut fabricated_finality_body = evidence.body.clone();
     fabricated_finality_body.block_pin.observed_confirmations = 13;
@@ -103,7 +124,10 @@ fn funding_evidence_binds_terms_event_operator_asset_and_finality() -> Result<()
         )?,
         body: fabricated_finality_body,
     };
-    assert!(verify_channel_funding_evidence(&fabricated_finality, &trust).is_err());
+    assert_eq!(
+        verify_channel_funding_evidence(&fabricated_finality, &trust).err(),
+        Some(ChannelError::InvalidField("funding_finality"))
+    );
 
     let mut relabeled_asset_body = evidence.body.clone();
     relabeled_asset_body.asset_binding.currency = "EUR".to_owned();
@@ -116,15 +140,24 @@ fn funding_evidence_binds_terms_event_operator_asset_and_finality() -> Result<()
         )?,
         body: relabeled_asset_body,
     };
-    assert!(verify_channel_funding_evidence(&relabeled_asset, &trust).is_err());
+    assert_eq!(
+        verify_channel_funding_evidence(&relabeled_asset, &trust).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut unsafe_log_index = evidence.body.clone();
     unsafe_log_index.creation_event.log_index = super::validation::I_JSON_MAX_SAFE_INTEGER + 1;
-    assert!(unsafe_log_index.validate().is_err());
+    assert_eq!(
+        unsafe_log_index.validate().err(),
+        Some(ChannelError::InvalidField("creation_log_index"))
+    );
 
     let mut incomplete_refund = evidence.body.escrow_state.clone();
     incomplete_refund.refunded = true;
-    assert!(incomplete_refund.validate().is_err());
+    assert_eq!(
+        incomplete_refund.validate().err(),
+        Some(ChannelError::InvalidField("escrow_state"))
+    );
     Ok(())
 }
 
@@ -293,42 +326,54 @@ fn open_digest_graph_binds_funding_and_immutable_bound_timing() -> Result<(), Ch
 
     let mut substituted_authority = authority.clone();
     substituted_authority.token_symbol = "USDT".to_owned();
-    assert!(verify_channel_open_consent(
-        &open,
-        &verified_intent,
-        &acknowledgement,
-        &substituted_authority,
-        &trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_open_consent(
+            &open,
+            &verified_intent,
+            &acknowledgement,
+            &substituted_authority,
+            &trust,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut substituted_trust = trust.clone();
     substituted_trust.original_web3_dispatch_digest = digest("other-web3-dispatch");
-    assert!(verify_channel_open_consent(
-        &open,
-        &verified_intent,
-        &acknowledgement,
-        &authority,
-        &substituted_trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_open_consent(
+            &open,
+            &verified_intent,
+            &acknowledgement,
+            &authority,
+            &substituted_trust,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut expired_authority = authority.clone();
     expired_authority.trusted_time_unix_ms = acknowledgement.body.expires_at_unix_ms;
     let mut expired_trust = trust.clone();
     expired_trust.trusted_time_unix_ms = acknowledgement.body.expires_at_unix_ms;
-    assert!(verify_channel_open_consent(
-        &open,
-        &verified_intent,
-        &acknowledgement,
-        &expired_authority,
-        &expired_trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_open_consent(
+            &open,
+            &verified_intent,
+            &acknowledgement,
+            &expired_authority,
+            &expired_trust,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut regressing_policy = policy.clone();
     regressing_policy.tiers[1].dispute_window_secs = 50;
-    assert!(regressing_policy.validate().is_err());
+    assert_eq!(
+        regressing_policy.validate().err(),
+        Some(ChannelError::InvalidField("channel_dispute_tiers"))
+    );
 
     let mut mutable_tier = intent.clone();
     mutable_tier.body.dispute_window_secs = 200;
@@ -344,8 +389,9 @@ fn open_digest_graph_binds_funding_and_immutable_bound_timing() -> Result<(), Ch
         trust.payee_key_epoch,
         &payee_key,
     )?;
-    assert!(
-        verify_channel_open_intent(&mutable_tier, &funding, &authority, &policy, &trust).is_err()
+    assert_eq!(
+        verify_channel_open_intent(&mutable_tier, &funding, &authority, &policy, &trust).err(),
+        Some(ChannelError::AuthorityVerification)
     );
     Ok(())
 }
