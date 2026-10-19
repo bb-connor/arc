@@ -387,8 +387,8 @@ fn stored_unbound_dispatch_refuses_cold_replay_without_mutation() -> TestResult 
         )?;
         drop(store);
         let store = open(&path)?;
+        store.ensure_dispatch_ready()?;
         for error in [
-            store.ensure_dispatch_ready().err(),
             store.load_dispatch(&request.authorization.body.key).err(),
             store.commit_dispatch(&request).err(),
         ] {

@@ -84,6 +84,7 @@ fn execution_dispatch_binding() -> Value {
         "authorization_capability_hash": digest(40),
         "governed_intent_hash": digest(41),
         "policy_decision_hash": digest(42),
+        "admission_artifact_fingerprint": digest(44),
         "approval": { "approval_mode": "automatic" },
         "authorized_at_unix_ms": OCCURRED_AT_UNIX_MS - 10
     })
@@ -894,6 +895,7 @@ fn completion_dispatch_proofs_require_an_exact_nonzero_paired_binding() {
             "authorization_capability_hash",
             "governed_intent_hash",
             "policy_decision_hash",
+            "admission_artifact_fingerprint",
         ] {
             let mut zero = valid.clone();
             zero["body"]["execution_dispatch"][field] = digest(0);
