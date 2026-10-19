@@ -1,5 +1,15 @@
 use super::*;
 
+fn assert_proof_rejected<T>(
+    result: Result<T, EconomicStateAnchorError>,
+    key: &EconomicResourceKeyV1,
+) {
+    assert!(matches!(
+        result,
+        Err(EconomicStateAnchorError::TransitionProofRejected(ref rejected)) if rejected == key
+    ));
+}
+
 #[test]
 fn prepared_reservation_round_trip_composes_the_exact_ready_batch() -> Result<(), ChannelError> {
     let fixture = prepared_reservation_fixture()?;
@@ -84,45 +94,58 @@ fn prepared_reservation_rejects_replay_and_binding_substitution() -> Result<(), 
         fixture.proposal.accepted_at_unix_ms(),
     )?;
     let verifier = ChannelLifecycleBatchVerifier::new(projection);
-    assert!(verifier
-        .verify_transition(None, &batch.transitions[0])
-        .is_err());
+    assert_proof_rejected(
+        verifier.verify_transition(None, &batch.transitions[0]),
+        &batch.transitions[0].resource_key,
+    );
     batch.request_replays.clear();
-    assert!(verifier.verify_batch(&fixture.current, &batch).is_err());
+    assert_proof_rejected(
+        verifier.verify_batch(&fixture.current, &batch),
+        &batch.transitions[0].resource_key,
+    );
 
     let mut substituted_request = service.clone();
     substituted_request.request.request_binding_digest = digest("substituted-request-binding");
-    assert!(verify_channel_prepared_reservation(
-        &prepared,
-        &fixture.open,
-        &fixture.prior,
-        &fixture.current,
-        &body,
-        &substituted_request,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_prepared_reservation(
+            &prepared,
+            &fixture.open,
+            &fixture.prior,
+            &fixture.current,
+            &body,
+            &substituted_request,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let mut substituted_provider = service.clone();
     substituted_provider.provider.qualification_digest = digest("substituted-provider");
-    assert!(verify_channel_prepared_reservation(
-        &prepared,
-        &fixture.open,
-        &fixture.prior,
-        &fixture.current,
-        &body,
-        &substituted_provider,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_prepared_reservation(
+            &prepared,
+            &fixture.open,
+            &fixture.prior,
+            &fixture.current,
+            &body,
+            &substituted_provider,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let mut substituted_body = body;
     substituted_body.receipt_authority_digest = digest("substituted-proposal");
-    assert!(verify_channel_prepared_reservation(
-        &prepared,
-        &fixture.open,
-        &fixture.prior,
-        &fixture.current,
-        &substituted_body,
-        &service,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_prepared_reservation(
+            &prepared,
+            &fixture.open,
+            &fixture.prior,
+            &fixture.current,
+            &substituted_body,
+            &service,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
 
@@ -163,7 +186,12 @@ fn prepared_reservation_digest_is_domain_separated_and_canonical() -> Result<(),
 
     let mut wrong_schema = prepared;
     wrong_schema.schema = "chio.channel.prepared-reservation.v9".to_owned();
-    assert!(wrong_schema.digest().is_err());
+    assert_eq!(
+        wrong_schema.digest().err(),
+        Some(ChannelError::InvalidField(
+            "channel_prepared_reservation_schema"
+        ))
+    );
     Ok(())
 }
 
@@ -230,8 +258,9 @@ fn admitted_reservation_rejects_every_forged_ready_service_binding() -> Result<(
         ReadyServiceMutation::ResourceHead,
     ] {
         let forged = forged_ready_service_view(&fixture.ready_view, &effect_key, mutation)?;
-        assert!(
-            verify_admitted_channel_reservation(&fixture.proposal, &prepared, &forged).is_err()
+        assert_eq!(
+            verify_admitted_channel_reservation(&fixture.proposal, &prepared, &forged).err(),
+            Some(ChannelError::AuthorityVerification)
         );
     }
     let reservation_projection = compose_channel_reservation_transition(
@@ -267,8 +296,9 @@ fn admitted_reservation_rejects_mixed_batch_clocks_and_skipped_successor_heads(
         .checked_add(1)
         .ok_or(ChannelError::ArithmeticOverflow)?;
     let mixed_clocks = verified_modified_view(mixed_clocks)?;
-    assert!(
-        verify_admitted_channel_reservation(&fixture.proposal, &prepared, &mixed_clocks).is_err()
+    assert_eq!(
+        verify_admitted_channel_reservation(&fixture.proposal, &prepared, &mixed_clocks).err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     for resource_family in [
@@ -286,12 +316,11 @@ fn admitted_reservation_rejects_mixed_batch_clocks_and_skipped_successor_heads(
             .checked_add(1)
             .ok_or(ChannelError::ArithmeticOverflow)?;
         let skipped_successor = verified_modified_view(skipped_successor)?;
-        assert!(verify_admitted_channel_reservation(
-            &fixture.proposal,
-            &prepared,
-            &skipped_successor,
-        )
-        .is_err());
+        assert_eq!(
+            verify_admitted_channel_reservation(&fixture.proposal, &prepared, &skipped_successor,)
+                .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
     Ok(())
 }
@@ -353,9 +382,10 @@ fn dispatch_composer_advances_the_exact_retained_ready_effect() -> Result<(), Ch
 
     let batch = signed_channel_projection_batch(&fixture.ready_view, &projection, issued_at)?;
     let verifier = ChannelLifecycleBatchVerifier::new(projection.clone());
-    assert!(verifier
-        .verify_transition(Some(&transition.next_head), transition)
-        .is_err());
+    assert_proof_rejected(
+        verifier.verify_transition(Some(&transition.next_head), transition),
+        &transition.resource_key,
+    );
     let advance = verify_economic_state_batch_advance(
         &fixture.ready_view,
         batch,
@@ -408,7 +438,10 @@ fn dispatch_composer_rebases_over_a_newer_unchanged_checkpoint() -> Result<(), C
     let mut fork = fixture.ready_view.view().clone();
     fork.checkpoint_digest = digest("same-sequence-checkpoint-fork");
     let fork = verified_modified_view(fork)?;
-    assert!(compose_channel_dispatch_transition(&fixture.reservation, &fork, issued_at).is_err());
+    assert_eq!(
+        compose_channel_dispatch_transition(&fixture.reservation, &fork, issued_at).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut older = fixture.ready_view.view().clone();
     older.checkpoint_sequence = older
@@ -417,7 +450,10 @@ fn dispatch_composer_rebases_over_a_newer_unchanged_checkpoint() -> Result<(), C
         .ok_or(ChannelError::ArithmeticOverflow)?;
     older.checkpoint_digest = digest("older-checkpoint");
     let older = verified_modified_view(older)?;
-    assert!(compose_channel_dispatch_transition(&fixture.reservation, &older, issued_at).is_err());
+    assert_eq!(
+        compose_channel_dispatch_transition(&fixture.reservation, &older, issued_at).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut regressed_time = fixture.ready_view.view().clone();
     regressed_time.checkpoint_sequence = regressed_time
@@ -430,9 +466,10 @@ fn dispatch_composer_rebases_over_a_newer_unchanged_checkpoint() -> Result<(), C
         .checked_sub(1)
         .ok_or(ChannelError::ArithmeticOverflow)?;
     let regressed_time = verified_modified_view(regressed_time)?;
-    assert!(
+    assert_eq!(
         compose_channel_dispatch_transition(&fixture.reservation, &regressed_time, issued_at,)
-            .is_err()
+            .err(),
+        Some(ChannelError::AuthorityVerification)
     );
     Ok(())
 }
@@ -446,28 +483,28 @@ fn dispatch_composer_rejects_checkpoint_reservation_and_replay_substitution(
     let mut wrong_checkpoint = fixture.ready_view.view().clone();
     wrong_checkpoint.checkpoint_digest = digest("wrong-ready-checkpoint");
     let wrong_checkpoint = verified_modified_view(wrong_checkpoint)?;
-    assert!(compose_channel_dispatch_transition(
-        &fixture.reservation,
-        &wrong_checkpoint,
-        issued_at,
-    )
-    .is_err());
+    assert_eq!(
+        compose_channel_dispatch_transition(&fixture.reservation, &wrong_checkpoint, issued_at,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut missing_replay = fixture.ready_view.view().clone();
     missing_replay.request_replays.clear();
     missing_replay.absent_request_keys = vec![fixture.reservation.ready_effect().request.key()];
     let missing_replay = verified_modified_view(missing_replay)?;
-    assert!(
+    assert_eq!(
         compose_channel_dispatch_transition(&fixture.reservation, &missing_replay, issued_at,)
-            .is_err()
+            .err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     let mut wrong_replay = fixture.ready_view.view().clone();
     wrong_replay.request_replays[0].operation_id = digest("wrong-replay-operation");
     let wrong_replay = verified_modified_view(wrong_replay)?;
-    assert!(
-        compose_channel_dispatch_transition(&fixture.reservation, &wrong_replay, issued_at,)
-            .is_err()
+    assert_eq!(
+        compose_channel_dispatch_transition(&fixture.reservation, &wrong_replay, issued_at,).err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     let mut wrong_request = fixture.ready_view.view().clone();
@@ -475,9 +512,9 @@ fn dispatch_composer_rejects_checkpoint_reservation_and_replay_substitution(
         .request
         .request_binding_digest = digest("wrong-replay-request");
     let wrong_request = verified_modified_view(wrong_request)?;
-    assert!(
-        compose_channel_dispatch_transition(&fixture.reservation, &wrong_request, issued_at,)
-            .is_err()
+    assert_eq!(
+        compose_channel_dispatch_transition(&fixture.reservation, &wrong_request, issued_at,).err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     let mut wrong_reservation = fixture.ready_view.view().clone();
@@ -498,22 +535,25 @@ fn dispatch_composer_rejects_checkpoint_reservation_and_replay_substitution(
         .map_err(|_| ChannelError::AuthorityVerification)?;
     wrong_reservation.heads[effect_index].state = substituted_state;
     let wrong_reservation = verified_modified_view(wrong_reservation)?;
-    assert!(compose_channel_dispatch_transition(
-        &fixture.reservation,
-        &wrong_reservation,
-        issued_at,
-    )
-    .is_err());
+    assert_eq!(
+        compose_channel_dispatch_transition(&fixture.reservation, &wrong_reservation, issued_at,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let projection =
         compose_channel_dispatch_transition(&fixture.reservation, &fixture.ready_view, issued_at)?;
     let mut batch = signed_channel_projection_batch(&fixture.ready_view, &projection, issued_at)?;
     let verifier = ChannelLifecycleBatchVerifier::new(projection);
     batch.operation_id = Some(digest("generic-operation"));
-    assert!(verifier.verify_batch(&fixture.ready_view, &batch).is_err());
-    assert!(verifier
-        .verify_transition(None, &batch.transitions[0])
-        .is_err());
+    assert_proof_rejected(
+        verifier.verify_batch(&fixture.ready_view, &batch),
+        &batch.transitions[0].resource_key,
+    );
+    assert_proof_rejected(
+        verifier.verify_transition(None, &batch.transitions[0]),
+        &batch.transitions[0].resource_key,
+    );
     Ok(())
 }
 
@@ -607,29 +647,38 @@ fn cancellation_composer_allows_expired_ready_but_rejects_dispatched_and_invalid
         after_expiry,
     )?;
     assert_eq!(projection.not_after_unix_ms(), None);
-    assert!(compose_channel_cancellation_transition(
-        &fixture.reservation,
-        fixture.advance.current(),
-        after_expiry,
-    )
-    .is_err());
-    assert!(compose_channel_cancellation_transition(
-        &fixture.reservation,
-        &fixture.ready_view,
-        fixture
-            .ready_view
-            .view()
-            .observed_at
-            .checked_sub(1)
-            .ok_or(ChannelError::ArithmeticOverflow)?,
-    )
-    .is_err());
-    assert!(compose_channel_cancellation_transition(
-        &fixture.reservation,
-        &fixture.ready_view,
-        u64::MAX,
-    )
-    .is_err());
+    assert_eq!(
+        compose_channel_cancellation_transition(
+            &fixture.reservation,
+            fixture.advance.current(),
+            after_expiry,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
+    assert_eq!(
+        compose_channel_cancellation_transition(
+            &fixture.reservation,
+            &fixture.ready_view,
+            fixture
+                .ready_view
+                .view()
+                .observed_at
+                .checked_sub(1)
+                .ok_or(ChannelError::ArithmeticOverflow)?,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
+    assert_eq!(
+        compose_channel_cancellation_transition(
+            &fixture.reservation,
+            &fixture.ready_view,
+            u64::MAX,
+        )
+        .err(),
+        Some(ChannelError::InvalidField("cancellation_issued_at"))
+    );
     Ok(())
 }
 
@@ -649,13 +698,15 @@ fn cancellation_typed_verifier_rejects_a_resigned_tampered_batch() -> Result<(),
         .map_err(|_| ChannelError::AuthorityVerification)?;
 
     let verifier = ChannelCancellationTransitionVerifierV1::new(fixture.reservation.clone());
-    assert!(verify_economic_state_batch_advance(
-        &fixture.ready_view,
-        batch.clone(),
-        &channel_anchor_pins(),
-        &verifier,
-    )
-    .is_err());
+    assert_proof_rejected(
+        verify_economic_state_batch_advance(
+            &fixture.ready_view,
+            batch.clone(),
+            &channel_anchor_pins(),
+            &verifier,
+        ),
+        &batch.transitions[0].resource_key,
+    );
     let permissive = verify_economic_state_batch_advance(
         &fixture.ready_view,
         batch,
@@ -663,7 +714,10 @@ fn cancellation_typed_verifier_rejects_a_resigned_tampered_batch() -> Result<(),
         &DirectTransitionVerifier,
     )
     .map_err(|_| ChannelError::AuthorityVerification)?;
-    assert!(verify_channel_cancellation_advance(&fixture.reservation, &permissive).is_err());
+    assert_eq!(
+        verify_channel_cancellation_advance(&fixture.reservation, &permissive).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
 
@@ -677,28 +731,27 @@ fn cancellation_composer_rejects_replay_and_checkpoint_substitution() -> Result<
     missing_replay.request_replays.clear();
     missing_replay.absent_request_keys = vec![request_key];
     let missing_replay = verified_modified_view(missing_replay)?;
-    assert!(compose_channel_cancellation_transition(
-        &fixture.reservation,
-        &missing_replay,
-        issued_at,
-    )
-    .is_err());
+    assert_eq!(
+        compose_channel_cancellation_transition(&fixture.reservation, &missing_replay, issued_at,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut altered_replay = fixture.ready_view.view().clone();
     altered_replay.request_replays[0].operation_id = digest("altered-cancellation-operation");
     let altered_replay = verified_modified_view(altered_replay)?;
-    assert!(compose_channel_cancellation_transition(
-        &fixture.reservation,
-        &altered_replay,
-        issued_at,
-    )
-    .is_err());
+    assert_eq!(
+        compose_channel_cancellation_transition(&fixture.reservation, &altered_replay, issued_at,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut fork = fixture.ready_view.view().clone();
     fork.checkpoint_digest = digest("cancellation-same-sequence-fork");
     let fork = verified_modified_view(fork)?;
-    assert!(
-        compose_channel_cancellation_transition(&fixture.reservation, &fork, issued_at).is_err()
+    assert_eq!(
+        compose_channel_cancellation_transition(&fixture.reservation, &fork, issued_at).err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     let mut invalid_later = fixture.ready_view.view().clone();
@@ -707,12 +760,11 @@ fn cancellation_composer_rejects_replay_and_checkpoint_substitution() -> Result<
         .checked_add(1)
         .ok_or(ChannelError::ArithmeticOverflow)?;
     let invalid_later = verified_modified_view(invalid_later)?;
-    assert!(compose_channel_cancellation_transition(
-        &fixture.reservation,
-        &invalid_later,
-        issued_at,
-    )
-    .is_err());
+    assert_eq!(
+        compose_channel_cancellation_transition(&fixture.reservation, &invalid_later, issued_at,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut older = fixture.ready_view.view().clone();
     older.checkpoint_sequence = older
@@ -721,8 +773,9 @@ fn cancellation_composer_rejects_replay_and_checkpoint_substitution() -> Result<
         .ok_or(ChannelError::ArithmeticOverflow)?;
     older.checkpoint_digest = digest("cancellation-older-checkpoint");
     let older = verified_modified_view(older)?;
-    assert!(
-        compose_channel_cancellation_transition(&fixture.reservation, &older, issued_at).is_err()
+    assert_eq!(
+        compose_channel_cancellation_transition(&fixture.reservation, &older, issued_at).err(),
+        Some(ChannelError::AuthorityVerification)
     );
     Ok(())
 }
@@ -748,9 +801,10 @@ fn cancellation_composer_rejects_source_head_and_service_substitution() -> Resul
         .checked_add(1)
         .ok_or(ChannelError::ArithmeticOverflow)?;
     let mixed_clock = verified_modified_view(mixed_clock)?;
-    assert!(
+    assert_eq!(
         compose_channel_cancellation_transition(&fixture.reservation, &mixed_clock, issued_at,)
-            .is_err()
+            .err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     for mutation in [
@@ -775,12 +829,11 @@ fn cancellation_composer_rejects_source_head_and_service_substitution() -> Resul
             &fixture.reservation.ready_effect().resource_head_key(),
             mutation,
         )?;
-        assert!(compose_channel_cancellation_transition(
-            &fixture.reservation,
-            &substituted,
-            issued_at,
-        )
-        .is_err());
+        assert_eq!(
+            compose_channel_cancellation_transition(&fixture.reservation, &substituted, issued_at,)
+                .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
 
     for resource_family in [
@@ -798,9 +851,10 @@ fn cancellation_composer_rejects_source_head_and_service_substitution() -> Resul
             .checked_add(1)
             .ok_or(ChannelError::ArithmeticOverflow)?;
         let skipped = verified_modified_view(skipped)?;
-        assert!(
+        assert_eq!(
             compose_channel_cancellation_transition(&fixture.reservation, &skipped, issued_at,)
-                .is_err()
+                .err(),
+            Some(ChannelError::AuthorityVerification)
         );
 
         let mut wrong_predecessor = fixture.ready_view.view().clone();
@@ -811,12 +865,15 @@ fn cancellation_composer_rejects_source_head_and_service_substitution() -> Resul
             .ok_or(ChannelError::AuthorityVerification)?
             .predecessor_digest = Some(digest("wrong-cancellation-predecessor"));
         let wrong_predecessor = verified_modified_view(wrong_predecessor)?;
-        assert!(compose_channel_cancellation_transition(
-            &fixture.reservation,
-            &wrong_predecessor,
-            issued_at,
-        )
-        .is_err());
+        assert_eq!(
+            compose_channel_cancellation_transition(
+                &fixture.reservation,
+                &wrong_predecessor,
+                issued_at,
+            )
+            .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
     Ok(())
 }
@@ -1153,75 +1210,96 @@ fn channel_terminal_outcome_commitment_rejects_result_substitution() -> Result<(
         fixture.advance.batch().issued_at,
         &Keypair::from_seed(&[37; 32]),
     )?;
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_signer,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_signer,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_operation = signed.clone();
     wrong_operation.body.operation_id = digest("substituted-outcome-operation");
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_operation,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_operation,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_reservation = signed.clone();
     wrong_reservation.body.reservation_digest = digest("substituted-outcome-reservation");
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_reservation,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_reservation,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_receipt = signed.clone();
     wrong_receipt.body.receipt_id = "substituted-receipt".to_owned();
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_receipt,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_receipt,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_id = signed.clone();
     wrong_id.body.terminal_result.result_id = "substituted-result".to_owned();
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_id,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_id,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_digest = signed.clone();
     wrong_digest.body.terminal_result.result_digest = digest("substituted-result-digest");
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_digest,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_digest,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut wrong_result = signed;
     wrong_result.body.terminal_result.result = EconomicContentV1::Inline {
         value: serde_json::json!({"substituted": true}),
     };
-    assert!(verify_channel_terminal_outcome_commitment(
-        &wrong_result,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &fixture.signed_receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &wrong_result,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &fixture.signed_receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
 
@@ -1262,25 +1340,31 @@ fn channel_terminal_outcome_orders_recording_terminalization_and_receipt_time(
         &receipt,
     )?;
 
-    assert!(SignedChannelTerminalOutcomeCommitmentV1::sign_for_test(
-        &fixture.reservation,
-        &receipt,
-        terminal_result,
-        2_001,
-        2_000,
-        &kernel,
-    )
-    .is_err());
+    assert_eq!(
+        SignedChannelTerminalOutcomeCommitmentV1::sign_for_test(
+            &fixture.reservation,
+            &receipt,
+            terminal_result,
+            2_001,
+            2_000,
+            &kernel,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut substituted_terminalization = signed;
     substituted_terminalization.body.terminalized_at_unix_ms = 1_999;
-    assert!(verify_channel_terminal_outcome_commitment(
-        &substituted_terminalization,
-        &fixture.trusted_kernel_key,
-        &fixture.reservation,
-        &receipt,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_outcome_commitment(
+            &substituted_terminalization,
+            &fixture.trusted_kernel_key,
+            &fixture.reservation,
+            &receipt,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
 
@@ -1324,16 +1408,19 @@ fn channel_terminal_rejects_same_second_obligation_before_exact_terminalization(
     let mut later_batch = fixture.advance.batch().clone();
     later_batch.issued_at = 1_700;
     let later_advance = reseal_terminal_batch(&fixture, later_batch)?;
-    assert!(verify_channel_terminal_advance(
-        &fixture.open,
-        &fixture.reservation,
-        &fixture.prior,
-        &fixture.next,
-        &fixture.receipt,
-        &outcome,
-        &later_advance,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_terminal_advance(
+            &fixture.open,
+            &fixture.reservation,
+            &fixture.prior,
+            &fixture.next,
+            &fixture.receipt,
+            &outcome,
+            &later_advance,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
 
