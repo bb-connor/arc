@@ -139,7 +139,7 @@ case "${3:-}" in
       exit 1
     fi
     printf '{"message":"proof verify: invalid settlement: public settlement independent head block hash mismatch"}\n' >&2
-    exit 1
+    exit 20
     ;;
   */family/digest-mismatch/*)
     printf '%s\n' "$(cat "$stub_dir/message")" >&2
@@ -162,6 +162,7 @@ run_stub_gate() {
 
 right_message="proof verify: evidence graph digest mismatch: expected 01, got 02"
 for rejected in \
+  "1|$right_message|exited 1" \
   "2|$right_message|exited 2" \
   "101|$right_message|exited 101" \
   "127|$right_message|exited 127" \
@@ -180,7 +181,7 @@ for rejected in \
   fi
 done
 
-for accepted in 20 1; do
+for accepted in 10 20 30 50; do
   if ! run_stub_gate "$accepted" "$right_message"; then
     echo "check-chio-transaction-passport.test.sh: gate refused a negative rejected with exit $accepted and the expected code" >&2
     cat "$fixture_tree/gate.log" >&2

@@ -208,6 +208,58 @@ pub const TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED: ErrorCodeSpec = ErrorCod
     consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
 };
 
+pub const TRANSACTION_CLAIM_REJECTED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transaction:claim-rejected",
+    domain: Domain::Transaction,
+    severity: Severity::Error,
+    summary: "A proof family claim required by the transaction verifier failed verification.",
+    help: "Reject the proof bundle and regenerate the family evidence so every required claim verifies.",
+    string_code: "CHIO-TRANSACTION-CLAIM-REJECTED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
+};
+
+pub const TRANSACTION_ARTIFACT_SCHEMA_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transaction:artifact-schema-invalid",
+    domain: Domain::Transaction,
+    severity: Severity::Error,
+    summary: "A transaction proof artifact is malformed or violates its schema.",
+    help: "Reject the proof bundle and regenerate the artifact against its registered schema.",
+    string_code: "CHIO-TRANSACTION-ARTIFACT-SCHEMA-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
+};
+
+pub const TRANSACTION_SIGNATURE_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transaction:signature-invalid",
+    domain: Domain::Transaction,
+    severity: Severity::Error,
+    summary: "A transaction proof signature is invalid or its signer is not trusted.",
+    help: "Reject the proof bundle and re-sign it with a key the verifier trusts.",
+    string_code: "CHIO-TRANSACTION-SIGNATURE-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
+};
+
+pub const TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transaction:verifier-feature-unsupported",
+    domain: Domain::Transaction,
+    severity: Severity::Error,
+    summary: "The verifier lacks the trust context or capability the proof bundle requires.",
+    help: "Pin the required trust context for the verifier, or remove the unsupported feature from the proof bundle.",
+    string_code: "CHIO-TRANSACTION-VERIFIER-FEATURE-UNSUPPORTED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
+};
+
 pub const CAPABILITY_SCOPE_EXCEEDED: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:capability:scope-exceeded",
     domain: Domain::Capability,
@@ -3706,6 +3758,10 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_SETTLEMENT_UNVERIFIED,
     TRANSACTION_DISPUTE_UNBOUND,
     TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED,
+    TRANSACTION_CLAIM_REJECTED,
+    TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+    TRANSACTION_SIGNATURE_INVALID,
+    TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
     CAPABILITY_SCOPE_EXCEEDED,
     CAPABILITY_EXPIRED,
     CAPABILITY_REVOKED,

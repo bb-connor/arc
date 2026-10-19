@@ -67,7 +67,7 @@ pub(super) fn command_error(error: chio_proof_room::ProofRoomError) -> CliError 
     } else {
         match detail.split(':').next().unwrap_or("") {
             "proof-room.signature.signer-untrusted" => (
-                &TRANSACTION_IDENTITY_NOT_BOUND,
+                &TRANSACTION_SIGNATURE_INVALID,
                 "proof-room.signature.signer-untrusted",
             ),
             "proof-room.signature.payload-hash-mismatch" => (
