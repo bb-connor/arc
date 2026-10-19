@@ -528,11 +528,7 @@ impl PendingCallers {
                 Some(digest.as_str())
             );
             assert_eq!(
-                persisted
-                    .request_canonical_json
-                    .as_deref()
-                    .ok_or("original public retained recovery request")?
-                    .as_bytes(),
+                persisted.request_canonical_json.as_bytes(),
                 canonical_json_bytes(original.request_for_revalidation())?.as_slice()
             );
             assert_eq!(
