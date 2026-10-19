@@ -375,7 +375,6 @@ impl ChioKernel {
         matched_grant_index: Option<usize>,
         extra_metadata: Option<serde_json::Value>,
     ) -> Result<ToolCallResponse, KernelError> {
-        self.require_stopped_request_has_no_output(&request.request_id)?;
         // A stop denial is definite and precedes any effect, so the request
         // may be retried under the same id after resume.
         let mut metadata = match extra_metadata {
