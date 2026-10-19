@@ -162,7 +162,10 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         &alternate.artifact().body,
         &alternate_prepared_artifact.service,
     )?;
-    assert!(verify_admitted_channel_reservation(&reservation, &prepared, &available_view).is_err());
+    assert_eq!(
+        verify_admitted_channel_reservation(&reservation, &prepared, &available_view).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let reserved = ChannelLifecycleViewV1 {
         schema: CHANNEL_LIFECYCLE_SCHEMA.to_owned(),
         channel_id: open.artifact().body.channel_id.clone(),
@@ -216,8 +219,9 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         Some(admitted_open.snapshot()),
     )?;
     let wrong_reserved_view = retain_ready_request(&wrong_reserved_view, &wrong_ready_effect)?;
-    assert!(
-        verify_admitted_channel_reservation(&reservation, &prepared, &wrong_reserved_view).is_err()
+    assert_eq!(
+        verify_admitted_channel_reservation(&reservation, &prepared, &wrong_reserved_view).err(),
+        Some(ChannelError::AuthorityVerification)
     );
     let reserved_view_without_effect = anchored_channel_view_with_heads(
         &trust.settlement_authority_scope_id,
@@ -228,12 +232,11 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         &digest("reserved-without-effect-checkpoint"),
         Some(admitted_open.snapshot()),
     )?;
-    assert!(verify_admitted_channel_reservation(
-        &reservation,
-        &prepared,
-        &reserved_view_without_effect
-    )
-    .is_err());
+    assert_eq!(
+        verify_admitted_channel_reservation(&reservation, &prepared, &reserved_view_without_effect)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let reserved_channel_head = reserved_view_without_effect
         .view()
         .heads
@@ -260,8 +263,9 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         Some(admitted_open.snapshot()),
     )?;
     let stale_ready_view = retain_ready_request(&stale_ready_view, &ready_effect)?;
-    assert!(
-        verify_admitted_channel_reservation(&reservation, &prepared, &stale_ready_view).is_err()
+    assert_eq!(
+        verify_admitted_channel_reservation(&reservation, &prepared, &stale_ready_view).err(),
+        Some(ChannelError::AuthorityVerification)
     );
     let reserved_view = anchored_channel_view_with_heads(
         &trust.settlement_authority_scope_id,
@@ -426,14 +430,17 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         SettlementStatus::Pending,
     )?;
     let obligation = obligation_for(&receipt, actual_charge.clone())?;
-    assert!(verify_channel_receipt_binding(
-        &receipt,
-        &kernel_key.public_key(),
-        &reservation,
-        &open,
-        None,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_receipt_binding(
+            &receipt,
+            &kernel_key.public_key(),
+            &reservation,
+            &open,
+            None,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let denied_zero = sign_receipt(
         "channel-denied-zero",
@@ -484,14 +491,17 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
             0,
             SettlementStatus::Pending,
         )?;
-        assert!(verify_channel_receipt_binding(
-            &wrong_status,
-            &kernel_key.public_key(),
-            &reservation,
-            &open,
-            None,
-        )
-        .is_err());
+        assert_eq!(
+            verify_channel_receipt_binding(
+                &wrong_status,
+                &kernel_key.public_key(),
+                &reservation,
+                &open,
+                None,
+            )
+            .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
 
     for decision in [
@@ -508,14 +518,17 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
             0,
             SettlementStatus::NotApplicable,
         )?;
-        assert!(verify_channel_receipt_binding(
-            &nonterminal,
-            &kernel_key.public_key(),
-            &reservation,
-            &open,
-            None,
-        )
-        .is_err());
+        assert_eq!(
+            verify_channel_receipt_binding(
+                &nonterminal,
+                &kernel_key.public_key(),
+                &reservation,
+                &open,
+                None,
+            )
+            .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
 
     let wrong_positive_status = sign_receipt(
@@ -525,31 +538,40 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         SettlementStatus::NotApplicable,
     )?;
     let wrong_positive_obligation = obligation_for(&wrong_positive_status, actual_charge.clone())?;
-    assert!(verify_channel_receipt_binding(
-        &wrong_positive_status,
-        &kernel_key.public_key(),
-        &reservation,
-        &open,
-        Some(&wrong_positive_obligation),
-    )
-    .is_err());
-    assert!(verify_channel_receipt_binding(
-        &allowed_zero,
-        &kernel_key.public_key(),
-        &reservation,
-        &open,
-        Some(&obligation),
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_receipt_binding(
+            &wrong_positive_status,
+            &kernel_key.public_key(),
+            &reservation,
+            &open,
+            Some(&wrong_positive_obligation),
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
+    assert_eq!(
+        verify_channel_receipt_binding(
+            &allowed_zero,
+            &kernel_key.public_key(),
+            &reservation,
+            &open,
+            Some(&obligation),
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let alternate_open = verified_channel_fixture_with_intent("alternate-transition-open-intent")?;
-    assert!(verify_channel_receipt_binding(
-        &receipt,
-        &kernel_key.public_key(),
-        &reservation,
-        &alternate_open.open,
-        Some(&obligation),
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_receipt_binding(
+            &receipt,
+            &kernel_key.public_key(),
+            &reservation,
+            &alternate_open.open,
+            Some(&obligation),
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let receipt = verify_channel_receipt_binding(
         &receipt,
         &kernel_key.public_key(),
@@ -557,7 +579,10 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         &open,
         Some(&obligation),
     )?;
-    assert!(build_channel_state_transition(prior, &alternate, &receipt, &open).is_err());
+    assert_eq!(
+        build_channel_state_transition(prior, &alternate, &receipt, &open).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let state_body = build_channel_state_transition(prior, &reservation, &receipt, &open)?;
     let state = SignedChannelStateV1 {
         payee_signature: ChannelSignatureV1::sign(
@@ -580,15 +605,18 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         verify_channel_state_transition(&state, prior, &reservation, &receipt, &open, &trust)?;
     let mut substituted_state_trust = trust.clone();
     substituted_state_trust.participant_snapshot_digest = digest("other-participants");
-    assert!(verify_channel_state_transition(
-        &state,
-        prior,
-        &reservation,
-        &receipt,
-        &open,
-        &substituted_state_trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_state_transition(
+            &state,
+            prior,
+            &reservation,
+            &receipt,
+            &open,
+            &substituted_state_trust,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let serialized = serde_json::to_value(&state)
         .map_err(|error| ChannelError::Canonicalization(error.to_string()))?;
     assert!(serialized.get("payerSignature").is_none());
@@ -596,7 +624,10 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
 
     let mut unsafe_cumulative = state.clone();
     unsafe_cumulative.body.cumulative_owed.units = super::validation::I_JSON_MAX_SAFE_INTEGER + 1;
-    assert!(unsafe_cumulative.body.validate().is_err());
+    assert_eq!(
+        unsafe_cumulative.body.validate().err(),
+        Some(ChannelError::InvalidField("channel_state_amount"))
+    );
 
     let mut excessive = state.clone();
     excessive.body.actual_charge = Some(MonetaryAmount {
@@ -609,21 +640,18 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         trust.payee_key_epoch,
         &payee_key,
     )?;
-    assert!(verify_channel_state_transition(
-        &excessive,
-        prior,
-        &reservation,
-        &receipt,
-        &open,
-        &trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_state_transition(&excessive, prior, &reservation, &receipt, &open, &trust,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let attacker_key = Keypair::from_seed(&[34; 32]);
     let mut wrong_payee = state;
     wrong_payee.payee_signature =
         ChannelSignatureV1::sign(&wrong_payee.body, "payee".to_owned(), 3, &attacker_key)?;
-    assert!(verify_channel_state_transition(
+    assert_eq!(
+verify_channel_state_transition(
         &wrong_payee,
         prior,
         &reservation,
@@ -631,7 +659,9 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         &open,
         &trust,
     )
-    .is_err());
+    .err(),
+Some(ChannelError::AuthorityVerification)
+);
 
     let stale_close_body = build_channel_close_body(
         ChannelCloseKindV1::Contested,
@@ -757,18 +787,20 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
     )?;
     let substituted_dispute =
         verify_channel_dispute(&substituted_dispute, &stale_close, &chain, &submitter)?;
-    assert!(verify_effective_channel_dispute_advance(
-        &stale_effective,
-        &substituted_dispute,
-        &linked_disputed_snapshot,
-    )
-    .is_err());
-    assert!(verify_effective_channel_dispute_advance(
-        &stale_effective,
-        &dispute,
-        &disputed_snapshot,
-    )
-    .is_err());
+    assert_eq!(
+        verify_effective_channel_dispute_advance(
+            &stale_effective,
+            &substituted_dispute,
+            &linked_disputed_snapshot,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
+    assert_eq!(
+        verify_effective_channel_dispute_advance(&stale_effective, &dispute, &disputed_snapshot,)
+            .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     for (state_version_delta, escrow_version_delta, fence_delta) in
         [(1_u64, 0_u64, 0_u64), (0, 1, 0), (0, 0, 1)]
     {
@@ -790,12 +822,15 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
             &trust.settlement_authority_scope_id,
             &skipped_lifecycle.channel_id,
         )?;
-        assert!(verify_effective_channel_dispute_advance(
+        assert_eq!(
+verify_effective_channel_dispute_advance(
             &stale_effective,
             &dispute,
             &skipped_snapshot,
         )
-        .is_err());
+        .err(),
+Some(ChannelError::AuthorityVerification)
+);
     }
     let disputed_effective = verify_effective_channel_dispute_advance(
         &stale_effective,
@@ -836,8 +871,9 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
     );
     let mut deadline_submitter = submitter.clone();
     deadline_submitter.trusted_time_unix_ms = stale_close.artifact().body.dispute_deadline_unix_ms;
-    assert!(
-        verify_channel_dispute(&signed_dispute, &stale_close, &chain, &deadline_submitter).is_err()
+    assert_eq!(
+        verify_channel_dispute(&signed_dispute, &stale_close, &chain, &deadline_submitter).err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     let mut equal_sequence = signed_dispute;
@@ -848,7 +884,10 @@ fn reservation_authorizes_payee_signed_post_service_state() -> Result<(), Channe
         submitter.submitter_key_epoch,
         &payer_key,
     )?;
-    assert!(verify_channel_dispute(&equal_sequence, &stale_close, &chain, &submitter).is_err());
+    assert_eq!(
+        verify_channel_dispute(&equal_sequence, &stale_close, &chain, &submitter).err(),
+        Some(ChannelError::InvalidField("channel_dispute_sequence"))
+    );
     Ok(())
 }
 
@@ -866,20 +905,30 @@ fn channel_signatures_bind_identity_metadata_and_evm_keys_are_canonical() -> Res
     };
     let mut signature = ChannelSignatureV1::sign(&body, "payer".to_owned(), 1, &key)?;
     signature.signer_id = "payee".to_owned();
-    assert!(signature
-        .verify(&body, "payee", 1, &key.public_key())
-        .is_err());
+    assert_eq!(
+        signature.verify(&body, "payee", 1, &key.public_key()).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let mut epoch = ChannelSignatureV1::sign(&body, "payer".to_owned(), 1, &key)?;
     epoch.key_epoch = 2;
-    assert!(epoch.verify(&body, "payer", 2, &key.public_key()).is_err());
+    assert_eq!(
+        epoch.verify(&body, "payer", 2, &key.public_key()).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut funding = funding_body();
     funding.escrow_reference.escrow_contract =
         "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_owned();
-    assert!(funding.validate().is_err());
+    assert_eq!(
+        funding.validate().err(),
+        Some(ChannelError::InvalidField("escrow_contract"))
+    );
     let mut numeric_chain = asset_binding(2, 6);
     numeric_chain.chain_id = "31337".to_owned();
-    assert!(numeric_chain.validate().is_err());
+    assert_eq!(
+        numeric_chain.validate().err(),
+        Some(ChannelError::InvalidField("chain_id"))
+    );
     Ok(())
 }
 
@@ -930,12 +979,15 @@ fn channel_snapshot_rejects_resource_clocks_ahead_of_signed_view() -> Result<(),
             escrow_clock,
             1_500,
         )?;
-        assert!(verify_channel_lifecycle_snapshot(
-            &view,
-            &fixture.trust.settlement_authority_scope_id,
-            &lifecycle.channel_id,
-        )
-        .is_err());
+        assert_eq!(
+            verify_channel_lifecycle_snapshot(
+                &view,
+                &fixture.trust.settlement_authority_scope_id,
+                &lifecycle.channel_id,
+            )
+            .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
     Ok(())
 }

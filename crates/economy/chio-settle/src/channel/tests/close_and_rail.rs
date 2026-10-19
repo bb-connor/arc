@@ -28,11 +28,20 @@ fn public_rail_amount_conversion_rejects_invalid_policy_currency_and_ijson_overf
     )?;
 
     config.policy.tiers.clear();
-    assert!(crate::scale_token_minor_units_to_chio_amount(scaled, "USD", &config).is_err());
+    assert!(matches!(
+    crate::scale_token_minor_units_to_chio_amount(scaled, "USD", &config).err(),
+    Some(crate::SettlementError::InvalidInput(message)) if message == "settlement policy requires at least one amount tier"
+    ));
     config.policy = crate::SettlementPolicyConfig::default();
-    assert!(crate::scale_token_minor_units_to_chio_amount(scaled, "usd", &config).is_err());
+    assert!(matches!(
+    crate::scale_token_minor_units_to_chio_amount(scaled, "usd", &config).err(),
+    Some(crate::SettlementError::InvalidInput(message)) if message == "currency must be an uppercase ISO 4217 code"
+    ));
     let unsafe_units = (u128::from((1_u64 << 53) - 1) + 1) * 10_000;
-    assert!(crate::scale_token_minor_units_to_chio_amount(unsafe_units, "USD", &config).is_err());
+    assert!(matches!(
+    crate::scale_token_minor_units_to_chio_amount(unsafe_units, "USD", &config).err(),
+    Some(crate::SettlementError::InvalidInput(message)) if message == "Chio amount exceeds the I-JSON safe integer range"
+    ));
     Ok(())
 }
 
@@ -96,14 +105,17 @@ fn close_fences_reservations_and_binds_zero_release_frost_action() -> Result<(),
         .dispute_window_secs
         .checked_mul(1_000)
         .ok_or(ChannelError::ArithmeticOverflow)?;
-    assert!(build_channel_close_body(
-        ChannelCloseKindV1::Contested,
-        &open,
-        final_state,
-        &pre_snapshot,
-        cutoff_unix_ms - dispute_window_unix_ms,
-    )
-    .is_err());
+    assert_eq!(
+        build_channel_close_body(
+            ChannelCloseKindV1::Contested,
+            &open,
+            final_state,
+            &pre_snapshot,
+            cutoff_unix_ms - dispute_window_unix_ms,
+        )
+        .err(),
+        Some(ChannelError::IllegalTransition)
+    );
     let close_body = build_channel_close_body(
         ChannelCloseKindV1::Contested,
         &open,
@@ -174,14 +186,17 @@ fn close_fences_reservations_and_binds_zero_release_frost_action() -> Result<(),
         &trust.settlement_authority_scope_id,
         &shortened_lifecycle.channel_id,
     )?;
-    assert!(verify_channel_close(
-        &shortened_window,
-        &open,
-        final_state,
-        &shortened_snapshot,
-        &trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_close(
+            &shortened_window,
+            &open,
+            final_state,
+            &shortened_snapshot,
+            &trust,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let mut wrong_escrow = pre_escrow.clone();
     wrong_escrow.escrow_reference.escrow_id = evm_hash("other-close-escrow");
     let wrong_escrow_view = anchored_channel_view(
@@ -190,20 +205,26 @@ fn close_fences_reservations_and_binds_zero_release_frost_action() -> Result<(),
         &wrong_escrow,
         1_500,
     )?;
-    assert!(verify_admitted_channel_open(&open, &wrong_escrow_view).is_err());
+    assert_eq!(
+        verify_admitted_channel_open(&open, &wrong_escrow_view).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let wrong_escrow_snapshot = verify_channel_lifecycle_snapshot(
         &wrong_escrow_view,
         &trust.settlement_authority_scope_id,
         &pre_lifecycle.channel_id,
     )?;
-    assert!(build_channel_close_body(
-        ChannelCloseKindV1::Contested,
-        &open,
-        final_state,
-        &wrong_escrow_snapshot,
-        1_500,
-    )
-    .is_err());
+    assert_eq!(
+        build_channel_close_body(
+            ChannelCloseKindV1::Contested,
+            &open,
+            final_state,
+            &wrong_escrow_snapshot,
+            1_500,
+        )
+        .err(),
+        Some(ChannelError::IllegalTransition)
+    );
     let post_view = anchored_channel_view(
         &trust.settlement_authority_scope_id,
         &post_lifecycle,
@@ -218,14 +239,17 @@ fn close_fences_reservations_and_binds_zero_release_frost_action() -> Result<(),
     let close = verify_channel_close(&close, &open, final_state, &post_snapshot, &trust)?;
     let mut substituted_close_trust = trust.clone();
     substituted_close_trust.original_web3_dispatch_digest = digest("other-close-dispatch");
-    assert!(verify_channel_close(
-        close.artifact(),
-        &open,
-        final_state,
-        &post_snapshot,
-        &substituted_close_trust,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_close(
+            close.artifact(),
+            &open,
+            final_state,
+            &post_snapshot,
+            &substituted_close_trust,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     let effective = verify_effective_channel_close(&close)?;
     let action = channel_close_frost_action(&effective, 4)?;
     let chio_core::federation::frost::FrostActionPreimageV1::ChannelClose(action_body) = &action
@@ -257,14 +281,17 @@ fn close_fences_reservations_and_binds_zero_release_frost_action() -> Result<(),
         &trust.settlement_authority_scope_id,
         &reserved.channel_id,
     )?;
-    assert!(build_channel_close_body(
-        ChannelCloseKindV1::Contested,
-        &open,
-        final_state,
-        &reserved_snapshot,
-        1_500,
-    )
-    .is_err());
+    assert_eq!(
+        build_channel_close_body(
+            ChannelCloseKindV1::Contested,
+            &open,
+            final_state,
+            &reserved_snapshot,
+            1_500,
+        )
+        .err(),
+        Some(ChannelError::IllegalTransition)
+    );
 
     let mut cooperative = close.artifact().clone();
     cooperative.body.close_kind = ChannelCloseKindV1::Cooperative;
@@ -274,8 +301,9 @@ fn close_fences_reservations_and_binds_zero_release_frost_action() -> Result<(),
         trust.payee_key_epoch,
         &fixture.payee_key,
     )?;
-    assert!(
-        verify_channel_close(&cooperative, &open, final_state, &post_snapshot, &trust,).is_err()
+    assert_eq!(
+        verify_channel_close(&cooperative, &open, final_state, &post_snapshot, &trust,).err(),
+        Some(ChannelError::AuthorityVerification)
     );
     Ok(())
 }
@@ -372,16 +400,19 @@ fn channel_release_authority_rejects_stale_or_substituted_authority() -> Result<
         .ok_or(ChannelError::ArithmeticOverflow)?;
     let facts = release_frost_facts(&close, publisher_fence, dispute_deadline)?;
 
-    assert!(verify_channel_release_authorization_parts(
-        &close,
-        &facts,
-        publisher_fence,
-        dispute_deadline - 1,
-    )
-    .is_err());
-    assert!(
-        verify_channel_release_authorization_parts(&close, &facts, publisher_fence, cutoff,)
-            .is_err()
+    assert_eq!(
+        verify_channel_release_authorization_parts(
+            &close,
+            &facts,
+            publisher_fence,
+            dispute_deadline - 1,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
+    assert_eq!(
+        verify_channel_release_authorization_parts(&close, &facts, publisher_fence, cutoff,).err(),
+        Some(ChannelError::AuthorityVerification)
     );
 
     for mutation in ["scope", "resource", "version", "fence", "action", "current"] {
@@ -395,22 +426,28 @@ fn channel_release_authority_rejects_stale_or_substituted_authority() -> Result<
             "current" => substituted.current = false,
             _ => return Err(ChannelError::AuthorityVerification),
         }
-        assert!(verify_channel_release_authorization_parts(
-            &close,
-            &substituted,
-            publisher_fence,
-            dispute_deadline,
-        )
-        .is_err());
+        assert_eq!(
+            verify_channel_release_authorization_parts(
+                &close,
+                &substituted,
+                publisher_fence,
+                dispute_deadline,
+            )
+            .err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
 
-    assert!(verify_channel_release_authorization_parts(
-        &close,
-        &facts,
-        publisher_fence + 1,
-        dispute_deadline,
-    )
-    .is_err());
+    assert_eq!(
+        verify_channel_release_authorization_parts(
+            &close,
+            &facts,
+            publisher_fence + 1,
+            dispute_deadline,
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
 
@@ -480,7 +517,10 @@ fn channel_release_preparation_rejects_dispatch_operator_asset_and_amount_drift(
             "base_units" => substituted.release_token_base_units = "1".to_owned(),
             _ => return Err(ChannelError::AuthorityVerification),
         }
-        assert!(verify_channel_release_preparation_parts(&authorization, &substituted).is_err());
+        assert_eq!(
+            verify_channel_release_preparation_parts(&authorization, &substituted).err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
     Ok(())
 }
@@ -503,11 +543,17 @@ fn channel_release_preparation_uses_pinned_non_unit_asset_scaling() -> Result<()
 
     let mut decimal_drift = facts.clone();
     decimal_drift.token_decimals = 5;
-    assert!(verify_channel_release_preparation_parts(&authorization, &decimal_drift).is_err());
+    assert_eq!(
+        verify_channel_release_preparation_parts(&authorization, &decimal_drift).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let mut base_unit_drift = facts;
     base_unit_drift.release_token_base_units = "25".to_owned();
-    assert!(verify_channel_release_preparation_parts(&authorization, &base_unit_drift).is_err());
+    assert_eq!(
+        verify_channel_release_preparation_parts(&authorization, &base_unit_drift).err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     assert_eq!(
         asset_binding(3, 2).token_base_units(&MonetaryAmount {
@@ -715,7 +761,10 @@ fn release_dispatch_authority_rejects_every_signed_binding_substitution() -> Res
             "state" => substituted.state = EconomicEffectStateV1::Ready,
             _ => return Err(ChannelError::AuthorityVerification),
         }
-        assert!(verify_channel_release_dispatch_slot(&authorization, &substituted).is_err());
+        assert_eq!(
+            verify_channel_release_dispatch_slot(&authorization, &substituted).err(),
+            Some(ChannelError::AuthorityVerification)
+        );
     }
     Ok(())
 }
@@ -744,29 +793,35 @@ fn signed_channel_release_authorization_binds_root_release_and_publisher_epoch(
 
     let mut substituted = verified.artifact().clone();
     substituted.body.release_broadcast.call_digest = digest("substituted-release-call");
-    assert!(verify_signed_channel_release_authorization(
-        &substituted,
-        authority,
-        &ChannelReleasePublisherTrustV1 {
-            publisher_id: "channel-release-publisher".to_owned(),
-            publisher_key_epoch: 8,
-            publisher_key: Keypair::from_seed(&[19; 32]).public_key(),
-        },
-        authority.binding().authorized_at_unix_ms(),
-    )
-    .is_err());
+    assert_eq!(
+        verify_signed_channel_release_authorization(
+            &substituted,
+            authority,
+            &ChannelReleasePublisherTrustV1 {
+                publisher_id: "channel-release-publisher".to_owned(),
+                publisher_key_epoch: 8,
+                publisher_key: Keypair::from_seed(&[19; 32]).public_key(),
+            },
+            authority.binding().authorized_at_unix_ms(),
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
 
     let wrong_epoch = ChannelReleasePublisherTrustV1 {
         publisher_id: "channel-release-publisher".to_owned(),
         publisher_key_epoch: 9,
         publisher_key: Keypair::from_seed(&[19; 32]).public_key(),
     };
-    assert!(verify_signed_channel_release_authorization(
-        verified.artifact(),
-        authority,
-        &wrong_epoch,
-        authority.binding().authorized_at_unix_ms(),
-    )
-    .is_err());
+    assert_eq!(
+        verify_signed_channel_release_authorization(
+            verified.artifact(),
+            authority,
+            &wrong_epoch,
+            authority.binding().authorized_at_unix_ms(),
+        )
+        .err(),
+        Some(ChannelError::AuthorityVerification)
+    );
     Ok(())
 }
