@@ -152,7 +152,7 @@ expected = {
     ),
     "post-response watermark tripwire": (
         True,
-        [name for name in adapters if "post_output_match" in name],
+        [name for name in adapters if "post_output" in name],
         [
             "cargo",
             "test",
@@ -160,7 +160,7 @@ expected = {
             "chio-security-kernel",
             "--test",
             "adapters",
-            "post_output_match",
+            "post_output",
         ],
     ),
     "sealed private registry store": (
@@ -253,8 +253,8 @@ for label, (expected_filtered, expected_inventory, expected_command) in expected
         )
 
 total = sum(len(inventory) for _, inventory, _ in calls.values())
-if total != 114:
-    raise SystemExit(f"deception exact inventory total changed: expected=114 observed={total}")
+if total != 120:
+    raise SystemExit(f"deception exact inventory total changed: expected=120 observed={total}")
 PY
 }
 
@@ -378,4 +378,4 @@ for mutant in "${work}"/*.sh; do
   fi
 done
 
-echo "Deception security gate contract passed (12 exact inventories, 114 tests)"
+echo "Deception security gate contract passed (12 exact inventories, 120 tests)"

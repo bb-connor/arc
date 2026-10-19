@@ -74,6 +74,8 @@ run_exact_target --label "decoy registry key rotation" --expected \
   -- cargo test -p chio-decoy --test registry_key_rotation
 
 run_exact_target --label "signed watermark lifecycle" --expected \
+  a_rescan_of_two_inactive_tokens_with_changed_attribution_conflicts \
+  a_retried_scan_of_two_inactive_tokens_returns_both_first_observations \
   a_verified_active_hit_survives_observation_store_failure_and_cross_tenant_replay \
   active_and_overlap_keys_verify_only_inside_receipt_anchored_windows \
   an_inactive_hit_retried_later_is_a_duplicate_with_the_first_time \
@@ -88,6 +90,7 @@ run_exact_target --label "signed watermark lifecycle" --expected \
   observation_deduplication_binds_token_and_first_complete_attribution \
   replay_is_reserved_before_signing_and_exact_operation_retry_is_idempotent \
   retired_and_expired_entries_are_verified_inactive_advisories \
+  two_inactive_tokens_under_one_public_ref_record_two_observations \
   -- cargo test -p chio-decoy --test watermark
 
 run_exact_target --label "signed watermark vectors" --expected \
@@ -121,7 +124,10 @@ run_exact_target --label "pre-dispatch tripwire adapters" --allow-filtered --exp
 
 run_exact_target --label "post-response watermark tripwire" --allow-filtered --expected \
   post_output_match_blocks_delivery_after_server_execution \
-  -- cargo test -p chio-security-kernel --test adapters post_output_match
+  post_output_watermark::a_retried_request_with_two_inactive_tokens_keeps_both_first_observations \
+  post_output_watermark::an_inactive_token_whose_request_attribution_changes_still_blocks \
+  post_output_watermark::two_inactive_tokens_under_one_public_ref_are_two_observations_and_do_not_block \
+  -- cargo test -p chio-security-kernel --test adapters post_output
 
 run_exact_target --label "sealed private registry store" --expected \
   cas_rejects_immutable_mutation_stale_state_and_generation_skips \
@@ -157,4 +163,4 @@ run_exact_target --label "native canary and honey-tool pre-dispatch denial" --al
   honey_tool_pre_dispatch_denial \
   -- cargo test -p chio-conformance --test active_defense pre_dispatch_denial
 
-echo "Deception security gate passed (108 exact tests)"
+echo "Deception security gate passed (120 exact tests)"

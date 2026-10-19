@@ -188,15 +188,12 @@ impl DecoyTripwireDetectorPort {
             .clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::get)?;
-        let observation_digest = domain_digest(
-            b"chio.security.watermark-observation.v1\0",
+        let scan_digest = domain_digest(
+            b"chio.security.watermark-scan.v1\0",
             input.request_id.as_str().as_bytes(),
         );
-        let observation_id = RecordId::new(format!(
-            "watermark-observation-{}",
-            hex_digest(observation_digest)
-        ))
-        .map_err(|_| PortError::invalid_data())?;
+        let scan_id = RecordId::new(format!("watermark-scan-{}", hex_digest(scan_digest)))
+            .map_err(|_| PortError::invalid_data())?;
         let evidence_ref = RecordId::new(format!(
             "watermark-evidence-{}",
             hex_digest(input.canonical_context_digest)
@@ -207,7 +204,7 @@ impl DecoyTripwireDetectorPort {
                 text,
                 &WatermarkObservationContext {
                     observing_tenant_id: input.tenant_id.clone(),
-                    observation_id,
+                    scan_id,
                     evidence_ref,
                     observed_at_unix_ms,
                 },

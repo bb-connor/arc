@@ -112,7 +112,7 @@ expected_counts = {
     "security session-throttle types": 3,
     "flow lattice and enforcement engine": 48,
     "strict manifest": 28,
-    "security kernel adapters": 50,
+    "security kernel adapters": 53,
     "durable flow state": 44,
     "native flow custody": 131,
     "native dispatch participant snapshots": 3,
