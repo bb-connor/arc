@@ -2,9 +2,10 @@ use chio_core::crypto::Keypair;
 use chio_manifest::{
     load_existing_verified_manifest_registry, sign_manifest, verify_manifest,
     AuthoritativeToolPolicy, DeclassificationPurpose, EnvironmentVariableName, LatencyHint,
-    NativeSyscallProfile, NetworkDestination, RequiredPermissions, RuntimeToolTopology, ServerTool,
-    ToolAnnotations, ToolDefinition, ToolManifest, VerifiedManifestAdmissionError,
-    VerifiedManifestInvocationError, VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
+    ManifestError, NativeSyscallProfile, NetworkDestination, RequiredPermissions,
+    RuntimeToolTopology, ServerTool, ToolAnnotations, ToolDefinition, ToolManifest,
+    VerifiedManifestAdmissionError, VerifiedManifestInvocationError, VerifiedManifestLoadError,
+    VerifiedManifestRegistry, TOOL_MANIFEST_SCHEMA,
 };
 use chio_security_types::{Compartment, InformationLabel};
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,6 +13,25 @@ use std::path::PathBuf;
 
 #[path = "manifest_admission/json_boundary.rs"]
 mod json_boundary;
+
+macro_rules! assert_refused {
+    ($result:expr, $pattern:pat $(if $guard:expr)?) => {
+        match $result {
+            Err(error) => assert!(
+                matches!(&error, $pattern $(if $guard)?),
+                "wrong refusal: {error:?}"
+            ),
+            Ok(_) => panic!("expected a refusal"),
+        }
+    };
+}
+
+fn decode_error<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> String {
+    match serde_json::from_value::<T>(value) {
+        Ok(_) => panic!("decode unexpectedly succeeded"),
+        Err(error) => error.to_string(),
+    }
+}
 
 fn platform_manifest(public_key: String) -> ToolManifest {
     ToolManifest {
@@ -88,20 +108,27 @@ fn existing_signed_manifest_loader_requires_out_of_band_key_and_server_identity(
     assert!(security.effective_egress());
 
     let wrong_key = Keypair::generate();
-    assert!(load_existing_verified_manifest_registry(
-        &path,
-        &wrong_key.public_key().to_hex(),
-        "srv-platform",
-        RuntimeToolTopology::remote(),
-    )
-    .is_err());
-    assert!(load_existing_verified_manifest_registry(
-        &path,
-        &keypair.public_key().to_hex(),
-        "different-server",
-        RuntimeToolTopology::remote(),
-    )
-    .is_err());
+    assert_refused!(
+        load_existing_verified_manifest_registry(
+            &path,
+            &wrong_key.public_key().to_hex(),
+            "srv-platform",
+            RuntimeToolTopology::remote(),
+        ),
+        VerifiedManifestLoadError::Admission(VerifiedManifestAdmissionError::Manifest(
+            ManifestError::VerificationFailed
+        ))
+    );
+    assert_refused!(
+        load_existing_verified_manifest_registry(
+            &path,
+            &keypair.public_key().to_hex(),
+            "different-server",
+            RuntimeToolTopology::remote(),
+        ),
+        VerifiedManifestLoadError::ServerIdMismatch { expected, actual }
+            if expected == "different-server" && actual == "srv-platform"
+    );
     std::fs::remove_file(path).unwrap_or_else(|error| panic!("remove fixture: {error}"));
 }
 
@@ -109,13 +136,16 @@ fn existing_signed_manifest_loader_requires_out_of_band_key_and_server_identity(
 fn existing_signed_manifest_loader_never_creates_missing_paths() {
     let path = unique_manifest_path("missing");
     let keypair = Keypair::generate();
-    assert!(load_existing_verified_manifest_registry(
-        &path,
-        &keypair.public_key().to_hex(),
-        "srv-platform",
-        RuntimeToolTopology::remote(),
-    )
-    .is_err());
+    assert_refused!(
+        load_existing_verified_manifest_registry(
+            &path,
+            &keypair.public_key().to_hex(),
+            "srv-platform",
+            RuntimeToolTopology::remote(),
+        ),
+        VerifiedManifestLoadError::Open { source, .. }
+            if source.kind() == std::io::ErrorKind::NotFound
+    );
     assert!(!path.exists());
 }
 
@@ -127,13 +157,15 @@ fn existing_signed_manifest_loader_rejects_symlinks() {
     let (target, keypair) = write_signed_manifest_fixture("symlink-target");
     let link = unique_manifest_path("symlink-link");
     symlink(&target, &link).unwrap_or_else(|error| panic!("create symlink: {error}"));
-    assert!(load_existing_verified_manifest_registry(
-        &link,
-        &keypair.public_key().to_hex(),
-        "srv-platform",
-        RuntimeToolTopology::remote(),
-    )
-    .is_err());
+    assert_refused!(
+        load_existing_verified_manifest_registry(
+            &link,
+            &keypair.public_key().to_hex(),
+            "srv-platform",
+            RuntimeToolTopology::remote(),
+        ),
+        VerifiedManifestLoadError::Open { .. }
+    );
     std::fs::remove_file(link).unwrap_or_else(|error| panic!("remove symlink: {error}"));
     std::fs::remove_file(target).unwrap_or_else(|error| panic!("remove target: {error}"));
 }
@@ -209,20 +241,26 @@ fn verified_registry_admits_provider_server_tools_only_as_remote_egress() {
     ));
 
     let mut local_registry = VerifiedManifestRegistry::default();
-    assert!(local_registry
-        .register_public_only(signed, &signer.public_key(), RuntimeToolTopology::local(),)
-        .is_err());
+    assert_refused!(
+        local_registry.register_public_only(
+            signed,
+            &signer.public_key(),
+            RuntimeToolTopology::local(),
+        ),
+        VerifiedManifestAdmissionError::ServerToolRequiresRemoteTopology(name) if name == "bash"
+    );
 
     let signed = sign_manifest(&manifest, &signer)
         .unwrap_or_else(|error| panic!("sign broker-confused server-tool manifest: {error}"));
     let mut broker_registry = VerifiedManifestRegistry::default();
-    assert!(broker_registry
-        .register_public_only(
+    assert_refused!(
+        broker_registry.register_public_only(
             signed,
             &signer.public_key(),
             RuntimeToolTopology::brokered(),
-        )
-        .is_err());
+        ),
+        VerifiedManifestAdmissionError::ServerToolRequiresRemoteTopology(name) if name == "bash"
+    );
 }
 
 #[test]
@@ -444,7 +482,10 @@ fn changing_flow_metadata_invalidates_manifest_signature() {
     let mut signed = sign_manifest(&manifest, &keypair)
         .unwrap_or_else(|error| panic!("sign flow manifest: {error}"));
     signed.manifest.tools[0].flow = None;
-    assert!(verify_manifest(&signed, &keypair.public_key()).is_err());
+    assert_refused!(
+        verify_manifest(&signed, &keypair.public_key()),
+        ManifestError::VerificationFailed
+    );
 }
 
 #[test]
@@ -456,22 +497,27 @@ fn manifest_rejects_alternate_json_spellings_of_signed_fields() {
 
     let mut explicit_description_null = canonical.clone();
     explicit_description_null["description"] = serde_json::Value::Null;
-    assert!(serde_json::from_value::<ToolManifest>(explicit_description_null).is_err());
+    assert!(decode_error::<ToolManifest>(explicit_description_null)
+        .contains("explicit null is not a canonical manifest representation"));
 
     let mut explicit_server_tools_empty = canonical.clone();
     explicit_server_tools_empty["server_tools"] = serde_json::json!([]);
-    assert!(serde_json::from_value::<ToolManifest>(explicit_server_tools_empty).is_err());
+    assert!(decode_error::<ToolManifest>(explicit_server_tools_empty)
+        .contains("explicit empty array is not a canonical manifest representation"));
 
     let mut explicit_output_schema_null = canonical.clone();
     explicit_output_schema_null["tools"][0]["output_schema"] = serde_json::Value::Null;
-    assert!(serde_json::from_value::<ToolManifest>(explicit_output_schema_null).is_err());
+    assert!(decode_error::<ToolManifest>(explicit_output_schema_null)
+        .contains("explicit null is not a canonical manifest representation"));
 
     let mut missing_annotation = canonical;
     missing_annotation["tools"][0]["annotations"]
         .as_object_mut()
         .unwrap_or_else(|| panic!("annotations object"))
         .remove("destructive");
-    assert!(serde_json::from_value::<ToolManifest>(missing_annotation).is_err());
+    assert!(
+        decode_error::<ToolManifest>(missing_annotation).contains("missing field `destructive`")
+    );
 }
 
 #[test]
@@ -484,14 +530,20 @@ fn manifest_rejects_noncanonical_permission_spellings() {
     let mut uppercase_host = canonical.clone();
     uppercase_host["required_permissions"]["network_destinations"][0]["host"] =
         serde_json::json!("API.Example.COM");
-    assert!(serde_json::from_value::<ToolManifest>(uppercase_host).is_err());
+    assert!(decode_error::<ToolManifest>(uppercase_host).contains(
+        "invalid required permission required_permissions.network_destinations.host: API.Example.COM"
+    ));
 
     for path in ["/workspace/./data", "/workspace//data", "/workspace/"] {
         let mut aliased_path = canonical.clone();
         aliased_path["required_permissions"]["read_paths"] = serde_json::json!([path]);
         let parsed = serde_json::from_value::<ToolManifest>(aliased_path)
             .unwrap_or_else(|error| panic!("parse aliased path {path}: {error}"));
-        assert!(chio_manifest::validate_manifest(&parsed).is_err(), "{path}");
+        assert_refused!(
+            chio_manifest::validate_manifest(&parsed),
+            ManifestError::InvalidRequiredPermission { field, value }
+                if *field == "required_permissions.read_paths" && value == path
+        );
     }
 
     for field in [
@@ -504,9 +556,11 @@ fn manifest_rejects_noncanonical_permission_spellings() {
         empty_permission["required_permissions"][field] = serde_json::json!([]);
         let parsed = serde_json::from_value::<ToolManifest>(empty_permission)
             .unwrap_or_else(|error| panic!("parse empty permission {field}: {error}"));
-        assert!(
-            chio_manifest::validate_manifest(&parsed).is_err(),
-            "{field}"
+        let expected_field = format!("required_permissions.{field}");
+        assert_refused!(
+            chio_manifest::validate_manifest(&parsed),
+            ManifestError::InvalidRequiredPermission { field, value }
+                if *field == expected_field && value == "[]"
         );
     }
 }
@@ -591,18 +645,18 @@ fn retired_manifest_ids_are_refused_as_unsupported_schema() {
 #[test]
 fn flow_rejects_null_and_explicit_empty_aliases() {
     assert!(
-        serde_json::from_value::<chio_manifest::ToolFlowDeclaration>(serde_json::json!({
+        decode_error::<chio_manifest::ToolFlowDeclaration>(serde_json::json!({
             "egress": false,
             "output_label": null
         }))
-        .is_err()
+        .contains("invalid type: null, expected a strict known or top information label")
     );
     assert!(
-        serde_json::from_value::<chio_manifest::ToolFlowDeclaration>(serde_json::json!({
+        decode_error::<chio_manifest::ToolFlowDeclaration>(serde_json::json!({
             "egress": false,
             "declassification_purposes": []
         }))
-        .is_err()
+        .contains("explicit empty array is not a canonical flow representation")
     );
 }
 
@@ -707,7 +761,10 @@ fn verified_registry_composes_registered_key_policy_and_runtime_topology() {
     assert!(admitted
         .authorize_source(&InformationLabel::bottom())
         .is_ok());
-    assert!(admitted.authorize_source(&InformationLabel::Top).is_err());
+    assert_refused!(
+        admitted.authorize_source(&InformationLabel::Top),
+        VerifiedManifestAdmissionError::TopSource
+    );
     assert_eq!(registry.verified_manifests().count(), 1);
     let sidecar = registry
         .bridge_security("srv-platform", "read")
@@ -785,9 +842,11 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
         value[field] = replacement;
         let forged = serde_json::from_value(value)
             .unwrap_or_else(|error| panic!("decode forged sidecar: {error}"));
-        assert!(registry
-            .validate_bridge_security("srv-platform", "read", &forged)
-            .is_err());
+        assert_refused!(
+            registry.validate_bridge_security("srv-platform", "read", &forged),
+            VerifiedManifestAdmissionError::BridgeSecurityMismatch { server_id, tool_name }
+                if server_id == "srv-platform" && tool_name == "read"
+        );
     }
 
     let mut flow_value = serde_json::to_value(&sidecar)
@@ -799,15 +858,21 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
     });
     let forged_flow = serde_json::from_value(flow_value)
         .unwrap_or_else(|error| panic!("decode forged flow sidecar: {error}"));
-    assert!(registry
-        .validate_bridge_security("srv-platform", "read", &forged_flow)
-        .is_err());
-    assert!(registry
-        .validate_bridge_security("other-server", "read", &sidecar)
-        .is_err());
-    assert!(registry
-        .validate_bridge_security("srv-platform", "other-tool", &sidecar)
-        .is_err());
+    assert_refused!(
+        registry.validate_bridge_security("srv-platform", "read", &forged_flow),
+        VerifiedManifestAdmissionError::BridgeSecurityMismatch { server_id, tool_name }
+            if server_id == "srv-platform" && tool_name == "read"
+    );
+    assert_refused!(
+        registry.validate_bridge_security("other-server", "read", &sidecar),
+        VerifiedManifestAdmissionError::BridgeSecurityMismatch { server_id, tool_name }
+            if server_id == "other-server" && tool_name == "read"
+    );
+    assert_refused!(
+        registry.validate_bridge_security("srv-platform", "other-tool", &sidecar),
+        VerifiedManifestAdmissionError::BridgeSecurityMismatch { server_id, tool_name }
+            if server_id == "srv-platform" && tool_name == "other-tool"
+    );
 
     let second_signer = Keypair::from_seed(&[35; 32]);
     let mut second_manifest = platform_manifest(second_signer.public_key().to_hex());
@@ -822,9 +887,11 @@ fn verified_registry_requires_an_exact_live_bridge_security_value() {
             RuntimeToolTopology::remote(),
         )
         .unwrap_or_else(|error| panic!("register second manifest: {error}"));
-    assert!(second_registry
-        .validate_bridge_security("srv-platform", "read", &sidecar)
-        .is_err());
+    assert_refused!(
+        second_registry.validate_bridge_security("srv-platform", "read", &sidecar),
+        VerifiedManifestAdmissionError::BridgeSecurityMismatch { server_id, tool_name }
+            if server_id == "srv-platform" && tool_name == "read"
+    );
 }
 
 #[test]
@@ -841,9 +908,10 @@ fn verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance
     let mut registry = VerifiedManifestRegistry::default();
     let signed =
         sign_manifest(&manifest, &keypair).unwrap_or_else(|error| panic!("sign manifest: {error}"));
-    assert!(registry
-        .register(signed, &keypair.public_key(), &policies, &topologies)
-        .is_err());
+    assert_refused!(
+        registry.register(signed, &keypair.public_key(), &policies, &topologies),
+        VerifiedManifestAdmissionError::MissingPolicyClearance(name) if name == "read"
+    );
 
     let policy = AuthoritativeToolPolicy::new(
         vec![InformationLabel::bottom()],
@@ -854,38 +922,45 @@ fn verified_registry_rejects_tampering_and_remote_tools_without_policy_clearance
     let mut tampered =
         sign_manifest(&manifest, &keypair).unwrap_or_else(|error| panic!("sign manifest: {error}"));
     tampered.manifest.tools[0].description = "tampered".to_string();
-    assert!(registry
-        .register(
+    assert_refused!(
+        registry.register(
             tampered,
             &keypair.public_key(),
             &[("read".to_string(), policy)].into_iter().collect(),
             &topologies,
-        )
-        .is_err());
+        ),
+        VerifiedManifestAdmissionError::Manifest(ManifestError::VerificationFailed)
+    );
 }
 
 #[test]
 fn required_permissions_reject_implicit_ports_and_loader_environment() {
-    assert!(
-        serde_json::from_value::<RequiredPermissions>(serde_json::json!({
-            "read_paths": null,
-            "write_paths": null,
-            "network_destinations": [{"host": "api.example.com"}],
-            "environment_variables": null,
-            "native_syscall_profile": "native_minimal_v1"
-        }))
-        .is_err()
+    assert!(decode_error::<RequiredPermissions>(serde_json::json!({
+        "network_destinations": [{"host": "api.example.com"}],
+        "native_syscall_profile": "native_minimal_v1"
+    }))
+    .contains("missing field `port`"));
+    assert_refused!(
+        EnvironmentVariableName::new("LD_PRELOAD"),
+        ManifestError::InvalidRequiredPermission { field, value }
+            if *field == "required_permissions.environment_variables" && value == "LD_PRELOAD"
     );
-    assert!(EnvironmentVariableName::new("LD_PRELOAD").is_err());
-    assert!(NetworkDestination::new("*.example.com", 443).is_err());
-    assert!(
-        serde_json::from_value::<RequiredPermissions>(serde_json::json!({
-            "network_destinations": [{"host": "api.example.com", "port": 0}],
-            "native_syscall_profile": "native_minimal_v1"
-        }))
-        .is_err()
+    assert_refused!(
+        NetworkDestination::new("*.example.com", 443),
+        ManifestError::InvalidRequiredPermission { field, value }
+            if *field == "required_permissions.network_destinations.host"
+                && value == "*.example.com"
     );
-    assert!(NetworkDestination::new("api.example.com", 0).is_err());
+    assert!(decode_error::<RequiredPermissions>(serde_json::json!({
+        "network_destinations": [{"host": "api.example.com", "port": 0}],
+        "native_syscall_profile": "native_minimal_v1"
+    }))
+    .contains("invalid value: integer `0`, expected a nonzero u16"));
+    assert_refused!(
+        NetworkDestination::new("api.example.com", 0),
+        ManifestError::InvalidRequiredPermission { field, value }
+            if *field == "required_permissions.network_destinations.port" && value == "0"
+    );
     for port in [1, u16::MAX] {
         let wire = serde_json::json!({"host": "api.example.com", "port": port});
         let destination: NetworkDestination = serde_json::from_value(wire.clone())
@@ -972,19 +1047,22 @@ fn environment_variable_names_reject_injection_and_credential_names() {
         "Java_Tool_Options",
         "ssh_auth_sock",
     ] {
-        assert!(
-            EnvironmentVariableName::new(name).is_err(),
-            "dangerous environment variable was accepted: {name}"
-        );
+        match EnvironmentVariableName::new(name) {
+            Err(ManifestError::InvalidRequiredPermission { field, value }) => {
+                assert_eq!(field, "required_permissions.environment_variables");
+                assert_eq!(value, name);
+            }
+            other => panic!("dangerous environment variable {name} was not refused: {other:?}"),
+        }
     }
 
-    assert!(
-        serde_json::from_value::<RequiredPermissions>(serde_json::json!({
-            "environment_variables": ["OPENAI_API_KEY"],
-            "native_syscall_profile": "native_minimal_v1"
-        }))
-        .is_err()
-    );
+    assert!(decode_error::<RequiredPermissions>(serde_json::json!({
+        "environment_variables": ["OPENAI_API_KEY"],
+        "native_syscall_profile": "native_minimal_v1"
+    }))
+    .contains(
+        "invalid required permission required_permissions.environment_variables: OPENAI_API_KEY"
+    ));
 }
 
 #[test]
@@ -1079,7 +1157,7 @@ fn manifest_schema_accepts_runtime_shape_and_rejects_unknown_nested_fields() {
     unknown["tools"][0]["annotations"]["estimated_duration_ms"] = serde_json::json!(10);
     assert!(!validator.is_valid(&unknown));
     assert!(
-        serde_json::from_value::<ToolManifest>(unknown).is_err(),
+        decode_error::<ToolManifest>(unknown).contains("unknown field `estimated_duration_ms`"),
         "the runtime must reject the same second latency authority as its schema",
     );
 }
