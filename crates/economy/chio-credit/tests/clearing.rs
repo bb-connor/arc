@@ -1856,7 +1856,7 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
             560,
         )
         .err(),
-        Some(ClearingError::AuthorityVerification)
+        Some(ClearingError::IncompleteLifecycleProjection)
     ));
     assert!(matches!(
         sign_clearing_round_abort(

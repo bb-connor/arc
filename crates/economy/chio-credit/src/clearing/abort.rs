@@ -728,7 +728,7 @@ fn verify_dispatch_statuses(
     statuses: &[ClearingIntentDispatchStatusV1],
 ) -> Result<(), ClearingError> {
     if intents.len() != statuses.len() {
-        return Err(ClearingError::AuthorityVerification);
+        return Err(ClearingError::IncompleteLifecycleProjection);
     }
     let mut expected = intents.iter().collect::<Vec<_>>();
     expected.sort_by(|left, right| left.intent_id.cmp(&right.intent_id));
