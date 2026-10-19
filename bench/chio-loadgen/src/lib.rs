@@ -79,6 +79,17 @@ pub enum LoadgenError {
         completed: u64,
     },
     #[error(
+        "dispatch backlog saturated after {attempted} of {scheduled} scheduled dispatches: {completed} completed, {in_flight} in flight against a capacity of {capacity}, no completion for {stalled_ms}ms"
+    )]
+    DispatchBacklogSaturated {
+        scheduled: u64,
+        attempted: u64,
+        completed: u64,
+        in_flight: u64,
+        capacity: u64,
+        stalled_ms: u128,
+    },
+    #[error(
         "resident-set size was never measured, so the growth budget cannot be proven satisfied"
     )]
     RssUnmeasured,
