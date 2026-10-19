@@ -16,10 +16,6 @@ pub enum WasmGuardError {
     /// Guard YAML input failed its original-document contract.
     #[error("{0}")]
     ManifestYaml(#[from] crate::ManifestYamlError),
-    /// The `.wasm` module could not be read from disk.
-    #[error("failed to read WASM module at {path}: {reason}")]
-    ModuleLoad { path: String, reason: String },
-
     /// The module failed compilation or validation.
     #[error("WASM module compilation failed: {0}")]
     Compilation(String),

@@ -36,18 +36,12 @@ impl WasmGuardRuntime {
     where
         F: FnOnce(&[u8], u64) -> Result<Box<dyn WasmGuardAbi>, WasmGuardError>,
     {
-        let wasm_bytes = std::fs::read(&config.path).map_err(|e| WasmGuardError::ModuleLoad {
-            path: config.path.clone(),
-            reason: e.to_string(),
-        })?;
-
-        // Pre-check module size before passing to the factory
-        if wasm_bytes.len() > config.max_module_size {
-            return Err(WasmGuardError::ModuleTooLarge {
-                size: wasm_bytes.len(),
-                limit: config.max_module_size,
-            });
-        }
+        let wasm_bytes =
+            crate::input::read_file(std::path::Path::new(&config.path), config.max_module_size)
+                .map_err(|source| WasmGuardError::InputFile {
+                    path: config.path.clone().into(),
+                    source,
+                })?;
 
         let backend = factory(&wasm_bytes, config.fuel_limit)?;
 
