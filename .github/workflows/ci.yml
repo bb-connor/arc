@@ -220,6 +220,7 @@ jobs:
           run_gate ./scripts/check-web3-contract-parity.sh
           run_gate ./scripts/check-workspace-layering.sh
           run_gate python3 scripts/check-review-slices.py
+          run_gate python3 scripts/tests/check-review-slices.test.py
           run_gate bash ./scripts/check-regression-tests.sh
           run_gate bash ./scripts/tests/check-regression-tests.test.sh
           run_gate python3 ./scripts/check-rust-toolchain-parity.py
@@ -262,6 +263,7 @@ jobs:
           run_gate bash ./scripts/tests/check-chio-schema-registry.test.sh
           run_gate bash ./scripts/tests/check-chio-transaction-passport.test.sh
           run_gate python3 ./scripts/check-root-authority-schema-examples.py
+          run_gate python3 ./scripts/tests/check-root-authority-schema-examples.test.py
           run_gate bash ./scripts/check-agent-web-proof-envelope-schema.sh
           run_gate bash ./scripts/tests/check-agent-web-proof-envelope-schema.test.sh
           run_gate bash ./scripts/tests/check-protocol-peer-negotiation.test.sh
