@@ -526,7 +526,7 @@ The competitive landscape splits into three silos:
 3. **Identity standards** (AIMS, UCAN, SPIFFE) define who agents are but not
    what scoped authority they hold or how to attest their actions.
 
-Chio is the only protocol where a single token simultaneously expresses
+Chio is a protocol in which a single token simultaneously expresses
 identity (subject-bound Ed25519 key), authorization (scoped tool grants with
 argument constraints), economic limits (invocation budgets), and produces
 cryptographic proof (signed receipts in a Merkle log) for every decision.
