@@ -13,13 +13,13 @@
 </p>
 
 <p align="center">
-  <strong>The kernel your agents answer to.</strong>
+  <strong>A kernel that governs what your agents may do.</strong>
 </p>
 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/subhead-mobile.svg" />
-    <img src="docs/assets/subhead.svg" alt="A signed receipt for every call &middot; Authority that can only narrow &middot; Agents that pay each other" width="880" />
+    <img src="docs/assets/subhead.svg" alt="A signed receipt for every call &middot; Authority that can only narrow &middot; Receipts you verify offline" width="880" />
   </picture>
 </p>
 
