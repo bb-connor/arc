@@ -4,6 +4,7 @@ use crate::executor_proof::{
     validate_dispatch_authorization as validate_dispatch_authorization_proof,
 };
 mod error;
+mod lease;
 
 pub use error::ExecutorError;
 
@@ -21,11 +22,10 @@ use chio_security_types::ports::{
     ActionId, AlertDeliveryQuery, CanonicalBody, Digest32, EffectExecutionStatus, EffectId,
     EffectOperation, EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode,
     LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, OpaqueReceiptRef, PortError,
-    PortErrorKind, ReceiptAppendRequest, RecordId, ResponseDispatchAuthorization,
-    ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey,
-    ResponsePlanRecord, ResponseReceiptCursor, ResponseReceiptCursorCasRequest,
-    ResponseSchedulerStore, ScheduledWork, SecurityAlert, SecurityAlertPort, SecurityReceiptSink,
-    TenantId,
+    ReceiptAppendRequest, RecordId, ResponseDispatchAuthorization, ResponseEffectCasRequest,
+    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
+    ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseSchedulerStore, ScheduledWork,
+    SecurityAlert, SecurityAlertPort, SecurityReceiptSink, TenantId,
 };
 use chio_security_types::{
     PlannedResponseEffect, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectProgress,
