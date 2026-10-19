@@ -135,9 +135,16 @@ pub fn sign_receipt_relaying_trusted_body(
     let backend_key = match backend.public_key() {
         Ok(key) => key,
         Err(error) => {
+            // The proof models the refusal, not the rendering of its error.
             #[cfg(kani)]
-            core::mem::forget(body);
-
+            {
+                core::mem::forget(body);
+                core::mem::forget(error);
+                return Err(ReceiptSigningError::SigningFailed(
+                    alloc::string::String::new(),
+                ));
+            }
+            #[cfg(not(kani))]
             return Err(ReceiptSigningError::SigningFailed(error.to_string()));
         }
     };
