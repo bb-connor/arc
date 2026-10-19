@@ -9,12 +9,9 @@ fn denied_at_capture() -> crate::service::failure::FailureProjection {
 }
 
 fn decode_refusal(frame: &[u8]) -> SensitiveJsonRefusal {
-    match decode_canonical_ipc_frame(frame) {
-        Err(SensitiveJsonFailure::Refused(reason)) => reason,
-        Err(SensitiveJsonFailure::Broker(error)) => {
-            panic!("canonical IPC decode refused outside the parser: {error:?}")
-        }
-        Ok(_) => panic!("canonical IPC decode accepted a refused vector"),
+    match parse_canonical_ipc_frame(frame) {
+        Err(refusal) => refusal,
+        Ok(_) => panic!("canonical IPC parse accepted a refused vector"),
     }
 }
 

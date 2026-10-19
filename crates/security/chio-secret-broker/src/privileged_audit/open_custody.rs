@@ -180,9 +180,7 @@ impl<'a> Fields<'a> {
         let salt = parser
             .parse_string_with_capacity::<MAX_AUDIT_OPEN_FRAME_BYTES>(raw.len())
             .map_err(|source| match BrokerError::from(source) {
-                source @ (BrokerError::Storage(_)
-                | BrokerError::Invariant(_)
-                | BrokerError::Custody(_)) => source,
+                source @ BrokerError::Storage(_) => source,
                 _ => BrokerError::UntrustedInput(
                     chio_core_types::canonical::UntrustedJsonError::NonCanonical,
                 ),

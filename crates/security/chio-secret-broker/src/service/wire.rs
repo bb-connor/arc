@@ -133,13 +133,17 @@ impl<const MAXIMUM: usize> BoundedZeroizingByteArray<MAXIMUM> {
                 "sensitive byte array is oversized".to_string(),
             ));
         }
+        let mut value = Self::reserved()?;
+        value.0.extend_from_slice(bytes);
+        Ok(value)
+    }
+
+    fn reserved() -> std::result::Result<Self, SensitiveJsonRefusal> {
         let mut storage = Vec::new();
-        storage.try_reserve_exact(MAXIMUM).map_err(|_| {
-            BrokerError::Storage("sensitive byte array allocation failed".to_string())
-        })?;
-        let mut storage = Zeroizing::new(storage);
-        storage.extend_from_slice(bytes);
-        Ok(Self(storage))
+        storage
+            .try_reserve_exact(MAXIMUM)
+            .map_err(|_| SensitiveJsonRefusal::ByteArrayAllocation)?;
+        Ok(Self(Zeroizing::new(storage)))
     }
 
     pub(crate) fn as_slice(&self) -> &[u8] {
@@ -196,11 +200,9 @@ impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
             return Err(SensitiveJsonRefusal::StringOverflow.into());
         }
         let mut storage = String::new();
-        storage.try_reserve_exact(capacity).map_err(|_| {
-            SensitiveJsonFailure::Broker(BrokerError::Storage(
-                "sensitive JSON string allocation failed".to_string(),
-            ))
-        })?;
+        storage
+            .try_reserve_exact(capacity)
+            .map_err(|_| SensitiveJsonRefusal::StringAllocation)?;
         Ok(Self(Zeroizing::new(storage), capacity))
     }
 
@@ -234,8 +236,8 @@ impl<const MAXIMUM: usize> Drop for BoundedZeroizingString<MAXIMUM> {
     }
 }
 
-/// Rule a sensitive JSON payload broke. Callers only ever observe the uniform
-/// `invalid_request` refusal; the reason never leaves the crate.
+/// Rule a sensitive JSON payload broke. Callers observe only the uniform
+/// `invalid_request` refusal or the allocation failure; the rule never leaves the crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SensitiveJsonRefusal {
     UnexpectedToken(&'static [u8]),
@@ -251,34 +253,22 @@ pub(crate) enum SensitiveJsonRefusal {
     MissingArrayDelimiter,
     TrailingData,
     UnknownOperation,
+    StringAllocation,
+    ByteArrayAllocation,
 }
 
-pub(crate) enum SensitiveJsonFailure {
-    Refused(
-        #[cfg_attr(
-            not(test),
-            expect(dead_code, reason = "only in-crate decode tests read the refusal rule")
-        )]
-        SensitiveJsonRefusal,
-    ),
-    Broker(BrokerError),
-}
+pub(crate) type SensitiveJsonResult<T> = std::result::Result<T, SensitiveJsonRefusal>;
 
-pub(crate) type SensitiveJsonResult<T> = std::result::Result<T, SensitiveJsonFailure>;
-
-impl From<SensitiveJsonRefusal> for SensitiveJsonFailure {
-    fn from(reason: SensitiveJsonRefusal) -> Self {
-        Self::Refused(reason)
-    }
-}
-
-impl From<SensitiveJsonFailure> for BrokerError {
-    fn from(failure: SensitiveJsonFailure) -> Self {
-        match failure {
-            SensitiveJsonFailure::Refused(_) => {
-                Self::InvalidRequest("sensitive JSON payload is invalid".to_string())
+impl From<SensitiveJsonRefusal> for BrokerError {
+    fn from(refusal: SensitiveJsonRefusal) -> Self {
+        match refusal {
+            SensitiveJsonRefusal::StringAllocation => {
+                Self::Storage("sensitive JSON string allocation failed".to_string())
             }
-            SensitiveJsonFailure::Broker(error) => error,
+            SensitiveJsonRefusal::ByteArrayAllocation => {
+                Self::Storage("sensitive byte array allocation failed".to_string())
+            }
+            _ => Self::InvalidRequest("sensitive JSON payload is invalid".to_string()),
         }
     }
 }
@@ -297,9 +287,7 @@ impl<'a> SensitiveJsonParser<'a> {
         self.input
             .get(position)
             .copied()
-            .ok_or(SensitiveJsonFailure::Refused(
-                SensitiveJsonRefusal::Truncated,
-            ))
+            .ok_or(SensitiveJsonRefusal::Truncated)
     }
 
     pub(crate) fn expect_literal(&mut self, expected: &'static [u8]) -> SensitiveJsonResult<()> {
@@ -414,8 +402,7 @@ impl<'a> SensitiveJsonParser<'a> {
         &mut self,
     ) -> SensitiveJsonResult<BoundedZeroizingByteArray<MAXIMUM>> {
         self.expect_literal(b"[")?;
-        let mut value = BoundedZeroizingByteArray::copy_from_slice(&[])
-            .map_err(SensitiveJsonFailure::Broker)?;
+        let mut value = BoundedZeroizingByteArray::reserved()?;
         if self.input.get(self.position) == Some(&b']') {
             self.position += 1;
             return Ok(value);
@@ -718,10 +705,17 @@ pub fn canonical_ipc_request_bytes(
 }
 
 pub(crate) fn decode_canonical_ipc_request(frame: &[u8]) -> Result<AuthenticatedIpcRequest> {
-    decode_canonical_ipc_frame(frame).map_err(BrokerError::from)
+    let request = parse_canonical_ipc_frame(frame)?;
+    let canonical = canonical_ipc_request_bytes(&request)?;
+    if canonical.as_slice() != frame {
+        return Err(BrokerError::InvalidRequest(
+            "IPC request is not canonical JSON".to_string(),
+        ));
+    }
+    Ok(request)
 }
 
-pub(super) fn decode_canonical_ipc_frame(
+pub(super) fn parse_canonical_ipc_frame(
     frame: &[u8],
 ) -> SensitiveJsonResult<AuthenticatedIpcRequest> {
     let mut parser = SensitiveJsonParser::new(frame);
@@ -750,19 +744,12 @@ pub(super) fn decode_canonical_ipc_frame(
     let tenant_scope = parser.parse_string::<512>()?;
     parser.expect_literal(b"}")?;
     parser.finish()?;
-    let request = AuthenticatedIpcRequest {
+    Ok(AuthenticatedIpcRequest {
         operation,
         tenant_scope: tenant_scope.into_string(),
         authorization: authorization.into_sensitive(),
         payload: payload.into_sensitive(),
-    };
-    let canonical = canonical_ipc_request_bytes(&request).map_err(SensitiveJsonFailure::Broker)?;
-    if canonical.as_slice() != frame {
-        return Err(SensitiveJsonFailure::Broker(BrokerError::InvalidRequest(
-            "IPC request is not canonical JSON".to_string(),
-        )));
-    }
-    Ok(request)
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

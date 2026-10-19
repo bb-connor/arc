@@ -245,10 +245,7 @@ pub(crate) use wire::{
     SensitiveJsonParser, ZeroizingCanonicalJsonWriter,
 };
 #[cfg(test)]
-use wire::{
-    decode_canonical_ipc_frame, read_sensitive_frame_body, SensitiveJsonFailure,
-    SensitiveJsonRefusal,
-};
+use wire::{parse_canonical_ipc_frame, read_sensitive_frame_body, SensitiveJsonRefusal};
 #[cfg(test)]
 pub(crate) use wire::{reset_sensitive_drop_observer, sensitive_drop_observation};
 
