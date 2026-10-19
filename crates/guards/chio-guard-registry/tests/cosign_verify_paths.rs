@@ -1,4 +1,3 @@
-use std::path::Path;
 use std::time::SystemTime;
 
 use chio_guard_registry::{
@@ -11,16 +10,6 @@ struct BundleErrorVerifier {
 }
 
 impl AttestVerifier for BundleErrorVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".to_owned()))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],
@@ -59,16 +48,6 @@ struct BundleSuccessVerifier {
 }
 
 impl AttestVerifier for BundleSuccessVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".to_owned()))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],
@@ -101,16 +80,6 @@ struct BytesErrorVerifier {
 }
 
 impl AttestVerifier for BytesErrorVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".to_owned()))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],

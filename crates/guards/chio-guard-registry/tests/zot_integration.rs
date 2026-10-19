@@ -305,16 +305,6 @@ impl StaticVerifier {
 }
 
 impl AttestVerifier for StaticVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".to_owned()))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],

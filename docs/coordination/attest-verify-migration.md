@@ -54,8 +54,7 @@ through dependency injection. The crate adds a `chio-attest-verify =
 Invariants the target state must satisfy:
 
 - Every Sigstore verification call in consumer code paths goes through
-  `AttestVerifier::verify_blob`, `AttestVerifier::verify_bytes`, or
-  `AttestVerifier::verify_bundle`.
+  `AttestVerifier::verify_bytes` or `AttestVerifier::verify_bundle`.
 - The OIDC issuer and identity regex are constructed by populating
   `chio_attest_verify::ExpectedIdentity`. The consumer must not re-declare those
   fields locally.

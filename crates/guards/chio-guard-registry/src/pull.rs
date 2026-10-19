@@ -158,7 +158,6 @@ fn ensure_manifest_digest_matches(reference: &GuardOciRef, actual: &str) -> Resu
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
@@ -221,16 +220,6 @@ mod tests {
     }
 
     impl AttestVerifier for CountingVerifier {
-        fn verify_blob(
-            &self,
-            _artifact: &Path,
-            _signature: &Path,
-            _certificate: &Path,
-            _expected: &ExpectedIdentity,
-        ) -> std::result::Result<VerifiedAttestation, AttestError> {
-            Err(AttestError::Malformed("verify_blob unused".to_owned()))
-        }
-
         fn verify_bytes(
             &self,
             _artifact: &[u8],

@@ -10,12 +10,12 @@
 //!   performs those checks itself, this path marks
 //!   [`VerifiedAttestation::rekor_inclusion_verified`](crate::VerifiedAttestation::rekor_inclusion_verified) as `false`.
 //!
-//! - [`SigstoreVerifier::verify_blob`] and [`SigstoreVerifier::verify_bytes`]
-//!   verify a detached `(artifact, signature, leaf-cert)` triple against
-//!   the embedded Fulcio trust root. They perform certificate-chain
-//!   validation, OIDC issuer match, identity SAN regex match, certificate
-//!   validity-window check, and signature verification, but DO NOT consume
-//!   a Rekor inclusion proof and therefore mark the resulting
+//! - [`SigstoreVerifier::verify_bytes`] verifies a detached
+//!   `(artifact, signature, leaf-cert)` triple against the embedded Fulcio
+//!   trust root. It performs certificate-chain validation, OIDC issuer
+//!   match, identity SAN regex match, certificate validity-window check,
+//!   and signature verification, but DOES NOT consume
+//!   a Rekor inclusion proof and therefore marks the resulting
 //!   [`VerifiedAttestation`](crate::VerifiedAttestation) with `rekor_inclusion_verified = false`.
 //!
 //! All paths are fail-closed: any error returns one of the [`AttestError`](crate::AttestError)

@@ -2,8 +2,6 @@
 //! Integration coverage for [`SigstoreVerifier`]: fail-closed contract tests
 //! for malformed inputs, signature mismatches, and chain-validation failures.
 
-use std::io::Write;
-
 use chio_attest_verify::{AttestError, AttestVerifier, ExpectedIdentity, SigstoreVerifier};
 
 fn github_release_identity() -> ExpectedIdentity {
@@ -136,25 +134,6 @@ mnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789=\n\
                 | Err(AttestError::CertificateExpired)
         ),
         "non-Fulcio leaf must be rejected before signature check; got {result:?}"
-    );
-}
-
-#[test]
-fn verify_blob_returns_io_error_for_missing_artifact() {
-    let verifier = SigstoreVerifier::with_embedded_root().expect("embedded TUF root must parse");
-    let expected = github_release_identity();
-
-    let dir = tempfile::tempdir().expect("tempdir");
-    let nonexistent = dir.path().join("does-not-exist.bin");
-    let mut sig = tempfile::NamedTempFile::new().expect("sig tempfile");
-    let mut cert = tempfile::NamedTempFile::new().expect("cert tempfile");
-    sig.write_all(b"placeholder").expect("write sig");
-    cert.write_all(b"placeholder").expect("write cert");
-
-    let result = verifier.verify_blob(&nonexistent, sig.path(), cert.path(), &expected);
-    assert!(
-        matches!(result, Err(AttestError::Io(_))),
-        "missing artifact path must surface as Io error; got {result:?}"
     );
 }
 

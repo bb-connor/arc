@@ -12,7 +12,6 @@
 #![cfg(feature = "pq")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::Path;
 use std::time::SystemTime;
 
 use chio_guard_registry::{
@@ -52,18 +51,6 @@ const ALL_FLOORS: [CryptoFloorScenario; 3] = [
 struct AlwaysOkBundleVerifier;
 
 impl AttestVerifier for AlwaysOkBundleVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed(
-            "verify_blob unused in this regression".to_owned(),
-        ))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],
@@ -174,15 +161,6 @@ fn cosign_bundle_failure_propagates_under_all_floors() {
     // not bleed into the cosign-bundle gate.
     struct FailingVerifier;
     impl AttestVerifier for FailingVerifier {
-        fn verify_blob(
-            &self,
-            _: &Path,
-            _: &Path,
-            _: &Path,
-            _: &ExpectedIdentity,
-        ) -> Result<VerifiedAttestation, AttestError> {
-            Err(AttestError::SignatureMismatch)
-        }
         fn verify_bytes(
             &self,
             _: &[u8],
