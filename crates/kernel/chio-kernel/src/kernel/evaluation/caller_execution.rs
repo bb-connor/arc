@@ -1,16 +1,13 @@
 //! Caller execution separates preparation, committed start and authenticated
-//! return. Reservation never authorizes an effect. Legacy unsigned reports are
-//! refused when an executor is pinned; historical signed reports enter the
-//! original finalization path without repeating admission.
-
-use std::sync::{Arc, Mutex};
+//! return. Reservation never authorizes an effect. Signed delivery resumes
+//! original finalization without repeating admission.
 
 use super::evaluation_helpers::ExecutionNonceReservingResponse;
 use super::*;
 use crate::execution_nonce::SignedExecutionNonce;
 use crate::kernel::credential_reservation::DispatchCredentialReservation;
 use crate::kernel::responses::PreflightNonceSource;
-use crate::{NestedFlowBridge, ToolInvocationCost, ToolServerConnection};
+use crate::ToolInvocationCost;
 
 /// A reservation or receipt is never execution permission. Only `Authorized`
 /// carries the committed statement a configured durable executor can claim.
@@ -49,58 +46,6 @@ pub struct CallerExecutionReport {
     pub realized_cost: Option<ToolInvocationCost>,
 }
 
-/// Stands in for the tool server while a caller-reserved operation finalizes.
-struct CallerReportServer {
-    server_id: String,
-    tool_name: String,
-    report: Mutex<Option<CallerExecutionReport>>,
-}
-
-#[async_trait::async_trait]
-impl ToolServerConnection for CallerReportServer {
-    fn server_id(&self) -> &str {
-        &self.server_id
-    }
-
-    fn tool_names(&self) -> Vec<String> {
-        vec![self.tool_name.clone()]
-    }
-
-    async fn invoke(
-        &self,
-        tool_name: &str,
-        arguments: serde_json::Value,
-        nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<serde_json::Value, KernelError> {
-        self.invoke_with_cost(tool_name, arguments, nested_flow_bridge)
-            .await
-            .map(|(value, _)| value)
-    }
-
-    async fn invoke_with_cost(
-        &self,
-        tool_name: &str,
-        _arguments: serde_json::Value,
-        _nested_flow_bridge: Option<&mut dyn NestedFlowBridge>,
-    ) -> Result<(serde_json::Value, Option<ToolInvocationCost>), KernelError> {
-        if tool_name != self.tool_name {
-            return Err(KernelError::ToolServerError(format!(
-                "caller report covers tool {} but the dispatch names {tool_name}",
-                self.tool_name
-            )));
-        }
-        let report = self
-            .report
-            .lock()
-            .map_err(|_| KernelError::Internal("caller report lock poisoned".to_owned()))?
-            .take()
-            .ok_or_else(|| {
-                KernelError::ToolServerError("caller report was already consumed".to_owned())
-            })?;
-        Ok((report.output, report.realized_cost))
-    }
-}
-
 /// The admitted state a caller reservation stops at, before any capture.
 pub(super) struct CallerReservation<'a, 'c> {
     pub(super) request: &'a ToolCallRequest,
@@ -125,10 +70,7 @@ impl ChioKernel {
         session: Option<&SessionId>,
         now_unix_ms: u64,
     ) -> Result<Option<String>, KernelError> {
-        if matches!(
-            mode,
-            DispatchMode::CallerStart | DispatchMode::CallerReport(_)
-        ) {
+        if matches!(mode, DispatchMode::CallerStart) {
             let nonce = request.execution_nonce.as_ref().ok_or_else(|| {
                 KernelError::DurableAdmission("caller resume requires its original nonce".into())
             })?;
@@ -438,53 +380,6 @@ impl ChioKernel {
             None,
             security_context,
             EvaluationDisposition::caller_reservation(),
-        ))
-    }
-
-    /// Legacy unsigned reconciliation, refused when a caller executor is pinned.
-    /// This compatibility path does not authorize an external effect. New
-    /// integrations must use committed start and authenticated delivery reports.
-    pub fn reconcile_caller_execution_blocking(
-        &self,
-        nonce: &SignedExecutionNonce,
-        arguments: &serde_json::Value,
-        report: CallerExecutionReport,
-    ) -> Result<ToolCallResponse, KernelError> {
-        if self.caller_executor.is_some() {
-            return Err(KernelError::DurableAdmission(
-                "configured caller executor requires authenticated start and delivery; unsigned reports are not accepted".into(),
-            ));
-        }
-        let mut request = self.caller_reserved_request(nonce, self.read_authority_time()?.get())?;
-        let presented = ToolCallAction::from_parameters(arguments.clone()).map_err(|error| {
-            KernelError::DurableAdmission(format!(
-                "caller report arguments cannot be hashed: {error}"
-            ))
-        })?;
-        let retained =
-            ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
-                KernelError::DurableAdmission(format!(
-                    "retained request arguments cannot be hashed: {error}"
-                ))
-            })?;
-        if presented.parameter_hash != retained.parameter_hash {
-            return Err(KernelError::DurableAdmission(
-                "caller report arguments do not match the reserved call".to_owned(),
-            ));
-        }
-        request.execution_nonce = Some(nonce.clone());
-        let server: Arc<dyn ToolServerConnection> = Arc::new(CallerReportServer {
-            server_id: request.server_id.clone(),
-            tool_name: request.tool_name.clone(),
-            report: Mutex::new(Some(report)),
-        });
-        block_on_async_tool_dispatch(self.evaluate_tool_call_async_with_session_context(
-            &request,
-            None,
-            None,
-            None,
-            None,
-            EvaluationDisposition::caller_report(server),
         ))
     }
 }

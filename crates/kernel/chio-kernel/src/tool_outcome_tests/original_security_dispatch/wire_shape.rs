@@ -1,11 +1,11 @@
-//! Reuse the real signed legacy fixture to pin the new complete raw envelope.
+//! Canonical wire bytes require explicit evidence fields and consistent release binding.
 use super::*;
 use crate::admission_operation::NativeSecurityDispatchRequestBindingV1;
 use chio_core::canonical::UntrustedJsonError;
 use std::error::Error;
 
 pub(super) fn verify(
-    signing: &RawInvocationOutcomeV1,
+    raw: &RawInvocationOutcomeV1,
     operation: &AdmissionOperationV1,
     request: &ToolCallRequest,
     context: &SecurityInvocationContext,
@@ -22,14 +22,11 @@ pub(super) fn verify(
         canonical_json_bytes(&binding)?,
         canonical_json_bytes(&expected_binding)?
     );
-    let raw = signing
-        .clone()
-        .with_original_security_dispatch_binding(Some(Box::new(binding)))?;
     let commit = operation.dispatch_commit().ok_or("committed fixture")?;
     let expected = json!({
-        "schema": "chio.raw-invocation-outcome-with-original-security-dispatch.v1",
+        "schema": "chio.raw-invocation-outcome.v1",
         "operation_id": operation.binding().operation_id(),
-        "request_id": "legacy-original-dispatch",
+        "request_id": "original-dispatch",
         "dispatch_operation_version": commit.committed_version,
         "dispatch_fence": 9,
         "tool_server": "server-1",
@@ -51,17 +48,19 @@ pub(super) fn verify(
         "security_invocation_context": {
             "version": "v1",
             "context": {
-                "tenantId":"legacy-tenant", "sessionId":"legacy-session",
-                "principalId": request.agent_id, "isolationEpochId":"legacy-epoch",
+                "tenantId":"tenant", "sessionId":"session",
+                "principalId": request.agent_id, "isolationEpochId":"epoch",
                 "lineageRootId":"capability-1", "contextGeneration":1,
                 "flowStateGeneration":null,
             },
         },
+        "federation_context_json": null,
         "security_release_required": true,
         "receipt_signing_identity": {
             "public_key": request.capability.issuer,
             "crypto_floor": "allow_classical",
         },
+        "caller_delivery_evidence": null,
         "original_security_dispatch_binding": expected_binding,
     });
     let expected_bytes = canonical_json_bytes(&expected)?;
@@ -74,27 +73,30 @@ pub(super) fn verify(
         live.dispatch_commitment_id().clone()
     );
 
-    // Field presence and schema travel together. A historical schema with
-    // new authority-shaped data, or a new schema without it, must refuse.
-    let mut missing = expected.clone();
-    missing
-        .as_object_mut()
-        .ok_or("raw object")?
-        .remove("original_security_dispatch_binding");
-    assert!(matches!(
-        RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&missing)?),
+    let mut null_binding = expected.clone();
+    null_binding["original_security_dispatch_binding"] = Value::Null;
+    assert_eq!(
+        RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&null_binding)?),
         Err(ToolOutcomeError::Binding(
             "raw.original_security_dispatch_binding"
         ))
-    ));
-    let mut historical = expected.clone();
-    historical["schema"] = json!("chio.raw-invocation-outcome-with-signing-identity.v1");
-    assert!(matches!(
-        RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&historical)?),
+    );
+    let mut release_not_required = expected.clone();
+    release_not_required["security_release_required"] = json!(false);
+    assert_eq!(
+        RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&release_not_required)?),
         Err(ToolOutcomeError::Binding(
             "raw.original_security_dispatch_binding"
         ))
-    ));
+    );
+    let mut null_context = expected.clone();
+    null_context["security_invocation_context"] = Value::Null;
+    assert_eq!(
+        RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&null_context)?),
+        Err(ToolOutcomeError::Binding(
+            "raw.security_release_requirement"
+        ))
+    );
     let mut unknown = expected.clone();
     unknown["original_security_dispatch_binding"]["authority"] = json!("invented");
     match RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&unknown)?) {
@@ -122,11 +124,11 @@ pub(super) fn verify(
     let mut wrong_binding_schema = expected;
     wrong_binding_schema["original_security_dispatch_binding"]["schema"] =
         json!("chio.original-security-dispatch-binding.v0");
-    assert!(matches!(
+    assert_eq!(
         RawInvocationOutcomeV1::from_canonical_bytes(&canonical_json_bytes(&wrong_binding_schema)?),
         Err(ToolOutcomeError::Binding(
             "raw.original_security_dispatch_binding"
         ))
-    ));
+    );
     Ok(())
 }

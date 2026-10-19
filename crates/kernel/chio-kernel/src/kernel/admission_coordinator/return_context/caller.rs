@@ -4,26 +4,16 @@
 
 use super::*;
 use crate::admission_operation::{
-    AdmissionCallerDispatchContextV1, NativeCallerReleaseCustodyV1, NATIVE_CALLER_CONTEXT_SCHEMA,
+    AdmissionCallerDispatchContextV1, NativeCallerReleaseCustodyV1, CALLER_RETURN_CONTEXT_SCHEMA,
 };
 use serde::{Deserialize, Serialize};
 
-const LEGACY_SCHEMA: &str = "chio.kernel-caller-return-context.v1";
-const SIGNING_SCHEMA: &str = "chio.kernel-caller-return-context.v2";
-const PARTICIPANT_SCHEMA: &str = "chio.kernel-caller-return-context.v3";
-const CUSTODY_SCHEMA: &str = "chio.kernel-caller-return-context.v4";
-const SCHEMA: &str = "chio.kernel-caller-return-context.v6";
-
 #[cfg(test)]
 #[test]
-fn caller_return_wire_pins_its_written_and_legacy_schema_identities() {
-    // The written identity skips v5 because the native custody payload owns that
-    // number, and v4 stays readable because the validation ladder accepts it.
-    assert_eq!(SCHEMA, "chio.kernel-caller-return-context.v6");
-    assert_eq!(CUSTODY_SCHEMA, "chio.kernel-caller-return-context.v4");
+fn caller_return_wire_pins_its_v1_schema_identity() {
     assert_eq!(
-        NATIVE_CALLER_CONTEXT_SCHEMA,
-        "chio.kernel-caller-return-context.v5"
+        CALLER_RETURN_CONTEXT_SCHEMA,
+        "chio.kernel-caller-return-context.v1"
     );
 }
 
@@ -58,16 +48,11 @@ struct CallerReturnWire {
     security_invocation_context: Option<SecurityInvocationContext>,
     federation_context_json: Option<String>,
     runtime_participant_ledger_digest: Option<AdmissionDigest>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    receipt_signing_identity: Option<crate::tool_outcome::FrozenReceiptSigningIdentityV1>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    participants: Option<Box<FrozenDispatchParticipants>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    participant_custody: Option<CallerParticipantCustody>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    receipt_signing_identity: crate::tool_outcome::FrozenReceiptSigningIdentityV1,
+    participants: Box<FrozenDispatchParticipants>,
+    participant_custody: CallerParticipantCustody,
     native_custody: Option<NativeCallerReleaseCustodyV1>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    start_valid_until_unix_ms: Option<u64>,
+    start_valid_until_unix_ms: u64,
 }
 
 impl ChioKernel {
@@ -205,10 +190,8 @@ impl ChioKernel {
         )
         .and_then(|input| input.decode_signed())
         .map_err(crate::KernelError::from)?;
-        if wire.schema != SCHEMA && wire.schema != NATIVE_CALLER_CONTEXT_SCHEMA {
-            return Err(invalid(
-                "legacy caller context cannot acquire start authority",
-            ));
+        if wire.schema != CALLER_RETURN_CONTEXT_SCHEMA {
+            return Err(invalid("caller context cannot acquire start authority"));
         }
         let expires_at_unix_ms = expires_at_unix_ms.min(wire.start_deadline()?);
         let body = CallerDispatchAuthorizationBodyV1 {
@@ -260,22 +243,19 @@ impl ChioKernel {
             ));
         }
         let wire = CallerReturnWire {
-            start_valid_until_unix_ms: if native_custody.is_none() {
-                Some(self.freeze_caller_start_deadline(admission, request, context, now)?)
-            } else {
-                None
+            start_valid_until_unix_ms: match native_custody.as_ref() {
+                Some(custody) => custody.valid_until_unix_ms(),
+                None => self.freeze_caller_start_deadline(admission, request, context, now)?,
             },
-            schema: if native_custody.is_some() {
-                NATIVE_CALLER_CONTEXT_SCHEMA
-            } else {
-                SCHEMA
-            }
-            .into(),
+            schema: CALLER_RETURN_CONTEXT_SCHEMA.into(),
             native_custody,
             kernel_public_key: self.config.keypair.public_key(),
             receipt_signing_identity: context.receipt_signing_identity.clone(),
             participants: context.participants.clone(),
-            participant_custody: context.caller_participant_custody.clone(),
+            participant_custody: context
+                .caller_participant_custody
+                .clone()
+                .ok_or_else(|| invalid("caller return context lost participant custody"))?,
             frozen_at_unix_ms: now,
             operation_id: context.operation_id.clone(),
             request_binding_hash: context.request_binding_hash.clone(),
@@ -392,26 +372,12 @@ impl ChioKernel {
                 "caller return component is not exact typed canonical JSON",
             ));
         }
-        let schema_valid = match (
-            wire.schema.as_str(),
-            wire.receipt_signing_identity.as_ref(),
-            wire.participants.as_ref(),
-            wire.participant_custody.as_ref(),
-        ) {
-            (
-                SCHEMA | CUSTODY_SCHEMA | NATIVE_CALLER_CONTEXT_SCHEMA,
-                Some(identity),
-                Some(_),
-                Some(_),
-            )
-            | (PARTICIPANT_SCHEMA, Some(identity), Some(_), None)
-            | (SIGNING_SCHEMA, Some(identity), None, None) => identity.validate().is_ok(),
-            (LEGACY_SCHEMA, None, None, None) => true,
-            _ => false,
-        };
-        if !schema_valid
+        if wire.schema != CALLER_RETURN_CONTEXT_SCHEMA
+            || wire.receipt_signing_identity.validate().is_err()
             || !wire.valid_deadline_shape()
-            || (wire.schema == NATIVE_CALLER_CONTEXT_SCHEMA) != wire.native_custody.is_some()
+            || admission.operation.provider_attempt().is_some_and(
+                crate::admission_operation::ProviderAttemptBindingV1::is_native_caller_report,
+            ) != wire.native_custody.is_some()
             || wire.kernel_public_key != self.config.keypair.public_key()
             || wire.frozen_at_unix_ms == 0
             || wire.frozen_at_unix_ms > I_JSON_MAX_SAFE_INTEGER
@@ -423,7 +389,8 @@ impl ChioKernel {
                 "caller return component lost its admission binding",
             ));
         }
-        if let Some(custody) = wire.participant_custody.as_ref() {
+        {
+            let custody = &wire.participant_custody;
             let retained = self.read_caller_participant_custody(
                 admission,
                 wire.matched_grant_index,
@@ -508,7 +475,7 @@ impl ChioKernel {
             federation_context,
             receipt_signing_identity: wire.receipt_signing_identity,
             participants: wire.participants,
-            caller_participant_custody: wire.participant_custody,
+            caller_participant_custody: Some(wire.participant_custody),
         };
         context.validate_binding(admission, request)?;
         Ok(context)

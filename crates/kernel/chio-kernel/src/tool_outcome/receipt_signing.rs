@@ -48,25 +48,22 @@ impl FrozenReceiptSigningIdentityV1 {
 }
 
 impl RawInvocationOutcomeV1 {
-    /// Historical request equality only. A false result holds raw custody;
+    /// Request equality only. A false result holds raw custody;
     /// the enclosing store must separately verify the retained begin commit.
     pub fn matches_compacted_original_request(
         &self,
         retained: &crate::admission_operation::RetainedToolAdmissionRequestV1,
     ) -> bool {
-        self.recovery_request().is_ok_and(|request| {
-            request.is_some_and(|request| retained.validate_request_material(&request).is_ok())
-        })
+        self.recovery_request()
+            .is_ok_and(|request| retained.validate_request_material(&request).is_ok())
     }
 
     /// Data-only retention qualification. The fenced store must separately
     /// authenticate the Completed record, original request and sealed evidence.
-    /// Missing or richer signing selections keep their raw identity material.
+    /// Signing selections outside the basic profile retain their raw identity material.
     pub fn supports_compacted_value_replay(&self) -> bool {
-        let Some(identity) = &self.receipt_signing_identity else {
-            return false;
-        };
-        let Ok(Some(request)) = self.recovery_request() else {
+        let identity = &self.receipt_signing_identity;
+        let Ok(request) = self.recovery_request() else {
             return false;
         };
         identity.crypto_floor == ReceiptCryptoFloor::AllowClassical
@@ -91,10 +88,7 @@ impl RawInvocationOutcomeV1 {
         receipt: &chio_core::receipt::body::ChioReceipt,
     ) -> bool {
         self.supports_compacted_value_replay()
-            && self
-                .receipt_signing_identity
-                .as_ref()
-                .is_some_and(|identity| identity.public_key == receipt.kernel_key)
+            && self.receipt_signing_identity.public_key == receipt.kernel_key
             && receipt
                 .metadata
                 .as_ref()
@@ -104,29 +98,8 @@ impl RawInvocationOutcomeV1 {
                 .is_ok_and(|valid| valid)
     }
 
-    pub(crate) fn with_receipt_signing_identity(
-        mut self,
-        identity: FrozenReceiptSigningIdentityV1,
-    ) -> Result<Self, ToolOutcomeError> {
-        identity.validate()?;
-        if self.request_canonical_json.is_none() {
-            return Err(ToolOutcomeError::Binding("raw.receipt_signing_request"));
-        }
-        self.requires_security_release()?;
-        self.receipt_signing_identity = Some(identity);
-        self.schema = if self.original_security_dispatch_binding.is_some() {
-            RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA
-        } else if self.caller_delivery_evidence.is_some() {
-            RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
-        } else {
-            RAW_INVOCATION_OUTCOME_WITH_SIGNING_IDENTITY_SCHEMA
-        };
-        self.canonical_blob()?;
-        Ok(self)
-    }
-
-    pub(crate) fn receipt_signing_identity(&self) -> Option<&FrozenReceiptSigningIdentityV1> {
-        self.receipt_signing_identity.as_ref()
+    pub(crate) fn receipt_signing_identity(&self) -> &FrozenReceiptSigningIdentityV1 {
+        &self.receipt_signing_identity
     }
 }
 

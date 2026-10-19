@@ -1,10 +1,12 @@
-//! Real custody retention behind the caller codec. No external effect or
-//! dispatch-start authorization is inferred from this report-path regression.
+//! Runtime custody retention across authenticated caller start and return.
 
 use super::*;
 use chio_kernel::admission_operation::AdmissionOperationStore;
+use chio_kernel::caller_delivery::{
+    CallerDeliveryReportBodyV1, CallerExecutorIdentityV1, SignedCallerDeliveryReportV1,
+    CALLER_DELIVERY_REPORT_SCHEMA,
+};
 use chio_kernel::execution_nonce::{ExecutionNonceConfig, InMemoryExecutionNonceStore};
-use chio_kernel::CallerExecutionReport;
 
 #[path = "caller/authenticated.rs"]
 mod authenticated;
@@ -27,8 +29,15 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
     let _clock = chio_test_support::clock::scope_unix_secs(NOW / 1000);
     let fixture = Fixture::new(true)?;
     let signer = Keypair::generate();
+    let executor_key = Keypair::generate();
+    let executor = CallerExecutorIdentityV1 {
+        executor_id: AdmissionIdentifier::try_new("executor_id", "runtime-custody-executor")?,
+        public_key: executor_key.public_key(),
+        key_epoch: 1,
+    };
     let mut kernel = fixture.kernel_with_key(fixture.hook()?, true, false, signer.clone())?;
     nonce_config(&mut kernel);
+    kernel.set_caller_executor(executor.clone())?;
     let reserved = kernel.reserve_caller_execution_blocking(&fixture.request)?;
     assert_eq!(reserved.verdict, Verdict::Allow, "{reserved:#?}");
     let nonce = reserved.execution_nonce.ok_or("caller nonce")?;
@@ -58,14 +67,32 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
         before,
         "duplicate reservation must not reacquire or replace an episode",
     );
-    let completed = kernel.reconcile_caller_execution_blocking(
-        &nonce,
-        &fixture.request.arguments,
-        CallerExecutionReport {
+    let authorization =
+        match kernel.start_caller_execution_blocking(&nonce, &fixture.request.arguments)? {
+            chio_kernel::CallerStartResponse::Authorized(authorization) => *authorization,
+            chio_kernel::CallerStartResponse::Denied(response) => {
+                return Err(format!("caller start denied: {:?}", response.reason).into());
+            }
+        };
+    let report = SignedCallerDeliveryReportV1::sign(
+        CallerDeliveryReportBodyV1 {
+            schema: CALLER_DELIVERY_REPORT_SCHEMA.into(),
+            authorization_digest: authorization.verify_historical(
+                &signer.public_key(),
+                &executor,
+                &authorization.authorization.invocation,
+            )?,
+            executor: executor.clone(),
+            claim_id: AdmissionIdentifier::try_new("claim_id", "runtime-custody-claim")?,
+            execution_started_at_unix_ms: NOW,
+            completed_at_unix_ms: NOW,
             output: serde_json::json!({"closed": true}),
             realized_cost: None,
         },
+        &executor_key,
     )?;
+    let completed =
+        kernel.reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(completed.verdict, Verdict::Allow, "{:?}", completed.reason);
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     let (operation, _) = store
@@ -88,7 +115,7 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
         .load_caller_dispatch_context(operation.binding().operation_id(), &fence, NOW)?
         .ok_or("caller frame")?;
     let payload: serde_json::Value = serde_json::from_slice(frame.kernel_context_json())?;
-    assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v6");
+    assert_eq!(payload["schema"], "chio.kernel-caller-return-context.v1");
     let selected = &payload["participant_custody"]["runtime"];
     assert_eq!(
         selected["episode_id"],
@@ -153,14 +180,9 @@ fn caller_context_retains_exact_runtime_episode_and_released_predecessor_after_r
     };
     let mut kernel = fixture.kernel_with_key(fixture.hook()?, true, false, signer)?;
     nonce_config(&mut kernel);
-    let replay = kernel.reconcile_caller_execution_blocking(
-        &nonce,
-        &fixture.request.arguments,
-        CallerExecutionReport {
-            output: serde_json::json!({"closed": true}),
-            realized_cost: None,
-        },
-    )?;
+    kernel.set_caller_executor(executor.clone())?;
+    let replay =
+        kernel.reconcile_authenticated_caller_execution_blocking(&authorization, &report)?;
     assert_eq!(replay.verdict, Verdict::Allow, "{:?}", replay.reason);
     assert_eq!(
         canonical_json_bytes(&replay.receipt)?,

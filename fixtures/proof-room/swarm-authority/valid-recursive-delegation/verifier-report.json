@@ -1,7 +1,7 @@
 {
   "schema": "chio.attest.verifier-report.v1",
-  "packageSha256": "4dea1d2a7849361da9078f112ebb968073b784c890d127cd0adc56da09006542",
-  "trustBundleSha256": "f2564d82d42e576deaa7efac1e2c2682f69f91ce6042db68c066761f1780736a",
+  "packageSha256": "e93e2db909af76c58429f0de931e5f485b04b8a75311e4d0bb64e75445a58372",
+  "trustBundleSha256": "742a91d7a1f8b86bcd211a30e3560beda462a7cef82819752d1c6e0aedaf4cd5",
   "contextSha256": "4758a93f2dbc16256105ce6d47a4efdd39d477733dcb2a5e80075a3e1aaddcce",
   "revocationEpochHeight": 64,
   "accepted": true,

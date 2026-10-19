@@ -1,7 +1,13 @@
 use super::*;
 
+#[path = "tool_outcome_tests/required_envelope.rs"]
+mod required_envelope;
+
 #[path = "tool_outcome_tests/terminal_snapshot.rs"]
 mod terminal_snapshot;
+
+#[path = "tool_outcome_tests/caller_delivery.rs"]
+mod caller_delivery;
 
 #[path = "tool_outcome_tests/original_security_dispatch.rs"]
 mod original_security_dispatch;
@@ -206,6 +212,53 @@ fn raw_for(operation: &AdmissionOperationV1, output: Value) -> RawInvocationOutc
     raw_for_attempt(operation, "attempt-1", output).unwrap()
 }
 
+fn request_for(
+    operation: &AdmissionOperationV1,
+    server_id: &str,
+    tool_name: &str,
+) -> ToolCallRequest {
+    let issuer = Keypair::from_seed(&[0x71; 32]);
+    let capability = CapabilityToken::sign(
+        CapabilityTokenBody {
+            id: operation.binding().capability_id().as_str().to_owned(),
+            issuer: issuer.public_key(),
+            subject: issuer.public_key(),
+            scope: ChioScope::default(),
+            issued_at: 1,
+            expires_at: 2,
+            delegation_chain: Vec::new(),
+            aggregate_invocation_budget: None,
+        },
+        &issuer,
+    )
+    .unwrap();
+    serde_json::from_value(json!({
+        "request_id": operation.binding().request_id(),
+        "capability": capability,
+        "agent_id": issuer.public_key().to_hex(),
+        "arguments": {},
+        "server_id": server_id,
+        "tool_name": tool_name,
+    }))
+    .unwrap()
+}
+
+fn raw_context(request: &ToolCallRequest) -> RawInvocationContext<'_> {
+    RawInvocationContext {
+        request,
+        security_invocation_context: None,
+        federation_context_json: None,
+        security_release_required: false,
+        receipt_signing_identity: FrozenReceiptSigningIdentityV1::new(
+            Keypair::from_seed(&[0x72; 32]).public_key(),
+            chio_core::receipt::crypto_floor::ReceiptCryptoFloor::AllowClassical,
+        )
+        .unwrap(),
+        caller_delivery_evidence: None,
+        original_security_dispatch_binding: None,
+    }
+}
+
 fn stream_limits() -> InvocationStreamLimitsV1 {
     InvocationStreamLimitsV1 {
         max_total_bytes: 1024,
@@ -219,6 +272,7 @@ fn raw_for_attempt(
     attempt_id: &str,
     output: Value,
 ) -> Result<RawInvocationOutcomeV1, ToolOutcomeError> {
+    let request = request_for(operation, "server-1", "tool-1");
     RawInvocationOutcomeV1::from_committed_dispatch(
         operation,
         operation.dispatch_commit().unwrap(),
@@ -236,6 +290,7 @@ fn raw_for_attempt(
         }),
         None,
         Vec::new(),
+        raw_context(&request),
     )
 }
 
@@ -410,7 +465,12 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
     let mut reverse = Map::new();
     reverse.insert("z".to_owned(), json!(2));
     reverse.insert("a".to_owned(), json!(1));
-    let operation_id = AdmissionOperationId::from_persisted(sha("op")).unwrap();
+    let operation = committed_operation("req");
+    let operation_id = operation.binding().operation_id().clone();
+    let request = request_for(&operation, "server", "tool");
+    let signing_identity = raw_context(&request).receipt_signing_identity;
+    let request_canonical_json =
+        String::from_utf8(canonical_json_bytes(&request).unwrap()).unwrap();
     let raw = RawInvocationOutcomeV1 {
         original_security_dispatch_binding: None,
         caller_delivery_evidence: None,
@@ -441,19 +501,34 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         reported_cost: None,
         receipt_metadata_snapshot: None,
         pre_invocation_guard_evidence: Vec::new(),
-        request_canonical_json: None,
+        request_canonical_json: request_canonical_json.clone(),
         security_invocation_context: None,
-        security_release_required: None,
+        security_release_required: false,
         federation_context_json: None,
-        receipt_signing_identity: None,
+        receipt_signing_identity: signing_identity,
     };
     let blob = raw.canonical_blob().unwrap();
     let expected = format!(
-        "{{\"dispatch_fence\":8,\"dispatch_operation_version\":7,\"elapsed_millis\":7,\"matched_grant_index\":0,\"operation_id\":\"{}\",\"output\":{{\"kind\":\"value\",\"value\":{{\"a\":1,\"z\":2}}}},\"pre_invocation_guard_evidence\":[],\"provider_attempt\":{{\"attempt_id\":\"attempt\",\"operation_id\":\"{}\",\"transport_id\":\"transport\",\"transport_key_epoch\":1}},\"receipt_metadata_snapshot\":null,\"reported_cost\":null,\"request_id\":\"req\",\"schema\":\"{}\",\"stream_limits\":{{\"max_chunks\":16,\"max_duration_secs\":30,\"max_total_bytes\":1024}},\"tool_name\":\"tool\",\"tool_server\":\"server\",\"transport_terminal_evidence_digest\":\"{}\"}}",
-        operation_id.as_str(),
-        operation_id.as_str(),
-        RAW_INVOCATION_OUTCOME_SCHEMA,
-        "a".repeat(64)
+        concat!(
+            "{{\"caller_delivery_evidence\":null,\"dispatch_fence\":8,",
+            "\"dispatch_operation_version\":7,\"elapsed_millis\":7,",
+            "\"federation_context_json\":null,\"matched_grant_index\":0,",
+            "\"operation_id\":\"{operation_id}\",\"original_security_dispatch_binding\":null,",
+            "\"output\":{{\"kind\":\"value\",\"value\":{{\"a\":1,\"z\":2}}}},",
+            "\"pre_invocation_guard_evidence\":[],\"provider_attempt\":{{\"attempt_id\":\"attempt\",",
+            "\"operation_id\":\"{operation_id}\",\"transport_id\":\"transport\",\"transport_key_epoch\":1}},",
+            "\"receipt_metadata_snapshot\":null,\"receipt_signing_identity\":{{",
+            "\"crypto_floor\":\"allow_classical\",\"public_key\":\"{receipt_key}\"}},",
+            "\"reported_cost\":null,\"request_canonical_json\":{request_json},\"request_id\":\"req\",",
+            "\"schema\":\"chio.raw-invocation-outcome.v1\",\"security_invocation_context\":null,",
+            "\"security_release_required\":false,\"stream_limits\":{{\"max_chunks\":16,",
+            "\"max_duration_secs\":30,\"max_total_bytes\":1024}},\"tool_name\":\"tool\",",
+            "\"tool_server\":\"server\",\"transport_terminal_evidence_digest\":\"{terminal_digest}\"}}"
+        ),
+        operation_id = operation_id.as_str(),
+        receipt_key = Keypair::from_seed(&[0x72; 32]).public_key().to_hex(),
+        request_json = serde_json::to_string(&request_canonical_json).unwrap(),
+        terminal_digest = "a".repeat(64),
     );
     assert_eq!(blob.bytes(), expected.as_bytes());
     assert_eq!(
@@ -470,10 +545,16 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
     );
     let mut noncanonical = vec![b' '];
     noncanonical.extend_from_slice(blob.bytes());
-    assert!(RawInvocationOutcomeV1::from_canonical_bytes(&noncanonical).is_err());
+    assert_eq!(
+        RawInvocationOutcomeV1::from_canonical_bytes(&noncanonical),
+        Err(ToolOutcomeError::Invalid("raw.noncanonical_bytes"))
+    );
     let mut wrong_schema = raw.to_persisted();
     wrong_schema.schema = "chio.raw-invocation-outcome.v0".to_owned();
-    assert!(RawInvocationOutcomeV1::from_persisted(wrong_schema).is_err());
+    assert_eq!(
+        RawInvocationOutcomeV1::from_persisted(wrong_schema),
+        Err(ToolOutcomeError::Invalid("raw.schema"))
+    );
     assert!(matches!(
         raw.canonical_blob_bounded(32),
         Err(ToolOutcomeError::TooLarge { .. })
@@ -485,7 +566,10 @@ fn raw_outcome_has_one_canonical_bounded_encoding() {
         chunks: vec![],
         reason: " ambiguous ".to_owned(),
     };
-    assert!(incomplete.canonical_blob().is_err());
+    assert_eq!(
+        incomplete.canonical_blob(),
+        Err(ToolOutcomeError::Invalid("output.reason"))
+    );
 }
 
 #[test]
@@ -566,7 +650,7 @@ fn raw_outcome_omits_transient_credentials_without_changing_request_material() {
             &request,
         )
         .unwrap();
-    let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch(
         &operation,
         operation.dispatch_commit().unwrap(),
         id("server-1"),
@@ -580,11 +664,10 @@ fn raw_outcome_omits_transient_credentials_without_changing_request_material() {
         None,
         None,
         Vec::new(),
-        &request,
-        None,
+        raw_context(&request),
     )
     .unwrap();
-    let persisted_request = raw.to_persisted().request_canonical_json.unwrap();
+    let persisted_request = raw.to_persisted().request_canonical_json;
     assert!(!persisted_request.contains("TRANSIENT_PROOF_CANARY"));
     assert!(!persisted_request.contains("TRANSIENT_APPROVAL_CANARY"));
     let retained: ToolCallRequest = serde_json::from_str(&persisted_request).unwrap();
@@ -648,7 +731,7 @@ fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
         LineageId::new(request.capability.id.clone()).unwrap(),
         7,
     ));
-    let raw = RawInvocationOutcomeV1::from_committed_dispatch_with_request(
+    let raw = RawInvocationOutcomeV1::from_committed_dispatch(
         &operation,
         operation.dispatch_commit().unwrap(),
         id("server-1"),
@@ -662,8 +745,10 @@ fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
         None,
         None,
         Vec::new(),
-        &request,
-        Some(security_context.clone()),
+        RawInvocationContext {
+            security_invocation_context: Some(security_context.clone()),
+            ..raw_context(&request)
+        },
     )
     .unwrap();
     let bytes = raw.canonical_blob().unwrap().bytes().to_vec();
@@ -672,31 +757,27 @@ fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
         decoded.security_invocation_context(),
         Some(&security_context)
     );
-    assert!(decoded.requires_security_release().is_err());
+    assert_eq!(decoded.requires_security_release(), Ok(false));
     for required in [false, true] {
-        let frozen = raw
-            .clone()
-            .with_security_release_requirement(required)
+        let mut persisted = raw.to_persisted();
+        persisted.security_release_required = required;
+        if required {
+            let binding = crate::admission_operation::NativeSecurityDispatchRequestBindingV1::from_live_request(
+                &request,
+                &security_context,
+            )
             .unwrap();
+            persisted.original_security_dispatch_binding = Some(Box::new(
+                OriginalSecurityDispatchBindingV1::new(&binding).unwrap(),
+            ));
+        }
+        let frozen = RawInvocationOutcomeV1::from_persisted(persisted).unwrap();
         let blob = frozen.canonical_blob().unwrap();
         let decoded = RawInvocationOutcomeV1::from_canonical_bytes(blob.bytes()).unwrap();
         assert_eq!(decoded.requires_security_release().unwrap(), required);
         assert_eq!(decoded.federation_context_json(), None);
-        assert_eq!(
-            decoded.to_persisted().schema,
-            RAW_INVOCATION_OUTCOME_WITH_SECURITY_RELEASE_SCHEMA
-        );
-        let mut missing = frozen.to_persisted();
-        missing.security_release_required = None;
-        assert!(RawInvocationOutcomeV1::from_persisted(missing).is_err());
-        let mut downgraded = frozen.to_persisted();
-        downgraded.schema = RAW_INVOCATION_OUTCOME_WITH_SECURITY_CONTEXT_SCHEMA.to_owned();
-        assert!(RawInvocationOutcomeV1::from_persisted(downgraded).is_err());
+        assert_eq!(decoded.to_persisted().schema, RAW_INVOCATION_OUTCOME_SCHEMA);
     }
-
-    let mut wrong_schema = raw.to_persisted();
-    wrong_schema.schema = RAW_INVOCATION_OUTCOME_WITH_REQUEST_SCHEMA.to_string();
-    assert!(RawInvocationOutcomeV1::from_persisted(wrong_schema).is_err());
 
     let mut wrong_principal = raw.to_persisted();
     wrong_principal.security_invocation_context = Some(SecurityInvocationContext::v1(
@@ -709,7 +790,10 @@ fn raw_outcome_preserves_and_revalidates_authoritative_security_context() {
             7,
         ),
     ));
-    assert!(RawInvocationOutcomeV1::from_persisted(wrong_principal).is_err());
+    assert_eq!(
+        RawInvocationOutcomeV1::from_persisted(wrong_principal),
+        Err(ToolOutcomeError::Binding("raw.security_invocation_context"))
+    );
 }
 
 #[test]
@@ -770,6 +854,7 @@ fn raw_outcome_rejects_unsafe_recovery_fields() {
 #[test]
 fn raw_outcome_round_trip_retains_finalization_inputs() {
     let operation = committed_operation("request-raw-finalization-inputs");
+    let request = request_for(&operation, "server-1", "tool-1");
     let evidence = GuardEvidence {
         guard_name: "input-policy".to_owned(),
         verdict: true,
@@ -795,6 +880,7 @@ fn raw_outcome_round_trip_retains_finalization_inputs() {
         None,
         Some(metadata.clone()),
         vec![evidence.clone()],
+        raw_context(&request),
     )
     .unwrap();
 
@@ -812,24 +898,30 @@ fn raw_outcome_round_trip_retains_finalization_inputs() {
 fn canonical_blob_and_admission_bindings_reject_substitution() {
     let operation = committed_operation("request-1");
     let other = committed_operation("request-2");
+    let request = request_for(&operation, "server", "tool");
     let mut substituted_commit = other.dispatch_commit().unwrap().clone();
     substituted_commit.committed_version += 1;
-    assert!(RawInvocationOutcomeV1::from_committed_dispatch(
-        &operation,
-        &substituted_commit,
-        id("server"),
-        id("tool"),
-        operation.provider_attempt().unwrap().clone(),
-        admission_digest("transport"),
-        0,
-        7,
-        stream_limits(),
-        InvocationOutputV1::Value { value: json!(1) },
-        None,
-        None,
-        Vec::new(),
-    )
-    .is_err());
+    assert_eq!(
+        RawInvocationOutcomeV1::from_committed_dispatch(
+            &operation,
+            &substituted_commit,
+            id("server"),
+            id("tool"),
+            operation.provider_attempt().unwrap().clone(),
+            admission_digest("transport"),
+            0,
+            7,
+            stream_limits(),
+            InvocationOutputV1::Value { value: json!(1) },
+            None,
+            None,
+            Vec::new(),
+            raw_context(&request),
+        ),
+        Err(ToolOutcomeError::Binding(
+            "admission_operation.dispatch_commit"
+        ))
+    );
 
     let raw = raw_for(&operation, json!({"ok": true}));
     let mut blob = raw.canonical_blob().unwrap();
@@ -870,6 +962,7 @@ fn canonical_blob_and_admission_bindings_reject_substitution() {
 #[test]
 fn broker_attempt_registration_binds_raw_outcome_creation_and_recording() {
     let operation = committed_broker_operation("request-broker-attempt", "attempt-1");
+    let request = request_for(&operation, "server-1", "tool-1");
     let sibling = committed_broker_operation("request-broker-attempt", "attempt-2");
     assert_eq!(
         operation.binding().operation_id(),
@@ -923,6 +1016,7 @@ fn broker_attempt_registration_binds_raw_outcome_creation_and_recording() {
                 None,
                 None,
                 Vec::new(),
+                raw_context(&request),
             )
             .unwrap_err(),
             ToolOutcomeError::Binding("provider_attempt.registered_attempt"),
@@ -1270,6 +1364,7 @@ fn exact_replay_rejects_immutable_semantic_substitution() {
         (id("server-1"), id("tool-1"), 25, json!({"other": true})),
     ];
     for (server, tool, units, output) in substitutions {
+        let request = request_for(&operation, server.as_str(), tool.as_str());
         let raw = RawInvocationOutcomeV1::from_committed_dispatch(
             &operation,
             operation.dispatch_commit().unwrap(),
@@ -1287,6 +1382,7 @@ fn exact_replay_rejects_immutable_semantic_substitution() {
             }),
             None,
             Vec::new(),
+            raw_context(&request),
         )
         .unwrap();
         let blob = raw.canonical_blob().unwrap();

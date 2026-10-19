@@ -147,7 +147,7 @@ fn reserve_child(runtime: &Runtime, request: &ToolCallRequest) -> TestResult<Too
 
 #[test]
 fn settling_a_durable_caller_reservation_releases_its_delegated_share() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let first = reserve_child(&runtime, &request(&siblings.first, "share-first")?)?;
@@ -159,7 +159,7 @@ fn settling_a_durable_caller_reservation_releases_its_delegated_share() -> TestR
         .reason
         .as_deref()
         .is_some_and(|reason| reason.contains("sibling-sum")));
-    let settled = reconcile(&runtime, &first)?;
+    let settled = reconcile(&fixture, &runtime, &first)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_state(&fixture, &first, "completed")?;
     let _second = reserve_child(&runtime, &request(&siblings.second, "share-after-settle")?)?;
@@ -169,7 +169,7 @@ fn settling_a_durable_caller_reservation_releases_its_delegated_share() -> TestR
 
 #[test]
 fn restart_preserves_the_delegated_share_of_a_live_caller_reservation() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let (siblings, first) = {
         let mut runtime = fixture.open()?;
         let siblings = Siblings::new(&fixture, &mut runtime)?;
@@ -184,7 +184,7 @@ fn restart_preserves_the_delegated_share_of_a_live_caller_reservation() -> TestR
         .kernel
         .reserve_caller_execution_blocking(&request(&siblings.second, "share-restart-blocked")?)?;
     assert_eq!(blocked.verdict, Verdict::Deny, "{:?}", blocked.reason);
-    let settled = reconcile(&runtime, &first)?;
+    let settled = reconcile(&fixture, &runtime, &first)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     let _second = reserve_child(
         &runtime,
@@ -196,20 +196,20 @@ fn restart_preserves_the_delegated_share_of_a_live_caller_reservation() -> TestR
 
 #[test]
 fn two_caller_operations_share_one_child_edge_until_both_settle() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let first = reserve_child(&runtime, &request(&siblings.first, "same-child-first")?)?;
     let second = reserve_child(&runtime, &request(&siblings.first, "same-child-second")?)?;
     assert_eq!(grant_quota(&runtime, &first)?, (2, 0));
-    let settled = reconcile(&runtime, &first)?;
+    let settled = reconcile(&fixture, &runtime, &first)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_eq!(grant_quota(&runtime, &second)?, (1, 1));
     let blocked = runtime
         .kernel
         .reserve_caller_execution_blocking(&request(&siblings.second, "same-child-still-held")?)?;
     assert_eq!(blocked.verdict, Verdict::Deny, "{:?}", blocked.reason);
-    let settled = reconcile(&runtime, &second)?;
+    let settled = reconcile(&fixture, &runtime, &second)?;
     assert_eq!(settled.verdict, Verdict::Allow, "{:?}", settled.reason);
     assert_eq!(grant_quota(&runtime, &first)?, (0, 2));
     let _sibling = reserve_child(&runtime, &request(&siblings.second, "same-child-released")?)?;
@@ -219,7 +219,7 @@ fn two_caller_operations_share_one_child_edge_until_both_settle() -> TestResult 
 
 #[test]
 fn caller_share_snapshot_is_complete_scoped_and_fenced() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let first = reserve_child(&runtime, &request(&siblings.first, "snapshot-first")?)?;
@@ -278,7 +278,7 @@ fn an_expired_caller_share_stays_owned_until_recovery_compensates_it() -> TestRe
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs();
     let _clock = chio_test_support::clock::scope_unix_secs(now);
-    let fixture = Fixture::with_nonce_ttl(1)?;
+    let fixture = caller_fixture_with_nonce_ttl(1)?;
     let (siblings, first) = {
         let mut runtime = fixture.open()?;
         let siblings = Siblings::new(&fixture, &mut runtime)?;

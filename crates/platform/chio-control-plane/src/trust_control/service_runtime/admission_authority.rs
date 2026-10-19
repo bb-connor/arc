@@ -918,7 +918,8 @@ fn outcome_store_error(error: ToolOutcomeStoreError) -> AdmissionAuthorityWireEr
         ToolOutcomeStoreError::Conflict => AdmissionAuthorityErrorCode::Conflict,
         ToolOutcomeStoreError::CasConflict => AdmissionAuthorityErrorCode::CasConflict,
         ToolOutcomeStoreError::Invariant(_) => AdmissionAuthorityErrorCode::Invariant,
-        ToolOutcomeStoreError::Compacted { .. } => AdmissionAuthorityErrorCode::Invariant,
+        ToolOutcomeStoreError::Compacted { .. }
+        | ToolOutcomeStoreError::NoncurrentSchema { .. } => AdmissionAuthorityErrorCode::Invariant,
     };
     wire_error(code, error.to_string())
 }

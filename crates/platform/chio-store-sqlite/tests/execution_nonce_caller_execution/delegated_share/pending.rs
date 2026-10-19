@@ -36,7 +36,7 @@ fn pause_funded_request(runtime: &mut Runtime, request_id: &str) -> TestResult<F
 
 #[test]
 fn a_later_funded_sibling_cannot_displace_an_existing_caller_owner() -> TestResult {
-    let fixture = Fixture::with_nonce_ttl(300)?;
+    let fixture = caller_fixture_with_nonce_ttl(300)?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let gate = pause_funded_request(&mut runtime, "pending-share-second")?;
@@ -50,7 +50,7 @@ fn a_later_funded_sibling_cannot_displace_an_existing_caller_owner() -> TestResu
         let arrived = gate.arrived.recv_timeout(Duration::from_secs(30));
         let checked = match arrived {
             Ok(()) => (|| -> TestResult<_> {
-                let settled = reconcile(&runtime, &first)?;
+                let settled = reconcile(&fixture, &runtime, &first)?;
                 let newcomer = runtime.kernel.reserve_caller_execution_blocking(&request(
                     &siblings.first,
                     "newcomer-during-pending-share",
@@ -88,7 +88,7 @@ fn a_later_funded_sibling_cannot_displace_an_existing_caller_owner() -> TestResu
 
 #[test]
 fn an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_owner() -> TestResult {
-    let fixture = Fixture::with_nonce_ttl(300)?;
+    let fixture = caller_fixture_with_nonce_ttl(300)?;
     let (siblings, first, second) = {
         let mut runtime = fixture.open()?;
         let siblings = Siblings::new(&fixture, &mut runtime)?;
@@ -126,7 +126,10 @@ fn an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_own
     assert_eq!(grant_quota(&runtime, &second)?, (0, 0));
     assert_state(&fixture, &first, "ready_to_dispatch")?;
     assert_eq!(grant_quota(&runtime, &first)?, (1, 0));
-    assert_eq!(reconcile(&runtime, &first)?.verdict, Verdict::Allow);
+    assert_eq!(
+        reconcile(&fixture, &runtime, &first)?.verdict,
+        Verdict::Allow
+    );
     let _next = reserve_child(
         &runtime,
         &request(&siblings.second, "after-funded-recovery")?,

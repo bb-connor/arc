@@ -4,9 +4,9 @@ use super::*;
 use chio_kernel::CallerExecutionCheckpoint;
 
 #[test]
-fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry() -> TestResult
-{
-    let fixture = Fixture::with_nonce_ttl(300)?;
+fn an_unreported_caller_dispatch_retains_its_share_and_capture_after_restart_and_expiry(
+) -> TestResult {
+    let fixture = caller_fixture_with_nonce_ttl(300)?;
     let (siblings, first) = {
         let mut runtime = fixture.open()?;
         let siblings = Siblings::new(&fixture, &mut runtime)?;
@@ -24,11 +24,9 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
         let interrupted = std::thread::scope(|scope| {
             scope
                 .spawn(|| {
-                    runtime.kernel.reconcile_caller_execution_blocking(
-                        nonce,
-                        &first.arguments,
-                        report(),
-                    )
+                    runtime
+                        .kernel
+                        .start_caller_execution_blocking(nonce, &first.arguments)
                 })
                 .join()
         });
@@ -53,7 +51,7 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
     let mut runtime = fixture.open_with_reconcile(false)?;
     siblings.configure(&fixture, &mut runtime)?;
     runtime.kernel.reconcile_durable_admission_startup()?;
-    assert_state(&fixture, &first, "outcome_unknown_after_dispatch")?;
+    assert_state(&fixture, &first, "awaiting_caller_report")?;
     assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
     let parent = AdmissionIdentifier::try_new("parent_id", siblings.parent.id.clone())?;
     let shares = runtime
@@ -68,7 +66,7 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
     assert_eq!(
         shares.len(),
         1,
-        "unknown terminal owners stay in the complete view"
+        "unreported caller owners stay in the complete view"
     );
     assert_eq!(shares[0].child_id().as_str(), first.capability.id);
     assert!(shares[0].is_reserved_for_caller());
@@ -81,14 +79,14 @@ fn an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_exp
         .reason
         .as_deref()
         .is_some_and(|reason| reason.contains("sibling-sum")));
-    if let Ok(replayed) = reconcile(&runtime, &first) {
-        assert_ne!(
-            replayed.verdict,
-            Verdict::Allow,
-            "unknown effects cannot be replayed as success"
-        );
-    }
-    assert_state(&fixture, &first, "outcome_unknown_after_dispatch")?;
+    let refused = reconcile(&fixture, &runtime, &first);
+    assert!(refused.as_ref().is_err_and(|error| matches!(
+        error.downcast_ref::<chio_store_sqlite::caller_execution_ledger::CallerExecutionLedgerError>(),
+        Some(chio_store_sqlite::caller_execution_ledger::CallerExecutionLedgerError::Authentication(
+            chio_kernel::caller_delivery::CallerDeliveryError::Expired
+        ))
+    )), "{refused:?}");
+    assert_state(&fixture, &first, "awaiting_caller_report")?;
     assert_eq!(grant_quota(&runtime, &first)?, (0, 1));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
     Ok(())

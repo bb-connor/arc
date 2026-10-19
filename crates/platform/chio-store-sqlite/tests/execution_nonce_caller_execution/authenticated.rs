@@ -136,10 +136,6 @@ fn start_captures_before_publication_and_retries_original_authorization() -> Tes
             &serde_json::json!({"different": true}),
         )
         .is_err());
-    assert!(
-        reconcile(&runtime, &request).is_err(),
-        "unsigned report must not bypass start"
-    );
     assert_eq!(grant_quota(&runtime, &request)?, (0, 1));
     Ok(())
 }

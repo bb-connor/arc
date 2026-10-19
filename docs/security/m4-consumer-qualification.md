@@ -180,7 +180,7 @@ Production authentication is unchanged. All five hosted targets passed (3 auth,
 `/tmp/chio-m4-proof-hosted-regressions.log`.
 
 Proof fixture drift was traced to the retained raw-outcome schema
-`chio.raw-invocation-outcome-with-signing-identity.v1`: federation context and
+`chio.raw-invocation-outcome.v1`: federation context and
 receipt-signing identity now participate in the outcome blob hash. Recomputing
 all three old outcome identities using only the previous schema and omitting
 those two fields reproduces the old fixture IDs exactly. The regenerated proof
@@ -391,7 +391,7 @@ other advertised callers. Reuse [M3's contract](authenticated-caller-delivery.md
   delivery and changed delivery across the consumer boundary. Invoke the durable
   executor ledger rather than a fixture-only callback map. Recovery never renews
   the original execution interval or repeats an uncertain effect.
-- [x] Retain early rejection of deprecated unsigned reconciliation and direct
+- [x] Reject unsigned reconciliation and direct
   reserve/execute integrations. Distinguish transport helpers from signature
   verification and custody ownership in SDK docs and tests.
 - [x] Keep supplemental and combined threshold-approval/credit-exposure caller

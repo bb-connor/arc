@@ -5,38 +5,12 @@ use super::*;
 use crate::caller_delivery::CallerDeliveryEvidenceV1;
 
 impl RawInvocationOutcomeV1 {
-    pub(crate) fn with_caller_delivery_evidence(
-        mut self,
-        evidence: Option<Box<CallerDeliveryEvidenceV1>>,
-    ) -> Result<Self, ToolOutcomeError> {
-        if let Some(evidence) = evidence {
-            if self
-                .caller_delivery_evidence
-                .as_ref()
-                .is_some_and(|original| original != &evidence)
-            {
-                return Err(invalid());
-            }
-            self.caller_delivery_evidence = Some(evidence);
-            self.schema = if self.original_security_dispatch_binding.is_some() {
-                RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA
-            } else {
-                RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA
-            };
-            self.canonical_blob()?;
-        }
-        Ok(self)
-    }
-
     pub(crate) fn caller_delivery_evidence(&self) -> Option<&CallerDeliveryEvidenceV1> {
         self.caller_delivery_evidence.as_deref()
     }
 
     pub(super) fn validate_caller_delivery_evidence(&self) -> Result<(), ToolOutcomeError> {
-        if self.schema != RAW_INVOCATION_OUTCOME_WITH_ORIGINAL_SECURITY_DISPATCH_SCHEMA
-            && (self.schema == RAW_INVOCATION_OUTCOME_WITH_CALLER_DELIVERY_SCHEMA)
-                != self.caller_delivery_evidence.is_some()
-        {
+        if self.provider_attempt.is_caller_report() != self.caller_delivery_evidence.is_some() {
             return Err(invalid());
         }
         let Some(evidence) = self.caller_delivery_evidence() else {
@@ -53,8 +27,7 @@ impl RawInvocationOutcomeV1 {
                 &authorization.invocation,
             )
             .map_err(|_| invalid())?;
-        // These internally consistent keys are still untrusted here. The
-        // release path must compare them with the original physical admission.
+        // Release authentication compares these untrusted keys with the physical admission.
         let invocation = &authorization.invocation;
         if !self.provider_attempt.is_caller_report()
             || invocation.operation_id != self.operation_id
@@ -82,7 +55,7 @@ impl RawInvocationOutcomeV1 {
         {
             return Err(invalid());
         }
-        let request = self.recovery_request()?.ok_or_else(invalid)?;
+        let request = self.recovery_request()?;
         let action =
             crate::ToolCallAction::from_parameters(request.arguments).map_err(|_| invalid())?;
         if invocation.capability_id.as_str() != request.capability.id.as_str()

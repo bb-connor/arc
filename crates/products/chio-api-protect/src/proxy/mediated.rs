@@ -9,8 +9,8 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    CallerExecutionReport, ChioKernel, KernelConfig, ToolCallRequest, ToolInvocationCost,
-    ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    ChioKernel, KernelConfig, ToolCallRequest, ToolInvocationCost, ToolServerConnection,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
@@ -649,16 +649,9 @@ pub(crate) struct SidecarReconcileRequest {
 /// agent that called `/v1/evaluate` must not reach this endpoint, or it could
 /// settle its own reservation at cost zero and defeat the cumulative spend cap.
 ///
-/// The presented nonce is the credential: the shared kernel that minted it
-/// verifies its signature and operation binding under the configured profile,
-/// settles the exact reserved hold at `min(realized, reserved)`, releases the
-/// difference back to the grant, and signs a completed authoritative receipt.
-/// The `realized_cost` is the tool server's own report of what the call cost;
-/// binding it to an attested oracle cost is a later concern. Invalid credentials
-/// or mismatched arguments cannot authorize a settlement. Non-durable admission
-/// rejects a consumed nonce. Durable admission can redeliver a completed
-/// operation's retained receipt without settling again; that replay never
-/// authorizes a second external execution.
+/// Non-durable admission verifies the nonce and arguments, settles its reserved
+/// hold and refuses nonce replay. Durable admission refuses unsigned reports;
+/// it requires `/v1/caller/start` and `/v1/caller/report`.
 pub(crate) async fn sidecar_reconcile_handler(
     State(state): State<Arc<ProxyState>>,
     request: Request<Body>,
@@ -693,24 +686,12 @@ pub(crate) async fn sidecar_reconcile_handler(
              a remote control-plane budget store (--control-url) cannot resolve a reserved hold",
         );
     }
-    // Settle on the shared kernel. The same instance minted the nonce, so its
-    // configured nonce authority prevents a second settlement. Non-durable
-    // admission rejects replay; durable completion can redeliver its retained
-    // receipt. The lock releases at the end of the block, before sidecar
-    // receipt-persistence I/O.
     let reconciled = {
         let kernel = mediation_kernel.lock().await;
         if kernel.has_durable_admission_store() {
-            kernel.reconcile_caller_execution_blocking(
-                &parsed.execution_nonce,
-                &parsed.arguments,
-                CallerExecutionReport {
-                    output: serde_json::json!({
-                        "caller_report": { "realized_cost": parsed.realized_cost }
-                    }),
-                    realized_cost: Some(parsed.realized_cost.clone()),
-                },
-            )
+            Err(chio_kernel::KernelError::DurableAdmission(
+                "durable caller execution requires authenticated start and delivery".into(),
+            ))
         } else {
             kernel.reconcile_reserved_authorization_by_nonce(
                 &parsed.execution_nonce,

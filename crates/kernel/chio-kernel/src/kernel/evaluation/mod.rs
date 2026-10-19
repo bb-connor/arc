@@ -58,13 +58,9 @@ pub(crate) enum PreflightHoldDisposition {
 pub(crate) enum DispatchMode {
     /// Dispatch to the registered tool server and finalize its return.
     Kernel,
-    /// Reserve the executable hold and the nonce, then stop. The caller
-    /// executes the tool elsewhere and returns through a reconcile that resumes
-    /// the same operation.
+    /// Reserve the operation-owned hold and nonce. Execution requires committed
+    /// start authorization and authenticated delivery.
     ReserveForCaller,
-    /// Resume a caller-reserved operation with the caller's report standing in
-    /// for the tool server.
-    CallerReport(std::sync::Arc<dyn crate::ToolServerConnection>),
     /// Capture the original participants, then stop before any external effect.
     CallerStart,
 }
@@ -89,9 +85,8 @@ impl EvaluationDisposition {
         }
     }
 
-    /// The legacy sidecar reservation: keep the preflight hold open and mint
-    /// a nonce for a tool server the kernel never dispatches to.
-    pub(crate) fn legacy_reservation() -> Self {
+    /// Keep the non-durable preflight hold open and return the minted nonce.
+    pub(crate) fn preflight_reservation() -> Self {
         Self {
             preflight_hold: PreflightHoldDisposition::ReserveForCaller,
             dispatch: DispatchMode::Kernel,
@@ -105,15 +100,6 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::ReserveForCaller,
-            session_guard_attempt: None,
-        }
-    }
-
-    /// Resume a caller reservation with the caller's report as the server.
-    pub(crate) fn caller_report(report: std::sync::Arc<dyn crate::ToolServerConnection>) -> Self {
-        Self {
-            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
-            dispatch: DispatchMode::CallerReport(report),
             session_guard_attempt: None,
         }
     }

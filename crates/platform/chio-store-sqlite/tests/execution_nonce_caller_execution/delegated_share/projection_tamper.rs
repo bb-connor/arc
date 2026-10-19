@@ -7,7 +7,7 @@ const DROP_TRIGGERS: &str = "DROP TRIGGER admission_operation_caller_shares_immu
      DROP TRIGGER admission_operation_caller_shares_no_delete;";
 
 fn assert_external_edit_refused(label: &str, edit: &str) -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let _first = reserve_child(

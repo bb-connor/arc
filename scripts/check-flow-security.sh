@@ -675,7 +675,7 @@ run_exact_target --label "native post-join policy" --allow-filtered --expected \
   security::adapters::tests::native_flow::support::process_recovery::declassification_effect_started \
   security::adapters::tests::native_flow::support::process_recovery::declassification_output_joined \
   security::adapters::tests::native_flow::support::process_recovery::declassification_release_checkpointed \
-  security::adapters::tests::native_flow::support::process_recovery::late_caller_report_cannot_replace_native_unknown_outcome \
+  security::adapters::tests::native_flow::support::process_recovery::late_caller_start_cannot_replace_native_unknown_outcome \
   security::adapters::tests::native_flow::support::process_recovery::nonce_capture_transaction_rollback \
   security::adapters::tests::native_flow::support::process_recovery::nonce_database_commit_before_anchor \
   security::adapters::tests::native_flow::support::process_recovery::nonce_effect_started \
@@ -859,17 +859,20 @@ run_exact_target --label "durable release output binding" --allow-filtered --exp
   -- cargo test -p chio-kernel --lib tool_outcome::security_release::context::tests::
 
 run_exact_target --label "frozen dispatch participant context" --allow-filtered --expected \
-  kernel::admission_coordinator::return_context::caller::caller_return_wire_pins_its_written_and_legacy_schema_identities \
+  kernel::admission_coordinator::return_context::caller::caller_return_wire_pins_its_v1_schema_identity \
+  kernel::admission_coordinator::return_context::caller::tests::missing_frozen_signer_refuses_caller_decode_without_state_changes \
+  kernel::admission_coordinator::return_context::caller::tests::caller_return_wire_requires_signer_participants_custody_and_deadline \
+  kernel::admission_coordinator::return_context::caller::tests::caller_return_wire_writes_one_complete_v1_schema \
   kernel::admission_coordinator::return_context::caller::tests::caller_observation_metadata_cannot_be_injected_before_dispatch \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_custody_rejects_each_selected_family_without_its_physical_ledger \
   kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_custody_requires_explicit_absence_and_rejects_unowned_claims \
-  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_v3_remains_readable_but_cannot_acquire_custody_on_reissue \
+  kernel::admission_coordinator::return_context::caller::tests::custody::caller_return_refuses_absent_participant_custody \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_frozen_facts_without_credentials_or_return_observations \
-  kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_keeps_legacy_identity_absence_explicit \
+  kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_noncurrent_schema_identities \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_individually_valid_but_unadmitted_security_context \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_noncanonical_oversized_and_unbound_frames \
   kernel::admission_coordinator::return_context::caller::tests::caller_return_codec_rejects_private_payload_schema_identity_grant_and_limit_substitution \
-  kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_preserve_legacy_absence_without_upgrading_custody \
+  kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_refuse_absent_snapshot \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_caller_decode \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_reject_changed_operation_references_in_live_context \
   kernel::admission_coordinator::return_context::caller::tests::participants::frozen_participants_require_every_reference_and_reject_substitution \
@@ -887,7 +890,7 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::tests::durable_admission::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
   kernel::tests::durable_admission::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
   kernel::tests::durable_admission::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
-  kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
+  kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
@@ -919,11 +922,11 @@ run_exact_target --label "frozen federation context" --allow-filtered --expected
   kernel::tests::durable_admission::federation_context::recovery_isolation::concurrent_recovery_keeps_distinct_treaty_reports_for_the_same_request_id \
   kernel::tests::durable_admission::federation_context::retained_federation_context_does_not_bypass_public_replay_revocation \
   kernel::tests::durable_admission::federation_context::retained_federation_context_finalizing_recovery_survives_owner_rotation \
-  kernel::tests::durable_admission::federation_context::retained_federation_context_is_private_and_cannot_be_removed_by_schema_downgrade \
+  kernel::tests::durable_admission::federation_context::retained_federation_context_is_private_and_bound_to_the_committed_outcome \
   kernel::tests::durable_admission::federation_context::retained_federation_context_recovers_without_live_peer_or_new_runtime_admission \
   kernel::tests::durable_admission::federation_context::retained_federation_context_rejects_wrong_treaty_pin_before_dispatch \
   kernel::tests::durable_admission::federation_context::retained_federation_context_tampering_fails_the_committed_outcome_binding \
-  kernel::tests::durable_admission::federation_context::security_release_requirement_and_federation_survive_either_codec_order \
+  kernel::tests::durable_admission::federation_context::security_release_requirement_and_federation_survive_canonical_roundtrip \
   kernel::tests::durable_admission::federation_context::refusal::federated_refusal_replay_rejects_a_conflicting_dsse_envelope \
   kernel::tests::durable_admission::federation_context::refusal::federated_refusal_replay_rejects_a_poisoned_artifact_cache \
   kernel::tests::durable_admission::federation_context::refusal::federated_unknown_refusal_replays_existing_bilateral_artifacts \
@@ -939,7 +942,7 @@ run_exact_target --label "frozen durable receipt signing" --allow-filtered --exp
   kernel::tests::durable_admission::return_context::signing::completed_replay_does_not_weaken_the_current_crypto_floor \
   kernel::tests::durable_admission::return_context::signing::completed_replay_uses_original_signer_without_reinvocation \
   kernel::tests::durable_admission::return_context::signing::nested_completed_replay_uses_original_signer_without_reinvocation \
-  kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_omission_downgrade_and_invalid_floor \
+  kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \

@@ -131,7 +131,7 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(completed, replay);
-    let (legacy_status, _) = post_reconcile(
+    let (unsigned_status, unsigned_refusal) = post_reconcile(
         Arc::clone(&state),
         &serde_json::json!({
             "execution_nonce": reserved["execution_nonce"], "arguments": parameters,
@@ -139,7 +139,14 @@ async fn public_caller_routes_require_commit_and_authenticated_durable_delivery(
         }),
     )
     .await;
-    assert_eq!(legacy_status, StatusCode::BAD_REQUEST);
+    assert_eq!(unsigned_status, StatusCode::BAD_REQUEST);
+    assert_eq!(
+        unsigned_refusal,
+        serde_json::json!({
+            "error": "chio_reconcile_rejected",
+            "message": "durable admission failed: durable caller execution requires authenticated start and delivery",
+        })
+    );
     assert_eq!(effects.load(Ordering::SeqCst), 1);
     Ok(())
 }
