@@ -216,6 +216,53 @@ fn runtime_orchestration_evidence_load_refuses_oversized_manifest_artifact(
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn runtime_orchestration_evidence_load_refuses_symlinked_workflow_report(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = write_evidence_fixture(NOW)?;
+    let report = fixture.evidence_dir.path().join("workflow-run-report.json");
+    let target = fixture
+        .evidence_dir
+        .path()
+        .join("workflow-run-report.target");
+    fs::rename(&report, &target)?;
+    std::os::unix::fs::symlink(&target, &report)?;
+
+    assert_evidence_not_regular(load_runtime_orchestration_evidence(
+        fixture.evidence_dir.path(),
+    ));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn runtime_orchestration_evidence_load_refuses_fifo_manifest_artifact() -> Result<(), Box<dyn Error>>
+{
+    let fixture = write_evidence_fixture(NOW)?;
+    let artifact = fixture.evidence_dir.path().join("proof-package.json");
+    fs::remove_file(&artifact)?;
+    let status = std::process::Command::new("mkfifo")
+        .arg(&artifact)
+        .status()?;
+    assert!(status.success(), "mkfifo failed: {status}");
+
+    assert_evidence_not_regular(load_runtime_orchestration_evidence(
+        fixture.evidence_dir.path(),
+    ));
+    Ok(())
+}
+
+#[cfg(unix)]
+fn assert_evidence_not_regular<T: std::fmt::Debug>(result: Result<T, ChioRuntimeError>) {
+    match result {
+        Err(ChioRuntimeError::Rejected { code, .. }) => {
+            assert_eq!(code, "runtime_untrusted_file_not_regular");
+        }
+        other => panic!("expected runtime_untrusted_file_not_regular, got {other:?}"),
+    }
+}
+
 fn write_oversized_file(path: &Path) -> Result<(), Box<dyn Error>> {
     fs::File::create(path)?.set_len(u64::try_from(EVIDENCE_JSON_LIMIT)? + 1)?;
     Ok(())
