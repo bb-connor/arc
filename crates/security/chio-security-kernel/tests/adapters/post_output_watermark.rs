@@ -374,11 +374,17 @@ fn a_retried_request_with_two_inactive_tokens_keeps_both_first_observations() {
 fn an_inactive_token_whose_request_attribution_changes_still_blocks() {
     let fixture = WatermarkFixture::new();
     let response = two_retired_tokens(&fixture);
+    let first_principal = request();
     assert!(matches!(
-        fixture.inspect(&request(), OBSERVED_AT, &response),
+        fixture.inspect(&first_principal, OBSERVED_AT, &response),
         PostInvocationVerdict::Allow
     ));
-    let other_principal = request();
+    let other_principal = ToolCallRequest {
+        agent_id: Keypair::from_seed(&[63_u8; 32]).public_key().to_hex(),
+        ..first_principal.clone()
+    };
+    assert_eq!(other_principal.request_id, first_principal.request_id);
+    assert_ne!(other_principal.agent_id, first_principal.agent_id);
     assert!(matches!(
         fixture.inspect(&other_principal, OBSERVED_AT + 1, &response),
         PostInvocationVerdict::Block(_)
