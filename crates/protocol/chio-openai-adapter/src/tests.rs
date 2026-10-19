@@ -211,6 +211,62 @@ fn denied_tool_call_result_preserves_call_identity_without_receipt() {
     assert!(result.receipt.is_none());
 }
 
+#[test]
+fn kernel_denial_reaches_the_model_as_a_fixed_coded_message() {
+    let error = KernelError::OutOfScope {
+        tool: "get_weather".to_string(),
+        server: "/srv/chio/internal-tool-server".to_string(),
+    };
+    let result = failed_tool_call_result(&weather_tool_call(), ToolCallFailure::Kernel(&error));
+
+    assert_eq!(
+        result.content,
+        "Error: Chio kernel refused the tool call (CHIO-KERNEL-OUT-OF-SCOPE-TOOL)"
+    );
+    assert!(!result.content.contains("/srv/chio"));
+    assert!(result.denied);
+    assert!(result.receipt.is_none());
+}
+
+#[test]
+fn kernel_internal_error_keeps_paths_and_debug_out_of_model_context() {
+    let error = KernelError::Internal(
+        "receipt store /var/lib/chio/receipts.sqlite3: disk I/O error".to_string(),
+    );
+    let result = failed_tool_call_result(&weather_tool_call(), ToolCallFailure::Kernel(&error));
+
+    assert_eq!(
+        result.content,
+        "Error: Chio kernel refused the tool call (CHIO-KERNEL-INTERNAL)"
+    );
+    assert!(!result.content.contains("/var/lib/chio"));
+    assert!(!result.content.contains("disk I/O"));
+    assert!(!result.content.contains("Internal("));
+    assert!(result.denied);
+    assert!(result.receipt.is_none());
+}
+
+#[test]
+fn route_failures_reach_the_model_as_fixed_messages() {
+    let error = BridgeError::Canonical("/etc/chio/route-table.json: bad key".to_string());
+
+    let planning =
+        failed_tool_call_result(&weather_tool_call(), ToolCallFailure::RoutePlanning(&error));
+    assert_eq!(
+        planning.content,
+        "Error: tool call route could not be planned"
+    );
+
+    let selection = failed_tool_call_result(
+        &weather_tool_call(),
+        ToolCallFailure::RouteSelection(&error),
+    );
+    assert_eq!(
+        selection.content,
+        "Error: tool call route selection could not be recorded"
+    );
+}
+
 fn test_kernel_config() -> KernelConfig {
     KernelConfig {
         keypair: Keypair::generate(),
@@ -402,9 +458,10 @@ fn openai_host_rejects_unnegotiated_authority_before_effect_or_receipt() {
         Some(serde_json::from_value(serde_json::json!({"signed_extension":"b3BhcXVl"})).unwrap());
     let result = adapter.execute_tool_call(&weather_tool_call(), &kernel, &execution);
     assert!(result.denied);
-    assert!(result
-        .content
-        .contains("opaque_supplemental_authorization was not negotiated"));
+    assert_eq!(
+        result.content,
+        "Error: tool call requires an invocation feature the host did not negotiate"
+    );
     assert!(result.receipt.is_none());
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     assert_eq!(kernel.receipt_log().receipts().len(), receipts);

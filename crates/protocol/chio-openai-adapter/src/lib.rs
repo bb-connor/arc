@@ -25,10 +25,11 @@ use chio_core::capability::{
 use chio_core::receipt::body::ChioReceipt;
 use chio_core::session::OperationTerminalState;
 use chio_cross_protocol::discovery::{DiscoveryProtocol, TargetProtocolRegistry};
+use chio_cross_protocol::error::BridgeError;
 use chio_cross_protocol::routing::{plan_authoritative_route, route_selection_metadata};
 use chio_kernel::{
-    dpop, ChioKernel, SignedExecutionNonce, ToolCallOutput, ToolCallRequest, ToolCallResponse,
-    Verdict as KernelVerdict,
+    dpop, ChioKernel, KernelError, SignedExecutionNonce, ToolCallOutput, ToolCallRequest,
+    ToolCallResponse, Verdict as KernelVerdict,
 };
 use chio_manifest::{ToolDefinition, ToolManifest, TOOL_MANIFEST_SCHEMA};
 use serde::{Deserialize, Serialize};
@@ -390,7 +391,7 @@ impl ChioOpenAiAdapter {
         };
 
         if let Err(error) = request.validate_peer_capabilities(&self.peer_capabilities) {
-            return denied_tool_call_result(tool_call, format!("Error: {error}"));
+            return failed_tool_call_result(tool_call, ToolCallFailure::PeerCapabilities(&error));
         }
 
         let route_plan = match plan_authoritative_route(
@@ -403,19 +404,13 @@ impl ChioOpenAiAdapter {
         ) {
             Ok(plan) => plan,
             Err(error) => {
-                return denied_tool_call_result(
-                    tool_call,
-                    format!("Error: failed to plan authoritative route: {error}"),
-                );
+                return failed_tool_call_result(tool_call, ToolCallFailure::RoutePlanning(&error));
             }
         };
         let route_metadata = match route_selection_metadata(&route_plan.evidence) {
             Ok(metadata) => metadata,
             Err(error) => {
-                return denied_tool_call_result(
-                    tool_call,
-                    format!("Error: failed to serialize route selection: {error}"),
-                );
+                return failed_tool_call_result(tool_call, ToolCallFailure::RouteSelection(&error));
             }
         };
 
@@ -440,7 +435,7 @@ impl ChioOpenAiAdapter {
                     receipt: Some(response.receipt),
                 }
             }
-            Err(error) => denied_tool_call_result(tool_call, format!("Error: {error}")),
+            Err(error) => failed_tool_call_result(tool_call, ToolCallFailure::Kernel(&error)),
         }
     }
 
@@ -655,6 +650,40 @@ fn denied_tool_call_result(
         receipt_ref: None,
         receipt: None,
     }
+}
+
+/// Failure classes whose detail stays in the trace log; the model sees a fixed message.
+enum ToolCallFailure<'a> {
+    PeerCapabilities(&'a chio_core::Error),
+    RoutePlanning(&'a BridgeError),
+    RouteSelection(&'a BridgeError),
+    Kernel(&'a KernelError),
+}
+
+fn failed_tool_call_result(
+    tool_call: &OpenAiToolCall,
+    failure: ToolCallFailure<'_>,
+) -> ToolCallResult {
+    let content = match failure {
+        ToolCallFailure::PeerCapabilities(error) => {
+            tracing::warn!(tool_call_id = %tool_call.id, %error, "openai tool call needs an unnegotiated peer feature");
+            "Error: tool call requires an invocation feature the host did not negotiate".to_string()
+        }
+        ToolCallFailure::RoutePlanning(error) => {
+            tracing::warn!(tool_call_id = %tool_call.id, %error, "openai tool call route planning failed");
+            "Error: tool call route could not be planned".to_string()
+        }
+        ToolCallFailure::RouteSelection(error) => {
+            tracing::warn!(tool_call_id = %tool_call.id, %error, "openai tool call route selection encoding failed");
+            "Error: tool call route selection could not be recorded".to_string()
+        }
+        ToolCallFailure::Kernel(error) => {
+            let code = error.report().code;
+            tracing::warn!(tool_call_id = %tool_call.id, %code, %error, "openai tool call kernel evaluation failed");
+            format!("Error: Chio kernel refused the tool call ({code})")
+        }
+    };
+    denied_tool_call_result(tool_call, content)
 }
 
 fn render_response_content(output: &Option<ToolCallOutput>, reason: Option<&str>) -> String {
