@@ -25,7 +25,7 @@ fn seed_lifecycle(tx: &Transaction<'_>, authority: &str) -> TestResult {
         "INSERT INTO security_participant_state_declassification_lifecycle
          (security_authority_id, singleton, schema_version, readiness_cursor,
           reconciliation_active, live_dispatch_sealed, compaction_active)
-         VALUES (?1, 1, 2, ?2, 0, 0, 0)",
+         VALUES (?1, 1, 1, ?2, 0, 0, 0)",
         params![authority, DECLASSIFICATION_READINESS_CURSOR],
     )?;
     Ok(())

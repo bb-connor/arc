@@ -167,7 +167,7 @@ fn closed_store(parent: &Path) -> PathBuf {
 }
 
 #[test]
-fn a_legacy_world_readable_database_is_private_before_sqlite_opens_it() {
+fn an_existing_world_readable_database_is_private_before_sqlite_opens_it() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let parent = world_readable_parent(directory.path());
@@ -178,7 +178,7 @@ fn a_legacy_world_readable_database_is_private_before_sqlite_opens_it() {
         .ino();
 
     let store = SqliteSecurityStateStore::open(&path)
-        .unwrap_or_else(|error| panic!("reopen legacy security state: {error}"));
+        .unwrap_or_else(|error| panic!("reopen existing security state: {error}"));
     let observed = open_database_modes(&path);
     drop(store);
 
@@ -193,7 +193,7 @@ fn a_legacy_world_readable_database_is_private_before_sqlite_opens_it() {
 }
 
 #[test]
-fn legacy_world_readable_sidecars_are_private_before_sqlite_opens_them() {
+fn existing_world_readable_sidecars_are_private_before_sqlite_opens_them() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let parent = world_readable_parent(directory.path());
@@ -206,7 +206,7 @@ fn legacy_world_readable_sidecars_are_private_before_sqlite_opens_them() {
     }
 
     let store = SqliteSecurityStateStore::open(&path)
-        .unwrap_or_else(|error| panic!("open with legacy sidecars: {error}"));
+        .unwrap_or_else(|error| panic!("open with existing sidecars: {error}"));
     let observed = open_database_modes(&path);
     drop(store);
 
@@ -309,6 +309,10 @@ fn a_new_store_in_a_world_readable_parent_is_private_with_its_sidecars() {
 
     let store = SqliteSecurityStateStore::open(&path)
         .unwrap_or_else(|error| panic!("open security state: {error}"));
+    assert_eq!(file_mode(&path), FileMode(0o600));
+    store
+        .active_defense_overlay_inventory()
+        .unwrap_or_else(|error| panic!("read security state: {error}"));
     let observed = open_database_modes(&path);
     drop(store);
 
@@ -317,7 +321,7 @@ fn a_new_store_in_a_world_readable_parent_is_private_with_its_sidecars() {
 }
 
 #[test]
-fn a_hard_linked_legacy_database_is_refused_without_repairing_the_alias() {
+fn a_hard_linked_existing_database_is_refused_without_repairing_the_alias() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let parent = world_readable_parent(directory.path());

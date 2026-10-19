@@ -1,15 +1,18 @@
 use super::{
-    ensure_attested_finding_batch_tenant_keys, ensure_attested_finding_response_outbox_schema,
-    ensure_lineage_fence_binding_columns, ensure_response_dispatch_commit_mode_column,
-    ensure_response_effect_generation_column, ensure_scheduler_lease_body_hash_column,
-    ensure_scheduler_retry_health_columns, prepare_declassification_schema_migration,
-    schema_version_error, sqlite_error, upgrade_correlation_ingress_pending_index,
-    validate_correlation_durable_schema, Connection, PortResult,
+    create_attested_finding_response_outbox_schema, schema_version_error, sqlite_error,
+    validate_attested_finding_batch_tenant_keys, validate_attested_finding_response_outbox_schema,
+    validate_correlation_durable_schema, validate_declassification_evidence_integrity,
+    validate_declassification_evidence_schema, validate_lineage_fence_binding_columns,
+    validate_response_dispatch_commit_mode_column, validate_response_effect_generation_column,
+    validate_scheduler_lease_body_hash_column, validate_scheduler_retry_health_columns, Connection,
+    PortError, PortResult,
 };
+
+mod catalog;
 
 const SECURITY_STATE_STORE_SCHEMA_KEY: &str = "security_state";
 pub(super) const SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
+const SECURITY_STATE_STORE_ANCHOR_TABLES: &[&str] = &[
     "security_transitions",
     "security_flow_contexts",
     "security_response_effects",
@@ -72,34 +75,88 @@ const SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES: &[&str] = &[
 // tenant-read-contract: security_transitions; class=tenant-predicate; principal=security-runtime
 // tenant-read-contract: security_verified_events; class=tenant-predicate; principal=security-runtime
 // Contracts: docs/security/trust-boundary-inventory.json
-pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
-    super::effect_finality::preflight(connection)?;
-    super::dispatch::preflight_automatic_preparation_schema(connection)?;
+pub(super) fn open_schema(connection: &Connection) -> PortResult<()> {
     connection
         .execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-            PRAGMA foreign_keys = ON;
-            BEGIN IMMEDIATE;
-            "#,
+            "PRAGMA synchronous = FULL; \
+         PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON; BEGIN IMMEDIATE;",
         )
         .map_err(sqlite_error)?;
-    let migration = (|| {
-        crate::check_schema_version(
+    let result = (|| {
+        let catalog = catalog::Catalog::canonical()?;
+        catalog.preflight(connection)?;
+        match crate::check_current_schema(
             connection,
             SECURITY_STATE_STORE_SCHEMA_KEY,
             SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION,
-            SECURITY_STATE_STORE_LEGACY_ANCHOR_TABLES,
+            SECURITY_STATE_STORE_ANCHOR_TABLES,
         )
-        .map_err(schema_version_error)?;
-        prepare_declassification_schema_migration(connection)?;
-        connection
-            .execute_batch(
-                r#"
+        .map_err(schema_version_error)?
+        {
+            crate::SchemaState::Current => {}
+            crate::SchemaState::Unstamped => {
+                create_schema(connection)?;
+                crate::stamp_schema_version(
+                    connection,
+                    SECURITY_STATE_STORE_SCHEMA_KEY,
+                    SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION,
+                )
+                .map_err(schema_version_error)?;
+            }
+        }
+        catalog.validate(connection)?;
+        validate_schema(connection)
+    })();
+    match result {
+        Ok(()) => connection
+            .execute_batch("COMMIT; PRAGMA journal_mode = WAL;")
+            .map_err(sqlite_error),
+        Err(error) => {
+            let _ = connection.execute_batch("ROLLBACK;");
+            Err(error)
+        }
+    }
+}
 
-            CREATE TABLE IF NOT EXISTS security_isolation_epochs (
+fn validate_schema(connection: &Connection) -> PortResult<()> {
+    let canonical_stamp: bool = connection
+        .query_row(
+            "SELECT COUNT(*) = 1 AND COALESCE(MIN(store_key COLLATE BINARY = 'security_state'
+             AND typeof(version) = 'integer' AND version = 1), 0)
+             FROM chio_store_schema_versions WHERE lower(store_key) = 'security_state'",
+            [],
+            |row| row.get(0),
+        )
+        .map_err(sqlite_error)?;
+    if !canonical_stamp {
+        return Err(PortError::integrity_failure());
+    }
+    let automatic_preparation_present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'security_response_automatic_preparations' AND type = 'table')",
+        [], |row| row.get(0),
+    ).map_err(sqlite_error)?;
+    if !automatic_preparation_present {
+        return Err(PortError::integrity_failure());
+    }
+    super::dispatch::preflight_automatic_preparation_schema(connection)?;
+    super::effect_finality::validate_schema(connection)?;
+    super::effect_finality::verify_coverage(connection)?;
+    validate_declassification_evidence_schema(connection)?;
+    validate_declassification_evidence_integrity(connection)?;
+    validate_attested_finding_batch_tenant_keys(connection)?;
+    validate_attested_finding_response_outbox_schema(connection)?;
+    validate_correlation_durable_schema(connection)?;
+    validate_response_effect_generation_column(connection)?;
+    validate_response_dispatch_commit_mode_column(connection)?;
+    validate_scheduler_lease_body_hash_column(connection)?;
+    validate_scheduler_retry_health_columns(connection)?;
+    validate_lineage_fence_binding_columns(connection)
+}
+
+fn create_schema(connection: &Connection) -> PortResult<()> {
+    connection.execute_batch(r#"
+
+            CREATE TABLE security_isolation_epochs (
                 tenant_id TEXT NOT NULL,
                 principal_id TEXT NOT NULL,
                 lineage_id TEXT NOT NULL,
@@ -118,7 +175,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 UNIQUE (tenant_id, transition_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_principal_flow_state (
+            CREATE TABLE security_principal_flow_state (
                 tenant_id TEXT NOT NULL,
                 principal_id TEXT NOT NULL,
                 isolation_epoch_id TEXT NOT NULL,
@@ -128,7 +185,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, principal_id, isolation_epoch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_lineage_flow_state (
+            CREATE TABLE security_lineage_flow_state (
                 tenant_id TEXT NOT NULL,
                 lineage_id TEXT NOT NULL,
                 label_json BLOB NOT NULL CHECK (length(label_json) <= 1048576),
@@ -137,7 +194,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, lineage_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_flow_state (
+            CREATE TABLE security_session_flow_state (
                 tenant_id TEXT NOT NULL,
                 principal_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
@@ -148,7 +205,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, principal_id, session_id, isolation_epoch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_memberships (
+            CREATE TABLE security_session_memberships (
                 tenant_id TEXT NOT NULL,
                 principal_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
@@ -156,7 +213,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, principal_id, session_id, isolation_epoch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_flow_contexts (
+            CREATE TABLE security_flow_contexts (
                 tenant_id TEXT NOT NULL,
                 principal_id TEXT NOT NULL,
                 lineage_id TEXT NOT NULL,
@@ -168,13 +225,13 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 )
             );
 
-            CREATE TABLE IF NOT EXISTS security_flow_sequences (
+            CREATE TABLE security_flow_sequences (
                 tenant_id TEXT NOT NULL,
                 last_generation INTEGER NOT NULL,
                 PRIMARY KEY (tenant_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_egress_fences (
+            CREATE TABLE security_egress_fences (
                 fence_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 principal_id TEXT NOT NULL,
@@ -191,9 +248,9 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 UNIQUE (tenant_id, request_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_declassification_lifecycle (
+            CREATE TABLE security_declassification_lifecycle (
                 singleton INTEGER NOT NULL PRIMARY KEY CHECK (singleton = 1),
-                schema_version INTEGER NOT NULL CHECK (schema_version = 2),
+                schema_version INTEGER NOT NULL CHECK (schema_version = 1),
                 readiness_cursor TEXT NOT NULL,
                 reconciliation_active INTEGER NOT NULL DEFAULT 0
                     CHECK (reconciliation_active IN (0, 1)),
@@ -204,11 +261,11 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 CHECK (reconciliation_active = 0 OR live_dispatch_sealed = 0)
             );
 
-            INSERT OR IGNORE INTO security_declassification_lifecycle (
+            INSERT INTO security_declassification_lifecycle (
                 singleton, schema_version, readiness_cursor
-            ) VALUES (1, 2, 'declassification-evidence-schema-v2');
+            ) VALUES (1, 1, 'declassification-evidence-schema-v1');
 
-            CREATE TABLE IF NOT EXISTS security_declassification_uses (
+            CREATE TABLE security_declassification_uses (
                 grant_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 request_hash BLOB NOT NULL CHECK (length(request_hash) = 32),
@@ -237,7 +294,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, grant_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_declassification_evidence_identity (
+            CREATE TABLE security_declassification_evidence_identity (
                 evidence_id TEXT NOT NULL,
                 transition_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
@@ -248,7 +305,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 UNIQUE (tenant_id, transition_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_declassification_receipt_outbox (
+            CREATE TABLE security_declassification_receipt_outbox (
                 tenant_id TEXT NOT NULL,
                 grant_id TEXT NOT NULL,
                 phase TEXT NOT NULL CHECK (phase IN ('consumption', 'outcome')),
@@ -298,7 +355,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_declassification_uses (tenant_id, grant_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_declassification_tombstones (
+            CREATE TABLE security_declassification_tombstones (
                 tenant_id TEXT NOT NULL,
                 grant_id TEXT NOT NULL,
                 request_hash BLOB NOT NULL CHECK (length(request_hash) = 32),
@@ -330,12 +387,12 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     )
             );
 
-            CREATE INDEX IF NOT EXISTS security_declassification_receipt_pending
+            CREATE INDEX security_declassification_receipt_pending
                 ON security_declassification_receipt_outbox (
                     acknowledged, next_attempt_at, tenant_id, grant_id, phase_ordinal
                 );
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_tombstone_replay_rejected
+            CREATE TRIGGER security_declassification_tombstone_replay_rejected
             BEFORE INSERT ON security_declassification_uses
             WHEN EXISTS (
                 SELECT 1
@@ -347,7 +404,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification tombstone replay is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_use_immutable
+            CREATE TRIGGER security_declassification_use_immutable
             BEFORE UPDATE ON security_declassification_uses
             WHEN NEW.tenant_id != OLD.tenant_id
               OR NEW.grant_id != OLD.grant_id
@@ -366,7 +423,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification use mapping is immutable');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_use_delete_rejected
+            CREATE TRIGGER security_declassification_use_delete_rejected
             BEFORE DELETE ON security_declassification_uses
             WHEN (SELECT compaction_active FROM security_declassification_lifecycle
                   WHERE singleton = 1) != 1
@@ -374,7 +431,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification use deletion is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_outcome_predecessor_insert
+            CREATE TRIGGER security_declassification_outcome_predecessor_insert
             BEFORE INSERT ON security_declassification_receipt_outbox
             WHEN NEW.phase = 'outcome' AND NOT EXISTS (
                 SELECT 1
@@ -389,7 +446,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification outcome predecessor is missing');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_evidence_use_binding_insert
+            CREATE TRIGGER security_declassification_evidence_use_binding_insert
             BEFORE INSERT ON security_declassification_receipt_outbox
             WHEN NOT EXISTS (
                 SELECT 1
@@ -403,7 +460,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification evidence use binding is invalid');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_outcome_ack_order
+            CREATE TRIGGER security_declassification_outcome_ack_order
             BEFORE UPDATE OF acknowledged ON security_declassification_receipt_outbox
             WHEN NEW.phase = 'outcome' AND NEW.acknowledged = 1 AND NOT EXISTS (
                 SELECT 1
@@ -419,7 +476,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification outcome predecessor is not acknowledged');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_evidence_immutable
+            CREATE TRIGGER security_declassification_evidence_immutable
             BEFORE UPDATE ON security_declassification_receipt_outbox
             WHEN NEW.tenant_id != OLD.tenant_id
               OR NEW.grant_id != OLD.grant_id
@@ -445,7 +502,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification evidence mapping is immutable');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_evidence_delete_rejected
+            CREATE TRIGGER security_declassification_evidence_delete_rejected
             BEFORE DELETE ON security_declassification_receipt_outbox
             WHEN (SELECT compaction_active FROM security_declassification_lifecycle
                   WHERE singleton = 1) != 1
@@ -453,31 +510,31 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'declassification evidence deletion is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_identity_immutable
+            CREATE TRIGGER security_declassification_identity_immutable
             BEFORE UPDATE ON security_declassification_evidence_identity
             BEGIN
                 SELECT RAISE(ABORT, 'declassification evidence identity is immutable');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_identity_delete_rejected
+            CREATE TRIGGER security_declassification_identity_delete_rejected
             BEFORE DELETE ON security_declassification_evidence_identity
             BEGIN
                 SELECT RAISE(ABORT, 'declassification evidence identity deletion is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_tombstone_immutable
+            CREATE TRIGGER security_declassification_tombstone_immutable
             BEFORE UPDATE ON security_declassification_tombstones
             BEGIN
                 SELECT RAISE(ABORT, 'declassification tombstone is immutable');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_declassification_tombstone_delete_rejected
+            CREATE TRIGGER security_declassification_tombstone_delete_rejected
             BEFORE DELETE ON security_declassification_tombstones
             BEGIN
                 SELECT RAISE(ABORT, 'declassification tombstone deletion is rejected');
             END;
 
-            CREATE TABLE IF NOT EXISTS security_event_ids (
+            CREATE TABLE security_event_ids (
                 event_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 event_class TEXT NOT NULL,
@@ -485,7 +542,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, event_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_verified_events (
+            CREATE TABLE security_verified_events (
                 tenant_id TEXT NOT NULL,
                 event_id TEXT NOT NULL,
                 producer_id TEXT NOT NULL,
@@ -498,10 +555,10 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, event_id)
             );
 
-            CREATE INDEX IF NOT EXISTS security_verified_event_partition
+            CREATE INDEX security_verified_event_partition
                 ON security_verified_events (tenant_id, event_time, event_id);
 
-            CREATE TABLE IF NOT EXISTS security_correlation_ingress (
+            CREATE TABLE security_correlation_ingress (
                 sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL,
                 event_id TEXT NOT NULL,
@@ -518,10 +575,10 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_verified_events (tenant_id, event_id)
             );
 
-            CREATE INDEX IF NOT EXISTS security_correlation_ingress_pending
+            CREATE INDEX security_correlation_ingress_pending
                 ON security_correlation_ingress (acknowledged, event_time, sequence);
 
-            CREATE TRIGGER IF NOT EXISTS security_correlation_ingress_immutable
+            CREATE TRIGGER security_correlation_ingress_immutable
             BEFORE UPDATE ON security_correlation_ingress
             WHEN OLD.sequence != NEW.sequence
                 OR OLD.tenant_id != NEW.tenant_id
@@ -539,13 +596,13 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 SELECT RAISE(ABORT, 'correlation ingress mutation is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_correlation_ingress_delete_rejected
+            CREATE TRIGGER security_correlation_ingress_delete_rejected
             BEFORE DELETE ON security_correlation_ingress
             BEGIN
                 SELECT RAISE(ABORT, 'correlation ingress deletion is rejected');
             END;
 
-            CREATE TABLE IF NOT EXISTS security_advisory_events (
+            CREATE TABLE security_advisory_events (
                 tenant_id TEXT NOT NULL,
                 event_id TEXT NOT NULL,
                 producer_id TEXT NOT NULL,
@@ -555,7 +612,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, event_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_correlation_events (
+            CREATE TABLE security_correlation_events (
                 tenant_id TEXT NOT NULL,
                 rule_id TEXT NOT NULL,
                 partition_hash BLOB NOT NULL CHECK (length(partition_hash) = 32),
@@ -568,7 +625,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_verified_events (tenant_id, event_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_correlation_partition_heads (
+            CREATE TABLE security_correlation_partition_heads (
                 tenant_id TEXT NOT NULL,
                 rule_id TEXT NOT NULL,
                 partition_hash BLOB NOT NULL CHECK (length(partition_hash) = 32),
@@ -576,7 +633,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, rule_id, partition_hash)
             );
 
-            CREATE TABLE IF NOT EXISTS security_correlation_partials (
+            CREATE TABLE security_correlation_partials (
                 tenant_id TEXT NOT NULL,
                 rule_id TEXT NOT NULL,
                 partition_hash BLOB NOT NULL CHECK (length(partition_hash) = 32),
@@ -590,7 +647,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 UNIQUE (tenant_id, transition_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_correlation_outcomes (
+            CREATE TABLE security_correlation_outcomes (
                 tenant_id TEXT NOT NULL,
                 rule_id TEXT NOT NULL,
                 event_id TEXT NOT NULL,
@@ -610,19 +667,19 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_verified_events (tenant_id, event_id)
             );
 
-            CREATE TRIGGER IF NOT EXISTS security_correlation_outcomes_immutable
+            CREATE TRIGGER security_correlation_outcomes_immutable
             BEFORE UPDATE ON security_correlation_outcomes
             BEGIN
                 SELECT RAISE(ABORT, 'correlation outcome mutation is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_correlation_outcomes_delete_rejected
+            CREATE TRIGGER security_correlation_outcomes_delete_rejected
             BEFORE DELETE ON security_correlation_outcomes
             BEGIN
                 SELECT RAISE(ABORT, 'correlation outcome deletion is rejected');
             END;
 
-            CREATE TABLE IF NOT EXISTS security_attested_finding_batches (
+            CREATE TABLE security_attested_finding_batches (
                 batch_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 item_count INTEGER NOT NULL CHECK (item_count > 0 AND item_count <= 4096),
@@ -631,7 +688,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, batch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_attested_finding_batch_items (
+            CREATE TABLE security_attested_finding_batch_items (
                 batch_id TEXT NOT NULL,
                 ordinal INTEGER NOT NULL CHECK (ordinal >= 0 AND ordinal < 4096),
                 tenant_id TEXT NOT NULL,
@@ -651,7 +708,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_attested_finding_batches (tenant_id, batch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_response_plans (
+            CREATE TABLE security_response_plans (
                 action_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 generation INTEGER NOT NULL,
@@ -662,7 +719,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, action_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_response_receipt_cursors (
+            CREATE TABLE security_response_receipt_cursors (
                 tenant_id TEXT NOT NULL,
                 action_id TEXT NOT NULL,
                 plan_hash BLOB NOT NULL CHECK (length(plan_hash) = 32),
@@ -673,7 +730,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_response_plans (tenant_id, action_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_response_dispatches (
+            CREATE TABLE security_response_dispatches (
                 dispatch_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 action_id TEXT NOT NULL,
@@ -695,7 +752,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_response_plans (tenant_id, action_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_response_dispatch_fences (
+            CREATE TABLE security_response_dispatch_fences (
                 dispatch_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 action_id TEXT NOT NULL,
@@ -708,7 +765,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 UNIQUE (tenant_id, dispatch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_response_effects (
+            CREATE TABLE security_response_effects (
                 effect_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 action_id TEXT NOT NULL,
@@ -723,7 +780,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 FOREIGN KEY (encrypted_rollback_ref) REFERENCES chio_encrypted_blobs (blob_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_effect_contributions (
+            CREATE TABLE security_effect_contributions (
                 tenant_id TEXT NOT NULL,
                 target_id TEXT NOT NULL,
                 effect_id TEXT NOT NULL,
@@ -735,7 +792,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 UNIQUE (tenant_id, effect_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_overlay_state (
+            CREATE TABLE security_overlay_state (
                 tenant_id TEXT NOT NULL,
                 target_id TEXT NOT NULL,
                 generation INTEGER NOT NULL,
@@ -744,7 +801,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, target_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_containment_overlay_commands (
+            CREATE TABLE security_containment_overlay_commands (
                 tenant_id TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL,
                 request_body BLOB NOT NULL CHECK (length(request_body) <= 2097152),
@@ -756,7 +813,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, idempotency_key)
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_throttle_state (
+            CREATE TABLE security_session_throttle_state (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 generation INTEGER NOT NULL CHECK (generation >= 0),
@@ -764,7 +821,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, session_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_throttle_effects (
+            CREATE TABLE security_session_throttle_effects (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 effect_id TEXT NOT NULL,
@@ -780,7 +837,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_session_throttle_state (tenant_id, session_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_throttle_windows (
+            CREATE TABLE security_session_throttle_windows (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 effect_id TEXT NOT NULL,
@@ -796,7 +853,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     ) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_throttle_invocations (
+            CREATE TABLE security_session_throttle_invocations (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 effect_id TEXT NOT NULL,
@@ -811,7 +868,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     ) ON DELETE CASCADE
             );
 
-            CREATE TABLE IF NOT EXISTS security_session_throttle_commands (
+            CREATE TABLE security_session_throttle_commands (
                 tenant_id TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL,
                 request_body BLOB NOT NULL CHECK (length(request_body) <= 2097152),
@@ -823,12 +880,12 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, idempotency_key)
             );
 
-            CREATE INDEX IF NOT EXISTS security_session_throttle_window_lookup
+            CREATE INDEX security_session_throttle_window_lookup
                 ON security_session_throttle_windows (
                     tenant_id, session_id, effect_id, window_start
                 );
 
-            CREATE TABLE IF NOT EXISTS security_capability_set_suspension_state (
+            CREATE TABLE security_capability_set_suspension_state (
                 tenant_id TEXT NOT NULL,
                 affected_set_hash BLOB NOT NULL CHECK (length(affected_set_hash) = 32),
                 generation INTEGER NOT NULL CHECK (generation >= 0),
@@ -836,7 +893,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, affected_set_hash)
             );
 
-            CREATE TABLE IF NOT EXISTS security_capability_set_suspension_effects (
+            CREATE TABLE security_capability_set_suspension_effects (
                 tenant_id TEXT NOT NULL,
                 affected_set_hash BLOB NOT NULL CHECK (length(affected_set_hash) = 32),
                 action_id TEXT NOT NULL,
@@ -853,7 +910,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     )
             );
 
-            CREATE TABLE IF NOT EXISTS security_capability_set_suspension_members (
+            CREATE TABLE security_capability_set_suspension_members (
                 tenant_id TEXT NOT NULL,
                 affected_set_hash BLOB NOT NULL CHECK (length(affected_set_hash) = 32),
                 action_id TEXT NOT NULL,
@@ -868,12 +925,12 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     ) ON DELETE CASCADE
             );
 
-            CREATE INDEX IF NOT EXISTS security_capability_set_suspension_member_lookup
+            CREATE INDEX security_capability_set_suspension_member_lookup
                 ON security_capability_set_suspension_members (
                     tenant_id, capability_id, action_id, effect_id
                 );
 
-            CREATE TABLE IF NOT EXISTS security_capability_set_suspension_commands (
+            CREATE TABLE security_capability_set_suspension_commands (
                 tenant_id TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL,
                 request_body BLOB NOT NULL CHECK (length(request_body) <= 2097152),
@@ -885,7 +942,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, idempotency_key)
             );
 
-            CREATE TABLE IF NOT EXISTS security_issuance_freeze_state (
+            CREATE TABLE security_issuance_freeze_state (
                 tenant_id TEXT NOT NULL,
                 lineage_id TEXT NOT NULL,
                 generation INTEGER NOT NULL CHECK (generation >= 0),
@@ -895,7 +952,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, lineage_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_issuance_freeze_effects (
+            CREATE TABLE security_issuance_freeze_effects (
                 tenant_id TEXT NOT NULL,
                 lineage_id TEXT NOT NULL,
                 action_id TEXT NOT NULL,
@@ -925,12 +982,12 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_issuance_freeze_state (tenant_id, lineage_id)
             );
 
-            CREATE INDEX IF NOT EXISTS security_issuance_freeze_lineage_lookup
+            CREATE INDEX security_issuance_freeze_lineage_lookup
                 ON security_issuance_freeze_effects (
                     tenant_id, lineage_id, action_id, effect_id
                 );
 
-            CREATE TABLE IF NOT EXISTS security_issuance_freeze_commands (
+            CREATE TABLE security_issuance_freeze_commands (
                 tenant_id TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL,
                 lineage_id TEXT NOT NULL,
@@ -969,12 +1026,12 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, idempotency_key)
             );
 
-            CREATE INDEX IF NOT EXISTS security_issuance_freeze_pending_lookup
+            CREATE INDEX security_issuance_freeze_pending_lookup
                 ON security_issuance_freeze_commands (
                     tenant_id, lineage_id, command_state, action_id, effect_id
                 );
 
-            CREATE TABLE IF NOT EXISTS security_egress_restriction_state (
+            CREATE TABLE security_egress_restriction_state (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 generation INTEGER NOT NULL CHECK (generation >= 0),
@@ -982,7 +1039,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, session_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_egress_restriction_effects (
+            CREATE TABLE security_egress_restriction_effects (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 effect_id TEXT NOT NULL,
@@ -996,7 +1053,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_egress_restriction_state (tenant_id, session_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_egress_restriction_destinations (
+            CREATE TABLE security_egress_restriction_destinations (
                 tenant_id TEXT NOT NULL,
                 session_id TEXT NOT NULL,
                 effect_id TEXT NOT NULL,
@@ -1008,12 +1065,12 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     ) ON DELETE CASCADE
             );
 
-            CREATE INDEX IF NOT EXISTS security_egress_restriction_destination_lookup
+            CREATE INDEX security_egress_restriction_destination_lookup
                 ON security_egress_restriction_destinations (
                     tenant_id, session_id, destination_id, effect_id
                 );
 
-            CREATE TABLE IF NOT EXISTS security_egress_restriction_commands (
+            CREATE TABLE security_egress_restriction_commands (
                 tenant_id TEXT NOT NULL,
                 idempotency_key TEXT NOT NULL,
                 request_body BLOB NOT NULL CHECK (length(request_body) <= 2097152),
@@ -1023,7 +1080,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, idempotency_key)
             );
 
-            CREATE TABLE IF NOT EXISTS security_lineage_fences (
+            CREATE TABLE security_lineage_fences (
                 action_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 commit_index INTEGER NOT NULL,
@@ -1036,7 +1093,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, action_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_scheduler_claims (
+            CREATE TABLE security_scheduler_claims (
                 tenant_id TEXT NOT NULL,
                 claim_id TEXT NOT NULL,
                 request_hash BLOB NOT NULL CHECK (length(request_hash) = 32),
@@ -1047,7 +1104,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, claim_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_scheduler_leases (
+            CREATE TABLE security_scheduler_leases (
                 action_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 claim_id TEXT NOT NULL,
@@ -1059,21 +1116,21 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, action_id)
             );
 
-            CREATE INDEX IF NOT EXISTS security_scheduler_leases_claim
+            CREATE INDEX security_scheduler_leases_claim
                 ON security_scheduler_leases (tenant_id, claim_id, action_id);
 
-            CREATE INDEX IF NOT EXISTS security_scheduler_leases_expiry_order
+            CREATE INDEX security_scheduler_leases_expiry_order
                 ON security_scheduler_leases (
                     tenant_id, lease_expires_at, claim_id, claim_ordinal, action_id
                 );
 
-            CREATE TABLE IF NOT EXISTS security_scheduler_fence_sequences (
+            CREATE TABLE security_scheduler_fence_sequences (
                 tenant_id TEXT NOT NULL,
                 last_fencing_token INTEGER NOT NULL,
                 PRIMARY KEY (tenant_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_scheduler_retries (
+            CREATE TABLE security_scheduler_retries (
                 tenant_id TEXT NOT NULL,
                 action_id TEXT NOT NULL,
                 attempts INTEGER NOT NULL,
@@ -1085,7 +1142,7 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                 PRIMARY KEY (tenant_id, action_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_response_dispatch_recoveries (
+            CREATE TABLE security_response_dispatch_recoveries (
                 recovery_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 dispatch_id TEXT NOT NULL,
@@ -1100,29 +1157,19 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_response_dispatches (tenant_id, dispatch_id)
             );
 
-            CREATE TABLE IF NOT EXISTS security_transitions (
+            CREATE TABLE security_transitions (
                 transition_id TEXT NOT NULL,
                 tenant_id TEXT NOT NULL,
                 transition_kind TEXT NOT NULL,
                 request_hash BLOB NOT NULL CHECK (length(request_hash) = 32),
                 PRIMARY KEY (tenant_id, transition_id)
             );
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        ensure_attested_finding_batch_tenant_keys(connection)?;
-        super::dispatch::ensure_automatic_preparation_schema(connection)?;
-        super::effect_finality::ensure_schema(connection)?;
-        if super::effect_finality::schema_revision(connection)? == 0 {
-            super::effect_finality::migrate_legacy(connection)?;
-        }
-        ensure_attested_finding_response_outbox_schema(connection)?;
-        upgrade_correlation_ingress_pending_index(connection)?;
-        validate_correlation_durable_schema(connection)?;
-        connection
-            .execute_batch(
-                r#"
-            CREATE TABLE IF NOT EXISTS security_ingress_rejections (
+                "#).map_err(sqlite_error)?;
+    super::dispatch::create_automatic_preparation_schema(connection)?;
+    super::effect_finality::create_schema(connection)?;
+    create_attested_finding_response_outbox_schema(connection)?;
+    connection.execute_batch(r#"
+            CREATE TABLE security_ingress_rejections (
                 tenant_id TEXT NOT NULL,
                 event_id TEXT NOT NULL,
                 producer_id TEXT NOT NULL,
@@ -1136,38 +1183,16 @@ pub(super) fn migrate(connection: &Connection) -> PortResult<()> {
                     REFERENCES security_correlation_ingress (tenant_id, event_id)
             );
 
-            CREATE TRIGGER IF NOT EXISTS security_ingress_rejections_immutable
+            CREATE TRIGGER security_ingress_rejections_immutable
             BEFORE UPDATE ON security_ingress_rejections
             BEGIN
                 SELECT RAISE(ABORT, 'ingress rejection mutation is rejected');
             END;
 
-            CREATE TRIGGER IF NOT EXISTS security_ingress_rejections_delete_rejected
+            CREATE TRIGGER security_ingress_rejections_delete_rejected
             BEFORE DELETE ON security_ingress_rejections
             BEGIN
                 SELECT RAISE(ABORT, 'ingress rejection deletion is rejected');
             END;
-                "#,
-            )
-            .map_err(sqlite_error)?;
-        ensure_response_effect_generation_column(connection)?;
-        ensure_response_dispatch_commit_mode_column(connection)?;
-        ensure_scheduler_lease_body_hash_column(connection)?;
-        ensure_scheduler_retry_health_columns(connection)?;
-        ensure_lineage_fence_binding_columns(connection)?;
-        crate::stamp_schema_version(
-            connection,
-            SECURITY_STATE_STORE_SCHEMA_KEY,
-            SECURITY_STATE_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(schema_version_error)?;
-        Ok(())
-    })();
-    match migration {
-        Ok(()) => connection.execute_batch("COMMIT;").map_err(sqlite_error),
-        Err(error) => {
-            let _ = connection.execute_batch("ROLLBACK;");
-            Err(error)
-        }
-    }
+                "#).map_err(sqlite_error)
 }

@@ -4703,39 +4703,6 @@
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
     {
-      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
-      "owner": "migrate_declassification_tenant_keys",
-      "sha256": "84c2705c3a930636a2c58e020c41a236a7d5d0caee63f5ad1a085835c00f09d9",
-      "tables": [
-        "security_declassification_evidence_identity"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_declassification_evidence_identity",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
-      "owner": "migrate_declassification_tenant_keys",
-      "sha256": "a2f242d7fb09a6882cb19e68e500467d630cff70a3d40bd9cbffa42e8d91fed5",
-      "tables": [
-        "security_declassification_receipt_outbox"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_declassification_receipt_outbox",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs",
-      "owner": "migrate_declassification_tenant_keys",
-      "sha256": "f60f397bbfe3c073388193b9b574ba0157d9c77ce1258f19e2a6bb0e69074828",
-      "tables": [
-        "security_declassification_tombstones"
-      ],
-      "sql": "SELECT COUNT(*) FROM security_declassification_tombstones",
-      "principal": "security-runtime",
-      "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
-    },
-    {
       "path": "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs",
       "owner": "ensure_dispatch_ready",
       "sha256": "26ad3854e58cd6bc1f4299d165ee8ab4fd703e3ab47e6a21307152c13d3928b2",
@@ -4847,7 +4814,7 @@
     },
     {
       "owner": "verify_coverage",
-      "path": "crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs",
       "sha256": "9b56d8622141d76b4371fd8be5436bcd5912ae0ed7d547e51d3cda74fed2b545",
       "sql": "SELECT EXISTS(SELECT 1 FROM security_response_effect_finality WHERE effect_kind NOT IN ('suspend_session', 'restrict_egress', 'throttle_session', 'suspend_capability_set', 'freeze_issuance'))",
       "tables": [
@@ -4858,7 +4825,7 @@
     },
     {
       "owner": "verify_kind_coverage",
-      "path": "crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs",
+      "path": "crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs",
       "sha256": "24462267acffa8b77105db3a4585f7e608de3f1502d0eccc30e5f98930679e76",
       "sql": "SELECT tenant_id, effect_id FROM security_response_effect_finality WHERE effect_kind = ?1 AND (tenant_id, effect_id) > (?2, ?3) ORDER BY tenant_id, effect_id LIMIT ?4",
       "tables": [
@@ -4968,18 +4935,18 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
-      "owner": "ensure_response_dispatch_commit_mode_column",
-      "sha256": "672a479bf737d8a5ceb89d653e2cce4f1b883041bbe7560b689a612dc998c747",
+      "owner": "validate_response_dispatch_commit_mode_column",
+      "sha256": "f6d168cc9bbf4e3001765563e569f376072d355c1520e456b9fc777d05de0fb8",
       "tables": [
         "security_response_dispatches"
       ],
-      "sql": "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
+      "sql": "SELECT COUNT(*) FROM security_response_dispatches WHERE commit_mode IS NULL OR commit_mode NOT IN ('fresh', 'governed_committed_resume', 'governed_committed_expired_resume')",
       "principal": "security-runtime",
       "contract": "Internal readiness, integrity, retention, scheduler or recovery operation; tenant port operations use tenant-bound keys."
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
-      "owner": "ensure_response_effect_generation_column",
+      "owner": "validate_response_effect_generation_column",
       "sha256": "dedee0c3b14fc6fe9540c7a13304e9b425707485dd228c27ab45970d7c4ac0b8",
       "tables": [
         "security_response_effects"
@@ -4990,7 +4957,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
-      "owner": "ensure_scheduler_lease_body_hash_column",
+      "owner": "validate_scheduler_lease_body_hash_column",
       "sha256": "779361a4363cbfb1926cad20beae83cc1fac0bc479e99b5735aa5b4e8d0bfe74",
       "tables": [
         "security_scheduler_leases"
@@ -5001,7 +4968,7 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/security_state/response_schema.rs",
-      "owner": "ensure_scheduler_lease_body_hash_column",
+      "owner": "validate_scheduler_lease_body_hash_column",
       "sha256": "a8aefd147e8606376bad3f5cba020153eff8e365e31fa164554f1d288c0c7c48",
       "tables": [
         "security_scheduler_leases"
@@ -21361,9 +21328,6 @@
       "validate_stored_correlation_ingress::shared-reader::crates/platform/chio-store-sqlite/src/security_state/codec.rs::validate_canonical_json_body"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs": [
-      "ensure_attested_finding_batch_tenant_keys::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::validate_attested_finding_batch_records",
-      "ensure_attested_finding_batch_tenant_keys::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::validate_attested_finding_batch_tenant_keys",
-      "ensure_attested_finding_batch_tenant_keys::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::validate_attested_finding_batch_tenant_keys",
       "validate_attested_finding_batch_records::shared-reader::crates/platform/chio-store-sqlite/src/security_state/finding_batches.rs::load_attested_finding_batch_record",
       "validate_attested_finding_batch_tenant_keys::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::validate_attested_finding_batch_records"
     ],
@@ -21398,9 +21362,6 @@
       "validate_declassification_outcome_evidence::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_codec.rs::decode_declassification_receipt"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs": [
-      "migrate_declassification_tenant_keys::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::validate_declassification_evidence_integrity",
-      "migrate_declassification_tenant_keys::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::validate_declassification_evidence_integrity",
-      "prepare_declassification_schema_migration::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::migrate_declassification_tenant_keys",
       "validate_declassification_evidence_integrity::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification.rs::verify_legacy_integrity"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/dispatch.rs": [
@@ -21602,13 +21563,13 @@
       "decode_retained_security_row::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::layout",
       "decode_retained_security_row::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::validate_values",
       "encode_retained_security_values::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::validate_values",
-      "layout::shared-reader::crates/platform/chio-store-sqlite/src/security_state/schema.rs::migrate",
+      "layout::shared-reader::crates/platform/chio-store-sqlite/src/security_state/schema.rs::open_schema",
       "retained_security_columns::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::layout",
       "validate_values::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/row_codec.rs::layout"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/participant_source/schema.rs": [
       "digest::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/schema.rs::expected_catalog",
-      "expected_catalog::shared-reader::crates/platform/chio-store-sqlite/src/security_state/schema.rs::migrate",
+      "expected_catalog::shared-reader::crates/platform/chio-store-sqlite/src/security_state/schema.rs::open_schema",
       "verify::shared-reader::crates/platform/chio-store-sqlite/src/security_state/participant_source/schema.rs::expected_catalog"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/response_journal.rs": [
@@ -21672,10 +21633,10 @@
       "renew_lease::shared-reader::crates/platform/chio-store-sqlite/src/security_state/response_journal.rs::load_response_plan"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/schema.rs": [
-      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::ensure_attested_finding_batch_tenant_keys",
-      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::prepare_declassification_schema_migration",
-      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::migrate_legacy",
-      "migrate::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs::preflight"
+      "open_schema::shared-reader::crates/platform/chio-store-sqlite/src/security_state/schema.rs::validate_schema",
+      "validate_schema::shared-reader::crates/platform/chio-store-sqlite/src/security_state/correlation_schema.rs::validate_attested_finding_batch_tenant_keys",
+      "validate_schema::shared-reader::crates/platform/chio-store-sqlite/src/security_state/declassification_schema.rs::validate_declassification_evidence_integrity",
+      "validate_schema::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_coverage"
     ],
     "crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs": [
       "apply_session_throttle::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::check_apply",
@@ -23752,21 +23713,15 @@
       "completed_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
       "completed_freeze_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/issuance_freeze.rs::load_finality_command",
       "load_marker::original-json-reader::UntrustedJsonText",
-      "migrate_legacy::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::backfill",
       "persist_first::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
       "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::persist_first",
       "record_remove::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load",
-      "validate_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_kind_coverage",
+      "validate_ready::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_kind_coverage",
       "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::load_marker",
       "verified_marker::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/commands.rs::load"
     ],
-    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/schema.rs": [
-      "preflight::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_coverage"
-    ],
-    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs": [
-      "backfill::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::persist_first",
-      "backfill::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_coverage",
-      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/migration.rs::verify_kind_coverage",
+    "crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs": [
+      "verify_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality/coverage.rs::verify_kind_coverage",
       "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker",
       "verify_kind_coverage::shared-reader::crates/platform/chio-store-sqlite/src/security_state/effect_finality.rs::verified_marker"
     ],

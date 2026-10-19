@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS security_participant_state_declassification_evidence_
 CREATE TABLE IF NOT EXISTS security_participant_state_declassification_lifecycle (
     security_authority_id TEXT NOT NULL REFERENCES security_participant_migration_expectations(security_authority_id),
     singleton INTEGER NOT NULL CHECK (singleton = 1),
-    schema_version INTEGER NOT NULL CHECK (schema_version = 2),
+    schema_version INTEGER NOT NULL CHECK (schema_version = 1),
     readiness_cursor TEXT NOT NULL,
     reconciliation_active INTEGER NOT NULL DEFAULT 0
         CHECK (reconciliation_active IN (0, 1)),

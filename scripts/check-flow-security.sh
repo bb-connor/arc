@@ -113,6 +113,8 @@ run_exact_target --label "security response-dispatch types" --expected \
   dispatch_authorization_binds_every_security_identity \
   dispatch_lease_and_load_outcome_are_explicit \
   dispatch_recovery_binds_the_exact_action_and_fencing_observation \
+  dispatch_recovery_requires_a_fencing_token_on_the_wire \
+  dispatch_recovery_rejects_zero_fencing_token_on_wire \
   execution_dispatch_binding_rejects_zero_and_mismatched_authority_fields \
   execution_binding_requires_exact_artifact_schema_pairing \
   legacy_dispatch_authorization_v1_preserves_canonical_bytes_and_hash \
@@ -290,7 +292,6 @@ run_exact_target --label "durable flow state" --expected \
   concurrent_joins_retain_every_restriction_and_new_sessions_inherit \
   correlation_ingress_orders_due_event_time_ahead_of_a_future_fifo_prefix \
   correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement \
-  correlation_ingress_upgrades_the_known_legacy_pending_index \
   correlation_schema_drift_fails_startup \
   corrupt_canonical_hash_fails_closed_on_read \
   egress_dispatch_commitment_is_idempotent_and_immutable \
@@ -300,28 +301,26 @@ run_exact_target --label "durable flow state" --expected \
   injected_clock_controls_scheduler_lease_and_overlay_mutations \
   isolation_epoch_must_be_verified_and_preserves_lineage_taint \
   lineage_change_invalidates_every_principal_context \
-  database_path_inputs::migration_is_idempotent_and_preserves_existing_tables \
+  database_path_inputs::opening_is_idempotent_and_preserves_sibling_tables \
   missing_flow_context_generation_fails_closed \
   missing_flow_epoch_or_session_row_fails_closed \
   new_lineage_inherits_existing_epoch_and_cannot_bootstrap_a_new_epoch \
   no_op_shared_label_joins_preserve_sibling_context_integrity \
   open_path::a_group_writable_parent_is_refused_before_the_store_is_created \
-  open_path::a_hard_linked_legacy_database_is_refused_without_repairing_the_alias \
+  open_path::a_hard_linked_existing_database_is_refused_without_repairing_the_alias \
   open_path::a_hard_linked_path_is_refused_before_it_is_written \
-  open_path::a_legacy_world_readable_database_is_private_before_sqlite_opens_it \
+  open_path::an_existing_world_readable_database_is_private_before_sqlite_opens_it \
   open_path::a_new_store_in_a_world_readable_parent_is_private_with_its_sidecars \
   open_path::a_new_store_is_private_to_its_owner \
   open_path::a_private_database_reopens_without_its_mode_or_identity_changing \
   open_path::a_shared_writable_parent_is_refused_before_the_store_is_created \
   open_path::a_symlinked_path_is_refused_before_the_target_is_created_or_written \
   open_path::an_aliased_or_irregular_sidecar_is_refused_before_sqlite_opens_it \
-  open_path::legacy_world_readable_sidecars_are_private_before_sqlite_opens_them \
+  open_path::existing_world_readable_sidecars_are_private_before_sqlite_opens_them \
   overlapping_overlay_contributions_are_removed_independently \
   overlay_effect_identity_cannot_cross_action_boundaries \
-  response_effect_generation_migration_preserves_existing_intent \
-  response_effect_owner_migration_rejects_unbound_existing_intent \
+  response_effect_without_a_lease_owner_is_refused \
   scheduler_and_effect_reads_verify_canonical_hashes \
-  scheduler_retry_health_migration_preserves_age_conservatively \
   scheduler_retry_health_outbox_survives_restart_and_ack_is_idempotent \
   scheduler_takeover_fences_stale_overlay_mutations \
   database_path_inputs::security_state_rejects_ephemeral_sqlite_paths \

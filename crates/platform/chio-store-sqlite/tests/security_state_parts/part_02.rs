@@ -846,44 +846,6 @@ fn correlation_ingress_pending_snapshot_survives_a_concurrent_acknowledgement() 
 }
 
 #[test]
-fn correlation_ingress_upgrades_the_known_legacy_pending_index() {
-    let directory =
-        chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
-    let path = directory.path().join("correlation-legacy-index.db");
-    drop(
-        SqliteSecurityStateStore::open(&path)
-            .unwrap_or_else(|error| panic!("create canonical store: {error}")),
-    );
-    let connection = rusqlite::Connection::open(&path)
-        .unwrap_or_else(|error| panic!("open legacy index fixture: {error}"));
-    connection
-        .execute_batch(
-            r#"
-            DROP INDEX security_correlation_ingress_pending;
-            CREATE INDEX security_correlation_ingress_pending
-                ON security_correlation_ingress (acknowledged, sequence);
-            "#,
-        )
-        .unwrap_or_else(|error| panic!("install legacy pending index: {error}"));
-    drop(connection);
-
-    drop(
-        SqliteSecurityStateStore::open(&path)
-            .unwrap_or_else(|error| panic!("upgrade legacy pending index: {error}")),
-    );
-    let upgraded_sql: String = rusqlite::Connection::open(path)
-        .and_then(|connection| {
-            connection.query_row(
-                "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'security_correlation_ingress_pending'",
-                [],
-                |row| row.get(0),
-            )
-        })
-        .unwrap_or_else(|error| panic!("load upgraded pending index: {error}"));
-    assert!(upgraded_sql.contains("acknowledged, event_time, sequence"));
-}
-
-#[test]
 fn correlation_schema_drift_fails_startup() {
     let mutations = [
         (

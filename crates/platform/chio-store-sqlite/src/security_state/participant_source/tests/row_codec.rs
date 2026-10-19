@@ -10,7 +10,7 @@ fn all_retained_tables_decode_into_a_disposable_projection_without_changing_fing
     let _store = seeded_security_history(&path)?;
     let source = Connection::open(&path)?;
     let destination = Connection::open_in_memory()?;
-    super::super::super::migrate(&destination)?;
+    super::super::super::open_schema(&destination)?;
     destination.execute_batch(
         "BEGIN IMMEDIATE; PRAGMA defer_foreign_keys = ON;
          DELETE FROM security_declassification_lifecycle;",
