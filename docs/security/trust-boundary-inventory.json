@@ -21700,7 +21700,8 @@
       "verify_outcome_projection::shared-reader::crates/platform/chio-store-sqlite/src/tool_outcome_projection.rs::load_verified_projection"
     ],
     "crates/platform/chio-store-sqlite/src/tool_outcome_security_release.rs": [
-      "persist_security_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::verify_participant_recovery_lease_tx"
+      "persist_security_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store.rs::verify_participant_recovery_lease_tx",
+      "require_terminal_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::require_output_release"
     ],
     "crates/platform/chio-store-sqlite/src/tool_outcome_store.rs": [
       "begin_post_return_evaluation_under::shared-reader::crates/platform/chio-store-sqlite/src/tool_outcome_store.rs::load_evaluation_tx",
@@ -23774,6 +23775,7 @@
       "load_chain::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::decode",
       "load_stop_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
       "projection_reference::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::decode",
+      "require_output_release::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::verified_head",
       "verified_head::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/stop_epoch.rs::load_chain"
     ],
     "crates/products/chio-cli/src/cli/process_host/stop_control.rs": [
