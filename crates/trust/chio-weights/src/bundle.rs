@@ -94,7 +94,6 @@ pub fn verify_model_card_bundle<V: AttestVerifier + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
     use std::sync::Mutex;
     use std::time::SystemTime;
 
@@ -126,17 +125,6 @@ mod tests {
     }
 
     impl AttestVerifier for FakeVerifier {
-        fn verify_blob(
-            &self,
-            _artifact: &Path,
-            _signature: &Path,
-            _certificate: &Path,
-            _expected: &ExpectedIdentity,
-        ) -> Result<VerifiedAttestation, AttestError> {
-            Err(AttestError::Malformed(
-                "verify_blob not used in tests".into(),
-            ))
-        }
         fn verify_bytes(
             &self,
             _artifact: &[u8],

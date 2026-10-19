@@ -31,7 +31,7 @@ presence and sets rebuild triggers. It performs no TUF authenticity check.
 
 Detached verification parses the leaf, validates its chain against embedded
 Fulcio roots, matches identity, checks current validity, and verifies the
-signature. `verify_blob` reads its files fully before delegating to this path.
+signature.
 Bundle input first passes a bounded external JSON decoder, then the Sigstore
 bundle verifier, followed by Chio's anchored SAN and exact issuer checks.
 The async bridge uses a helper runtime thread when called inside Tokio.

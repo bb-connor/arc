@@ -27,7 +27,6 @@
 #![forbid(clippy::unwrap_used)]
 #![forbid(clippy::expect_used)]
 
-use std::path::Path;
 use std::time::SystemTime;
 
 #[cfg(feature = "tee-quotes")]
@@ -284,15 +283,6 @@ pub enum AttestError {
 
 /// The single trait every chio component implements against.
 pub trait AttestVerifier: Send + Sync {
-    /// Verify a detached blob signature.
-    fn verify_blob(
-        &self,
-        artifact: &Path,
-        signature: &Path,
-        certificate: &Path,
-        expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError>;
-
     /// Verify an in-memory blob.
     fn verify_bytes(
         &self,

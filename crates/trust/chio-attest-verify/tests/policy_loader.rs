@@ -7,7 +7,6 @@
 //! signing is exercised by `tests/integration.rs` against the embedded
 //! TUF root and is not duplicated here.
 
-use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
@@ -55,16 +54,6 @@ impl RecordingVerifier {
 }
 
 impl AttestVerifier for RecordingVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::SignatureMismatch)
-    }
-
     fn verify_bytes(
         &self,
         artifact: &[u8],

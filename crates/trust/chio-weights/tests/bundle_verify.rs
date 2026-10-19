@@ -19,7 +19,6 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use std::path::Path;
 use std::sync::Mutex;
 use std::time::SystemTime;
 
@@ -52,15 +51,6 @@ impl FakeVerifier {
 }
 
 impl AttestVerifier for FakeVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".into()))
-    }
     fn verify_bytes(
         &self,
         _artifact: &[u8],
@@ -201,15 +191,6 @@ fn verify_byte_pins_artifact_pass_through() {
         seen: Mutex<Option<Vec<u8>>>,
     }
     impl AttestVerifier for ArtifactProbe {
-        fn verify_blob(
-            &self,
-            _: &Path,
-            _: &Path,
-            _: &Path,
-            _: &ExpectedIdentity,
-        ) -> Result<VerifiedAttestation, AttestError> {
-            Err(AttestError::Malformed("unused".into()))
-        }
         fn verify_bytes(
             &self,
             _: &[u8],

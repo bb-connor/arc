@@ -1,5 +1,3 @@
-use std::fs;
-use std::path::Path;
 use std::sync::Arc;
 use std::time::SystemTime;
 
@@ -32,7 +30,7 @@ use super::EMBEDDED_TRUSTED_ROOT_JSON;
 /// across the kernel's tokio runtime; the type is [`Send`] + [`Sync`].
 pub struct SigstoreVerifier {
     /// Pre-built collection of trusted Fulcio root certificates, used by
-    /// the raw `verify_blob` / `verify_bytes` paths to chain-validate the
+    /// the raw `verify_bytes` path to chain-validate the
     /// supplied leaf certificate via [`webpki`]. Held as owned bytes so
     /// `TrustAnchor` borrows can be reconstructed per call.
     fulcio_root_ders: Arc<Vec<Vec<u8>>>,
@@ -91,24 +89,6 @@ fn build_trust_root() -> Result<SigstoreTrustRoot, AttestError> {
 }
 
 impl AttestVerifier for SigstoreVerifier {
-    fn verify_blob(
-        &self,
-        artifact: &Path,
-        signature: &Path,
-        certificate: &Path,
-        expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        let artifact_bytes = fs::read(artifact)?;
-        let signature_bytes = fs::read(signature)?;
-        let certificate_bytes = fs::read(certificate)?;
-        self.verify_bytes(
-            &artifact_bytes,
-            &signature_bytes,
-            &certificate_bytes,
-            expected,
-        )
-    }
-
     fn verify_bytes(
         &self,
         artifact: &[u8],

@@ -1,7 +1,7 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -16,16 +16,6 @@ use chio_tool_call_fabric::Principal;
 struct AllowVerifier;
 
 impl AttestVerifier for AllowVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".to_string()))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],
@@ -62,16 +52,6 @@ struct DenyVerifier;
 static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 impl AttestVerifier for DenyVerifier {
-    fn verify_blob(
-        &self,
-        _artifact: &Path,
-        _signature: &Path,
-        _certificate: &Path,
-        _expected: &ExpectedIdentity,
-    ) -> Result<VerifiedAttestation, AttestError> {
-        Err(AttestError::Malformed("verify_blob unused".to_string()))
-    }
-
     fn verify_bytes(
         &self,
         _artifact: &[u8],
