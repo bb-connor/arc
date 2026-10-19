@@ -127,10 +127,9 @@ Do not count abstract model checks or mocked status DTOs as these executions.
 
 The implementation must account for these existing boundaries:
 
-- `kernel/evaluation/caller_execution.rs` uses `CallerReportServer` as a
-  stand-in for already-performed execution. It is not an authenticated provider
-  adapter. Its transport epoch currently derives from coordinator ownership,
-  not an independently pinned external executor signing key.
+- `kernel/evaluation/caller_execution.rs` exposes committed start and
+  authenticated delivery. The executor identity is pinned at admission; unsigned
+  caller reports have no kernel reconciliation entry point.
 - `kernel/admission_coordinator.rs` does not resume tool admission from
   `DispatchCommitted`. Merely adding that state to its replay match would send
   an already-executed call back through pre-dispatch authority acquisition.

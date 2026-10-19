@@ -9,8 +9,8 @@ use std::sync::Arc;
 pub enum CallerExecutionCheckpoint {
     /// The caller owns a funded hold, before acquiring the sibling registry lock.
     BeforeShareAdmission,
-    /// Dispatch and invocation capture are durable, with post-dispatch cleanup
-    /// ownership armed, but the caller report has not been recorded as a return.
+    /// Dispatch and invocation capture are durable, before the caller receives
+    /// the signed start authorization.
     DispatchCommitted,
 }
 

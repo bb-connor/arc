@@ -62,9 +62,6 @@ pub(crate) enum DispatchMode {
     /// executes the tool elsewhere and returns through a reconcile that resumes
     /// the same operation.
     ReserveForCaller,
-    /// Resume a caller-reserved operation with the caller's report standing in
-    /// for the tool server.
-    CallerReport(std::sync::Arc<dyn crate::ToolServerConnection>),
     /// Capture the original participants, then stop before any external effect.
     CallerStart,
 }
@@ -105,15 +102,6 @@ impl EvaluationDisposition {
         Self {
             preflight_hold: PreflightHoldDisposition::ReverseForRetry,
             dispatch: DispatchMode::ReserveForCaller,
-            session_guard_attempt: None,
-        }
-    }
-
-    /// Resume a caller reservation with the caller's report as the server.
-    pub(crate) fn caller_report(report: std::sync::Arc<dyn crate::ToolServerConnection>) -> Self {
-        Self {
-            preflight_hold: PreflightHoldDisposition::ReverseForRetry,
-            dispatch: DispatchMode::CallerReport(report),
             session_guard_attempt: None,
         }
     }

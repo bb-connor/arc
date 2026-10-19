@@ -10,8 +10,8 @@ export RUST_TEST_THREADS=1
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 
 ./scripts/run-exact-cargo-test-inventory.sh --label "authenticated caller lifecycle" --expected \
-  a_nonce_of_an_unreserved_operation_cannot_reconcile \
-  a_report_for_other_arguments_is_refused_and_keeps_the_reservation \
+  a_nonce_of_an_unreserved_operation_cannot_start \
+  a_start_for_other_arguments_is_refused_and_keeps_the_reservation \
   a_second_reservation_is_bounded_by_the_shared_budget \
   an_expired_caller_reservation_is_compensated_by_startup_recovery \
   authenticated::authenticated_report_finalizes_after_expiry_and_restart_without_readmission \
@@ -31,7 +31,7 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   delegated_share::boundaries::concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak \
   delegated_share::caller_share_snapshot_is_complete_scoped_and_fenced \
   delegated_share::indexed::indexed_caller_shares_match_verified_operations_for_each_parent \
-  delegated_share::outcome_unknown::an_unknown_caller_outcome_retains_its_share_and_capture_after_restart_and_expiry \
+  delegated_share::outcome_unknown::an_unreported_caller_dispatch_retains_its_share_and_capture_after_restart_and_expiry \
   delegated_share::pending::a_later_funded_sibling_cannot_displace_an_existing_caller_owner \
   delegated_share::pending::an_interrupted_funded_caller_is_compensated_without_displacing_a_reserved_owner \
   delegated_share::projection_tamper::external_foreign_projection_insert_is_refused \

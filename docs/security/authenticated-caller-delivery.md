@@ -126,14 +126,13 @@ This gate is local functional and process-loss acceptance. It does not qualify
 process confinement, power loss, distributed authority or public activation.
 See [launch status](launch-status.md) for the tested candidate and broader gates.
 
-## Compatibility and provisioning
+## Authenticated delivery and provisioning
 
-This is an explicit break with reserve/execute/unsigned-report integrations.
-The SDK rejects old `status: "authorized"` reservation responses and its old
-`reconcile_mediated_authorization` method fails before sending HTTP. A configured
-authenticated kernel rejects unsigned reconciliation. An unconfigured legacy
-embedding remains available for historical compatibility tests; its reservation
-is not an executable authorization. Do not use it for external effects.
+Caller execution requires a pinned executor, committed start authorization and
+an authenticated delivery report. Reservation alone does not authorize an effect.
+The kernel exposes no unsigned caller reconciliation API. The SDK rejects
+`status: "authorized"` reservation responses and refuses unsigned reconciliation
+before sending HTTP.
 
 Signed wire artifacts have separate schemas:
 `chio.caller-dispatch-authorization.v1` and `chio.caller-delivery-report.v1`.

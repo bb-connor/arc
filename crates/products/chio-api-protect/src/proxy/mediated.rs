@@ -1,5 +1,8 @@
 use super::*;
 
+#[cfg(test)]
+use chio_kernel::CallerExecutionReport;
+
 use chio_core_types::capability::governance::GovernedTransactionIntent;
 use chio_core_types::capability::supplemental_authorization::OpaqueSupplementalAuthorization;
 use chio_kernel::budget_store::BudgetStore;
@@ -9,8 +12,8 @@ use chio_kernel::execution_nonce::{
     ExecutionNonceConfig, InMemoryExecutionNonceStore, SignedExecutionNonce,
 };
 use chio_kernel::{
-    CallerExecutionReport, ChioKernel, KernelConfig, ToolCallRequest, ToolInvocationCost,
-    ToolServerConnection, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    ChioKernel, KernelConfig, ToolCallRequest, ToolInvocationCost, ToolServerConnection,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 
@@ -693,24 +696,12 @@ pub(crate) async fn sidecar_reconcile_handler(
              a remote control-plane budget store (--control-url) cannot resolve a reserved hold",
         );
     }
-    // Settle on the shared kernel. The same instance minted the nonce, so its
-    // configured nonce authority prevents a second settlement. Non-durable
-    // admission rejects replay; durable completion can redeliver its retained
-    // receipt. The lock releases at the end of the block, before sidecar
-    // receipt-persistence I/O.
     let reconciled = {
         let kernel = mediation_kernel.lock().await;
         if kernel.has_durable_admission_store() {
-            kernel.reconcile_caller_execution_blocking(
-                &parsed.execution_nonce,
-                &parsed.arguments,
-                CallerExecutionReport {
-                    output: serde_json::json!({
-                        "caller_report": { "realized_cost": parsed.realized_cost }
-                    }),
-                    realized_cost: Some(parsed.realized_cost.clone()),
-                },
-            )
+            Err(chio_kernel::KernelError::DurableAdmission(
+                "durable caller execution requires authenticated start and delivery".into(),
+            ))
         } else {
             kernel.reconcile_reserved_authorization_by_nonce(
                 &parsed.execution_nonce,

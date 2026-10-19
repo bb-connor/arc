@@ -285,7 +285,7 @@ pub(super) fn verify(
                 Ok(())
             })?;
         }
-        RecoveryMode::LateCallerReport => {
+        RecoveryMode::LateCallerStart => {
             caller_lookup_waits_for_original_coordinator(&kernel, witness, &fence)?;
             let barrier = std::sync::Barrier::new(2);
             std::thread::scope(|scope| -> TestResult {
@@ -294,25 +294,23 @@ pub(super) fn verify(
                     kernel.reconcile_recoverable_admissions()
                 });
                 barrier.wait();
-                let result = kernel.reconcile_caller_execution_blocking(
-                    witness
-                        .request
-                        .execution_nonce
-                        .as_ref()
-                        .ok_or("native nonce")?,
-                    &witness.request.arguments,
-                    chio_kernel::CallerExecutionReport {
-                        output: serde_json::json!({"forged_late_report": true}),
-                        realized_cost: None,
-                    },
-                );
+                let result = kernel
+                    .start_caller_execution_blocking(
+                        witness
+                            .request
+                            .execution_nonce
+                            .as_ref()
+                            .ok_or("native nonce")?,
+                        &witness.request.arguments,
+                    )
+                    .map(|_| ());
                 assert!(
-                    matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
+                    matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason == "caller start requires an originally pinned executor"),
                     "late caller transport must be rejected: {result:?}"
                 );
                 worker
                     .join()
-                    .map_err(|_| "late-report recovery panicked")??;
+                    .map_err(|_| "late-start recovery panicked")??;
                 Ok(())
             })?;
         }
@@ -528,14 +526,9 @@ fn caller_lookup_waits_for_original_coordinator(
         let (finished_tx, finished_rx) = mpsc::sync_channel(1);
         let worker = scope.spawn(move || {
             let _ = started_tx.send(());
-            let result = kernel.reconcile_caller_execution_blocking(
-                nonce,
-                &witness.request.arguments,
-                chio_kernel::CallerExecutionReport {
-                    output: serde_json::json!({"forged_queued_report": true}),
-                    realized_cost: None,
-                },
-            );
+            let result = kernel
+                .start_caller_execution_blocking(nonce, &witness.request.arguments)
+                .map(|_| ());
             let _ = finished_tx.send(result);
         });
         let started = started_rx.recv_timeout(Duration::from_secs(30));
@@ -555,8 +548,8 @@ fn caller_lookup_waits_for_original_coordinator(
             "caller lookup bypassed the original mutation sequencer"
         );
         assert!(
-            matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason.contains("caller")),
-            "queued native caller report must still be refused: {result:?}"
+            matches!(result, Err(KernelError::DurableAdmission(ref reason)) if reason == "caller start requires an originally pinned executor"),
+            "queued native caller start must still be refused: {result:?}"
         );
         Ok(())
     })
