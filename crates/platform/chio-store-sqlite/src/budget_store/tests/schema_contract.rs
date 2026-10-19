@@ -377,21 +377,32 @@ fn budget_schema_provisioning_preserves_typed_stale_refusal() -> TestResult {
 #[test]
 fn budget_schema_provisioning_refuses_unstamped_colocated_catalog_without_mutation() -> TestResult {
     use std::os::unix::fs::PermissionsExt;
-    let (directory, path) = populated_database()?;
-    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
-    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
-    let lock_root = directory.path().join("locks");
-    std::fs::create_dir(&lock_root)?;
-    std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
-    let connection = Connection::open(&path)?;
-    connection.execute_batch("CREATE TABLE revoked_capabilities(capability_id TEXT PRIMARY KEY); DELETE FROM chio_store_schema_versions WHERE store_key = 'budget'; PRAGMA application_id = 0;")?;
-    let before = snapshot(&connection)?;
-    let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
-        .expect_err("unstamped budget catalog cannot be provisioned");
-    assert!(
-        matches!(error, crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(ref message)) if message == "budget schema does not match the current v1 shape")
-    );
-    assert_eq!(snapshot(&connection)?, before);
+    for application_id in [crate::CHIO_SQLITE_APPLICATION_ID, 0] {
+        let (directory, path) = populated_database()?;
+        std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))?;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))?;
+        let lock_root = directory.path().join("locks");
+        std::fs::create_dir(&lock_root)?;
+        std::fs::set_permissions(&lock_root, std::fs::Permissions::from_mode(0o700))?;
+        let connection = Connection::open(&path)?;
+        connection.execute_batch("CREATE TABLE revoked_capabilities(capability_id TEXT PRIMARY KEY); DELETE FROM chio_store_schema_versions WHERE store_key = 'budget';")?;
+        connection.pragma_update(None, "application_id", application_id)?;
+        let before = snapshot(&connection)?;
+        let error = crate::SqliteAuthorityStore::provision(&path, &lock_root)
+            .expect_err("unstamped budget catalog cannot be provisioned");
+        if application_id == 0 {
+            assert!(
+                matches!(&error, crate::SqliteServingOwnerError::ToolOutcomeSchema(chio_kernel::tool_outcome::ToolOutcomeStoreError::Invariant(message)) if message == "versioned outcome source has a damaged application identity"),
+                "unexpected identity refusal: {error:?}"
+            );
+        } else {
+            assert!(
+                matches!(&error, crate::SqliteServingOwnerError::BudgetSchema(BudgetStoreError::Invariant(message)) if message == "budget schema does not match the current v1 shape"),
+                "unexpected budget refusal: {error:?}"
+            );
+        }
+        assert_eq!(snapshot(&connection)?, before);
+    }
     Ok(())
 }
 
