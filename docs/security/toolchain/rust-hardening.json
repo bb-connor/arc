@@ -43,7 +43,8 @@
     "chio-runtime-harness": "crates/kernel/chio-runtime-harness/src/lib.rs",
     "chio-runtime": "crates/kernel/chio-runtime/src/lib.rs",
     "chio-cage-init": "crates/security/chio-cage-init/src/lib.rs",
-    "chio-cage-plan": "crates/security/chio-cage-plan/src/lib.rs"
+    "chio-cage-plan": "crates/security/chio-cage-plan/src/lib.rs",
+    "chio-semantic-contracts": "crates/security/chio-semantic-contracts/src/lib.rs"
   },
   "accounting_modules": [
     "crates/kernel/chio-kernel-core/src/budget_split.rs",

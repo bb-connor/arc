@@ -1,7 +1,10 @@
 use super::*;
 
 impl VerifiedAdmissionReceipt {
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "Each expected binding is checked independently against the refusal receipt."
+    )]
     pub(crate) fn from_kernel_verified_refusal(
         receipt: ChioReceipt,
         expected_kernel_public_key: &PublicKey,

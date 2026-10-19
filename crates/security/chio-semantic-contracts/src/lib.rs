@@ -2,8 +2,22 @@
 //! contracts, semantic registries, selectors, plans and invocation
 //! recomputation. No provider, plugin, filesystem, store or clock is
 //! reachable, and no result is an execution permit.
-#![cfg_attr(not(feature = "std"), no_std)]
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::indexing_slicing,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unreachable,
+        clippy::dbg_macro,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::as_conversions,
+    )
+)]
 #![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 
