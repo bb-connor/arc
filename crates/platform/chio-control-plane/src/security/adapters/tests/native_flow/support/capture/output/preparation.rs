@@ -362,3 +362,68 @@ fn native_output_preparation_rejects_missing_double_suppressed_and_panicking_joi
     }
     Ok(())
 }
+
+struct StoppingOutputHook {
+    binding: NativeSecurityAuthorityBindingV1,
+    control: chio_kernel::stop::StopControl,
+}
+
+impl SecurityPreDispatchHook for StoppingOutputHook {
+    fn name(&self) -> &str {
+        "stop-during-output-preparation"
+    }
+    fn native_authority_binding(
+        &self,
+    ) -> Result<Option<NativeSecurityAuthorityBindingV1>, KernelError> {
+        Ok(Some(self.binding.clone()))
+    }
+    fn commit(
+        &self,
+        _: &SecurityPreDispatchContext<'_>,
+    ) -> Result<Option<SecurityDispatchOutcomeHandle>, KernelError> {
+        Err(KernelError::GuardDenied("output-only test hook".into()))
+    }
+    fn prepare_native_output(
+        &self,
+        _: &chio_kernel::tool_outcome::DurableSecurityReleaseContext<'_>,
+        authority: &chio_kernel::NativeSecurityOutputJoinAuthority<'_>,
+    ) -> Result<(), KernelError> {
+        authority.join_output(InformationLabel::bottom())?;
+        self.control
+            .stop(chio_kernel::stop::StopCommand {
+                reason: "stop during output preparation".into(),
+                authorizer: chio_kernel::stop::StopAuthorizer::shared_credential("output-test"),
+                requested_via: chio_kernel::stop::StopRequestPath::OfflineCli,
+                allow_containment: false,
+            })
+            .map_err(|error| KernelError::Internal(error.to_string()))?;
+        Ok(())
+    }
+}
+
+#[test]
+fn native_output_preparation_stop_returns_typed_withholding() -> TestResult {
+    let mut fixture = super::super::super::super::public_fixture()?;
+    let finalizing = finalizing(&mut fixture, false)?;
+    let control = chio_kernel::stop::StopControl::process_local();
+    fixture.kernel.set_stop_control(control.clone());
+    fixture
+        .kernel
+        .set_security_pre_dispatch_hook(Arc::new(StoppingOutputHook {
+            binding: fixture.binding.clone(),
+            control,
+        }));
+    let result = prepare(
+        &fixture,
+        &finalizing,
+        &finalizing.lease,
+        &ToolCallOutput::Value(serde_json::json!({"allowed": true})),
+    )?;
+    assert!(
+        matches!(result, Err(KernelError::OutputWithheld)),
+        "{result:?}"
+    );
+    assert_eq!(counts(&fixture)?, (1, 1, 0));
+    assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
+    Ok(())
+}

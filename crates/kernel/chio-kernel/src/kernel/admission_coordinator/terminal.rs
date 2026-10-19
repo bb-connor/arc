@@ -764,12 +764,9 @@ impl ChioKernel {
                     signing_nonce
             })),
         );
-        let expected_metadata = if matches!(expected_decision, Decision::Allow) {
-            expected_metadata
-        } else {
+        let expected_metadata =
             RefusalReceiptMetadata::new(expected_metadata, IdentityDisposition::Terminal)
-                .into_signed_metadata(operation.binding().request_namespace_digest())
-        };
+                .into_signed_metadata(operation.binding().request_namespace_digest());
         let dispatch_fence = operation
             .dispatch_commit()
             .map(|commit| &commit.store_fence);
@@ -1541,12 +1538,8 @@ impl ChioKernel {
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
             })?;
-        let metadata = if matches!(terminal_decision, Decision::Allow) {
-            metadata
-        } else {
-            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal)
-                .into_signed_metadata(admission.operation.binding().request_namespace_digest())
-        };
+        let metadata = RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal)
+            .into_signed_metadata(admission.operation.binding().request_namespace_digest());
         let persisted_binding = admission.operation.binding().to_persisted();
         let authenticated_tenant_id = persisted_binding.authenticated_tenant_id.as_str();
         let receipt_tenant_id = (authenticated_tenant_id != LOCAL_SYSTEM_TENANT_ID)
@@ -1740,12 +1733,7 @@ impl ChioKernel {
                     &runtime.fence,
                     trusted_now_unix_ms,
                 )
-                .map_err(|error| match error {
-                    crate::admission_operation::ChannelTerminalAuthorityError::OutputWithheld => {
-                        KernelError::OutputWithheld
-                    }
-                    error => KernelError::DurableAdmission(error.to_string()),
-                })?
+                .map_err(|error| KernelError::DurableAdmission(error.to_string()))?
             } else {
                 runtime
                     .store
@@ -1808,6 +1796,7 @@ impl ChioKernel {
         {
             self.append_memory_provenance_for_write(store, key, request, &projected_receipt)?;
         }
+        self.require_caller_output_release(tool_return, request)?;
         let (verdict, reason, terminal_state, execution_nonce) =
             if let Some(denial) = delivery_evaluation.denial.as_ref() {
                 (

@@ -59,6 +59,14 @@ fn stopped_live_return_and_retry_retain_output_until_resume() -> TestResult {
     assert!(released.output.is_some());
     assert!(released.receipt.verify_signature()?);
     assert_eq!(
+        released
+            .receipt
+            .metadata
+            .as_ref()
+            .ok_or("receipt metadata")?["chio_runtime"]["identity_disposition"],
+        "terminal"
+    );
+    assert_eq!(
         store.operation().state(),
         AdmissionOperationState::Completed
     );

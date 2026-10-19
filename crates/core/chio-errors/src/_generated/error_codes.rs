@@ -679,7 +679,7 @@ pub const KERNEL_OUTPUT_WITHHELD: ErrorCodeSpec = ErrorCodeSpec {
     jsonrpc_code: None,
     since: "0.1.0",
     stability: "stable",
-    consumed_by: &["chio-kernel", "chio-process"],
+    consumed_by: &["chio-kernel", "chio-process", "chio-control-plane"],
 };
 
 pub const KERNEL_INTERNAL_ERROR: ErrorCodeSpec = ErrorCodeSpec {

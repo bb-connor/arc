@@ -670,6 +670,7 @@ codes:
     consumed_by:
       - chio-kernel
       - chio-process
+      - chio-control-plane
   - urn: "urn:chio:error:kernel:internal-error"
     domain: kernel
     severity: fatal
