@@ -4495,10 +4495,12 @@ fn mcp_serve_http_control_service_centralizes_receipts_revocations_and_authority
         rejected_session.status(),
         reqwest::StatusCode::INTERNAL_SERVER_ERROR
     );
-    assert!(rejected_session
-        .text()
-        .expect("read rejected unannounced rotation response")
-        .contains("current key does not match the operator pin"));
+    assert_eq!(
+        rejected_session
+            .text()
+            .expect("read rejected unannounced rotation response"),
+        "urn:chio:error:transport:session-spawn-failed"
+    );
 
     drop(server_b);
     let (repinned_listen_b, _repinned_server_b) = spawn_with_bind_retry(

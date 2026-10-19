@@ -3769,6 +3769,19 @@ pub const TRANSPORT_INVALID_PROXY_HEADER: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-mcp-remote"],
 };
 
+pub const TRANSPORT_SESSION_SPAWN_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:session-spawn-failed",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The remote MCP edge could not construct a session for an admitted request.",
+    help: "Retry later; the operator must inspect the server log for the construction failure.",
+    string_code: "CHIO-TRANSPORT-SESSION-SPAWN-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -4051,6 +4064,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_MEDIATED_DENIAL,
     TRANSPORT_UNTRUSTED_PROXY,
     TRANSPORT_INVALID_PROXY_HEADER,
+    TRANSPORT_SESSION_SPAWN_FAILED,
 ];
 
 #[must_use]
