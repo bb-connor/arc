@@ -10,7 +10,7 @@
 
 use std::fmt;
 #[cfg(unix)]
-use std::fs::{File, OpenOptions};
+use std::fs::OpenOptions;
 #[cfg(unix)]
 use std::io::{Read, Write};
 #[cfg(unix)]
@@ -47,6 +47,8 @@ use crate::authority_ipc::{
     verify_authority_exchange, SignedAuthorityRequest, SignedAuthorityResponse,
     VerifiedAuthorityExchange,
 };
+#[cfg(unix)]
+use crate::lifecycle_lock::LifecycleLock;
 use crate::protocol::{BrokerExecuteRequest, MAX_BODY_BYTES, MAX_WIRE_BYTES};
 use crate::provision::AdminAuthorization;
 use crate::{validate_digest, validate_identifier, BrokerError, Result};
@@ -699,7 +701,7 @@ pub(crate) struct BrokerPrivilegedAuditEndpoint {
     challenge_signer: Arc<dyn SigningBackend>,
     handler: Arc<dyn BrokerPrivilegedAuditHandler>,
     socket_identity: AuditSocketIdentity,
-    _lifecycle_lock: File,
+    _lifecycle_lock: LifecycleLock,
 }
 
 #[cfg(unix)]
@@ -1440,7 +1442,7 @@ fn validate_audit_socket_identity(
 }
 
 #[cfg(unix)]
-fn acquire_audit_lifecycle_lock(path: &Path, service_uid: u32) -> Result<File> {
+fn acquire_audit_lifecycle_lock(path: &Path, service_uid: u32) -> Result<LifecycleLock> {
     let mut lock_path = path.as_os_str().to_os_string();
     lock_path.push(".lifecycle.lock");
     let lock_path = PathBuf::from(lock_path);
@@ -1476,14 +1478,11 @@ fn acquire_audit_lifecycle_lock(path: &Path, service_uid: u32) -> Result<File> {
             "privileged audit lifecycle lock identity is invalid".to_string(),
         ));
     }
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive).map_err(
-        |error| {
-            BrokerError::AuthorityUnavailable(format!(
-                "privileged audit socket is owned by another daemon: {error}"
-            ))
-        },
-    )?;
-    Ok(lock)
+    LifecycleLock::try_exclusive(lock).map_err(|error| {
+        BrokerError::AuthorityUnavailable(format!(
+            "privileged audit socket is owned by another daemon: {error}"
+        ))
+    })
 }
 
 #[cfg(unix)]

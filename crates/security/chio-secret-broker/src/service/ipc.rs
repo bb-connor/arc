@@ -7,8 +7,8 @@ use super::{
 };
 #[cfg(unix)]
 use super::{
-    is_well_formed_broker_execute_diagnostic_code, File, Instant, OpenOptions, OpenOptionsExt,
-    PathBuf, PermissionsExt, UnixListener, UnixStream,
+    is_well_formed_broker_execute_diagnostic_code, Instant, OpenOptions, OpenOptionsExt, PathBuf,
+    PermissionsExt, UnixListener, UnixStream,
 };
 #[cfg(test)]
 use super::{
@@ -58,7 +58,7 @@ pub struct UnixBrokerEndpoint {
     socket_path: PathBuf,
     socket_identity: BrokerSocketIdentity,
     trusted_service_uid: u32,
-    _lifecycle_lock: File,
+    _lifecycle_lock: LifecycleLock,
     prepared: PreparedIpcSlot,
 }
 
@@ -303,6 +303,8 @@ use response::write_broker_ipc_response;
 
 mod lifecycle;
 
+#[cfg(unix)]
+use crate::lifecycle_lock::LifecycleLock;
 #[cfg(unix)]
 use lifecycle::acquire_broker_socket_lifecycle_lock;
 
