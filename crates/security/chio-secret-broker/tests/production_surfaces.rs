@@ -27,6 +27,7 @@ use chio_secret_broker::receipt::{
     BROKER_RECEIPT_SCHEMA,
 };
 use chio_secret_broker::service::IpcOperation;
+use chio_secret_broker::BrokerError;
 use chio_test_support::prelude::*;
 use sha2::Digest;
 
@@ -68,19 +69,25 @@ fn governed_admin_test_policy() -> (GovernedAdminPolicy, PublicKey) {
 
 #[test]
 fn governed_admin_replay_rejects_volatile_and_relative_database_names() {
-    for path in [
-        std::path::PathBuf::from(":memory:"),
-        std::path::PathBuf::from("FiLe:admin-replay?mode=memory&cache=shared"),
-        std::path::PathBuf::from("relative-admin-replay.sqlite3"),
+    for (path, message) in [
+        (
+            std::path::PathBuf::from(":memory:"),
+            "broker database must use a durable filesystem path",
+        ),
+        (
+            std::path::PathBuf::from("FiLe:admin-replay?mode=memory&cache=shared"),
+            "broker database must use a durable filesystem path",
+        ),
+        (
+            std::path::PathBuf::from("relative-admin-replay.sqlite3"),
+            "broker database path must be absolute",
+        ),
     ] {
         let (policy, receipt_signer) = governed_admin_test_policy();
-        assert!(GovernedAdminAuthorizer::open(
-            path,
-            policy,
-            receipt_signer,
-            Arc::new(FixedClock(100)),
-        )
-        .is_err());
+        storage(
+            GovernedAdminAuthorizer::open(path, policy, receipt_signer, Arc::new(FixedClock(100))),
+            message,
+        );
     }
 }
 
@@ -105,14 +112,14 @@ fn governed_admin_replay_detects_hardlinks_and_path_rebinding() {
     .test_expect("authorizer");
 
     std::fs::hard_link(&database, &hardlink).test_expect("hardlink database");
-    assert!(authorizer.query_operation(&"00".repeat(32)).is_err());
-    assert!(GovernedAdminAuthorizer::open(
-        &database,
-        policy,
-        receipt_signer,
-        Arc::new(FixedClock(100)),
-    )
-    .is_err());
+    storage(
+        authorizer.query_operation(&"00".repeat(32)),
+        HARDLINKED_DATABASE,
+    );
+    storage(
+        GovernedAdminAuthorizer::open(&database, policy, receipt_signer, Arc::new(FixedClock(100))),
+        HARDLINKED_DATABASE,
+    );
     std::fs::remove_file(&hardlink).test_expect("remove hardlink");
 
     std::fs::rename(&database, &displaced).test_expect("displace database name");
@@ -122,7 +129,10 @@ fn governed_admin_replay_detects_hardlinks_and_path_rebinding() {
         .mode(0o600)
         .open(&database)
         .test_expect("create same-name replacement");
-    assert!(authorizer.query_operation(&"00".repeat(32)).is_err());
+    storage(
+        authorizer.query_operation(&"00".repeat(32)),
+        DATABASE_IDENTITY_CHANGED,
+    );
 }
 
 fn credential() -> CredentialRef {
@@ -212,14 +222,15 @@ fn governed_admin_authorization_is_threshold_bound_and_durably_single_use() {
         )
         .test_expect("authorized once");
     assert_eq!(digest.len(), 64);
-    assert!(authorizer
-        .authorize(
+    denied(
+        authorizer.authorize(
             &authorization,
             AdminOperation::Rotate,
             "tenant-production",
             &credential,
-        )
-        .is_err());
+        ),
+        APPROVAL_CONSUMED,
+    );
 
     let reopened = GovernedAdminAuthorizer::open(
         trusted_directory.join("admin-replay.sqlite3"),
@@ -233,14 +244,15 @@ fn governed_admin_authorization_is_threshold_bound_and_durably_single_use() {
         Arc::new(FixedClock(100)),
     )
     .test_expect("reopened authorizer");
-    assert!(reopened
-        .authorize(
+    denied(
+        reopened.authorize(
             &authorization,
             AdminOperation::Rotate,
             "tenant-production",
             &credential,
-        )
-        .is_err());
+        ),
+        APPROVAL_CONSUMED,
+    );
 }
 
 #[test]
@@ -403,9 +415,10 @@ fn governed_admin_journal_rejects_self_signed_completion_substitution() {
         &Ed25519Backend::new(attacker_receipt_signer.clone()),
     )
     .test_expect("untrusted completion receipt");
-    assert!(authorizer
-        .complete_operation(&operation, &untrusted_completion)
-        .is_err());
+    denied(
+        authorizer.complete_operation(&operation, &untrusted_completion),
+        UNTRUSTED_COMPLETION_SIGNER,
+    );
     authorizer
         .complete_operation(&operation, &trusted_receipt)
         .test_expect("complete operation");
@@ -447,10 +460,14 @@ fn governed_admin_journal_rejects_self_signed_completion_substitution() {
         Arc::new(FixedClock(1_000)),
     )
     .test_expect("reopened authorizer");
-    assert!(reopened.query_operation(operation.operation_id()).is_err());
-    assert!(reopened
-        .begin_intent_digest(&authorization, &intent_digest)
-        .is_err());
+    denied(
+        reopened.query_operation(operation.operation_id()),
+        UNTRUSTED_COMPLETION_SIGNER,
+    );
+    denied(
+        reopened.begin_intent_digest(&authorization, &intent_digest),
+        UNTRUSTED_COMPLETION_SIGNER,
+    );
 }
 
 #[test]
@@ -711,7 +728,10 @@ fn enterprise_receipt_binds_every_execution_field_and_excludes_seeded_secret() {
     mutations.push(lineage);
 
     for mutation in mutations {
-        assert!(verify_execution_receipt(&mutation, &signer.public_key()).is_err());
+        denied(
+            verify_execution_receipt(&mutation, &signer.public_key()),
+            "broker receipt signature is invalid",
+        );
     }
 }
 
@@ -741,7 +761,10 @@ fn durable_receipt_sink_is_append_only_idempotent_and_restart_safe() {
     let conflicting =
         sign_execution_receipt(conflicting_body, &Ed25519Backend::new(signer.clone()))
             .test_expect("conflicting signed receipt");
-    assert!(reopened.persist(&conflicting).is_err());
+    conflict(
+        reopened.persist(&conflicting),
+        "broker receipt ID was reused with different canonical content",
+    );
 }
 
 #[test]
@@ -759,7 +782,10 @@ fn durable_completed_response_replays_exact_bytes_after_restart() {
         chio_secret_broker::protocol::HeaderField::normalized("content-type", b"text/html")
             .test_expect("valid substituted header"),
     );
-    assert!(sink.persist_completed(&substituted).is_err());
+    response_rejected(
+        sink.persist_completed(&substituted),
+        "completed broker response headers differ from signed evidence",
+    );
 
     let first = sink
         .persist_completed(&response)
@@ -798,7 +824,10 @@ fn receipt_store_rejects_success_failure_terminal_conflicts_in_both_orders() {
     success_first
         .persist_completed(&response)
         .test_expect("persist success");
-    assert!(success_first.persist_failure(&failure).is_err());
+    conflict(
+        success_first.persist_failure(&failure),
+        "broker failure receipt conflicts with an existing append-only record",
+    );
 
     let failure_first = SqliteBrokerReceiptSink::open(
         trusted_directory.join("failure-first.sqlite3"),
@@ -808,7 +837,10 @@ fn receipt_store_rejects_success_failure_terminal_conflicts_in_both_orders() {
     failure_first
         .persist_failure(&failure)
         .test_expect("persist failure");
-    assert!(failure_first.persist_completed(&response).is_err());
+    conflict(
+        failure_first.persist_completed(&response),
+        "broker attempt already has different append-only terminal evidence",
+    );
 }
 
 #[test]
@@ -838,51 +870,54 @@ fn durable_failure_receipt_binds_truthful_dispatch_state_and_survives_restart() 
         .test_expect("signed failure receipt");
     verify_failure_receipt(&receipt, &signer.public_key()).test_expect("verified failure receipt");
 
-    let mut mutations = Vec::new();
+    let mut mutations: Vec<(_, &str)> = Vec::new();
     let mut schema = receipt.clone();
     schema.body.schema = "chio.broker-execution-failure-receipt.tampered".to_string();
-    mutations.push(schema);
+    mutations.push((schema, FAILURE_RECEIPT_TRUST));
     let mut identifier = receipt.clone();
     identifier.body.receipt_id = "broker-failure-receipt-production-2".to_string();
-    mutations.push(identifier);
+    mutations.push((identifier, FAILURE_RECEIPT_SIGNATURE));
     let mut time = receipt.clone();
     time.body.issued_at_unix_seconds += 1;
-    mutations.push(time);
+    mutations.push((time, FAILURE_RECEIPT_SIGNATURE));
     let mut stage = receipt.clone();
     stage.body.stage = BrokerFailureStage::Dispatch;
-    mutations.push(stage);
+    mutations.push((stage, FAILURE_RECEIPT_SIGNATURE));
     let mut outcome = receipt.clone();
     outcome.body.outcome = BrokerFailureOutcome::Denied;
-    mutations.push(outcome);
+    mutations.push((outcome, FAILURE_RECEIPT_STATE));
     let mut diagnostic = receipt.clone();
     diagnostic.body.diagnostic_code = "chio.broker.capture_conflict".to_string();
-    mutations.push(diagnostic);
+    mutations.push((diagnostic, FAILURE_RECEIPT_SIGNATURE));
     let mut request = receipt.clone();
     request.body.request_digest = "33".repeat(32);
-    mutations.push(request);
+    mutations.push((request, FAILURE_RECEIPT_SIGNATURE));
     let mut capability = receipt.clone();
     capability.body.capability_digest = Some("44".repeat(32));
-    mutations.push(capability);
+    mutations.push((capability, FAILURE_RECEIPT_SIGNATURE));
     let mut attempt = receipt.clone();
     attempt.body.attempt_id = Some("attempt-production-2".to_string());
-    mutations.push(attempt);
+    mutations.push((attempt, FAILURE_RECEIPT_SIGNATURE));
     let mut invocation = receipt.clone();
     invocation.body.invocation_id = Some("invocation-production-2".to_string());
-    mutations.push(invocation);
+    mutations.push((invocation, FAILURE_RECEIPT_SIGNATURE));
     let mut hold = receipt.clone();
     hold.body.hold_id = Some("hold-production-2".to_string());
-    mutations.push(hold);
+    mutations.push((hold, FAILURE_RECEIPT_SIGNATURE));
     let mut parent = receipt.clone();
     parent.body.parent_capability_id = Some("parent-capability-production-2".to_string());
-    mutations.push(parent);
+    mutations.push((parent, FAILURE_RECEIPT_SIGNATURE));
     let mut broker = receipt.clone();
     broker.body.broker_capability_id = Some("broker-capability-production-2".to_string());
-    mutations.push(broker);
+    mutations.push((broker, FAILURE_RECEIPT_SIGNATURE));
     let mut dispatch = receipt.clone();
     dispatch.body.dispatch_knowledge = BrokerDispatchKnowledge::Committed;
-    mutations.push(dispatch);
-    for mutation in mutations {
-        assert!(verify_failure_receipt(&mutation, &signer.public_key()).is_err());
+    mutations.push((dispatch, FAILURE_RECEIPT_STATE));
+    for (mutation, message) in mutations {
+        denied(
+            verify_failure_receipt(&mutation, &signer.public_key()),
+            message,
+        );
     }
 
     let sink = SqliteBrokerReceiptSink::open(&path, signer.public_key()).test_expect("sink");
@@ -900,5 +935,61 @@ fn durable_failure_receipt_binds_truthful_dispatch_state_and_survives_restart() 
             .test_expect("load failure")
             .test_expect("persisted failure"),
         receipt
+    );
+}
+
+const HARDLINKED_DATABASE: &str = "broker database must have trusted ownership, mode 0600 or stricter, no authority-granting ACL, and one hard link";
+const DATABASE_IDENTITY_CHANGED: &str = "broker database descriptor identity changed";
+const APPROVAL_CONSUMED: &str = "governed admin approval was already consumed";
+const UNTRUSTED_COMPLETION_SIGNER: &str = "admin mutation receipt signer is not trusted";
+const FAILURE_RECEIPT_TRUST: &str =
+    "broker failure receipt schema, signer, or algorithm is invalid";
+const FAILURE_RECEIPT_SIGNATURE: &str = "broker failure receipt signature is invalid";
+const FAILURE_RECEIPT_STATE: &str = "broker failure receipt body is invalid: broker request is invalid: broker failure receipt stage, outcome, or dispatch state is inconsistent";
+
+#[track_caller]
+fn refusal<T>(result: Result<T, BrokerError>, code: &str) -> BrokerError {
+    match result {
+        Err(error) => {
+            assert_eq!(error.diagnostic_code(), code, "{error:?}");
+            error
+        }
+        Ok(_) => panic!("operation was accepted"),
+    }
+}
+
+#[track_caller]
+fn denied<T>(result: Result<T, BrokerError>, message: &str) {
+    let error = refusal(result, "authorization_denied");
+    assert!(
+        matches!(&error, BrokerError::AuthorizationDenied(actual) if actual == message),
+        "{error:?}"
+    );
+}
+
+#[track_caller]
+fn storage<T>(result: Result<T, BrokerError>, message: &str) {
+    let error = refusal(result, "storage");
+    assert!(
+        matches!(&error, BrokerError::Storage(actual) if actual == message),
+        "{error:?}"
+    );
+}
+
+#[track_caller]
+fn conflict<T>(result: Result<T, BrokerError>, message: &str) {
+    let error = refusal(result, "conflict");
+    assert!(
+        matches!(&error, BrokerError::Conflict(actual) if actual == message),
+        "{error:?}"
+    );
+}
+
+#[track_caller]
+fn response_rejected<T>(result: Result<T, BrokerError>, message: &str) {
+    let error = refusal(result, "response_rejected");
+    assert!(
+        matches!(&error, BrokerError::ResponseRejected(actual) if actual == message),
+        "{error:?}"
     );
 }
