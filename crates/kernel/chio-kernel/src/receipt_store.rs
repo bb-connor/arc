@@ -507,7 +507,7 @@ pub trait ReceiptStore: Send + Sync {
         _budget: std::time::Duration,
     ) -> Result<Option<u64>, ReceiptStoreError> {
         Err(ReceiptStoreError::Unsupported(
-            "timeout-aware atomic settlement observation projection".to_string(),
+            "atomic settlement observation projection".to_string(),
         ))
     }
     /// Load a chio receipt by id. The provided default returns `None`; a store
@@ -1606,7 +1606,7 @@ mod tests {
                 std::time::Duration::from_millis(1),
             ),
             Err(ReceiptStoreError::Unsupported(message))
-                if message == "timeout-aware atomic settlement observation projection"
+                if message == "atomic settlement observation projection"
         ));
         assert_eq!(store.append_calls.load(Ordering::SeqCst), 0);
     }
@@ -1633,7 +1633,7 @@ mod tests {
                 std::time::Duration::from_millis(1),
             ),
             Err(ReceiptStoreError::Unsupported(message))
-                if message == "timeout-aware atomic settlement observation projection"
+                if message == "atomic settlement observation projection"
         ));
         assert_eq!(store.append_calls.load(Ordering::SeqCst), 0);
     }
