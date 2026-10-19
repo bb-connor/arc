@@ -733,7 +733,7 @@ impl<'de> Deserialize<'de> for InformationLabel {
 mod tests {
     use super::{
         Compartment, InformationLabel, LabelLimits, LabelValidationError, PrincipalId,
-        ToolFlowDeclaration, DEFAULT_LABEL_LIMITS, MAX_IDENTIFIER_BYTES,
+        ToolFlowDeclaration, ToolFlowValidationError, DEFAULT_LABEL_LIMITS, MAX_IDENTIFIER_BYTES,
     };
     use alloc::collections::{BTreeMap, BTreeSet};
     use alloc::format;
@@ -773,6 +773,29 @@ mod tests {
             unit unit_struct newtype_struct seq tuple tuple_struct map struct enum identifier
             ignored_any
         }
+    }
+
+    fn decode_error<T: serde::de::DeserializeOwned + core::fmt::Debug>(
+        json: &str,
+    ) -> alloc::string::String {
+        match from_str::<T>(json) {
+            Ok(value) => panic!("decode must fail: {value:?}"),
+            Err(error) => error.to_string(),
+        }
+    }
+
+    fn decode_value_error(value: Value) -> alloc::string::String {
+        match serde_json::from_value::<InformationLabel>(value) {
+            Ok(label) => panic!("decode must fail: {label:?}"),
+            Err(error) => error.to_string(),
+        }
+    }
+
+    fn assert_message(message: &str, expected: &str) {
+        assert!(
+            message.contains(expected),
+            "expected {expected:?} in {message:?}"
+        );
     }
 
     fn principal(value: &str) -> PrincipalId {
@@ -838,7 +861,10 @@ mod tests {
     fn duplicate_owner_json_is_rejected() {
         let json =
             r#"{"kind":"known","owners":{"alice":["alice"],"alice":["alice"]},"compartments":[]}"#;
-        assert!(from_str::<InformationLabel>(json).is_err());
+        assert_message(
+            &decode_error::<InformationLabel>(json),
+            "duplicate owner policy `alice`",
+        );
     }
 
     #[test]
@@ -846,15 +872,35 @@ mod tests {
         let duplicate_reader =
             r#"{"kind":"known","owners":{"alice":["alice","alice"]},"compartments":[]}"#;
         let duplicate_compartment = r#"{"kind":"known","owners":{},"compartments":["pii","pii"]}"#;
-        assert!(from_str::<InformationLabel>(duplicate_reader).is_err());
-        assert!(from_str::<InformationLabel>(duplicate_compartment).is_err());
+        assert_message(
+            &decode_error::<InformationLabel>(duplicate_reader),
+            "duplicate reader principal `alice`",
+        );
+        assert_message(
+            &decode_error::<InformationLabel>(duplicate_compartment),
+            "duplicate compartment `pii`",
+        );
     }
 
     #[test]
     fn blank_principal_and_compartment_are_rejected() {
-        for value in ["", " ", " alice", "alice ", "alice\n"] {
-            assert!(PrincipalId::new(value).is_err(), "principal {value:?}");
-            assert!(Compartment::new(value).is_err(), "compartment {value:?}");
+        for (value, expected) in [
+            ("", LabelValidationError::BlankIdentifier),
+            (" ", LabelValidationError::NonCanonicalIdentifier),
+            (" alice", LabelValidationError::NonCanonicalIdentifier),
+            ("alice ", LabelValidationError::NonCanonicalIdentifier),
+            ("alice\n", LabelValidationError::NonCanonicalIdentifier),
+        ] {
+            assert_eq!(
+                PrincipalId::new(value),
+                Err(expected),
+                "principal {value:?}"
+            );
+            assert_eq!(
+                Compartment::new(value),
+                Err(expected),
+                "compartment {value:?}"
+            );
         }
     }
 
@@ -897,8 +943,14 @@ mod tests {
     fn unknown_and_variant_payload_fields_are_rejected() {
         let unknown = r#"{"kind":"known","owners":{},"compartments":[],"extra":true}"#;
         let top_payload = r#"{"kind":"top","owners":{}}"#;
-        assert!(from_str::<InformationLabel>(unknown).is_err());
-        assert!(from_str::<InformationLabel>(top_payload).is_err());
+        assert_message(
+            &decode_error::<InformationLabel>(unknown),
+            "unknown field `extra`",
+        );
+        assert_message(
+            &decode_error::<InformationLabel>(top_payload),
+            "top label has payload fields",
+        );
     }
 
     #[test]
@@ -914,22 +966,34 @@ mod tests {
             r#"{"output_label":{"kind":"known","owners":{},"compartments":["pii"]},"input_clearance":{"kind":"known","owners":{},"compartments":["pii"]},"egress":true,"declassification_purposes":["billing","support"]}"#
         );
 
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"egress":true,"declassification_purposes":["billing","billing"]}"#
-        )
-        .is_err());
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"egress":true,"declassification_purposes":[],"unknown":true}"#
-        )
-        .is_err());
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"output_label":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
-        )
-        .is_err());
-        assert!(from_str::<ToolFlowDeclaration>(
-            r#"{"input_clearance":{"kind":"top"},"egress":false,"declassification_purposes":[]}"#
-        )
-        .is_err());
+        assert_message(
+            &decode_error::<ToolFlowDeclaration>(
+                r#"{"egress":true,"declassification_purposes":["billing","billing"]}"#,
+            ),
+            "duplicate declassification purpose `billing`",
+        );
+        assert_message(
+            &decode_error::<ToolFlowDeclaration>(
+                r#"{"egress":true,"declassification_purposes":[]}"#,
+            ),
+            "explicit empty array is not a canonical flow representation",
+        );
+        assert_message(
+            &decode_error::<ToolFlowDeclaration>(r#"{"egress":true,"unknown":true}"#),
+            "unknown field `unknown`",
+        );
+        assert_message(
+            &decode_error::<ToolFlowDeclaration>(
+                r#"{"output_label":{"kind":"top"},"egress":false}"#,
+            ),
+            &ToolFlowValidationError::TopOutputLabel.to_string(),
+        );
+        assert_message(
+            &decode_error::<ToolFlowDeclaration>(
+                r#"{"input_clearance":{"kind":"top"},"egress":false}"#,
+            ),
+            &ToolFlowValidationError::TopInputClearance.to_string(),
+        );
     }
 
     #[test]
@@ -977,24 +1041,45 @@ mod tests {
         }
 
         let negative = [
-            json!({"kind": "top", "owners": {}}),
-            json!({"kind": "unknown"}),
-            json!({"kind": "known", "owners": {}, "compartments": [], "extra": true}),
-            json!({"kind": "known", "owners": {"": [""]}, "compartments": []}),
-            json!({"kind": "known", "owners": {" alice": [" alice"]}, "compartments": []}),
-            json!({"kind": "known", "owners": {"alice": ["bob"]}, "compartments": []}),
-            json!({"kind": "known", "owners": {"alice": ["alice", "alice"]}, "compartments": []}),
-            json!({"kind": "known", "owners": {}, "compartments": [""]}),
-            json!({"kind": "known", "owners": {}, "compartments": ["pii", "pii"]}),
+            (
+                json!({"kind": "top", "owners": {}}),
+                "top label has payload fields".to_string(),
+            ),
+            (
+                json!({"kind": "unknown"}),
+                "unknown variant `unknown`".to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {}, "compartments": [], "extra": true}),
+                "unknown field `extra`".to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {"": [""]}, "compartments": []}),
+                LabelValidationError::BlankIdentifier.to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {" alice": [" alice"]}, "compartments": []}),
+                LabelValidationError::NonCanonicalIdentifier.to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {"alice": ["bob"]}, "compartments": []}),
+                LabelValidationError::OwnerMissingSelfReader.to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {"alice": ["alice", "alice"]}, "compartments": []}),
+                "duplicate reader principal `alice`".to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {}, "compartments": [""]}),
+                LabelValidationError::BlankIdentifier.to_string(),
+            ),
+            (
+                json!({"kind": "known", "owners": {}, "compartments": ["pii", "pii"]}),
+                "duplicate compartment `pii`".to_string(),
+            ),
         ];
-        for vector in negative {
-            let structural_rejection = !validator.is_valid(&vector);
-            let semantic_rejection =
-                serde_json::from_value::<InformationLabel>(vector.clone()).is_err();
-            assert!(
-                structural_rejection || semantic_rejection,
-                "negative vector: {vector}"
-            );
+        for (vector, expected) in negative {
+            assert_message(&decode_value_error(vector), &expected);
         }
 
         let owner_missing_self =
@@ -1003,9 +1088,9 @@ mod tests {
             validator.is_valid(&owner_missing_self),
             "JSON Schema cannot compare a property name with an array member"
         );
-        assert!(
-            serde_json::from_value::<InformationLabel>(owner_missing_self).is_err(),
-            "portable semantic validation must enforce owner self readership"
+        assert_message(
+            &decode_value_error(owner_missing_self),
+            &LabelValidationError::OwnerMissingSelfReader.to_string(),
         );
     }
 
@@ -1022,7 +1107,10 @@ mod tests {
         let oversized_id =
             json!({"kind": "known", "owners": {}, "compartments": [oversized_ascii_id]});
         assert!(!validator.is_valid(&oversized_id));
-        assert!(serde_json::from_value::<InformationLabel>(oversized_id).is_err());
+        assert_message(
+            &decode_value_error(oversized_id),
+            &LabelValidationError::IdentifierTooLong.to_string(),
+        );
 
         let mut owner_object = serde_json::Map::new();
         for value in 0..=DEFAULT_LABEL_LIMITS.max_owners() {
@@ -1035,7 +1123,10 @@ mod tests {
             "compartments": []
         });
         assert!(!validator.is_valid(&too_many_owners));
-        assert!(serde_json::from_value::<InformationLabel>(too_many_owners).is_err());
+        assert_message(
+            &decode_value_error(too_many_owners),
+            &LabelValidationError::TooManyOwners.to_string(),
+        );
 
         let readers = (0..=DEFAULT_LABEL_LIMITS.max_readers_per_owner())
             .map(|value| Value::String(format!("reader-{value}")))
@@ -1046,7 +1137,10 @@ mod tests {
             "compartments": []
         });
         assert!(!validator.is_valid(&too_many_readers));
-        assert!(serde_json::from_value::<InformationLabel>(too_many_readers).is_err());
+        assert_message(
+            &decode_value_error(too_many_readers),
+            &LabelValidationError::TooManyReaders.to_string(),
+        );
 
         let compartments = (0..=DEFAULT_LABEL_LIMITS.max_compartments())
             .map(|value| Value::String(format!("compartment-{value}")))
@@ -1057,7 +1151,10 @@ mod tests {
             "compartments": compartments
         });
         assert!(!validator.is_valid(&too_many_compartments));
-        assert!(serde_json::from_value::<InformationLabel>(too_many_compartments).is_err());
+        assert_message(
+            &decode_value_error(too_many_compartments),
+            &LabelValidationError::TooManyCompartments.to_string(),
+        );
     }
 
     #[test]
@@ -1078,7 +1175,10 @@ mod tests {
             validator.is_valid(&vector),
             "JSON Schema maxLength counts Unicode scalar values"
         );
-        assert!(serde_json::from_value::<InformationLabel>(vector).is_err());
+        assert_message(
+            &decode_value_error(vector),
+            &LabelValidationError::IdentifierTooLong.to_string(),
+        );
         assert_eq!(
             Compartment::new("é".repeat(MAX_IDENTIFIER_BYTES / 2 + 1)),
             Err(LabelValidationError::IdentifierTooLong)
@@ -1099,7 +1199,10 @@ mod tests {
             "compartments": ["pii\u{1}restricted"]
         });
         assert!(!validator.is_valid(&vector));
-        assert!(serde_json::from_value::<InformationLabel>(vector).is_err());
+        assert_message(
+            &decode_value_error(vector),
+            &LabelValidationError::NonCanonicalIdentifier.to_string(),
+        );
     }
 
     #[test]
@@ -1116,6 +1219,9 @@ mod tests {
             "compartments": ["pii\u{85}restricted"]
         });
         assert!(!validator.is_valid(&vector));
-        assert!(serde_json::from_value::<InformationLabel>(vector).is_err());
+        assert_message(
+            &decode_value_error(vector),
+            &LabelValidationError::NonCanonicalIdentifier.to_string(),
+        );
     }
 }
