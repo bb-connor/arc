@@ -295,8 +295,8 @@ fn commit_admission_projection(
 
 Default implementations report no capabilities and fail before append. A
 monetary or side-effecting production call cannot use `append_chio_receipt`,
-`append_chio_receipt_with_pending_observation_and_timeout`, or another specialized append
-method to bypass operation finalization.
+`append_chio_receipt_with_pending_observation_and_timeout`, or another
+specialized append method to bypass operation finalization.
 
 ## Terminal projection transaction
 

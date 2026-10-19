@@ -431,7 +431,11 @@ fn timed_out_atomic_receipt_append_commits_once_after_writer_drains(
     )
     .err()
     .ok_or("atomic settlement append must time out behind the blocked writer")?;
-    assert!(matches!(error, ReceiptStoreError::Timeout { .. }));
+    assert!(matches!(
+        error,
+        ReceiptStoreError::Timeout { operation, timeout_ms: 25 }
+            if operation == "sqlite receipt commit write"
+    ));
     assert!(store.load_chio_receipt(&receipt.id)?.is_none());
     assert_eq!(attempt_count(&store, &receipt.id)?, 0);
     let timed_out = store.receipt_commit_actor.writer_counters();
