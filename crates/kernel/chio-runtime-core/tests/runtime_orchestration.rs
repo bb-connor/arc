@@ -2,16 +2,18 @@ use std::error::Error;
 use std::fs;
 use std::path::Path;
 
+use chio_core_types::canonical::UntrustedJsonError;
 use chio_core_types::crypto::{canonical_json_bytes, sha256_hex};
 use chio_runtime_core::{
     load_runtime_orchestration_evidence, runtime_orchestration_evidence_sink_healthy,
     runtime_orchestration_profile_sha256, validate_runtime_orchestration_evidence_binding,
-    validate_runtime_orchestration_profile, validate_runtime_run_contract, RuntimeEvidenceManifest,
-    RuntimeEvidenceManifestEntry, RuntimeOrchestrationProfile, RuntimeProofRegenerationReport,
-    RuntimeProofSourceRecord, RuntimeRunContract, RuntimeStepEvidence, RuntimeWorkflowRunReport,
-    CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA, CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA,
-    CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA, CHIO_RUNTIME_RUN_CONTRACT_SCHEMA,
-    CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA, CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA,
+    validate_runtime_orchestration_profile, validate_runtime_run_contract, ChioRuntimeError,
+    RuntimeEvidenceManifest, RuntimeEvidenceManifestEntry, RuntimeOrchestrationProfile,
+    RuntimeProofRegenerationReport, RuntimeProofSourceRecord, RuntimeRunContract,
+    RuntimeStepEvidence, RuntimeWorkflowRunReport, CHIO_RUNTIME_EVIDENCE_MANIFEST_SCHEMA,
+    CHIO_RUNTIME_ORCHESTRATION_PROFILE_SCHEMA, CHIO_RUNTIME_PROOF_REGENERATION_REPORT_SCHEMA,
+    CHIO_RUNTIME_RUN_CONTRACT_SCHEMA, CHIO_RUNTIME_STEP_EVIDENCE_SCHEMA,
+    CHIO_RUNTIME_WORKFLOW_RUN_REPORT_SCHEMA,
 };
 use serde::Serialize;
 use tempfile::TempDir;
@@ -19,6 +21,7 @@ use tempfile::TempDir;
 const ISSUED_AT: u64 = 1_800_000_000_000;
 const EXPIRES_AT: u64 = 1_800_003_600_000;
 const NOW: u64 = 1_800_000_010_000;
+const EVIDENCE_JSON_LIMIT: usize = 64 * 1024 * 1024;
 
 struct EvidenceFixture {
     profile: RuntimeOrchestrationProfile,
@@ -187,6 +190,98 @@ fn runtime_orchestration_evidence_load_rejects_manifest_artifact_hash_mismatch(
 
     assert_eq!(error.code(), "runtime_orchestration_artifact_hash_mismatch");
     Ok(())
+}
+
+#[test]
+fn runtime_orchestration_evidence_load_refuses_oversized_workflow_report(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = write_evidence_fixture(NOW)?;
+    write_oversized_file(&fixture.evidence_dir.path().join("workflow-run-report.json"))?;
+
+    assert_evidence_too_large(load_runtime_orchestration_evidence(
+        fixture.evidence_dir.path(),
+    ));
+    Ok(())
+}
+
+#[test]
+fn runtime_orchestration_evidence_load_refuses_oversized_manifest_artifact(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = write_evidence_fixture(NOW)?;
+    write_oversized_file(&fixture.evidence_dir.path().join("proof-package.json"))?;
+
+    assert_evidence_too_large(load_runtime_orchestration_evidence(
+        fixture.evidence_dir.path(),
+    ));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn runtime_orchestration_evidence_load_refuses_symlinked_workflow_report(
+) -> Result<(), Box<dyn Error>> {
+    let fixture = write_evidence_fixture(NOW)?;
+    let report = fixture.evidence_dir.path().join("workflow-run-report.json");
+    let target = fixture
+        .evidence_dir
+        .path()
+        .join("workflow-run-report.target");
+    fs::rename(&report, &target)?;
+    std::os::unix::fs::symlink(&target, &report)?;
+
+    assert_evidence_not_regular(load_runtime_orchestration_evidence(
+        fixture.evidence_dir.path(),
+    ));
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn runtime_orchestration_evidence_load_refuses_fifo_manifest_artifact() -> Result<(), Box<dyn Error>>
+{
+    let fixture = write_evidence_fixture(NOW)?;
+    let artifact = fixture.evidence_dir.path().join("proof-package.json");
+    fs::remove_file(&artifact)?;
+    let fifo =
+        std::ffi::CString::new(std::os::unix::ffi::OsStrExt::as_bytes(artifact.as_os_str()))?;
+    // SAFETY: `fifo` is a NUL-terminated path that outlives the call.
+    let status = unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) };
+    assert_eq!(
+        status,
+        0,
+        "mkfifo failed: {}",
+        std::io::Error::last_os_error()
+    );
+
+    assert_evidence_not_regular(load_runtime_orchestration_evidence(
+        fixture.evidence_dir.path(),
+    ));
+    Ok(())
+}
+
+#[cfg(unix)]
+fn assert_evidence_not_regular<T: std::fmt::Debug>(result: Result<T, ChioRuntimeError>) {
+    match result {
+        Err(ChioRuntimeError::Rejected { code, .. }) => {
+            assert_eq!(code, "runtime_untrusted_file_not_regular");
+        }
+        other => panic!("expected runtime_untrusted_file_not_regular, got {other:?}"),
+    }
+}
+
+fn write_oversized_file(path: &Path) -> Result<(), Box<dyn Error>> {
+    fs::File::create(path)?.set_len(u64::try_from(EVIDENCE_JSON_LIMIT)? + 1)?;
+    Ok(())
+}
+
+fn assert_evidence_too_large<T: std::fmt::Debug>(result: Result<T, ChioRuntimeError>) {
+    match result {
+        Err(ChioRuntimeError::UntrustedInput(UntrustedJsonError::TooLarge { bytes, bound })) => {
+            assert_eq!(bytes, EVIDENCE_JSON_LIMIT + 1);
+            assert_eq!(bound, EVIDENCE_JSON_LIMIT);
+        }
+        other => panic!("expected oversized evidence refusal, got {other:?}"),
+    }
 }
 
 fn write_evidence_fixture(generated_at_unix_ms: u64) -> Result<EvidenceFixture, Box<dyn Error>> {

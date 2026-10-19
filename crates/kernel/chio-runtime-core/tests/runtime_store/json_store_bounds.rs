@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use chio_core_types::canonical::UntrustedJsonError;
 use chio_runtime_core::{
     ChioRuntimeError, JsonRuntimeAdmissionStore, JsonRuntimeTrustFloorStateStore,
     RuntimeTrustFloorEntry, RuntimeTrustFloorStore,
@@ -8,6 +9,7 @@ use chio_runtime_core::{
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 const OVERSIZED_ID_BYTES: usize = 64 * 1024 * 1024;
+const JSON_STORE_LIMIT: usize = 64 * 1024 * 1024;
 
 fn floor(verifier_id: String) -> RuntimeTrustFloorEntry {
     RuntimeTrustFloorEntry {
@@ -62,4 +64,32 @@ fn json_admission_store_refuses_oversized_write_and_keeps_state() -> TestResult 
 #[test]
 fn json_trust_floor_store_refuses_oversized_write_and_keeps_state() -> TestResult {
     assert_oversized_write_preserves_store(|path| JsonRuntimeTrustFloorStateStore::open(path))
+}
+
+fn assert_oversized_file_refused_on_open<S>(
+    open: impl Fn(&Path) -> Result<S, ChioRuntimeError>,
+) -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("store.json");
+    std::fs::File::create(&path)?.set_len(u64::try_from(JSON_STORE_LIMIT)? + 1)?;
+
+    match open(&path) {
+        Err(ChioRuntimeError::UntrustedInput(UntrustedJsonError::TooLarge { bytes, bound })) => {
+            assert_eq!(bytes, JSON_STORE_LIMIT + 1);
+            assert_eq!(bound, JSON_STORE_LIMIT);
+        }
+        Err(other) => panic!("expected oversized store refusal, got {other:?}"),
+        Ok(_) => panic!("expected oversized store refusal, store opened"),
+    }
+    Ok(())
+}
+
+#[test]
+fn json_admission_store_refuses_oversized_file_on_open() -> TestResult {
+    assert_oversized_file_refused_on_open(|path| JsonRuntimeAdmissionStore::open(path))
+}
+
+#[test]
+fn json_trust_floor_store_refuses_oversized_file_on_open() -> TestResult {
+    assert_oversized_file_refused_on_open(|path| JsonRuntimeTrustFloorStateStore::open(path))
 }
