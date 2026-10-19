@@ -83,3 +83,76 @@ fn listener_refuses_same_process_and_non_private_parent() {
     };
     assert!(SecureUnixListener::bind(config).is_err());
 }
+
+#[cfg(target_os = "linux")]
+fn listener_config(directory: &Path) -> SecureUnixListenerConfig {
+    SecureUnixListenerConfig {
+        socket_path: directory.join("authority.sock"),
+        trusted_service_uid: rustix::process::getuid().as_raw(),
+        expected_peer: PeerIdentity {
+            process_id: std::process::id().saturating_add(1),
+            user_id: rustix::process::getuid().as_raw(),
+            group_id: rustix::process::getgid().as_raw(),
+        },
+    }
+}
+
+#[test]
+fn lifecycle_lock_drop_releases_while_a_duplicate_descriptor_stays_open() {
+    use rustix::fs::{flock, FlockOperation};
+
+    let directory = tempfile::tempdir().test_expect("create lock directory");
+    let path = directory.path().join("authority.sock.lifecycle.lock");
+    let open = || {
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .test_expect("open lifecycle lock file")
+    };
+    let held = LifecycleLock::try_exclusive(open()).test_expect("acquire lifecycle lock");
+    let inherited = held
+        .file()
+        .try_clone()
+        .test_expect("duplicate lock descriptor");
+    let contender = open();
+    assert_eq!(
+        flock(&contender, FlockOperation::NonBlockingLockExclusive),
+        Err(rustix::io::Errno::WOULDBLOCK)
+    );
+
+    drop(held);
+
+    assert_eq!(
+        flock(&contender, FlockOperation::NonBlockingLockExclusive),
+        Ok(())
+    );
+    drop(inherited);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn listener_rebinds_after_drop_while_a_duplicate_lock_descriptor_stays_open() {
+    let directory = tempfile::tempdir().test_expect("create socket directory");
+    std::fs::set_permissions(directory.path(), std::fs::Permissions::from_mode(0o700))
+        .test_expect("set private permissions");
+    let listener =
+        SecureUnixListener::bind(listener_config(directory.path())).test_expect("first bind");
+    let inherited = listener
+        ._lifecycle_lock
+        .file()
+        .try_clone()
+        .test_expect("duplicate lock descriptor");
+    assert!(matches!(
+        SecureUnixListener::bind(listener_config(directory.path())),
+        Err(SecureIpcError::Custody(_))
+    ));
+
+    drop(listener);
+
+    let rebound = SecureUnixListener::bind(listener_config(directory.path())).test_expect("rebind");
+    drop(rebound);
+    drop(inherited);
+}
