@@ -348,11 +348,6 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
         "cognition finding handler surface with authenticated status-operator standing and live service-bond renewal; capped to current size until split",
         max_lines=2_412,
     ),
-    "crates/economy/chio-finding/tests/challenge_families.rs": allow(
-        "2026-11-30",
-        "cognition challenge artifact and schema regression suite; capped to current size until split",
-        max_lines=2_314,
-    ),
     "crates/trust/chio-finding-verifier/tests/verifier.rs": allow(
         "2026-11-30",
         "cognition finding verifier regression suite with authority standing and evidence-role separation coverage; capped until split",
