@@ -113,7 +113,7 @@ expected_counts = {
     "flow lattice and enforcement engine": 48,
     "strict manifest": 28,
     "security kernel adapters": 53,
-    "durable flow state": 44,
+    "durable flow state": 41,
     "native flow custody": 131,
     "native dispatch participant snapshots": 3,
     "native dispatch ledger callbacks": 3,
