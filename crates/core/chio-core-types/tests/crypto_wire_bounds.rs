@@ -47,14 +47,14 @@ impl Rejection {
     }
 }
 
-fn assert_rejected<T: std::fmt::Debug>(
+fn assert_rejected<T>(
     actual: chio_core_types::Result<T>,
     expected: chio_core_types::Error,
     context: &str,
 ) {
     match actual {
         Err(error) => assert_eq!(format!("{error:?}"), format!("{expected:?}"), "{context}"),
-        Ok(value) => panic!("{context}: expected {expected:?}, decoded {value:?}"),
+        Ok(_) => panic!("{context}: expected {expected:?}, input decoded"),
     }
 }
 
