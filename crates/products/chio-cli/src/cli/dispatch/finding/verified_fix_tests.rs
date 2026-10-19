@@ -1,11 +1,16 @@
 use super::*;
 use std::os::unix::fs::PermissionsExt as _;
 
-#[test]
-fn staged_worktree_disables_source_repository_hooks() {
-    if require_sandbox().is_err() {
-        return;
+fn require_test_sandbox() {
+    if let Err(error) = require_sandbox() {
+        panic!("verified-fix sandbox test requires the verified-fix sandbox: {error}");
     }
+}
+
+#[test]
+#[ignore = "requires bubblewrap, prlimit and cgroup isolation"]
+fn staged_worktree_disables_source_repository_hooks() {
+    require_test_sandbox();
     let root = tempfile::tempdir().unwrap();
     let source = root.path().join("source");
     fs::create_dir(&source).unwrap();
@@ -61,10 +66,9 @@ fn staged_worktree_disables_source_repository_hooks() {
 }
 
 #[test]
+#[ignore = "requires bubblewrap, prlimit and cgroup isolation"]
 fn source_git_sandbox_rejects_an_external_alternate_object_store() {
-    if require_sandbox().is_err() {
-        return;
-    }
+    require_test_sandbox();
     let root = tempfile::tempdir().unwrap();
     let approved = root.path().join("approved");
     let source = approved.join("source");
@@ -383,10 +387,9 @@ fn admission_reconciliation_continues_after_one_job_fails() {
 }
 
 #[test]
+#[ignore = "requires bubblewrap, prlimit and cgroup isolation"]
 fn isolated_test_cannot_read_operator_sibling_and_has_a_deadline() {
-    if require_sandbox().is_err() {
-        return;
-    }
+    require_test_sandbox();
     let root = tempfile::tempdir().unwrap();
     let worktree = root.path().join("worktree");
     fs::create_dir(&worktree).unwrap();
@@ -439,10 +442,9 @@ fn isolated_test_cannot_read_operator_sibling_and_has_a_deadline() {
 }
 
 #[test]
+#[ignore = "requires bubblewrap, prlimit, cgroup isolation and a host Rust toolchain with cc"]
 fn isolated_test_supports_offline_path_vendored_rust() {
-    if require_sandbox().is_err() {
-        return;
-    }
+    require_test_sandbox();
     let root = tempfile::tempdir().unwrap();
     let worktree = root.path().join("worktree");
     fs::create_dir_all(worktree.join("src")).unwrap();

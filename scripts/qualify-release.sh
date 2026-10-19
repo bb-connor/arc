@@ -303,13 +303,22 @@ cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qua
 qualification_assert_no_required_skips "${log_root}/trust-cluster-repeat-run.log" \
   ${optional_tests[@]+"${optional_tests[@]}"}
 
-npm_sandbox_test=dispatch_cli::finding_cmd::finding_verified_fix::sandbox::npm_runtime::tests::npm_runs_an_offline_script_in_the_sandbox
-cargo test -p chio-cli --bin chio "${npm_sandbox_test}" -- --exact --ignored --nocapture \
-  | tee "${log_root}/npm-runtime-sandbox.log"
-if ! grep -Eq '^test result: ok\. 1 passed; 0 failed; 0 ignored;' "${log_root}/npm-runtime-sandbox.log"; then
-  echo "npm runtime sandbox test did not execute exactly once: ${npm_sandbox_test}" >&2
-  exit 1
-fi
+verified_fix_sandbox_tests=(
+  dispatch_cli::finding_cmd::finding_verified_fix::sandbox::npm_runtime::tests::npm_runs_an_offline_script_in_the_sandbox
+  dispatch_cli::finding_cmd::finding_verified_fix::tests::staged_worktree_disables_source_repository_hooks
+  dispatch_cli::finding_cmd::finding_verified_fix::tests::source_git_sandbox_rejects_an_external_alternate_object_store
+  dispatch_cli::finding_cmd::finding_verified_fix::tests::isolated_test_cannot_read_operator_sibling_and_has_a_deadline
+  dispatch_cli::finding_cmd::finding_verified_fix::tests::isolated_test_supports_offline_path_vendored_rust
+)
+for sandbox_test in "${verified_fix_sandbox_tests[@]}"; do
+  sandbox_log="${log_root}/verified-fix-sandbox-${sandbox_test##*::}.log"
+  cargo test -p chio-cli --bin chio "${sandbox_test}" -- --exact --ignored --nocapture \
+    | tee "${sandbox_log}"
+  if ! grep -Eq '^test result: ok\. 1 passed; 0 failed; 0 ignored;' "${sandbox_log}"; then
+    echo "verified-fix sandbox test did not execute exactly once: ${sandbox_test}" >&2
+    exit 1
+  fi
+done
 
 COVERAGE_FAIL_UNDER=65 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"
 cp -R coverage/. "${coverage_root}/"
