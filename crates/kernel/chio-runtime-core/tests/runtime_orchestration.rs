@@ -242,10 +242,16 @@ fn runtime_orchestration_evidence_load_refuses_fifo_manifest_artifact() -> Resul
     let fixture = write_evidence_fixture(NOW)?;
     let artifact = fixture.evidence_dir.path().join("proof-package.json");
     fs::remove_file(&artifact)?;
-    let status = std::process::Command::new("mkfifo")
-        .arg(&artifact)
-        .status()?;
-    assert!(status.success(), "mkfifo failed: {status}");
+    let fifo =
+        std::ffi::CString::new(std::os::unix::ffi::OsStrExt::as_bytes(artifact.as_os_str()))?;
+    // SAFETY: `fifo` is a NUL-terminated path that outlives the call.
+    let status = unsafe { libc::mkfifo(fifo.as_ptr(), 0o600) };
+    assert_eq!(
+        status,
+        0,
+        "mkfifo failed: {}",
+        std::io::Error::last_os_error()
+    );
 
     assert_evidence_not_regular(load_runtime_orchestration_evidence(
         fixture.evidence_dir.path(),

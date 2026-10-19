@@ -14,7 +14,7 @@ use crate::{
     RuntimeRunContract, RuntimeStepEvidence, RuntimeWorkflowRunReport,
 };
 
-/// Largest runtime evidence JSON file read from an evidence directory.
+/// Bounds each untrusted JSON file read from a runtime orchestration evidence directory.
 const MAX_RUNTIME_EVIDENCE_JSON_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug, Clone, PartialEq)]
