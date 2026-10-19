@@ -159,7 +159,13 @@ checkpoint, and evidence-export workflows continue to apply.
 
 Compatibility rule:
 
-- additive fields may appear in JSON responses and signed artifacts
+- signed capability-tree bodies and signed manifests are closed: `CapabilityToken`,
+  `CapabilityTokenBody`, `ChioScope`, every grant and attenuation record, `DelegationLink`
+  and `ToolManifest` reject an unknown member at decode time
+- additive members are tolerated only where the type is not closed: unsigned JSON
+  responses, and `ChioReceipt`, `ChioReceiptBody`, `ChildRequestReceipt` and
+  `ChildRequestReceiptBody`, whose decoders drop members outside the body and sign
+  only the body fields
 - unknown schema identifiers for schema-tagged artifacts must be rejected
 - fail-closed behavior is part of the protocol contract, not an implementation
   detail
