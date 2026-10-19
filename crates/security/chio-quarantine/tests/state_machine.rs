@@ -8,8 +8,8 @@ mod scheduler_fence;
 
 use chio_quarantine::{
     build_response_plan, decode_response_record, EffectMutation, EffectMutationRequest,
-    EffectReceiptContext, PlanDefect, ResponseStateMachine, ResponseTransitionRequest,
-    StateMachineError,
+    EffectReceiptContext, FreezeBindingField, PlanDefect, RecordDefect, ResponseStateMachine,
+    ResponseTransitionRequest, StateMachineError,
 };
 use chio_security_types::ports::{
     response_affected_set_hash, ActionId, BlastRadiusFenceAcquisition, BlastRadiusQueryBounds,
@@ -21,11 +21,18 @@ use chio_security_types::ports::{
 use chio_security_types::{
     OperatorCapabilityBinding, ResponseApprovalRequirement, ResponseEffectKind,
     ResponseEffectProgress, ResponseEffectSpec, ResponsePlanAuthorizationBody, ResponsePlanInput,
-    ResponseState, ResponseTarget,
+    ResponseShapeError, ResponseState, ResponseTarget,
 };
 use proptest::prelude::*;
 use response_support::{record, TestResponseStore};
 use std::sync::Arc;
+
+fn expect_err<T: std::fmt::Debug, E>(result: Result<T, E>) -> E {
+    match result {
+        Ok(value) => panic!("expected a refusal, got {value:?}"),
+        Err(error) => error,
+    }
+}
 
 const RESPONSE_STATES: [ResponseState; 12] = [
     ResponseState::Planned,
@@ -698,12 +705,13 @@ fn canonical_plan_effect_and_transition_ids_are_stable_and_cas_is_idempotent() {
         .unwrap_or_else(|failure| panic!("duplicate effect request failed: {failure}"));
     assert_eq!(duplicate_request, requested);
 
-    assert!(machine
-        .transition(
+    assert!(matches!(
+        expect_err(machine.transition(
             &planned,
             &transition(0, ResponseState::AwaitingApproval, 111),
-        )
-        .is_err());
+        )),
+        StateMachineError::InvalidTransition
+    ));
 }
 
 #[test]
@@ -828,10 +836,13 @@ fn pure_replay_rejects_predeadline_not_executed_without_takeover_provenance() {
     snapshot.mutations = BoundedVec::new(mutations)
         .unwrap_or_else(|failure| panic!("mutation reconstruction failed: {failure}"));
 
-    assert!(
-        chio_core_types::receipt::security::validate_response_snapshot_lifecycle(&snapshot, false,)
-            .is_err()
-    );
+    assert!(matches!(
+        expect_err(chio_core_types::receipt::security::validate_response_snapshot_lifecycle(
+            &snapshot, false,
+        )),
+        chio_core_types::Error::CanonicalJson(ref message)
+            if message == "effect failure lifecycle is invalid"
+    ));
 }
 
 #[test]
@@ -902,7 +913,10 @@ fn response_plan_hash_commits_to_the_validated_canonical_contribution() {
 
     let mut mismatched_input = plan_input(1);
     mismatched_input.effects[0].contribution_hash = digest(99);
-    assert!(build_response_plan(mismatched_input).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(mismatched_input)),
+        StateMachineError::InvalidPlan(PlanDefect::ContributionHashMismatch)
+    ));
 }
 
 #[test]
@@ -921,14 +935,24 @@ fn freeze_issuance_plan_requires_the_exact_globally_approved_affected_set() {
     );
 
     let narrower = freeze_plan_input(vec![record("affected-response-root")]);
-    assert!(build_response_plan(narrower).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(narrower)),
+        StateMachineError::InvalidPlan(PlanDefect::FreezeBindingMismatch(
+            FreezeBindingField::AffectedIds
+        ))
+    ));
 
     let broader = freeze_plan_input(vec![
         record("affected-response-child"),
         record("affected-response-extra"),
         record("affected-response-root"),
     ]);
-    assert!(build_response_plan(broader).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(broader)),
+        StateMachineError::InvalidPlan(PlanDefect::FreezeBindingMismatch(
+            FreezeBindingField::AffectedIds
+        ))
+    ));
 }
 
 #[test]
@@ -1073,11 +1097,17 @@ fn response_plan_hash_changes_with_every_authorized_field() {
 fn response_plan_rejects_zero_policy_or_finding_hashes() {
     let mut zero_policy = plan_input(1);
     zero_policy.policy_hash = Digest32::new([0; 32]);
-    assert!(build_response_plan(zero_policy).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(zero_policy)),
+        StateMachineError::Shape(ResponseShapeError::InvalidPolicyHash)
+    ));
 
     let mut zero_finding = plan_input(1);
     zero_finding.trigger_finding_hash = Digest32::new([0; 32]);
-    assert!(build_response_plan(zero_finding).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(zero_finding)),
+        StateMachineError::Shape(ResponseShapeError::InvalidFindingHash)
+    ));
 }
 
 #[test]
@@ -1141,7 +1171,9 @@ fn canonical_body_with_recomputed_hash_cannot_forge_a_transition_id() {
     forged.body_hash = Digest32::new(*chio_core_types::sha256(&bytes).as_bytes());
     forged.canonical_body = CanonicalBody::new(bytes)
         .unwrap_or_else(|error| panic!("canonical body construction failed: {error}"));
-    assert!(decode_response_record(&forged).is_err());
+    assert!(
+        matches!(expect_err(decode_response_record(&forged)), StateMachineError::InvalidRecord(RecordDefect::Lifecycle(chio_core_types::Error::CanonicalJson(ref message))) if message == "response mutation binding is invalid")
+    );
 }
 
 include!("state_machine_parts/apply_failure_edges.inc");
@@ -1260,12 +1292,13 @@ fn partial_apply_timeout_full_rollback_and_rollback_failure_remain_truthful() {
         .unwrap_or_else(|failure| panic!("response decode failed: {failure}"));
     assert_eq!(partial.state, ResponseState::RollbackPartial);
     assert!(partial.operator_page_required);
-    assert!(machine
-        .transition(
+    assert!(matches!(
+        expect_err(machine.transition(
             &current,
             &transition(current.generation, ResponseState::Lifted, 129),
-        )
-        .is_err());
+        )),
+        StateMachineError::InvalidTransition
+    ));
 
     current = machine
         .transition(
@@ -1412,12 +1445,13 @@ fn terminal_failure_cannot_bypass_partial_rollback_at_the_apply_lease_deadline()
     let applying = machine
         .transition(&planned, &transition(0, ResponseState::Applying, 110))
         .unwrap_or_else(|failure| panic!("begin apply failed: {failure}"));
-    assert!(machine
-        .transition(
+    assert!(matches!(
+        expect_err(machine.transition(
             &applying,
             &transition(applying.generation, ResponseState::Failed, 500),
-        )
-        .is_err());
+        )),
+        StateMachineError::InvalidTiming
+    ));
     let requested = request_effect_at(&machine, &applying, 0, 120);
     let applying = apply_requested_effect_at(&machine, &requested, 0, 121);
     let timed_out = machine
@@ -1554,7 +1588,9 @@ fn reversible_effect_vocabulary_cannot_construct_permanent_revocation() {
             .unwrap_or_else(|failure| panic!("effect kind serialization failed: {failure}"));
         assert!(!encoded.contains("revocation"));
     }
-    assert!(serde_json::from_str::<ResponseEffectKind>("\"permanent_revocation\"").is_err());
+    assert!(
+        matches!(expect_err(serde_json::from_str::<ResponseEffectKind>("\"permanent_revocation\"")), error if error.to_string().starts_with("unknown variant `permanent_revocation`"))
+    );
 }
 
 #[test]
@@ -1571,28 +1607,38 @@ fn cancellation_before_apply_is_terminal() {
         Some(chio_security_types::ResponseMutationRecord::Final(record))
             if record.final_state == ResponseState::Cancelled
     ));
-    assert!(machine
-        .transition(
+    assert!(matches!(
+        expect_err(machine.transition(
             &cancelled,
             &transition(cancelled.generation, ResponseState::Applying, 111),
-        )
-        .is_err());
+        )),
+        StateMachineError::InvalidTransition
+    ));
 }
 
 #[test]
 fn response_plan_rejects_empty_effects_and_invalid_target_shapes() {
-    assert!(build_response_plan(plan_input(0)).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(plan_input(0))),
+        StateMachineError::InvalidPlan(PlanDefect::NoEffects)
+    ));
     let mut invalid = plan_input(1);
+    let contribution = CanonicalBody::new(b"{}".to_vec())
+        .unwrap_or_else(|failure| panic!("invalid contribution body: {failure}"));
     invalid.effects[0] = ResponseEffectSpec {
         kind: ResponseEffectKind::FreezeIssuance,
         target: ResponseTarget::Session {
             session_id: SessionId::new("wrong-target")
                 .unwrap_or_else(|failure| panic!("invalid session id: {failure}")),
         },
-        canonical_contribution: CanonicalBody::new(b"{}".to_vec())
-            .unwrap_or_else(|failure| panic!("invalid contribution body: {failure}")),
-        contribution_hash: digest(60),
+        canonical_contribution: contribution.clone(),
+        contribution_hash: Digest32::new(
+            *chio_core_types::sha256(contribution.as_bytes()).as_bytes(),
+        ),
         observed_base_version_hash: digest(61),
     };
-    assert!(build_response_plan(invalid).is_err());
+    assert!(matches!(
+        expect_err(build_response_plan(invalid)),
+        StateMachineError::Shape(ResponseShapeError::InvalidEffectTarget)
+    ));
 }

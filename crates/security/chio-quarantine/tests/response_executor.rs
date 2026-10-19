@@ -7,7 +7,7 @@ mod rollback_budget;
 use chio_core_types::receipt::security::{ActiveDefenseEffectOutcome, ActiveDefenseReceiptBody};
 use chio_quarantine::{
     build_response_plan, decode_response_record, ExecutorError, ResponseExecutor,
-    ResponseStateMachine,
+    ResponseStateMachine, StateMachineError,
 };
 use chio_security_types::ports::{
     response_affected_set_hash, ActionId, AlertDeliveryQuery, AlertDeliveryStatus,
@@ -31,6 +31,13 @@ use chio_security_types::{
 use response_support::{record, TestResponseStore};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, MutexGuard};
+
+fn expect_err<T: std::fmt::Debug, E>(result: Result<T, E>) -> E {
+    match result {
+        Ok(value) => panic!("expected a refusal, got {value:?}"),
+        Err(error) => error,
+    }
+}
 
 fn digest(value: u8) -> Digest32 {
     Digest32::new([value; 32])
@@ -245,8 +252,8 @@ fn applying_lease_renewal_requires_an_unexpired_application_lease_and_exact_live
     let takeover = work(&planned, 2, 900);
     harness.store.install_work(takeover.clone());
 
-    assert!(machine
-        .transition(
+    assert!(matches!(
+        expect_err(machine.transition(
             &applying,
             &chio_quarantine::ResponseTransitionRequest {
                 expected_generation: applying.generation,
@@ -255,19 +262,22 @@ fn applying_lease_renewal_requires_an_unexpired_application_lease_and_exact_live
                 applying_lease_expires_at_unix_ms: Some(900),
                 error_code: None,
             },
-        )
-        .is_err());
+        )),
+        StateMachineError::InvalidTransition
+    ));
 
     let foreign = work(&planned, 3, 950);
-    assert!(machine
+    assert!(matches!(expect_err(machine
         .renew_applying_lease(&applying, &foreign, 400)
-        .is_err());
-    assert!(machine
-        .renew_applying_lease(&applying, &takeover, 500)
-        .is_err());
-    assert!(machine
-        .renew_applying_lease(&applying, &takeover, 600)
-        .is_err());
+        ), StateMachineError::Store(ref error) if error.kind() == PortErrorKind::Conflict));
+    assert!(matches!(
+        expect_err(machine.renew_applying_lease(&applying, &takeover, 500)),
+        StateMachineError::InvalidTiming
+    ));
+    assert!(matches!(
+        expect_err(machine.renew_applying_lease(&applying, &takeover, 600)),
+        StateMachineError::InvalidTiming
+    ));
 
     let renewed = machine
         .renew_applying_lease(&applying, &takeover, 400)
@@ -287,9 +297,10 @@ fn applying_lease_renewal_requires_an_unexpired_application_lease_and_exact_live
                 && transition.scheduler_lease_owner_id.as_ref() == Some(&takeover.lease_owner_id)
                 && transition.scheduler_fencing_token == Some(takeover.fencing_token)
     ));
-    assert!(machine
-        .renew_applying_lease(&renewed, &takeover, 601)
-        .is_err());
+    assert!(matches!(
+        expect_err(machine.renew_applying_lease(&renewed, &takeover, 601)),
+        StateMachineError::InvalidTiming
+    ));
 }
 
 #[test]
@@ -316,9 +327,9 @@ fn scheduler_takeover_between_prevalidation_and_response_cas_is_rejected() {
         .store
         .arm_takeover_during_applying_lease_cas(takeover.clone());
 
-    assert!(machine
+    assert!(matches!(expect_err(machine
         .renew_applying_lease(&applying, &original, 400)
-        .is_err());
+        ), StateMachineError::Store(ref error) if error.kind() == PortErrorKind::Conflict));
     assert_eq!(
         harness
             .store
@@ -1195,7 +1206,9 @@ fn reconciled_freeze_apply_yields_before_the_next_effect() {
     let apply_work = work(&planned, 1, 900);
     harness.store.install_work(apply_work.clone());
     harness.store.arm(StoreCrash::BeforeAppliedResult);
-    assert!(executor.execute(&planned, &apply_work, 110).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&planned, &apply_work, 110)), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Unavailable)
+    );
     assert_eq!(harness.effects.mutation_counts().0, 1);
 
     let pending = harness.load(&planned);
@@ -1281,9 +1294,19 @@ fn executor_every_effect_kind_six_boundary_crash_matrix_converges_exactly_once()
                     | CrashCase::AfterPortBeforeResult
                     | CrashCase::AfterResultBeforeNextEffect
             ) {
+                let error = first_apply.as_ref().err().unwrap_or_else(|| {
+                    panic!("effect {effect_kind:?}, crash {crash_case:?} did not trip")
+                });
                 assert!(
-                    first_apply.is_err(),
-                    "effect {effect_kind:?}, crash {crash_case:?} did not trip"
+                    match crash_case {
+                        CrashCase::BeforeIntentPersistence | CrashCase::AfterPortBeforeResult => {
+                            matches!(error, ExecutorError::Store(cause) if cause.kind() == PortErrorKind::Unavailable)
+                        }
+                        _ => {
+                            matches!(error, ExecutorError::Receipt(cause) if cause.kind() == PortErrorKind::Unavailable)
+                        }
+                    },
+                    "effect {effect_kind:?}, crash {crash_case:?} refused with {error:?}"
                 );
             }
             let mut active = if first_apply.is_ok() {
@@ -1334,9 +1357,19 @@ fn executor_every_effect_kind_six_boundary_crash_matrix_converges_exactly_once()
                     CrashCase::DuringRollbackBeforePort | CrashCase::AfterRestoreBeforeResult
                 )
             {
+                let error = first_rollback.as_ref().err().unwrap_or_else(|| {
+                    panic!("effect {effect_kind:?}, crash {crash_case:?} did not trip")
+                });
                 assert!(
-                    first_rollback.is_err(),
-                    "effect {effect_kind:?}, crash {crash_case:?} did not trip"
+                    match crash_case {
+                        CrashCase::DuringRollbackBeforePort => {
+                            matches!(error, ExecutorError::Receipt(cause) if cause.kind() == PortErrorKind::Unavailable)
+                        }
+                        _ => {
+                            matches!(error, ExecutorError::Store(cause) if cause.kind() == PortErrorKind::Unavailable)
+                        }
+                    },
+                    "effect {effect_kind:?}, crash {crash_case:?} refused with {error:?}"
                 );
             }
             let mut lifted = if first_rollback.is_ok() {
@@ -1531,13 +1564,17 @@ fn executor_crash_stale_takeover_pending_apply_never_calls_effect_port() {
     harness
         .receipts
         .fail_once_on_effect_state("apply_requested");
-    assert!(executor.execute(&planned, &first_work, 110).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&planned, &first_work, 110)), ExecutorError::Receipt(ref error) if error.kind() == PortErrorKind::Unavailable)
+    );
     assert_eq!(harness.effects.mutation_counts(), (0, 0));
 
     let takeover_work = work(&planned, 2, 900);
     harness.store.install_work(takeover_work.clone());
     let pending = harness.load(&planned);
-    assert!(executor.execute(&pending, &first_work, 111).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&pending, &first_work, 111)), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Conflict)
+    );
     assert_eq!(harness.effects.mutation_counts(), (0, 0));
 
     let reconciled = harness.load(&planned);
@@ -1624,7 +1661,9 @@ fn receipt_cursor_cas_failure_retries_without_running_effect_early() {
     harness.store.install_work(work.clone());
     harness.store.arm(StoreCrash::BeforeReceiptCursorCas);
 
-    assert!(executor.execute(&planned, &work, 110).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&planned, &work, 110)), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Unavailable)
+    );
     assert_eq!(harness.effects.mutation_counts(), (0, 0));
 
     let active = executor
@@ -1647,7 +1686,9 @@ fn executor_crash_takeover_at_apply_deadline_reconciles_applied_journal_before_r
     let first_work = work(&planned, 1, 900);
     harness.store.install_work(first_work.clone());
     harness.receipts.fail_once_on_effect_state("applied");
-    assert!(executor.execute(&planned, &first_work, 110).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&planned, &first_work, 110)), ExecutorError::Receipt(ref error) if error.kind() == PortErrorKind::Unavailable)
+    );
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
 
     let takeover_work = work(&planned, 2, 1_500);
@@ -1673,7 +1714,9 @@ fn executor_crash_takeover_at_apply_deadline_queries_port_before_result_gap() {
     let first_work = work(&planned, 1, 900);
     harness.store.install_work(first_work.clone());
     harness.store.arm(StoreCrash::BeforeAppliedResult);
-    assert!(executor.execute(&planned, &first_work, 110).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&planned, &first_work, 110)), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Unavailable)
+    );
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
 
     let takeover_work = work(&planned, 2, 1_500);
@@ -1701,7 +1744,9 @@ fn executor_crash_apply_not_executed_at_deadline_never_creates_late_mutation() {
     harness
         .receipts
         .fail_once_on_effect_state("apply_requested");
-    assert!(executor.execute(&planned, &first_work, 110).is_err());
+    assert!(
+        matches!(expect_err(executor.execute(&planned, &first_work, 110)), ExecutorError::Receipt(ref error) if error.kind() == PortErrorKind::Unavailable)
+    );
     assert_eq!(harness.effects.mutation_counts(), (0, 0));
 
     let takeover_work = work(&planned, 2, 1_500);
@@ -1730,13 +1775,20 @@ fn executor_crash_unknown_apply_outcome_at_deadline_stays_restrictive_and_nonter
         harness
             .receipts
             .fail_once_on_effect_state("apply_requested");
-        assert!(executor.execute(&planned, &first_work, 110).is_err());
+        assert!(
+            matches!(expect_err(executor.execute(&planned, &first_work, 110)), ExecutorError::Receipt(ref error) if error.kind() == PortErrorKind::Unavailable)
+        );
         harness.effects.set_query_fault(fault);
 
         let takeover_work = work(&planned, 2, 1_500);
         harness.store.install_work(takeover_work.clone());
         let pending = harness.load(&planned);
-        assert!(executor.execute(&pending, &takeover_work, 900).is_err());
+        assert!(
+            matches!(expect_err(executor.execute(&pending, &takeover_work, 900)), error if match fault {
+                QueryFault::Unknown => matches!(&error, ExecutorError::EffectOutcomeUnknown),
+                QueryFault::Unavailable => matches!(&error, ExecutorError::EffectQuery(cause) if cause.kind() == PortErrorKind::Unavailable),
+            })
+        );
         assert_eq!(
             decode_response_record(&harness.load(&planned))
                 .unwrap_or_else(|error| panic!("decode unknown outcome: {error}"))
@@ -1763,17 +1815,17 @@ fn executor_crash_stale_takeover_pending_rollback_never_calls_effect_port() {
     harness
         .receipts
         .fail_once_on_effect_state("rollback_requested");
-    assert!(executor
+    assert!(matches!(expect_err(executor
         .execute(&active, &first_rollback_work, 1_000)
-        .is_err());
+        ), ExecutorError::Receipt(ref error) if error.kind() == PortErrorKind::Unavailable));
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
 
     let takeover_work = work(&active, 3, 1_500);
     harness.store.install_work(takeover_work.clone());
     let pending = harness.load(&active);
-    assert!(executor
+    assert!(matches!(expect_err(executor
         .execute(&pending, &first_rollback_work, 1_001)
-        .is_err());
+        ), ExecutorError::Store(ref error) if error.kind() == PortErrorKind::Conflict));
     assert_eq!(harness.effects.mutation_counts(), (1, 0));
 
     let reconciled = harness.load(&active);
