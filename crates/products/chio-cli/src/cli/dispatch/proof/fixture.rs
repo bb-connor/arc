@@ -2112,9 +2112,7 @@ fn write_commerce_event_authority_receipt(
             "proof fixture commerce authority receipt signing failed: {error}"
         ))
     })?;
-    let mut receipt_value = serde_json::to_value(receipt)?;
-    receipt_value["schema"] = serde_json::Value::String("chio.receipt.v1".to_string());
-    write_json_line_file(destination, &receipt_value)
+    write_json_line_file(destination, &serde_json::to_value(receipt)?)
 }
 
 fn required_event_string(event: &serde_json::Value, field: &str) -> Result<String, CliError> {

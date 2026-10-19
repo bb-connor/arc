@@ -303,7 +303,25 @@ pub struct CommerceOrderVerificationBundle {
 #[serde(deny_unknown_fields)]
 pub struct CommerceEventAuthorityReceiptArtifact {
     pub receipt_ref: String,
+    /// Schema of `receipt_bytes`; must be `chio.receipt.v1`.
+    pub schema: String,
     pub receipt_bytes: Vec<u8>,
+}
+
+impl CommerceEventAuthorityReceiptArtifact {
+    /// Decode the routed receipt bytes as a closed `ChioReceipt`.
+    pub(crate) fn decode_receipt(
+        &self,
+        field: &'static str,
+    ) -> Result<chio_core_types::receipt::body::ChioReceipt, CommerceOrderError> {
+        if self.schema != chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA {
+            return Err(CommerceOrderError::UnsupportedSchema {
+                field,
+                schema: self.schema.clone(),
+            });
+        }
+        crate::input::decode(&self.receipt_bytes)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

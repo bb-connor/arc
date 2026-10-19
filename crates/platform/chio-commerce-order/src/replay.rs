@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use chio_core_types::{
     crypto::PublicKey,
     receipt::{
-        body::{ChioReceipt, CHIO_RECEIPT_SCHEMA},
+        body::ChioReceipt,
         decision::Decision,
         kinds::{BoundaryClass, ReceiptKind, TrustLevel},
     },
@@ -274,32 +274,10 @@ fn authority_receipts_by_ref(
         }
         by_ref.insert(
             artifact.receipt_ref.as_str(),
-            parse_authority_receipt(artifact)?,
+            artifact.decode_receipt("authority receipt")?,
         );
     }
     Ok(by_ref)
-}
-
-fn parse_authority_receipt(
-    artifact: &CommerceEventAuthorityReceiptArtifact,
-) -> Result<ChioReceipt, CommerceOrderError> {
-    let value: serde_json::Value = crate::input::decode(&artifact.receipt_bytes)?;
-    let schema = value
-        .get("schema")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| {
-            CommerceOrderError::ReplayFailed(format!(
-                "authority receipt artifact schema missing: {}",
-                artifact.receipt_ref
-            ))
-        })?;
-    if schema != CHIO_RECEIPT_SCHEMA {
-        return Err(CommerceOrderError::UnsupportedSchema {
-            field: "authority receipt",
-            schema: schema.to_string(),
-        });
-    }
-    crate::input::project(value)
 }
 
 fn validate_event_authority_receipt(

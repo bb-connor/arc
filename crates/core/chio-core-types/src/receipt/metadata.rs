@@ -21,7 +21,7 @@ use super::validation::{
 
 /// Actor reference carried by signed receipt semantics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub struct ActorRef {
     pub actor_id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -190,6 +190,7 @@ impl From<&ModelMetadata> for ModelMetadataReceiptMetadata {
 
 /// Evidence from a single guard's evaluation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct GuardEvidence {
     /// Name of the guard (e.g. "ForbiddenPathGuard").
     pub guard_name: String,

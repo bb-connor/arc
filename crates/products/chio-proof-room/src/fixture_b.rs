@@ -377,6 +377,7 @@ fn embedded_commerce_event_authority_receipts(
             )?;
             Ok(chio_commerce_order::CommerceEventAuthorityReceiptArtifact {
                 receipt_ref,
+                schema: node.schema.clone(),
                 receipt_bytes,
             })
         })

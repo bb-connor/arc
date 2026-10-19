@@ -7,7 +7,12 @@ use crate::error::Result;
 
 /// The Kernel's verdict on a tool call.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "verdict", rename_all = "snake_case")]
+#[serde(
+    tag = "verdict",
+    rename_all = "snake_case",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum Decision {
     /// The tool call was allowed and executed.
     Allow,
@@ -30,8 +35,11 @@ pub enum Decision {
     },
 }
 
+chio_security_types::lossless_serde!(Decision);
+
 /// Describes the tool call that was evaluated.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ToolCallAction {
     /// The parameters that were passed to the tool (or attempted).
     pub parameters: serde_json::Value,

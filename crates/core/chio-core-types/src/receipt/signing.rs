@@ -96,6 +96,7 @@ impl BbsReceiptSignature {
 /// The receipt id is computed from [`ChioReceiptIdInput`]. The signature then
 /// binds both that id and the exact body input used to derive it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChioReceiptSigningBody {
     pub id: String,
     pub body: ChioReceiptIdInput,

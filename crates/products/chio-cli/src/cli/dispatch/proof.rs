@@ -2115,13 +2115,16 @@ fn load_commerce_event_authority_receipts(
     // Scan each candidate once. Both the index and every retained copy consume
     // the bundle budget, so repeated references cannot multiply retained bytes.
     let mut candidates = Vec::new();
-    for node in nodes.iter().filter(|node| {
-        node.schema.as_deref() == Some(chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA)
+    for (node, schema) in nodes.iter().filter_map(|node| {
+        node.schema
+            .as_deref()
+            .filter(|schema| *schema == chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA)
+            .map(|schema| (node, schema))
     }) {
         let bytes = load_graph_bytes_artifact_bounded(
             bundle_dir,
             node,
-            chio_core_types::receipt::body::CHIO_RECEIPT_SCHEMA,
+            schema,
             "commerce authority receipt",
             budget,
         )?;
@@ -2130,15 +2133,15 @@ fn load_commerce_event_authority_receipts(
             .get("id")
             .and_then(serde_json::Value::as_str)
             .map(str::to_owned);
-        candidates.push((node, id, bytes));
+        candidates.push((node, schema, id, bytes));
     }
     let mut receipts = Vec::new();
     for receipt_ref in refs {
         let path = format!("authority-receipts/{receipt_ref}.json");
         let mut matches = candidates
             .iter()
-            .filter(|(node, id, _)| node.path == path || id.as_deref() == Some(&receipt_ref));
-        let (_, _, bytes) = matches.next().ok_or_else(|| {
+            .filter(|(node, _, id, _)| node.path == path || id.as_deref() == Some(&receipt_ref));
+        let (_, schema, _, bytes) = matches.next().ok_or_else(|| {
             graph_not_closed("proof verify: missing commerce authority receipt artifact")
         })?;
         if matches.next().is_some() {
@@ -2150,6 +2153,7 @@ fn load_commerce_event_authority_receipts(
         budget.charge(bytes.len())?;
         receipts.push(chio_commerce_order::CommerceEventAuthorityReceiptArtifact {
             receipt_ref,
+            schema: (*schema).to_string(),
             receipt_bytes: bytes.clone(),
         });
     }

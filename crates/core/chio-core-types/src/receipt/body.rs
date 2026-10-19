@@ -40,6 +40,7 @@ pub const CHIO_RECEIPT_SCHEMA: &str = "chio.receipt.v1";
 
 /// A Chio receipt. Signed proof that a tool call was evaluated by the Kernel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChioReceipt {
     /// Content-addressed receipt ID derived from the canonical receipt body.
     pub id: String,
@@ -111,6 +112,7 @@ pub struct ChioReceipt {
 
 /// The body of a receipt (everything except the signature), used for signing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChioReceiptBody {
     pub id: String,
     pub timestamp: u64,
@@ -181,6 +183,7 @@ impl ChioReceiptBody {
 
 /// Receipt fields that define the authoritative receipt id.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ChioReceiptIdInput {
     pub timestamp: u64,
     pub capability_id: String,

@@ -12,12 +12,19 @@ use super::identifiers::{ProgressToken, RequestId, SessionId};
 /// A denied request still reaches a terminal `Completed` state, while cancelled
 /// or interrupted work records a different terminal outcome.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(tag = "state", rename_all = "snake_case")]
+#[serde(
+    tag = "state",
+    rename_all = "snake_case",
+    deny_unknown_fields,
+    remote = "Self"
+)]
 pub enum OperationTerminalState {
     Completed,
     Cancelled { reason: String },
     Incomplete { reason: String },
 }
+
+chio_security_types::lossless_serde!(OperationTerminalState);
 
 impl OperationTerminalState {
     pub fn is_completed(&self) -> bool {
