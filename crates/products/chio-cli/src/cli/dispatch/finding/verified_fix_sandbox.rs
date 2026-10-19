@@ -899,11 +899,18 @@ fn build_runtime_mount_spec(profile: RuntimeMountProfile) -> Result<RuntimeMount
 }
 
 fn executable_on_path(name: &str) -> Option<PathBuf> {
-    std::env::var_os("PATH").and_then(|path| {
-        std::env::split_paths(&path)
-            .map(|directory| directory.join(name))
-            .find(|candidate| candidate.is_file())
-    })
+    find_executable(name, std::env::var_os("PATH")?.as_os_str())
+}
+
+fn find_executable(name: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    std::env::split_paths(search_path)
+        .map(|directory| directory.join(name))
+        .find(|candidate| {
+            fs::metadata(candidate)
+                .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
+        })
 }
 
 fn bounded_runtime_path(executable: &Path, args: &[&str], label: &str) -> Result<PathBuf, String> {
@@ -1110,5 +1117,43 @@ mod tests {
         let remaining = deadline.saturating_duration_since(Instant::now());
         assert!(remaining <= Duration::from_millis(50));
         assert!(remaining < TEST_COMMAND_TIMEOUT);
+    }
+
+    fn private_dir() -> tempfile::TempDir {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let dir = tempfile::tempdir().unwrap();
+        fs::set_permissions(dir.path(), fs::Permissions::from_mode(0o700)).unwrap();
+        dir
+    }
+
+    fn write_with_mode(directory: &Path, name: &str, mode: u32) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt as _;
+
+        let path = directory.join(name);
+        fs::write(&path, b"#!/bin/sh\n").unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+        path
+    }
+
+    #[test]
+    fn find_executable_skips_files_without_an_execute_bit() {
+        let sourceable = private_dir();
+        let runnable = private_dir();
+        write_with_mode(sourceable.path(), "env", 0o644);
+        let expected = write_with_mode(runnable.path(), "env", 0o755);
+        let search_path =
+            std::env::join_paths([sourceable.path(), runnable.path()]).unwrap();
+
+        assert_eq!(find_executable("env", &search_path), Some(expected));
+    }
+
+    #[test]
+    fn find_executable_rejects_a_path_holding_only_non_executable_files() {
+        let sourceable = private_dir();
+        write_with_mode(sourceable.path(), "env", 0o644);
+        let search_path = std::env::join_paths([sourceable.path()]).unwrap();
+
+        assert_eq!(find_executable("env", &search_path), None);
     }
 }
