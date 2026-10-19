@@ -1,5 +1,13 @@
 use std::sync::Arc;
 
+fn assert_clearing_round_proof_rejected<T>(result: Result<T, EconomicStateAnchorError>) {
+    assert!(matches!(
+        result,
+        Err(EconomicStateAnchorError::TransitionProofRejected(ref key))
+            if key.resource_family == "clearing_round" && key.resource_id == "round-1"
+    ));
+}
+
 use chio_core_types::canonical::canonical_json_bytes;
 use chio_core_types::capability::scope::MonetaryAmount;
 use chio_core_types::crypto::{sha256_hex, Keypair};
@@ -8,10 +16,10 @@ use chio_core_types::economic_continuity::{
     EconomicAdmissionHandoffStateV1, EconomicAdmissionHandoffV1, EconomicContentV1,
     EconomicEffectSlotV1, EconomicEffectStateV1, EconomicEffectTargetV1, EconomicEffectTerminalV1,
     EconomicFrostBindingV1, EconomicRequestBindingV1, EconomicResourceHeadV1,
-    EconomicResourceKeyV1, EconomicStateAnchorPins, EconomicStateAnchorViewV1,
-    EconomicStateBatchV1, EconomicTransitionAuthorizationV1, CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA,
-    CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA, CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA,
-    CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
+    EconomicResourceKeyV1, EconomicStateAnchorError, EconomicStateAnchorPins,
+    EconomicStateAnchorViewV1, EconomicStateBatchV1, EconomicTransitionAuthorizationV1,
+    CHIO_ECONOMIC_EFFECT_SLOT_SCHEMA, CHIO_ECONOMIC_RESOURCE_HEAD_SCHEMA,
+    CHIO_ECONOMIC_STATE_ANCHOR_VIEW_SCHEMA, CHIO_ECONOMIC_STATE_BATCH_SCHEMA,
 };
 use chio_core_types::StoreMutationFence;
 use chio_credit::clearing::{
@@ -28,14 +36,15 @@ use chio_credit::clearing::{
     verify_clearing_zero_dispatch_proof, verify_netting_round, verify_signed_netting_round,
     AnchoredClearingObligationV1, ClearingAbortReplayV1, ClearingAcceptancesReplayV1,
     ClearingAuthorityTrustV1, ClearingDispatchReplayV1, ClearingDisputeWindowResolver,
-    ClearingDisputeWindowStatusV1, ClearingFinalizationReplayV1, ClearingInputManifestBodyV1,
-    ClearingInputManifestEntryV1, ClearingIntentDispatchStatusV1, ClearingLifecycleAuthorityPinsV1,
-    ClearingLifecycleReplayBatchVerifier, ClearingLifecycleReplayEvidenceV1,
-    ClearingLifecycleReplayV1, ClearingObligationInputV1, ClearingParticipantAcceptanceBodyV1,
-    ClearingParticipantBindingV1, ClearingParticipantSnapshotAcknowledgementBodyV1,
-    ClearingParticipantSnapshotBodyV1, ClearingReconciliationReplayV1, ClearingRoundAbortReasonV1,
-    ClearingRoundFinalizationBodyV1, ClearingRoundLifecycleRecordV1, ClearingRoundRequestV1,
-    ClearingRoundTransitionV1, ClearingSatisfactionReplayV1, ClearingSettlementObservedStatusV1,
+    ClearingDisputeWindowStatusV1, ClearingError, ClearingFinalizationReplayV1,
+    ClearingInputManifestBodyV1, ClearingInputManifestEntryV1, ClearingIntentDispatchStatusV1,
+    ClearingLifecycleAuthorityPinsV1, ClearingLifecycleReplayBatchVerifier,
+    ClearingLifecycleReplayEvidenceV1, ClearingLifecycleReplayV1, ClearingObligationInputV1,
+    ClearingParticipantAcceptanceBodyV1, ClearingParticipantBindingV1,
+    ClearingParticipantSnapshotAcknowledgementBodyV1, ClearingParticipantSnapshotBodyV1,
+    ClearingReconciliationReplayV1, ClearingRoundAbortReasonV1, ClearingRoundFinalizationBodyV1,
+    ClearingRoundLifecycleRecordV1, ClearingRoundRequestV1, ClearingRoundTransitionV1,
+    ClearingSatisfactionReplayV1, ClearingSettlementObservedStatusV1,
     ClearingSettlementOutcomeVerifier, ClearingSettlementReconciliationBodyV1,
     ClearingZeroDispatchTrustV1, ClearingZeroIntentReconciliationReplayV1,
     SignedClearingInputManifestV1, SignedClearingParticipantAcceptanceV1,
@@ -741,20 +750,26 @@ fn acyclic_chain_reduces_to_one_direct_intent() -> TestResult {
     )?;
     let mut tampered = output.clone();
     tampered.intents[0].amount.units = 101;
-    assert!(verify_netting_round(
-        &request,
-        &trust(&participant_authority, &obligation_authority),
-        &tampered,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_netting_round(
+            &request,
+            &trust(&participant_authority, &obligation_authority),
+            &tampered,
+        )
+        .err(),
+        Some(ClearingError::InvalidField("round_output"))
+    ));
     let authority_trust = trust(&participant_authority, &obligation_authority);
-    assert!(sign_netting_round(
-        &request,
-        &tampered,
-        &authority_trust,
-        &participant_authority,
-    )
-    .is_err());
+    assert!(matches!(
+        sign_netting_round(
+            &request,
+            &tampered,
+            &authority_trust,
+            &participant_authority,
+        )
+        .err(),
+        Some(ClearingError::InvalidField("round_output"))
+    ));
     let signed = sign_netting_round(&request, &output, &authority_trust, &participant_authority)?;
     validate_schema(
         "clearing-participant-snapshot.v1.json",
@@ -784,14 +799,24 @@ fn acyclic_chain_reduces_to_one_direct_intent() -> TestResult {
     );
     let mut tampered_signed = signed;
     tampered_signed.intents[0].body.amount.units = 101;
-    assert!(verify_signed_netting_round(&request, &authority_trust, &tampered_signed).is_err());
+    assert!(matches!(
+        verify_signed_netting_round(&request, &authority_trust, &tampered_signed).err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
     let mut unknown_field = serde_json::to_value(&tampered_signed.core)?;
     unknown_field["unexpected"] = serde_json::Value::Bool(true);
-    assert!(serde_json::from_value::<SignedNettingRoundCoreV1>(unknown_field).is_err());
+    assert!(
+        serde_json::from_value::<SignedNettingRoundCoreV1>(unknown_field)
+            .err()
+            .is_some_and(|error| error.to_string().contains("unknown field `unexpected`"))
+    );
 
     let mut missing_acknowledgement = request.clone();
     missing_acknowledgement.participant_acknowledgements.pop();
-    assert!(compute_netting_round(&missing_acknowledgement, &authority_trust).is_err());
+    assert!(matches!(
+        compute_netting_round(&missing_acknowledgement, &authority_trust).err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut shuffled = request;
     shuffled.obligations.reverse();
@@ -950,14 +975,17 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         return Err("begin-finalization replay used the wrong evidence".into());
     };
     replay_acceptances.dispute_status.checkpoint_digest = digest("forged-dispute-checkpoint");
-    assert!(verify_clearing_lifecycle_replay_authority(
-        proposed_head,
-        &forged_dispute_replay,
-        &replay_pins,
-        None,
-        Some(&closed_dispute_window),
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority(
+            proposed_head,
+            &forged_dispute_replay,
+            &replay_pins,
+            None,
+            Some(&closed_dispute_window),
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let frost = frost_finalization_fixture(&finalization_body)?;
     let finalizing_heads = finalizing
@@ -1093,14 +1121,17 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         return Err("dispatch replay used the wrong evidence".into());
     };
     dispatch.effect_slot.resource_head_digest = digest("wrong-round-head");
-    assert!(verify_clearing_lifecycle_replay_authority(
-        finalized_head,
-        &wrong_source,
-        &replay_pins,
-        None,
-        None,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority(
+            finalized_head,
+            &wrong_source,
+            &replay_pins,
+            None,
+            None,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut wrong_intent = dispatch_replay.clone();
     let ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } = &mut wrong_intent.evidence
@@ -1108,14 +1139,17 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         return Err("dispatch replay used the wrong evidence".into());
     };
     dispatch.intent_id = "missing-intent".to_owned();
-    assert!(verify_clearing_lifecycle_replay_authority(
-        finalized_head,
-        &wrong_intent,
-        &replay_pins,
-        None,
-        None,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority(
+            finalized_head,
+            &wrong_intent,
+            &replay_pins,
+            None,
+            None,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut wrong_idempotency = dispatch_replay.clone();
     let ClearingLifecycleReplayEvidenceV1::BeginDispatch { dispatch } =
@@ -1124,14 +1158,17 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         return Err("dispatch replay used the wrong evidence".into());
     };
     dispatch.effect_slot.idempotency_key = digest("wrong-idempotency-key");
-    assert!(verify_clearing_lifecycle_replay_authority(
-        finalized_head,
-        &wrong_idempotency,
-        &replay_pins,
-        None,
-        None,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority(
+            finalized_head,
+            &wrong_idempotency,
+            &replay_pins,
+            None,
+            None,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let dispatch_heads = dispatch_projection
         .transitions()
@@ -1240,13 +1277,12 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         .next_head
         .trusted_clock_high_water += 1;
     substituted_reconciliation_clock.seal(&state_anchor_key())?;
-    assert!(verify_economic_state_batch_advance(
+    assert_clearing_round_proof_rejected(verify_economic_state_batch_advance(
         &verified_reconciliation_view,
         substituted_reconciliation_clock,
         &state_anchor_pins(),
         &replay_verifier,
-    )
-    .is_err());
+    ));
     let mut substituted_terminal = reconciliation_batch;
     let terminal_transition = substituted_terminal
         .transitions
@@ -1268,13 +1304,12 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
     *value = serde_json::to_value(terminal_slot)?;
     terminal_transition.next_head.state_digest = terminal_transition.next_head.state.digest()?;
     substituted_terminal.seal(&state_anchor_key())?;
-    assert!(verify_economic_state_batch_advance(
+    assert_clearing_round_proof_rejected(verify_economic_state_batch_advance(
         &verified_reconciliation_view,
         substituted_terminal,
         &state_anchor_pins(),
         &replay_verifier,
-    )
-    .is_err());
+    ));
     let reconciled_heads = reconciliation_projection
         .transitions()
         .iter()
@@ -1372,13 +1407,12 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         .next_head
         .trusted_clock_high_water += 1;
     substituted_satisfaction_clock.seal(&state_anchor_key())?;
-    assert!(verify_economic_state_batch_advance(
+    assert_clearing_round_proof_rejected(verify_economic_state_batch_advance(
         &verified_satisfaction_view,
         substituted_satisfaction_clock,
         &state_anchor_pins(),
         &satisfaction_verifier,
-    )
-    .is_err());
+    ));
     let canonical_reconciliation_replay = canonical_json_bytes(&reconciliation_replay)?;
     let decoded_reconciliation_replay: ClearingLifecycleReplayV1 =
         serde_json::from_slice(&canonical_reconciliation_replay)?;
@@ -1392,15 +1426,18 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
     reconciliation
         .source_effect_slot_head
         .trusted_clock_high_water += 1;
-    assert!(verify_clearing_lifecycle_replay_authority_with_outcome(
-        dispatching_head,
-        &substituted_reconciliation,
-        &replay_pins,
-        None,
-        None,
-        Some(&ReplaySettledOutcome),
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority_with_outcome(
+            dispatching_head,
+            &substituted_reconciliation,
+            &replay_pins,
+            None,
+            None,
+            Some(&ReplaySettledOutcome),
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let canonical_replay = canonical_json_bytes(&finalization_replay)?;
     let decoded_replay: ClearingLifecycleReplayV1 = serde_json::from_slice(&canonical_replay)?;
@@ -1418,14 +1455,17 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         return Err("finalization replay lineage used the wrong transition".into());
     };
     *authority_digest = digest("substituted-acceptance-authority");
-    assert!(verify_clearing_lifecycle_replay_authority(
-        finalizing_head,
-        &substituted_lineage,
-        &replay_pins,
-        Some(&frost.trust),
-        Some(&closed_dispute_window),
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority(
+            finalizing_head,
+            &substituted_lineage,
+            &replay_pins,
+            Some(&frost.trust),
+            Some(&closed_dispute_window),
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut alternate_acceptances = acceptances.clone();
     alternate_acceptances[0] = SignedClearingParticipantAcceptanceV1::sign(
@@ -1442,32 +1482,41 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         &closed_dispute_window,
         &finalization_trust,
     )?;
-    assert!(prepare_clearing_round_finalization(
-        finalizing_head,
-        &alternate_verified,
-        &finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        prepare_clearing_round_finalization(
+            finalizing_head,
+            &alternate_verified,
+            &finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut expired_finalization_trust = finalization_trust.clone();
     expired_finalization_trust.trusted_time_unix_ms = 600;
-    assert!(prepare_clearing_round_finalization(
-        finalizing_head,
-        &verified,
-        &expired_finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        prepare_clearing_round_finalization(
+            finalizing_head,
+            &verified,
+            &expired_finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut incomplete = acceptances.clone();
     incomplete.pop();
-    assert!(verify_clearing_participant_acceptances(
-        &request,
-        &signed_output,
-        &incomplete,
-        &closed_dispute_window,
-        &finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_participant_acceptances(
+            &request,
+            &signed_output,
+            &incomplete,
+            &closed_dispute_window,
+            &finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut wrong_statement = acceptances.clone();
     wrong_statement[0] = SignedClearingParticipantAcceptanceV1::sign(
@@ -1477,14 +1526,17 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         },
         &participant_key("A"),
     )?;
-    assert!(verify_clearing_participant_acceptances(
-        &request,
-        &signed_output,
-        &wrong_statement,
-        &closed_dispute_window,
-        &finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_participant_acceptances(
+            &request,
+            &signed_output,
+            &wrong_statement,
+            &closed_dispute_window,
+            &finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     let mut expired = acceptances.clone();
     expired[0] = SignedClearingParticipantAcceptanceV1::sign(
@@ -1494,35 +1546,44 @@ fn participant_acceptances_bind_every_affected_statement_after_the_dispute_windo
         },
         &participant_key("A"),
     )?;
-    assert!(verify_clearing_participant_acceptances(
-        &request,
-        &signed_output,
-        &expired,
-        &closed_dispute_window,
-        &finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_participant_acceptances(
+            &request,
+            &signed_output,
+            &expired,
+            &closed_dispute_window,
+            &finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     finalization_trust.trusted_time_unix_ms = 499;
-    assert!(verify_clearing_participant_acceptances(
-        &request,
-        &signed_output,
-        &acceptances,
-        &closed_dispute_window,
-        &finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_participant_acceptances(
+            &request,
+            &signed_output,
+            &acceptances,
+            &closed_dispute_window,
+            &finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::InvalidField("dispute_window"))
+    ));
     finalization_trust.trusted_time_unix_ms = 550;
-    assert!(verify_clearing_participant_acceptances(
-        &request,
-        &signed_output,
-        &acceptances,
-        &DisputeWindow {
-            unresolved_dispute_count: 1,
-        },
-        &finalization_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_participant_acceptances(
+            &request,
+            &signed_output,
+            &acceptances,
+            &DisputeWindow {
+                unresolved_dispute_count: 1,
+            },
+            &finalization_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
     Ok(())
 }
 
@@ -1604,15 +1665,18 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
     let mut advanced_checkpoint = proof_trust.clone();
     advanced_checkpoint.admission_commit_sequence += 1;
     advanced_checkpoint.admission_commit_digest = digest("advanced-admission-commit");
-    assert!(verify_clearing_zero_dispatch_proof(
-        proposed_head,
-        &request,
-        Some(&signed_output),
-        &signed_proof,
-        &clearing_trust,
-        &advanced_checkpoint,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_zero_dispatch_proof(
+            proposed_head,
+            &request,
+            Some(&signed_output),
+            &signed_proof,
+            &clearing_trust,
+            &advanced_checkpoint,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
 
     clearing_trust.trusted_time_unix_ms = 525;
     let abort_body = prepare_clearing_round_abort(
@@ -1756,14 +1820,17 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
         return Err("completion replay used the wrong evidence".into());
     };
     begin_abort_proof.source_round_head_digest = digest("substituted-source");
-    assert!(verify_clearing_lifecycle_replay_authority(
-        aborting_head,
-        &substituted_replay,
-        &replay_pins,
-        None,
-        None,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_clearing_lifecycle_replay_authority(
+            aborting_head,
+            &substituted_replay,
+            &replay_pins,
+            None,
+            None,
+        )
+        .err(),
+        Some(ClearingError::IllegalLifecycleTransition)
+    ));
     for transition in aborted
         .transitions()
         .iter()
@@ -1778,25 +1845,34 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
 
     let mut incomplete = statuses;
     incomplete.pop();
-    assert!(prepare_clearing_zero_dispatch_proof(
-        proposed_head,
-        &request,
-        Some(&signed_output),
-        incomplete,
-        &clearing_trust,
-        &proof_trust,
-        560,
-    )
-    .is_err());
-    assert!(sign_clearing_round_abort(
-        signed_abort.body.clone(),
-        &clearing_trust,
-        &participant_authority,
-    )
-    .is_err());
-    assert!(verified_abort
-        .abort_transition(proposed_head, aborting.proof())
-        .is_err());
+    assert!(matches!(
+        prepare_clearing_zero_dispatch_proof(
+            proposed_head,
+            &request,
+            Some(&signed_output),
+            incomplete,
+            &clearing_trust,
+            &proof_trust,
+            560,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
+    assert!(matches!(
+        sign_clearing_round_abort(
+            signed_abort.body.clone(),
+            &clearing_trust,
+            &participant_authority,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
+    assert!(matches!(
+        verified_abort
+            .abort_transition(proposed_head, aborting.proof())
+            .err(),
+        Some(ClearingError::IllegalLifecycleTransition)
+    ));
     let mut substituted_proof = aborting.proof().clone();
     let ClearingRoundTransitionV1::BeginAbort {
         zero_dispatch_proof_digest,
@@ -1806,20 +1882,26 @@ fn signed_abort_releases_only_after_complete_zero_dispatch_and_the_winning_fence
         return Err("aborting proof used the wrong transition".into());
     };
     *zero_dispatch_proof_digest = digest("substituted-zero-dispatch");
-    assert!(verified_abort
-        .abort_transition(aborting_head, &substituted_proof)
-        .is_err());
+    assert!(matches!(
+        verified_abort
+            .abort_transition(aborting_head, &substituted_proof)
+            .err(),
+        Some(ClearingError::IllegalLifecycleTransition)
+    ));
     let mut expired_trust = clearing_trust;
     expired_trust.trusted_time_unix_ms = 560;
-    assert!(prepare_clearing_round_abort(
-        proposed_head,
-        &verified_proof,
-        ClearingRoundAbortReasonV1::OperatorCancelled,
-        digest("abort-authority"),
-        None,
-        &expired_trust,
-    )
-    .is_err());
+    assert!(matches!(
+        prepare_clearing_round_abort(
+            proposed_head,
+            &verified_proof,
+            ClearingRoundAbortReasonV1::OperatorCancelled,
+            digest("abort-authority"),
+            None,
+            &expired_trust,
+        )
+        .err(),
+        Some(ClearingError::AuthorityVerification)
+    ));
     Ok(())
 }
 
