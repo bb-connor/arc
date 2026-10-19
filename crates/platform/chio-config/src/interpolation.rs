@@ -53,7 +53,11 @@ fn interpolate_with_policy(
             Ok(val) => {
                 validate_replacement(var_name, "environment value", &val, policy, &mut rejected)
             }
-            Err(_) => {
+            Err(env::VarError::NotUnicode(_)) => {
+                rejected.push(format!("{var_name} environment value is not valid unicode"));
+                String::new()
+            }
+            Err(env::VarError::NotPresent) => {
                 // Check for a default value.
                 if let Some(default_match) = caps.get(2) {
                     let default = default_match.as_str();
@@ -302,6 +306,48 @@ mod tests {
                 assert!(msg.contains("CHIO_TEST_UNSAFE_DEFAULT"));
                 assert!(msg.contains("default value"));
             }
+            other => panic!("wrong error variant: {other}"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_unicode_value_is_rejected_instead_of_defaulted() {
+        use std::os::unix::ffi::OsStrExt;
+        env::set_var(
+            "CHIO_TEST_NON_UNICODE_WITH_DEFAULT",
+            std::ffi::OsStr::from_bytes(&[0xff]),
+        );
+        let err = interpolation_error(interpolate(
+            "key: ${CHIO_TEST_NON_UNICODE_WITH_DEFAULT:-fallback}",
+        ));
+        env::remove_var("CHIO_TEST_NON_UNICODE_WITH_DEFAULT");
+        match err {
+            ConfigError::Interpolation(msg) => assert_eq!(
+                msg,
+                "unsafe interpolation values for loader: CHIO_TEST_NON_UNICODE_WITH_DEFAULT environment value is not valid unicode"
+            ),
+            other => panic!("wrong error variant: {other}"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_unicode_value_without_default_is_rejected_not_reported_unset() {
+        use std::os::unix::ffi::OsStrExt;
+        env::set_var(
+            "CHIO_TEST_NON_UNICODE_NO_DEFAULT",
+            std::ffi::OsStr::from_bytes(&[0xff]),
+        );
+        let err = interpolation_error(interpolate_for_loader(
+            "key: ${CHIO_TEST_NON_UNICODE_NO_DEFAULT}",
+        ));
+        env::remove_var("CHIO_TEST_NON_UNICODE_NO_DEFAULT");
+        match err {
+            ConfigError::Interpolation(msg) => assert_eq!(
+                msg,
+                "unsafe interpolation values for loader: CHIO_TEST_NON_UNICODE_NO_DEFAULT environment value is not valid unicode"
+            ),
             other => panic!("wrong error variant: {other}"),
         }
     }
