@@ -1628,8 +1628,6 @@ pub(crate) use dispatch::derive_security_dispatch_commitment_id;
 // Purchase-marked admission checks for delivery-committed reveals.
 #[path = "delivery_contract.rs"]
 pub(crate) mod delivery_contract;
-#[path = "evaluator.rs"]
-pub mod evaluator;
 #[cfg(not(feature = "finding-market"))]
 #[path = "market_disabled.rs"]
 mod market_disabled;

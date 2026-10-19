@@ -127,7 +127,7 @@ DOMAIN_CODE_HINTS: list[tuple[set[str], list[str]]] = [
         [
             "crates/guards/chio-guards/src/pipeline.rs",
             "crates/guards/chio-guards/src/lib.rs",
-            "crates/kernel/chio-kernel/src/kernel/evaluator.rs",
+            "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
             "crates/guards/chio-guards/src/mcp_tool.rs",
         ],
     ),
@@ -2654,7 +2654,7 @@ async def brief_feature(
             code,
             [
                 "crates/guards/chio-guards/src/pipeline.rs",
-                "crates/kernel/chio-kernel/src/kernel/evaluator.rs",
+                "crates/kernel/chio-kernel/src/kernel/dispatch.rs",
             ],
         )
         guard_tests = _prioritize_paths(

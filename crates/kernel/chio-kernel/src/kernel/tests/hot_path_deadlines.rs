@@ -629,39 +629,6 @@ async fn healthy_writer_records_capability_snapshot_through_the_bounded_path(
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn phase_dispatch_requires_the_full_evaluation_pipeline(
-) -> Result<(), Box<dyn std::error::Error>> {
-    use crate::kernel::evaluator::{BlockingToolEvaluator, ToolEvaluator};
-
-    let invocations = Arc::new(AtomicU64::new(0));
-    let mut kernel = make_kernel(make_config());
-    kernel.register_tool_server(Box::new(HangingToolServer {
-        id: "srv-phase-hang".to_string(),
-        tools: vec!["noop".to_string()],
-        invocations: Arc::clone(&invocations),
-    }));
-    let agent_kp = make_keypair();
-    let cap = make_capability(
-        &kernel,
-        &agent_kp,
-        make_scope(vec![make_grant("srv-phase-hang", "noop")]),
-        300,
-    );
-    let request = make_request("req-phase-dispatch", &cap, "noop", "srv-phase-hang");
-    let kernel = Arc::new(kernel);
-
-    let result = BlockingToolEvaluator
-        .dispatch(&kernel, &request, false)
-        .await;
-    assert_eq!(invocations.load(Ordering::SeqCst), 0);
-    assert!(matches!(
-        result,
-        Err(KernelError::DirectDispatchUnavailable)
-    ));
-    Ok(())
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dispatch_budget_bounds_a_connection_that_blocks_before_awaiting(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // A connection that performs synchronous blocking work before its first

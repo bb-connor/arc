@@ -65,6 +65,7 @@ The primary live release documents. Auditors and operators start here.
 - [SDK TypeScript Reference](reference/SDK_TYPESCRIPT_REFERENCE.md) - `@chio-protocol/sdk` package API for agent-side TypeScript
 - [SDK Python Reference](reference/SDK_PYTHON_REFERENCE.md) - `chio-sdk` distribution for Python agents, receipt queries, and invariant checks
 - [Bindings API](reference/BINDINGS_API.md) - frozen `chio-binding-helpers` boundary contract that SDKs build on
+- [Kernel Embedding Guide](reference/KERNEL_EMBEDDING_GUIDE.md) - evaluation entrypoints, settlement runtime installation, and delegated revocation for hosts that build `ChioKernel` directly
 
 ### Receipts and queries
 
@@ -189,9 +190,6 @@ The primary live release documents. Auditors and operators start here.
 
 ## Migrations
 
-- [Delegation migration](migrations/delegation-migration.md)
-- [Async kernel migration](migrations/async-kernel-migration.md)
-- [Kernel embedder surface migration](migrations/kernel-embedder-surface.md)
 - [Attest-verify migration](coordination/attest-verify-migration.md)
 
 ## Custody and weights

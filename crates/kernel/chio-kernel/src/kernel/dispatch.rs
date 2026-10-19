@@ -436,9 +436,8 @@ fn evaluate_guards_sequential(
                         ));
                     }
                     Verdict::PendingApproval => {
-                        // The `Guard` trait does not carry the HITL approval flow; that runs via
-                        // `ApprovalGuard::evaluate`. A `Guard` returning `PendingApproval` is an
-                        // unsupported state, so fail closed.
+                        // A `Guard` cannot open an approval, so `PendingApproval` from a guard
+                        // fails closed.
                         return Err(GuardRunError::new(
                             KernelError::GuardDenied(format!(
                                 "guard \"{}\" returned an unsupported approval verdict",
@@ -1598,10 +1597,10 @@ impl ChioKernel {
     }
 
     /// Forward the validated request and optionally report actual invocation
-    /// cost, enforcing the configured dispatch budget. This is the phase-level
-    /// dispatch entry point (`ToolEvaluator::dispatch`), so a custom evaluator or
-    /// phase-level caller cannot bypass the deadline and hang indefinitely on a
-    /// wedged tool server; it matches the budget the full evaluate path enforces.
+    /// cost, enforcing the configured dispatch budget, so a phase-level caller
+    /// cannot bypass the deadline and hang indefinitely on a wedged tool server;
+    /// it matches the budget the full evaluate path enforces. Monetary dispatch
+    /// is refused with `KernelError::DirectDispatchUnavailable`.
     #[cfg(test)]
     pub(crate) async fn dispatch_tool_call_with_cost(
         &self,

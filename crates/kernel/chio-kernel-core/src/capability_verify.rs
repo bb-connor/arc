@@ -10,7 +10,7 @@
 //! - Scope match against a request (use [`crate::scope::resolve_capability_grants`]).
 //! - DPoP subject binding (lives in `chio-kernel::dpop`).
 //!
-//! All four are orchestrated by `chio-kernel::ChioKernel::evaluate_tool_call_sync`,
+//! All four are orchestrated by `chio-kernel::ChioKernel::evaluate_tool_call`,
 //! which calls into this module for the pure pieces and its own async/std
 //! plumbing for the rest.
 //!
