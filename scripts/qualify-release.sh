@@ -303,6 +303,14 @@ cargo test -p chio-cli --test trust_cluster trust_control_cluster_repeat_run_qua
 qualification_assert_no_required_skips "${log_root}/trust-cluster-repeat-run.log" \
   ${optional_tests[@]+"${optional_tests[@]}"}
 
+npm_sandbox_test=dispatch_cli::finding_cmd::finding_verified_fix::sandbox::npm_runtime::tests::npm_runs_an_offline_script_in_the_sandbox
+cargo test -p chio-cli --bin chio "${npm_sandbox_test}" -- --exact --ignored --nocapture \
+  | tee "${log_root}/npm-runtime-sandbox.log"
+if ! grep -Eq '^test result: ok\. 1 passed; 0 failed; 0 ignored;' "${log_root}/npm-runtime-sandbox.log"; then
+  echo "npm runtime sandbox test did not execute exactly once: ${npm_sandbox_test}" >&2
+  exit 1
+fi
+
 COVERAGE_FAIL_UNDER=65 ./scripts/run-coverage.sh | tee "${log_root}/coverage.log"
 cp -R coverage/. "${coverage_root}/"
 
