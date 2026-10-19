@@ -24,12 +24,12 @@ use axum::routing::post;
 use axum::Json;
 use axum::Router;
 use chio_core_types::Keypair;
-use chio_federation::pheromone_gossip::PheromoneGossipBatch;
+use chio_federation::pheromone_gossip::{PheromoneGossipBatch, PheromoneGossipError};
 use chio_http_serve::{
     apply_server_hygiene, run_until_drained, MaxConnListener, ServeHygieneConfig,
     ShutdownController,
 };
-use chio_pheromone_runtime::PheromoneReceiveReport;
+use chio_pheromone_runtime::{PheromoneReceiveReport, PheromoneRuntimeError};
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -654,43 +654,151 @@ pub(crate) fn authorize_operator(
     if authorized {
         Ok(())
     } else {
-        Err(relay_http_status_error(
+        Err(relay_http_error(
             service,
             PheromoneRelayError::OperatorAuthRequired(
                 "operator token is required for relay observability".to_string(),
             ),
-            StatusCode::UNAUTHORIZED,
         ))
     }
 }
 
+const RELAY_INTERNAL_ERROR_CODE: &str = "relay_internal_error";
+const RELAY_INTERNAL_ERROR_DETAIL: &str = "relay internal error";
+const RELAY_STORE_UNAVAILABLE_CODE: &str = "relay_store_unavailable";
+const RELAY_STORE_UNAVAILABLE_DETAIL: &str = "relay store unavailable";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RelayErrorResponse {
+    status: StatusCode,
+    code: &'static str,
+    detail: &'static str,
+}
+
+const RELAY_INTERNAL_ERROR: RelayErrorResponse = RelayErrorResponse {
+    status: StatusCode::INTERNAL_SERVER_ERROR,
+    code: RELAY_INTERNAL_ERROR_CODE,
+    detail: RELAY_INTERNAL_ERROR_DETAIL,
+};
+
+const RELAY_STORE_UNAVAILABLE: RelayErrorResponse = RelayErrorResponse {
+    status: StatusCode::SERVICE_UNAVAILABLE,
+    code: RELAY_STORE_UNAVAILABLE_CODE,
+    detail: RELAY_STORE_UNAVAILABLE_DETAIL,
+};
+
+/// The full error text and its specific code go only to the operator event
+/// report; the response body carries the fixed code and detail chosen here.
 pub(crate) fn relay_http_error(
     service: &PheromoneRelayService,
     error: PheromoneRelayError,
 ) -> (StatusCode, Json<RelayOperatorReport>) {
-    relay_http_status_error(service, error, StatusCode::BAD_REQUEST)
-}
-
-pub(crate) fn relay_http_status_error(
-    service: &PheromoneRelayService,
-    error: PheromoneRelayError,
-    status: StatusCode,
-) -> (StatusCode, Json<RelayOperatorReport>) {
     let now = service.request_now_unix_ms();
-    let code = error.code().to_string();
-    let detail = error.to_string();
-    let _ = service.emit_event_report("request_rejected", false, &code, &detail, now);
+    let response = relay_error_response(&error);
+    let _ = service.emit_event_report(
+        "request_rejected",
+        false,
+        error.code(),
+        &error.to_string(),
+        now,
+    );
     (
-        status,
+        response.status,
         Json(RelayOperatorReport {
             schema: PHEROMONE_RELAY_OPERATOR_REPORT_SCHEMA.to_string(),
             accepted: false,
-            code,
-            detail,
+            code: response.code.to_string(),
+            detail: response.detail.to_string(),
             local_kernel_id: service.config.local_kernel_id.clone(),
             generated_at_unix_ms: now,
         }),
     )
+}
+
+fn relay_error_response(error: &PheromoneRelayError) -> RelayErrorResponse {
+    use PheromoneRelayError as E;
+    let refused = |detail| RelayErrorResponse {
+        status: StatusCode::BAD_REQUEST,
+        code: error.code(),
+        detail,
+    };
+    match error {
+        E::Runtime(runtime) => runtime_error_response(runtime),
+        E::Input(_) => refused("relay request body violates the JSON input policy"),
+        E::Json(_) => refused("relay request payload does not match its schema"),
+        E::UnsupportedSchema(_) => refused("relay request declares an unsupported schema"),
+        E::PeerRemoved(_) => refused("peer has been removed from the directory"),
+        E::UnknownPeer(_) => refused("peer is not in the directory"),
+        E::EndpointDenied(_) => refused("peer endpoint is not allowed"),
+        E::RelayProfileDenied(_) => refused("relay profile denied the request"),
+        E::CatchupDenied(_) => refused("catch-up request was denied"),
+        E::BodyHashMismatch(_) => refused("relay request body hash does not match"),
+        E::SignatureInvalid => refused("relay request signature does not verify"),
+        E::RelayNonceReplay(_) => refused("relay request nonce was already used"),
+        E::RelayRequestStale(_) => refused("relay request is outside the freshness window"),
+        E::SenderMismatch(_) => refused("relay request sender does not match"),
+        E::RecipientMismatch(_) => refused("relay request recipient does not match"),
+        E::MethodMismatch(_) => refused("relay request method does not match"),
+        E::PathMismatch(_) => refused("relay request path does not match"),
+        E::OperatorAuthRequired(_) => RelayErrorResponse {
+            status: StatusCode::UNAUTHORIZED,
+            code: error.code(),
+            detail: "operator token is required",
+        },
+        E::StorePoisoned => RELAY_STORE_UNAVAILABLE,
+        E::DuplicatePeer(_)
+        | E::DuplicateEndpoint(_)
+        | E::PeerDirectoryUnsigned(_)
+        | E::UnknownPeerDirectoryIssuer(_)
+        | E::PeerDirectoryRollback(_)
+        | E::PeerDirectoryStateInvalid(_)
+        | E::PeerDirectoryStale(_)
+        | E::SupervisorProfileInvalid(_)
+        | E::AlertRoutingInvalid(_)
+        | E::AlertSourceInvalid(_)
+        | E::AlertHandoffInvalid(_)
+        | E::AlertDeliveryInvalid(_)
+        | E::AlertAssuranceInvalid(_)
+        | E::ArchivePackageInvalid(_)
+        | E::CanonicalJson(_)
+        | E::Sqlite(_)
+        | E::Http(_)
+        | E::TransportError(_) => RELAY_INTERNAL_ERROR,
+    }
+}
+
+fn runtime_error_response(error: &PheromoneRuntimeError) -> RelayErrorResponse {
+    use PheromoneRuntimeError as E;
+    let refused = RelayErrorResponse {
+        status: StatusCode::BAD_REQUEST,
+        code: error.code(),
+        detail: "pheromone runtime rejected relay operation",
+    };
+    match error {
+        E::Federation(federation) => match federation {
+            PheromoneGossipError::UnsupportedSchema(_)
+            | PheromoneGossipError::OriginMismatch(_)
+            | PheromoneGossipError::TreatyScopeViolation(_)
+            | PheromoneGossipError::TransitChainInvalid(_)
+            | PheromoneGossipError::TransitPolicyViolation(_)
+            | PheromoneGossipError::UnknownPeer(_)
+            | PheromoneGossipError::BatchRecipientMismatch(_)
+            | PheromoneGossipError::BatchTreatyMismatch(_)
+            | PheromoneGossipError::BatchEmpty(_)
+            | PheromoneGossipError::AuthenticatedSenderMismatch(_) => refused,
+            PheromoneGossipError::InvalidConfiguration(_) => RELAY_INTERNAL_ERROR,
+            PheromoneGossipError::QueuePoisoned => RELAY_STORE_UNAVAILABLE,
+        },
+        E::Input(_)
+        | E::Pheromone(_)
+        | E::WorkflowContextMismatch(_)
+        | E::WorkflowVerification(_)
+        | E::Json(_)
+        | E::SchemaInvalid(_)
+        | E::InvalidField(_) => refused,
+        E::Io(_) | E::Sqlite(_) | E::CanonicalJson(_) => RELAY_INTERNAL_ERROR,
+        E::StorePoisoned => RELAY_STORE_UNAVAILABLE,
+    }
 }
 
 pub async fn deliver_due_batches(
@@ -891,10 +999,180 @@ pub(crate) fn sanitize_event_part(value: &str) -> String {
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-    use super::{PheromoneReceiveReport, RelayBatchReceiver};
+    use super::{
+        relay_error_response, PheromoneReceiveReport, PheromoneRuntimeError, RelayBatchReceiver,
+        RelayErrorResponse, RELAY_INTERNAL_ERROR_CODE, RELAY_INTERNAL_ERROR_DETAIL,
+        RELAY_STORE_UNAVAILABLE_CODE, RELAY_STORE_UNAVAILABLE_DETAIL,
+    };
     use crate::PheromoneRelayError;
     use async_trait::async_trait;
-    use chio_federation::pheromone_gossip::PheromoneGossipBatch;
+    use axum::http::StatusCode;
+    use chio_federation::pheromone_gossip::{PheromoneGossipBatch, PheromoneGossipError};
+
+    const INTERNAL_TEXT: &str =
+        "no such table: chio_pheromone_relay_inbox in /var/lib/chio/relay.db";
+    const PEER_TEXT: &str = "did:chio:<peer-supplied>";
+
+    fn refusal(status: StatusCode, code: &'static str, detail: &'static str) -> RelayErrorResponse {
+        RelayErrorResponse {
+            status,
+            code,
+            detail,
+        }
+    }
+
+    #[test]
+    fn internal_failures_answer_with_fixed_server_errors() {
+        let internal = refusal(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            RELAY_INTERNAL_ERROR_CODE,
+            RELAY_INTERNAL_ERROR_DETAIL,
+        );
+        let unavailable = refusal(
+            StatusCode::SERVICE_UNAVAILABLE,
+            RELAY_STORE_UNAVAILABLE_CODE,
+            RELAY_STORE_UNAVAILABLE_DETAIL,
+        );
+        let cases = [
+            (
+                PheromoneRelayError::Sqlite(INTERNAL_TEXT.to_string()),
+                internal,
+            ),
+            (
+                PheromoneRelayError::Http(INTERNAL_TEXT.to_string()),
+                internal,
+            ),
+            (
+                PheromoneRelayError::TransportError(INTERNAL_TEXT.to_string()),
+                internal,
+            ),
+            (
+                PheromoneRelayError::CanonicalJson(INTERNAL_TEXT.to_string()),
+                internal,
+            ),
+            (
+                PheromoneRelayError::PeerDirectoryStale(INTERNAL_TEXT.to_string()),
+                internal,
+            ),
+            (PheromoneRelayError::StorePoisoned, unavailable),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::Sqlite(
+                    INTERNAL_TEXT.to_string(),
+                )),
+                internal,
+            ),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::Io(std::io::Error::other(
+                    INTERNAL_TEXT,
+                ))),
+                internal,
+            ),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::StorePoisoned),
+                unavailable,
+            ),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::Federation(
+                    PheromoneGossipError::InvalidConfiguration(INTERNAL_TEXT.to_string()),
+                )),
+                internal,
+            ),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::Federation(
+                    PheromoneGossipError::QueuePoisoned,
+                )),
+                unavailable,
+            ),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(relay_error_response(&error), expected, "{error:?}");
+        }
+    }
+
+    #[test]
+    fn peer_refusals_answer_with_fixed_client_errors() {
+        let cases = [
+            (
+                PheromoneRelayError::SignatureInvalid,
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "signature_invalid",
+                    "relay request signature does not verify",
+                ),
+            ),
+            (
+                PheromoneRelayError::RelayNonceReplay(PEER_TEXT.to_string()),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "relay_nonce_replay",
+                    "relay request nonce was already used",
+                ),
+            ),
+            (
+                PheromoneRelayError::RelayRequestStale(PEER_TEXT.to_string()),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "relay_request_stale",
+                    "relay request is outside the freshness window",
+                ),
+            ),
+            (
+                PheromoneRelayError::UnknownPeer(PEER_TEXT.to_string()),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "unknown_peer",
+                    "peer is not in the directory",
+                ),
+            ),
+            (
+                PheromoneRelayError::RecipientMismatch(PEER_TEXT.to_string()),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "recipient_mismatch",
+                    "relay request recipient does not match",
+                ),
+            ),
+            (
+                PheromoneRelayError::UnsupportedSchema(PEER_TEXT.to_string()),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "unsupported_schema",
+                    "relay request declares an unsupported schema",
+                ),
+            ),
+            (
+                PheromoneRelayError::OperatorAuthRequired(PEER_TEXT.to_string()),
+                refusal(
+                    StatusCode::UNAUTHORIZED,
+                    "operator_auth_required",
+                    "operator token is required",
+                ),
+            ),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::InvalidField(
+                    PEER_TEXT.to_string(),
+                )),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "invalid_field",
+                    "pheromone runtime rejected relay operation",
+                ),
+            ),
+            (
+                PheromoneRelayError::Runtime(PheromoneRuntimeError::Federation(
+                    PheromoneGossipError::AuthenticatedSenderMismatch(PEER_TEXT.to_string()),
+                )),
+                refusal(
+                    StatusCode::BAD_REQUEST,
+                    "authenticated_sender_mismatch",
+                    "pheromone runtime rejected relay operation",
+                ),
+            ),
+        ];
+        for (error, expected) in cases {
+            assert_eq!(relay_error_response(&error), expected, "{error:?}");
+        }
+    }
 
     struct SilentReceiver;
 

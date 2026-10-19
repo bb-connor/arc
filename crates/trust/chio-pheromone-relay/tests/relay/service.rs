@@ -1,13 +1,14 @@
 use super::common::{
-    alert_profile, client_directory, degraded_observability_report, deliver_due_batches, directory,
-    generate_relay_trend_report, key, relay_alert_routing_profile_from_json, sample_batch,
-    sign_relay_http_request, AcceptingReceiver, Arc, CatchupRequest, CatchupResponse,
-    PeerDirectory, PheromoneRelayClient, PheromoneRelayConfig, PheromoneRelayService,
-    PheromoneTransitChain, PheromoneTransitHop, RelayEventReport, RelayHttpSigningInput,
-    RelayProfile, RelayRole, RelayTrendInput, SqlitePheromoneRelayStore, NOW,
-    PHEROMONE_BATCH_RELAY_PATH, PHEROMONE_CATCHUP_RELAY_PATH, PHEROMONE_CATCHUP_REQUEST_SCHEMA,
-    PHEROMONE_RELAY_OBSERVABILITY_PATH, PHEROMONE_RELAY_OBSERVABILITY_REPORT_SCHEMA,
-    PHEROMONE_RELAY_TREND_REPORT_SCHEMA,
+    alert_profile, async_trait, client_directory, degraded_observability_report,
+    deliver_due_batches, directory, generate_relay_trend_report, key,
+    relay_alert_routing_profile_from_json, sample_batch, sign_relay_http_request,
+    AcceptingReceiver, Arc, CatchupRequest, CatchupResponse, PeerDirectory, PheromoneGossipBatch,
+    PheromoneReceiveReport, PheromoneRelayClient, PheromoneRelayConfig, PheromoneRelayError,
+    PheromoneRelayService, PheromoneTransitChain, PheromoneTransitHop, RelayBatchReceiver,
+    RelayEventReport, RelayHttpSigningInput, RelayProfile, RelayRole, RelayTrendInput,
+    SqlitePheromoneRelayStore, NOW, PHEROMONE_BATCH_RELAY_PATH, PHEROMONE_CATCHUP_RELAY_PATH,
+    PHEROMONE_CATCHUP_REQUEST_SCHEMA, PHEROMONE_RELAY_OBSERVABILITY_PATH,
+    PHEROMONE_RELAY_OBSERVABILITY_REPORT_SCHEMA, PHEROMONE_RELAY_TREND_REPORT_SCHEMA,
 };
 
 #[test]
@@ -268,6 +269,7 @@ async fn relay_rejects_authenticated_batch_above_peer_frame_limit() {
     let sender = key(1);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
     let receiver_directory =
         PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
     let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
@@ -280,7 +282,7 @@ async fn relay_rejects_authenticated_batch_above_peer_frame_limit() {
             max_body_bytes: 256_000,
             use_system_clock: false,
             operator_token: None,
-            report_dir: None,
+            report_dir: Some(reports.path().to_path_buf()),
         },
         receiver_directory,
         Arc::new(AcceptingReceiver),
@@ -312,10 +314,11 @@ async fn relay_rejects_authenticated_batch_above_peer_frame_limit() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let report = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(report["code"].as_str(), Some("relay_profile_denied"));
-    assert!(report["detail"]
-        .as_str()
-        .unwrap()
-        .contains("submitted 9 batch frames"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("relay profile denied the request")
+    );
+    assert!(rejected_event_detail(reports.path()).contains("submitted 9 batch frames"));
     server.abort();
 }
 
@@ -324,6 +327,7 @@ async fn relay_rejects_authenticated_batch_for_unsubscribed_treaty() {
     let sender = key(1);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
     let receiver_directory =
         PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
     let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
@@ -336,7 +340,7 @@ async fn relay_rejects_authenticated_batch_for_unsubscribed_treaty() {
             max_body_bytes: 256_000,
             use_system_clock: false,
             operator_token: None,
-            report_dir: None,
+            report_dir: Some(reports.path().to_path_buf()),
         },
         receiver_directory,
         Arc::new(AcceptingReceiver),
@@ -370,10 +374,11 @@ async fn relay_rejects_authenticated_batch_for_unsubscribed_treaty() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let report = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(report["code"].as_str(), Some("relay_profile_denied"));
-    assert!(report["detail"]
-        .as_str()
-        .unwrap()
-        .contains("is not subscribed to treaty"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("relay profile denied the request")
+    );
+    assert!(rejected_event_detail(reports.path()).contains("is not subscribed to treaty"));
     server.abort();
 }
 
@@ -382,6 +387,7 @@ async fn relay_rejects_authenticated_batch_from_non_origin_peer_role() {
     let sender = key(1);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
     let mut document = directory(&sender, format!("http://{address}"));
     document.peers[0].relay_role = RelayRole::Receiver;
     let receiver_directory = PeerDirectory::from_document(document, NOW).unwrap();
@@ -395,7 +401,7 @@ async fn relay_rejects_authenticated_batch_from_non_origin_peer_role() {
             max_body_bytes: 256_000,
             use_system_clock: false,
             operator_token: None,
-            report_dir: None,
+            report_dir: Some(reports.path().to_path_buf()),
         },
         receiver_directory,
         Arc::new(AcceptingReceiver),
@@ -425,10 +431,13 @@ async fn relay_rejects_authenticated_batch_from_non_origin_peer_role() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let report = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(report["code"].as_str(), Some("relay_profile_denied"));
-    assert!(report["detail"]
-        .as_str()
-        .unwrap()
-        .contains("not authorized to submit inbound batches"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("relay profile denied the request")
+    );
+    assert!(
+        rejected_event_detail(reports.path()).contains("not authorized to submit inbound batches")
+    );
     server.abort();
 }
 
@@ -437,6 +446,7 @@ async fn relay_rejects_authenticated_batch_with_unpinned_transit_ladder() {
     let sender = key(1);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
     let receiver_directory =
         PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
     let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
@@ -449,7 +459,7 @@ async fn relay_rejects_authenticated_batch_with_unpinned_transit_ladder() {
             max_body_bytes: 256_000,
             use_system_clock: false,
             operator_token: None,
-            report_dir: None,
+            report_dir: Some(reports.path().to_path_buf()),
         },
         receiver_directory,
         Arc::new(AcceptingReceiver),
@@ -493,10 +503,11 @@ async fn relay_rejects_authenticated_batch_with_unpinned_transit_ladder() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let report = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(report["code"].as_str(), Some("relay_profile_denied"));
-    assert!(report["detail"]
-        .as_str()
-        .unwrap()
-        .contains("transit ladder"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("relay profile denied the request")
+    );
+    assert!(rejected_event_detail(reports.path()).contains("transit ladder"));
     server.abort();
 }
 
@@ -594,6 +605,7 @@ async fn relay_catchup_rejects_origin_only_peer_role() {
     let sender = key(1);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
     let receiver_directory =
         PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
     let store = Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap());
@@ -606,7 +618,7 @@ async fn relay_catchup_rejects_origin_only_peer_role() {
             max_body_bytes: 256_000,
             use_system_clock: false,
             operator_token: None,
-            report_dir: None,
+            report_dir: Some(reports.path().to_path_buf()),
         },
         receiver_directory,
         Arc::new(AcceptingReceiver),
@@ -643,10 +655,11 @@ async fn relay_catchup_rejects_origin_only_peer_role() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let report = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(report["code"].as_str(), Some("catchup_denied"));
-    assert!(report["detail"]
-        .as_str()
-        .unwrap()
-        .contains("not authorized for catch-up"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("catch-up request was denied")
+    );
+    assert!(rejected_event_detail(reports.path()).contains("not authorized for catch-up"));
     server.abort();
 }
 
@@ -655,6 +668,7 @@ async fn relay_catchup_rejects_returned_frame_with_unpinned_transit_ladder() {
     let sender = key(1);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
     let mut document = directory(&sender, format!("http://{address}"));
     document.peers[0].relay_role = RelayRole::Receiver;
     let receiver_directory = PeerDirectory::from_document(document, NOW).unwrap();
@@ -693,7 +707,7 @@ async fn relay_catchup_rejects_returned_frame_with_unpinned_transit_ladder() {
             max_body_bytes: 256_000,
             use_system_clock: false,
             operator_token: None,
-            report_dir: None,
+            report_dir: Some(reports.path().to_path_buf()),
         },
         receiver_directory,
         Arc::new(AcceptingReceiver),
@@ -730,10 +744,11 @@ async fn relay_catchup_rejects_returned_frame_with_unpinned_transit_ladder() {
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     let report = response.json::<serde_json::Value>().await.unwrap();
     assert_eq!(report["code"].as_str(), Some("catchup_denied"));
-    assert!(report["detail"]
-        .as_str()
-        .unwrap()
-        .contains("transit ladder"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("catch-up request was denied")
+    );
+    assert!(rejected_event_detail(reports.path()).contains("transit ladder"));
     server.abort();
 }
 
@@ -882,4 +897,219 @@ async fn relay_tick_rejects_recipient_without_receiver_role_before_delivery() {
         .failures
         .iter()
         .any(|failure| failure.contains("relay_profile_denied")));
+}
+
+fn rejection_config(report_dir: &std::path::Path) -> PheromoneRelayConfig {
+    PheromoneRelayConfig {
+        local_kernel_id: "did:chio:buyer-kernel".to_string(),
+        profile: RelayProfile::Production,
+        now_unix_ms: NOW,
+        freshness_window_ms: 60_000,
+        max_body_bytes: 256_000,
+        use_system_clock: false,
+        operator_token: None,
+        report_dir: Some(report_dir.to_path_buf()),
+    }
+}
+
+fn rejected_event_detail(report_dir: &std::path::Path) -> String {
+    let mut details = std::fs::read_dir(report_dir)
+        .unwrap()
+        .map(|entry| std::fs::read_to_string(entry.unwrap().path()).unwrap())
+        .map(|json| serde_json::from_str::<RelayEventReport>(&json).unwrap())
+        .filter(|report| report.event_kind == "request_rejected")
+        .map(|report| report.detail)
+        .collect::<Vec<_>>();
+    assert_eq!(details.len(), 1, "{details:?}");
+    details.remove(0)
+}
+
+fn assert_body_hides(body: &str, hidden: &[&str]) {
+    let lowered = body.to_lowercase();
+    for text in hidden {
+        assert!(
+            !lowered.contains(&text.to_lowercase()),
+            "response body exposes {text:?}: {body}"
+        );
+    }
+}
+
+async fn post_signed_batch(
+    address: std::net::SocketAddr,
+    recipient_kernel_id: &str,
+    nonce: &str,
+    signer: &chio_core_types::Keypair,
+) -> (reqwest::StatusCode, String) {
+    let request = sign_relay_http_request(RelayHttpSigningInput {
+        sender_kernel_id: "did:chio:llamaworks",
+        recipient_kernel_id,
+        method: "POST",
+        path: PHEROMONE_BATCH_RELAY_PATH,
+        nonce,
+        sent_at_unix_ms: NOW,
+        payload: &sample_batch(),
+        keypair: signer,
+    })
+    .unwrap();
+    let response = reqwest::Client::new()
+        .post(format!("http://{address}{PHEROMONE_BATCH_RELAY_PATH}"))
+        .json(&request)
+        .send()
+        .await
+        .unwrap();
+    let status = response.status();
+    (status, response.text().await.unwrap())
+}
+
+#[tokio::test]
+async fn relay_store_failure_answers_fixed_internal_error() {
+    let sender = key(1);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
+    let store_dir = tempfile::tempdir().unwrap();
+    let store_path = store_dir.path().canonicalize().unwrap().join("relay.db");
+    let store = Arc::new(SqlitePheromoneRelayStore::open(&store_path).unwrap());
+    rusqlite::Connection::open(&store_path)
+        .unwrap()
+        .execute_batch("DROP TABLE chio_pheromone_relay_inbox;")
+        .unwrap();
+    let receiver_directory =
+        PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
+    let service = PheromoneRelayService::new(
+        rejection_config(reports.path()),
+        receiver_directory,
+        Arc::new(AcceptingReceiver),
+        store,
+    );
+    let server = tokio::spawn(service.serve(listener));
+
+    let (status, body) = post_signed_batch(
+        address,
+        "did:chio:buyer-kernel",
+        "relay-nonce-store-failure",
+        &sender,
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::INTERNAL_SERVER_ERROR);
+    let report: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(report["accepted"].as_bool(), Some(false));
+    assert_eq!(report["code"].as_str(), Some("relay_internal_error"));
+    assert_eq!(report["detail"].as_str(), Some("relay internal error"));
+    assert_body_hides(
+        &body,
+        &[
+            "sqlite",
+            "no such table",
+            "chio_pheromone_relay_inbox",
+            "relay.db",
+            &store_dir.path().display().to_string(),
+        ],
+    );
+    assert_eq!(
+        rejected_event_detail(reports.path()),
+        "sqlite: no such table: chio_pheromone_relay_inbox"
+    );
+    server.abort();
+}
+
+struct PoisonedReceiver;
+
+#[async_trait]
+impl RelayBatchReceiver for PoisonedReceiver {
+    async fn receive_batch(
+        &self,
+        _batch: PheromoneGossipBatch,
+        _authenticated_sender_kernel_id: String,
+        _received_at_unix_ms: u64,
+    ) -> Result<PheromoneReceiveReport, PheromoneRelayError> {
+        Err(PheromoneRelayError::StorePoisoned)
+    }
+}
+
+#[tokio::test]
+async fn relay_poisoned_store_answers_fixed_unavailable_error() {
+    let sender = key(1);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
+    let receiver_directory =
+        PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
+    let service = PheromoneRelayService::new(
+        rejection_config(reports.path()),
+        receiver_directory,
+        Arc::new(PoisonedReceiver),
+        Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap()),
+    );
+    let server = tokio::spawn(service.serve(listener));
+
+    let (status, body) = post_signed_batch(
+        address,
+        "did:chio:buyer-kernel",
+        "relay-nonce-poisoned-store",
+        &sender,
+    )
+    .await;
+
+    assert_eq!(status, reqwest::StatusCode::SERVICE_UNAVAILABLE);
+    let report: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(report["code"].as_str(), Some("relay_store_unavailable"));
+    assert_eq!(report["detail"].as_str(), Some("relay store unavailable"));
+    assert_body_hides(&body, &["poison", "StorePoisoned", "lock"]);
+    assert_eq!(
+        rejected_event_detail(reports.path()),
+        "store_poisoned: pheromone relay store lock is poisoned"
+    );
+    server.abort();
+}
+
+#[tokio::test]
+async fn relay_unauthenticated_refusals_answer_fixed_details() {
+    let sender = key(1);
+    let impostor = key(9);
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let reports = tempfile::tempdir().unwrap();
+    let receiver_directory =
+        PeerDirectory::from_document(directory(&sender, format!("http://{address}")), NOW).unwrap();
+    let service = PheromoneRelayService::new(
+        rejection_config(reports.path()),
+        receiver_directory,
+        Arc::new(AcceptingReceiver),
+        Arc::new(SqlitePheromoneRelayStore::open_in_memory().unwrap()),
+    );
+    let server = tokio::spawn(service.serve(listener));
+
+    let (status, body) = post_signed_batch(
+        address,
+        "did:chio:buyer-kernel",
+        "relay-nonce-impostor",
+        &impostor,
+    )
+    .await;
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+    let report: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(report["code"].as_str(), Some("signature_invalid"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("relay request signature does not verify")
+    );
+
+    let (status, body) = post_signed_batch(
+        address,
+        "did:chio:<peer-supplied>",
+        "relay-nonce-impostor-recipient",
+        &impostor,
+    )
+    .await;
+    assert_eq!(status, reqwest::StatusCode::BAD_REQUEST);
+    let report: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(report["code"].as_str(), Some("recipient_mismatch"));
+    assert_eq!(
+        report["detail"].as_str(),
+        Some("relay request recipient does not match")
+    );
+    assert_body_hides(&body, &["<peer-supplied>"]);
+    server.abort();
 }
