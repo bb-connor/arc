@@ -18,7 +18,7 @@ use chio_security_types::ports::{
 };
 use chio_security_types::{
     DecoyLifecycle, DecoyOperationAttempt, DecoyOperationKind, DecoyRecord, DecoySurface,
-    DecoyVersion,
+    DecoyVersion, PrincipalId,
 };
 use chio_store_sqlite::SqliteSealedDecoyRegistryStore;
 
@@ -168,6 +168,8 @@ impl Fixture {
     ) -> PortResult<TripwireDecision> {
         let input = TripwireInput {
             tenant_id: TenantId::new(tenant)?,
+            principal_id: PrincipalId::new("principal-port-fixture")
+                .map_err(|_| PortError::invalid_data())?,
             request_id: RequestId::new("request-port-fixture")?,
             kind,
             content: CanonicalBody::new(presented.as_bytes().to_vec())

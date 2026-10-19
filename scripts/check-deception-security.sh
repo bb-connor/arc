@@ -125,8 +125,10 @@ run_exact_target --label "pre-dispatch tripwire adapters" --allow-filtered --exp
 run_exact_target --label "post-response watermark tripwire" --allow-filtered --expected \
   post_output_match_blocks_delivery_after_server_execution \
   post_output_watermark::a_retried_request_with_two_inactive_tokens_keeps_both_first_observations \
-  post_output_watermark::an_inactive_token_whose_request_attribution_changes_still_blocks \
+  post_output_watermark::a_retry_by_the_second_principal_is_a_duplicate_of_its_own_first_observations \
+  post_output_watermark::an_inactive_token_whose_attribution_changes_for_the_same_principal_still_blocks \
   post_output_watermark::two_inactive_tokens_under_one_public_ref_are_two_observations_and_do_not_block \
+  post_output_watermark::two_principals_reusing_one_request_id_each_record_their_own_observations \
   -- cargo test -p chio-security-kernel --test adapters post_output
 
 run_exact_target --label "sealed private registry store" --expected \
@@ -163,4 +165,4 @@ run_exact_target --label "native canary and honey-tool pre-dispatch denial" --al
   honey_tool_pre_dispatch_denial \
   -- cargo test -p chio-conformance --test active_defense pre_dispatch_denial
 
-echo "Deception security gate passed (120 exact tests)"
+echo "Deception security gate passed (122 exact tests)"

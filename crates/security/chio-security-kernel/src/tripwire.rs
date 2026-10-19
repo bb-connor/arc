@@ -35,6 +35,7 @@ mod arguments;
 
 const PRE_INVOCATION_GUARD_NAME: &str = "chio-tripwire-pre-invocation";
 const POST_INVOCATION_HOOK_NAME: &str = "chio-watermark-tripwire";
+const WATERMARK_SCAN_DOMAIN: &[u8] = b"chio.security.watermark-scan.v1\0";
 
 pub use chio_security_types::clock::{Clock, SystemClock};
 
@@ -188,12 +189,7 @@ impl DecoyTripwireDetectorPort {
             .clock
             .unix_millis()
             .map(chio_security_types::clock::UnixMillis::get)?;
-        let scan_digest = domain_digest(
-            b"chio.security.watermark-scan.v1\0",
-            input.request_id.as_str().as_bytes(),
-        );
-        let scan_id = RecordId::new(format!("watermark-scan-{}", hex_digest(scan_digest)))
-            .map_err(|_| PortError::invalid_data())?;
+        let scan_id = watermark_scan_id(input)?;
         let evidence_ref = RecordId::new(format!(
             "watermark-evidence-{}",
             hex_digest(input.canonical_context_digest)
@@ -546,6 +542,7 @@ fn build_input(
     let content = CanonicalBody::new(content).map_err(|_| PortError::invalid_data())?;
     Ok(TripwireInput {
         tenant_id: context.tenant_id().clone(),
+        principal_id: context.principal_id().clone(),
         request_id,
         kind,
         content,
@@ -924,11 +921,23 @@ fn digest(bytes: &[u8]) -> Digest32 {
     Digest32::new(*sha256(bytes).as_bytes())
 }
 
-fn domain_digest(domain: &[u8], bytes: &[u8]) -> Digest32 {
-    let mut preimage = Vec::with_capacity(domain.len().saturating_add(bytes.len()));
-    preimage.extend_from_slice(domain);
-    preimage.extend_from_slice(bytes);
-    digest(&preimage)
+/// Scopes one scanned output to its observing tenant, observing principal
+/// and request. Every field carries a big-endian u64 length prefix, so
+/// distinct tuples never share a preimage.
+fn watermark_scan_id(input: &TripwireInput) -> PortResult<RecordId> {
+    let fields: [&[u8]; 3] = [
+        input.tenant_id.as_str().as_bytes(),
+        input.principal_id.as_str().as_bytes(),
+        input.request_id.as_str().as_bytes(),
+    ];
+    let mut preimage = WATERMARK_SCAN_DOMAIN.to_vec();
+    for field in fields {
+        let length = u64::try_from(field.len()).map_err(|_| PortError::invalid_data())?;
+        preimage.extend_from_slice(&length.to_be_bytes());
+        preimage.extend_from_slice(field);
+    }
+    RecordId::new(format!("watermark-scan-{}", hex_digest(digest(&preimage))))
+        .map_err(|_| PortError::invalid_data())
 }
 
 fn hex_digest(value: Digest32) -> String {
