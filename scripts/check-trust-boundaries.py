@@ -41,9 +41,13 @@ DECODER_KINDS = {
 # The reviewed debt cohort survives scoped caller repairs and direct-site
 # migrations. Removing or promoting it requires an explicit source-gate review.
 RAW_INPUT_BASELINE_IDENTITIES_SHA256 = "049948d58a6c6c1ee334f7dd0886724dc786227068ee1df88b5be862318b2922"
+# Each retired helper names the inner reader that owns its single signed
+# decode and that reader's constructor. A distinct reader is private to the helper.
 RETIRED_DIRECT_HELPERS = {
-    "crates/products/chio-mercury/src/commands/shared/utils.rs": "read_json_file",
-    "crates/sdk/chio-binding-helpers/src/receipt.rs": "parse_receipt_json",
+    "crates/products/chio-mercury/src/commands/shared/utils.rs": (
+        "read_json_file", "read_json_file_bounded", "from_wire"),
+    "crates/sdk/chio-binding-helpers/src/receipt.rs": (
+        "parse_receipt_json", "parse_receipt_json", "new"),
 }
 
 
@@ -86,10 +90,11 @@ def retired_direct_contracts(catalog, found, files):
         errors.append("raw-input baseline debt identities changed")
     retired = catalog.get("retired_direct_readers", {})
     for path, review in retired.items():
-        helper = RETIRED_DIRECT_HELPERS.get(path)
-        if helper is None:
+        pinned = RETIRED_DIRECT_HELPERS.get(path)
+        if pinned is None:
             errors.append(f"unreviewed retired direct reader: {path}")
             continue
+        helper, reader, constructor = pinned
         baseline_contract = contracts.get(path, {})
         contract_hash = hashlib.sha256(json.dumps(
             baseline_contract, sort_keys=True, separators=(",", ":")
@@ -101,11 +106,17 @@ def retired_direct_contracts(catalog, found, files):
         if path in found["decoder_census"]:
             errors.append(f"retired direct reader gained direct decoder: {path}")
         source = files.get(path)
-        signature = f"{path}::{helper}::new#1::decode_signed"
+        signature = f"{path}::{reader}::{constructor}#1::decode_signed"
         actual = [site for site in found["decoding_contracts"]
-                  if site.startswith(f"{path}::{helper}::")]
-        source_hash, _ = function_body(source or "", helper)
-        if (review.get("helper") != helper or actual != [signature]
+                  if site.startswith((f"{path}::{helper}::", f"{path}::{reader}::"))]
+        source_hash, helper_body = function_body(source or "", helper)
+        reader_hash, _ = function_body(source or "", reader)
+        reader_pinned = reader == helper or (
+            review.get("reader") == reader
+            and reader_hash is not None and review.get("reader_source_sha256") == reader_hash
+            and _contracts.calls(helper_body or "", reader)
+            and local_helper_consumers(files, path, reader) == {(path, helper)})
+        if (review.get("helper") != helper or not reader_pinned or actual != [signature]
                 or review.get("constructor_contract") != signature
                 or source_hash is None or review.get("helper_source_sha256") != source_hash
                 or review.get("ingress") != found["ingress_census"].get(path)):

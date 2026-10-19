@@ -33,6 +33,12 @@ class RetirementCalibration(unittest.TestCase):
         with patch.object(gate, "sources", return_value=iter(chosen_files.items())):
             return gate.check(ROOT, chosen_catalog)[0]
 
+    @staticmethod
+    def function_hash(text, owner):
+        code = gate._lexer.blank_rust_noise(text)
+        function = next(row for row in gate._contracts.functions(code) if row[0] == owner)
+        return hashlib.sha256(text[function[1]:function[3]].encode()).hexdigest()
+
     def retirement_errors(self, catalog=None):
         return [error for error in self.errors(catalog) if
                 "decoder file contracts" in error or "retired direct" in error or
@@ -73,21 +79,53 @@ class RetirementCalibration(unittest.TestCase):
 
     def test_signed_helper_cannot_downgrade_after_catalog_metadata_refresh(self):
         files = self.files.copy()
-        before = "UntrustedJsonText::new(text).decode_signed()"
+        before = "UntrustedJsonText::from_wire(&bytes, bound)?.decode_signed()"
         self.assertIn(before, files[MERCURY])
-        files[MERCURY] = files[MERCURY].replace(before, "UntrustedJsonText::new(text).decode_document()", 1)
+        files[MERCURY] = files[MERCURY].replace(
+            before, "UntrustedJsonText::from_wire(&bytes, bound)?.decode_document()", 1)
         changed = copy.deepcopy(self.catalog)
         row = changed["retired_direct_readers"][MERCURY]
         row["constructor_contract"] = row["constructor_contract"].replace("decode_signed", "decode_document")
-        text = files[MERCURY]
-        code = gate._lexer.blank_rust_noise(text)
-        function = next(row for row in gate._contracts.functions(code) if row[0] == "read_json_file")
-        row["helper_source_sha256"] = hashlib.sha256(text[function[1]:function[3]].encode()).hexdigest()
+        row["reader_source_sha256"] = self.function_hash(files[MERCURY], "read_json_file_bounded")
         with patch.object(gate, "sources", return_value=iter(files.items())):
             observed = gate.scan(ROOT, changed)[0]
         changed["decoding_contracts"] = observed["decoding_contracts"]
         changed["ingress_census"] = observed["ingress_census"]
         row["ingress"] = observed["ingress_census"][MERCURY]
+        with patch.object(gate, "scan", return_value=(observed, files)):
+            errors = gate.check(ROOT, changed)[0]
+        self.assertIn("retired direct-reader signed helper changed: " + MERCURY, errors)
+
+    def test_signed_helper_cannot_drop_the_input_bound_after_catalog_metadata_refresh(self):
+        files = self.files.copy()
+        before = "Ok(chio_core::canonical::UntrustedJsonText::from_wire(&bytes, bound)?.decode_signed()?)"
+        self.assertIn(before, files[MERCURY])
+        files[MERCURY] = files[MERCURY].replace(before, (
+            "let text = std::str::from_utf8(&bytes).map_err(|e| CliError::Other(e.to_string()))?;\n"
+            "    Ok(chio_core::canonical::UntrustedJsonText::new(text).decode_signed()?)"), 1)
+        changed = copy.deepcopy(self.catalog)
+        row = changed["retired_direct_readers"][MERCURY]
+        row["constructor_contract"] = row["constructor_contract"].replace("from_wire", "new")
+        row["reader_source_sha256"] = self.function_hash(files[MERCURY], "read_json_file_bounded")
+        with patch.object(gate, "sources", return_value=iter(files.items())):
+            observed = gate.scan(ROOT, changed)[0]
+        changed["decoding_contracts"] = observed["decoding_contracts"]
+        changed["constructors"] = observed["constructors"]
+        changed["ingress_census"] = observed["ingress_census"]
+        row["ingress"] = observed["ingress_census"][MERCURY]
+        with patch.object(gate, "scan", return_value=(observed, files)):
+            errors = gate.check(ROOT, changed)[0]
+        self.assertIn("retired direct-reader signed helper changed: " + MERCURY, errors)
+
+    def test_bounded_reader_cannot_gain_a_second_caller(self):
+        files = self.files.copy()
+        files[MERCURY] += ("\nfn unbounded_review(path: &Path) "
+                           "{ read_json_file_bounded::<serde_json::Value>(path, usize::MAX); }\n")
+        changed = copy.deepcopy(self.catalog)
+        with patch.object(gate, "sources", return_value=iter(files.items())):
+            observed = gate.scan(ROOT, changed)[0]
+        changed["ingress_census"] = observed["ingress_census"]
+        changed["retired_direct_readers"][MERCURY]["ingress"] = observed["ingress_census"][MERCURY]
         with patch.object(gate, "scan", return_value=(observed, files)):
             errors = gate.check(ROOT, changed)[0]
         self.assertIn("retired direct-reader signed helper changed: " + MERCURY, errors)
