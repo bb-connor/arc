@@ -37,6 +37,9 @@ fn test_client(
     client.test_expect("valid active-response authority client")
 }
 
+const INVALID_CONFIG_MESSAGE: &str =
+    "active-response authority path, peer identity, deadline, or freshness bound is invalid";
+
 fn different_process_id() -> u32 {
     let current = std::process::id();
     if current == u32::MAX {
@@ -115,22 +118,22 @@ fn production_authority_configuration_rejects_unpinned_or_unbounded_inputs() {
 
     let mut invalid = valid.clone();
     invalid.socket_path = PathBuf::from("relative.sock");
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(INVALID_CONFIG_MESSAGE.to_string()));
     let mut invalid = valid.clone();
     invalid.socket_path = PathBuf::from("/run/chio/../authority.sock");
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(INVALID_CONFIG_MESSAGE.to_string()));
     let mut invalid = valid.clone();
     invalid.expected_peer.process_id = 0;
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(INVALID_CONFIG_MESSAGE.to_string()));
     let mut invalid = valid.clone();
     invalid.timeout_ms = 30_001;
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(INVALID_CONFIG_MESSAGE.to_string()));
     let mut invalid = valid.clone();
     invalid.store_digest = Digest32::new([0; 32]);
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(INVALID_CONFIG_MESSAGE.to_string()));
     let mut invalid = valid;
     invalid.maximum_clock_skew_seconds = 31;
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(INVALID_CONFIG_MESSAGE.to_string()));
 }
 
 #[test]
@@ -159,9 +162,10 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
         authority.public_key(),
         &wrong_authority,
     );
-    assert!(client
-        .verify_response(&wrong_signature, "request-1", &"a".repeat(64), now)
-        .is_err());
+    assert_eq!(
+        client.verify_response(&wrong_signature, "request-1", &"a".repeat(64), now),
+        Err(PortError::integrity_failure())
+    );
     let replayed = signed_health_response(
         "request-1",
         &"b".repeat(64),
@@ -169,9 +173,10 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
         authority.public_key(),
         &authority,
     );
-    assert!(client
-        .verify_response(&replayed, "request-1", &"a".repeat(64), now)
-        .is_err());
+    assert_eq!(
+        client.verify_response(&replayed, "request-1", &"a".repeat(64), now),
+        Err(PortError::integrity_failure())
+    );
     let stale = signed_health_response(
         "request-1",
         &"a".repeat(64),
@@ -179,9 +184,10 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
         authority.public_key(),
         &authority,
     );
-    assert!(client
-        .verify_response(&stale, "request-1", &"a".repeat(64), now)
-        .is_err());
+    assert_eq!(
+        client.verify_response(&stale, "request-1", &"a".repeat(64), now),
+        Err(PortError::integrity_failure())
+    );
     let mut wrong_store = signed_health_response(
         "request-1",
         &"a".repeat(64),
@@ -193,9 +199,10 @@ fn response_verification_rejects_wrong_signer_replay_and_staleness() {
     let signing_bytes = active_response_authority_response_signing_bytes(&wrong_store.body)
         .test_expect("mismatched store response signing bytes");
     wrong_store.signature = authority.sign(&signing_bytes);
-    assert!(client
-        .verify_response(&wrong_store, "request-1", &"a".repeat(64), now)
-        .is_err());
+    assert_eq!(
+        client.verify_response(&wrong_store, "request-1", &"a".repeat(64), now),
+        Err(PortError::integrity_failure())
+    );
 }
 
 struct SwitchingBackend {
@@ -296,13 +303,29 @@ fn authority_payloads_reject_unknown_fields_and_unbounded_rejection_codes() {
             "unexpected": true
         }
     });
-    assert!(serde_json::from_value::<ActiveResponseAuthorityResult>(unknown_ready_field).is_err());
+    let Err(error) = serde_json::from_value::<ActiveResponseAuthorityResult>(unknown_ready_field)
+    else {
+        panic!("a ready result with an unknown field must be refused");
+    };
+    assert!(
+        error.to_string().contains("unknown field `unexpected`"),
+        "{error}"
+    );
 
     let unbounded_rejection = serde_json::json!({
         "result": "rejected",
         "output": { "classification": "permanent", "code": "x".repeat(257) }
     });
-    assert!(serde_json::from_value::<ActiveResponseAuthorityResult>(unbounded_rejection).is_err());
+    let Err(error) = serde_json::from_value::<ActiveResponseAuthorityResult>(unbounded_rejection)
+    else {
+        panic!("a rejection code beyond the bound must be refused");
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("identifier exceeds the byte limit"),
+        "{error}"
+    );
 
     let digestless_request = serde_json::json!({
         "schema": ACTIVE_RESPONSE_AUTHORITY_SCHEMA,
@@ -328,15 +351,17 @@ fn authority_results_are_bound_to_the_requested_operation() {
         deployment_digest: deployment_digest(),
         store_digest: store_digest(),
     };
-    assert!(super::protocol::validate_operation_result(
-        &ActiveResponseAuthorityOperation::Health,
-        &ActiveResponseAuthorityResult::Ready {
-            protocol: "wrong-protocol".to_string(),
-            deployment_digest: deployment_digest(),
-            store_digest: store_digest(),
-        },
-    )
-    .is_err());
+    assert_eq!(
+        super::protocol::validate_operation_result(
+            &ActiveResponseAuthorityOperation::Health,
+            &ActiveResponseAuthorityResult::Ready {
+                protocol: "wrong-protocol".to_string(),
+                deployment_digest: deployment_digest(),
+                store_digest: store_digest(),
+            },
+        ),
+        Err(PortError::integrity_failure())
+    );
     assert!(super::protocol::validate_operation_result(
         &ActiveResponseAuthorityOperation::Health,
         &ready,
@@ -998,7 +1023,7 @@ mod linux_uds {
         let client = test_client(config);
         let started = Instant::now();
 
-        assert!(client.ensure_ready().is_err());
+        assert_eq!(client.ensure_ready(), Err(PortError::unavailable()));
         assert!(started.elapsed() < Duration::from_millis(500));
         server.join().test_expect("authority server thread");
     }
