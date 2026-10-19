@@ -18,7 +18,7 @@ mod caller;
 enum RecoveryMode {
     Serial,
     CompetingWorkers,
-    LateCallerReport,
+    LateCallerStart,
 }
 
 const CHILD: &str = "CHIO_NATIVE_M2_PROCESS_CHILD";
@@ -498,12 +498,12 @@ fn competing_native_recovery_workers_converge_on_original_terminalization() -> T
 }
 
 #[test]
-fn late_caller_report_cannot_replace_native_unknown_outcome() -> TestResult {
+fn late_caller_start_cannot_replace_native_unknown_outcome() -> TestResult {
     matrix_with_recovery(
-        "late_caller_report_cannot_replace_native_unknown_outcome",
+        "late_caller_start_cannot_replace_native_unknown_outcome",
         Profile::Nonce,
         Point::EffectStarted,
-        RecoveryMode::LateCallerReport,
+        RecoveryMode::LateCallerStart,
     )
 }
 

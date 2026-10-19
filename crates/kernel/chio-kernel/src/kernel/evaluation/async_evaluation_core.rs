@@ -1198,7 +1198,6 @@ impl ChioKernel {
         }
 
         let server = match &dispatch_mode {
-            DispatchMode::CallerReport(report) => Some(report.clone()),
             DispatchMode::Kernel => self.tool_servers.get(&request.server_id).cloned(),
             // Preparation cannot dispatch an external effect.
             DispatchMode::ReserveForCaller | DispatchMode::CallerStart => None,
@@ -1871,6 +1870,13 @@ impl ChioKernel {
             None
         };
         if matches!(dispatch_mode, DispatchMode::CallerStart) {
+            #[cfg(feature = "admission-test-support")]
+            if let Some(admission) = durable_admission.as_ref() {
+                self.reach_caller_execution_checkpoint(
+                    super::super::CallerExecutionCheckpoint::DispatchCommitted,
+                    admission.operation(),
+                );
+            }
             return self.build_committed_caller_start_response(
                 request,
                 durable_admission.as_ref(),
@@ -1945,13 +1951,6 @@ impl ChioKernel {
                 prepared: prepared_post_effect,
             },
         );
-        #[cfg(feature = "admission-test-support")]
-        if let Some(admission) = obligation.admission() {
-            self.reach_caller_execution_checkpoint(
-                super::super::CallerExecutionCheckpoint::DispatchCommitted,
-                admission.operation(),
-            );
-        }
         let dispatch = self.dispatch_resolved_server_within_budget(
             server,
             request,

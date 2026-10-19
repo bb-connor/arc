@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn a_caller_share_also_blocks_ordinary_kernel_dispatch_until_settlement() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let first = reserve_child(&runtime, &request(&siblings.first, "caller-before-kernel")?)?;
@@ -18,7 +18,10 @@ fn a_caller_share_also_blocks_ordinary_kernel_dispatch_until_settlement() -> Tes
         .is_some_and(|reason| reason.contains("sibling-sum")));
     assert_eq!(fixture.invocations.load(Ordering::SeqCst), 0);
 
-    assert_eq!(reconcile(&runtime, &first)?.verdict, Verdict::Allow);
+    assert_eq!(
+        reconcile(&fixture, &runtime, &first)?.verdict,
+        Verdict::Allow
+    );
     let second = request(&siblings.second, "kernel-share-released")?;
     let nonce = preflight(&runtime, &second)?;
     let response = runtime
@@ -32,7 +35,7 @@ fn a_caller_share_also_blocks_ordinary_kernel_dispatch_until_settlement() -> Tes
 
 #[test]
 fn concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let first = request(&siblings.first, "concurrent-share-first")?;
@@ -69,13 +72,19 @@ fn concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak() -> T
                     .as_deref()
                     .ok_or("reserved nonce")?,
             );
-            assert_eq!(reconcile(&runtime, &reserved)?.verdict, Verdict::Allow);
+            assert_eq!(
+                reconcile(&fixture, &runtime, &reserved)?.verdict,
+                Verdict::Allow
+            );
         } else {
             assert_eq!(response.verdict, Verdict::Deny, "{:?}", response.reason);
         }
     }
     let next = reserve_child(&runtime, &request(&siblings.first, "after-share-race")?)?;
-    assert_eq!(reconcile(&runtime, &next)?.verdict, Verdict::Allow);
+    assert_eq!(
+        reconcile(&fixture, &runtime, &next)?.verdict,
+        Verdict::Allow
+    );
     let _sibling = reserve_child(
         &runtime,
         &request(&siblings.second, "sibling-after-share-race")?,
@@ -86,7 +95,7 @@ fn concurrent_siblings_cannot_oversubscribe_and_denied_claims_do_not_leak() -> T
 
 #[test]
 fn an_out_of_band_terminal_edit_cannot_hide_a_live_caller_share() -> TestResult {
-    let fixture = Fixture::new()?;
+    let fixture = caller_fixture()?;
     let mut runtime = fixture.open()?;
     let siblings = Siblings::new(&fixture, &mut runtime)?;
     let _first = reserve_child(&runtime, &request(&siblings.first, "tampered-share-first")?)?;

@@ -1230,16 +1230,13 @@ async fn mediated_authorization_works_with_both_control_url_and_budget_db() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report() {
+async fn durable_mediation_refuses_unsigned_reports_without_consuming_the_reservation() {
     let signer = Keypair::generate();
     let agent = Keypair::generate();
     let directory = tempfile::tempdir().test_unwrap();
     let durable = durable_admission_stores(directory.path());
     let budget = Arc::clone(&durable.budget_store);
     let kernel = issuing_kernel(&signer, Arc::clone(&budget), &[]);
-    // A monetary reservation would need the qualified payment adapter every
-    // durable monetary admission requires; the invocation budget exercises the
-    // reservation, the report and the replay on their own.
     let cap = issue_invocation_capability(&kernel, &agent, "cost-srv", "compute", 3);
     let cap_value = serde_json::to_value(&cap).unwrap();
     let params = serde_json::json!({ "invoice": "inv-durable" });
@@ -1265,9 +1262,6 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
         "the mediation kernel runs under durable admission"
     );
 
-    // The reservation is the durable operation's own: the strict preflight
-    // issues the operation-bound nonce and the execution's first half reserves
-    // the executable hold and the nonce.
     let body = serde_json::json!({
         "capability": cap_value,
         "tool_server": "cost-srv",
@@ -1292,26 +1286,46 @@ async fn durable_mediation_reserves_the_operation_and_settles_the_caller_report(
         "chio.operation_execution_nonce.v1"
     );
 
-    // The caller's report settles the same operation once and replays after.
-    let reconcile_body = serde_json::json!({
-        "execution_nonce": nonce_json,
-        "arguments": params,
-        "realized_cost": { "units": 30, "currency": "USD" },
+    let quota_key = chio_kernel::budget_store::BudgetQuotaKey::grant(&cap.id, 0);
+    let quota_before = budget
+        .get_invocation_quota_usage(&quota_key)
+        .test_unwrap()
+        .test_unwrap();
+    assert_eq!(
+        (
+            quota_before.reserved_invocations,
+            quota_before.captured_invocations
+        ),
+        (1, 0)
+    );
+    let expected = serde_json::json!({
+        "error": "chio_reconcile_rejected",
+        "message": "durable admission failed: durable caller execution requires authenticated start and delivery",
     });
-    let (status, settled) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
-    assert_eq!(status, StatusCode::OK, "{settled}");
-    assert_eq!(settled["receipt"]["decision"]["verdict"], "allow");
-    let (status, replayed) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
-    assert_eq!(status, StatusCode::OK, "{replayed}");
-    assert_eq!(replayed["receipt"]["id"], settled["receipt"]["id"]);
-
-    // A report for another call is refused and settles nothing.
-    let other_body = serde_json::json!({
-        "execution_nonce": reconcile_body["execution_nonce"],
-        "arguments": { "invoice": "inv-other" },
-        "realized_cost": { "units": 30, "currency": "USD" },
-    });
-    let (status, refused) = post_reconcile(state, &other_body).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "{refused}");
-    assert_eq!(refused["error"], "chio_reconcile_rejected");
+    for arguments in [
+        params.clone(),
+        params.clone(),
+        serde_json::json!({"invoice": "inv-other"}),
+    ] {
+        let reconcile_body = serde_json::json!({
+            "execution_nonce": nonce_json,
+            "arguments": arguments,
+            "realized_cost": { "units": 30, "currency": "USD" },
+        });
+        let (status, refused) = post_reconcile(Arc::clone(&state), &reconcile_body).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{refused}");
+        assert_eq!(refused, expected);
+        let quota = budget
+            .get_invocation_quota_usage(&quota_key)
+            .test_unwrap()
+            .test_unwrap();
+        assert_eq!(
+            (quota.reserved_invocations, quota.captured_invocations),
+            (1, 0)
+        );
+    }
+    let (status, retry) = post_evaluate(state, &body).await;
+    assert_eq!(status, StatusCode::OK, "{retry}");
+    assert_eq!(retry["status"], "reserved");
+    assert_eq!(retry["execution_nonce"], nonce_json);
 }

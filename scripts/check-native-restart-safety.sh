@@ -46,7 +46,7 @@ export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
   security::adapters::tests::native_flow::support::process_recovery::declassification_effect_started \
   security::adapters::tests::native_flow::support::process_recovery::declassification_output_joined \
   security::adapters::tests::native_flow::support::process_recovery::declassification_release_checkpointed \
-  security::adapters::tests::native_flow::support::process_recovery::late_caller_report_cannot_replace_native_unknown_outcome \
+  security::adapters::tests::native_flow::support::process_recovery::late_caller_start_cannot_replace_native_unknown_outcome \
   security::adapters::tests::native_flow::support::process_recovery::nonce_capture_transaction_rollback \
   security::adapters::tests::native_flow::support::process_recovery::nonce_database_commit_before_anchor \
   security::adapters::tests::native_flow::support::process_recovery::nonce_effect_started \

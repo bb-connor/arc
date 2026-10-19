@@ -391,7 +391,7 @@ other advertised callers. Reuse [M3's contract](authenticated-caller-delivery.md
   delivery and changed delivery across the consumer boundary. Invoke the durable
   executor ledger rather than a fixture-only callback map. Recovery never renews
   the original execution interval or repeats an uncertain effect.
-- [x] Retain early rejection of deprecated unsigned reconciliation and direct
+- [x] Reject unsigned reconciliation and direct
   reserve/execute integrations. Distinguish transport helpers from signature
   verification and custody ownership in SDK docs and tests.
 - [x] Keep supplemental and combined threshold-approval/credit-exposure caller

@@ -60,7 +60,8 @@ mod tempfile {
 fn ledger_domain() -> String {
     let thread = std::thread::current();
     format!(
-        "ledger:cognition-market:test:{}",
+        "ledger:cognition-market:test:{}:{}",
+        std::process::id(),
         thread.name().unwrap_or("unnamed")
     )
 }

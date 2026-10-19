@@ -61,6 +61,7 @@ pub struct Fixture {
     /// cutpoint. Only the child process of a crash test sets it.
     pub finalization_cutpoint: Option<DurableFinalizationCutpoint>,
     pub caller_executor: Option<chio_kernel::caller_delivery::CallerExecutorIdentityV1>,
+    pub caller_executor_key: Option<Keypair>,
     /// Real durable fixed-price local-credit rail, never external currency.
     pub local_payment_rail: bool,
 }
@@ -99,6 +100,7 @@ impl Fixture {
             tool_server: None,
             finalization_cutpoint: None,
             caller_executor: None,
+            caller_executor_key: None,
             local_payment_rail: false,
         };
         SqliteAuthorityStore::provision(
@@ -128,6 +130,7 @@ impl Fixture {
             tool_server: None,
             finalization_cutpoint: None,
             caller_executor: None,
+            caller_executor_key: None,
             local_payment_rail: false,
         })
     }
