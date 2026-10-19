@@ -61,6 +61,20 @@ where
     }
 }
 
+fn serde_refusal<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> String {
+    match serde_json::from_value::<T>(value) {
+        Ok(_) => panic!("value was accepted"),
+        Err(error) => error.to_string(),
+    }
+}
+
+fn schema_refusal(name: &str, artifact: &impl serde::Serialize) -> String {
+    match validate_schema(name, artifact) {
+        Ok(()) => panic!("artifact validated against {name}"),
+        Err(error) => error.to_string(),
+    }
+}
+
 fn did(keypair: &Keypair) -> String {
     DidChio::from_public_key(keypair.public_key())
         .test_ok("derive DID")
@@ -286,11 +300,25 @@ fn financial_subjects_are_typed_strict_and_raw_issuance_is_not_an_api() {
         FinancialCredentialFamilyV1::PremiumHistory,
         FinancialCredentialFamilyV1::LossHistory,
     ];
-    for (subject, family) in financial_subjects().into_iter().zip(expected) {
+    let unknown_field_messages = [
+        "unknown field `unknown`, expected one of `id`, `band`, `confidence`, `overallScore`, `probationary`, `importedSignals`",
+        "unknown field `unknown`, expected `id` or `positions`",
+        "unknown field `unknown`, expected one of `id`, `onTimeCount`, `obligationCount`, `onTimeRatioBps`",
+        "unknown field `unknown`, expected one of `id`, `quotedCount`, `quotedAmounts`",
+        "unknown field `unknown`, expected one of `id`, `delinquencyCount`, `recoveryCount`, `reserveReleaseCount`, `reserveSlashCount`, `writeOffCount`, `outstandingAmounts`",
+    ];
+    for ((subject, family), message) in financial_subjects()
+        .into_iter()
+        .zip(expected)
+        .zip(unknown_field_messages)
+    {
         assert_eq!(subject.family(), family);
         let mut value = serde_json::to_value(&subject).test_ok("serialize subject");
         value["claims"]["unknown"] = serde_json::json!(true);
-        assert!(serde_json::from_value::<FinancialCredentialSubjectV1>(value).is_err());
+        assert_eq!(
+            serde_refusal::<FinancialCredentialSubjectV1>(value),
+            message
+        );
     }
 
     let _: fn(
@@ -404,14 +432,24 @@ fn validated_builder_binds_manifest_credentials_and_schema_first_admission() {
 
     let mut substituted = passport;
     substituted.credentials[0] = reputation_credential_with_composite(&issuer, &holder, 0.93);
-    assert!(inspect_financial_agent_passport(&substituted, ISSUED_AT + 1).is_err());
+    assert!(matches!(
+        inspect_financial_agent_passport(&substituted, ISSUED_AT + 1),
+        Err(CredentialError::InvalidFinancialCredential(reason))
+            if reason == "source passport credential root is invalid"
+    ));
 
     let mut without_manifest = encoded;
     if let Some(object) = without_manifest.as_object_mut() {
         object.remove("sourceManifest");
     }
-    assert!(serde_json::from_value::<FinancialAgentPassport>(without_manifest.clone()).is_err());
-    assert!(validate_schema("financial-agent-passport.schema.json", &without_manifest).is_err());
+    assert_eq!(
+        serde_refusal::<FinancialAgentPassport>(without_manifest.clone()),
+        "missing field `sourceManifest`"
+    );
+    assert!(
+        schema_refusal("financial-agent-passport.schema.json", &without_manifest)
+            .contains("\"sourceManifest\" is a required property")
+    );
 }
 
 #[test]
@@ -666,26 +704,30 @@ fn financial_passport_and_presentation_reject_unknown_fields() {
         .test_ok("validate financial passport schema");
     let mut passport = serde_json::to_value(passport).test_ok("serialize financial passport");
     passport["unknown"] = serde_json::json!(true);
-    assert!(validate_schema("financial-agent-passport.schema.json", &passport).is_err());
-    assert!(serde_json::from_value::<chio_credentials::FinancialAgentPassport>(passport).is_err());
+    assert!(
+        schema_refusal("financial-agent-passport.schema.json", &passport)
+            .contains("Additional properties are not allowed ('unknown' was unexpected)")
+    );
+    assert_eq!(
+        serde_refusal::<chio_credentials::FinancialAgentPassport>(passport),
+        "unknown field `unknown`, expected one of `schema`, `subject`, `credentials`, `merkleRoots`, `enterpriseIdentityProvenance`, `issuedAt`, `validUntil`, `trustTier`, `sourceManifest`"
+    );
 
     let mut credential_with_unknown =
         serde_json::to_value(&credential).test_ok("serialize credential carrier");
     credential_with_unknown["unknown"] = serde_json::json!(true);
-    assert!(
-        serde_json::from_value::<chio_credentials::FinancialPassportCredential>(
-            credential_with_unknown
-        )
-        .is_err()
+    assert_eq!(
+        serde_refusal::<chio_credentials::FinancialPassportCredential>(credential_with_unknown),
+        "invalid value: string \"unknown\", expected \"kind\" or \"credential\""
     );
     let mut nested_credential_with_unknown =
         serde_json::to_value(&credential).test_ok("serialize nested credential");
     nested_credential_with_unknown["credential"]["unknown"] = serde_json::json!(true);
-    assert!(
-        serde_json::from_value::<chio_credentials::FinancialPassportCredential>(
+    assert_eq!(
+        serde_refusal::<chio_credentials::FinancialPassportCredential>(
             nested_credential_with_unknown
-        )
-        .is_err()
+        ),
+        "unknown field `unknown`, expected one of `@context`, `type`, `issuer`, `issuanceDate`, `expirationDate`, `credentialSubject`, `evidence`, `enterpriseIdentityProvenance`, `proof`"
     );
     let (manifest, proofs) = issue_financial_passport_source_manifest(
         &issuer,
@@ -698,9 +740,9 @@ fn financial_passport_and_presentation_reject_unknown_fields() {
     let mut manifest_with_unknown =
         serde_json::to_value(&manifest).test_ok("serialize source manifest envelope");
     manifest_with_unknown["unknown"] = serde_json::json!(true);
-    assert!(
-        serde_json::from_value::<SignedFinancialPassportSourceManifest>(manifest_with_unknown)
-            .is_err()
+    assert_eq!(
+        serde_refusal::<SignedFinancialPassportSourceManifest>(manifest_with_unknown),
+        "unknown field `unknown`, expected one of `body`, `signerKey`, `signature`"
     );
     let challenge = create_financial_passport_presentation_challenge(
         &verifier,
@@ -731,11 +773,11 @@ fn financial_passport_and_presentation_reject_unknown_fields() {
         Err(CredentialError::InvalidFinancialCredential(reason))
             if reason.contains("presented passport schema")
     ));
-    assert!(validate_schema(
+    assert!(schema_refusal(
         "presented-financial-agent-passport.schema.json",
         &unknown_schema
     )
-    .is_err());
+    .contains("\"chio.financial-agent-passport.presentation.v1\" was expected"));
     validate_schema(
         "presented-financial-agent-passport.schema.json",
         &response.presentation,
@@ -744,14 +786,14 @@ fn financial_passport_and_presentation_reject_unknown_fields() {
     let mut presentation =
         serde_json::to_value(response.presentation).test_ok("serialize presentation");
     presentation["unknown"] = serde_json::json!(true);
-    assert!(validate_schema(
+    assert!(schema_refusal(
         "presented-financial-agent-passport.schema.json",
         &presentation
     )
-    .is_err());
-    assert!(
-        serde_json::from_value::<chio_credentials::PresentedFinancialAgentPassport>(presentation)
-            .is_err()
+    .contains("Additional properties are not allowed ('unknown' was unexpected)"));
+    assert_eq!(
+        serde_refusal::<chio_credentials::PresentedFinancialAgentPassport>(presentation),
+        "unknown field `unknown`, expected one of `schema`, `sourceManifest`, `credentials`, `membershipProofs`, `challengeDigest`, `presentationDigest`"
     );
 }
 
@@ -822,15 +864,15 @@ fn signed_challenge_rejects_digest_signature_and_unknown_field_tampering() {
     let mut unknown_envelope =
         serde_json::to_value(&challenge).test_ok("serialize challenge envelope");
     unknown_envelope["unknown"] = serde_json::json!(true);
-    assert!(
-        serde_json::from_value::<SignedFinancialPassportPresentationChallenge>(unknown_envelope)
-            .is_err()
+    assert_eq!(
+        serde_refusal::<SignedFinancialPassportPresentationChallenge>(unknown_envelope),
+        "unknown field `unknown`, expected one of `body`, `signerKey`, `signature`"
     );
     let mut unknown_body = serde_json::to_value(challenge).test_ok("serialize challenge body");
     unknown_body["body"]["unknown"] = serde_json::json!(true);
-    assert!(
-        serde_json::from_value::<SignedFinancialPassportPresentationChallenge>(unknown_body)
-            .is_err()
+    assert_eq!(
+        serde_refusal::<SignedFinancialPassportPresentationChallenge>(unknown_body),
+        "unknown field `unknown`, expected one of `schema`, `verifier`, `verifierKeyEpoch`, `challengeId`, `nonce`, `issuedAt`, `expiresAt`, `sourcePassportId`, `selectors`, `challengeDigest`"
     );
 }
 
@@ -852,7 +894,11 @@ fn manifest_present_passport_rejects_outer_metadata_tampering_and_addition() {
 
     let mut roots = passport.clone();
     roots.merkle_roots.push("added-root".to_string());
-    assert!(inspect_financial_agent_passport(&roots, ISSUED_AT + 1).is_err());
+    assert!(matches!(
+        inspect_financial_agent_passport(&roots, ISSUED_AT + 1),
+        Err(CredentialError::InvalidFinancialCredential(reason))
+            if reason == "financial agent passport source manifest binding is invalid"
+    ));
 
     let mut provenance = passport.clone();
     provenance.enterprise_identity_provenance.push(
@@ -874,11 +920,19 @@ fn manifest_present_passport_rejects_outer_metadata_tampering_and_addition() {
             trust_material_ref: None,
         },
     );
-    assert!(inspect_financial_agent_passport(&provenance, ISSUED_AT + 1).is_err());
+    assert!(matches!(
+        inspect_financial_agent_passport(&provenance, ISSUED_AT + 1),
+        Err(CredentialError::InvalidFinancialCredential(reason))
+            if reason == "financial agent passport source manifest binding is invalid"
+    ));
 
     let mut tier = passport;
     tier.trust_tier = Some(TrustTier::Verified);
-    assert!(inspect_financial_agent_passport(&tier, ISSUED_AT + 1).is_err());
+    assert!(matches!(
+        inspect_financial_agent_passport(&tier, ISSUED_AT + 1),
+        Err(CredentialError::InvalidFinancialCredential(reason))
+            if reason == "financial agent passport source manifest binding is invalid"
+    ));
 }
 
 struct UnavailableLifecycle;
