@@ -15,7 +15,9 @@ fn enterprise_provider_registry_file(
         return Ok(None);
     };
     let file = EnterpriseProviderRegistryFile::new(path);
-    let registry = file.load()?;
+    let registry = file
+        .load()
+        .map_err(EnterpriseProviderRegistryRefusal::into_cause)?;
     for record in registry.providers.values() {
         if !record.validation_errors.is_empty() {
             warn!(
@@ -641,9 +643,7 @@ async fn handle_initialize_post(
 
     let session = match state.factory.spawn_session(auth_context) {
         Ok(session) => session,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
+        Err(error) => return spawn_session_error(error),
     };
 
     let request_id = message.get("id").cloned().unwrap_or(Value::Null);
@@ -722,6 +722,15 @@ async fn handle_initialize_post(
                 );
             }
         }
+    }
+}
+
+/// A provider registry refusal answers its fixed 503 message; any other
+/// session construction failure answers 500.
+fn spawn_session_error(error: CliError) -> Response {
+    match EnterpriseProviderRegistryRefusal::find(&error) {
+        Some(refusal) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &refusal.to_string()),
+        None => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
     }
 }
 

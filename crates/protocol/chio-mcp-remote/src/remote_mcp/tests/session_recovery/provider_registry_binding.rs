@@ -55,17 +55,15 @@ async fn resume_refuses_a_session_once_the_provider_registry_changes(
         .restore_session(&record)
         .err()
         .ok_or("an oversized provider registry resumed a session")?;
-    let CliError::SignedJson(chio_core::canonical::UntrustedJsonError::TooLarge { bytes, bound }) =
-        &oversized
+    assert_eq!(oversized.to_string(), "urn:chio:error:cli:json");
+    let Some(EnterpriseProviderRegistryRefusal::Oversized(CliError::SignedJson(
+        chio_core::canonical::UntrustedJsonError::TooLarge { bytes, bound },
+    ))) = EnterpriseProviderRegistryRefusal::find(&oversized)
     else {
-        return Err(format!("expected an oversized registry error, got {oversized:?}").into());
+        return Err(format!("expected an oversized registry refusal, got {oversized:?}").into());
     };
     assert_eq!(*bound, 16 * 1024 * 1024);
     assert_eq!(*bytes, bound + 1);
-    assert_eq!(
-        oversized.to_string(),
-        "urn:chio:error:attest:signed-json-too-large"
-    );
 
     std::fs::remove_file(&registry_path)?;
     let expected = EnterpriseProviderRegistry::load(&registry_path)
@@ -75,14 +73,13 @@ async fn resume_refuses_a_session_once_the_provider_registry_changes(
         .restore_session(&record)
         .err()
         .ok_or("an unreadable provider registry resumed a session")?;
-    assert!(
-        matches!(
-            EnterpriseProviderRegistryRefusal::from(unreadable),
-            EnterpriseProviderRegistryRefusal::Unreadable(ref cause)
-                if cause.to_string() == expected.to_string()
-        ),
-        "expected the unreadable registry cause {expected}"
-    );
+    assert_eq!(unreadable.to_string(), "urn:chio:error:cli:io");
+    let Some(EnterpriseProviderRegistryRefusal::Unreadable(cause)) =
+        EnterpriseProviderRegistryRefusal::find(&unreadable)
+    else {
+        return Err(format!("expected an unreadable registry refusal, got {unreadable:?}").into());
+    };
+    assert_eq!(cause.to_string(), expected.to_string());
 
     drop((fresh, unchanged, restored, factory));
     std::fs::remove_dir_all(directory)?;

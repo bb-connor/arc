@@ -5,7 +5,7 @@
 use super::*;
 use chio_control_plane::enterprise_federation::EnterpriseProviderRegistry;
 
-const ISSUER: &str = "https://issuer.enterprise.example";
+pub(super) const ISSUER: &str = "https://issuer.enterprise.example";
 
 fn provider_record(enabled: bool) -> serde_json::Value {
     json!({
@@ -57,7 +57,7 @@ pub(super) fn write_oversized_registry(path: &std::path::Path) {
     std::fs::write(path, bytes).unwrap();
 }
 
-fn signed_token(keypair: &Keypair) -> String {
+pub(super) fn signed_token(keypair: &Keypair) -> String {
     let header = URL_SAFE_NO_PAD.encode(
         serde_json::to_vec(&json!({
             "alg": "EdDSA",
@@ -80,7 +80,7 @@ fn signed_token(keypair: &Keypair) -> String {
     format!("{signing_input}.{signature}")
 }
 
-fn jwt_verifier(config: &RemoteServeHttpConfig) -> Arc<JwtBearerVerifier> {
+pub(super) fn jwt_verifier(config: &RemoteServeHttpConfig) -> Arc<JwtBearerVerifier> {
     let registry = enterprise_provider_registry_file(
         config.enterprise_providers_file.as_deref(),
         "remote_mcp",
@@ -94,7 +94,10 @@ fn jwt_verifier(config: &RemoteServeHttpConfig) -> Arc<JwtBearerVerifier> {
     }
 }
 
-fn authenticate(verifier: &JwtBearerVerifier, token: &str) -> Result<SessionAuthContext, Response> {
+pub(super) fn authenticate(
+    verifier: &JwtBearerVerifier,
+    token: &str,
+) -> Result<SessionAuthContext, Response> {
     verifier.authenticate_token(token, &empty_header_map(), None, None)
 }
 
