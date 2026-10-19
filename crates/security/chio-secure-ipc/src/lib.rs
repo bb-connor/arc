@@ -34,6 +34,11 @@ use std::os::unix::net::{UnixListener, UnixStream};
 use serde::{Deserialize, Serialize};
 
 pub mod credentials;
+#[cfg(unix)]
+mod lifecycle_lock;
+
+#[cfg(unix)]
+pub use lifecycle_lock::LifecycleLock;
 
 pub const MAX_UNIX_SOCKET_PATH_BYTES: usize = 100;
 pub const MAX_INHERITED_DESCRIPTOR: u32 = 65_535;
@@ -105,7 +110,7 @@ pub struct SecureUnixListener {
     listener: UnixListener,
     config: SecureUnixListenerConfig,
     socket_identity: SocketIdentity,
-    _lifecycle_lock: File,
+    _lifecycle_lock: LifecycleLock,
 }
 
 #[cfg(unix)]
@@ -309,7 +314,7 @@ fn validate_private_parent(path: &Path, trusted_service_uid: u32) -> Result<()> 
 }
 
 #[cfg(unix)]
-fn acquire_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<File> {
+fn acquire_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<LifecycleLock> {
     let mut lock_path = path.as_os_str().to_os_string();
     lock_path.push(".lifecycle.lock");
     let lock_path = PathBuf::from(lock_path);
@@ -323,9 +328,9 @@ fn acquire_lifecycle_lock(path: &Path, trusted_service_uid: u32) -> Result<File>
         .open(&lock_path)
         .map_err(|error| SecureIpcError::Io(format!("lifecycle lock open failed: {error}")))?;
     validate_lock_identity(&lock_path, &lock, trusted_service_uid)?;
-    rustix::fs::flock(&lock, rustix::fs::FlockOperation::NonBlockingLockExclusive)
+    let lock = LifecycleLock::try_exclusive(lock)
         .map_err(|error| SecureIpcError::Custody(format!("lifecycle lock is held: {error}")))?;
-    validate_lock_identity(&lock_path, &lock, trusted_service_uid)?;
+    validate_lock_identity(&lock_path, lock.file(), trusted_service_uid)?;
     Ok(lock)
 }
 
