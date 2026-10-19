@@ -263,7 +263,13 @@ fn receipt_signing_public_key_fails_closed_on_unreadable_identity() -> TestResul
     ));
     assert!(matches!(
         kernel.record_session_tool_failure(&context, &operation),
-        Err(KernelError::ReceiptSigningFailed(_))
+        Err(KernelError::ReceiptSigningFailed(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.trusted_threshold_proposal_authorities(),
+        Err(KernelError::ReceiptSigningFailed(reason))
+            if reason == "invalid public key: selector unavailable"
     ));
     assert!(kernel.receipt_log().receipts().is_empty());
     Ok(())

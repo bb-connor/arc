@@ -259,7 +259,7 @@ impl ChioKernel {
                     .unwrap_or(u64::MAX),
                 policy_hash: &self.config.policy_hash,
                 proposal,
-                trusted_policy_authorities: &self.trusted_threshold_proposal_authorities(),
+                trusted_policy_authorities: &self.trusted_threshold_proposal_authorities()?,
                 allowed_signing_algorithms: self
                     .capability_crypto_floor
                     .allowed_signing_algorithms(),

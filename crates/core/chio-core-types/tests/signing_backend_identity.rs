@@ -30,7 +30,10 @@ fn identity_signing_fails_before_signing_when_identity_is_unreadable() {
     let err = backend.sign_bytes_with_identity(b"m").unwrap_err();
     assert!(matches!(err, Error::InvalidPublicKey(ref m) if m == "selector unreadable"));
     let key = Keypair::from_seed(&[7u8; 32]).public_key();
-    assert!(backend.sign_bytes_for_identity(&key, b"m").is_err());
+    assert!(matches!(
+        backend.sign_bytes_for_identity(&key, b"m"),
+        Err(Error::InvalidPublicKey(ref m)) if m == "selector unreadable"
+    ));
     assert!(!backend.signed.load(SeqCst));
 }
 

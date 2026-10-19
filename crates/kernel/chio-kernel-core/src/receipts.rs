@@ -67,7 +67,8 @@ pub enum ReceiptSigningError {
 ///   `content_hash` does not match `sha256_hex(canonical_content)`.
 /// - [`ReceiptSigningError::KernelKeyMismatch`] when `body.kernel_key` does not
 ///   match `backend.public_key()`.
-/// - [`ReceiptSigningError::SigningFailed`] when canonical signing fails.
+/// - [`ReceiptSigningError::SigningFailed`] when the backend identity cannot be
+///   read or canonical signing fails.
 pub fn sign_receipt(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
@@ -127,7 +128,8 @@ pub fn sign_receipt(
 ///
 /// - [`ReceiptSigningError::KernelKeyMismatch`] when `body.kernel_key` does not
 ///   match `backend.public_key()`.
-/// - [`ReceiptSigningError::SigningFailed`] when canonical signing fails.
+/// - [`ReceiptSigningError::SigningFailed`] when the backend identity cannot be
+///   read or canonical signing fails.
 pub fn sign_receipt_relaying_trusted_body(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
@@ -237,7 +239,8 @@ pub fn sign_receipt_relaying_trusted_body(
 ///   `content_hash` does not match the handle's recomputed hash.
 /// - [`ReceiptSigningError::KernelKeyMismatch`] when `body.kernel_key` does not
 ///   match `backend.public_key()`.
-/// - [`ReceiptSigningError::SigningFailed`] when canonical signing fails.
+/// - [`ReceiptSigningError::SigningFailed`] when the backend identity cannot be
+///   read or canonical signing fails.
 pub fn sign_receipt_with_handle(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,

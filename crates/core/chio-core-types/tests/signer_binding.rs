@@ -21,7 +21,7 @@ use chio_core_types::receipt::{
 use chio_core_types::session::{SessionAnchor, SessionAnchorBody, SessionAnchorContext};
 use chio_core_types::{
     sha256_hex, Ed25519Backend, Keypair, OperationKind, OperationTerminalState, RequestId,
-    SessionAuthContext, SessionId, SigningBackend, ToolManifest, ToolManifestBody,
+    SessionAuthContext, SessionId, ToolManifest, ToolManifestBody,
 };
 
 fn capability_body(

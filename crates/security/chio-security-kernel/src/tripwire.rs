@@ -72,7 +72,7 @@ impl TripwireEventPublisher {
         policy_version: RecordId,
     ) -> PortResult<Self> {
         if signer.public_key().is_err() {
-            return Err(PortError::integrity_failure());
+            return Err(PortError::unavailable());
         }
         Ok(Self {
             ingress,
