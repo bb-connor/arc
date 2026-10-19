@@ -46,6 +46,31 @@ fn valid_response_plan_body() -> GovernedResponsePlanIntentBody {
     .unwrap()
 }
 
+fn decode_plan_error(value: Value) -> String {
+    serde_json::from_value::<GovernedResponsePlanIntentBody>(value)
+        .unwrap_err()
+        .to_string()
+}
+
+fn decode_intent_error(value: Value) -> String {
+    serde_json::from_value::<GovernedTransactionIntent>(value)
+        .unwrap_err()
+        .to_string()
+}
+
+fn assert_refused(message: &str, fragment: &str) {
+    assert!(
+        message.contains(fragment),
+        "expected `{fragment}` in `{message}`"
+    );
+}
+
+fn hash_error(body: &Value) -> String {
+    GovernedResponsePlanIntentBody::compute_plan_body_hash(body)
+        .unwrap_err()
+        .to_string()
+}
+
 fn response_plan_json() -> Value {
     serde_json::to_value(valid_response_plan_body()).unwrap()
 }
@@ -83,21 +108,24 @@ fn active_response_plan_uses_an_explicit_typed_variant_and_binds_the_complete_bo
 fn response_plan_rejects_unknown_fields_and_partial_variant_markers() {
     let mut body = response_plan_json();
     body["unknown_field"] = json!(true);
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(body).is_err());
+    assert_refused(&decode_plan_error(body), "unknown field `unknown_field`");
 
     let mut partial = serde_json::to_value(GovernedTransactionIntent::active_response_plan(
         valid_response_plan_body(),
     ))
     .unwrap();
     partial["body"] = json!({"kind": "active_response_plan"});
-    assert!(serde_json::from_value::<GovernedTransactionIntent>(partial).is_err());
+    assert_refused(&decode_intent_error(partial), "missing field `value`");
 
     let mut wrong_kind = serde_json::to_value(GovernedTransactionIntent::active_response_plan(
         valid_response_plan_body(),
     ))
     .unwrap();
     wrong_kind["body"]["kind"] = json!("delete_account");
-    assert!(serde_json::from_value::<GovernedTransactionIntent>(wrong_kind).is_err());
+    assert_refused(
+        &decode_intent_error(wrong_kind),
+        "unknown variant `delete_account`",
+    );
 }
 
 #[test]
@@ -105,31 +133,49 @@ fn response_plan_rejects_raw_hash_substitution_and_body_hash_mismatch() {
     let mut raw_hash = response_plan_json();
     raw_hash["canonical_plan_body"] = json!("a".repeat(64));
     raw_hash["plan_body_hash"] = json!("a".repeat(64));
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(raw_hash).is_err());
+    assert_refused(
+        &decode_plan_error(raw_hash),
+        "governed response plan body must be an object",
+    );
 
     let mut mismatched = response_plan_json();
     mismatched["canonical_plan_body"]["tenant"] = json!("tenant-2");
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(mismatched).is_err());
+    assert_refused(
+        &decode_plan_error(mismatched),
+        "governed response plan body hash does not match its canonical body",
+    );
 
     let mut embedded_raw_hash = response_plan_json();
     embedded_raw_hash["canonical_plan_body"] = json!({"planHash": "a".repeat(64)});
     embedded_raw_hash["plan_body_hash"] = json!("a".repeat(64));
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(embedded_raw_hash).is_err());
+    assert_refused(
+        &decode_plan_error(embedded_raw_hash),
+        "governed response plan body is empty or recursively hashed",
+    );
 }
 
 #[test]
 fn response_plan_rejects_empty_duplicate_and_unsupported_effects() {
     let mut empty = response_plan_json();
     empty["ordered_effects"] = json!([]);
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(empty).is_err());
+    assert_refused(
+        &decode_plan_error(empty),
+        "governed response plan must contain between 1 and 5 effects",
+    );
 
     let mut duplicate = response_plan_json();
     duplicate["ordered_effects"] = json!(["suspend_session", "suspend_session"]);
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(duplicate).is_err());
+    assert_refused(
+        &decode_plan_error(duplicate),
+        "governed response plan effects must be unique",
+    );
 
     let mut unsupported = response_plan_json();
     unsupported["ordered_effects"] = json!(["delete_account"]);
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(unsupported).is_err());
+    assert_refused(
+        &decode_plan_error(unsupported),
+        "unknown variant `delete_account`",
+    );
 }
 
 #[test]
@@ -137,41 +183,57 @@ fn response_plan_rejects_invalid_digests_and_expiry_bounds() {
     for invalid_digest in ["abc".to_string(), "A".repeat(64), "g".repeat(64)] {
         let mut body = response_plan_json();
         body["operator_capability_hash"] = json!(invalid_digest);
-        assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(body).is_err());
+        assert_refused(
+            &decode_plan_error(body),
+            "governed response plan operator capability hash must be lowercase SHA-256 hex",
+        );
     }
 
     let mut expires_after_capability = response_plan_json();
     expires_after_capability["expires_at"] = json!(1_301);
-    assert!(
-        serde_json::from_value::<GovernedResponsePlanIntentBody>(expires_after_capability).is_err()
+    assert_refused(
+        &decode_plan_error(expires_after_capability),
+        "governed response plan expiry exceeds operator capability expiry",
     );
 
     let mut zero_expiry = response_plan_json();
     zero_expiry["expires_at"] = json!(0);
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(zero_expiry).is_err());
+    assert_refused(
+        &decode_plan_error(zero_expiry),
+        "governed response plan expiry exceeds operator capability expiry",
+    );
 }
 
 #[test]
 fn response_plan_rejects_unbounded_identifiers_and_canonical_bodies() {
     let mut identifier = response_plan_json();
     identifier["plan_id"] = json!("x".repeat(257));
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(identifier).is_err());
+    assert_refused(
+        &decode_plan_error(identifier),
+        "governed response plan plan id is not canonical bounded text",
+    );
 
     let mut huge_body = response_plan_json();
     huge_body["canonical_plan_body"] = json!({"payload": "x".repeat(65_536)});
-    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(
-        &huge_body["canonical_plan_body"]
-    )
-    .is_err());
+    assert_refused(
+        &hash_error(&huge_body["canonical_plan_body"]),
+        "governed response plan canonical plan body exceeds the byte ceiling",
+    );
     huge_body["plan_body_hash"] = json!("a".repeat(64));
-    assert!(serde_json::from_value::<GovernedResponsePlanIntentBody>(huge_body).is_err());
+    assert_refused(
+        &decode_plan_error(huge_body),
+        "governed response plan canonical plan body exceeds the byte ceiling",
+    );
 }
 
 #[test]
 fn response_plan_hashing_rejects_bodies_above_the_governance_node_ceiling() {
     let oversized = json!({"nodes": vec![false; 4_097]});
 
-    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&oversized).is_err());
+    assert_refused(
+        &hash_error(&oversized),
+        "governed response plan canonical plan body exceeds the JSON shape ceiling",
+    );
 }
 
 #[test]
@@ -184,5 +246,8 @@ fn response_plan_hashing_enforces_the_exact_canonical_byte_ceiling() {
         MAX_RESPONSE_PLAN_BODY_BYTES
     );
     assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&at_limit).is_ok());
-    assert!(GovernedResponsePlanIntentBody::compute_plan_body_hash(&above_limit).is_err());
+    assert_refused(
+        &hash_error(&above_limit),
+        "governed response plan canonical plan body exceeds the byte ceiling",
+    );
 }
