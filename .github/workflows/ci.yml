@@ -243,6 +243,7 @@ jobs:
           run_gate python3 scripts/check-architecture-docs.py
           run_gate python3 scripts/tests/check-architecture-docs.test.py
           run_gate python3 scripts/tests/check-anchor-batch-async-witness.test.py
+          run_gate python3 scripts/tests/check-aeneas-equivalence.test.py
           run_gate python3 scripts/tests/check-dudect-threshold.test.py
           run_gate python3 scripts/tests/check-upstream-skips.test.py
           run_gate python3 scripts/tests/check-release-inputs.test.py
