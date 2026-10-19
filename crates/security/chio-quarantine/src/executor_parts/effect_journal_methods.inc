@@ -151,9 +151,7 @@ impl<
         if work.fencing_token <= current.scheduler_fencing_token {
             return Err(ExecutorError::StaleLease);
         }
-        self.store
-            .validate_lease(work)
-            .map_err(ExecutorError::Store)?;
+        self.require_live_lease(work)?;
         self.update_effect_record(plan_record, current, journal, work)
     }
 
@@ -444,27 +442,10 @@ impl<
             scheduler_lease_owner_id: lookup.command_lease_owner_id.clone(),
             scheduler_fencing_token: lookup.command_fencing_token,
         };
-        self.store
-            .validate_lease(work)
-            .map_err(ExecutorError::Store)?;
+        self.require_live_lease(work)?;
         self.effects
             .load_result(&query)
             .map_err(ExecutorError::EffectQuery)
-    }
-
-    fn validate_work(
-        &self,
-        snapshot: &ResponseSnapshot,
-        work: &ScheduledWork,
-        now_unix_ms: u64,
-    ) -> Result<(), ExecutorError> {
-        if work.tenant_id != snapshot.plan.tenant_id || work.action_id != snapshot.plan.action_id {
-            return Err(ExecutorError::WorkMismatch);
-        }
-        if work.lease_expires_at_unix_ms <= now_unix_ms {
-            return Err(ExecutorError::StaleLease);
-        }
-        Ok(())
     }
 
     fn state_machine(&self) -> ResponseStateMachine<S> {

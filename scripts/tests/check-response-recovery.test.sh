@@ -37,6 +37,7 @@ required_mappings=(
   'cargo test -p chio-quarantine --test response_executor executor_every_effect_kind_six_boundary_crash_matrix_converges_exactly_once -- --exact'
   'cargo test -p chio-quarantine --test response_executor executor_crash_stale_takeover_pending_apply_never_calls_effect_port -- --exact'
   'cargo test -p chio-quarantine --test response_executor executor_crash_stale_takeover_pending_rollback_never_calls_effect_port -- --exact'
+  'cargo test -p chio-quarantine --test response_executor takeover_after_the_executor_lease_check_is_refused_by_the_store_fence -- --exact'
   'cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart::escalate_alert_recovers_page_ack_loss_retry_and_backend_restart -- --exact'
   'cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart::throttle_backend_recovers_apply_and_remove_ack_loss_across_restart -- --exact'
   'cargo test -p chio-control-plane --lib security::adapters::effect_port::tests::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped::restrict_egress_backend_is_canonical_ack_safe_and_destination_scoped -- --exact'

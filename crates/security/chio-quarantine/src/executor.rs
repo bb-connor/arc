@@ -4,6 +4,7 @@ use crate::executor_proof::{
     validate_dispatch_authorization as validate_dispatch_authorization_proof,
 };
 mod error;
+mod lease;
 
 pub use error::ExecutorError;
 
