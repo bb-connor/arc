@@ -4,6 +4,13 @@ fn sha(value: &[u8]) -> String {
     sha256_hex(value)
 }
 
+fn invalid_value(field: &'static str, reason: &str) -> ProviderAttemptValidationError {
+    ProviderAttemptValidationError::InvalidValue {
+        field,
+        reason: reason.to_string(),
+    }
+}
+
 fn attempt() -> ProviderAttemptBindingV1 {
     ProviderAttemptBindingV1 {
         operation_id: sha(b"operation"),
@@ -211,13 +218,23 @@ fn every_other_transition_is_rejected() {
 fn checkpoint_and_nested_binding_substitution_fail() {
     let mut substituted_chain = lifecycle();
     substituted_chain[1].attempt.attempt_id = "substituted".to_string();
-    assert!(validate_provider_checkpoint_chain(None, &substituted_chain).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_chain(None, &substituted_chain),
+        Err(ProviderAttemptValidationError::BindingMismatch(
+            "checkpoint invocation blob"
+        ))
+    );
 
     let mut accepted = lifecycle()[1].clone();
     if let ProviderAttemptPhaseV1::Accepted { acceptance, .. } = &mut accepted.phase {
         acceptance.attempt.transport_key_epoch += 1;
     }
-    assert!(accepted.validate().is_err());
+    assert_eq!(
+        accepted.validate(),
+        Err(ProviderAttemptValidationError::BindingMismatch(
+            "acceptance"
+        ))
+    );
 }
 
 #[test]
@@ -225,11 +242,19 @@ fn predecessor_sequence_and_immutable_payload_changes_fail() {
     let lifecycle = lifecycle();
     let mut wrong_predecessor = lifecycle[1].clone();
     wrong_predecessor.previous_checkpoint_digest = Some(sha(b"wrong"));
-    assert!(validate_provider_checkpoint_transition(&lifecycle[0], &wrong_predecessor).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_transition(&lifecycle[0], &wrong_predecessor),
+        Err(ProviderAttemptValidationError::BindingMismatch(
+            "previous_checkpoint_digest"
+        ))
+    );
 
     let mut skipped = lifecycle[1].clone();
     skipped.checkpoint_sequence = 3;
-    assert!(validate_provider_checkpoint_transition(&lifecycle[0], &skipped).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_transition(&lifecycle[0], &skipped),
+        Err(invalid_value("checkpoint_sequence", "expected 2, got 3"))
+    );
 
     let mut changed = lifecycle[2].clone();
     if let ProviderAttemptPhaseV1::Executing {
@@ -239,7 +264,12 @@ fn predecessor_sequence_and_immutable_payload_changes_fail() {
         invocation_blob.blob_ref = "cas://other".to_string();
     }
     changed.previous_checkpoint_digest = Some(lifecycle[1].digest().unwrap());
-    assert!(validate_provider_checkpoint_transition(&lifecycle[1], &changed).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_transition(&lifecycle[1], &changed),
+        Err(ProviderAttemptValidationError::BindingMismatch(
+            "acceptance invocation_blob_digest"
+        ))
+    );
 }
 
 #[test]
@@ -251,17 +281,35 @@ fn cancellation_and_execution_fences_are_enforced() {
     {
         execution_lease.execution_fence = acceptance().cancellation_fence;
     }
-    assert!(weak.validate().is_err());
+    assert_eq!(
+        weak.validate(),
+        Err(invalid_value(
+            "execution_fence",
+            "execution fence must advance the immutable cancellation fence"
+        ))
+    );
 
     let mut late = lifecycle()[3].clone();
     if let ProviderAttemptPhaseV1::Completed { completion, .. } = &mut late.phase {
         completion.completed_at = lease().expires_at;
     }
-    assert!(late.validate().is_err());
+    assert_eq!(
+        late.validate(),
+        Err(invalid_value(
+            "completed_at",
+            "completion must be committed by the active execution lease"
+        ))
+    );
 
     let mut unfenced_cancellation = cancellation();
     unfenced_cancellation.cancellation_fence = 0;
-    assert!(unfenced_cancellation.validate().is_err());
+    assert_eq!(
+        unfenced_cancellation.validate(),
+        Err(invalid_value(
+            "cancellation_fence",
+            "must be a positive I-JSON safe integer"
+        ))
+    );
 }
 
 #[test]
@@ -276,7 +324,13 @@ fn terminal_anchor_allows_no_extra_checkpoint() {
             invocation_blob: blob(),
         },
     );
-    assert!(validate_provider_checkpoint_chain(Some(completed), &[extra]).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_chain(Some(completed), &[extra]),
+        Err(ProviderAttemptValidationError::IllegalTransition {
+            from: ProviderAttemptState::Completed,
+            to: ProviderAttemptState::Pending,
+        })
+    );
 
     let cancelled = checkpoint(
         2,
@@ -294,20 +348,44 @@ fn terminal_anchor_allows_no_extra_checkpoint() {
             invocation_blob: blob(),
         },
     );
-    assert!(validate_provider_checkpoint_chain(Some(&cancelled), &[extra]).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_chain(Some(&cancelled), &[extra]),
+        Err(ProviderAttemptValidationError::IllegalTransition {
+            from: ProviderAttemptState::Cancelled,
+            to: ProviderAttemptState::Pending,
+        })
+    );
 }
 
 #[test]
 fn schemas_digests_sizes_and_chain_length_are_bounded() {
     let mut invalid = blob();
     invalid.schema = "v2".to_string();
-    assert!(invalid.validate().is_err());
+    assert_eq!(
+        invalid.validate(),
+        Err(ProviderAttemptValidationError::UnsupportedSchema {
+            field: "invocation_blob",
+            value: "v2".to_string(),
+        })
+    );
     invalid = blob();
     invalid.blob_sha256 = "A".repeat(64);
-    assert!(invalid.validate().is_err());
+    assert_eq!(
+        invalid.validate(),
+        Err(ProviderAttemptValidationError::InvalidDigest("blob_sha256"))
+    );
     invalid = blob();
     invalid.blob_size_bytes = MAX_PROVIDER_INVOCATION_BLOB_BYTES + 1;
-    assert!(invalid.validate().is_err());
+    assert_eq!(
+        invalid.validate(),
+        Err(invalid_value(
+            "blob_size_bytes",
+            &format!(
+                "must be in 1..={MAX_PROVIDER_INVOCATION_BLOB_BYTES}, got {}",
+                MAX_PROVIDER_INVOCATION_BLOB_BYTES + 1
+            )
+        ))
+    );
     invalid = blob();
     invalid.idempotency_key = sha(b"other-operation");
     assert!(matches!(
@@ -324,16 +402,41 @@ fn schemas_digests_sizes_and_chain_length_are_bounded() {
 
     let mut invalid_currency = completion();
     invalid_currency.currency = "usd".to_string();
-    assert!(invalid_currency.validate().is_err());
+    assert_eq!(
+        invalid_currency.validate(),
+        Err(invalid_value(
+            "currency",
+            "must be an uppercase ISO-4217 code"
+        ))
+    );
 
     let mut unsafe_cost = completion();
     unsafe_cost.cost_units = 1_u64 << 53;
-    assert!(unsafe_cost.validate().is_err());
+    assert_eq!(
+        unsafe_cost.validate(),
+        Err(invalid_value(
+            "cost_units",
+            "must be an I-JSON safe integer"
+        ))
+    );
 
     let mut unsafe_expiry = lease();
     unsafe_expiry.expires_at = 1_u64 << 53;
-    assert!(unsafe_expiry.validate().is_err());
+    assert_eq!(
+        unsafe_expiry.validate(),
+        Err(invalid_value(
+            "expires_at",
+            "must be a positive I-JSON safe integer"
+        ))
+    );
 
     let too_long = vec![lifecycle()[0].clone(); MAX_PROVIDER_CHECKPOINT_CHAIN + 1];
-    assert!(validate_provider_checkpoint_chain(None, &too_long).is_err());
+    assert_eq!(
+        validate_provider_checkpoint_chain(None, &too_long),
+        Err(ProviderAttemptValidationError::FieldTooLarge {
+            field: "checkpoint_chain",
+            actual: MAX_PROVIDER_CHECKPOINT_CHAIN + 1,
+            maximum: MAX_PROVIDER_CHECKPOINT_CHAIN,
+        })
+    );
 }
