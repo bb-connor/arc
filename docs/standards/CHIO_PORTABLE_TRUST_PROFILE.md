@@ -268,7 +268,7 @@ The profile does not cover:
 - `chio.certify.check.v1`, `chio.certify.registry.v1`, and
   `chio.certify.discovery-network.v1` remain the supported certification
   compatibility inputs
-- additive fields are allowed where signature verification still succeeds
+- signed passport and verifier-policy bodies are closed: an unknown member is a decode refusal
 - consumers must not invent cross-issuer trust semantics not present in the
   artifact contract
 - unsupported generic VC profiles or incompatible issuance-format requests must
