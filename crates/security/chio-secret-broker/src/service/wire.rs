@@ -197,7 +197,7 @@ pub(crate) struct BoundedZeroizingString<const MAXIMUM: usize>(Zeroizing<String>
 impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
     fn with_capacity(capacity: usize) -> SensitiveJsonResult<Self> {
         if capacity > MAXIMUM {
-            return Err(SensitiveJsonRefusal::StringOverflow.into());
+            return Err(SensitiveJsonRefusal::StringOverflow);
         }
         let mut storage = String::new();
         storage
@@ -221,7 +221,7 @@ impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
             .checked_add(character.len_utf8())
             .ok_or(SensitiveJsonRefusal::StringOverflow)?;
         if length > MAXIMUM || length > self.1 {
-            return Err(SensitiveJsonRefusal::StringOverflow.into());
+            return Err(SensitiveJsonRefusal::StringOverflow);
         }
         self.0.push(character);
         Ok(())
@@ -296,7 +296,7 @@ impl<'a> SensitiveJsonParser<'a> {
             .checked_add(expected.len())
             .ok_or(SensitiveJsonRefusal::Truncated)?;
         if self.input.get(self.position..end) != Some(expected) {
-            return Err(SensitiveJsonRefusal::UnexpectedToken(expected).into());
+            return Err(SensitiveJsonRefusal::UnexpectedToken(expected));
         }
         self.position = end;
         Ok(())
@@ -344,9 +344,7 @@ impl<'a> SensitiveJsonParser<'a> {
                                 let nibble = match digit {
                                     b'0'..=b'9' => digit - b'0',
                                     b'a'..=b'f' => digit - b'a' + 10,
-                                    _ => {
-                                        return Err(SensitiveJsonRefusal::NonCanonicalEscape.into())
-                                    }
+                                    _ => return Err(SensitiveJsonRefusal::NonCanonicalEscape),
                                 };
                                 code = code
                                     .checked_mul(16)
@@ -354,17 +352,17 @@ impl<'a> SensitiveJsonParser<'a> {
                                     .ok_or(SensitiveJsonRefusal::NonCanonicalEscape)?;
                             }
                             if code > 0x1f || matches!(code, 0x08 | 0x09 | 0x0a | 0x0c | 0x0d) {
-                                return Err(SensitiveJsonRefusal::NonCanonicalEscape.into());
+                                return Err(SensitiveJsonRefusal::NonCanonicalEscape);
                             }
                             value.push(char::from(code))?;
                             self.position = escape_end;
                             continue;
                         }
-                        _ => return Err(SensitiveJsonRefusal::NonCanonicalEscape.into()),
+                        _ => return Err(SensitiveJsonRefusal::NonCanonicalEscape),
                     }
                     self.position += 2;
                 }
-                0x00..=0x1f => return Err(SensitiveJsonRefusal::ControlCharacter.into()),
+                0x00..=0x1f => return Err(SensitiveJsonRefusal::ControlCharacter),
                 0x20..=0x7f => {
                     value.push(char::from(byte))?;
                     self.position += 1;
@@ -374,7 +372,7 @@ impl<'a> SensitiveJsonParser<'a> {
                         0xc2..=0xdf => 2,
                         0xe0..=0xef => 3,
                         0xf0..=0xf4 => 4,
-                        _ => return Err(SensitiveJsonRefusal::InvalidUtf8.into()),
+                        _ => return Err(SensitiveJsonRefusal::InvalidUtf8),
                     };
                     let end = self
                         .position
@@ -389,7 +387,7 @@ impl<'a> SensitiveJsonParser<'a> {
                     let mut characters = encoded.chars();
                     let character = characters.next().ok_or(SensitiveJsonRefusal::InvalidUtf8)?;
                     if characters.next().is_some() {
-                        return Err(SensitiveJsonRefusal::InvalidUtf8.into());
+                        return Err(SensitiveJsonRefusal::InvalidUtf8);
                     }
                     value.push(character)?;
                     self.position = end;
@@ -409,11 +407,11 @@ impl<'a> SensitiveJsonParser<'a> {
         }
         loop {
             if value.0.len() == MAXIMUM {
-                return Err(SensitiveJsonRefusal::ArrayOverflow.into());
+                return Err(SensitiveJsonRefusal::ArrayOverflow);
             }
             let first = self.byte_at(self.position)?;
             if !first.is_ascii_digit() {
-                return Err(SensitiveJsonRefusal::NotUnsignedInteger.into());
+                return Err(SensitiveJsonRefusal::NotUnsignedInteger);
             }
             let mut byte = first - b'0';
             self.position += 1;
@@ -430,7 +428,7 @@ impl<'a> SensitiveJsonParser<'a> {
                 .get(self.position)
                 .is_some_and(|byte| byte.is_ascii_digit())
             {
-                return Err(SensitiveJsonRefusal::LeadingZero.into());
+                return Err(SensitiveJsonRefusal::LeadingZero);
             }
             value.0.push(byte);
             match self.input.get(self.position) {
@@ -439,7 +437,7 @@ impl<'a> SensitiveJsonParser<'a> {
                     self.position += 1;
                     return Ok(value);
                 }
-                _ => return Err(SensitiveJsonRefusal::MissingArrayDelimiter.into()),
+                _ => return Err(SensitiveJsonRefusal::MissingArrayDelimiter),
             }
         }
     }
@@ -448,7 +446,7 @@ impl<'a> SensitiveJsonParser<'a> {
         const MAXIMUM: u64 = (1 << 53) - 1;
         let first = self.byte_at(self.position)?;
         if !first.is_ascii_digit() {
-            return Err(SensitiveJsonRefusal::NotUnsignedInteger.into());
+            return Err(SensitiveJsonRefusal::NotUnsignedInteger);
         }
         let mut value = u64::from(first - b'0');
         self.position += 1;
@@ -458,7 +456,7 @@ impl<'a> SensitiveJsonParser<'a> {
                 .get(self.position)
                 .is_some_and(|byte| byte.is_ascii_digit())
             {
-                return Err(SensitiveJsonRefusal::LeadingZero.into());
+                return Err(SensitiveJsonRefusal::LeadingZero);
             }
             return Ok(value);
         }
@@ -475,7 +473,7 @@ impl<'a> SensitiveJsonParser<'a> {
 
     pub(crate) fn finish(self) -> SensitiveJsonResult<()> {
         if self.position != self.input.len() {
-            return Err(SensitiveJsonRefusal::TrailingData.into());
+            return Err(SensitiveJsonRefusal::TrailingData);
         }
         Ok(())
     }
@@ -736,7 +734,7 @@ pub(super) fn parse_canonical_ipc_frame(
         "rotate" => IpcOperation::Rotate,
         "disable" => IpcOperation::Disable,
         "delete" => IpcOperation::Delete,
-        _ => return Err(SensitiveJsonRefusal::UnknownOperation.into()),
+        _ => return Err(SensitiveJsonRefusal::UnknownOperation),
     };
     parser.expect_literal(b",\"payload\":")?;
     let payload = parser.parse_byte_array::<MAX_WIRE_BYTES>()?;
