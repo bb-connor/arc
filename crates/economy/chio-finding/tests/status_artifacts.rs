@@ -10,7 +10,7 @@ use chio_finding::{
     build_status_inclusion_proof_input, build_status_non_inclusion_proof_input,
     compute_status_epoch_id, parse_signed_status_epoch, parse_status_proof_input,
     status_epoch_envelope_sha256, verify_signed_status_epoch, verify_status_proof_input,
-    FindingAuthorityKeyPolicy, FindingStatusEpoch, FindingStatusFreshnessPolicy,
+    FindingAuthorityKeyPolicy, FindingError, FindingStatusEpoch, FindingStatusFreshnessPolicy,
     FindingStatusOperatorAuthorization, FindingStatusOperatorRole, FindingStatusProofInput,
     FINDING_STATUS_EPOCH_SCHEMA_V1, FINDING_STATUS_SIGNATURE_DOMAIN,
 };
@@ -24,6 +24,13 @@ use chio_revocation_oracle::{
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+fn refusal<T, E: std::fmt::Debug>(result: Result<T, E>) -> E {
+    match result {
+        Ok(_) => panic!("input was accepted"),
+        Err(error) => error,
+    }
+}
 
 const FINDING_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const FINDING_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
@@ -197,11 +204,17 @@ fn status_epoch_numeric_identifiers_are_nonzero_i_json_integers() -> TestResult 
 
     let mut zero_epoch = signed.body.clone();
     zero_epoch.map_epoch = 0;
-    assert!(zero_epoch.validate().is_err());
+    assert_eq!(
+        refusal(zero_epoch.validate()),
+        FindingError::NonZeroRequired("map_epoch")
+    );
 
     let mut oversized_key_epoch = signed.body;
     oversized_key_epoch.operator_key_epoch = 1_u64 << 53;
-    assert!(oversized_key_epoch.validate().is_err());
+    assert_eq!(
+        refusal(oversized_key_epoch.validate()),
+        FindingError::IJsonIntegerOutOfRange("operator_key_epoch")
+    );
     Ok(())
 }
 
@@ -227,7 +240,10 @@ fn exact_canonical_proof_bytes_round_trip() -> TestResult {
     assert_eq!(parse_status_proof_input(&canonical)?, proof);
 
     let pretty = serde_json::to_string_pretty(&proof)?;
-    assert!(parse_status_proof_input(pretty.as_bytes()).is_err());
+    assert_eq!(
+        refusal(parse_status_proof_input(pretty.as_bytes())),
+        FindingError::NonCanonicalBytes("status_proof")
+    );
 
     let canonical_text = String::from_utf8(canonical)?;
     let duplicate = canonical_text.replacen(
@@ -235,7 +251,10 @@ fn exact_canonical_proof_bytes_round_trip() -> TestResult {
         "\"feed_id\":\"venue-status-feed\",\"feed_id\":\"venue-status-feed\"",
         1,
     );
-    assert!(parse_status_proof_input(duplicate.as_bytes()).is_err());
+    assert_eq!(
+        refusal(parse_status_proof_input(duplicate.as_bytes())),
+        FindingError::NonCanonicalBytes("status_proof")
+    );
     Ok(())
 }
 
@@ -256,8 +275,19 @@ fn epoch_version_domain_and_ordinary_root_substitution_reject() -> TestResult {
         }
         body.status_epoch_id = compute_status_epoch_id(&body)?;
         let altered = SignedExportEnvelope::sign(body, &keypair)?;
-        assert!(
-            verify_signed_status_epoch(&altered, &auth).is_err(),
+        let expected = match field {
+            "schema" => {
+                FindingError::UnsupportedSchema("chio.revocation.epoch-root.v1".to_string())
+            }
+            "domain" => FindingError::InvalidField("signature_domain"),
+            "map" => FindingError::InvalidField("status_map_version"),
+            "proof" => FindingError::InvalidField("proof_semantics"),
+            "hash" => FindingError::InvalidField("branch_domain"),
+            _ => FindingError::InvalidField("empty_leaf_hash"),
+        };
+        assert_eq!(
+            refusal(verify_signed_status_epoch(&altered, &auth)),
+            expected,
             "mutation must reject: {field}"
         );
     }
@@ -270,23 +300,38 @@ fn operator_role_key_epoch_validity_and_revocation_are_pinned() -> TestResult {
 
     let mut wrong_feed = auth.clone();
     wrong_feed.feed_id = "other-feed".to_string();
-    assert!(verify_signed_status_epoch(&signed, &wrong_feed).is_err());
+    assert_eq!(
+        refusal(verify_signed_status_epoch(&signed, &wrong_feed)),
+        FindingError::AuthorityMismatch("status_epoch.feed_id")
+    );
 
     let mut wrong_key = auth.clone();
     wrong_key.operator.key = Keypair::from_seed(&[9_u8; 32]).public_key();
-    assert!(verify_signed_status_epoch(&signed, &wrong_key).is_err());
+    assert_eq!(
+        refusal(verify_signed_status_epoch(&signed, &wrong_key)),
+        FindingError::AuthorityMismatch("status_epoch.operator")
+    );
 
     let mut wrong_epoch = auth.clone();
     wrong_epoch.operator.key_epoch += 1;
-    assert!(verify_signed_status_epoch(&signed, &wrong_epoch).is_err());
+    assert_eq!(
+        refusal(verify_signed_status_epoch(&signed, &wrong_epoch)),
+        FindingError::AuthorityMismatch("status_epoch.operator")
+    );
 
     let mut expired = auth.clone();
     expired.operator.valid_until = ROOT_GENERATED_AT;
-    assert!(verify_signed_status_epoch(&signed, &expired).is_err());
+    assert_eq!(
+        refusal(verify_signed_status_epoch(&signed, &expired)),
+        FindingError::AuthorityMismatch("status_epoch.operator_validity")
+    );
 
     let mut revoked = auth;
     revoked.revoked_from = Some(ROOT_GENERATED_AT);
-    assert!(verify_signed_status_epoch(&signed, &revoked).is_err());
+    assert_eq!(
+        refusal(verify_signed_status_epoch(&signed, &revoked)),
+        FindingError::AuthorityMismatch("status_epoch.operator_revocation")
+    );
     Ok(())
 }
 
@@ -372,9 +417,23 @@ fn every_portable_cross_binding_and_freshness_mutation_rejects() -> TestResult {
     }
     cases.push(changed);
 
-    for (index, changed) in cases.iter().enumerate() {
-        assert!(
-            verify_status_proof_input(changed, &auth, freshness()).is_err(),
+    let expected_fields = [
+        "status_proof.epoch_binding",
+        "status_proof.key_domain_nonce",
+        "status_proof.epoch_binding",
+        "status_proof.path",
+        "status_proof.epoch_binding",
+        "status_proof.epoch_binding",
+        "status_proof.epoch_binding",
+        "status_proof.path",
+        "status_proof.path",
+        "status_proof.freshness",
+    ];
+    assert_eq!(cases.len(), expected_fields.len());
+    for (index, (changed, field)) in cases.iter().zip(expected_fields).enumerate() {
+        assert_eq!(
+            refusal(verify_status_proof_input(changed, &auth, freshness())),
+            FindingError::InvalidField(field),
             "cross-binding mutation {index} must reject"
         );
     }
@@ -388,7 +447,10 @@ fn exact_epoch_bytes_and_signature_cannot_be_substituted() -> TestResult {
     if let FindingStatusProofInput::Inclusion(value) = &mut proof {
         value.signed_status_epoch_b64 = STANDARD.encode(pretty.as_bytes());
     }
-    assert!(verify_status_proof_input(&proof, &auth, freshness()).is_err());
+    assert_eq!(
+        refusal(verify_status_proof_input(&proof, &auth, freshness())),
+        FindingError::NonCanonicalBytes("status_epoch")
+    );
 
     let (mut proof, auth, signed) = inclusion_fixture()?;
     let wrong_signed = SignedExportEnvelope::sign(signed.body, &Keypair::from_seed(&[8_u8; 32]))?;
@@ -397,35 +459,45 @@ fn exact_epoch_bytes_and_signature_cannot_be_substituted() -> TestResult {
         value.signed_status_epoch_b64 = STANDARD.encode(raw);
         value.status_epoch_sha256 = status_epoch_envelope_sha256(&wrong_signed)?;
     }
-    assert!(verify_status_proof_input(&proof, &auth, freshness()).is_err());
+    assert_eq!(
+        refusal(verify_status_proof_input(&proof, &auth, freshness())),
+        FindingError::AuthorityMismatch("status_epoch")
+    );
     Ok(())
 }
 
 #[test]
 fn stale_future_and_revoked_at_verification_time_reject() -> TestResult {
     let (proof, auth, _) = inclusion_fixture()?;
-    assert!(verify_status_proof_input(
-        &proof,
-        &auth,
-        FindingStatusFreshnessPolicy {
-            now: PROOF_CHECKED_AT + 120,
-            max_epoch_age_secs: 60,
-        },
-    )
-    .is_err());
-    assert!(verify_status_proof_input(
-        &proof,
-        &auth,
-        FindingStatusFreshnessPolicy {
-            now: PROOF_CHECKED_AT - 1,
-            max_epoch_age_secs: 60,
-        },
-    )
-    .is_err());
+    assert_eq!(
+        refusal(verify_status_proof_input(
+            &proof,
+            &auth,
+            FindingStatusFreshnessPolicy {
+                now: PROOF_CHECKED_AT + 120,
+                max_epoch_age_secs: 60,
+            },
+        )),
+        FindingError::InvalidField("status_proof.freshness")
+    );
+    assert_eq!(
+        refusal(verify_status_proof_input(
+            &proof,
+            &auth,
+            FindingStatusFreshnessPolicy {
+                now: PROOF_CHECKED_AT - 1,
+                max_epoch_age_secs: 60,
+            },
+        )),
+        FindingError::InvalidField("status_proof.freshness")
+    );
 
     let mut revoked = auth;
     revoked.revoked_from = Some(PROOF_CHECKED_AT);
-    assert!(verify_status_proof_input(&proof, &revoked, freshness()).is_err());
+    assert_eq!(
+        refusal(verify_status_proof_input(&proof, &revoked, freshness())),
+        FindingError::AuthorityMismatch("status_epoch.operator_revocation")
+    );
     Ok(())
 }
 
@@ -446,10 +518,22 @@ fn schemas_accept_both_branches_and_reject_cross_branch_fields() -> TestResult {
         "retraction_intent_sha256".to_string(),
         Value::String(INTENT_A.to_string()),
     );
-    assert!(validate_schema("status-proof-input", &invalid).is_err());
+    let error = refusal(validate_schema("status-proof-input", &invalid));
+    let chio_spec_validate::ValidateError::SchemaViolation(_, _, violations) = &error else {
+        panic!("expected a schema violation, got {error:?}");
+    };
+    assert_eq!(violations.len(), 1);
+    assert!(
+        violations[0]
+            .ends_with("is not valid under any of the schemas listed in the 'oneOf' keyword"),
+        "{violations:?}"
+    );
 
     let canonical = chio_core_types::canonical_json_bytes(&invalid)?;
-    assert!(parse_status_proof_input(&canonical).is_err());
+    assert_eq!(
+        refusal(parse_status_proof_input(&canonical)),
+        FindingError::InvalidField("status_proof")
+    );
     Ok(())
 }
 

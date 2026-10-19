@@ -61,6 +61,13 @@ const CHALLENGE_LANE_FAMILIES: [&str; 8] = [
     "replay-observation",
 ];
 
+fn refusal<T, E: std::fmt::Debug>(result: Result<T, E>) -> E {
+    match result {
+        Ok(_) => panic!("input was accepted"),
+        Err(error) => error,
+    }
+}
+
 fn keypair(seed: u8) -> Keypair {
     Keypair::from_seed(&[seed; 32])
 }
@@ -617,12 +624,18 @@ fn challenge_authorization_union_rejects_cross_branch_members() -> TestResult {
     let challenge = buyer_digest_mismatch_challenge(&challenger)?;
     let mut value: Value = serde_json::to_value(&challenge)?;
     value["authorization"]["buyer_submission"]["audit_epoch_envelope_sha256"] = json!(HEX64);
-    assert!(serde_json::from_value::<FindingChallenge>(value.clone()).is_err());
+    assert_eq!(
+    refusal(serde_json::from_value::<FindingChallenge>(value.clone())).to_string(),
+    "unknown field `audit_epoch_envelope_sha256`, expected one of `challenger`, `dispute_fee_terminal`, `dispute_lock_ref`, `standing`"
+);
 
     let venue = venue_replay_challenge()?;
     let mut value: Value = serde_json::to_value(&venue)?;
     value["authorization"]["venue_audit"]["challenger"] = json!(HEX64);
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+    refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+    "unknown field `challenger`, expected one of `audit_epoch_envelope_sha256`, `selection_digest`, `authorization_digest`"
+);
 
     let mut value: Value = serde_json::to_value(&venue)?;
     value["authorization"]["venue_audit"]["dispute_lock_ref"] = json!({
@@ -632,7 +645,10 @@ fn challenge_authorization_union_rejects_cross_branch_members() -> TestResult {
         "amount": { "units": 1, "currency": "USD" },
         "expiry": 1,
     });
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+    refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+    "unknown field `dispute_lock_ref`, expected one of `audit_epoch_envelope_sha256`, `selection_digest`, `authorization_digest`"
+);
 
     // Both branches at once is not a union.
     let mut value: Value = serde_json::to_value(&challenge)?;
@@ -641,7 +657,10 @@ fn challenge_authorization_union_rejects_cross_branch_members() -> TestResult {
         "selection_digest": HEX64_ALT,
         "authorization_digest": HEX64_THIRD,
     });
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+        refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+        "invalid value: map, expected map with a single key"
+    );
     Ok(())
 }
 
@@ -651,16 +670,25 @@ fn challenge_evidence_union_rejects_cross_class_members() -> TestResult {
     let challenge = buyer_digest_mismatch_challenge(&challenger)?;
     let mut value: Value = serde_json::to_value(&challenge)?;
     value["evidence"]["digest_mismatch"]["purchase_record_envelope_sha256"] = json!(HEX64);
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+    refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+    "unknown field `purchase_record_envelope_sha256`, expected one of `failed_delivery_envelope_sha256`, `deny_receipt_ref`, `deny_checkpoint_ref`"
+);
 
     let mut value: Value = serde_json::to_value(&challenge)?;
     value["evidence"]["digest_mismatch"]["recipe_preimage"] = json!("{}");
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+    refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+    "unknown field `recipe_preimage`, expected one of `failed_delivery_envelope_sha256`, `deny_receipt_ref`, `deny_checkpoint_ref`"
+);
 
     let venue = venue_replay_challenge()?;
     let mut value: Value = serde_json::to_value(&venue)?;
     value["evidence"]["replay_contradiction"]["failed_delivery_envelope_sha256"] = json!(HEX64);
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+    refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+    "unknown field `failed_delivery_envelope_sha256`, expected one of `reproduction`, `recipe_preimage`, `purchase_record_envelope_sha256`"
+);
 
     let mut value: Value = serde_json::to_value(&venue)?;
     value["evidence"]["digest_mismatch"] = json!({
@@ -671,7 +699,10 @@ fn challenge_evidence_union_rejects_cross_class_members() -> TestResult {
             "checkpoint_sha256": HEX64_ALT,
         },
     });
-    assert!(serde_json::from_value::<FindingChallenge>(value).is_err());
+    assert_eq!(
+        refusal(serde_json::from_value::<FindingChallenge>(value)).to_string(),
+        "invalid value: map, expected map with a single key"
+    );
     Ok(())
 }
 
@@ -2202,7 +2233,13 @@ fn authority_status_round_trips_registered_schema_and_external_pin() -> TestResu
 
     verify_signed_authority_status(&signed, &status_authority.public_key())?;
     validate_family_schema("authority-status", &canonical_document(&signed)?)?;
-    assert!(verify_signed_authority_status(&signed, &keypair(53).public_key()).is_err());
+    assert_eq!(
+        refusal(verify_signed_authority_status(
+            &signed,
+            &keypair(53).public_key()
+        )),
+        FindingError::AuthorityMismatch("authority_status")
+    );
     Ok(())
 }
 
