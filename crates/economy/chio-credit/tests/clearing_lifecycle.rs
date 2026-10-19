@@ -18,7 +18,7 @@ use chio_core_types::StoreMutationFence;
 use chio_credit::clearing::{
     clearing_reservation_root, compose_clearing_dispatch_transition,
     compose_clearing_lifecycle_transition, compose_clearing_reconciliation_transition,
-    AnchoredClearingObligationV1, ClearingAuthorityTrustV1,
+    AnchoredClearingObligationV1, ClearingAuthorityTrustV1, ClearingError,
     ClearingLifecycleAuthorityVerificationV1, ClearingLifecycleAuthorityVerifier,
     ClearingLifecycleBatchVerifier, ClearingLifecycleProofResolver, ClearingObligationInputV1,
     ClearingRoundLifecycleRecordV1, ClearingRoundTransitionProofV1, ClearingRoundTransitionV1,
@@ -33,6 +33,8 @@ use chio_credit::obligation::{
     ObligationCreditElectionV1, ObligationDispositionRecordV1, ObligationDispositionTransitionV1,
     ObligationDispositionV1,
 };
+
+use chio_spec_validate::ValidateError;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -53,6 +55,16 @@ fn validate_schema(name: &str, artifact: &impl serde::Serialize) -> TestResult {
         &value,
     )?;
     Ok(())
+}
+
+fn schema_violations(result: TestResult) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let error = result
+        .err()
+        .ok_or("schema validation unexpectedly passed")?;
+    match error.downcast_ref::<ValidateError>() {
+        Some(ValidateError::SchemaViolation(_, _, violations)) => Ok(violations.clone()),
+        _ => Err("schema validation failed without a schema violation".into()),
+    }
 }
 
 fn anchor_key() -> Keypair {
@@ -758,13 +770,17 @@ fn finalization_and_abort_compete_on_one_complete_external_projection() -> TestR
     )?;
     let verified_committed = verify_economic_state_view(committed_view, &pins())?;
     verify_economic_state_batch_commit(&finalizing_advance, &verified_committed, &pins())?;
-    assert!(verify_economic_state_batch_advance(
-        &verified_committed,
-        aborting_batch,
-        &pins(),
-        &verifier,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_economic_state_batch_advance(
+            &verified_committed,
+            aborting_batch,
+            &pins(),
+            &verifier,
+        ),
+        Err(EconomicStateAnchorError::InvalidView(
+            "batch checkpoint predecessor mismatch"
+        ))
+    ));
 
     let mut omitted = signed_batch(&aborting, &current_view)?;
     omitted.transitions.pop();
@@ -814,26 +830,41 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
     let EconomicContentV1::Inline { value } = &finalizing_head.state else {
         return Err("finalizing head did not contain inline state".into());
     };
+    let control_record: ClearingRoundLifecycleRecordV1 = serde_json::from_value(value.clone())?;
+    control_record.validate()?;
+    validate_schema("clearing-round-lifecycle.v1.json", &control_record)?;
     let mut impossible_record = value.clone();
     impossible_record["participantAcceptanceCount"] = serde_json::json!(1025);
     let impossible_record: ClearingRoundLifecycleRecordV1 =
         serde_json::from_value(impossible_record)?;
-    assert!(impossible_record.validate().is_err());
-    assert!(validate_schema("clearing-round-lifecycle.v1.json", &impossible_record,).is_err());
+    assert!(matches!(
+        impossible_record.validate(),
+        Err(ClearingError::InvalidField("participant_acceptance_count"))
+    ));
+    let violations = schema_violations(validate_schema(
+        "clearing-round-lifecycle.v1.json",
+        &impossible_record,
+    ))?;
+    assert_eq!(
+        violations,
+        vec!["1025 is greater than the maximum of 1024".to_owned()]
+    );
     anchored = anchored_obligations(&inputs, &finalizing_heads)
         .ok_or("projection omitted an obligation head")?;
-    assert!(compose_clearing_lifecycle_transition(
-        &finalizing_head,
-        &anchored,
-        ClearingRoundTransitionV1::BeginAbort {
-            abort_digest: digest("abort"),
-            zero_dispatch_proof_digest: digest("zero-dispatch"),
-            authority_digest: digest("abort-authority"),
-            frost_burn_checkpoint_digest: None,
-        },
-        503,
-    )
-    .is_err());
+    assert!(matches!(
+        compose_clearing_lifecycle_transition(
+            &finalizing_head,
+            &anchored,
+            ClearingRoundTransitionV1::BeginAbort {
+                abort_digest: digest("abort"),
+                zero_dispatch_proof_digest: digest("zero-dispatch"),
+                authority_digest: digest("abort-authority"),
+                frost_burn_checkpoint_digest: None,
+            },
+            503,
+        ),
+        Err(ClearingError::IllegalLifecycleTransition)
+    ));
 
     let finalized = compose_clearing_lifecycle_transition(
         &finalizing_head,
@@ -863,13 +894,16 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
         Arc::new(Proofs(proofs.clone())),
         Arc::new(DirectAuthority),
     );
-    assert!(verify_economic_state_batch_advance(
-        &verified_current,
-        finalized_batch.clone(),
-        &pins(),
-        &direct_verifier,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_economic_state_batch_advance(
+            &verified_current,
+            finalized_batch.clone(),
+            &pins(),
+            &direct_verifier,
+        ),
+        Err(EconomicStateAnchorError::AuthorizationMismatch(key))
+            if key.resource_family == "clearing_round"
+    ));
     let matching_verifier =
         ClearingLifecycleBatchVerifier::new(Arc::new(Proofs(proofs)), Arc::new(MatchingAuthority));
     verify_economic_state_batch_advance(
@@ -879,18 +913,20 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
         &matching_verifier,
     )?;
 
-    assert!(compose_clearing_lifecycle_transition(
-        &finalized_head,
-        &finalized_obligations,
-        ClearingRoundTransitionV1::BeginAbort {
-            abort_digest: digest("late-abort"),
-            zero_dispatch_proof_digest: digest("zero-dispatch"),
-            authority_digest: digest("abort-authority"),
-            frost_burn_checkpoint_digest: Some(digest("burned-slot")),
-        },
-        504,
-    )
-    .is_err());
+    assert!(matches!(
+        compose_clearing_lifecycle_transition(
+            &finalized_head,
+            &finalized_obligations,
+            ClearingRoundTransitionV1::BeginAbort {
+                abort_digest: digest("late-abort"),
+                zero_dispatch_proof_digest: digest("zero-dispatch"),
+                authority_digest: digest("abort-authority"),
+                frost_burn_checkpoint_digest: Some(digest("burned-slot")),
+            },
+            504,
+        ),
+        Err(ClearingError::IllegalLifecycleTransition)
+    ));
 
     let first_intent = signed_dispatch_intent(&core.digest()?, "first")?;
     let first_slot = dispatch_slot(&finalized_head, &first_intent, "first")?;
@@ -954,25 +990,31 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
         }
     }
     substituted_slot.seal(&anchor_key())?;
-    assert!(verify_economic_state_batch_advance(
-        &verified_dispatch_view,
-        substituted_slot,
-        &pins(),
-        &dispatch_verifier,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_economic_state_batch_advance(
+            &verified_dispatch_view,
+            substituted_slot,
+            &pins(),
+            &dispatch_verifier,
+        ),
+        Err(EconomicStateAnchorError::TransitionProofRejected(key))
+            if key.resource_family == "clearing_round"
+    ));
     let mut incomplete_dispatch = dispatch_batch;
     incomplete_dispatch
         .transitions
         .retain(|transition| transition.resource_key.resource_id != inputs[0].atom.obligation_id());
     incomplete_dispatch.seal(&anchor_key())?;
-    assert!(verify_economic_state_batch_advance(
-        &verified_dispatch_view,
-        incomplete_dispatch,
-        &pins(),
-        &dispatch_verifier,
-    )
-    .is_err());
+    assert!(matches!(
+        verify_economic_state_batch_advance(
+            &verified_dispatch_view,
+            incomplete_dispatch,
+            &pins(),
+            &dispatch_verifier,
+        ),
+        Err(EconomicStateAnchorError::TransitionProofRejected(key))
+            if key.resource_family == "clearing_round"
+    ));
 
     let first_dispatch_heads = next_heads(&first_dispatch);
     let dispatching_head = first_dispatch_heads
@@ -1025,14 +1067,16 @@ fn finalizing_abort_requires_a_burn_and_dispatch_is_effect_fenced() -> TestResul
     let mut reused_operation = dispatch_slot(dispatching_head, &second_intent, "second")?;
     reused_operation.operation_id = first_slot.operation_id.clone();
     reused_operation.slot_id = reused_operation.recompute_slot_id()?;
-    assert!(compose_clearing_dispatch_transition(
-        dispatching_head,
-        &dispatching_obligations,
-        &second_intent,
-        reused_operation,
-        505,
-    )
-    .is_err());
+    assert!(matches!(
+        compose_clearing_dispatch_transition(
+            dispatching_head,
+            &dispatching_obligations,
+            &second_intent,
+            reused_operation,
+            505,
+        ),
+        Err(ClearingError::AuthorityVerification)
+    ));
     Ok(())
 }
 
@@ -1235,9 +1279,11 @@ fn settled_reconciliation_terminalizes_the_slot_and_round_attempt_together() -> 
     let proofs = BTreeMap::from([(projection.proof().digest()?, projection.proof().clone())]);
     let verifier =
         ClearingLifecycleBatchVerifier::new(Arc::new(Proofs(proofs)), Arc::new(DirectAuthority));
-    assert!(
-        verify_economic_state_batch_advance(&verified_current, batch, &pins(), &verifier).is_err()
-    );
+    assert!(matches!(
+        verify_economic_state_batch_advance(&verified_current, batch, &pins(), &verifier),
+        Err(EconomicStateAnchorError::TransitionProofRejected(key))
+            if key.resource_family == "clearing_round"
+    ));
     Ok(())
 }
 
@@ -1327,14 +1373,16 @@ fn no_effect_retries_and_unknown_outcomes_remain_effect_slot_fenced() -> TestRes
         .ok_or("unknown reconciliation omitted an obligation head")?;
     assert_eq!(unknown_round_head.lifecycle_state, "incident");
     let blocked_retry_slot = dispatch_slot(unknown_round_head, &fixture.intent, "blocked-retry")?;
-    assert!(compose_clearing_dispatch_transition(
-        unknown_round_head,
-        &unknown_obligations,
-        &fixture.intent,
-        blocked_retry_slot,
-        507,
-    )
-    .is_err());
+    assert!(matches!(
+        compose_clearing_dispatch_transition(
+            unknown_round_head,
+            &unknown_obligations,
+            &fixture.intent,
+            blocked_retry_slot,
+            507,
+        ),
+        Err(ClearingError::IllegalLifecycleTransition)
+    ));
     let remaining_intent = signed_dispatch_intent(&fixture.core.digest()?, "remaining")?;
     let remaining_slot = dispatch_slot(unknown_round_head, &remaining_intent, "remaining")?;
     compose_clearing_dispatch_transition(
