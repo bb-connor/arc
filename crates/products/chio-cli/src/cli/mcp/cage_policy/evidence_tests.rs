@@ -8,6 +8,23 @@ use serde_json::json;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+fn refusal<T>(
+    result: std::result::Result<T, CliError>,
+    label: &str,
+    expected: &str,
+) -> Result {
+    let message = match result {
+        Ok(_) => return Err(format!("{label}: accepted").into()),
+        Err(error) => error.to_string(),
+    };
+    let prefix = format!("urn:chio:error:cli:other [cli:error]: {expected} (");
+    if message.starts_with(&prefix) {
+        Ok(())
+    } else {
+        Err(format!("{label}: unexpected refusal: {message}").into())
+    }
+}
+
 fn fixture() -> Result<(NativeLaunchEvidence, McpCageLaunchPolicy, Keypair)> {
     let policy = policy(
         NativeSyscallProfile::NativeMinimalV1,
@@ -123,17 +140,20 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
     assert_eq!(window.started_at_unix_ms, 1300);
     assert_eq!(window.exited_at_unix_ms, 2000);
     assert_eq!(window.tools, BTreeSet::from(["echo".into()]));
-    assert!(
+    refusal(
         verify_native_launch_evidence(
             &evidence,
             "cage-policy-test",
-            &Keypair::from_seed(&[92; 32]).public_key()
-        )
-        .is_err()
-    );
-    assert!(
-        verify_native_launch_evidence(&evidence, "other-server", &signer.public_key()).is_err()
-    );
+            &Keypair::from_seed(&[92; 32]).public_key(),
+        ),
+        "wrong-signer",
+        "cage launch policy is not signed by the configured trust root",
+    )?;
+    refusal(
+        verify_native_launch_evidence(&evidence, "other-server", &signer.public_key()),
+        "other-server",
+        "native launch evidence: expected the pinned server's selected policy",
+    )?;
     for field in ["helper", "target", "identity", "head"] {
         let mut policy = policy.clone();
         match field {
@@ -150,7 +170,11 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
         let mut changed = evidence.clone();
         changed.signed_policy =
             String::from_utf8(canonical_json_bytes(&signed_policy(policy, &signer))?)?;
-        assert!(verify(&changed).is_err(), "accepted substituted {field}");
+        refusal(
+            verify(&changed),
+            &format!("substituted-{field}"),
+            "native launch evidence: receipt does not bind the complete admitted signed policy",
+        )?;
     }
     let mut changed = evidence.clone();
     let mut terminal = verify_signed_cage_receipt(&evidence.terminal)?;
@@ -200,7 +224,11 @@ fn native_run_evidence_requires_external_policy_pin_and_same_observed_launch() -
         );
     }
     changed.terminal = sign_cage_receipt(terminal, &context, &Ed25519Backend::new(signer.clone()))?;
-    assert!(verify(&changed).is_err());
+    refusal(
+        verify(&changed),
+        "terminal-other-launch",
+        "native launch evidence: enforcement and terminal receipts belong to different launches",
+    )?;
     Ok(())
 }
 
@@ -218,34 +246,52 @@ fn native_start_verification_binds_original_receipt_without_claiming_exit() -> R
         verify_native_start_file(&policy_path, &receipt_path, server, key, id, target)
     };
     verify("cage-policy-test", &pin, &evidence.enforcement.id, target)?;
-    assert!(verify("other-server", &pin, &evidence.enforcement.id, target).is_err());
-    assert!(
+    refusal(
+        verify("other-server", &pin, &evidence.enforcement.id, target),
+        "start-other-server",
+        "native launch evidence: expected the pinned server's selected policy",
+    )?;
+    refusal(
         verify(
             "cage-policy-test",
             &Keypair::from_seed(&[92; 32]).public_key().to_hex(),
             &evidence.enforcement.id,
             target,
-        )
-        .is_err()
-    );
-    assert!(verify("cage-policy-test", &pin, &"a".repeat(64), target).is_err());
-    assert!(
+        ),
+        "start-wrong-pin",
+        "cage launch policy is not signed by the configured trust root",
+    )?;
+    refusal(
+        verify("cage-policy-test", &pin, &"a".repeat(64), target),
+        "start-wrong-id",
+        "native launch evidence: launch differs from selected receipt or expected target",
+    )?;
+    refusal(
         verify(
             "cage-policy-test",
             &pin,
             &evidence.enforcement.id,
-            &"b".repeat(64)
-        )
-        .is_err()
-    );
+            &"b".repeat(64),
+        ),
+        "start-wrong-target",
+        "native launch evidence: launch differs from selected receipt or expected target",
+    )?;
 
     // A valid signed exit is not the selected original enforcement receipt.
     std::fs::write(&receipt_path, canonical_json_bytes(&evidence.terminal)?)?;
-    assert!(verify("cage-policy-test", &pin, &evidence.terminal.id, target).is_err());
+    refusal(
+        verify("cage-policy-test", &pin, &evidence.terminal.id, target),
+        "start-terminal",
+        "native launch evidence: receipt is not a released Enforced launch",
+    )?;
     let mut changed = serde_json::to_value(&evidence.enforcement)?;
     changed["invented_field"] = json!(true);
     std::fs::write(&receipt_path, serde_json::to_vec(&changed)?)?;
-    assert!(verify("cage-policy-test", &pin, &evidence.enforcement.id, target).is_err());
+    refusal(
+        verify("cage-policy-test", &pin, &evidence.enforcement.id, target),
+        "start-invented-field",
+        "receipt fields differ from the supported signed schema",
+    )?;
     Ok(())
 }
 
@@ -317,21 +363,21 @@ fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Resu
                 .contains("complete admitted signed policy"),
             "{field}: {error}"
         );
-        assert!(
-            verify_native_launch_evidence(&changed, "cage-policy-test", &signer.public_key())
-                .is_err(),
-            "{field}"
-        );
+        refusal(
+            verify_native_launch_evidence(&changed, "cage-policy-test", &signer.public_key()),
+            &format!("policy-{field}-evidence"),
+            "native launch evidence: receipt does not bind the complete admitted signed policy",
+        )?;
         let observed = NativeLaunchObservation {
             signed_policy: changed.signed_policy,
             enforcement: changed.enforcement,
             terminal: None,
         };
-        assert!(
-            verify_native_launch_observation(&observed, "cage-policy-test", &signer.public_key())
-                .is_err(),
-            "{field}"
-        );
+        refusal(
+            verify_native_launch_observation(&observed, "cage-policy-test", &signer.public_key()),
+            &format!("policy-{field}-observation"),
+            "native launch evidence: receipt does not bind the complete admitted signed policy",
+        )?;
         assert_eq!(std::fs::read(&receipt_path)?, original_receipt);
     }
     // A fresh policy signer also cannot relabel the original signed launch.
@@ -339,10 +385,11 @@ fn native_policy_substitutions_by_the_same_operator_fail_all_verifiers() -> Resu
     let mut changed = evidence.clone();
     changed.signed_policy =
         String::from_utf8(canonical_json_bytes(&signed_policy(policy, &replacement))?)?;
-    assert!(
-        verify_native_launch_evidence(&changed, "cage-policy-test", &replacement.public_key())
-            .is_err()
-    );
+    refusal(
+        verify_native_launch_evidence(&changed, "cage-policy-test", &replacement.public_key()),
+        "policy-replacement-signer",
+        "native launch evidence: receipt does not bind the complete admitted signed policy",
+    )?;
     Ok(())
 }
 
@@ -360,16 +407,20 @@ fn native_policy_verification_rejects_legacy_and_mismatched_terminal_commitments
     let mut terminal = verify_signed_cage_receipt(&evidence.terminal)?;
     terminal.admitted_policy_digest = None;
     evidence.terminal = sign_cage_receipt(terminal.clone(), &legacy_context, &backend)?;
-    assert!(
-        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()).is_err()
-    );
+    refusal(
+        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()),
+        "terminal-legacy-context",
+        "native launch evidence: enforcement and terminal receipts belong to different launches",
+    )?;
     let alternate = legacy_context
         .clone()
         .with_admitted_policy_digest("a".repeat(64))?;
     evidence.terminal = sign_cage_receipt(terminal, &alternate, &backend)?;
-    assert!(
-        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()).is_err()
-    );
+    refusal(
+        verify_native_launch_evidence(&evidence, "cage-policy-test", &signer.public_key()),
+        "terminal-alternate-context",
+        "native launch evidence: enforcement and terminal receipts belong to different launches",
+    )?;
     let mut legacy = verify_signed_cage_receipt(&evidence.enforcement)?;
     legacy.admitted_policy_digest = None;
     evidence.enforcement = sign_cage_receipt(legacy, &legacy_context, &backend)?;
@@ -404,14 +455,15 @@ fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_termin
     let start = verify(&observed)?;
     assert_eq!(start.started_at_unix_ms, 1300);
     assert_eq!(start.exited_at_unix_ms, None);
-    assert!(
+    refusal(
         verify_native_launch_observation(
             &observed,
             "cage-policy-test",
-            &Keypair::from_seed(&[92; 32]).public_key()
-        )
-        .is_err()
-    );
+            &Keypair::from_seed(&[92; 32]).public_key(),
+        ),
+        "observation-wrong-signer",
+        "cage launch policy is not signed by the configured trust root",
+    )?;
     observed.terminal = Some(evidence.terminal.clone());
     assert_eq!(verify(&observed)?.exited_at_unix_ms, Some(2000));
 
@@ -430,8 +482,16 @@ fn native_observation_keeps_missing_exit_distinct_and_rejects_substituted_termin
         &context,
         &Ed25519Backend::new(signer.clone()),
     )?);
-    assert!(verify(&observed).is_err());
+    refusal(
+        verify(&observed),
+        "observation-substituted-terminal",
+        "native launch evidence: enforcement and terminal receipts belong to different launches",
+    )?;
     observed.terminal = Some(observed.enforcement.clone());
-    assert!(verify(&observed).is_err());
+    refusal(
+        verify(&observed),
+        "observation-enforcement-as-terminal",
+        "native launch evidence: enforcement and terminal receipts belong to different launches",
+    )?;
     Ok(())
 }
