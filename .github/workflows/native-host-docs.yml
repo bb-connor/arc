@@ -2,9 +2,9 @@
 #
 # Runs `scripts/check-native-host-docs.py --scope program` (links, retired
 # phrases, em dashes, case IDs and word budgets for the native host program
-# documents) and the checker's regression test when those documents or the
-# checker change. It is a separate job and not a required check; the
-# public-copy gate is added by the unified roadmap's positioning work.
+# documents), `--scope public` (retired phrases and em dashes in the public
+# copy) and the checker's regression test when those documents or the checker
+# change. It is a separate job and not a required check.
 
 name: native-host-docs
 
@@ -23,6 +23,13 @@ on:
       - "scripts/check-native-host-docs.py"
       - "scripts/tests/check-native-host-docs.test.sh"
       - ".github/workflows/native-host-docs.yml"
+      - "README.md"
+      - "AGENTS.md"
+      - "docs/adr/README.md"
+      - "docs/reference/COMPETITIVE_LANDSCAPE.md"
+      - "spec/PROTOCOL.md"
+      - "docs/start-here/**"
+      - "docs/assets/*.svg"
   pull_request:
     branches: [main]
     paths:
@@ -37,6 +44,13 @@ on:
       - "scripts/check-native-host-docs.py"
       - "scripts/tests/check-native-host-docs.test.sh"
       - ".github/workflows/native-host-docs.yml"
+      - "README.md"
+      - "AGENTS.md"
+      - "docs/adr/README.md"
+      - "docs/reference/COMPETITIVE_LANDSCAPE.md"
+      - "spec/PROTOCOL.md"
+      - "docs/start-here/**"
+      - "docs/assets/*.svg"
 
 permissions:
   contents: read
@@ -62,6 +76,9 @@ jobs:
 
       - name: Program document gate
         run: python3 -I scripts/check-native-host-docs.py --scope program
+
+      - name: Public copy gate
+        run: python3 -I scripts/check-native-host-docs.py --scope public
 
       - name: Checker regression tests
         run: bash scripts/tests/check-native-host-docs.test.sh
