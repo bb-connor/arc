@@ -117,23 +117,65 @@ mod tests {
 
     #[test]
     fn rejects_root_zero_unsorted_duplicate_and_primary_groups() {
-        assert!(ExecutionIdentity::new(0, 10001, Vec::new()).is_err());
-        assert!(ExecutionIdentity::new(10001, 0, Vec::new()).is_err());
-        assert!(ExecutionIdentity::new(u32::MAX, 10001, Vec::new()).is_err());
-        assert!(ExecutionIdentity::new(10001, u32::MAX, Vec::new()).is_err());
-        assert!(ExecutionIdentity::new(10001, 10001, vec![0]).is_err());
-        assert!(ExecutionIdentity::new(10001, 10001, vec![u32::MAX]).is_err());
-        assert!(ExecutionIdentity::new(10001, 10001, vec![10001]).is_err());
-        assert!(ExecutionIdentity::new(10001, 10001, vec![10003, 10002]).is_err());
-        assert!(ExecutionIdentity::new(10001, 10001, vec![10002, 10002]).is_err());
-        assert!(ExecutionIdentity::from_observed_credentials(0, 10001, vec![]).is_err());
-        assert!(ExecutionIdentity::from_observed_credentials(10001, 0, vec![0]).is_err());
-        assert!(ExecutionIdentity::from_observed_credentials(10001, 10001, vec![0]).is_err());
-        assert!(
-            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![u32::MAX]).is_err()
+        fn assert_reason(result: Result<ExecutionIdentity, CageError>, expected: &str) {
+            match result {
+                Err(CageError::InvalidExecutionIdentity(reason)) => assert_eq!(reason, expected),
+                other => panic!("expected InvalidExecutionIdentity({expected:?}), got {other:?}"),
+            }
+        }
+
+        assert_reason(ExecutionIdentity::new(0, 10001, Vec::new()), "root uid");
+        assert_reason(
+            ExecutionIdentity::new(10001, 0, Vec::new()),
+            "root primary gid",
         );
-        assert!(
-            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![10002, 10002]).is_err()
+        assert_reason(
+            ExecutionIdentity::new(u32::MAX, 10001, Vec::new()),
+            "sentinel uid",
+        );
+        assert_reason(
+            ExecutionIdentity::new(10001, u32::MAX, Vec::new()),
+            "sentinel primary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::new(10001, 10001, vec![0]),
+            "root supplementary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::new(10001, 10001, vec![u32::MAX]),
+            "sentinel supplementary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::new(10001, 10001, vec![10001]),
+            "primary gid duplicated as supplementary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::new(10001, 10001, vec![10003, 10002]),
+            "supplementary gids must be sorted and unique",
+        );
+        assert_reason(
+            ExecutionIdentity::new(10001, 10001, vec![10002, 10002]),
+            "supplementary gids must be sorted and unique",
+        );
+        assert_reason(
+            ExecutionIdentity::from_observed_credentials(0, 10001, vec![]),
+            "root uid",
+        );
+        assert_reason(
+            ExecutionIdentity::from_observed_credentials(10001, 0, vec![0]),
+            "root primary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![0]),
+            "root supplementary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![u32::MAX]),
+            "sentinel supplementary gid",
+        );
+        assert_reason(
+            ExecutionIdentity::from_observed_credentials(10001, 10001, vec![10002, 10002]),
+            "supplementary gids must be sorted and unique",
         );
     }
 
