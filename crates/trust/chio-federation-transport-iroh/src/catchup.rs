@@ -5,7 +5,7 @@
 //! [`chio_federation::revocation_gossip::RevocationCatchupResponse`]) rides lane
 //! b's QUIC stream; the BULK signed-root bytes ride iroh-blobs, content
 //! addressed and capped at
-//! [`REVOCATION_CATCHUP_MAX_EPOCHS`](chio_federation::revocation_gossip::REVOCATION_CATCHUP_MAX_EPOCHS).
+//! [`REVOCATION_CATCHUP_MAX_EPOCHS`].
 //!
 //! ## Integrity is not authenticity
 //!
@@ -14,7 +14,7 @@
 //! 2.2). So every fetched blob is deserialized as a
 //! [`chio_revocation_oracle::SignedEpochRoot`] and signature-verified against the
 //! PINNED signer before it is trusted. The [`BlobCatchupClient`] holds the one
-//! issuer-signed [`VerifiedDirectory`](crate::identity::VerifiedDirectory) and
+//! issuer-signed [`VerifiedDirectory`] and
 //! resolves the signer binding structurally via
 //! [`VerifiedDirectory::resolve_signer`](crate::identity::VerifiedDirectory::resolve_signer),
 //! exactly as the direct push lane
@@ -226,7 +226,7 @@ impl BlobCatchupClient {
     /// bundle rotation because it holds the live directory. A free-standing
     /// [`VerifiedSignerDirectory`](crate::lanes::revocation::VerifiedSignerDirectory)
     /// (for example one built by
-    /// [`from_bindings`](crate::lanes::revocation::VerifiedSignerDirectory::from_bindings))
+    /// `from_bindings`)
     /// is NOT accepted on this production path. The issuer-signed directory is
     /// accepted (positive control, identical scaffolding):
     ///
