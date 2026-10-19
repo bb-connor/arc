@@ -131,6 +131,19 @@ impl CapturedSpans {
     }
 }
 
+/// Tracing caches each callsite's interest process-wide on first use. While a
+/// single scoped dispatcher is registered, that first use consults only the
+/// registering thread's default, so a guard span first reached by a test with
+/// no subscriber is cached as never and disappears from a concurrent capture.
+/// The tests in this binary therefore run one at a time.
+static EXCLUSIVE: Mutex<()> = Mutex::new(());
+
+fn exclusive() -> MutexGuard<'static, ()> {
+    EXCLUSIVE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 fn subscriber(captured: &CapturedSpans) -> impl Subscriber {
     Registry::default().with(captured.layer())
 }
@@ -227,6 +240,7 @@ fn loaded_allowing_backend() -> MockWasmBackend {
 
 #[test]
 fn evaluate_span_records_exact_field_set() {
+    let _exclusive = exclusive();
     let captured = CapturedSpans::default();
     tracing::subscriber::with_default(subscriber(&captured), || {
         let guard = WasmGuard::new_with_metadata(
@@ -268,6 +282,7 @@ fn evaluate_span_records_exact_field_set() {
 
 #[test]
 fn host_fetch_blob_and_verify_helpers_emit_exact_fields() {
+    let _exclusive = exclusive();
     let captured = CapturedSpans::default();
     tracing::subscriber::with_default(subscriber(&captured), || {
         let host_span = guard_host_call_span(HOST_FETCH_BLOB);
@@ -296,6 +311,7 @@ fn host_fetch_blob_and_verify_helpers_emit_exact_fields() {
 #[test]
 fn evaluation_emits_verdict_duration_and_fuel() {
     use chio_metrics_spec::runtime::families;
+    let _exclusive = exclusive();
     // Build a guard named uniquely for this test and drive one allow eval.
     let guard = WasmGuard::new_with_metadata(
         "emit-test-guard".to_string(),
@@ -344,6 +360,7 @@ fn evaluation_emits_verdict_duration_and_fuel() {
 
 #[test]
 fn reload_path_emits_applied_span() {
+    let _exclusive = exclusive();
     let captured = CapturedSpans::default();
     tracing::subscriber::with_default(subscriber(&captured), || {
         let engine = Engine::new(|_bytes: &[u8]| {
@@ -377,6 +394,7 @@ fn reload_path_emits_applied_span() {
 #[test]
 fn record_reload_seq_uses_documented_applied_outcome() {
     use chio_metrics_spec::runtime::families;
+    let _exclusive = exclusive();
     let guard = WasmGuard::new_with_metadata(
         "reload-outcome-guard".to_string(),
         "1.0.0".to_string(),
@@ -453,6 +471,7 @@ fn make_malformed_request() -> ToolCallRequest {
 #[test]
 fn deny_records_bounded_reason_class_from_reason_string() {
     use chio_metrics_spec::runtime::families;
+    let _exclusive = exclusive();
     let guard = WasmGuard::new_with_metadata(
         "reason-class-guard".to_string(),
         "1.0.0".to_string(),
@@ -500,6 +519,7 @@ fn deny_records_bounded_reason_class_from_reason_string() {
 #[test]
 fn malformed_argument_deny_records_metrics() {
     use chio_metrics_spec::runtime::families;
+    let _exclusive = exclusive();
     let guard = WasmGuard::new_with_metadata(
         "malformed-guard".to_string(),
         "1.0.0".to_string(),
