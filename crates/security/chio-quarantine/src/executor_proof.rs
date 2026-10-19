@@ -256,7 +256,7 @@ mod tests {
             authorization_capability_hash: digest(24),
             governed_intent_hash: digest(26),
             policy_decision_hash: digest(27),
-            admission_artifact_fingerprint: digest(28),
+            admission_artifact_fingerprint: Some(digest(28)),
             executor_authority_id: record_id("executor-authority-proof"),
             executor_authority_generation: 4,
             approval: ResponseDispatchApproval::Automatic,
