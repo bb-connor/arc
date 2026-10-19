@@ -55,6 +55,8 @@ mod adapter_cause_tests;
 mod adapter_error;
 mod backend;
 mod encrypted_blob_backend;
+#[cfg(unix)]
+mod lifecycle_lock;
 mod private_request_wire;
 #[cfg(all(test, target_os = "linux"))]
 mod process_boundary_tests;
