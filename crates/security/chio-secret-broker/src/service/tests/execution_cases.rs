@@ -8,6 +8,16 @@ fn denied_at_capture() -> crate::service::failure::FailureProjection {
     }
 }
 
+fn decode_refusal(frame: &[u8]) -> SensitiveJsonRefusal {
+    match decode_canonical_ipc_frame(frame) {
+        Err(SensitiveJsonFailure::Refused(reason)) => reason,
+        Err(SensitiveJsonFailure::Broker(error)) => {
+            panic!("canonical IPC decode refused outside the parser: {error:?}")
+        }
+        Ok(_) => panic!("canonical IPC decode accepted a refused vector"),
+    }
+}
+
 #[test]
 fn expired_authority_after_capture_never_reaches_network_dispatch() {
     let fixture = fixture(1, false, false);
@@ -287,50 +297,90 @@ fn sensitive_ipc_envelope_is_strictly_canonical_and_zeroizing() {
         decode_canonical_ipc_request(reordered),
         "sensitive JSON payload is invalid",
     );
+    assert_eq!(
+        decode_refusal(reordered),
+        SensitiveJsonRefusal::UnexpectedToken(b"{\"authorization\":")
+    );
     let duplicate = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"payload":[4],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(duplicate),
         "sensitive JSON payload is invalid",
+    );
+    assert_eq!(
+        decode_refusal(duplicate),
+        SensitiveJsonRefusal::UnexpectedToken(b",\"tenantScope\":")
     );
     let unknown = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-ipc","unexpected":true}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(unknown),
         "sensitive JSON payload is invalid",
     );
+    assert_eq!(
+        decode_refusal(unknown),
+        SensitiveJsonRefusal::UnexpectedToken(b"}")
+    );
     let escaped_key = br#"{"authoriz\u0061tion":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(escaped_key),
         "sensitive JSON payload is invalid",
+    );
+    assert_eq!(
+        decode_refusal(escaped_key),
+        SensitiveJsonRefusal::UnexpectedToken(b"{\"authorization\":")
     );
     let surrogate_pair = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"\ud83d\ude00"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(surrogate_pair),
         "sensitive JSON payload is invalid",
     );
+    assert_eq!(
+        decode_refusal(surrogate_pair),
+        SensitiveJsonRefusal::NonCanonicalEscape
+    );
     let exponent_byte = br#"{"authorization":[1],"operation":"provision","payload":[2e0],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(exponent_byte),
         "sensitive JSON payload is invalid",
+    );
+    assert_eq!(
+        decode_refusal(exponent_byte),
+        SensitiveJsonRefusal::MissingArrayDelimiter
     );
     let negative_byte = br#"{"authorization":[1],"operation":"provision","payload":[-1],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(negative_byte),
         "sensitive JSON payload is invalid",
     );
+    assert_eq!(
+        decode_refusal(negative_byte),
+        SensitiveJsonRefusal::NotUnsignedInteger
+    );
     let fractional_byte = br#"{"authorization":[1],"operation":"provision","payload":[2.0],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(fractional_byte),
         "sensitive JSON payload is invalid",
+    );
+    assert_eq!(
+        decode_refusal(fractional_byte),
+        SensitiveJsonRefusal::MissingArrayDelimiter
     );
     let trailing_data = br#"{"authorization":[1],"operation":"provision","payload":[2,3],"tenantScope":"tenant-ipc"}true"#;
     assert_invalid_request(
         decode_canonical_ipc_request(trailing_data),
         "sensitive JSON payload is invalid",
     );
+    assert_eq!(
+        decode_refusal(trailing_data),
+        SensitiveJsonRefusal::TrailingData
+    );
     let deep_nesting = br#"{"authorization":[1],"operation":"provision","payload":[[[[2]]]],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(deep_nesting),
         "sensitive JSON payload is invalid",
+    );
+    assert_eq!(
+        decode_refusal(deep_nesting),
+        SensitiveJsonRefusal::NotUnsignedInteger
     );
 
     let mut malformed_utf8 = Zeroizing::new(
@@ -342,12 +392,20 @@ fn sensitive_ipc_envelope_is_strictly_canonical_and_zeroizing() {
         decode_canonical_ipc_request(&malformed_utf8),
         "sensitive JSON payload is invalid",
     );
+    assert_eq!(
+        decode_refusal(&malformed_utf8),
+        SensitiveJsonRefusal::InvalidUtf8
+    );
 
     reset_sensitive_drop_observer();
     let malformed_nested = br#"{"authorization":[1],"operation":"provision","payload":[2,"secret-canary"],"tenantScope":"tenant-ipc"}"#;
     assert_invalid_request(
         decode_canonical_ipc_request(malformed_nested),
         "sensitive JSON payload is invalid",
+    );
+    assert_eq!(
+        decode_refusal(malformed_nested),
+        SensitiveJsonRefusal::NotUnsignedInteger
     );
     assert!(sensitive_drop_observation().0 >= 1);
 }

@@ -191,13 +191,15 @@ impl<const MAXIMUM: usize> Drop for BoundedZeroizingByteArray<MAXIMUM> {
 pub(crate) struct BoundedZeroizingString<const MAXIMUM: usize>(Zeroizing<String>, usize);
 
 impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
-    fn with_capacity(capacity: usize) -> Result<Self> {
+    fn with_capacity(capacity: usize) -> SensitiveJsonResult<Self> {
         if capacity > MAXIMUM {
-            return Err(sensitive_json_invalid());
+            return Err(SensitiveJsonRefusal::StringOverflow.into());
         }
         let mut storage = String::new();
         storage.try_reserve_exact(capacity).map_err(|_| {
-            BrokerError::Storage("sensitive JSON string allocation failed".to_string())
+            SensitiveJsonFailure::Broker(BrokerError::Storage(
+                "sensitive JSON string allocation failed".to_string(),
+            ))
         })?;
         Ok(Self(Zeroizing::new(storage), capacity))
     }
@@ -210,14 +212,14 @@ impl<const MAXIMUM: usize> BoundedZeroizingString<MAXIMUM> {
         std::mem::take(&mut *self.0)
     }
 
-    fn push(&mut self, character: char) -> Result<()> {
+    fn push(&mut self, character: char) -> SensitiveJsonResult<()> {
         let length = self
             .0
             .len()
             .checked_add(character.len_utf8())
-            .ok_or_else(sensitive_json_invalid)?;
+            .ok_or(SensitiveJsonRefusal::StringOverflow)?;
         if length > MAXIMUM || length > self.1 {
-            return Err(sensitive_json_invalid());
+            return Err(SensitiveJsonRefusal::StringOverflow.into());
         }
         self.0.push(character);
         Ok(())
@@ -232,8 +234,47 @@ impl<const MAXIMUM: usize> Drop for BoundedZeroizingString<MAXIMUM> {
     }
 }
 
-pub(super) fn sensitive_json_invalid() -> BrokerError {
-    BrokerError::InvalidRequest("sensitive JSON payload is invalid".to_string())
+/// Rule a sensitive JSON payload broke. Callers only ever observe the uniform
+/// `invalid_request` refusal; the reason never leaves the crate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SensitiveJsonRefusal {
+    UnexpectedToken(&'static [u8]),
+    Truncated,
+    StringOverflow,
+    NonCanonicalEscape,
+    ControlCharacter,
+    InvalidUtf8,
+    ArrayOverflow,
+    NotUnsignedInteger,
+    LeadingZero,
+    IntegerOverflow,
+    MissingArrayDelimiter,
+    TrailingData,
+    UnknownOperation,
+}
+
+pub(crate) enum SensitiveJsonFailure {
+    Refused(SensitiveJsonRefusal),
+    Broker(BrokerError),
+}
+
+pub(crate) type SensitiveJsonResult<T> = std::result::Result<T, SensitiveJsonFailure>;
+
+impl From<SensitiveJsonRefusal> for SensitiveJsonFailure {
+    fn from(reason: SensitiveJsonRefusal) -> Self {
+        Self::Refused(reason)
+    }
+}
+
+impl From<SensitiveJsonFailure> for BrokerError {
+    fn from(failure: SensitiveJsonFailure) -> Self {
+        match failure {
+            SensitiveJsonFailure::Refused(_) => {
+                Self::InvalidRequest("sensitive JSON payload is invalid".to_string())
+            }
+            SensitiveJsonFailure::Broker(error) => error,
+        }
+    }
 }
 
 pub(crate) struct SensitiveJsonParser<'a> {
@@ -246,13 +287,22 @@ impl<'a> SensitiveJsonParser<'a> {
         Self { input, position: 0 }
     }
 
-    pub(crate) fn expect_literal(&mut self, expected: &[u8]) -> Result<()> {
+    fn byte_at(&self, position: usize) -> SensitiveJsonResult<u8> {
+        self.input
+            .get(position)
+            .copied()
+            .ok_or(SensitiveJsonFailure::Refused(
+                SensitiveJsonRefusal::Truncated,
+            ))
+    }
+
+    pub(crate) fn expect_literal(&mut self, expected: &'static [u8]) -> SensitiveJsonResult<()> {
         let end = self
             .position
             .checked_add(expected.len())
-            .ok_or_else(sensitive_json_invalid)?;
+            .ok_or(SensitiveJsonRefusal::Truncated)?;
         if self.input.get(self.position..end) != Some(expected) {
-            return Err(sensitive_json_invalid());
+            return Err(SensitiveJsonRefusal::UnexpectedToken(expected).into());
         }
         self.position = end;
         Ok(())
@@ -260,32 +310,25 @@ impl<'a> SensitiveJsonParser<'a> {
 
     pub(crate) fn parse_string<const MAXIMUM: usize>(
         &mut self,
-    ) -> Result<BoundedZeroizingString<MAXIMUM>> {
+    ) -> SensitiveJsonResult<BoundedZeroizingString<MAXIMUM>> {
         self.parse_string_with_capacity::<MAXIMUM>(MAXIMUM)
     }
 
     pub(crate) fn parse_string_with_capacity<const MAXIMUM: usize>(
         &mut self,
         capacity: usize,
-    ) -> Result<BoundedZeroizingString<MAXIMUM>> {
+    ) -> SensitiveJsonResult<BoundedZeroizingString<MAXIMUM>> {
         self.expect_literal(b"\"")?;
         let mut value = BoundedZeroizingString::with_capacity(capacity)?;
         loop {
-            let byte = *self
-                .input
-                .get(self.position)
-                .ok_or_else(sensitive_json_invalid)?;
+            let byte = self.byte_at(self.position)?;
             match byte {
                 b'"' => {
                     self.position += 1;
                     return Ok(value);
                 }
                 b'\\' => {
-                    let escape = *self
-                        .input
-                        .get(self.position + 1)
-                        .ok_or_else(sensitive_json_invalid)?;
-                    match escape {
+                    match self.byte_at(self.position + 1)? {
                         b'"' => value.push('"')?,
                         b'\\' => value.push('\\')?,
                         b'b' => value.push('\u{08}')?,
@@ -297,35 +340,37 @@ impl<'a> SensitiveJsonParser<'a> {
                             let escape_end = self
                                 .position
                                 .checked_add(6)
-                                .ok_or_else(sensitive_json_invalid)?;
+                                .ok_or(SensitiveJsonRefusal::Truncated)?;
                             let digits = self
                                 .input
                                 .get(self.position + 2..escape_end)
-                                .ok_or_else(sensitive_json_invalid)?;
+                                .ok_or(SensitiveJsonRefusal::Truncated)?;
                             let mut code = 0_u8;
                             for digit in digits.iter().copied() {
                                 let nibble = match digit {
                                     b'0'..=b'9' => digit - b'0',
                                     b'a'..=b'f' => digit - b'a' + 10,
-                                    _ => return Err(sensitive_json_invalid()),
+                                    _ => {
+                                        return Err(SensitiveJsonRefusal::NonCanonicalEscape.into())
+                                    }
                                 };
                                 code = code
                                     .checked_mul(16)
                                     .and_then(|value| value.checked_add(nibble))
-                                    .ok_or_else(sensitive_json_invalid)?;
+                                    .ok_or(SensitiveJsonRefusal::NonCanonicalEscape)?;
                             }
                             if code > 0x1f || matches!(code, 0x08 | 0x09 | 0x0a | 0x0c | 0x0d) {
-                                return Err(sensitive_json_invalid());
+                                return Err(SensitiveJsonRefusal::NonCanonicalEscape.into());
                             }
                             value.push(char::from(code))?;
                             self.position = escape_end;
                             continue;
                         }
-                        _ => return Err(sensitive_json_invalid()),
+                        _ => return Err(SensitiveJsonRefusal::NonCanonicalEscape.into()),
                     }
                     self.position += 2;
                 }
-                0x00..=0x1f => return Err(sensitive_json_invalid()),
+                0x00..=0x1f => return Err(SensitiveJsonRefusal::ControlCharacter.into()),
                 0x20..=0x7f => {
                     value.push(char::from(byte))?;
                     self.position += 1;
@@ -335,22 +380,22 @@ impl<'a> SensitiveJsonParser<'a> {
                         0xc2..=0xdf => 2,
                         0xe0..=0xef => 3,
                         0xf0..=0xf4 => 4,
-                        _ => return Err(sensitive_json_invalid()),
+                        _ => return Err(SensitiveJsonRefusal::InvalidUtf8.into()),
                     };
                     let end = self
                         .position
                         .checked_add(width)
-                        .ok_or_else(sensitive_json_invalid)?;
+                        .ok_or(SensitiveJsonRefusal::Truncated)?;
                     let encoded = self
                         .input
                         .get(self.position..end)
-                        .ok_or_else(sensitive_json_invalid)?;
-                    let encoded =
-                        std::str::from_utf8(encoded).map_err(|_| sensitive_json_invalid())?;
+                        .ok_or(SensitiveJsonRefusal::Truncated)?;
+                    let encoded = std::str::from_utf8(encoded)
+                        .map_err(|_| SensitiveJsonRefusal::InvalidUtf8)?;
                     let mut characters = encoded.chars();
-                    let character = characters.next().ok_or_else(sensitive_json_invalid)?;
+                    let character = characters.next().ok_or(SensitiveJsonRefusal::InvalidUtf8)?;
                     if characters.next().is_some() {
-                        return Err(sensitive_json_invalid());
+                        return Err(SensitiveJsonRefusal::InvalidUtf8.into());
                     }
                     value.push(character)?;
                     self.position = end;
@@ -361,23 +406,21 @@ impl<'a> SensitiveJsonParser<'a> {
 
     pub(crate) fn parse_byte_array<const MAXIMUM: usize>(
         &mut self,
-    ) -> Result<BoundedZeroizingByteArray<MAXIMUM>> {
+    ) -> SensitiveJsonResult<BoundedZeroizingByteArray<MAXIMUM>> {
         self.expect_literal(b"[")?;
-        let mut value = BoundedZeroizingByteArray::copy_from_slice(&[])?;
+        let mut value = BoundedZeroizingByteArray::copy_from_slice(&[])
+            .map_err(SensitiveJsonFailure::Broker)?;
         if self.input.get(self.position) == Some(&b']') {
             self.position += 1;
             return Ok(value);
         }
         loop {
             if value.0.len() == MAXIMUM {
-                return Err(sensitive_json_invalid());
+                return Err(SensitiveJsonRefusal::ArrayOverflow.into());
             }
-            let first = *self
-                .input
-                .get(self.position)
-                .ok_or_else(sensitive_json_invalid)?;
+            let first = self.byte_at(self.position)?;
             if !first.is_ascii_digit() {
-                return Err(sensitive_json_invalid());
+                return Err(SensitiveJsonRefusal::NotUnsignedInteger.into());
             }
             let mut byte = first - b'0';
             self.position += 1;
@@ -386,7 +429,7 @@ impl<'a> SensitiveJsonParser<'a> {
                     byte = byte
                         .checked_mul(10)
                         .and_then(|value| value.checked_add(digit - b'0'))
-                        .ok_or_else(sensitive_json_invalid)?;
+                        .ok_or(SensitiveJsonRefusal::IntegerOverflow)?;
                     self.position += 1;
                 }
             } else if self
@@ -394,7 +437,7 @@ impl<'a> SensitiveJsonParser<'a> {
                 .get(self.position)
                 .is_some_and(|byte| byte.is_ascii_digit())
             {
-                return Err(sensitive_json_invalid());
+                return Err(SensitiveJsonRefusal::LeadingZero.into());
             }
             value.0.push(byte);
             match self.input.get(self.position) {
@@ -403,19 +446,16 @@ impl<'a> SensitiveJsonParser<'a> {
                     self.position += 1;
                     return Ok(value);
                 }
-                _ => return Err(sensitive_json_invalid()),
+                _ => return Err(SensitiveJsonRefusal::MissingArrayDelimiter.into()),
             }
         }
     }
 
-    pub(crate) fn parse_i_json_u64(&mut self) -> Result<u64> {
+    pub(crate) fn parse_i_json_u64(&mut self) -> SensitiveJsonResult<u64> {
         const MAXIMUM: u64 = (1 << 53) - 1;
-        let first = *self
-            .input
-            .get(self.position)
-            .ok_or_else(sensitive_json_invalid)?;
+        let first = self.byte_at(self.position)?;
         if !first.is_ascii_digit() {
-            return Err(sensitive_json_invalid());
+            return Err(SensitiveJsonRefusal::NotUnsignedInteger.into());
         }
         let mut value = u64::from(first - b'0');
         self.position += 1;
@@ -425,7 +465,7 @@ impl<'a> SensitiveJsonParser<'a> {
                 .get(self.position)
                 .is_some_and(|byte| byte.is_ascii_digit())
             {
-                return Err(sensitive_json_invalid());
+                return Err(SensitiveJsonRefusal::LeadingZero.into());
             }
             return Ok(value);
         }
@@ -434,15 +474,15 @@ impl<'a> SensitiveJsonParser<'a> {
                 .checked_mul(10)
                 .and_then(|value| value.checked_add(u64::from(digit - b'0')))
                 .filter(|value| *value <= MAXIMUM)
-                .ok_or_else(sensitive_json_invalid)?;
+                .ok_or(SensitiveJsonRefusal::IntegerOverflow)?;
             self.position += 1;
         }
         Ok(value)
     }
 
-    pub(crate) fn finish(self) -> Result<()> {
+    pub(crate) fn finish(self) -> SensitiveJsonResult<()> {
         if self.position != self.input.len() {
-            return Err(sensitive_json_invalid());
+            return Err(SensitiveJsonRefusal::TrailingData.into());
         }
         Ok(())
     }
@@ -672,6 +712,12 @@ pub fn canonical_ipc_request_bytes(
 }
 
 pub(crate) fn decode_canonical_ipc_request(frame: &[u8]) -> Result<AuthenticatedIpcRequest> {
+    decode_canonical_ipc_frame(frame).map_err(BrokerError::from)
+}
+
+pub(super) fn decode_canonical_ipc_frame(
+    frame: &[u8],
+) -> SensitiveJsonResult<AuthenticatedIpcRequest> {
     let mut parser = SensitiveJsonParser::new(frame);
     parser.expect_literal(b"{\"authorization\":")?;
     let authorization = parser.parse_byte_array::<65_536>()?;
@@ -690,7 +736,7 @@ pub(crate) fn decode_canonical_ipc_request(frame: &[u8]) -> Result<Authenticated
         "rotate" => IpcOperation::Rotate,
         "disable" => IpcOperation::Disable,
         "delete" => IpcOperation::Delete,
-        _ => return Err(sensitive_json_invalid()),
+        _ => return Err(SensitiveJsonRefusal::UnknownOperation.into()),
     };
     parser.expect_literal(b",\"payload\":")?;
     let payload = parser.parse_byte_array::<MAX_WIRE_BYTES>()?;
@@ -704,11 +750,11 @@ pub(crate) fn decode_canonical_ipc_request(frame: &[u8]) -> Result<Authenticated
         authorization: authorization.into_sensitive(),
         payload: payload.into_sensitive(),
     };
-    let canonical = canonical_ipc_request_bytes(&request)?;
+    let canonical = canonical_ipc_request_bytes(&request).map_err(SensitiveJsonFailure::Broker)?;
     if canonical.as_slice() != frame {
-        return Err(BrokerError::InvalidRequest(
+        return Err(SensitiveJsonFailure::Broker(BrokerError::InvalidRequest(
             "IPC request is not canonical JSON".to_string(),
-        ));
+        )));
     }
     Ok(request)
 }
