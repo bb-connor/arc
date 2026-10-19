@@ -21,10 +21,11 @@ use chio_security_types::ports::{
     ActionId, AlertDeliveryQuery, CanonicalBody, Digest32, EffectExecutionStatus, EffectId,
     EffectOperation, EffectPort, EffectRequest, EffectResult, EffectResultQuery, ErrorCode,
     LineageFenceMaintenanceOutcome, LineageFenceMaintenanceRequest, OpaqueReceiptRef, PortError,
-    ReceiptAppendRequest, RecordId, ResponseDispatchAuthorization, ResponseEffectCasRequest,
-    ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey, ResponsePlanRecord,
-    ResponseReceiptCursor, ResponseReceiptCursorCasRequest, ResponseSchedulerStore, ScheduledWork,
-    SecurityAlert, SecurityAlertPort, SecurityReceiptSink, TenantId,
+    PortErrorKind, ReceiptAppendRequest, RecordId, ResponseDispatchAuthorization,
+    ResponseEffectCasRequest, ResponseEffectKey, ResponseEffectRecord, ResponsePlanKey,
+    ResponsePlanRecord, ResponseReceiptCursor, ResponseReceiptCursorCasRequest,
+    ResponseSchedulerStore, ScheduledWork, SecurityAlert, SecurityAlertPort, SecurityReceiptSink,
+    TenantId,
 };
 use chio_security_types::{
     PlannedResponseEffect, ResponseApprovalRequirement, ResponseEffectKind, ResponseEffectProgress,

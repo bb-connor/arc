@@ -151,9 +151,7 @@ impl<
         if work.fencing_token <= current.scheduler_fencing_token {
             return Err(ExecutorError::StaleLease);
         }
-        self.store
-            .validate_lease(work)
-            .map_err(ExecutorError::Store)?;
+        self.require_live_lease(work)?;
         self.update_effect_record(plan_record, current, journal, work)
     }
 
@@ -444,9 +442,7 @@ impl<
             scheduler_lease_owner_id: lookup.command_lease_owner_id.clone(),
             scheduler_fencing_token: lookup.command_fencing_token,
         };
-        self.store
-            .validate_lease(work)
-            .map_err(ExecutorError::Store)?;
+        self.require_live_lease(work)?;
         self.effects
             .load_result(&query)
             .map_err(ExecutorError::EffectQuery)
@@ -464,7 +460,19 @@ impl<
         if work.lease_expires_at_unix_ms <= now_unix_ms {
             return Err(ExecutorError::StaleLease);
         }
-        Ok(())
+        self.require_live_lease(work)
+    }
+
+    /// Names a lost lease before any write. The scheduled CAS still checks the
+    /// exact live lease in its own transaction and stays the authoritative fence.
+    fn require_live_lease(&self, work: &ScheduledWork) -> Result<(), ExecutorError> {
+        self.store.validate_lease(work).map_err(|error| {
+            if error.kind() == PortErrorKind::Conflict {
+                ExecutorError::StaleLease
+            } else {
+                ExecutorError::Store(error)
+            }
+        })
     }
 
     fn state_machine(&self) -> ResponseStateMachine<S> {
