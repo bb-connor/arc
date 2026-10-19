@@ -35,6 +35,7 @@ pub(super) fn build_coverage(root: &Path) -> Result<CoverageBuild, String> {
 
     let mapping_raw = read_input(root, "formal/MAPPING.md", &mut input_hashes)?;
     let mapping = parse_mapping(&mapping_raw);
+    reject_mapping_warnings("formal/MAPPING.md", &mapping.warnings)?;
 
     let assumptions_raw = read_input(root, "formal/assumptions.toml", &mut input_hashes)?;
     let assumptions_registry: AssumptionRegistry =
@@ -277,6 +278,5 @@ pub(super) fn build_coverage(root: &Path) -> Result<CoverageBuild, String> {
         excluded_surfaces: manifest.excluded_surfaces,
         review_links,
         lane_postures,
-        parse_warnings: mapping.warnings,
     })
 }

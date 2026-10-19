@@ -63,6 +63,36 @@ fn malformed_mapping_row_produces_a_deterministic_warning() {
 }
 
 #[test]
+fn mapping_warnings_fail_closed_with_exact_error() {
+    let cell_count = parse_mapping(
+        "## TLA properties\n\n| Property | Source | Rust path constrained | Evidence |\n| --- | --- | --- | --- |\n| `Broken` | only two cells |\n",
+    );
+    assert_eq!(
+        reject_mapping_warnings("formal/MAPPING.md", &cell_count.warnings),
+        Err("formal/MAPPING.md has 1 malformed property table row(s):\n  formal/MAPPING.md line 5: expected 4 cells, found 2".to_string())
+    );
+
+    let missing_columns = parse_mapping(
+        "| Property | Source | Rust implementation |\n| --- | --- | --- |\n| `P` | `formal/tla/P.tla` | `crates/core/chio-core/src/lib.rs` |\n",
+    );
+    assert_eq!(
+        reject_mapping_warnings("formal/MAPPING.md", &missing_columns.warnings),
+        Err("formal/MAPPING.md has 1 malformed property table row(s):\n  formal/MAPPING.md line 1: property table missing required columns: Rust path constrained".to_string())
+    );
+}
+
+#[test]
+fn clean_mapping_passes_warning_gate() {
+    let clean = parse_mapping(
+        "| Property | Source | Rust path constrained |\n| --- | --- | --- |\n| `P` | `formal/tla/P.tla` | `crates/core/chio-core/src/lib.rs` |\n",
+    );
+    assert_eq!(
+        reject_mapping_warnings("formal/MAPPING.md", &clean.warnings),
+        Ok(())
+    );
+}
+
+#[test]
 fn committed_markdown_drift_is_rejected() {
     if let Err(error) = verify_committed_markdown("same\n", "same\n") {
         panic!("matching Markdown was rejected: {error}");
@@ -399,11 +429,6 @@ fn current_registries_have_total_primary_attribution() {
         Err(error) => panic!("coverage build failed: {error}"),
     };
 
-    assert!(
-        build.parse_warnings.is_empty(),
-        "{:?}",
-        build.parse_warnings
-    );
     let kani: KaniManifest = match parse_toml(
         ".kani/harnesses.toml",
         include_str!("../../../../.kani/harnesses.toml"),
