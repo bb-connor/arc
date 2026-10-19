@@ -36,3 +36,7 @@ pub(super) fn parse_rfc3339_utc(
 pub(super) fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::RiskComptrollerClaimFailed(message.into())
 }
+
+pub(super) fn signature_invalid(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::RiskComptrollerSignatureInvalid(message.into())
+}

@@ -6,16 +6,17 @@ mod room;
 mod transaction_error;
 use super::*;
 use artifacts::*;
-use chio_errors::_generated::error_codes::{
-    TRANSACTION_ARTIFACT_HASH_MISMATCH, TRANSACTION_AUTHORIZATION_NOT_BOUND,
-    TRANSACTION_DISPUTE_UNBOUND, TRANSACTION_GRAPH_CYCLE, TRANSACTION_GRAPH_NOT_CLOSED,
-    TRANSACTION_IDENTITY_NOT_BOUND, TRANSACTION_PASSPORT_HASH_MISMATCH,
-    TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED, TRANSACTION_REQUIRED_CLAIM_MISSING,
-    TRANSACTION_RUNTIME_PROOF_REJECTED, TRANSACTION_SETTLEMENT_UNVERIFIED,
-    TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED,
-};
+use chio_errors::_generated::error_codes::TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED;
 use std::collections::{BTreeMap, BTreeSet};
-use transaction_error::map_proof_error;
+use transaction_error::{
+    artifact_digest_mismatch, artifact_schema_invalid, claim_rejected, graph_not_closed,
+    is_transparency_preview_not_allowed_code, map_commerce_proof_error,
+    map_crypto_context_proof_error, map_disclosure_lineage_proof_error, map_proof_error,
+    map_runtime_proof_error,
+    map_selective_disclosure_proof_error, map_public_settlement_proof_error,
+    map_swarm_proof_error, proof_verify_exit_code, required_claim_missing, runtime_proof_rejected,
+    verifier_feature_unsupported,
+};
 
 #[path = "proof/env.rs"]
 mod proof_env;
@@ -82,12 +83,6 @@ const VERIFIER_CLAIM_PREFIXES: [&str; 12] = [
     CLAIM_PREFIX_MARKET,
     CLAIM_PREFIX_FINDING,
 ];
-const PROOF_VERIFY_EXIT_REQUIRED_CLAIM_FAILED: i32 = 10;
-const PROOF_VERIFY_EXIT_INTEGRITY_FAILURE: i32 = 20;
-const PROOF_VERIFY_EXIT_PARSE_OR_SCHEMA_FAILURE: i32 = 30;
-const PROOF_VERIFY_EXIT_NEGATIVE_DID_NOT_FAIL: i32 = 40;
-const PROOF_VERIFY_EXIT_UNSUPPORTED_FEATURE: i32 = 50;
-const PROOF_VERIFY_EXIT_RELEASE_TRUTH_FAILURE: i32 = 60;
 
 #[derive(Clone, Copy)]
 enum LocalProofFamilyRoute {
@@ -340,95 +335,6 @@ fn exit_proof_verify_error(error: CliError, json_output: bool) -> ! {
     std::process::exit(exit_code);
 }
 
-fn proof_verify_exit_code(error: &CliError) -> i32 {
-    let report = error.report();
-    let code = report.code.as_str();
-    let message = report.message.as_str();
-    if code == TRANSACTION_REQUIRED_CLAIM_MISSING.urn
-        || code == TRANSACTION_REQUIRED_CLAIM_MISSING.string_code
-        || proof_verify_required_claim_failed(message)
-    {
-        return PROOF_VERIFY_EXIT_REQUIRED_CLAIM_FAILED;
-    }
-    if proof_verify_integrity_failed(code, message) {
-        return PROOF_VERIFY_EXIT_INTEGRITY_FAILURE;
-    }
-    if proof_verify_parse_or_schema_failed(code, message) {
-        return PROOF_VERIFY_EXIT_PARSE_OR_SCHEMA_FAILURE;
-    }
-    if proof_verify_negative_did_not_fail(message) {
-        return PROOF_VERIFY_EXIT_NEGATIVE_DID_NOT_FAIL;
-    }
-    if proof_verify_release_truth_failed(message) {
-        return PROOF_VERIFY_EXIT_RELEASE_TRUTH_FAILURE;
-    }
-    if proof_verify_unsupported_feature(message) {
-        return PROOF_VERIFY_EXIT_UNSUPPORTED_FEATURE;
-    }
-    1
-}
-
-fn proof_verify_required_claim_failed(message: &str) -> bool {
-    message.contains("required proof claim not verified")
-        || message.contains("required proof claim family missing")
-        || message.contains("required proof runtime authority missing")
-        || message.contains("required delegation claim not verified")
-        || message.contains("required commerce claim not verified")
-        || message.contains("required disclosure lineage claim not verified")
-        || message.contains("required swarm claim not verified")
-        || message.contains("required public settlement claim not verified")
-}
-
-fn proof_verify_integrity_failed(code: &str, message: &str) -> bool {
-    code == TRANSACTION_ARTIFACT_HASH_MISMATCH.urn
-        || code == TRANSACTION_ARTIFACT_HASH_MISMATCH.string_code
-        || code == TRANSACTION_GRAPH_NOT_CLOSED.urn
-        || code == TRANSACTION_GRAPH_NOT_CLOSED.string_code
-        || code == TRANSACTION_PASSPORT_HASH_MISMATCH.urn
-        || code == TRANSACTION_PASSPORT_HASH_MISMATCH.string_code
-        || message.contains("digest mismatch")
-        || message.contains("hash mismatch")
-        || message.contains("proof-room.signature.")
-        || message.contains("signature invalid")
-        || message.contains("signature verification failed")
-        || message.contains("manifest integrity")
-}
-
-fn proof_verify_parse_or_schema_failed(code: &str, message: &str) -> bool {
-    code == TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED.urn
-        || code.starts_with("urn:chio:error:attest:signed-json-")
-        || code == TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED.string_code
-        || code == "CHIO-CLI-JSON"
-        || message.contains("unsupported transaction passport schema")
-        || message.contains("unsupported verifier policy schema")
-        || message.contains("unsupported evidence graph schema")
-        || message.contains("unsupported required proof claim")
-        || message.contains("proof-room.schema-violation")
-        || message.contains("json error")
-        || message.contains("missing field")
-}
-
-fn proof_verify_negative_did_not_fail(message: &str) -> bool {
-    message.contains("proof-room.negative-case.unexpected-success")
-        || message.contains("proof-room.negative-case.failure-mismatch")
-        || (message.contains("negative fixture") && message.contains("verified unexpectedly"))
-}
-
-fn proof_verify_release_truth_failed(message: &str) -> bool {
-    message.contains("release truth")
-        || message.contains("package truth")
-        || message.contains("release-truth")
-        || message.contains("package-truth")
-        || message.contains("chio.proof.release-truth.v1")
-}
-
-fn proof_verify_unsupported_feature(message: &str) -> bool {
-    message.contains("unsupported proof feature")
-        || message.contains("must pin trusted")
-        || message.contains("missing disclosure crypto verification context")
-        || message.contains("missing disclosure selective disclosure proof")
-}
-
 #[derive(serde::Deserialize)]
 struct ProofBundleManifestClaims {
     #[serde(default)]
@@ -517,7 +423,7 @@ fn load_manifest_claim(
 pub(super) fn verify_static_proof_bundle(bundle: &Path) -> Result<(), CliError> {
     let manifest_path = bundle.join("manifest.json");
     if !manifest_path.is_file() {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_schema_invalid(format!(
             "proof room bundle manifest missing: {}",
             manifest_path.display()
         )));
@@ -751,7 +657,7 @@ fn ensure_manifest_claim_verified(
 ) -> Result<(), CliError> {
     match load_manifest_claim(input_path, claim_id)? {
         Some(claim) if claim.result == "verified" => Ok(()),
-        _ => Err(CliError::cli_other_error(format!(
+        _ => Err(required_claim_missing(format!(
             "required proof claim family missing: {label}"
         ))),
     }
@@ -774,7 +680,7 @@ fn ensure_verified_claim_family(
     if verified {
         Ok(())
     } else {
-        Err(CliError::cli_other_error(format!(
+        Err(required_claim_missing(format!(
             "required proof claim family missing: {label}"
         )))
     }
@@ -782,14 +688,14 @@ fn ensure_verified_claim_family(
 
 fn ensure_runtime_authority_claims_verified(report: &serde_json::Value) -> Result<(), CliError> {
     let verified_claims = verified_claims_array(report).ok_or_else(|| {
-        CliError::cli_other_error("required proof claim family missing: runtime".to_string())
+        required_claim_missing("required proof claim family missing: runtime".to_string())
     })?;
     for required_claim in REQUIRED_RUNTIME_AUTHORITY_CLAIMS {
         if !verified_claims
             .iter()
             .any(|claim| claim.as_str() == Some(required_claim))
         {
-            return Err(CliError::cli_other_error(format!(
+            return Err(required_claim_missing(format!(
                 "required proof runtime authority missing: {required_claim}"
             )));
         }
@@ -799,14 +705,14 @@ fn ensure_runtime_authority_claims_verified(report: &serde_json::Value) -> Resul
 
 fn ensure_delegation_claims_verified(report: &serde_json::Value) -> Result<(), CliError> {
     let verified_claims = verified_claims_array(report).ok_or_else(|| {
-        CliError::cli_other_error("required proof claim family missing: delegation".to_string())
+        required_claim_missing("required proof claim family missing: delegation".to_string())
     })?;
     for required_claim in REQUIRED_DELEGATION_CLAIMS {
         if !verified_claims
             .iter()
             .any(|claim| claim.as_str() == Some(required_claim))
         {
-            return Err(CliError::cli_other_error(format!(
+            return Err(required_claim_missing(format!(
                 "required delegation claim not verified: {required_claim}"
             )));
         }
@@ -825,7 +731,7 @@ fn ensure_runtime_parity_verified(report: &serde_json::Value) -> Result<(), CliE
         return Ok(());
     }
 
-    Err(CliError::cli_other_error(
+    Err(required_claim_missing(
         "required proof runtime parity missing",
     ))
 }
@@ -1332,7 +1238,7 @@ fn push_local_proof_family_report(
             let report = chio_selective_disclosure::verify_disclosure_lineage_bundle_with_trust(
                 &bundle, &trust,
             )
-            .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
+            .map_err(map_disclosure_lineage_proof_error)?;
             push_checked_local_family_report(family_reports, claim_requirements, spec, report)
         }
         LocalProofFamilyRoute::Swarm => {
@@ -1340,7 +1246,7 @@ fn push_local_proof_family_report(
             let trusted_witness_keys = swarm_trusted_witness_keys_for_bundle(&bundle)?;
             let report =
                 chio_swarm_authority::verify_swarm_authority_bundle(&bundle, &trusted_witness_keys)
-                    .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
+                    .map_err(map_swarm_proof_error)?;
             push_checked_local_family_report(family_reports, claim_requirements, spec, report)
         }
         LocalProofFamilyRoute::PublicSettlement => {
@@ -1350,7 +1256,7 @@ fn push_local_proof_family_report(
             trust.expected_trust_market_context =
                 expected_public_settlement_trust_market_context.cloned();
             if proof_bundle.transaction_passport_id != passport.id {
-                return Err(CliError::cli_other_error(format!(
+                return Err(claim_rejected(format!(
                     "proof verify: public settlement proof bundle passport mismatch: expected {}, got {}",
                     passport.id, proof_bundle.transaction_passport_id
                 )));
@@ -1379,7 +1285,7 @@ fn ensure_graph_bound_commerce_order_passport(
     let graph_bound_passport: chio_commerce_order::CommerceOrderPassportReport =
         crate::input::json(&order_passport_bytes).map_err(CliError::from)?;
     if &graph_bound_passport != report {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: commerce order passport artifact mismatch".to_string(),
         ));
     }
@@ -1445,7 +1351,7 @@ fn ensure_integrated_commerce_settlement_order_binding(
     for commerce_order_id in &commerce_order_ids {
         for settlement_order_id in &settlement_order_ids {
             if commerce_order_id != settlement_order_id {
-                return Err(CliError::cli_other_error(format!(
+                return Err(claim_rejected(format!(
                     "proof verify: public settlement commerce order mismatch: commerce report order_id {}, settlement report commerce_order_id {}",
                     commerce_order_id, settlement_order_id
                 )));
@@ -1658,7 +1564,7 @@ fn attach_runtime_proof_parity_report(
         return Ok(());
     };
     if !runtime_parity_report_is_accepted(&parity_report) {
-        return Err(CliError::cli_other_error(
+        return Err(runtime_proof_rejected(
             "proof verify: runtime proof parity report is not accepted".to_string(),
         ));
     }
@@ -1666,7 +1572,7 @@ fn attach_runtime_proof_parity_report(
         validate_runtime_proof_regeneration_artifacts_from_graph(bundle_dir, evidence_graph_bytes)?;
     ensure_runtime_parity_report_binds_regenerated_artifacts(&parity_report, &regeneration_hashes)?;
     let report_object = report.as_object_mut().ok_or_else(|| {
-        CliError::cli_other_error("proof verify: verifier report is not a JSON object".to_string())
+        artifact_schema_invalid("proof verify: verifier report is not a JSON object".to_string())
     })?;
     report_object.insert("runtime_proof_parity_report".to_string(), parity_report);
     Ok(())
@@ -1689,13 +1595,13 @@ fn load_runtime_proof_parity_report_from_graph(
         [] => return Ok(None),
         [node] => node,
         _ => {
-            return Err(CliError::cli_other_error(
+            return Err(artifact_schema_invalid(
                 "proof verify: multiple runtime proof parity reports".to_string(),
             ));
         }
     };
     if node.schema != chio_runtime_core::CHIO_RUNTIME_PROOF_PARITY_REPORT_SCHEMA {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_schema_invalid(format!(
             "proof verify: unsupported runtime proof parity schema: {}",
             node.schema
         )));
@@ -1704,7 +1610,7 @@ fn load_runtime_proof_parity_report_from_graph(
     let parity_bytes = crate::input::read(&parity_path)?;
     let actual_sha256 = chio_core::sha256_hex(&parity_bytes);
     if actual_sha256 != node.sha256 {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_digest_mismatch(format!(
             "proof verify: runtime proof parity report digest mismatch: expected {}, got {}",
             node.sha256, actual_sha256
         )));
@@ -1712,7 +1618,7 @@ fn load_runtime_proof_parity_report_from_graph(
     let parity_report: chio_runtime_core::RuntimeProofParityReport =
         crate::input::json(&parity_bytes)?;
     chio_runtime_core::validate_runtime_proof_parity_report(&parity_report)
-        .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
+        .map_err(map_runtime_proof_error)?;
     serde_json::to_value(parity_report)
         .map(Some)
         .map_err(CliError::from)
@@ -1765,7 +1671,7 @@ fn validate_runtime_proof_regeneration_artifacts_from_graph(
             workflow_receipt: &workflow_receipt,
         },
     )
-    .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
+    .map_err(map_runtime_proof_error)?;
     Ok(RuntimeProofRegenerationHashes {
         proof_package_sha256: chio_core_types::canonical_json_bytes(&crate::input::json::<
             serde_json::Value,
@@ -1810,14 +1716,14 @@ fn ensure_runtime_parity_hash_matches(
     label: &'static str,
 ) -> Result<(), CliError> {
     let Some(actual) = parity_report.get(field).and_then(serde_json::Value::as_str) else {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_schema_invalid(format!(
             "proof verify: runtime proof parity report missing {field}"
         )));
     };
     if actual == expected {
         Ok(())
     } else {
-        Err(CliError::cli_other_error(format!(
+        Err(artifact_digest_mismatch(format!(
             "proof verify: {label}: expected {expected}, got {actual}"
         )))
     }
@@ -1839,19 +1745,19 @@ fn runtime_graph_artifact_bytes(
     let node = match matching_nodes.as_slice() {
         [node] => *node,
         [] => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(graph_not_closed(format!(
                 "proof verify: runtime proof regeneration evidence missing: {role}"
             )));
         }
         _ => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(artifact_schema_invalid(format!(
                 "proof verify: multiple runtime proof regeneration artifacts: {role}"
             )));
         }
     };
     if let Some(expected_schema) = schema {
         if node.schema != expected_schema {
-            return Err(CliError::cli_other_error(format!(
+            return Err(artifact_schema_invalid(format!(
                 "proof verify: unsupported runtime proof regeneration schema for {role}: {}",
                 node.schema
             )));
@@ -1861,7 +1767,7 @@ fn runtime_graph_artifact_bytes(
     let bytes = crate::input::read(&artifact_path)?;
     let actual_sha256 = chio_core::sha256_hex(&bytes);
     if actual_sha256 != node.sha256 {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_digest_mismatch(format!(
             "proof verify: runtime proof regeneration artifact digest mismatch for {role}: expected {}, got {}",
             node.sha256, actual_sha256
         )));
@@ -1990,7 +1896,7 @@ fn verifier_policy_claim_requirements(
         requirements.required_claims = claims.clone();
         for claim in claims {
             let Some(claim) = claim.as_str() else {
-                return Err(CliError::cli_other_error(
+                return Err(artifact_schema_invalid(
                     "proof verify: required claims must be strings".to_string(),
                 ));
             };
@@ -2002,7 +1908,7 @@ fn verifier_policy_claim_requirements(
                 }
             }
             if !supported {
-                return Err(CliError::cli_other_error(format!(
+                return Err(artifact_schema_invalid(format!(
                     "proof verify: unsupported required proof claim: {claim}",
                 )));
             }
@@ -2049,7 +1955,7 @@ fn load_commerce_mandate_protocol_payloads(
     let refs: CommerceMandateProtocolPayloadRefs =
         crate::input::json(mandate_ledger_bytes).map_err(CliError::from)?;
     if refs.protocol_projections.len() > crate::input::collection::MAX_ENTRIES {
-        return Err(CliError::cli_other_error(
+        return Err(artifact_schema_invalid(
             "commerce projection entry limit exceeded",
         ));
     }
@@ -2233,10 +2139,10 @@ fn load_commerce_event_authority_receipts(
             .iter()
             .filter(|(node, id, _)| node.path == path || id.as_deref() == Some(&receipt_ref));
         let (_, _, bytes) = matches.next().ok_or_else(|| {
-            CliError::cli_other_error("proof verify: missing commerce authority receipt artifact")
+            graph_not_closed("proof verify: missing commerce authority receipt artifact")
         })?;
         if matches.next().is_some() {
-            return Err(CliError::cli_other_error(
+            return Err(artifact_schema_invalid(
                 "proof verify: multiple commerce authority receipt artifacts",
             ));
         }
@@ -2256,12 +2162,12 @@ fn commerce_event_authority_receipt_refs(event_log_bytes: &[u8]) -> Result<Vec<S
         .get("events")
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| {
-            CliError::cli_other_error(
+            artifact_schema_invalid(
                 "proof verify: commerce event log events must be an array".to_string(),
             )
         })?;
     if events.len() > crate::input::collection::MAX_ENTRIES {
-        return Err(CliError::cli_other_error(
+        return Err(artifact_schema_invalid(
             "commerce event entry limit exceeded",
         ));
     }
@@ -2274,7 +2180,7 @@ fn commerce_event_authority_receipt_refs(event_log_bytes: &[u8]) -> Result<Vec<S
                 .filter(|receipt_ref| !receipt_ref.is_empty())
                 .map(str::to_string)
                 .ok_or_else(|| {
-                    CliError::cli_other_error(
+                    graph_not_closed(
                         "proof verify: commerce event missing authority receipt ref".to_string(),
                     )
                 })
@@ -2289,13 +2195,13 @@ fn ensure_required_claims_verified(
     label: &str,
 ) -> Result<(), CliError> {
     let verified_claims = verified_claims_array(report).ok_or_else(|| {
-        CliError::cli_other_error(format!(
+        artifact_schema_invalid(format!(
             "proof verify: {label} verifier report missing verified_claims"
         ))
     })?;
     for required_claim in &policy.required_claims {
         let Some(required_claim) = required_claim.as_str() else {
-            return Err(CliError::cli_other_error(
+            return Err(artifact_schema_invalid(
                 "proof verify: required claims must be strings".to_string(),
             ));
         };
@@ -2306,7 +2212,7 @@ fn ensure_required_claims_verified(
             .iter()
             .any(|verified_claim| verified_claim.as_str() == Some(required_claim))
         {
-            return Err(CliError::cli_other_error(format!(
+            return Err(required_claim_missing(format!(
                 "proof verify: required {label} claim not verified: {required_claim}",
             )));
         }
@@ -2320,12 +2226,12 @@ fn ensure_policy_required_claims_verified(
 ) -> Result<(), CliError> {
     for required_claim in &policy.required_claims {
         let Some(required_claim) = required_claim.as_str() else {
-            return Err(CliError::cli_other_error(
+            return Err(artifact_schema_invalid(
                 "proof verify: required claims must be strings".to_string(),
             ));
         };
         if !report_verifies_required_claim(report, required_claim) {
-            return Err(CliError::cli_other_error(format!(
+            return Err(required_claim_missing(format!(
                 "proof verify: required proof claim not verified: {required_claim}",
             )));
         }
@@ -2453,10 +2359,10 @@ fn load_required_disclosure_crypto_verification_context(
             chio_selective_disclosure::CRYPTO_VERIFICATION_CONTEXT_SCHEMA_V1,
             "disclosure lineage",
         ),
-        [] => Err(CliError::cli_other_error(
+        [] => Err(verifier_feature_unsupported(
             "proof verify: missing disclosure crypto verification context".to_string(),
         )),
-        _ => Err(CliError::cli_other_error(
+        _ => Err(artifact_schema_invalid(
             "proof verify: multiple disclosure crypto verification contexts".to_string(),
         )),
     }
@@ -2467,17 +2373,17 @@ fn ensure_disclosure_crypto_context_matches_report(
     report: &chio_selective_disclosure::DisclosureCryptoContextReport,
 ) -> Result<(), CliError> {
     if context.context_id != report.context_id {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure crypto verification context id mismatch".to_string(),
         ));
     }
     if context.artifact_ref != report.artifact_ref {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure crypto verification context artifact mismatch".to_string(),
         ));
     }
     if context.proof_mechanism != "bbs" {
-        return Err(CliError::cli_other_error(
+        return Err(verifier_feature_unsupported(
             "proof verify: disclosure crypto verification context must use bbs".to_string(),
         ));
     }
@@ -2496,10 +2402,10 @@ fn load_required_disclosure_selective_disclosure_proof(
             chio_selective_disclosure::SELECTIVE_DISCLOSURE_PROOF_SCHEMA_V1,
             "disclosure lineage",
         ),
-        [] => Err(CliError::cli_other_error(
+        [] => Err(verifier_feature_unsupported(
             "proof verify: missing disclosure selective disclosure proof".to_string(),
         )),
-        _ => Err(CliError::cli_other_error(
+        _ => Err(artifact_schema_invalid(
             "proof verify: multiple disclosure selective disclosure proofs".to_string(),
         )),
     }
@@ -2517,10 +2423,10 @@ fn load_required_disclosure_bbs_projection_manifest(
             chio_selective_disclosure::BBS_PROJECTION_MANIFEST_SCHEMA_V1,
             "disclosure lineage",
         ),
-        [] => Err(CliError::cli_other_error(
+        [] => Err(graph_not_closed(
             "proof verify: missing disclosure BBS projection manifest".to_string(),
         )),
-        _ => Err(CliError::cli_other_error(
+        _ => Err(artifact_schema_invalid(
             "proof verify: multiple disclosure BBS projection manifests".to_string(),
         )),
     }
@@ -2547,10 +2453,10 @@ fn load_required_disclosure_transparency_inclusion_proof_for_anchored_context(
             "disclosure lineage",
         )
         .map(Some),
-        [] => Err(CliError::cli_other_error(
+        [] => Err(graph_not_closed(
             "proof verify: missing disclosure transparency inclusion proof".to_string(),
         )),
-        _ => Err(CliError::cli_other_error(
+        _ => Err(artifact_schema_invalid(
             "proof verify: multiple disclosure transparency inclusion proofs".to_string(),
         )),
     }
@@ -2567,25 +2473,28 @@ fn ensure_disclosure_selective_disclosure_proof_matches_context(
 ) -> Result<(), CliError> {
     ensure_projection_manifest_declares_capsule_hidden_predicates(capsule, projection_manifest)?;
     chio_selective_disclosure::verify_bbs_projection_manifest(proof, projection_manifest)
-        .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
+        .map_err(|error| {
+            map_selective_disclosure_proof_error(&error, format!("proof verify: {error}"))
+        })?;
     if let Some(inclusion) = transparency_inclusion {
-        chio_selective_disclosure::verify_transparency_inclusion_proof(proof, inclusion)
-            .map_err(|error| CliError::cli_other_error(format!("proof verify: {error}")))?;
+        chio_selective_disclosure::verify_transparency_inclusion_proof(proof, inclusion).map_err(
+            |error| map_selective_disclosure_proof_error(&error, format!("proof verify: {error}")),
+        )?;
     }
     if report.projection_manifest_ref != projection_manifest.manifest_id {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure crypto report projection manifest ref mismatch".to_string(),
         ));
     }
 
     let public_key_bytes = hex::decode(&proof.issuer_public_key_hex).map_err(|error| {
-        CliError::cli_other_error(format!(
+        claim_rejected(format!(
             "proof verify: malformed disclosure proof issuer public key: {error}"
         ))
     })?;
     let issuer_fingerprint = chio_core::sha256_hex(&public_key_bytes);
     if issuer_fingerprint != proof.issuer_fingerprint {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure proof issuer public key fingerprint mismatch".to_string(),
         ));
     }
@@ -2605,9 +2514,10 @@ fn ensure_disclosure_selective_disclosure_proof_matches_context(
         profile,
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "proof verify: disclosure selective disclosure proof rejected: {error}"
-        ))
+        map_crypto_context_proof_error(
+            &error,
+            format!("proof verify: disclosure selective disclosure proof rejected: {error}"),
+        )
     })?;
 
     if recomputed.verdict != chio_selective_disclosure::DisclosureContextVerdict::Verified {
@@ -2615,25 +2525,30 @@ fn ensure_disclosure_selective_disclosure_proof_matches_context(
             .rejected_checks
             .iter()
             .map(|check| check.code.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
-        let message = format!("proof verify: {rejected_codes}: disclosure crypto context rejected");
-        return if is_transparency_preview_not_allowed_error(&rejected_codes) {
+            .collect::<Vec<_>>();
+        let message = format!(
+            "proof verify: {}: disclosure crypto context rejected",
+            rejected_codes.join(", ")
+        );
+        return if rejected_codes
+            .iter()
+            .any(|code| is_transparency_preview_not_allowed_code(code))
+        {
             Err(CliError::registry_error(
                 &TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED,
                 message,
             ))
         } else {
-            Err(CliError::cli_other_error(message))
+            Err(claim_rejected(message))
         };
     }
     if !recomputed.cryptographic_proof_verified {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure cryptographic proof was not verified".to_string(),
         ));
     }
     if report.projection_manifest_ref != recomputed.projection_manifest_ref {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure crypto report projection manifest ref mismatch".to_string(),
         ));
     }
@@ -2661,32 +2576,32 @@ fn ensure_projection_manifest_declares_capsule_hidden_predicates(
         .map(|predicate| (predicate.predicate_id.as_str(), predicate))
         .collect::<BTreeMap<_, _>>();
     if declared.len() != projection_manifest.hidden_predicates.len() {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: disclosure projection manifest has duplicate hidden predicates"
                 .to_string(),
         ));
     }
     for predicate in &capsule.hidden_predicates {
         let Some(declared_predicate) = declared.get(predicate.predicate_id.as_str()) else {
-            return Err(CliError::cli_other_error(format!(
+            return Err(claim_rejected(format!(
                 "proof verify: disclosure hidden predicate missing from projection manifest: {}",
                 predicate.predicate_id
             )));
         };
         if declared_predicate.field != predicate.field {
-            return Err(CliError::cli_other_error(format!(
+            return Err(claim_rejected(format!(
                 "proof verify: disclosure hidden predicate field mismatch with projection manifest: {}",
                 predicate.predicate_id
             )));
         }
         if declared_predicate.operator != predicate.operator {
-            return Err(CliError::cli_other_error(format!(
+            return Err(claim_rejected(format!(
                 "proof verify: disclosure hidden predicate operator mismatch with projection manifest: {}",
                 predicate.predicate_id
             )));
         }
         let projection_slot = u16::try_from(predicate.projection_slot).map_err(|_| {
-            CliError::cli_other_error(format!(
+            claim_rejected(format!(
                 "proof verify: disclosure hidden predicate projection slot out of range: {}",
                 predicate.predicate_id
             ))
@@ -2696,19 +2611,19 @@ fn ensure_projection_manifest_declares_capsule_hidden_predicates(
             .iter()
             .find(|slot| slot.slot == projection_slot)
         else {
-            return Err(CliError::cli_other_error(format!(
+            return Err(claim_rejected(format!(
                 "proof verify: disclosure hidden predicate projection slot missing from projection manifest: {}",
                 predicate.predicate_id
             )));
         };
         if slot.field != predicate.field {
-            return Err(CliError::cli_other_error(format!(
+            return Err(claim_rejected(format!(
                 "proof verify: disclosure hidden predicate projection slot field mismatch with projection manifest: {}",
                 predicate.predicate_id
             )));
         }
         if slot.disclosure != chio_selective_disclosure::BbsProjectionDisclosure::Hidden {
-            return Err(CliError::cli_other_error(format!(
+            return Err(claim_rejected(format!(
                 "proof verify: disclosure hidden predicate projection slot is not hidden in projection manifest: {}",
                 predicate.predicate_id
             )));
@@ -2716,7 +2631,7 @@ fn ensure_projection_manifest_declares_capsule_hidden_predicates(
         if let Some(expected_value_sha256) = declared_predicate.value_sha256.as_deref() {
             let actual_value_sha256 = chio_core::sha256_hex(predicate.operand.as_bytes());
             if expected_value_sha256 != actual_value_sha256 {
-                return Err(CliError::cli_other_error(format!(
+                return Err(artifact_digest_mismatch(format!(
                     "proof verify: disclosure hidden predicate value hash mismatch with projection manifest: {}",
                     predicate.predicate_id
                 )));
@@ -2734,7 +2649,7 @@ fn ensure_same_string_set(
     let actual = actual.iter().map(String::as_str).collect::<BTreeSet<_>>();
     let expected = expected.iter().map(String::as_str).collect::<BTreeSet<_>>();
     if actual != expected {
-        return Err(CliError::cli_other_error(format!(
+        return Err(claim_rejected(format!(
             "proof verify: {label} did not match recomputed BBS verification"
         )));
     }
@@ -3080,7 +2995,7 @@ fn scoped_evidence_graph_bytes(
         .get_mut("nodes")
         .and_then(serde_json::Value::as_array_mut)
     else {
-        return Err(CliError::cli_other_error(
+        return Err(artifact_schema_invalid(
             "proof verify: evidence graph nodes must be an array",
         ));
     };
@@ -3162,59 +3077,6 @@ fn is_trust_market_evidence_graph_role(role: &str) -> bool {
         || is_trust_market_artifact_role(role)
 }
 
-fn map_commerce_proof_error(error: chio_commerce_order::CommerceOrderError) -> CliError {
-    match error {
-        chio_commerce_order::CommerceOrderError::ReplayFailed(ref message)
-        | chio_commerce_order::CommerceOrderError::SettlementFailed(ref message)
-            if is_settlement_unverified_error(message) =>
-        {
-            CliError::registry_error(
-                &TRANSACTION_SETTLEMENT_UNVERIFIED,
-                format!("proof verify: {error}"),
-            )
-        }
-        other => CliError::cli_other_error(format!("proof verify: {other}")),
-    }
-}
-
-fn map_public_settlement_proof_error(error: chio_web3::error::Web3ContractError) -> CliError {
-    match error {
-        chio_web3::error::Web3ContractError::InvalidProof(ref message)
-            if is_public_settlement_identity_not_bound_error(message) =>
-        {
-            CliError::registry_error(
-                &TRANSACTION_IDENTITY_NOT_BOUND,
-                format!("proof verify: {error}"),
-            )
-        }
-        chio_web3::error::Web3ContractError::InvalidProof(ref message)
-            if is_public_settlement_dispute_unbound_error(message) =>
-        {
-            CliError::registry_error(
-                &TRANSACTION_DISPUTE_UNBOUND,
-                format!("proof verify: {error}"),
-            )
-        }
-        chio_web3::error::Web3ContractError::InvalidSettlement(ref message)
-            if is_settlement_unverified_error(message) =>
-        {
-            CliError::registry_error(
-                &TRANSACTION_SETTLEMENT_UNVERIFIED,
-                format!("proof verify: {error}"),
-            )
-        }
-        other => CliError::cli_other_error(format!("proof verify: {other}")),
-    }
-}
-
-fn is_public_settlement_identity_not_bound_error(message: &str) -> bool {
-    message.starts_with("public settlement beneficiary identity binding ")
-}
-
-fn is_public_settlement_dispute_unbound_error(message: &str) -> bool {
-    message.starts_with("public settlement dispute ")
-}
-
 fn is_advisory_authority_edge_proof_error(
     error: &chio_control_plane::transaction_passport::TransactionPassportError,
 ) -> bool {
@@ -3223,43 +3085,6 @@ fn is_advisory_authority_edge_proof_error(
         chio_control_plane::transaction_passport::TransactionPassportError::InvalidEvidenceGraphArtifact(message)
             if message == "advisory evidence cannot satisfy authority edge"
     )
-}
-
-fn is_settlement_unverified_error(message: &str) -> bool {
-    message.contains("settlement event missing settlement packet evidence")
-        || message == "public settlement finality requires successful settlement state"
-}
-
-fn is_transparency_preview_not_allowed_error(message: &str) -> bool {
-    message.contains("disclosure_context_transparency_state_insufficient")
-        || message.contains("context transparency state was weaker than the profile requirement")
-}
-
-fn is_authorization_not_bound_error(message: &str) -> bool {
-    matches!(
-        message.strip_prefix("minimal governed action evidence invalid: "),
-        Some(
-            "capability proof not valid at evidence graph issuance"
-                | "capability proof expired before evidence graph issuance"
-                | "capability proof does not match receipt capability"
-                | "guard decision does not match capability proof"
-                | "guard-to-receipt binding missing"
-        )
-    )
-}
-
-fn is_graph_not_closed_error(message: &str) -> bool {
-    message.starts_with("unknown evidence graph edge source: ")
-        || message.starts_with("unknown evidence graph edge target: ")
-}
-
-fn is_graph_cycle_error(message: &str) -> bool {
-    message.starts_with("cyclic evidence graph: ")
-}
-
-fn is_required_claim_missing_error(message: &str) -> bool {
-    message.starts_with("claim set missing required claim: ")
-        || message.starts_with("claim set required claim was not verified: ")
 }
 
 #[cfg(test)]

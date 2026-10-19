@@ -74,7 +74,7 @@ pub fn verify_web3_identity_binding(
         .verify_canonical(&binding.certificate, &binding.signature)
         .map_err(|error| Web3ContractError::InvalidBinding(error.to_string()))?;
     if !verified {
-        return Err(Web3ContractError::InvalidBinding(
+        return Err(Web3ContractError::BindingSignatureInvalid(
             "identity binding signature verification failed".to_string(),
         ));
     }

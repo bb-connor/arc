@@ -213,6 +213,11 @@ fn launch_transaction_failure_codes_are_registered() {
         "urn:chio:error:transaction:settlement-unverified",
         "urn:chio:error:transaction:dispute-unbound",
         "urn:chio:error:transaction:transparency-preview-not-allowed",
+        "urn:chio:error:transaction:claim-rejected",
+        "urn:chio:error:transaction:artifact-schema-invalid",
+        "urn:chio:error:transaction:signature-invalid",
+        "urn:chio:error:transaction:verifier-feature-unsupported",
+        "urn:chio:error:transaction:negative-case-mismatch",
     ];
 
     for urn in expected {

@@ -251,6 +251,71 @@ codes:
       - chio-transaction-passport
       - chio-cli
       - chio-proof-room
+  - urn: "urn:chio:error:transaction:claim-rejected"
+    domain: transaction
+    severity: error
+    summary: "A proof family claim required by the transaction verifier failed verification."
+    help: "Reject the proof bundle and regenerate the family evidence so every required claim verifies."
+    string_code: "CHIO-TRANSACTION-CLAIM-REJECTED"
+    jsonrpc_code: 7114
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-transaction-passport
+      - chio-cli
+      - chio-proof-room
+  - urn: "urn:chio:error:transaction:artifact-schema-invalid"
+    domain: transaction
+    severity: error
+    summary: "A transaction proof artifact is malformed or violates its schema."
+    help: "Reject the proof bundle and regenerate the artifact against its registered schema."
+    string_code: "CHIO-TRANSACTION-ARTIFACT-SCHEMA-INVALID"
+    jsonrpc_code: 7115
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-transaction-passport
+      - chio-cli
+      - chio-proof-room
+  - urn: "urn:chio:error:transaction:signature-invalid"
+    domain: transaction
+    severity: error
+    summary: "A transaction proof signature is invalid or its signer is not trusted."
+    help: "Reject the proof bundle and re-sign it with a key the verifier trusts."
+    string_code: "CHIO-TRANSACTION-SIGNATURE-INVALID"
+    jsonrpc_code: 7116
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-transaction-passport
+      - chio-cli
+      - chio-proof-room
+  - urn: "urn:chio:error:transaction:verifier-feature-unsupported"
+    domain: transaction
+    severity: error
+    summary: "The verifier lacks the trust context or capability the proof bundle requires."
+    help: "Pin the required trust context for the verifier, or remove the unsupported feature from the proof bundle."
+    string_code: "CHIO-TRANSACTION-VERIFIER-FEATURE-UNSUPPORTED"
+    jsonrpc_code: 7117
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-transaction-passport
+      - chio-cli
+      - chio-proof-room
+  - urn: "urn:chio:error:transaction:negative-case-mismatch"
+    domain: transaction
+    severity: error
+    summary: "A Proof Room negative case verified, or failed for a reason other than the one it declares."
+    help: "Regenerate the negative case so it fails with its declared failure code, or correct the declared code."
+    string_code: "CHIO-TRANSACTION-NEGATIVE-CASE-MISMATCH"
+    jsonrpc_code: 7118
+    since: "0.1.0"
+    stability: stable
+    consumed_by:
+      - chio-transaction-passport
+      - chio-cli
+      - chio-proof-room
   - urn: "urn:chio:error:capability:scope-exceeded"
     domain: capability
     severity: error

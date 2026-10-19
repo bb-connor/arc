@@ -42,6 +42,12 @@ pub enum TransactionPassportError {
     UnsafeVerifierPolicyPath(String),
     #[error("invalid evidence graph artifact: {0}")]
     InvalidEvidenceGraphArtifact(String),
+    /// A digest the evidence graph binds does not match the bytes or value it names.
+    #[error("invalid evidence graph artifact: {0}")]
+    EvidenceGraphBindingDigestMismatch(String),
+    /// A signature the evidence graph binds does not verify.
+    #[error("invalid evidence graph artifact: {0}")]
+    EvidenceGraphBindingSignatureInvalid(String),
     #[error("unsupported evidence graph schema: {0}")]
     UnsupportedEvidenceGraphSchema(String),
     #[error("missing evidence graph artifact: {0}")]
@@ -64,34 +70,68 @@ pub enum TransactionPassportError {
     MissingRuntimeArtifact(String),
     #[error("invalid runtime artifact {path}: {message}")]
     InvalidRuntimeArtifact { path: String, message: String },
+    #[error("invalid runtime artifact {path}: {message}")]
+    RuntimeArtifactDigestMismatch { path: String, message: String },
     #[error("runtime security claim failed: {0}")]
     RuntimeSecurityClaimFailed(String),
+    #[error("runtime security claim failed: {0}")]
+    RuntimeSecurityDigestMismatch(String),
+    #[error("runtime security claim failed: {0}")]
+    RuntimeSecuritySignatureInvalid(String),
     #[error("missing enterprise artifact: {0}")]
     MissingEnterpriseArtifact(String),
     #[error("invalid enterprise artifact {path}: {message}")]
     InvalidEnterpriseArtifact { path: String, message: String },
     #[error("enterprise export claim failed: {0}")]
     EnterpriseExportClaimFailed(String),
+    #[error("enterprise export claim failed: {0}")]
+    EnterpriseExportDigestMismatch(String),
+    #[error("enterprise export claim failed: {0}")]
+    EnterpriseExportSignatureInvalid(String),
+    /// An enterprise export field is not well formed.
+    #[error("enterprise export claim failed: {0}")]
+    EnterpriseExportMalformed(String),
+    /// The enterprise export names a feature this verifier does not support.
+    #[error("enterprise export claim failed: {0}")]
+    EnterpriseExportUnsupported(String),
     #[error("missing Agent Web artifact: {0}")]
     MissingAgentWebArtifact(String),
     #[error("invalid Agent Web artifact {path}: {message}")]
     InvalidAgentWebArtifact { path: String, message: String },
     #[error("Agent Web claim failed: {0}")]
     AgentWebClaimFailed(String),
+    #[error("Agent Web claim failed: {0}")]
+    AgentWebDigestMismatch(String),
+    #[error("Agent Web claim failed: {0}")]
+    AgentWebSignatureInvalid(String),
+    /// The Agent Web evidence names a feature this verifier does not support.
+    #[error("Agent Web claim failed: {0}")]
+    AgentWebUnsupported(String),
     #[error("missing trust-market artifact: {0}")]
     MissingTrustMarketArtifact(String),
     #[error("invalid trust-market artifact {path}: {message}")]
     InvalidTrustMarketArtifact { path: String, message: String },
+    #[error("invalid trust-market artifact {path}: {message}")]
+    TrustMarketArtifactSignatureInvalid { path: String, message: String },
     #[error("trust-market claim failed: {0}")]
     TrustMarketClaimFailed(String),
+    /// The trust-market evidence names a feature this verifier does not support.
+    #[error("trust-market claim failed: {0}")]
+    TrustMarketUnsupported(String),
     #[error("risk comptroller claim failed: {0}")]
     RiskComptrollerClaimFailed(String),
+    #[error("risk comptroller claim failed: {0}")]
+    RiskComptrollerSignatureInvalid(String),
     #[error("missing cognition-market artifact: {0}")]
     MissingCognitionMarketArtifact(String),
     #[error("invalid cognition-market artifact {path}: {message}")]
     InvalidCognitionMarketArtifact { path: String, message: String },
+    #[error("invalid cognition-market artifact {path}: {message}")]
+    CognitionMarketArtifactSignatureInvalid { path: String, message: String },
     #[error("cognition-market claim failed: {0}")]
     CognitionMarketClaimFailed(String),
+    #[error("cognition-market claim failed: {0}")]
+    CognitionMarketSignatureInvalid(String),
     #[error("advisory evidence cannot authorize runtime execution")]
     AdvisoryEvidenceCannotAuthorize,
     #[error("evidence graph digest mismatch: expected {expected}, got {actual}")]

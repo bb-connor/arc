@@ -93,7 +93,7 @@ pub(super) fn validate_identity_registry_operator_snapshot(
     if snapshot.block_number == chain_anchor.block_number
         && snapshot.block_hash != chain_anchor.block_hash
     {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement identity registry operator snapshot block hash mismatch".to_string(),
         ));
     }
@@ -125,7 +125,7 @@ pub(super) fn validate_release_event(
             .observed_execution
             .external_reference_id
     {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement release event tx hash mismatch".to_string(),
         ));
     }
@@ -149,7 +149,7 @@ pub(super) fn validate_release_event(
     receipt_hash_bytes.copy_from_slice(receipt_hash.as_slice());
     let expected_receipt_hash = Hash::from_bytes(receipt_hash_bytes).to_hex_prefixed();
     if release_event.receipt_hash != expected_receipt_hash {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement release event receipt hash mismatch".to_string(),
         ));
     }
@@ -250,7 +250,7 @@ fn validate_trusted_release_event_log(
         ));
     }
     if trusted_log.receipt_hash != release_event.receipt_hash {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement trusted release event receipt hash mismatch".to_string(),
         ));
     }

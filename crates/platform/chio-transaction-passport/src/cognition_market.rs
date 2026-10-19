@@ -328,7 +328,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
     require_exact_canonical_json(finding_node.path, finding_bytes)?;
     let finding: Finding = crate::decode_evidence_json(finding_bytes)?;
     verify_finding(&finding)
-        .map_err(|error| invalid_artifact(finding_node.path, error.to_string()))?;
+        .map_err(|error| finding_invalid_artifact(finding_node.path, &error))?;
 
     let recipe_binding_required = selected_claims.contains(COGNITION_MARKET_CLAIMS[1])
         || finding.guarantee_class == FindingGuaranteeClass::DeterministicReplay
@@ -392,17 +392,23 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
     finding_verifier_signer
         .validate("finding_verifier_signer")
         .map_err(|error| {
-            claim_failed(format!(
-                "trusted verifier signer policy is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("trusted verifier signer policy is invalid: {error}"),
+            )
         })?;
     if finding_verifier_signer.key != trust.finding_verifier_authority {
         return Err(claim_failed(
             "pinned verifier profile signer and authority key disagree",
         ));
     }
-    let trusted_profile_digest = signed_envelope_sha256(&trust.trusted_verifier_profile)
-        .map_err(|error| claim_failed(format!("trusted verifier profile is invalid: {error}")))?;
+    let trusted_profile_digest =
+        signed_envelope_sha256(&trust.trusted_verifier_profile).map_err(|error| {
+            finding_claim_failed(
+                &error,
+                format!("trusted verifier profile is invalid: {error}"),
+            )
+        })?;
     if trusted_profile_digest != trust.trusted_verifier_profile_envelope_sha256 {
         return Err(claim_failed(
             "trusted verifier profile bytes do not match the deployment-pinned digest",
@@ -412,9 +418,10 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         .profile_governance_authority
         .validate("profile governance authority")
         .map_err(|error| {
-            claim_failed(format!(
-                "profile governance authority policy is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("profile governance authority policy is invalid: {error}"),
+            )
         })?;
     if trust.trusted_verifier_profile.body.governance_authority
         != trust.profile_governance_authority.key
@@ -427,7 +434,12 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         &trust.trusted_verifier_profile,
         &trust.profile_governance_authority.key,
     )
-    .map_err(|error| claim_failed(format!("trusted verifier profile is invalid: {error}")))?;
+    .map_err(|error| {
+        finding_claim_failed(
+            &error,
+            format!("trusted verifier profile is invalid: {error}"),
+        )
+    })?;
     if trust.trusted_verifier_profile.body.purchase_authority.key != trust.purchase_authority {
         return Err(claim_failed(
             "pinned verifier profile purchase authority and deployment key disagree",
@@ -491,7 +503,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         |_| claim_failed("trusted verifier profile requires unsupported verifier features"),
     )?;
     verify_signed_verifier_report(&report, &trust.finding_verifier_authority)
-        .map_err(|error| invalid_artifact(report_node.path, error.to_string()))?;
+        .map_err(|error| finding_invalid_artifact(report_node.path, &error))?;
     if report.body.verifier_key_epoch != finding_verifier_signer.key_epoch {
         return Err(claim_failed(
             "signed verifier report key epoch does not match the deployment-pinned signer policy",
@@ -581,7 +593,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
             ));
         }
         verify_signed_purchase_record(&purchase_record, &trust.purchase_authority)
-            .map_err(|error| invalid_artifact(purchase_record_node.path, error.to_string()))?;
+            .map_err(|error| finding_invalid_artifact(purchase_record_node.path, &error))?;
         let purchase_policy = &trust.trusted_verifier_profile.body.purchase_authority;
         if purchase_record.body.recorded_at < purchase_policy.valid_from
             || purchase_record.body.recorded_at >= purchase_policy.valid_until
@@ -615,7 +627,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         // node.
         if recipe
             .canonical_sha256()
-            .map_err(|error| invalid_artifact(recipe_node.path, error.to_string()))?
+            .map_err(|error| finding_invalid_artifact(recipe_node.path, &error))?
             != recipe_digest
         {
             return Err(claim_failed("replay-recipe typed digest drift"));
@@ -640,7 +652,10 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         })?;
         let status_operator_authorization = &status_trust.signed_status_operator_authorization.body;
         status_operator_authorization.validate().map_err(|error| {
-            claim_failed(format!("status operator authorization is invalid: {error}"))
+            finding_claim_failed(
+                &error,
+                format!("status operator authorization is invalid: {error}"),
+            )
         })?;
         verify_pinned_envelope(
             &status_trust.signed_status_operator_authorization,
@@ -648,9 +663,10 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
             "status_operator_authorization",
         )
         .map_err(|error| {
-            claim_failed(format!(
-                "status operator authorization envelope is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("status operator authorization envelope is invalid: {error}"),
+            )
         })?;
         if crate::validation::validate_sha256_hex(
             &status_trust.status_operator_authorization_sha256,
@@ -665,9 +681,10 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
             &status_trust.signed_status_operator_authorization,
         )
         .map_err(|error| {
-            claim_failed(format!(
-                "status operator authorization envelope cannot be hashed: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("status operator authorization envelope cannot be hashed: {error}"),
+            )
         })?;
         if actual_authorization_sha256 != status_trust.status_operator_authorization_sha256 {
             return Err(claim_failed(
@@ -676,7 +693,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
         }
         let status_bytes = artifact_bytes(artifacts, status_node.path)?;
         let status = chio_finding::parse_status_proof_input(status_bytes)
-            .map_err(|error| invalid_artifact(status_node.path, error.to_string()))?;
+            .map_err(|error| finding_invalid_artifact(status_node.path, &error))?;
         let status_digest = crate::sha256_hex(status_bytes);
         if report.body.status_proof_input_sha256.as_deref() != Some(status_digest.as_str()) {
             return Err(claim_failed(
@@ -709,7 +726,7 @@ pub fn verify_cognition_market_passport_artifacts_with_external_claims(
             status_operator_authorization,
             status_trust.status_freshness,
         )
-        .map_err(|error| invalid_artifact(status_node.path, error.to_string()))?;
+        .map_err(|error| finding_invalid_artifact(status_node.path, &error))?;
         verify_status_operator_authority_status(
             &status_operator_authorization.operator,
             &status_trust.operator_authority_status,
@@ -822,7 +839,12 @@ fn verify_verifier_authority_status(
     trust
         .status_authority
         .validate("verifier status authority")
-        .map_err(|error| claim_failed(format!("verifier status authority is invalid: {error}")))?;
+        .map_err(|error| {
+            finding_claim_failed(
+                &error,
+                format!("verifier status authority is invalid: {error}"),
+            )
+        })?;
     if trust.status_authority.key == policy.key {
         return Err(claim_failed(
             "verifier status authority must be independent from the verifier signer",
@@ -835,8 +857,14 @@ fn verify_verifier_authority_status(
             "verifier status authority is not live at the current trusted verification time",
         ));
     }
-    verify_signed_authority_status(&trust.signed_status, &trust.status_authority.key)
-        .map_err(|error| claim_failed(format!("verifier authority status is invalid: {error}")))?;
+    verify_signed_authority_status(&trust.signed_status, &trust.status_authority.key).map_err(
+        |error| {
+            finding_claim_failed(
+                &error,
+                format!("verifier authority status is invalid: {error}"),
+            )
+        },
+    )?;
     let status = &trust.signed_status.body;
     if status.observed_at < trust.status_authority.valid_from
         || status.observed_at >= trust.status_authority.valid_until
@@ -891,14 +919,20 @@ fn verify_purchase_authority_status(
             "purchase authority standing freshness policy is invalid",
         ));
     }
-    policy
-        .validate("purchase authority")
-        .map_err(|error| claim_failed(format!("purchase authority policy is invalid: {error}")))?;
+    policy.validate("purchase authority").map_err(|error| {
+        finding_claim_failed(
+            &error,
+            format!("purchase authority policy is invalid: {error}"),
+        )
+    })?;
     trust
         .status_authority
         .validate("purchase standing authority")
         .map_err(|error| {
-            claim_failed(format!("purchase standing authority is invalid: {error}"))
+            finding_claim_failed(
+                &error,
+                format!("purchase standing authority is invalid: {error}"),
+            )
         })?;
     if trust.status_authority.key == policy.key {
         return Err(claim_failed(
@@ -913,7 +947,12 @@ fn verify_purchase_authority_status(
         ));
     }
     verify_signed_authority_status(&trust.signed_status, &trust.status_authority.key).map_err(
-        |error| claim_failed(format!("purchase authority standing is invalid: {error}")),
+        |error| {
+            finding_claim_failed(
+                &error,
+                format!("purchase authority standing is invalid: {error}"),
+            )
+        },
     )?;
     let status = &trust.signed_status.body;
     if status.observed_at < trust.status_authority.valid_from
@@ -967,9 +1006,10 @@ fn verify_status_operator_authority_status(
         .status_authority
         .validate("status operator standing authority")
         .map_err(|error| {
-            claim_failed(format!(
-                "status operator standing authority is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("status operator standing authority is invalid: {error}"),
+            )
         })?;
     if trust.status_authority.key == policy.key {
         return Err(claim_failed(
@@ -985,9 +1025,10 @@ fn verify_status_operator_authority_status(
     }
     verify_signed_authority_status(&trust.signed_status, &trust.status_authority.key).map_err(
         |error| {
-            claim_failed(format!(
-                "status operator authority standing is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("status operator authority standing is invalid: {error}"),
+            )
         },
     )?;
     let status = &trust.signed_status.body;
@@ -1047,9 +1088,10 @@ fn verify_profile_governance_authority_status(
         .status_authority
         .validate("profile governance status authority")
         .map_err(|error| {
-            claim_failed(format!(
-                "profile governance status authority is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("profile governance status authority is invalid: {error}"),
+            )
         })?;
     if trust.status_authority.key == policy.key {
         return Err(claim_failed(
@@ -1065,9 +1107,10 @@ fn verify_profile_governance_authority_status(
     }
     verify_signed_authority_status(&trust.signed_status, &trust.status_authority.key).map_err(
         |error| {
-            claim_failed(format!(
-                "profile governance authority status is invalid: {error}"
-            ))
+            finding_claim_failed(
+                &error,
+                format!("profile governance authority status is invalid: {error}"),
+            )
         },
     )?;
     let status = &trust.signed_status.body;
@@ -1537,7 +1580,7 @@ fn parse_recipe(
     let recipe: FindingReplayRecipeInput = crate::decode_evidence_json(bytes)?;
     recipe
         .validate()
-        .map_err(|error| invalid_artifact(path, error.to_string()))?;
+        .map_err(|error| finding_invalid_artifact(path, &error))?;
     Ok(recipe)
 }
 
@@ -1632,4 +1675,37 @@ fn invalid_artifact(path: &str, message: impl Into<String>) -> TransactionPasspo
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::CognitionMarketClaimFailed(message.into())
+}
+
+fn finding_claim_failed(
+    error: &chio_finding::FindingError,
+    message: String,
+) -> TransactionPassportError {
+    if is_finding_signature_failure(error) {
+        TransactionPassportError::CognitionMarketSignatureInvalid(message)
+    } else {
+        claim_failed(message)
+    }
+}
+
+fn finding_invalid_artifact(
+    path: &str,
+    error: &chio_finding::FindingError,
+) -> TransactionPassportError {
+    if is_finding_signature_failure(error) {
+        TransactionPassportError::CognitionMarketArtifactSignatureInvalid {
+            path: path.to_string(),
+            message: error.to_string(),
+        }
+    } else {
+        invalid_artifact(path, error.to_string())
+    }
+}
+
+fn is_finding_signature_failure(error: &chio_finding::FindingError) -> bool {
+    matches!(
+        error,
+        chio_finding::FindingError::EnvelopeSignatureInvalid(_)
+            | chio_finding::FindingError::SignatureInvalid
+    )
 }

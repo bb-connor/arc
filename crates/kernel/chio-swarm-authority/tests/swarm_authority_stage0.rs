@@ -1041,6 +1041,10 @@ fn swarm_authority_stage0_rejects_unsupported_route_plan_egress_constraint(
     assert!(error
         .to_string()
         .contains("unsupported swarm route-plan egress constraint"));
+    assert!(matches!(
+        error,
+        chio_swarm_authority::SwarmAuthorityError::Unsupported(_)
+    ));
     Ok(())
 }
 

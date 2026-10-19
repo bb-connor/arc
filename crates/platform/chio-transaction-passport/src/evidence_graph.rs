@@ -371,11 +371,11 @@ pub fn validate_transaction_evidence_graph(
             ))
         })?;
         if node_id != node_sha256 {
-            return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-                format!(
+            return Err(
+                TransactionPassportError::EvidenceGraphBindingDigestMismatch(format!(
                     "evidence graph node id digest mismatch: expected {node_sha256}, got {node_id}"
-                ),
-            ));
+                )),
+            );
         }
         node_ids.push(node_id);
     }
@@ -523,9 +523,11 @@ pub(super) fn validate_claim_set_node_binding(
         ));
     }
     if node.sha256 != claim_set_sha256 {
-        return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-            "claim set evidence graph digest mismatch".to_string(),
-        ));
+        return Err(
+            TransactionPassportError::EvidenceGraphBindingDigestMismatch(
+                "claim set evidence graph digest mismatch".to_string(),
+            ),
+        );
     }
     Ok(())
 }
@@ -546,9 +548,11 @@ pub(super) fn validate_verifier_policy_node_binding(
         ));
     }
     if node.sha256 != verifier_policy_sha256 {
-        return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-            "verifier policy evidence graph digest mismatch".to_string(),
-        ));
+        return Err(
+            TransactionPassportError::EvidenceGraphBindingDigestMismatch(
+                "verifier policy evidence graph digest mismatch".to_string(),
+            ),
+        );
     }
     Ok(())
 }
@@ -674,32 +678,32 @@ pub(super) fn validate_minimal_governed_action_artifact_bindings(
         )?;
     }
     ensure_guard_receipt_binding(&guard, &receipt, guard_id)?;
-    ensure_binding_equal(
+    ensure_binding_digest_equal(
         &receipt.policy_digest,
         &policy_digest,
         "receipt policy digest mismatch",
     )?;
-    ensure_binding_equal(
+    ensure_binding_digest_equal(
         guard_policy_digest,
         &policy_digest,
         "guard decision policy digest mismatch",
     )?;
-    ensure_binding_equal(
+    ensure_binding_digest_equal(
         &receipt.request_digest,
         request_digest,
         "receipt request digest mismatch",
     )?;
-    ensure_binding_equal(
+    ensure_binding_digest_equal(
         guard_request_digest,
         request_digest,
         "guard decision request digest mismatch",
     )?;
-    ensure_binding_equal(
+    ensure_binding_digest_equal(
         &receipt.response_digest,
         response_digest,
         "receipt response digest mismatch",
     )?;
-    ensure_binding_equal(
+    ensure_binding_digest_equal(
         guard_response_digest,
         response_digest,
         "guard decision response digest mismatch",
@@ -985,6 +989,17 @@ fn ensure_binding_equal(
     Ok(())
 }
 
+fn ensure_binding_digest_equal(
+    actual: &str,
+    expected: &str,
+    message: &'static str,
+) -> Result<(), TransactionPassportError> {
+    if actual != expected {
+        return Err(minimal_governed_action_digest_error(message));
+    }
+    Ok(())
+}
+
 fn first_present<'a>(
     primary: Option<&'a str>,
     secondary: Option<&'a str>,
@@ -1123,7 +1138,7 @@ fn trust_root_signer_identity(
         require_binding_digest(key_digest, "trust root signer key digest")?;
         let actual = super::sha256_hex(key_id.as_bytes());
         if key_digest != actual {
-            return Err(minimal_governed_action_binding_error(
+            return Err(minimal_governed_action_digest_error(
                 "trust root signer key digest mismatch",
             ));
         }
@@ -1148,7 +1163,7 @@ fn verify_signed_role_artifact(
     require_binding_value(signature, "artifact signature")?;
     let public_key = minimal_self_certifying_public_key(signer_identity, label)?;
     let signature = Signature::from_hex(signature).map_err(|error| {
-        minimal_governed_action_binding_error(format!("{label} signature invalid: {error}"))
+        minimal_governed_action_signature_error(format!("{label} signature invalid: {error}"))
     })?;
     let bytes = artifact_bytes_for_role(graph, artifacts, role)?;
     let mut artifact: serde_json::Value = crate::decode_evidence_json(bytes)?;
@@ -1159,12 +1174,12 @@ fn verify_signed_role_artifact(
     let verified = public_key
         .verify_canonical(&artifact, &signature)
         .map_err(|error| {
-            minimal_governed_action_binding_error(format!("{label} signature invalid: {error}"))
+            minimal_governed_action_signature_error(format!("{label} signature invalid: {error}"))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(minimal_governed_action_binding_error(format!(
+        Err(minimal_governed_action_signature_error(format!(
             "{label} signature invalid"
         )))
     }
@@ -1223,6 +1238,20 @@ fn parse_rfc3339_utc(
 
 fn minimal_governed_action_binding_error(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::InvalidEvidenceGraphArtifact(format!(
+        "minimal governed action evidence invalid: {}",
+        message.into()
+    ))
+}
+
+fn minimal_governed_action_signature_error(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::EvidenceGraphBindingSignatureInvalid(format!(
+        "minimal governed action evidence invalid: {}",
+        message.into()
+    ))
+}
+
+fn minimal_governed_action_digest_error(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::EvidenceGraphBindingDigestMismatch(format!(
         "minimal governed action evidence invalid: {}",
         message.into()
     ))
@@ -1357,12 +1386,12 @@ fn validate_evidence_node(node: &EvidenceNode) -> Result<(), TransactionPassport
         ))
     })?;
     if node.id != node.sha256 {
-        return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-            format!(
+        return Err(
+            TransactionPassportError::EvidenceGraphBindingDigestMismatch(format!(
                 "evidence graph node id digest mismatch: expected {}, got {}",
                 node.sha256, node.id
-            ),
-        ));
+            )),
+        );
     }
     validate_bundle_relative_path(&node.path).map_err(|_| {
         TransactionPassportError::InvalidEvidenceGraphArtifact(format!(

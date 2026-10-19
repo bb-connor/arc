@@ -135,7 +135,7 @@ pub(super) fn validate_mandate_ledger(
         ));
     }
     if mandate.quote_sha256 != context.quote_sha256 {
-        return Err(CommerceOrderError::MandateFailed(
+        return Err(CommerceOrderError::MandateDigestMismatch(
             "mandate quote digest mismatch".to_string(),
         ));
     }
@@ -261,7 +261,7 @@ fn validate_protocol_projections(
             })?;
         if let Some(digest) = digest {
             if projection.digest != digest {
-                return Err(CommerceOrderError::MandateFailed(format!(
+                return Err(CommerceOrderError::MandateDigestMismatch(format!(
                     "mandate projection digest mismatch: {protocol}/{purpose}"
                 )));
             }
@@ -276,7 +276,7 @@ fn validate_protocol_projections(
             })?;
         let actual = hex::encode(Sha256::digest(&payload.payload_bytes));
         if actual != projection.digest {
-            return Err(CommerceOrderError::MandateFailed(format!(
+            return Err(CommerceOrderError::MandateDigestMismatch(format!(
                 "mandate projection payload digest mismatch: {protocol}/{purpose}"
             )));
         }

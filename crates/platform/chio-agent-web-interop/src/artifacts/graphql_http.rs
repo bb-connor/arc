@@ -2,7 +2,7 @@ use chio_transaction_passport::TransactionPassportError;
 
 use super::super::claims::CLAIM_EXTERNAL_GRAPHQL_HTTP_SUBSCRIPTION_COVERAGE;
 use super::super::evidence::validate_sha256_hex;
-use super::{claim_failed, required_json_str, required_json_u64, ProjectionManifest};
+use super::{claim_failed, required_json_str, required_json_u64, unsupported, ProjectionManifest};
 
 pub(super) fn validate_subject(
     value: &serde_json::Value,
@@ -62,7 +62,7 @@ pub(super) fn validate_subject(
             }
         }
         "subscription" => {
-            return Err(claim_failed("GraphQL subscription projection unsupported"));
+            return Err(unsupported("GraphQL subscription projection unsupported"));
         }
         _ => return Err(claim_failed("unsupported GraphQL operation type")),
     }

@@ -284,6 +284,61 @@
         "guidance": "Provide verified transparency inclusion evidence or remove the transparency claim."
       },
       "nativeWireName": "transaction_transparency_preview_not_allowed"
+    },
+    {
+      "code": 7114,
+      "name": "transaction_claim_rejected",
+      "category": "transaction",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Regenerate the family evidence so every required claim verifies."
+      },
+      "nativeWireName": "transaction_claim_rejected"
+    },
+    {
+      "code": 7115,
+      "name": "transaction_artifact_schema_invalid",
+      "category": "transaction",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Regenerate the artifact against its registered schema."
+      },
+      "nativeWireName": "transaction_artifact_schema_invalid"
+    },
+    {
+      "code": 7116,
+      "name": "transaction_signature_invalid",
+      "category": "transaction",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Re-sign the proof bundle with a key the verifier trusts."
+      },
+      "nativeWireName": "transaction_signature_invalid"
+    },
+    {
+      "code": 7117,
+      "name": "transaction_verifier_feature_unsupported",
+      "category": "transaction",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Pin the required trust context for the verifier, or remove the unsupported feature from the proof bundle."
+      },
+      "nativeWireName": "transaction_verifier_feature_unsupported"
+    },
+    {
+      "code": 7118,
+      "name": "transaction_negative_case_mismatch",
+      "category": "transaction",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Regenerate the negative case so it fails with its declared failure code, or correct the declared code."
+      },
+      "nativeWireName": "transaction_negative_case_mismatch"
     }
   ]
 }

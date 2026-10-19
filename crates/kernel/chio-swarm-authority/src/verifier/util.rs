@@ -189,3 +189,19 @@ fn is_sha256_hex(value: &str) -> bool {
 pub(super) fn rejected(message: impl Into<String>) -> SwarmAuthorityError {
     SwarmAuthorityError::Rejected(message.into())
 }
+
+pub(super) fn digest_mismatch(message: impl Into<String>) -> SwarmAuthorityError {
+    SwarmAuthorityError::DigestMismatch(message.into())
+}
+
+pub(super) fn signature_invalid(message: impl Into<String>) -> SwarmAuthorityError {
+    SwarmAuthorityError::SignatureInvalid(message.into())
+}
+
+pub(super) fn unsupported_schema(message: impl Into<String>) -> SwarmAuthorityError {
+    SwarmAuthorityError::UnsupportedSchema(message.into())
+}
+
+pub(super) fn unsupported(message: impl Into<String>) -> SwarmAuthorityError {
+    SwarmAuthorityError::Unsupported(message.into())
+}

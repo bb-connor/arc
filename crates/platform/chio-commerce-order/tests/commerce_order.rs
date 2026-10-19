@@ -1053,6 +1053,10 @@ fn commerce_order_replay_rejects_payment_quote_digest_mismatch() {
         .test_expect_err("payment quote digest mismatch must fail");
 
     assert!(error.to_string().contains("payment quote digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_commerce_order::CommerceOrderError::PaymentDigestMismatch(_)
+    ));
 }
 
 #[test]
@@ -1116,6 +1120,10 @@ fn commerce_order_replay_rejects_mandate_protocol_digest_mismatch() {
     assert!(error
         .to_string()
         .contains("mandate projection digest mismatch: ap2/checkout_mandate"));
+    assert!(matches!(
+        error,
+        chio_commerce_order::CommerceOrderError::MandateDigestMismatch(_)
+    ));
 }
 
 #[test]

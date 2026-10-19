@@ -1681,6 +1681,10 @@ fn trust_market_rejects_unsupported_collateral_source_type() {
     assert!(error
         .to_string()
         .contains("collateral source type unsupported"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::TrustMarketUnsupported(_)
+    ));
 }
 
 #[test]
@@ -1711,6 +1715,10 @@ fn trust_market_rejects_unsupported_guarantee_type() {
     .test_expect_err("unsupported guarantee type must fail");
 
     assert!(error.to_string().contains("guarantee type unsupported"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::TrustMarketUnsupported(_)
+    ));
 }
 
 #[test]

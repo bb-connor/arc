@@ -244,7 +244,7 @@ fn verify_provider_trust_signature<T: Serialize>(
         ));
     }
     let signature = Signature::from_hex(signature).map_err(|_| {
-        CommerceOrderError::ProviderTrustFailed(format!("{label} signature invalid"))
+        CommerceOrderError::ProviderTrustSignatureInvalid(format!("{label} signature invalid"))
     })?;
     let mut signature_body = serde_json::to_value(artifact).map_err(|error| {
         CommerceOrderError::ProviderTrustFailed(format!("{label} signature body invalid: {error}"))
@@ -257,13 +257,15 @@ fn verify_provider_trust_signature<T: Serialize>(
         let verified = trusted_key
             .verify_canonical(&signature_body, &signature)
             .map_err(|_| {
-                CommerceOrderError::ProviderTrustFailed(format!("{label} signature invalid"))
+                CommerceOrderError::ProviderTrustSignatureInvalid(format!(
+                    "{label} signature invalid"
+                ))
             })?;
         if verified {
             return Ok(());
         }
     }
-    Err(CommerceOrderError::ProviderTrustFailed(format!(
+    Err(CommerceOrderError::ProviderTrustSignatureInvalid(format!(
         "{label} signature invalid"
     )))
 }

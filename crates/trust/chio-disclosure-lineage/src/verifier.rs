@@ -238,7 +238,7 @@ pub fn verify_disclosure_lineage_bundle_with_trust(
 
 fn validate_capsule(capsule: &DisclosureCapsule) -> Result<(), DisclosureLineageError> {
     if capsule.schema != DISCLOSURE_CAPSULE_SCHEMA_V1 {
-        return Err(invalid(format!(
+        return Err(unsupported_schema(format!(
             "unsupported disclosure capsule schema: {}",
             capsule.schema
         )));
@@ -270,7 +270,7 @@ fn validate_lineage(
     trust: &DisclosureLineageVerifierTrust,
 ) -> Result<(), DisclosureLineageError> {
     if lineage.schema != LINEAGE_SIGNED_SUBGRAPH_SCHEMA_V1 {
-        return Err(invalid(format!(
+        return Err(unsupported_schema(format!(
             "unsupported signed lineage subgraph schema: {}",
             lineage.schema
         )));
@@ -366,13 +366,13 @@ fn validate_lineage(
             )));
         }
         if chio_core_types::sha256_hex(node.receipt_ref.as_bytes()) != node.artifact_sha256 {
-            return Err(invalid(format!(
+            return Err(digest_mismatch(format!(
                 "lineage node artifact digest mismatch: {}",
                 node.id
             )));
         }
         if chio_core_types::sha256_hex(node.receipt_ref.as_bytes()) != node.source_id_hash {
-            return Err(invalid(format!(
+            return Err(digest_mismatch(format!(
                 "lineage node source id digest mismatch: {}",
                 node.id
             )));
@@ -417,18 +417,20 @@ fn validate_lineage(
     validate_lineage_redactions(lineage, &node_ids, &redacted_nodes)?;
     let frontier_sha256 = compute_lineage_frontier_digest(lineage)?;
     if frontier_sha256 != lineage.frontier_sha256 {
-        return Err(invalid("lineage frontier digest mismatch"));
+        return Err(digest_mismatch("lineage frontier digest mismatch"));
     }
     let checkpoint_inclusion_sha256 = chio_core_types::sha256_hex(
         format!("{}|{}", lineage.checkpoint_ref, lineage.frontier_sha256).as_bytes(),
     );
     if checkpoint_inclusion_sha256 != lineage.checkpoint_inclusion_sha256 {
-        return Err(invalid("lineage checkpoint inclusion digest mismatch"));
+        return Err(digest_mismatch(
+            "lineage checkpoint inclusion digest mismatch",
+        ));
     }
 
     let actual_digest = compute_signed_lineage_subgraph_digest(lineage)?;
     if actual_digest != lineage.subgraph_sha256 {
-        return Err(invalid("lineage subgraph digest mismatch"));
+        return Err(digest_mismatch("lineage subgraph digest mismatch"));
     }
     verify_lineage_signature(lineage, &actual_digest, trust.trusted_lineage_signer_keys())?;
     Ok(())
@@ -442,7 +444,7 @@ fn verify_lineage_signature(
     let signature = lineage
         .signature
         .strip_prefix(LINEAGE_SIGNATURE_PREFIX)
-        .ok_or_else(|| invalid("lineage subgraph signature unsupported"))?;
+        .ok_or_else(|| unsupported("lineage subgraph signature unsupported"))?;
     let Some((public_key, signature)) = signature.split_once(':') else {
         return Err(invalid("lineage subgraph signature malformed"));
     };
@@ -451,11 +453,14 @@ fn verify_lineage_signature(
     if !is_trusted_public_key(&public_key, trusted_signer_keys) {
         return Err(invalid("lineage subgraph signer untrusted"));
     }
-    let signature = Signature::from_hex(signature)
-        .map_err(|error| invalid(format!("lineage subgraph signature invalid: {error}")))?;
+    let signature = Signature::from_hex(signature).map_err(|error| {
+        signature_invalid(format!("lineage subgraph signature invalid: {error}"))
+    })?;
     let verified = public_key.verify(digest.as_bytes(), &signature);
     if !verified {
-        return Err(invalid("lineage subgraph signature verification failed"));
+        return Err(signature_invalid(
+            "lineage subgraph signature verification failed",
+        ));
     }
     Ok(())
 }
@@ -483,15 +488,18 @@ pub fn verify_crypto_context_report_signature_with_trust(
     if !is_trusted_public_key(&public_key, trusted_signer_keys) {
         return Err(invalid("crypto context report signer untrusted"));
     }
-    let signature = Signature::from_hex(signature)
-        .map_err(|error| invalid(format!("crypto context report signature invalid: {error}")))?;
+    let signature = Signature::from_hex(signature).map_err(|error| {
+        signature_invalid(format!("crypto context report signature invalid: {error}"))
+    })?;
     let mut material = report.clone();
     material.signature = None;
     let verified = public_key
         .verify_canonical(&material, &signature)
-        .map_err(|error| invalid(format!("crypto context report signature invalid: {error}")))?;
+        .map_err(|error| {
+            signature_invalid(format!("crypto context report signature invalid: {error}"))
+        })?;
     if !verified {
-        return Err(invalid(
+        return Err(signature_invalid(
             "crypto context report signature verification failed",
         ));
     }
@@ -563,7 +571,7 @@ fn validate_lineage_edges(
         )?;
         require_sha256(&edge.statement_sha256, "lineage edge statement digest")?;
         if chio_core_types::sha256_hex(edge.edge_id.as_bytes()) != edge.source_artifact_sha256 {
-            return Err(invalid(format!(
+            return Err(digest_mismatch(format!(
                 "lineage edge source artifact digest mismatch: {}",
                 edge.edge_id
             )));
@@ -572,7 +580,7 @@ fn validate_lineage_edges(
             format!("{}|{}|{}", edge.from, edge.to, edge.kind).as_bytes(),
         );
         if statement_sha256 != edge.statement_sha256 {
-            return Err(invalid(format!(
+            return Err(digest_mismatch(format!(
                 "lineage edge statement digest mismatch: {}",
                 edge.edge_id
             )));
@@ -718,7 +726,7 @@ fn validate_leakage_ledger(
     profile: &DisclosureVerifierPrivacyProfile,
 ) -> Result<(), DisclosureLineageError> {
     if ledger.schema != DISCLOSURE_LEAKAGE_LEDGER_SCHEMA_V1 {
-        return Err(invalid(format!(
+        return Err(unsupported_schema(format!(
             "unsupported leakage ledger schema: {}",
             ledger.schema
         )));
@@ -852,7 +860,7 @@ fn validate_privacy_profile(
     profile: &DisclosureVerifierPrivacyProfile,
 ) -> Result<(), DisclosureLineageError> {
     if profile.schema != DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1 {
-        return Err(invalid(format!(
+        return Err(unsupported_schema(format!(
             "unsupported verifier privacy profile schema: {}",
             profile.schema
         )));
@@ -1096,7 +1104,9 @@ fn validate_bundle_bindings(
         return Err(invalid("missing crypto context report"));
     };
     if report.schema != DISCLOSURE_CRYPTO_CONTEXT_REPORT_SCHEMA_V1 {
-        return Err(invalid("unsupported crypto context report schema"));
+        return Err(unsupported_schema(
+            "unsupported crypto context report schema",
+        ));
     }
     if report.id != bundle.capsule.crypto_context_report_ref {
         return Err(invalid("crypto context report ref mismatch"));
@@ -1269,4 +1279,20 @@ fn require_sha256(value: &str, field: &'static str) -> Result<(), DisclosureLine
 
 fn invalid(message: impl Into<String>) -> DisclosureLineageError {
     DisclosureLineageError::InvalidArtifact(message.into())
+}
+
+fn digest_mismatch(message: impl Into<String>) -> DisclosureLineageError {
+    DisclosureLineageError::DigestMismatch(message.into())
+}
+
+fn signature_invalid(message: impl Into<String>) -> DisclosureLineageError {
+    DisclosureLineageError::SignatureInvalid(message.into())
+}
+
+fn unsupported_schema(message: impl Into<String>) -> DisclosureLineageError {
+    DisclosureLineageError::UnsupportedSchema(message.into())
+}
+
+fn unsupported(message: impl Into<String>) -> DisclosureLineageError {
+    DisclosureLineageError::Unsupported(message.into())
 }

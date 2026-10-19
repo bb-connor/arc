@@ -66,7 +66,8 @@ crypto-context producer; this verifier does not retrieve those inputs.
 
 `chio-core-types` supplies canonical bytes, SHA-256, and signature primitives.
 Serde rejects unknown artifact fields; semantic checks remain in the verifier.
-`thiserror` exposes `DisclosureLineageError::InvalidArtifact` with failure detail.
+`thiserror` exposes `DisclosureLineageError::InvalidArtifact` and, for a recomputed
+digest that does not match, `DisclosureLineageError::DigestMismatch`, each with failure detail.
 
 ## Verification
 

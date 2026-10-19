@@ -966,21 +966,21 @@ fn validate_agent_web_receipt(
     let receipt: ChioReceipt = chio_transaction_passport::decode_evidence_json(receipt_bytes)?;
     let signature_valid = receipt
         .verify_signature()
-        .map_err(|_| claim_failed("Agent Web receipt signature invalid"))?;
+        .map_err(|_| signature_invalid("Agent Web receipt signature invalid"))?;
     if !signature_valid {
-        return Err(claim_failed("Agent Web receipt signature invalid"));
+        return Err(signature_invalid("Agent Web receipt signature invalid"));
     }
     let action_hash_valid = receipt
         .action
         .verify_hash()
-        .map_err(|_| claim_failed("Agent Web receipt signature invalid"))?;
+        .map_err(|_| signature_invalid("Agent Web receipt signature invalid"))?;
     if !action_hash_valid {
-        return Err(claim_failed("Agent Web receipt signature invalid"));
+        return Err(signature_invalid("Agent Web receipt signature invalid"));
     }
     if receipt.receipt_kind != ReceiptKind::MediatedDecision
         || receipt.trust_level != TrustLevel::Mediated
     {
-        return Err(claim_failed("Agent Web receipt signature invalid"));
+        return Err(signature_invalid("Agent Web receipt signature invalid"));
     }
     if !trust.trusts_receipt_kernel_key(&receipt.kernel_key) {
         return Err(claim_failed("Agent Web receipt kernel key untrusted"));
@@ -994,10 +994,10 @@ fn validate_agent_web_receipt(
         return Err(claim_failed("Agent Web receipt did not execute"));
     }
     if receipt.content_hash != envelope.external_subject_digest {
-        return Err(claim_failed("Agent Web receipt content digest mismatch"));
+        return Err(digest_mismatch("Agent Web receipt content digest mismatch"));
     }
     if receipt.policy_hash != passport.verifier_policy_sha256 {
-        return Err(claim_failed("Agent Web receipt policy digest mismatch"));
+        return Err(digest_mismatch("Agent Web receipt policy digest mismatch"));
     }
     validate_receipt_action_parameter(
         &receipt,
@@ -1005,7 +1005,7 @@ fn validate_agent_web_receipt(
         receipt_ref,
         "Agent Web receipt action ref mismatch",
     )?;
-    validate_receipt_action_parameter(
+    validate_receipt_action_digest(
         &receipt,
         "content_hash",
         &envelope.external_subject_digest,
@@ -1035,7 +1035,7 @@ fn validate_agent_web_receipt(
         &envelope.envelope_id,
         "Agent Web receipt action envelope id mismatch",
     )?;
-    validate_receipt_action_parameter(
+    validate_receipt_action_digest(
         &receipt,
         "projection_manifest_sha256",
         &envelope.projection_manifest_sha256,
@@ -1054,6 +1054,16 @@ fn validate_agent_web_receipt(
         "Agent Web receipt action source protocol version mismatch",
     )?;
     Ok(())
+}
+
+fn validate_receipt_action_digest(
+    receipt: &ChioReceipt,
+    parameter: &str,
+    expected: &str,
+    mismatch_message: &str,
+) -> Result<(), TransactionPassportError> {
+    validate_receipt_action_parameter(receipt, parameter, expected, mismatch_message)
+        .map_err(|_| digest_mismatch(mismatch_message))
 }
 
 fn validate_receipt_action_parameter(
@@ -1143,7 +1153,7 @@ fn validate_order_context_binding(
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| claim_failed("missing acp-commerce order context digest"))?;
             if order_context_digest != chio_core_types::sha256_hex(order_bytes) {
-                return Err(claim_failed("acp-commerce order context digest mismatch"));
+                return Err(digest_mismatch("acp-commerce order context digest mismatch"));
             }
         }
         if source_protocol == "ap2" {
@@ -1152,7 +1162,7 @@ fn validate_order_context_binding(
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| claim_failed("missing ap2 transaction context digest"))?;
             if transaction_context_digest != chio_core_types::sha256_hex(order_bytes) {
-                return Err(claim_failed("ap2 transaction context digest mismatch"));
+                return Err(digest_mismatch("ap2 transaction context digest mismatch"));
             }
         }
         if matches!(source_protocol, "acp-commerce" | "x402") {
@@ -1225,7 +1235,7 @@ fn validate_envelope_manifest_binding(
         return Err(claim_failed("projection manifest protocol mismatch"));
     }
     if envelope.projection_manifest_sha256 != manifest_entry.node_sha256 {
-        return Err(claim_failed("projection manifest digest mismatch"));
+        return Err(digest_mismatch("projection manifest digest mismatch"));
     }
     Ok(())
 }
@@ -1361,6 +1371,14 @@ fn extend_unique(target: &mut Vec<String>, values: &[String]) {
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::AgentWebClaimFailed(message.into())
+}
+
+fn signature_invalid(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::AgentWebSignatureInvalid(message.into())
+}
+
+fn digest_mismatch(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::AgentWebDigestMismatch(message.into())
 }
 
 #[cfg(test)]

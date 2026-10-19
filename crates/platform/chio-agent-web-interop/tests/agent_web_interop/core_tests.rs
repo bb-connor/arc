@@ -681,6 +681,10 @@ fn agent_web_interop_rejects_external_digest_mismatch() {
     assert!(error
         .to_string()
         .contains("external subject digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::AgentWebDigestMismatch(_)
+    ));
 }
 
 #[test]
@@ -765,6 +769,10 @@ fn agent_web_interop_rejects_action_content_digest_mismatch() {
     assert!(error
         .to_string()
         .contains("Agent Web receipt action content digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::AgentWebDigestMismatch(_)
+    ));
 }
 
 #[test]
@@ -813,6 +821,10 @@ fn agent_web_interop_rejects_action_for_different_projection_manifest() {
     assert!(error
         .to_string()
         .contains("Agent Web receipt action projection manifest digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::AgentWebDigestMismatch(_)
+    ));
 }
 
 #[test]

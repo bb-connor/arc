@@ -240,12 +240,10 @@ pub(super) fn raw_artifact_bytes<'a>(
         .ok_or_else(|| TransactionPassportError::MissingAgentWebArtifact(node.path.clone()))?;
     let actual_digest = chio_core_types::sha256_hex(bytes);
     if actual_digest != node.sha256 {
-        return Err(TransactionPassportError::InvalidAgentWebArtifact {
+        return Err(TransactionPassportError::EvidenceGraphArtifactDigestMismatch {
             path: node.path.clone(),
-            message: format!(
-                "digest mismatch: expected {}, got {actual_digest}",
-                node.sha256
-            ),
+            expected: node.sha256.clone(),
+            actual: actual_digest,
         });
     }
     Ok(bytes)

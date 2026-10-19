@@ -132,13 +132,13 @@ fn parse_artifact_value(
         .ok_or_else(|| TransactionPassportError::MissingEnterpriseArtifact(node.path.clone()))?;
     let actual_digest = chio_core_types::sha256_hex(bytes);
     if actual_digest != node.sha256 {
-        return Err(TransactionPassportError::InvalidEnterpriseArtifact {
-            path: node.path.clone(),
-            message: format!(
-                "digest mismatch: expected {}, got {actual_digest}",
-                node.sha256
-            ),
-        });
+        return Err(
+            TransactionPassportError::EvidenceGraphArtifactDigestMismatch {
+                path: node.path.clone(),
+                expected: node.sha256.clone(),
+                actual: actual_digest,
+            },
+        );
     }
     let value: serde_json::Value = chio_transaction_passport::decode_evidence_json(bytes)?;
     let schema = value

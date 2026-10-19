@@ -266,7 +266,7 @@ pub(super) fn parse_artifact<T: for<'de> Deserialize<'de>>(
         .ok_or_else(|| TransactionPassportError::MissingRuntimeArtifact(node.path.clone()))?;
     let actual_digest = super::super::sha256_hex(bytes);
     if actual_digest != node.sha256 {
-        return Err(TransactionPassportError::InvalidRuntimeArtifact {
+        return Err(TransactionPassportError::RuntimeArtifactDigestMismatch {
             path: node.path.clone(),
             message: format!(
                 "digest mismatch: expected {}, got {actual_digest}",
@@ -307,12 +307,12 @@ fn validate_node(node: &RuntimeEvidenceNode) -> Result<(), TransactionPassportEr
         ))
     })?;
     if node.id != node.sha256 {
-        return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-            format!(
+        return Err(
+            TransactionPassportError::EvidenceGraphBindingDigestMismatch(format!(
                 "evidence graph node id digest mismatch: expected {}, got {}",
                 node.sha256, node.id
-            ),
-        ));
+            )),
+        );
     }
     Ok(())
 }

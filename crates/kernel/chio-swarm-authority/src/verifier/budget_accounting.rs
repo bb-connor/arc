@@ -6,7 +6,7 @@ use crate::{
     CHIO_SWARM_BUDGET_POOL_SCHEMA,
 };
 
-use super::util::{rejected, require_non_empty};
+use super::util::{rejected, require_non_empty, unsupported_schema};
 
 /// Validate the complete standalone accounting state committed by a pool
 /// digest before any authority-signed companion can authenticate it.
@@ -14,7 +14,7 @@ pub fn validate_swarm_budget_pool_accounting(
     budget: &SwarmBudgetPool,
 ) -> Result<(), SwarmAuthorityError> {
     if budget.schema != CHIO_SWARM_BUDGET_POOL_SCHEMA {
-        return Err(rejected(format!(
+        return Err(unsupported_schema(format!(
             "unsupported swarm budget pool schema: {}",
             budget.schema
         )));

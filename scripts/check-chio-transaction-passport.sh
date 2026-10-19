@@ -176,11 +176,11 @@ import pathlib
 import re
 import sys
 
-# Exit classes of `chio proof verify` for a rejected passport: 1 unclassified
-# rejection, 10 required claim, 20 integrity, 30 parse or schema, 50 unsupported
-# feature. A usage error (2), a panic (101) or a missing command (126, 127) is
-# not a rejection.
-REJECTION_EXITS = {1, 10, 20, 30, 50}
+# Exit classes of `chio proof verify` for a rejected passport: 10 required
+# claim, 20 integrity, 30 parse or schema, 50 unsupported verifier feature.
+# The generic exit (1), a usage error (2), a panic (101) or a missing command
+# (126, 127) is not a typed rejection.
+REJECTION_EXITS = {10, 20, 30, 50}
 
 # Mirrors semantic_negative_failure_code and negative_failure_code_matches in
 # crates/products/chio-cli/src/cli/dispatch/proof.rs.

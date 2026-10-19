@@ -327,13 +327,13 @@ fn validate_event_authority_receipt(
         )));
     }
     let signature_valid = receipt.verify_signature().map_err(|error| {
-        CommerceOrderError::ReplayFailed(format!(
+        CommerceOrderError::ReplaySignatureInvalid(format!(
             "authority receipt signature invalid: {}: {error}",
             event.authority_receipt_ref
         ))
     })?;
     if !signature_valid {
-        return Err(CommerceOrderError::ReplayFailed(format!(
+        return Err(CommerceOrderError::ReplaySignatureInvalid(format!(
             "authority receipt signature invalid: {}",
             event.authority_receipt_ref
         )));
@@ -360,7 +360,7 @@ fn validate_event_authority_receipt(
         )));
     }
     if receipt.content_hash != event.event_sha256 {
-        return Err(CommerceOrderError::ReplayFailed(format!(
+        return Err(CommerceOrderError::ReplayDigestMismatch(format!(
             "authority receipt content hash mismatch: {}",
             event.event_id
         )));
@@ -531,7 +531,7 @@ fn validate_event_digest(event: &CommerceOrderEvent) -> Result<(), CommerceOrder
     })?;
     let actual = hex::encode(Sha256::digest(&canonical));
     if event.event_sha256 != actual {
-        return Err(CommerceOrderError::ReplayFailed(format!(
+        return Err(CommerceOrderError::ReplayDigestMismatch(format!(
             "commerce event digest mismatch: {}",
             event.event_id
         )));

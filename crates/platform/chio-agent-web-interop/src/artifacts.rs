@@ -262,31 +262,31 @@ fn verify_envelope_signature(
     trust: &AgentWebVerifierTrust,
 ) -> Result<(), TransactionPassportError> {
     let Some(signature_ref) = envelope.signature.strip_prefix("sig-ed25519:") else {
-        return Err(claim_failed("Agent Web envelope signature invalid"));
+        return Err(signature_invalid("Agent Web envelope signature invalid"));
     };
     let mut parts = signature_ref.split(':');
     let Some(public_key_ref) = parts.next() else {
-        return Err(claim_failed("Agent Web envelope signature invalid"));
+        return Err(signature_invalid("Agent Web envelope signature invalid"));
     };
     let Some(signature_ref) = parts.next() else {
-        return Err(claim_failed("Agent Web envelope signature invalid"));
+        return Err(signature_invalid("Agent Web envelope signature invalid"));
     };
     if parts.next().is_some() {
-        return Err(claim_failed("Agent Web envelope signature invalid"));
+        return Err(signature_invalid("Agent Web envelope signature invalid"));
     }
 
     let public_key = PublicKey::from_hex(public_key_ref)
-        .map_err(|_| claim_failed("Agent Web envelope signature invalid"))?;
+        .map_err(|_| signature_invalid("Agent Web envelope signature invalid"))?;
     if !trust.trusts_envelope_sidecar_key(&public_key) {
         return Err(claim_failed("Agent Web envelope signer untrusted"));
     }
     let signature = Signature::from_hex(signature_ref)
-        .map_err(|_| claim_failed("Agent Web envelope signature invalid"))?;
+        .map_err(|_| signature_invalid("Agent Web envelope signature invalid"))?;
     let payload = envelope_signature_payload(envelope);
     let canonical = chio_core_types::canonical_json_bytes(&payload)
-        .map_err(|_| claim_failed("Agent Web envelope signature invalid"))?;
+        .map_err(|_| signature_invalid("Agent Web envelope signature invalid"))?;
     if !public_key.verify(&canonical, &signature) {
-        return Err(claim_failed("Agent Web envelope signature invalid"));
+        return Err(signature_invalid("Agent Web envelope signature invalid"));
     }
     Ok(())
 }
@@ -318,7 +318,7 @@ pub(super) fn validate_projection_manifest(
         )));
     }
     if manifest.digest_algorithm != "sha256" {
-        return Err(claim_failed("unsupported Agent Web digest algorithm"));
+        return Err(unsupported("unsupported Agent Web digest algorithm"));
     }
     validate_signature_algorithm(manifest)?;
     if manifest.external_fields_used.is_empty() {
@@ -360,7 +360,7 @@ fn validate_signature_algorithm(
         }
         if !supported_signature_algorithm(&manifest.source_protocol, &manifest.signature_algorithm)
         {
-            return Err(claim_failed("unsupported Agent Web signature algorithm"));
+            return Err(unsupported("unsupported Agent Web signature algorithm"));
         }
         return Ok(());
     }
@@ -387,7 +387,7 @@ pub(super) fn validate_external_subject(
 ) -> Result<Option<AgentWebReplayEntry>, TransactionPassportError> {
     let actual_digest = chio_core_types::sha256_hex(bytes);
     if actual_digest != envelope.external_subject_digest {
-        return Err(claim_failed("external subject digest mismatch"));
+        return Err(digest_mismatch("external subject digest mismatch"));
     }
     let value: serde_json::Value = chio_transaction_passport::decode_evidence_json(bytes)?;
     let subject_id = value
@@ -1496,4 +1496,16 @@ fn require_non_empty(value: &str, field: &'static str) -> Result<(), Transaction
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::AgentWebClaimFailed(message.into())
+}
+
+fn signature_invalid(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::AgentWebSignatureInvalid(message.into())
+}
+
+fn digest_mismatch(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::AgentWebDigestMismatch(message.into())
+}
+
+fn unsupported(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::AgentWebUnsupported(message.into())
 }

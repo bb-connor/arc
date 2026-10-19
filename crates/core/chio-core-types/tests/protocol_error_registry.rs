@@ -165,6 +165,11 @@ fn protocol_error_registry_includes_launch_transaction_failures() {
         "transaction_settlement_unverified",
         "transaction_dispute_unbound",
         "transaction_transparency_preview_not_allowed",
+        "transaction_claim_rejected",
+        "transaction_artifact_schema_invalid",
+        "transaction_signature_invalid",
+        "transaction_verifier_feature_unsupported",
+        "transaction_negative_case_mismatch",
     ]);
     let actual = registry
         .codes

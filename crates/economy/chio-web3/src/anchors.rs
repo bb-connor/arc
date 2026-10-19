@@ -260,14 +260,14 @@ pub fn verify_oracle_conversion_evidence_signature(
     let signature_valid = oracle_public_key
         .verify_canonical(&body, signature)
         .map_err(|error| {
-            Web3ContractError::InvalidProof(format!(
+            Web3ContractError::ProofSignatureInvalid(format!(
                 "oracle conversion evidence signature verification failed: {error}"
             ))
         })?;
     if signature_valid {
         Ok(())
     } else {
-        Err(Web3ContractError::InvalidProof(
+        Err(Web3ContractError::ProofSignatureInvalid(
             "oracle conversion evidence signature verification failed".to_string(),
         ))
     }
@@ -504,7 +504,7 @@ pub fn verify_checkpoint_statement(
         .verify_canonical(&body, &statement.signature)
         .map_err(|error| Web3ContractError::InvalidProof(error.to_string()))?;
     if !verified {
-        return Err(Web3ContractError::InvalidProof(
+        return Err(Web3ContractError::ProofSignatureInvalid(
             "checkpoint statement signature verification failed".to_string(),
         ));
     }
@@ -624,7 +624,7 @@ pub fn verify_anchor_inclusion_proof(
         .verify_signature()
         .map_err(|error| Web3ContractError::InvalidProof(error.to_string()))?;
     if !receipt_verified {
-        return Err(Web3ContractError::InvalidProof(
+        return Err(Web3ContractError::ProofSignatureInvalid(
             "receipt signature verification failed".to_string(),
         ));
     }

@@ -427,12 +427,10 @@ fn verify_quote_digest(context: &CommerceOrderContext) -> Result<(), CommerceOrd
     if actual == context.quote_sha256 {
         Ok(())
     } else {
-        Err(CommerceOrderError::InvalidArtifact {
-            field: "order context",
-            message: format!(
-                "quote digest mismatch: expected {}, got {}",
-                context.quote_sha256, actual
-            ),
+        Err(CommerceOrderError::DigestMismatch {
+            field: "order context quote".to_string(),
+            expected: context.quote_sha256.clone(),
+            actual,
         })
     }
 }

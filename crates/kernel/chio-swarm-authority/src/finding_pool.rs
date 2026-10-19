@@ -189,7 +189,9 @@ pub fn verify_finding_pool_allocation(
 ) -> Result<VerifiedFindingPoolAllocation, SwarmAuthorityError> {
     let body = &signed.body;
     if body.schema != FINDING_POOL_ALLOCATION_SCHEMA_V1 {
-        return Err(rejected("unsupported finding pool allocation schema"));
+        return Err(unsupported_schema(
+            "unsupported finding pool allocation schema",
+        ));
     }
     if signed.signer_key != *pinned_authority
         || body.authority != *pinned_authority
@@ -281,7 +283,9 @@ pub fn verify_finding_pool_allocation(
     }
     let pool_sha256 = swarm_budget_pool_sha256(pool)?;
     if body.pool_sha256 != pool_sha256 {
-        return Err(rejected("finding pool allocation pool digest mismatch"));
+        return Err(digest_mismatch(
+            "finding pool allocation pool digest mismatch",
+        ));
     }
     Ok(VerifiedFindingPoolAllocation {
         allocation_id: body.allocation_id.clone(),
@@ -300,7 +304,7 @@ pub fn verify_finding_pool_allocation(
 
 fn validate_pool_projection_bounds(pool: &SwarmBudgetPool) -> Result<(), SwarmAuthorityError> {
     if pool.schema != CHIO_SWARM_BUDGET_POOL_SCHEMA {
-        return Err(rejected("unsupported swarm budget pool schema"));
+        return Err(unsupported_schema("unsupported swarm budget pool schema"));
     }
     require_non_empty(&pool.pool_id, "pool.pool_id")?;
     require_non_empty(&pool.graph_id, "pool.graph_id")?;
@@ -394,6 +398,14 @@ fn require_sha256(value: &str, field: &str) -> Result<(), SwarmAuthorityError> {
 
 fn rejected(message: impl Into<String>) -> SwarmAuthorityError {
     SwarmAuthorityError::Rejected(message.into())
+}
+
+fn digest_mismatch(message: impl Into<String>) -> SwarmAuthorityError {
+    SwarmAuthorityError::DigestMismatch(message.into())
+}
+
+fn unsupported_schema(message: impl Into<String>) -> SwarmAuthorityError {
+    SwarmAuthorityError::UnsupportedSchema(message.into())
 }
 
 #[cfg(test)]
