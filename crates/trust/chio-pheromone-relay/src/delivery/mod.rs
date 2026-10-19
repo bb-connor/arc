@@ -46,16 +46,12 @@ pub use types::{
     RelayAlertRouteReviewPacket,
 };
 
-#[allow(unused_imports)]
 pub(crate) use helpers::{
-    json_labels, json_string, json_u64, normalization_receiver_map, normalize_downstream_source,
-    reject_downstream_source_secrets, relay_alert_delivery_status_from_str, route_owner_map,
-    validate_evidence_matches_receiver, validate_normalized_evidence,
+    normalization_receiver_map, normalize_downstream_source, reject_downstream_source_secrets,
+    route_owner_map,
 };
-#[allow(unused_imports)]
 pub(crate) use validators::{
-    validate_delivery_evidence_shape, validate_delivery_handoff_report, validate_delivery_labels,
-    validate_delivery_profile, validate_delivery_receiver, validate_delivery_report,
-    validate_delivery_result, validate_delivery_token, validate_normalization_profile,
-    validate_review_source_chain, validate_route_owner_profile,
+    validate_delivery_evidence_shape, validate_delivery_handoff_report, validate_delivery_profile,
+    validate_delivery_report, validate_delivery_result, validate_delivery_token,
+    validate_normalization_profile, validate_review_source_chain, validate_route_owner_profile,
 };

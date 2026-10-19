@@ -48,9 +48,3 @@ const OIDC_ISSUER_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.
 const OTHERNAME_OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.4.1.57264.1.7");
 /// EKU code-signing OID, required of every Fulcio-issued leaf.
 const ID_KP_CODE_SIGNING: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.3.6.1.5.5.7.3.3");
-
-// Bring `Identity` into scope for downstream consumers that may want to
-// build their own policies on top of the shared trust root. This re-export
-// is intentional and stable.
-#[allow(unused_imports)]
-pub use sigstore::bundle::verify::policy::Identity as SigstoreIdentityPolicy;
