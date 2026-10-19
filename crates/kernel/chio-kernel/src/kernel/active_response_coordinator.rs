@@ -38,6 +38,7 @@ use super::active_response_artifact::{self, ActiveResponseArtifactAuthorityAttes
 use super::active_response_operation_binding::{
     active_response_dispatch_operation_version, build_active_response_operation_anchor,
     derive_active_response_operation_request_binding_hash, ActiveResponseOperationAnchor,
+    ActiveResponseOperationAnchorInput, ActiveResponseOperationSeed,
 };
 use super::active_response_policy::VerifiedActiveResponseRequirement;
 use super::active_response_proof::{
@@ -77,7 +78,7 @@ pub(super) struct VerifiedGovernedActiveResponse {
     pub(super) operation: Box<AdmissionOperation>,
     pub(super) approval_set: Box<ApprovalSetReservationInput>,
     pub(super) policy_decision_hash: String,
-    pub(super) admission_artifact_fingerprint: Option<Digest32>,
+    pub(super) admission_artifact_fingerprint: Digest32,
     pub(super) authorized_at_unix_ms: u64,
 }
 
@@ -166,16 +167,17 @@ impl ChioKernel {
                             "active-response governed intent hashing failed: {error}"
                         ))
                     })?;
-                let mut anchor = build_active_response_operation_anchor(
-                    request.response_plan(),
-                    &executor_authority,
-                    verified.authorized_at_unix_ms,
-                    operation.authorization_capability_hash(),
-                    &governed_intent_hash,
-                    &verified.policy_decision_hash,
-                    verified.approval_set.approval_set_hash(),
-                )?;
-                anchor.admission_artifact_fingerprint = verified.admission_artifact_fingerprint;
+                let anchor =
+                    build_active_response_operation_anchor(ActiveResponseOperationAnchorInput {
+                        response_plan: request.response_plan(),
+                        executor_authority: &executor_authority,
+                        authorized_at_unix_ms: verified.authorized_at_unix_ms,
+                        authorization_capability_hash: operation.authorization_capability_hash(),
+                        governed_intent_hash: &governed_intent_hash,
+                        policy_decision_hash: &verified.policy_decision_hash,
+                        approval_set_hash: verified.approval_set.approval_set_hash(),
+                        admission_artifact_fingerprint: verified.admission_artifact_fingerprint,
+                    })?;
                 let retained_anchor = match self.journal_active_response_operation_anchor(
                     &operation,
                     anchor,
@@ -468,16 +470,17 @@ impl ChioKernel {
             }
         }
         let executor_authority = self.active_response_executor_identity()?;
-        let mut expected_anchor = build_active_response_operation_anchor(
-            request.response_plan(),
-            &executor_authority,
-            reservation.authorized_at_unix_ms,
-            &reservation.authorization_capability_hash,
-            &reservation.governed_intent_hash,
-            &reservation.policy_decision_hash,
-            reservation.approval_set.approval_set_hash(),
-        )?;
-        expected_anchor.admission_artifact_fingerprint = reservation.admission_artifact_fingerprint;
+        let expected_anchor =
+            build_active_response_operation_anchor(ActiveResponseOperationAnchorInput {
+                response_plan: request.response_plan(),
+                executor_authority: &executor_authority,
+                authorized_at_unix_ms: reservation.authorized_at_unix_ms,
+                authorization_capability_hash: &reservation.authorization_capability_hash,
+                governed_intent_hash: &reservation.governed_intent_hash,
+                policy_decision_hash: &reservation.policy_decision_hash,
+                approval_set_hash: reservation.approval_set.approval_set_hash(),
+                admission_artifact_fingerprint: reservation.admission_artifact_fingerprint,
+            })?;
         if self.load_active_response_operation_anchor(&operation)? != expected_anchor {
             return Err(active_response_internal(
                 "persisted active-response operation anchor changed before dispatch",
@@ -661,25 +664,24 @@ impl ChioKernel {
                         "governed active-response executor authority changed after commitment",
                     ));
                 }
-                let execution =
-                    if permit.recovery || reservation.admission_artifact_fingerprint.is_none() {
-                        self.execution_request_for_committed_preparation(
-                            request.response_plan(),
-                            reservation,
-                        )?
-                    } else {
-                        build_active_response_execution_request(
-                            request,
-                            executor_authority,
-                            &reservation.policy_decision_hash,
-                            reservation.authorized_at_unix_ms,
-                            ActiveResponseExecutionApproval::Governed {
-                                admission_operation_id: permit.operation.operation_id().to_string(),
-                                admission_operation_version: reservation.dispatch_operation_version,
-                                approval_set_hash: reservation.approval_set_hash().to_string(),
-                            },
-                        )?
-                    };
+                let execution = if permit.recovery {
+                    self.execution_request_for_committed_preparation(
+                        request.response_plan(),
+                        reservation,
+                    )?
+                } else {
+                    build_active_response_execution_request(
+                        request,
+                        executor_authority,
+                        &reservation.policy_decision_hash,
+                        reservation.authorized_at_unix_ms,
+                        ActiveResponseExecutionApproval::Governed {
+                            admission_operation_id: permit.operation.operation_id().to_string(),
+                            admission_operation_version: reservation.dispatch_operation_version,
+                            approval_set_hash: reservation.approval_set_hash().to_string(),
+                        },
+                    )?
+                };
                 if execution.dispatch_id() != reservation.dispatch_id() {
                     return Err(active_response_internal(
                         "governed active-response dispatch identifier changed",
@@ -832,7 +834,7 @@ impl ChioKernel {
                             .to_string(),
                         governed_intent_hash: bindings.governed_intent_hash().to_string(),
                         policy_decision_hash,
-                        admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
+                        admission_artifact_fingerprint,
                         executor_authority_id: requirement
                             .executor_authority()
                             .authority_id()
@@ -863,7 +865,7 @@ impl ChioKernel {
                         operation: Box::new(operation),
                         approval_set: Box::new(approval_set),
                         policy_decision_hash: requirement.policy_decision_hash().to_string(),
-                        admission_artifact_fingerprint: Some(admission_artifact_fingerprint),
+                        admission_artifact_fingerprint,
                         authorized_at_unix_ms: stable_authorized_at_unix_ms,
                     },
                 ))

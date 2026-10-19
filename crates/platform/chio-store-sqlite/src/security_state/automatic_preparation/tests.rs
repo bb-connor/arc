@@ -59,7 +59,7 @@ fn fixture() -> Result<AutomaticResponsePreparationClaimRequest, Box<dyn std::er
         authorization_capability_hash: plan.operator_capability.capability_digest,
         governed_intent_hash: Digest32::new([32; 32]),
         policy_decision_hash: Digest32::new([33; 32]),
-        admission_artifact_fingerprint: Some(Digest32::new([35; 32])),
+        admission_artifact_fingerprint: Digest32::new([35; 32]),
         approval: ResponseDispatchApproval::Automatic,
     };
     Ok(AutomaticResponsePreparationClaimRequest {
@@ -95,7 +95,7 @@ fn dispatch(
             authorization_capability_hash: binding.authorization_capability_hash,
             governed_intent_hash: binding.governed_intent_hash,
             policy_decision_hash: binding.policy_decision_hash,
-            admission_artifact_fingerprint: binding.admission_artifact_fingerprint,
+            admission_artifact_fingerprint: Some(binding.admission_artifact_fingerprint),
             executor_authority_id: binding.executor_authority_id.clone(),
             executor_authority_generation: binding.executor_authority_generation,
             approval: binding.approval.clone(),
@@ -170,7 +170,7 @@ fn concurrent_claims_choose_one_original_artifact_without_effects() -> TestResul
     let mut other = first.clone();
     other
         .prepared_dispatch_binding
-        .admission_artifact_fingerprint = Some(Digest32::new([36; 32]));
+        .admission_artifact_fingerprint = Digest32::new([36; 32]);
     other.prepared_dispatch_binding.dispatch_id = id("other-artifact-dispatch")?;
     let a = open(&path)?;
     let b = open(&path)?;
@@ -214,7 +214,7 @@ fn mismatched_claim_cannot_commit_or_fence_the_original_action() -> TestResult {
     let mut other = request.clone();
     other
         .prepared_dispatch_binding
-        .admission_artifact_fingerprint = Some(Digest32::new([36; 32]));
+        .admission_artifact_fingerprint = Digest32::new([36; 32]);
     other.prepared_dispatch_binding.dispatch_id = id("other-artifact-dispatch")?;
     let observer = Connection::open(&path)?;
     let before = counts(&observer)?;
@@ -298,154 +298,113 @@ fn readiness_refuses_missing_immutability_trigger_and_foreign_index() -> TestRes
     Ok(())
 }
 
-#[test]
-fn legacy_action_fence_remains_lossless_and_blocks_bound_preparation() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("legacy.db");
-    let store = open(&path)?;
-    let request = fixture()?;
-    let observer = Connection::open(&path)?;
-    let mut legacy = request.prepared_dispatch_binding.clone();
-    legacy.schema_version = 1;
-    legacy.admission_artifact_fingerprint = None;
-    let (body, hash) = canonical_prepared_dispatch_binding(&legacy)?;
-    assert!(!std::str::from_utf8(&body)?.contains("admission_artifact_fingerprint"));
-    observer.execute("INSERT INTO security_response_dispatch_fences (dispatch_id, tenant_id, action_id, prepared_binding_body, prepared_binding_hash, fenced_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![legacy.dispatch_id.as_str(), legacy.tenant_id.as_str(), legacy.action_id.as_str(), body, hash.as_bytes().as_slice(), 42_000])?;
-    drop(store);
-    let store = open(&path)?;
-    store.ensure_dispatch_ready()?;
-    let fence = AutomaticResponseDispatchFenceRequest {
-        response_plan: request.response_plan.clone(),
-        prepared_dispatch_binding: legacy.clone(),
-    };
-    let outcome = store.fence_uncommitted_automatic_dispatch(&fence)?;
-    let AutomaticResponseDispatchFenceOutcome::ExistingFence(record) = outcome else {
-        return Err("legacy fence was not retained".into());
-    };
-    assert_eq!(record.prepared_dispatch_binding, legacy);
-    assert_eq!(record.binding_hash, hash);
-    let error = match store.claim_automatic_preparation(&request) {
-        Err(error) => error,
-        Ok(_) => return Err("bound claim bypassed legacy fence".into()),
-    };
-    assert_eq!(
-        error.kind(),
-        chio_security_types::ports::PortErrorKind::Conflict
-    );
-    let error = match store.commit_dispatch(&dispatch(&request)?) {
-        Err(error) => error,
-        Ok(_) => return Err("bound dispatch bypassed legacy fence".into()),
-    };
-    assert_eq!(
-        error.kind(),
-        chio_security_types::ports::PortErrorKind::Conflict
-    );
-    let retained: Vec<u8> = observer.query_row(
-        "SELECT prepared_binding_body FROM security_response_dispatch_fences",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(retained, body);
-    assert_eq!(counts(&observer)?, vec![0, 0, 1, 0, 0, 0, 0]);
-    Ok(())
-}
-
-fn recanonicalize_legacy_dispatch(request: &mut ResponseDispatchCommitRequest) -> TestResult {
-    let mut snapshot = chio_quarantine::decode_response_record(&request.response_plan)?;
-    let binding = snapshot
-        .execution_dispatch
-        .as_mut()
-        .ok_or("dispatch binding missing")?;
-    binding.schema_version = 1;
-    binding.admission_artifact_fingerprint = None;
-    binding.policy_decision_hash = request.authorization.body.policy_decision_hash;
-    snapshot.dispatch_authorization_hash = None;
-    request.authorization.body.schema_version = 1;
-    request.authorization.body.admission_artifact_fingerprint = None;
-    request.authorization.body.response_body_hash =
-        Digest32::new(*sha256(&canonical_json_bytes(&snapshot)?).as_bytes());
-    let authorization = canonical_json_bytes(&request.authorization.body)?;
-    request.authorization.body_hash = Digest32::new(*sha256(&authorization).as_bytes());
-    request.authorization.canonical_body = CanonicalBody::new(authorization)?;
-    snapshot.dispatch_authorization_hash = Some(request.authorization.body_hash);
-    let response = canonical_json_bytes(&snapshot)?;
-    request.response_plan.body_hash = Digest32::new(*sha256(&response).as_bytes());
-    request.response_plan.canonical_body = CanonicalBody::new(response)?;
+fn remove_artifact_field(value: &mut serde_json::Value, null: bool) -> TestResult {
+    let fields = value.as_object_mut().ok_or("binding object")?;
+    if null {
+        fields.insert(
+            "admission_artifact_fingerprint".to_owned(),
+            serde_json::Value::Null,
+        );
+    } else {
+        fields.remove("admission_artifact_fingerprint");
+    }
     Ok(())
 }
 
 #[test]
-fn raw_legacy_fresh_dispatch_only_replays_its_exact_existing_payload() -> TestResult {
-    let directory = chio_test_support::private_tempdir()?;
-    let path = directory.path().join("legacy-fresh.db");
-    let store = open(&path)?;
-    let mut legacy = dispatch(&fixture()?)?;
-    recanonicalize_legacy_dispatch(&mut legacy)?;
-    assert!(
-        !std::str::from_utf8(legacy.authorization.canonical_body.as_bytes())?
-            .contains("admission_artifact_fingerprint")
-    );
-    assert!(
-        !std::str::from_utf8(legacy.response_plan.canonical_body.as_bytes())?
-            .contains("admission_artifact_fingerprint")
-    );
-    let observer = Connection::open(&path)?;
-    let authorization = &legacy.authorization.body;
-    let response = &legacy.response_plan;
-    observer.execute("INSERT INTO security_response_plans (action_id, tenant_id, generation, state, body, body_hash, due_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)", params![response.action_id.as_str(), response.tenant_id.as_str(), to_i64(response.generation)?, response.state.as_str(), response.canonical_body.as_bytes(), response.body_hash.as_bytes().as_slice(), response.due_at_unix_ms.map(to_i64).transpose()?])?;
-    let lease_hash = scheduler_lease_body_hash(
-        response.tenant_id.as_str(),
-        response.action_id.as_str(),
-        authorization.key.dispatch_id.as_str(),
-        0,
-        legacy.initial_lease.lease_owner_id.as_str(),
-        legacy.initial_lease.lease_expires_at_unix_ms,
-        1,
-    )?;
-    observer.execute("INSERT INTO security_scheduler_leases (action_id, tenant_id, claim_id, claim_ordinal, lease_owner_id, lease_expires_at, fencing_token, lease_body_hash) VALUES (?1, ?2, ?3, 0, ?4, ?5, 1, ?6)", params![response.action_id.as_str(), response.tenant_id.as_str(), authorization.key.dispatch_id.as_str(), legacy.initial_lease.lease_owner_id.as_str(), to_i64(legacy.initial_lease.lease_expires_at_unix_ms)?, lease_hash.as_slice()])?;
-    observer.execute("INSERT INTO security_response_dispatches (dispatch_id, tenant_id, action_id, commit_mode, authorization_body, authorization_body_hash, response_generation, response_state, response_body, response_body_hash, response_due_at, initial_lease_owner_id, initial_lease_expires_at, initial_fencing_token) VALUES (?1, ?2, ?3, 'fresh', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1)", params![authorization.key.dispatch_id.as_str(), response.tenant_id.as_str(), response.action_id.as_str(), legacy.authorization.canonical_body.as_bytes(), legacy.authorization.body_hash.as_bytes().as_slice(), to_i64(response.generation)?, response.state.as_str(), response.canonical_body.as_bytes(), response.body_hash.as_bytes().as_slice(), response.due_at_unix_ms.map(to_i64).transpose()?, legacy.initial_lease.lease_owner_id.as_str(), to_i64(legacy.initial_lease.lease_expires_at_unix_ms)?])?;
-    let before = counts(&observer)?;
-    drop(store);
-    let store = open(&path)?;
-    store.ensure_dispatch_ready()?;
-    let ResponseDispatchCommitOutcome::Existing(record) = store.commit_dispatch(&legacy)? else {
-        return Err("legacy fresh row was not replayed exactly".into());
-    };
-    assert_eq!(record.authorization, legacy.authorization);
-    assert_eq!(record.response_plan, legacy.response_plan);
-    let mut different = legacy.clone();
-    different.authorization.body.policy_decision_hash = Digest32::new([37; 32]);
-    recanonicalize_legacy_dispatch(&mut different)?;
-    let error = match store.commit_dispatch(&different) {
-        Err(error) => error,
-        Ok(_) => return Err("legacy existing row accepted another payload".into()),
-    };
-    assert_eq!(
-        error.kind(),
-        chio_security_types::ports::PortErrorKind::Conflict
-    );
-    assert_eq!(counts(&observer)?, before);
-    assert_eq!(
-        load_response_dispatch(&observer, &authorization.key)?
-            .ok_or("legacy row lost")?
-            .authorization,
-        legacy.authorization
-    );
-    assert_eq!(
-        before[0], 0,
-        "legacy row was backfilled as fresh preparation authority"
-    );
-    let empty_path = directory.path().join("unbound-new.db");
-    let empty = open(&empty_path)?;
-    let error = match empty.commit_dispatch(&legacy) {
-        Err(error) => error,
-        Ok(_) => return Err("unbound legacy data minted a fresh row".into()),
-    };
-    assert_eq!(
-        error.kind(),
-        chio_security_types::ports::PortErrorKind::InvalidData
-    );
-    assert_eq!(counts(&Connection::open(&empty_path)?)?, vec![0; 7]);
+fn unbound_action_fence_refuses_replay_without_mutation() -> TestResult {
+    for null in [false, true] {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("unbound-fence.db");
+        let store = open(&path)?;
+        let request = fixture()?;
+        let observer = Connection::open(&path)?;
+        let binding = &request.prepared_dispatch_binding;
+        let mut value = serde_json::to_value(binding)?;
+        remove_artifact_field(&mut value, null)?;
+        let body = canonical_json_bytes(&value)?;
+        let hash = sha256(&body);
+        observer.execute("INSERT INTO security_response_dispatch_fences (dispatch_id, tenant_id, action_id, prepared_binding_body, prepared_binding_hash, fenced_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", params![binding.dispatch_id.as_str(), binding.tenant_id.as_str(), binding.action_id.as_str(), body, hash.as_bytes().as_slice(), 42_000])?;
+        drop(store);
+        let store = open(&path)?;
+        let fence = AutomaticResponseDispatchFenceRequest {
+            response_plan: request.response_plan.clone(),
+            prepared_dispatch_binding: binding.clone(),
+        };
+        for error in [
+            store.ensure_dispatch_ready().err(),
+            store.fence_uncommitted_automatic_dispatch(&fence).err(),
+            store.claim_automatic_preparation(&request).err(),
+            store.commit_dispatch(&dispatch(&request)?).err(),
+        ] {
+            assert_eq!(
+                error.ok_or("unbound fence accepted")?.kind(),
+                chio_security_types::ports::PortErrorKind::IntegrityFailure
+            );
+        }
+        let retained: Vec<u8> = observer.query_row(
+            "SELECT prepared_binding_body FROM security_response_dispatch_fences",
+            [],
+            |row| row.get(0),
+        )?;
+        assert_eq!(retained, body);
+        assert_eq!(counts(&observer)?, vec![0, 0, 1, 0, 0, 0, 0]);
+    }
+    Ok(())
+}
+
+#[test]
+fn stored_unbound_dispatch_refuses_cold_replay_without_mutation() -> TestResult {
+    for null in [false, true] {
+        let directory = chio_test_support::private_tempdir()?;
+        let path = directory.path().join("unbound-dispatch.db");
+        let store = open(&path)?;
+        let fixture = fixture()?;
+        store.claim_automatic_preparation(&fixture)?;
+        let request = dispatch(&fixture)?;
+        store.commit_dispatch(&request)?;
+        let observer = Connection::open(&path)?;
+        let before = counts(&observer)?;
+        let mut response: serde_json::Value =
+            serde_json::from_slice(request.response_plan.canonical_body.as_bytes())?;
+        remove_artifact_field(&mut response["execution_dispatch"], null)?;
+        response["dispatch_authorization_hash"] = serde_json::Value::Null;
+        let mut authorization = serde_json::to_value(&request.authorization.body)?;
+        remove_artifact_field(&mut authorization, null)?;
+        authorization["response_body_hash"] = serde_json::to_value(Digest32::new(
+            *sha256(&canonical_json_bytes(&response)?).as_bytes(),
+        ))?;
+        let authorization_bytes = canonical_json_bytes(&authorization)?;
+        let authorization_hash = sha256(&authorization_bytes);
+        response["dispatch_authorization_hash"] =
+            serde_json::to_value(Digest32::new(*authorization_hash.as_bytes()))?;
+        let response_bytes = canonical_json_bytes(&response)?;
+        let response_hash = sha256(&response_bytes);
+        observer.execute("UPDATE security_response_dispatches SET authorization_body=?1, authorization_body_hash=?2, response_body=?3, response_body_hash=?4", params![authorization_bytes, authorization_hash.as_bytes().as_slice(), response_bytes, response_hash.as_bytes().as_slice()])?;
+        observer.execute(
+            "UPDATE security_response_plans SET body=?1, body_hash=?2",
+            params![response_bytes, response_hash.as_bytes().as_slice()],
+        )?;
+        drop(store);
+        let store = open(&path)?;
+        for error in [
+            store.ensure_dispatch_ready().err(),
+            store.load_dispatch(&request.authorization.body.key).err(),
+            store.commit_dispatch(&request).err(),
+        ] {
+            assert_eq!(
+                error.ok_or("unbound dispatch replayed")?.kind(),
+                chio_security_types::ports::PortErrorKind::IntegrityFailure
+            );
+        }
+        assert_eq!(counts(&observer)?, before);
+        let retained: (Vec<u8>, Vec<u8>) = observer.query_row(
+            "SELECT authorization_body, response_body FROM security_response_dispatches",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        assert_eq!(retained, (authorization_bytes, response_bytes));
+    }
     Ok(())
 }
 
@@ -483,7 +442,7 @@ fn raw_preparation_pin(
 fn recanonicalize_execution_binding_only(
     request: &mut ResponseDispatchCommitRequest,
     schema_version: u8,
-    fingerprint: Option<Digest32>,
+    fingerprint: Digest32,
 ) -> TestResult {
     let authorization_schema = request.authorization.body.schema_version;
     let authorization_fingerprint = request.authorization.body.admission_artifact_fingerprint;
@@ -494,7 +453,6 @@ fn recanonicalize_execution_binding_only(
         .ok_or("execution binding missing")?;
     binding.schema_version = schema_version;
     binding.admission_artifact_fingerprint = fingerprint;
-    binding.validate_for_plan(&snapshot.plan)?;
     snapshot.dispatch_authorization_hash = None;
     request.authorization.body.response_body_hash =
         Digest32::new(*sha256(&canonical_json_bytes(&snapshot)?).as_bytes());
@@ -519,7 +477,7 @@ fn recanonicalize_execution_binding_only(
 fn execution_binding_mismatch_preserves_pin(
     label: &str,
     execution_schema: u8,
-    execution_fingerprint: Option<Digest32>,
+    execution_fingerprint: Digest32,
 ) -> TestResult {
     let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join(format!("{label}.db"));
@@ -534,14 +492,15 @@ fn execution_binding_mismatch_preserves_pin(
     assert_eq!(before, vec![1, 0, 0, 0, 0, 0, 0]);
     let raw_before = raw_preparation_pin(&observer, &request)?;
     let healthy = dispatch(&request)?;
-    assert_eq!(healthy.authorization.body.schema_version, 2);
+    assert_eq!(healthy.authorization.body.schema_version, 1);
     assert_eq!(
         healthy.authorization.body.admission_artifact_fingerprint,
-        Some(Digest32::new([35; 32]))
+        Digest32::new([35; 32])
     );
     let mut mismatch = healthy.clone();
     recanonicalize_execution_binding_only(&mut mismatch, execution_schema, execution_fingerprint)?;
-    let decoded = chio_quarantine::decode_response_record(&mismatch.response_plan)?;
+    let decoded: chio_security_types::ResponseSnapshot =
+        serde_json::from_slice(mismatch.response_plan.canonical_body.as_bytes())?;
     let execution = decoded
         .execution_dispatch
         .as_ref()
@@ -595,14 +554,19 @@ fn fresh_dispatch_rejects_execution_fingerprint_different_from_authorization_and
 {
     execution_binding_mismatch_preserves_pin(
         "execution-fingerprint-mismatch",
-        2,
-        Some(Digest32::new([36; 32])),
+        1,
+        Digest32::new([36; 32]),
     )
 }
 
 #[test]
-fn fresh_dispatch_rejects_legacy_execution_binding_beside_v2_authorization_and_pin() -> TestResult {
-    execution_binding_mismatch_preserves_pin("execution-schema-mismatch", 1, None)
+fn fresh_dispatch_rejects_unsupported_execution_schema_beside_v1_authorization_and_pin(
+) -> TestResult {
+    execution_binding_mismatch_preserves_pin(
+        "execution-schema-mismatch",
+        2,
+        Digest32::new([35; 32]),
+    )
 }
 
 type SchemaCatalogObject = (String, String, String, i64, Option<String>);

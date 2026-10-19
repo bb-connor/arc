@@ -25,20 +25,13 @@ fn commit_without_effects(
     }
 }
 
-fn recanonicalize(
-    record: &mut ResponseDispatchRecord,
-    fingerprint: Option<Digest32>,
-) -> TestResult {
+fn recanonicalize(record: &mut ResponseDispatchRecord, fingerprint: Digest32) -> TestResult {
     let mut snapshot = decode_response_record(&record.response_plan)?;
     let binding = snapshot
         .execution_dispatch
         .as_mut()
         .ok_or("execution binding missing")?;
-    let schema = if fingerprint.is_some() {
-        chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
-    } else {
-        1
-    };
+    let schema = chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION;
     binding.schema_version = schema;
     binding.admission_artifact_fingerprint = fingerprint;
     binding.validate_for_plan(&snapshot.plan)?;
@@ -82,7 +75,7 @@ fn assert_original_unchanged(
     Ok(())
 }
 
-fn reject_other_binding(fingerprint: Option<Digest32>) -> TestResult {
+fn reject_other_binding(fingerprint: Digest32) -> TestResult {
     let harness = Harness::new();
     let raw = harness.automatic_request();
     let validated = harness.executor.validate_execution_request(raw.clone())?;
@@ -94,7 +87,7 @@ fn reject_other_binding(fingerprint: Option<Digest32>) -> TestResult {
     let mut alternate = original.clone();
     recanonicalize(&mut alternate, fingerprint)?;
     assert_ne!(
-        alternate.authorization.body.admission_artifact_fingerprint,
+        Some(alternate.authorization.body.admission_artifact_fingerprint),
         raw.admission_artifact_fingerprint
     );
     assert_eq!(
@@ -121,56 +114,38 @@ fn reject_other_binding(fingerprint: Option<Digest32>) -> TestResult {
 
 #[test]
 fn existing_dispatch_rejects_other_coherent_artifact_fingerprint() -> TestResult {
-    reject_other_binding(Some(Digest32::new([36; 32])))
+    reject_other_binding(Digest32::new([36; 32]))
 }
 
 #[test]
-fn existing_dispatch_rejects_coherent_legacy_downgrade_of_bound_request() -> TestResult {
-    reject_other_binding(None)
-}
-
-#[test]
-fn existing_dispatch_accepts_exact_coherent_legacy_request() -> TestResult {
+fn execution_request_refuses_unbound_artifact_for_every_origin() -> TestResult {
     let harness = Harness::new();
-    let mut raw = harness.governed_request();
-    raw.origin = ActiveResponseExecutionOrigin::CommittedAdmission;
-    raw.admission_artifact_fingerprint = None;
-    raw.dispatch_id = derive_active_response_dispatch_id(
-        &raw.response_plan,
-        &raw.executor_authority,
-        &raw.authorization_capability_hash,
-        &raw.governed_intent_hash,
-        &raw.policy_decision_hash,
-        raw.authorized_at_unix_ms,
-        &raw.approval,
-    )?;
-    let validated = harness.executor.validate_execution_request(raw.clone())?;
-    let record = commit_without_effects(&harness, &raw)?;
-    assert_eq!(record.authorization.body.schema_version, 1);
-    assert_eq!(
-        record.authorization.body.admission_artifact_fingerprint,
-        None
-    );
-    assert!(
-        !std::str::from_utf8(record.authorization.canonical_body.as_bytes())?
-            .contains("admission_artifact_fingerprint")
-    );
-    harness
-        .executor
-        .validate_existing_dispatch(&validated, &record)?;
-    assert_eq!(
-        harness
-            .executor
-            .store
-            .load_dispatch(&record.authorization.body.key)?,
-        ResponseDispatchLoadOutcome::Found(Box::new(record.clone()))
-    );
+    for origin in [
+        ActiveResponseExecutionOrigin::Fresh,
+        ActiveResponseExecutionOrigin::CommittedAdmission,
+        ActiveResponseExecutionOrigin::CommittedDispatch,
+    ] {
+        for fingerprint in [None, Some(Digest32::new([0; 32]))] {
+            let mut raw = harness.governed_request();
+            raw.origin = origin;
+            raw.admission_artifact_fingerprint = fingerprint;
+            let result = harness.executor.validate_execution_request(raw);
+            assert!(matches!(
+                result,
+                Err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                    chio_security_types::DispatchRejection::UnboundArtifactPreparation
+                ))
+            ));
+        }
+    }
     assert_eq!(harness.effect_executions(), 0);
-    let rows: i64 = rusqlite::Connection::open(&harness.database_path)?.query_row(
+    let connection = rusqlite::Connection::open(&harness.database_path)?;
+    for query in [
         "SELECT COUNT(*) FROM security_response_automatic_preparations",
-        [],
-        |row| row.get(0),
-    )?;
-    assert_eq!(rows, 0);
+        "SELECT COUNT(*) FROM security_response_dispatches",
+    ] {
+        let rows: i64 = connection.query_row(query, [], |row| row.get(0))?;
+        assert_eq!(rows, 0);
+    }
     Ok(())
 }
