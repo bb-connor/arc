@@ -301,14 +301,18 @@ fn npm_socket_entry_is_rejected() {
 }
 
 #[test]
+#[ignore = "requires bubblewrap, prlimit, cgroup isolation and a self-contained node and npm on PATH"]
 fn npm_runs_an_offline_script_in_the_sandbox() {
     use super::super::{executable_on_path, require_sandbox, run_test_command_with_timeout};
 
-    if executable_on_path("npm").is_none()
-        || executable_on_path("node").is_none()
-        || require_sandbox().is_err()
-    {
-        return;
+    for executable in ["node", "npm"] {
+        assert!(
+            executable_on_path(executable).is_some(),
+            "npm sandbox test requires {executable} on PATH"
+        );
+    }
+    if let Err(error) = require_sandbox() {
+        panic!("npm sandbox test requires the verified-fix sandbox: {error}");
     }
     let root = tempfile::tempdir().unwrap();
     fs::write(
