@@ -438,14 +438,19 @@ fn dispatch_committed_and_unknown_retries_never_resend() {
 fn exactly_n_concurrent_requests_capture_and_only_upstream_sees_secret() {
     let maximum = 4;
     let fixture = Arc::new(fixture(maximum, false, false));
-    let barrier = Arc::new(Barrier::new(12));
+    let executions = (0..12)
+        .map(|index| {
+            let (request, trusted) = execution(&fixture, index, maximum);
+            register_execution(&fixture, &request, &trusted, 20);
+            (request, trusted)
+        })
+        .collect::<Vec<_>>();
+    let barrier = Arc::new(Barrier::new(executions.len()));
     let mut workers = Vec::new();
-    for index in 0..12 {
+    for (request, trusted) in executions {
         let fixture = Arc::clone(&fixture);
         let barrier = Arc::clone(&barrier);
         workers.push(thread::spawn(move || {
-            let (request, trusted) = execution(&fixture, index, maximum);
-            register_execution(&fixture, &request, &trusted, 20);
             barrier.wait();
             fixture.service.execute(&request, &trusted, 21)
         }));
