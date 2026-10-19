@@ -2772,6 +2772,102 @@ mod tests {
         assert!(format!("{err}").contains("denied"));
     }
 
+    #[test]
+    fn jsonrpc_internal_errors_return_fixed_messages_without_detail() {
+        let leaked = "/var/lib/chio/receipts.sqlite3: database is locked";
+        let cases = [
+            (
+                A2aEdgeError::Kernel(format!("task projection failed: {leaked}")),
+                "internal error",
+            ),
+            (
+                A2aEdgeError::Manifest(chio_manifest::ManifestError::DuplicateToolName(
+                    leaked.to_string(),
+                )),
+                "internal error",
+            ),
+            (
+                A2aEdgeError::Bridge(BridgeError::Canonical(leaked.to_string())),
+                "internal error",
+            ),
+            (
+                A2aEdgeError::Bridge(BridgeError::InvalidAttenuation(leaked.to_string())),
+                "internal error",
+            ),
+            (
+                A2aEdgeError::Bridge(BridgeError::Kernel(chio_kernel::KernelError::Internal(
+                    leaked.to_string(),
+                ))),
+                "CHIO-KERNEL-INTERNAL",
+            ),
+            (
+                A2aEdgeError::Bridge(BridgeError::Kernel(
+                    chio_kernel::KernelError::ReceiptWriterUnavailable(leaked.to_string()),
+                )),
+                "CHIO-KERNEL-RECEIPT-WRITER-UNAVAILABLE",
+            ),
+        ];
+
+        for (error, expected_message) in cases {
+            let local_display = error.to_string();
+            let response = ChioA2aEdge::jsonrpc_error_response(json!(7), error);
+
+            assert_eq!(
+                response.as_value(),
+                Some(&json!({
+                    "jsonrpc": "2.0",
+                    "id": 7,
+                    "error": { "code": -32603, "message": expected_message }
+                }))
+            );
+            assert_eq!(
+                response.local_error().map(ToString::to_string),
+                Some(local_display)
+            );
+        }
+    }
+
+    #[test]
+    fn jsonrpc_bridge_peer_refusals_return_fixed_messages() {
+        let cases = [
+            (
+                A2aEdgeError::Bridge(BridgeError::InvalidRequest(
+                    "metadata must be a JSON object".to_string(),
+                )),
+                -32602,
+                "metadata must be a JSON object",
+            ),
+            (
+                A2aEdgeError::Bridge(BridgeError::CapabilityRefMismatch {
+                    expected: "capability-a".to_string(),
+                    actual: "capability-b".to_string(),
+                }),
+                -32602,
+                "capability reference mismatch",
+            ),
+            (
+                A2aEdgeError::Bridge(BridgeError::UnsupportedTargetProtocol(
+                    DiscoveryProtocol::A2a,
+                )),
+                -32004,
+                "unsupported target protocol",
+            ),
+        ];
+
+        for (error, expected_code, expected_message) in cases {
+            let response = ChioA2aEdge::jsonrpc_error_response(json!("peer"), error);
+
+            assert_eq!(
+                response.as_value(),
+                Some(&json!({
+                    "jsonrpc": "2.0",
+                    "id": "peer",
+                    "error": { "code": expected_code, "message": expected_message }
+                }))
+            );
+        }
+    }
+
     // ---- Duplicate skill handling ----
 
     #[test]
