@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <strong>A kernel that governs what your agents may do.</strong>
+  <strong>The kernel for tomorrow's computer.</strong>
 </p>
 
 <p align="center">
