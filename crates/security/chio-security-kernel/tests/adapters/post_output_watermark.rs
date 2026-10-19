@@ -370,23 +370,89 @@ fn a_retried_request_with_two_inactive_tokens_keeps_both_first_observations() {
     assert_ne!(first, second);
 }
 
+fn other_principal(request: &ToolCallRequest) -> ToolCallRequest {
+    ToolCallRequest {
+        agent_id: Keypair::from_seed(&[63_u8; 32]).public_key().to_hex(),
+        ..request.clone()
+    }
+}
+
 #[test]
-fn an_inactive_token_whose_request_attribution_changes_still_blocks() {
+fn two_principals_reusing_one_request_id_each_record_their_own_observations() {
     let fixture = WatermarkFixture::new();
     let response = two_retired_tokens(&fixture);
     let first_principal = request();
+    let second_principal = other_principal(&first_principal);
+    assert_eq!(second_principal.request_id, first_principal.request_id);
+    assert_ne!(second_principal.agent_id, first_principal.agent_id);
     assert!(matches!(
         fixture.inspect(&first_principal, OBSERVED_AT, &response),
         PostInvocationVerdict::Allow
     ));
-    let other_principal = ToolCallRequest {
-        agent_id: Keypair::from_seed(&[63_u8; 32]).public_key().to_hex(),
-        ..first_principal.clone()
-    };
-    assert_eq!(other_principal.request_id, first_principal.request_id);
-    assert_ne!(other_principal.agent_id, first_principal.agent_id);
     assert!(matches!(
-        fixture.inspect(&other_principal, OBSERVED_AT + 1, &response),
+        fixture.inspect(&second_principal, OBSERVED_AT + 1, &response),
+        PostInvocationVerdict::Allow
+    ));
+    assert_eq!(
+        fixture.results(),
+        [
+            WatermarkObservationResult::Recorded,
+            WatermarkObservationResult::Recorded,
+            WatermarkObservationResult::Recorded,
+            WatermarkObservationResult::Recorded
+        ]
+    );
+}
+
+#[test]
+fn a_retry_by_the_second_principal_is_a_duplicate_of_its_own_first_observations() {
+    let fixture = WatermarkFixture::new();
+    let response = two_retired_tokens(&fixture);
+    let first_principal = request();
+    let second_principal = other_principal(&first_principal);
+    for (principal, observed_at) in [
+        (&first_principal, OBSERVED_AT),
+        (&second_principal, OBSERVED_AT + 1),
+        (&second_principal, OBSERVED_AT + 2),
+    ] {
+        assert!(matches!(
+            fixture.inspect(principal, observed_at, &response),
+            PostInvocationVerdict::Allow
+        ));
+    }
+    let results = fixture.results();
+    assert_eq!(results.len(), 6);
+    for retry in &results[4..] {
+        assert!(
+            matches!(
+                retry,
+                WatermarkObservationResult::Duplicate {
+                    first_observed_at_unix_ms,
+                    ..
+                } if *first_observed_at_unix_ms == OBSERVED_AT + 1
+            ),
+            "retry must return the same principal's first observation: {retry:?}"
+        );
+    }
+}
+
+#[test]
+fn an_inactive_token_whose_attribution_changes_for_the_same_principal_still_blocks() {
+    let fixture = WatermarkFixture::new();
+    let response = two_retired_tokens(&fixture);
+    let first_call = request();
+    assert!(matches!(
+        fixture.inspect(&first_call, OBSERVED_AT, &response),
+        PostInvocationVerdict::Allow
+    ));
+    let changed_attribution = ToolCallRequest {
+        tool_name: "tool-b".to_string(),
+        ..first_call.clone()
+    };
+    assert_eq!(changed_attribution.request_id, first_call.request_id);
+    assert_eq!(changed_attribution.agent_id, first_call.agent_id);
+    assert!(matches!(
+        fixture.inspect(&changed_attribution, OBSERVED_AT + 1, &response),
         PostInvocationVerdict::Block(_)
     ));
 }

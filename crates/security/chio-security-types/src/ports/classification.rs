@@ -4,6 +4,7 @@ use super::{
     BodyError, BoundedVec, CanonicalBody, ClassifierId, ClassifierVersion, Deserialize, Digest32,
     RecordId, RequestId, Serialize, TenantId, Vec,
 };
+use crate::flow::PrincipalId;
 
 pub type ClassificationFindings = BoundedVec<ClassificationFinding, 256>;
 
@@ -85,6 +86,8 @@ pub enum TripwireKind {
 #[serde(deny_unknown_fields)]
 pub struct TripwireInput {
     pub tenant_id: TenantId,
+    /// Kernel-authoritative principal that presented or observed `content`.
+    pub principal_id: PrincipalId,
     pub request_id: RequestId,
     pub kind: TripwireKind,
     /// Bounded presented bytes. The detector verifies `content_digest`
