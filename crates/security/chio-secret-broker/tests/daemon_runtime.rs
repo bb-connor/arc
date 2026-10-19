@@ -10,6 +10,7 @@ use chio_secret_broker::daemon_runtime::{
     BrokerDaemonPrivilegedAuditConfig, ProviderPlacementConfig, BROKER_DAEMON_CONFIG_SCHEMA,
 };
 use chio_secret_broker::service::IpcOperation;
+use chio_secret_broker::BrokerError;
 use chio_test_support::prelude::*;
 
 #[cfg(unix)]
@@ -20,6 +21,34 @@ fn current_uid() -> u32 {
 #[cfg(unix)]
 fn current_gid() -> u32 {
     rustix::process::getegid().as_raw()
+}
+
+const MIGRATION_CONTROLS: &str =
+    "daemon enterprise migration anchors must contain the exact sorted broker controls";
+const MIGRATION_MISBOUND: &str =
+    "daemon enterprise migration anchor is misbound to its provider or control";
+const IPC_DEADLINES: &str = "broker IPC deadlines must be between 1 and 30000 milliseconds";
+const AUDIT_DEADLINES: &str = "privileged audit deadlines must be between 1 and 30000 milliseconds";
+#[cfg(target_os = "linux")]
+const MIGRATION_LEDGER_INTEGRITY: &str =
+    "broker storage failed: daemon enterprise migration state database failed: \
+     enterprise migration state schema or transition ledger failed integrity validation";
+const DISTINCT_DATABASES: &str = "daemon database paths must be distinct";
+
+fn assert_invalid_request<T: std::fmt::Debug>(
+    result: chio_secret_broker::Result<T>,
+    message: &str,
+) {
+    let error = result.test_expect_err("the runtime config must be refused");
+    assert!(
+        matches!(error, BrokerError::InvalidRequest(_)),
+        "unexpected variant: {error:?}"
+    );
+    assert_eq!(error.diagnostic_code(), "invalid_request");
+    assert_eq!(
+        error.to_string(),
+        format!("broker request is invalid: {message}")
+    );
 }
 
 fn config(directory: &std::path::Path) -> BrokerDaemonConfig {
@@ -91,38 +120,31 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
 
     let mut foreign_schema = valid.clone();
     foreign_schema.schema = "chio.secret-brokerd.runtime-config.unknown".to_string();
-    foreign_schema
-        .validate()
-        .test_expect_err("a runtime config with another schema must be rejected");
+    assert_invalid_request(foreign_schema.validate(), "daemon config schema is invalid");
 
     let mut missing_binding = valid.clone();
     missing_binding.enterprise_migration.heads.clear();
-    missing_binding
-        .validate()
-        .test_expect_err("both broker migration bindings are required");
+    assert_invalid_request(missing_binding.validate(), MIGRATION_CONTROLS);
 
     let mut wrong_deployment = valid.clone();
     wrong_deployment.enterprise_migration.deployment_id =
         chio_security_types::ports::RecordId::new("wrong-deployment")
             .test_expect("wrong deployment id");
-    wrong_deployment
-        .validate()
-        .test_expect_err("migration deployment must match daemon deployment");
+    assert_invalid_request(
+        wrong_deployment.validate(),
+        "daemon enterprise migration deployment does not match the broker deployment",
+    );
 
     let mut wrong_provider = valid.clone();
     wrong_provider.enterprise_migration.credential_provider =
         chio_security_types::ports::RecordId::new("wrong-provider")
             .test_expect("wrong provider id");
-    wrong_provider
-        .validate()
-        .test_expect_err("migration heads must match the configured provider");
+    assert_invalid_request(wrong_provider.validate(), MIGRATION_MISBOUND);
 
     let mut wrong_control = valid.clone();
     wrong_control.enterprise_migration.heads[0].key.control =
         chio_security_types::EnterpriseMigrationControl::BrokerQuotaEnforcement;
-    wrong_control
-        .validate()
-        .test_expect_err("migration heads must bind both exact controls");
+    assert_invalid_request(wrong_control.validate(), MIGRATION_CONTROLS);
 
     for (field, value) in [
         ("credentialCustodyStage", serde_json::json!("shadow")),
@@ -147,48 +169,61 @@ fn daemon_runtime_config_is_closed_and_rejects_partial_authority_or_storage() {
 
     let mut reused_runner = valid.clone();
     reused_runner.trusted_audit_runner = reused_runner.broker_identity.clone();
-    reused_runner
-        .validate()
-        .test_expect_err("audit runner must use an independent key");
+    assert_invalid_request(
+        reused_runner.validate(),
+        "daemon audit runner key must be independent of broker and operator keys",
+    );
 
     let mut partial = valid.clone();
     partial.authority_timeout_ms = 0;
-    assert!(partial.validate().is_err());
+    assert_invalid_request(
+        partial.validate(),
+        "daemon provider or authority limits are invalid",
+    );
 
     let mut unbounded_ipc = valid.clone();
     unbounded_ipc.ipc_read_timeout_ms = 0;
-    assert!(unbounded_ipc.validate().is_err());
+    assert_invalid_request(unbounded_ipc.validate(), IPC_DEADLINES);
 
     let mut aliased_audit_socket = valid.clone();
     aliased_audit_socket.privileged_audit.socket_path =
         aliased_audit_socket.ipc_socket_path.clone();
-    assert!(aliased_audit_socket.validate().is_err());
+    assert_invalid_request(
+        aliased_audit_socket.validate(),
+        "broker, authority, and privileged audit sockets must be distinct",
+    );
 
     let mut shared_audit_parent = valid.clone();
     shared_audit_parent.privileged_audit.socket_path = shared_audit_parent
         .ipc_socket_path
         .with_file_name("audit.sock");
-    assert!(shared_audit_parent.validate().is_err());
+    assert_invalid_request(
+        shared_audit_parent.validate(),
+        "privileged audit socket must use a dedicated parent directory",
+    );
 
     let mut unbounded_audit = valid.clone();
     unbounded_audit.privileged_audit.read_timeout_ms = 0;
-    assert!(unbounded_audit.validate().is_err());
+    assert_invalid_request(unbounded_audit.validate(), AUDIT_DEADLINES);
 
     let mut stale_audit_authorization = valid.clone();
     stale_audit_authorization
         .privileged_audit
         .authorization_lifetime_seconds = 301;
-    assert!(stale_audit_authorization.validate().is_err());
+    assert_invalid_request(
+        stale_audit_authorization.validate(),
+        "privileged audit identity or authorization lifetime is invalid",
+    );
 
     let mut aliased_storage = valid;
     aliased_storage.databases.receipt_database_path =
         aliased_storage.databases.attempt_database_path.clone();
-    assert!(aliased_storage.validate().is_err());
+    assert_invalid_request(aliased_storage.validate(), DISTINCT_DATABASES);
 
     let mut aliased_migration = config(directory.path());
     aliased_migration.enterprise_migration.state_database_path =
         aliased_migration.databases.receipt_database_path.clone();
-    assert!(aliased_migration.validate().is_err());
+    assert_invalid_request(aliased_migration.validate(), DISTINCT_DATABASES);
 }
 
 #[cfg(unix)]
@@ -201,9 +236,12 @@ fn daemon_runtime_config_rejects_a_self_declared_service_uid() {
     let error = untrusted
         .validate()
         .test_expect_err("configured service UID must be anchored to the effective UID");
-    assert!(error
-        .to_string()
-        .contains("effective service UID does not match"));
+    assert!(matches!(error, BrokerError::Custody(_)), "{error:?}");
+    assert_eq!(error.diagnostic_code(), "custody");
+    assert_eq!(
+        error.to_string(),
+        "broker custody failed: effective service UID does not match the trusted daemon configuration"
+    );
 }
 
 #[test]
@@ -231,7 +269,14 @@ fn daemon_config_file_owner_is_bound_to_the_effective_service_uid() {
         canonical_json_bytes(&forged).test_expect("canonical forged config"),
     )
     .test_expect("write forged daemon config");
-    assert!(BrokerDaemonConfig::load(&config_path).is_err());
+    let error = BrokerDaemonConfig::load(&config_path)
+        .test_expect_err("a config owned by another UID than it declares must be refused");
+    assert!(matches!(error, BrokerError::Custody(_)), "{error:?}");
+    assert_eq!(error.diagnostic_code(), "custody");
+    assert_eq!(
+        error.to_string(),
+        "broker custody failed: daemon config owner does not match the trusted service UID"
+    );
 }
 
 #[test]
@@ -276,7 +321,7 @@ mod startup {
     };
     use chio_secret_broker::budget::{ExecutionAuthorityCapabilities, ExecutionAuthorityProfile};
     use chio_secret_broker::daemon_runtime::BrokerDaemonRuntime;
-    use chio_secret_broker::{BrokerError, Result};
+    use chio_secret_broker::Result;
     use rustix::fs::{fcntl_add_seals, memfd_create, MemfdFlags, SealFlags};
 
     use super::*;
@@ -327,12 +372,17 @@ mod startup {
         let mut wrong_head = daemon_config.clone();
         wrong_head.enterprise_migration.heads[0].transition_digest =
             chio_security_types::ports::Digest32::new([0xee; 32]);
-        assert!(BrokerDaemonRuntime::build(
+        let error = match BrokerDaemonRuntime::build(
             wrong_head,
             sealed_read_only_seed("wrong-head-master", &[81; 32]),
             sealed_read_only_seed("wrong-head-signing", &[93; 32]),
-        )
-        .is_err());
+        ) {
+            Ok(_) => panic!("wrong-head startup must be refused"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, BrokerError::Storage(_)), "{error:?}");
+        assert_eq!(error.diagnostic_code(), "storage");
+        assert_eq!(error.to_string(), MIGRATION_LEDGER_INTEGRITY);
         assert!(!broker_socket.exists());
         assert!(!audit_socket.exists());
 
@@ -342,12 +392,17 @@ mod startup {
         std::fs::set_permissions(&missing_path, std::fs::Permissions::from_mode(0o600))
             .test_expect("harden missing-binding ledger");
         missing_binding.enterprise_migration.state_database_path = missing_path;
-        assert!(BrokerDaemonRuntime::build(
+        let error = match BrokerDaemonRuntime::build(
             missing_binding,
             sealed_read_only_seed("missing-binding-master", &[81; 32]),
             sealed_read_only_seed("missing-binding-signing", &[93; 32]),
-        )
-        .is_err());
+        ) {
+            Ok(_) => panic!("missing-binding startup must be refused"),
+            Err(error) => error,
+        };
+        assert!(matches!(error, BrokerError::Storage(_)), "{error:?}");
+        assert_eq!(error.diagnostic_code(), "storage");
+        assert_eq!(error.to_string(), MIGRATION_LEDGER_INTEGRITY);
         assert!(!broker_socket.exists());
         assert!(!audit_socket.exists());
     }
