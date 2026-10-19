@@ -19,14 +19,28 @@ pub(crate) fn unique_temp_dir(prefix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("{prefix}-{stamp}-{}", std::process::id()))
 }
 
+pub(crate) const MAX_JSON_INPUT_BYTES: usize = 16 * 1024 * 1024;
+
 /// Decodes with the signed-wire contract: a duplicate object key at any depth
 /// rejects before typed projection, so embedded receipts are checked against
-/// the bytes that were read.
+/// the bytes that were read. Input larger than `MAX_JSON_INPUT_BYTES` is
+/// refused after reading at most one byte past the bound.
 pub(crate) fn read_json_file<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, CliError> {
-    let bytes = fs::read(path)?;
-    let text = std::str::from_utf8(&bytes)
-        .map_err(|error| CliError::Other(format!("{} is not UTF-8: {error}", path.display())))?;
-    Ok(chio_core::canonical::UntrustedJsonText::new(text).decode_signed()?)
+    read_json_file_bounded(path, MAX_JSON_INPUT_BYTES)
+}
+
+pub(super) fn read_json_file_bounded<T: serde::de::DeserializeOwned>(
+    path: &Path,
+    bound: usize,
+) -> Result<T, CliError> {
+    use std::io::Read as _;
+    let limit = u64::try_from(bound)
+        .ok()
+        .and_then(|bound| bound.checked_add(1))
+        .ok_or_else(|| CliError::Other("JSON input bound exceeds reader range".to_string()))?;
+    let mut bytes = Vec::new();
+    fs::File::open(path)?.take(limit).read_to_end(&mut bytes)?;
+    Ok(chio_core::canonical::UntrustedJsonText::from_wire(&bytes, bound)?.decode_signed()?)
 }
 
 pub(crate) fn write_json_file<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
