@@ -1,3 +1,4 @@
+use super::transaction_error::authorization_not_bound;
 use super::*;
 use chrono::{DateTime, Utc};
 use std::{collections::BTreeSet, path::Path};
@@ -149,23 +150,23 @@ fn validate_standalone_risk_approval_case(
         ("approval case expires_at", &approval.expires_at),
     ] {
         if value.is_empty() {
-            return Err(CliError::cli_other_error(format!(
+            return Err(artifact_schema_invalid(format!(
                 "proof verify: risk {field} missing"
             )));
         }
     }
     if approval.passport_id != passport.id {
-        return Err(CliError::cli_other_error(
+        return Err(authorization_not_bound(
             "proof verify: risk approval case passport mismatch",
         ));
     }
     if approval.risk_comptroller_report_ref != risk_report_id {
-        return Err(CliError::cli_other_error(
+        return Err(authorization_not_bound(
             "proof verify: risk approval case report mismatch",
         ));
     }
     if approval.decision != "approved" || approval.decision_subject != "evidence-export" {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: risk approval case denied",
         ));
     }
@@ -179,28 +180,28 @@ fn validate_standalone_risk_approval_case(
         || passport_issued_at < approval_issued_at
         || passport_issued_at >= approval_expires_at
     {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: risk approval case outside validity window",
         ));
     }
     let required_quorum = usize::try_from(approval.required_quorum)
-        .map_err(|_| CliError::cli_other_error("proof verify: risk approval quorum overflow"))?;
+        .map_err(|_| artifact_schema_invalid("proof verify: risk approval quorum overflow"))?;
     let mut unique_approvers = BTreeSet::new();
     for approver in &approval.approvers {
         let approver = approver.trim();
         if approver.is_empty() {
-            return Err(CliError::cli_other_error(
+            return Err(artifact_schema_invalid(
                 "proof verify: risk approval approver missing",
             ));
         }
         if !unique_approvers.insert(approver) {
-            return Err(CliError::cli_other_error(
+            return Err(claim_rejected(
                 "proof verify: risk approval approver duplicate",
             ));
         }
     }
     if required_quorum == 0 || unique_approvers.len() < required_quorum {
-        return Err(CliError::cli_other_error(
+        return Err(claim_rejected(
             "proof verify: risk approval quorum not satisfied",
         ));
     }
@@ -210,7 +211,7 @@ fn validate_standalone_risk_approval_case(
 fn parse_risk_timestamp(value: &str, label: &str) -> Result<DateTime<Utc>, CliError> {
     DateTime::parse_from_rfc3339(value)
         .map(|timestamp| timestamp.with_timezone(&Utc))
-        .map_err(|_| CliError::cli_other_error(format!("proof verify: {label} invalid")))
+        .map_err(|_| artifact_schema_invalid(format!("proof verify: {label} invalid")))
 }
 
 #[derive(serde::Deserialize)]
@@ -347,12 +348,12 @@ fn load_risk_comptroller_report_from_graph(
     let risk_report_node = match risk_report_nodes.as_slice() {
         [node] => *node,
         [] => {
-            return Err(CliError::cli_other_error(
+            return Err(claim_rejected(
                 "proof verify: missing risk comptroller report",
             ));
         }
         _ => {
-            return Err(CliError::cli_other_error(
+            return Err(artifact_schema_invalid(
                 "proof verify: multiple risk comptroller reports",
             ));
         }
@@ -360,7 +361,7 @@ fn load_risk_comptroller_report_from_graph(
 
     let schema = graph_node_schema(risk_report_node, "risk comptroller report")?;
     if schema != RISK_COMPTROLLER_REPORT_SCHEMA {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_schema_invalid(format!(
             "proof verify: unsupported risk comptroller report schema: {schema}",
         )));
     }
@@ -370,7 +371,7 @@ fn load_risk_comptroller_report_from_graph(
     let actual_digest = chio_core::sha256_hex(&bytes);
     let expected_digest = graph_node_sha256(risk_report_node, "risk comptroller report")?;
     if actual_digest != expected_digest {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_digest_mismatch(format!(
             "proof verify: risk comptroller report digest mismatch: expected {}, got {}",
             expected_digest, actual_digest,
         )));
@@ -383,4 +384,20 @@ fn load_risk_comptroller_report_from_graph(
     )
     .map_err(map_proof_error)?;
     crate::input::project(value)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn risk_timestamp_rejection_is_a_schema_rejection() {
+        let error = match super::parse_risk_timestamp("digest mismatch", "risk approval case issued_at") {
+            Ok(_) => panic!("expected a rejected timestamp"),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.report().code,
+            chio_errors::_generated::error_codes::TRANSACTION_ARTIFACT_SCHEMA_INVALID.urn
+        );
+        assert_eq!(super::super::proof_verify_exit_code(&error), 30);
+    }
 }

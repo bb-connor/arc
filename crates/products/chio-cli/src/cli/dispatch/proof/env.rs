@@ -1,5 +1,8 @@
 use std::{collections::BTreeSet, path::Path, sync::Arc, time::Duration};
 
+use super::transaction_error::{
+    artifact_schema_invalid, verifier_context_invalid, verifier_feature_unsupported,
+};
 use super::CliError;
 use chio_egress_contract::HttpEgressContract;
 
@@ -119,7 +122,7 @@ pub(super) fn agent_web_verifier_trust_from_env(
             chio_control_plane::agent_web::AgentWebVerifierTrust::new()
         }
         Err(std::env::VarError::NotUnicode(_)) => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(verifier_context_invalid(format!(
                 "{AGENT_WEB_STANDARD_WEBHOOKS_SECRET_ENV} must be valid UTF-8"
             )))
         }
@@ -134,7 +137,7 @@ pub(super) fn agent_web_verifier_trust_from_env(
     if let Some(reservation_id) = replay_reservation_id {
         trust = trust
             .with_standard_webhooks_replay_reservation_id(reservation_id)
-            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+            .map_err(|error| verifier_context_invalid(error.to_string()))?;
     }
     match std::env::var(AGENT_WEB_TRUSTED_KERNEL_KEYS_ENV) {
         Ok(keys) => {
@@ -145,7 +148,7 @@ pub(super) fn agent_web_verifier_trust_from_env(
         }
         Err(std::env::VarError::NotPresent) => {}
         Err(std::env::VarError::NotUnicode(_)) => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(verifier_context_invalid(format!(
                 "{AGENT_WEB_TRUSTED_KERNEL_KEYS_ENV} must be valid UTF-8"
             )))
         }
@@ -159,7 +162,7 @@ pub(super) fn agent_web_verifier_trust_from_env(
         }
         Err(std::env::VarError::NotPresent) => {}
         Err(std::env::VarError::NotUnicode(_)) => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(verifier_context_invalid(format!(
                 "{AGENT_WEB_TRUSTED_ENVELOPE_SIDECAR_KEYS_ENV} must be valid UTF-8"
             )))
         }
@@ -170,7 +173,7 @@ pub(super) fn agent_web_verifier_trust_from_env(
 pub(super) fn agent_web_replay_store_from_env(
 ) -> Result<chio_store_sqlite::SqliteAgentWebReplayStore, CliError> {
     agent_web_replay_store_from_env_if_configured()?.ok_or_else(|| {
-        CliError::cli_other_error(format!(
+        verifier_feature_unsupported(format!(
             "{AGENT_WEB_REPLAY_STORE_PATH_ENV} must be set and non-empty"
         ))
     })
@@ -180,14 +183,14 @@ pub(super) fn agent_web_replay_store_from_env_if_configured(
 ) -> Result<Option<chio_store_sqlite::SqliteAgentWebReplayStore>, CliError> {
     let replay_store_path = match std::env::var(AGENT_WEB_REPLAY_STORE_PATH_ENV) {
         Ok(value) if value.trim().is_empty() => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(verifier_context_invalid(format!(
                 "{AGENT_WEB_REPLAY_STORE_PATH_ENV} must be non-empty"
             )))
         }
         Ok(value) => value,
         Err(std::env::VarError::NotPresent) => return Ok(None),
         Err(std::env::VarError::NotUnicode(_)) => {
-            return Err(CliError::cli_other_error(format!(
+            return Err(verifier_context_invalid(format!(
                 "{AGENT_WEB_REPLAY_STORE_PATH_ENV} must be valid UTF-8"
             )))
         }
@@ -195,7 +198,7 @@ pub(super) fn agent_web_replay_store_from_env_if_configured(
     chio_store_sqlite::SqliteAgentWebReplayStore::open(replay_store_path)
         .map(Some)
         .map_err(|error| {
-            CliError::cli_other_error(format!(
+            CliError::cli_io_error(format!(
                 "{AGENT_WEB_REPLAY_STORE_PATH_ENV} could not be opened: {error}"
             ))
         })
@@ -210,10 +213,10 @@ fn standard_webhooks_replay_window_from_env() -> Result<Option<(u64, u64)>, CliE
         (Some(now_unix_seconds), Some(max_age_seconds)) => {
             Ok(Some((now_unix_seconds, max_age_seconds)))
         }
-        (None, Some(_)) => Err(CliError::cli_other_error(format!(
+        (None, Some(_)) => Err(verifier_context_invalid(format!(
             "{AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS_ENV} must be set with {AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS_ENV}"
         ))),
-        (Some(_), None) => Err(CliError::cli_other_error(format!(
+        (Some(_), None) => Err(verifier_context_invalid(format!(
             "{AGENT_WEB_STANDARD_WEBHOOKS_MAX_AGE_SECONDS_ENV} must be set with {AGENT_WEB_STANDARD_WEBHOOKS_NOW_UNIX_SECONDS_ENV}"
         ))),
     }
@@ -222,10 +225,10 @@ fn standard_webhooks_replay_window_from_env() -> Result<Option<(u64, u64)>, CliE
 fn optional_u64_from_env(env_name: &str) -> Result<Option<u64>, CliError> {
     match std::env::var(env_name) {
         Ok(value) => value.trim().parse::<u64>().map(Some).map_err(|error| {
-            CliError::cli_other_error(format!("{env_name} must be a u64: {error}"))
+            verifier_context_invalid(format!("{env_name} must be a u64: {error}"))
         }),
         Err(std::env::VarError::NotPresent) => Ok(None),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -236,7 +239,7 @@ fn require_independent_profile_authorities(
     verifier: &chio_core_types::PublicKey,
 ) -> Result<(), CliError> {
     if governance == verifier {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_PROFILE_GOVERNANCE_AUTHORITY_KEY_ENV} must differ from {FINDING_VERIFIER_AUTHORITY_KEY_ENV}"
         )));
     }
@@ -247,7 +250,7 @@ fn validate_cli_finding_verifier_profile(
     profile: &chio_finding::FindingChallengeVerifierProfile,
 ) -> Result<(), CliError> {
     chio_finding_verifier::validate_supported_finding_verifier_profile(profile).map_err(|error| {
-        CliError::cli_other_error(format!(
+        verifier_feature_unsupported(format!(
             "{FINDING_VERIFIER_PROFILE_PATH_ENV} requires unsupported verifier behavior: {error}"
         ))
     })
@@ -264,19 +267,19 @@ pub(super) fn cognition_market_proof_trust_from_env(
         "Finding profile governance authority",
     )?;
     if governance_keys.len() != 1 {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_PROFILE_GOVERNANCE_AUTHORITY_KEY_ENV} must contain exactly one public key"
         )));
     }
     let profile_governance_authority = governance_keys.into_iter().next().ok_or_else(|| {
-        CliError::cli_other_error("Finding profile governance authority key is missing")
+        verifier_context_invalid("Finding profile governance authority key is missing")
     })?;
     let profile_governance_authority_policy = finding_authority_policy_from_env(
         FINDING_PROFILE_GOVERNANCE_AUTHORITY_POLICY_PATH_ENV,
         "profile governance authority",
     )?;
     if profile_governance_authority_policy.key != profile_governance_authority {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_PROFILE_GOVERNANCE_AUTHORITY_POLICY_PATH_ENV} key does not match {FINDING_PROFILE_GOVERNANCE_AUTHORITY_KEY_ENV}"
         )));
     }
@@ -285,25 +288,25 @@ pub(super) fn cognition_market_proof_trust_from_env(
         "Finding verifier authority",
     )?;
     if verifier_keys.len() != 1 {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_VERIFIER_AUTHORITY_KEY_ENV} must contain exactly one public key"
         )));
     }
     let finding_verifier_authority = verifier_keys
         .into_iter()
         .next()
-        .ok_or_else(|| CliError::cli_other_error("Finding verifier authority key is missing"))?;
+        .ok_or_else(|| verifier_context_invalid("Finding verifier authority key is missing"))?;
     let purchase_keys = required_public_keys_from_env(
         FINDING_PURCHASE_AUTHORITY_KEY_ENV,
         "Finding purchase-record authority",
     )?;
     if purchase_keys.len() != 1 {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_PURCHASE_AUTHORITY_KEY_ENV} must contain exactly one public key"
         )));
     }
     let purchase_authority = purchase_keys.into_iter().next().ok_or_else(|| {
-        CliError::cli_other_error("Finding purchase-record authority key is missing")
+        verifier_context_invalid("Finding purchase-record authority key is missing")
     })?;
     require_independent_profile_authorities(
         &profile_governance_authority,
@@ -315,18 +318,18 @@ pub(super) fn cognition_market_proof_trust_from_env(
         &profile_governance_authority_policy.key,
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!(
+        verifier_context_invalid(format!(
             "{FINDING_VERIFIER_PROFILE_PATH_ENV} is not authorized by {FINDING_PROFILE_GOVERNANCE_AUTHORITY_KEY_ENV}: {error}"
         ))
     })?;
     validate_cli_finding_verifier_profile(&trusted_verifier_profile.body)?;
     if trusted_verifier_profile.body.verifier_report_signer.key != finding_verifier_authority {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_VERIFIER_PROFILE_PATH_ENV} signer key does not match {FINDING_VERIFIER_AUTHORITY_KEY_ENV}"
         )));
     }
     if trusted_verifier_profile.body.purchase_authority.key != purchase_authority {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_VERIFIER_PROFILE_PATH_ENV} purchase authority key does not match {FINDING_PURCHASE_AUTHORITY_KEY_ENV}"
         )));
     }
@@ -345,7 +348,7 @@ pub(super) fn cognition_market_proof_trust_from_env(
         &finding_verifier_authority,
     )?;
     if status_authority.key == profile_governance_authority {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_VERIFIER_STATUS_AUTHORITY_POLICY_PATH_ENV} key must differ from {FINDING_PROFILE_GOVERNANCE_AUTHORITY_KEY_ENV}"
         )));
     }
@@ -396,7 +399,7 @@ pub(super) fn cognition_market_proof_trust_from_env(
         .as_ref()
         .is_some_and(|status| status.status_freshness.now != verifier_authority_status.checked_at)
     {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_STATUS_NOW_UNIX_SECONDS_ENV} must equal {FINDING_VERIFIER_AUTHORITY_STATUS_CHECKED_AT_ENV}"
         )));
     }
@@ -447,13 +450,13 @@ fn finding_authority_status_trust_from_env(
         crate::input::canonical_ijson(&bytes)?;
     chio_finding::verify_signed_authority_status(&signed_status, &status_authority.key).map_err(
         |error| {
-            CliError::cli_other_error(format!(
+            verifier_context_invalid(format!(
                 "{status_path_env} is not authorized by {FINDING_VERIFIER_STATUS_AUTHORITY_POLICY_PATH_ENV}: {error}"
             ))
         },
     )?;
     if &signed_status.body.key != subject_authority {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{status_path_env} key does not match its deployment-pinned authority"
         )));
     }
@@ -475,7 +478,7 @@ fn finding_authority_policy_from_env(
     let bytes = crate::input::read_regular(Path::new(&path), FINDING_AUTHORITY_POLICY_MAX_BYTES)?;
     let policy: chio_finding::FindingAuthorityKeyPolicy = crate::input::canonical_ijson(&bytes)?;
     policy.validate(subject).map_err(|error| {
-        CliError::cli_other_error(format!("{policy_path_env} is invalid: {error}"))
+        verifier_context_invalid(format!("{policy_path_env} is invalid: {error}"))
     })?;
     Ok(policy)
 }
@@ -485,7 +488,7 @@ fn require_independent_verifier_status_authority(
     finding_verifier_authority: &chio_core_types::PublicKey,
 ) -> Result<(), CliError> {
     if status_authority == finding_verifier_authority {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_VERIFIER_STATUS_AUTHORITY_POLICY_PATH_ENV} key must differ from {FINDING_VERIFIER_AUTHORITY_KEY_ENV}"
         )));
     }
@@ -510,7 +513,7 @@ fn cognition_market_status_trust_from_env(
         .body
         .validate()
         .map_err(|error| {
-            CliError::cli_other_error(format!(
+            verifier_context_invalid(format!(
                 "Finding status operator authorization is invalid: {error}"
             ))
         })?;
@@ -520,7 +523,7 @@ fn cognition_market_status_trust_from_env(
         "status_operator_authorization",
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!(
+        verifier_context_invalid(format!(
             "Finding status operator authorization envelope is invalid: {error}"
         ))
     })?;
@@ -528,7 +531,7 @@ fn cognition_market_status_trust_from_env(
         required_sha256_env(FINDING_STATUS_OPERATOR_AUTHORIZATION_SHA256_ENV)?;
     let actual_authorization_sha256 = chio_core_types::crypto::sha256_hex(&authorization_bytes);
     if status_operator_authorization_sha256 != actual_authorization_sha256 {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{FINDING_STATUS_OPERATOR_AUTHORIZATION_SHA256_ENV} does not match the signed authorization envelope"
         )));
     }
@@ -548,7 +551,7 @@ fn cognition_market_status_trust_from_env(
         &authority_lock_root,
     )
     .map_err(|error| {
-        CliError::cli_other_error(format!(
+        CliError::cli_io_error(format!(
             "durable Finding status authority store could not be opened: {error}"
         ))
     })?;
@@ -589,19 +592,19 @@ fn claim_set_bytes_advertise_verified(
     let claims = claim_set
         .get("claims")
         .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| CliError::cli_other_error("proof verify: claim set missing claims array"))?;
+        .ok_or_else(|| artifact_schema_invalid("proof verify: claim set missing claims array"))?;
     for claim in claims {
         let claim_id = claim
             .get("claim_id")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| {
-                CliError::cli_other_error("proof verify: claim set claim_id must be a string")
+                artifact_schema_invalid("proof verify: claim set claim_id must be a string")
             })?;
         let status = claim
             .get("status")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| {
-                CliError::cli_other_error("proof verify: claim set status must be a string")
+                artifact_schema_invalid("proof verify: claim set status must be a string")
             })?;
         if matches_claim(claim_id) && status == "verified" {
             return Ok(true);
@@ -613,13 +616,13 @@ fn claim_set_bytes_advertise_verified(
 fn required_utf8_env(env_name: &str) -> Result<String, CliError> {
     match std::env::var(env_name) {
         Ok(value) if !value.trim().is_empty() => Ok(value),
-        Ok(_) => Err(CliError::cli_other_error(format!(
+        Ok(_) => Err(verifier_context_invalid(format!(
             "{env_name} must be non-empty"
         ))),
         Err(std::env::VarError::NotPresent) => {
-            Err(CliError::cli_other_error(format!("{env_name} must be set")))
+            Err(verifier_feature_unsupported(format!("{env_name} must be set")))
         }
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -630,7 +633,7 @@ fn required_positive_u64_env(env_name: &str) -> Result<u64, CliError> {
     raw.parse::<u64>()
         .ok()
         .filter(|value| *value > 0)
-        .ok_or_else(|| CliError::cli_other_error(format!("{env_name} must be a nonzero u64")))
+        .ok_or_else(|| verifier_context_invalid(format!("{env_name} must be a nonzero u64")))
 }
 
 fn required_sha256_env(env_name: &str) -> Result<String, CliError> {
@@ -642,7 +645,7 @@ fn required_sha256_env(env_name: &str) -> Result<String, CliError> {
     {
         Ok(value)
     } else {
-        Err(CliError::cli_other_error(format!(
+        Err(verifier_context_invalid(format!(
             "{env_name} must be a lowercase 64-character SHA-256 digest"
         )))
     }
@@ -653,7 +656,7 @@ fn parse_public_keys(
     keys: &str,
 ) -> Result<Vec<chio_core_types::PublicKey>, CliError> {
     if keys.trim().is_empty() {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{env_name} must contain comma-separated public keys"
         )));
     }
@@ -662,12 +665,12 @@ fn parse_public_keys(
         .map(|key| {
             let key = key.trim();
             if key.is_empty() {
-                return Err(CliError::cli_other_error(format!(
+                return Err(verifier_context_invalid(format!(
                     "{env_name} must not contain empty public keys"
                 )));
             }
             chio_core_types::PublicKey::from_hex(key).map_err(|error| {
-                CliError::cli_other_error(format!(
+                verifier_context_invalid(format!(
                     "{env_name} contains invalid public key: {error}"
                 ))
             })
@@ -679,10 +682,10 @@ pub(super) fn trust_market_trusted_authority_keys_from_env(
 ) -> Result<Vec<chio_core_types::PublicKey>, CliError> {
     match std::env::var(TRUST_MARKET_TRUSTED_AUTHORITY_KEYS_ENV) {
         Ok(keys) => parse_public_keys(TRUST_MARKET_TRUSTED_AUTHORITY_KEYS_ENV, &keys),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{TRUST_MARKET_TRUSTED_AUTHORITY_KEYS_ENV} must pin trusted market authority keys"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{TRUST_MARKET_TRUSTED_AUTHORITY_KEYS_ENV} must be valid UTF-8"
         ))),
     }
@@ -718,10 +721,10 @@ fn required_public_keys_from_env(
 ) -> Result<Vec<chio_core_types::PublicKey>, CliError> {
     match std::env::var(env_name) {
         Ok(keys) => parse_public_keys(env_name, &keys),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{env_name} must pin trusted {label} keys"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -729,7 +732,7 @@ fn required_public_keys_from_env(
 
 fn parse_string_list(env_name: &str, values: &str) -> Result<Vec<String>, CliError> {
     if values.trim().is_empty() {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{env_name} must contain comma-separated values"
         )));
     }
@@ -739,7 +742,7 @@ fn parse_string_list(env_name: &str, values: &str) -> Result<Vec<String>, CliErr
         .map(|value| {
             let value = value.trim();
             if value.is_empty() {
-                return Err(CliError::cli_other_error(format!(
+                return Err(verifier_context_invalid(format!(
                     "{env_name} must not contain empty values"
                 )));
             }
@@ -751,10 +754,10 @@ fn parse_string_list(env_name: &str, values: &str) -> Result<Vec<String>, CliErr
 fn required_string_list_from_env(env_name: &str, label: &str) -> Result<Vec<String>, CliError> {
     match std::env::var(env_name) {
         Ok(values) => parse_string_list(env_name, &values),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{env_name} must pin trusted {label}"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -765,16 +768,16 @@ fn required_string_from_env(env_name: &str, label: &str) -> Result<String, CliEr
         Ok(value) => {
             let value = value.trim();
             if value.is_empty() {
-                return Err(CliError::cli_other_error(format!(
+                return Err(verifier_feature_unsupported(format!(
                     "{env_name} must pin trusted {label}"
                 )));
             }
             Ok(value.to_string())
         }
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{env_name} must pin trusted {label}"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -785,12 +788,12 @@ fn optional_bool_from_env(env_name: &str) -> Result<bool, CliError> {
         Ok(value) => match value.trim() {
             "1" | "true" | "TRUE" | "True" => Ok(true),
             "0" | "false" | "FALSE" | "False" => Ok(false),
-            _ => Err(CliError::cli_other_error(format!(
+            _ => Err(verifier_context_invalid(format!(
                 "{env_name} must be true or false"
             ))),
         },
         Err(std::env::VarError::NotPresent) => Ok(false),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -799,10 +802,10 @@ fn optional_bool_from_env(env_name: &str) -> Result<bool, CliError> {
 fn optional_u32_from_env(env_name: &str) -> Result<Option<u32>, CliError> {
     match std::env::var(env_name) {
         Ok(value) => value.trim().parse::<u32>().map(Some).map_err(|error| {
-            CliError::cli_other_error(format!("{env_name} must be a u32: {error}"))
+            verifier_context_invalid(format!("{env_name} must be a u32: {error}"))
         }),
         Err(std::env::VarError::NotPresent) => Ok(None),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{env_name} must be valid UTF-8"
         ))),
     }
@@ -813,12 +816,12 @@ fn optional_public_settlement_independent_chain_head_from_env(
 ) -> Result<Option<chio_web3::settlement_proof::PublicSettlementIndependentChainHead>, CliError> {
     let head_from_json = match std::env::var(PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV) {
         Ok(value) => crate::input::text(value.trim()).map(Some).map_err(|error| {
-            CliError::cli_other_error(format!(
+            verifier_context_invalid(format!(
                 "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid JSON: {error}"
             ))
         }),
         Err(std::env::VarError::NotPresent) => Ok(None),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_HEAD_JSON_ENV} must be valid UTF-8"
         ))),
     }?;
@@ -832,7 +835,7 @@ fn optional_public_settlement_independent_chain_head_from_env(
                 .map(Some)
         }
         Err(std::env::VarError::NotPresent) => Ok(None),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} must be valid UTF-8"
         ))),
     }
@@ -843,7 +846,7 @@ fn fetch_public_settlement_independent_chain_head_from_rpc(
     proof_bundle: &chio_web3::settlement_proof::PublicSettlementProofBundle,
 ) -> Result<chio_web3::settlement_proof::PublicSettlementIndependentChainHead, CliError> {
     if url.is_empty() {
-        return Err(CliError::cli_other_error(format!(
+        return Err(verifier_context_invalid(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} must not be empty"
         )));
     }
@@ -879,12 +882,12 @@ fn fetch_public_settlement_independent_chain_head_from_rpc(
 
 fn public_settlement_rpc_egress_contract(url: &str) -> Result<HttpEgressContract, CliError> {
     let parsed = reqwest::Url::parse(url).map_err(|error| {
-        CliError::cli_other_error(format!(
+        verifier_context_invalid(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} must be a valid URL: {error}"
         ))
     })?;
     let host = parsed.host_str().ok_or_else(|| {
-        CliError::cli_other_error(format!(
+        verifier_context_invalid(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} must include a host"
         ))
     })?;
@@ -913,7 +916,7 @@ fn public_settlement_rpc_egress_contract(url: &str) -> Result<HttpEgressContract
         max_response_bytes: 1024 * 1024,
     };
     contract.validate().map_err(|error| {
-        CliError::cli_other_error(format!(
+        verifier_context_invalid(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} rejected by HttpEgressContract: {error}"
         ))
     })?;
@@ -934,13 +937,13 @@ fn public_settlement_rpc_call(
     });
     let response =
         dispatch_public_settlement_rpc(egress_contract, url, &request_body).map_err(|reason| {
-            CliError::cli_other_error(format!(
+            CliError::cli_io_error(format!(
                 "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} {reason}"
             ))
         })?;
     let status = response.status();
     if !status.is_success() {
-        return Err(CliError::cli_other_error(format!(
+        return Err(CliError::cli_io_error(format!(
             "{PUBLIC_SETTLEMENT_INDEPENDENT_CHAIN_RPC_URL_ENV} {method} returned HTTP {status}"
         )));
     }
@@ -951,11 +954,11 @@ fn settlement_rpc_result(bytes: &[u8]) -> Result<serde_json::Value, CliError> {
     let body: serde_json::Value = crate::input::json(bytes)?;
     let object = body
         .as_object()
-        .ok_or_else(|| CliError::cli_other_error("settlement RPC response is not an object"))?;
+        .ok_or_else(|| verifier_context_invalid("settlement RPC response is not an object"))?;
     if object.get("jsonrpc").and_then(serde_json::Value::as_str) != Some("2.0")
         || object.get("id").and_then(serde_json::Value::as_u64) != Some(1)
     {
-        return Err(CliError::cli_other_error(
+        return Err(verifier_context_invalid(
             "settlement RPC response binding mismatch",
         ));
     }
@@ -971,11 +974,11 @@ fn settlement_rpc_result(bytes: &[u8]) -> Result<serde_json::Value, CliError> {
                     .and_then(serde_json::Value::as_str)
                     .is_some() =>
         {
-            Err(CliError::cli_other_error(
+            Err(CliError::cli_io_error(
                 "settlement RPC returned an error",
             ))
         }
-        _ => Err(CliError::cli_other_error(
+        _ => Err(verifier_context_invalid(
             "settlement RPC response envelope is invalid",
         )),
     }
@@ -1030,12 +1033,12 @@ fn dispatch_public_settlement_rpc(
 fn parse_json_rpc_hex_u64(value: &serde_json::Value, label: &str) -> Result<u64, CliError> {
     let raw = value
         .as_str()
-        .ok_or_else(|| CliError::cli_other_error(format!("{label} must be a hex string")))?;
+        .ok_or_else(|| verifier_context_invalid(format!("{label} must be a hex string")))?;
     let hex = raw
         .strip_prefix("0x")
-        .ok_or_else(|| CliError::cli_other_error(format!("{label} must start with 0x")))?;
+        .ok_or_else(|| verifier_context_invalid(format!("{label} must start with 0x")))?;
     u64::from_str_radix(hex, 16)
-        .map_err(|error| CliError::cli_other_error(format!("{label} is not a u64: {error}")))
+        .map_err(|error| verifier_context_invalid(format!("{label} is not a u64: {error}")))
 }
 
 fn required_json_rpc_string<'a>(
@@ -1046,7 +1049,7 @@ fn required_json_rpc_string<'a>(
     value
         .get(field)
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| CliError::cli_other_error(format!("{label}.{field} must be a string")))
+        .ok_or_else(|| verifier_context_invalid(format!("{label}.{field} must be a string")))
 }
 
 pub(super) fn public_settlement_verifier_trust_from_env(
@@ -1125,10 +1128,10 @@ pub(super) fn commerce_trusted_provider_keys_from_env(
 ) -> Result<Vec<chio_core_types::PublicKey>, CliError> {
     match std::env::var(COMMERCE_TRUSTED_PROVIDER_KEYS_ENV) {
         Ok(keys) => parse_public_keys(COMMERCE_TRUSTED_PROVIDER_KEYS_ENV, &keys),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{COMMERCE_TRUSTED_PROVIDER_KEYS_ENV} must pin trusted commerce provider keys"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{COMMERCE_TRUSTED_PROVIDER_KEYS_ENV} must be valid UTF-8"
         ))),
     }
@@ -1169,10 +1172,10 @@ pub(super) fn transaction_trusted_root_keys_from_env(
 ) -> Result<Vec<chio_core_types::PublicKey>, CliError> {
     match std::env::var(TRANSACTION_TRUSTED_ROOT_KEYS_ENV) {
         Ok(keys) => parse_public_keys(TRANSACTION_TRUSTED_ROOT_KEYS_ENV, &keys),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{TRANSACTION_TRUSTED_ROOT_KEYS_ENV} must pin trusted transaction root keys"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{TRANSACTION_TRUSTED_ROOT_KEYS_ENV} must be valid UTF-8"
         ))),
     }
@@ -1183,7 +1186,7 @@ pub(super) fn transaction_trusted_checkpoint_keys_from_env(
     match std::env::var(TRANSACTION_TRUSTED_CHECKPOINT_KEYS_ENV) {
         Ok(keys) => parse_public_keys(TRANSACTION_TRUSTED_CHECKPOINT_KEYS_ENV, &keys),
         Err(std::env::VarError::NotPresent) => Ok(Vec::new()),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{TRANSACTION_TRUSTED_CHECKPOINT_KEYS_ENV} must be valid UTF-8"
         ))),
     }
@@ -1194,10 +1197,10 @@ pub(super) fn runtime_trust_from_env(
     let trusted_passport_signer_keys = transaction_trusted_root_keys_from_env()?;
     let trusted_root_signer_keys = match std::env::var(RUNTIME_TRUSTED_ROOT_KEYS_ENV) {
         Ok(keys) => parse_public_keys(RUNTIME_TRUSTED_ROOT_KEYS_ENV, &keys),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{RUNTIME_TRUSTED_ROOT_KEYS_ENV} must pin trusted runtime root keys"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{RUNTIME_TRUSTED_ROOT_KEYS_ENV} must be valid UTF-8"
         ))),
     }?;
@@ -1212,10 +1215,10 @@ pub(super) fn runtime_trust_from_env(
 fn swarm_trusted_witness_keys_from_env() -> Result<Vec<chio_core_types::PublicKey>, CliError> {
     match std::env::var(SWARM_TRUSTED_WITNESS_KEYS_ENV) {
         Ok(keys) => parse_public_keys(SWARM_TRUSTED_WITNESS_KEYS_ENV, &keys),
-        Err(std::env::VarError::NotPresent) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotPresent) => Err(verifier_feature_unsupported(format!(
             "{SWARM_TRUSTED_WITNESS_KEYS_ENV} must pin trusted swarm witness keys"
         ))),
-        Err(std::env::VarError::NotUnicode(_)) => Err(CliError::cli_other_error(format!(
+        Err(std::env::VarError::NotUnicode(_)) => Err(verifier_context_invalid(format!(
             "{SWARM_TRUSTED_WITNESS_KEYS_ENV} must be valid UTF-8"
         ))),
     }
@@ -1293,5 +1296,53 @@ mod rpc_tests {
             let error = settlement_rpc_result(bytes).unwrap_err();
             assert!(!error.to_string().contains("private-marker"));
         }
+    }
+
+    fn assert_rejection(error: CliError, spec: &chio_errors::ErrorCodeSpec, exit_code: i32) {
+        assert_eq!(error.report().code, spec.urn, "{error}");
+        assert_eq!(super::super::proof_verify_exit_code(&error), exit_code, "{error}");
+    }
+
+    #[test]
+    fn verifier_context_sites_carry_typed_codes() {
+        use chio_errors::_generated::error_codes::{
+            CLI_IO, TRANSACTION_ARTIFACT_SCHEMA_INVALID, TRANSACTION_VERIFIER_CONTEXT_INVALID,
+        };
+        assert_rejection(
+            parse_public_keys("CHIO_TRANSACTION_TRUSTED_ROOT_KEYS", "digest mismatch").unwrap_err(),
+            &TRANSACTION_VERIFIER_CONTEXT_INVALID,
+            50,
+        );
+        assert_rejection(
+            parse_string_list("CHIO_PUBLIC_SETTLEMENT_ALLOWED_CHAIN_IDS", " , ").unwrap_err(),
+            &TRANSACTION_VERIFIER_CONTEXT_INVALID,
+            50,
+        );
+        let signer = chio_core_types::Keypair::from_seed(&[115_u8; 32]).public_key();
+        assert_rejection(
+            require_independent_verifier_status_authority(&signer, &signer).unwrap_err(),
+            &TRANSACTION_VERIFIER_CONTEXT_INVALID,
+            50,
+        );
+        assert_rejection(
+            settlement_rpc_result(br#"{"jsonrpc":"2.0","id":2,"result":"0x1"}"#).unwrap_err(),
+            &TRANSACTION_VERIFIER_CONTEXT_INVALID,
+            50,
+        );
+        assert_rejection(
+            settlement_rpc_result(br#"{"jsonrpc":"2.0","id":1,"error":{"code":-1,"message":"m"}}"#)
+                .unwrap_err(),
+            &CLI_IO,
+            1,
+        );
+        assert_rejection(
+            claim_set_bytes_advertise_verified_prefix(
+                br#"{"claims":[{"claim_id":"claim.finding.x","status":1}]}"#,
+                "claim.finding.",
+            )
+            .unwrap_err(),
+            &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+            30,
+        );
     }
 }
