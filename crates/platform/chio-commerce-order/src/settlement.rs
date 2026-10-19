@@ -94,7 +94,7 @@ pub(super) fn validate_settlement_packet(
         ));
     }
     if settlement.quote_sha256 != context.quote_sha256 {
-        return Err(CommerceOrderError::SettlementFailed(
+        return Err(CommerceOrderError::SettlementDigestMismatch(
             "settlement packet quote digest mismatch".to_string(),
         ));
     }
@@ -156,7 +156,7 @@ fn validate_settlement_dispatch_receipt(
     }
     if let Some(replayed_dispatch_event_sha256) = replayed_dispatch_event_sha256 {
         if receipt.content_hash != replayed_dispatch_event_sha256 {
-            return Err(CommerceOrderError::SettlementFailed(
+            return Err(CommerceOrderError::SettlementDigestMismatch(
                 "settlement dispatch receipt content hash mismatch".to_string(),
             ));
         }
@@ -168,13 +168,13 @@ fn validate_settlement_dispatch_receipt(
         )));
     }
     let signature_valid = receipt.verify_signature().map_err(|error| {
-        CommerceOrderError::SettlementFailed(format!(
+        CommerceOrderError::SettlementSignatureInvalid(format!(
             "settlement dispatch receipt signature invalid: {}: {error}",
             settlement.dispatch_receipt_ref
         ))
     })?;
     if !signature_valid {
-        return Err(CommerceOrderError::SettlementFailed(format!(
+        return Err(CommerceOrderError::SettlementSignatureInvalid(format!(
             "settlement dispatch receipt signature invalid: {}",
             settlement.dispatch_receipt_ref
         )));

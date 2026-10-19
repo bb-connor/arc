@@ -221,12 +221,12 @@ pub fn validate_web3_settlement_dispatch(
         .capital_instruction
         .verify_signature()
         .map_err(|error| {
-            Web3ContractError::invalid_settlement(format!(
+            Web3ContractError::settlement_signature_invalid(format!(
                 "capital instruction signature verification failed: {error}"
             ))
         })?;
     if !signature_valid {
-        return Err(Web3ContractError::invalid_settlement(
+        return Err(Web3ContractError::settlement_signature_invalid(
             "capital instruction signature verification failed",
         ));
     }
@@ -291,12 +291,12 @@ pub fn validate_web3_settlement_dispatch(
         })?;
     if let Some(bond) = dispatch.bond.as_ref() {
         let signature_valid = bond.verify_signature().map_err(|error| {
-            Web3ContractError::invalid_settlement(format!(
+            Web3ContractError::settlement_signature_invalid(format!(
                 "credit bond signature verification failed: {error}"
             ))
         })?;
         if !signature_valid {
-            return Err(Web3ContractError::invalid_settlement(
+            return Err(Web3ContractError::settlement_signature_invalid(
                 "credit bond signature verification failed",
             ));
         }

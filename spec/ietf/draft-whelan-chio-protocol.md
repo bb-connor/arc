@@ -4153,7 +4153,7 @@ JSON-RPC code, if any; and reference. Codes are decimal integers from
 namespace and are not values in this registry.
 Experts check that the retry guidance distinguishes a changed condition
 from repeating an unsafe side effect. The initial allocations follow.
-Core allocations reference this document. Values 7100 through 7113 are
+Core allocations reference this document. Values 7100 through 7118 are
 reserved for related transaction profiles, rather than allocated by this
 document; their diagnostic names below describe current implementation
 usage. A future Specification Required registration supplies a permanent
@@ -4306,6 +4306,36 @@ public specification before assigning any reserved value.
   retry `do_not_retry`.
   Related-profile diagnostic name: `transaction_transparency_preview_not_allowed`.
   Provide verified transparency inclusion evidence or remove the transparency claim.
+
+7114 (`transaction_claim_rejected`):
+: Category `transaction`; transient `false`;
+  retry `do_not_retry`.
+  Related-profile diagnostic name: `transaction_claim_rejected`.
+  Regenerate the family evidence so every required claim verifies.
+
+7115 (`transaction_artifact_schema_invalid`):
+: Category `transaction`; transient `false`;
+  retry `do_not_retry`.
+  Related-profile diagnostic name: `transaction_artifact_schema_invalid`.
+  Regenerate the artifact against its registered schema.
+
+7116 (`transaction_signature_invalid`):
+: Category `transaction`; transient `false`;
+  retry `do_not_retry`.
+  Related-profile diagnostic name: `transaction_signature_invalid`.
+  Re-sign the proof bundle with a key the verifier trusts.
+
+7117 (`transaction_verifier_feature_unsupported`):
+: Category `transaction`; transient `false`;
+  retry `do_not_retry`.
+  Related-profile diagnostic name: `transaction_verifier_feature_unsupported`.
+  Pin the required trust context for the verifier, or remove the unsupported feature from the proof bundle.
+
+7118 (`transaction_negative_case_mismatch`):
+: Category `transaction`; transient `false`;
+  retry `do_not_retry`.
+  Related-profile diagnostic name: `transaction_negative_case_mismatch`.
+  Regenerate the negative case so it fails with its declared failure code, or correct the declared code.
 
 ## Chio Signature Suites {#iana-signature-suites}
 

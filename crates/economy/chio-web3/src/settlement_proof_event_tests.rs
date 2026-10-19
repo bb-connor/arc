@@ -574,7 +574,7 @@ fn public_settlement_proof_rejects_timed_out_refund_tx_mismatch() {
 
     assert!(matches!(
         verify_public_settlement_proof(&signed_bundle, &trust),
-        Err(Web3ContractError::InvalidSettlement(message))
+        Err(Web3ContractError::SettlementDigestMismatch(message))
             if message.contains("refund event tx hash mismatch")
     ));
 }

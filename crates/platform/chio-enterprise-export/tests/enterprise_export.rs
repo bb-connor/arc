@@ -2024,6 +2024,10 @@ fn enterprise_export_rejects_export_bundle_digest_mismatch() {
         .test_expect_err("tampered export bundle digest must fail");
 
     assert!(error.to_string().contains("export bundle digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::EnterpriseExportDigestMismatch(_)
+    ));
 }
 
 #[test]
@@ -2066,6 +2070,10 @@ fn enterprise_export_rejects_approval_replay_over_recomputed_export_bundle() {
     assert!(error
         .to_string()
         .contains("approval case export bundle digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::EnterpriseExportDigestMismatch(_)
+    ));
 }
 
 #[test]
@@ -2197,6 +2205,10 @@ fn enterprise_export_rejects_telemetry_digest_mismatch() {
     assert!(error
         .to_string()
         .contains("telemetry artifact digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::EnterpriseExportDigestMismatch(_)
+    ));
 }
 
 #[test]

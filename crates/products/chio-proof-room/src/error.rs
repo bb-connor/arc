@@ -97,7 +97,7 @@ impl ProofRoomError {
                 {
                     Some("public settlement independent head missing")
                 }
-                Web3ContractError::InvalidSettlement(reason)
+                Web3ContractError::SettlementDigestMismatch(reason)
                     if reason == "public settlement independent head block hash mismatch" =>
                 {
                     Some("public settlement independent head block hash mismatch")
@@ -192,7 +192,7 @@ mod tests {
         let reason = "public settlement independent head block hash mismatch";
         let valid = ProofRoomError::verification(
             "proof-room.source-verifier.failed",
-            chio_web3::error::Web3ContractError::InvalidSettlement(reason.into()),
+            chio_web3::error::Web3ContractError::SettlementDigestMismatch(reason.into()),
         );
         assert_eq!(valid.public_reason(), Some(reason));
         let wrong_variant = ProofRoomError::verification(
@@ -202,7 +202,7 @@ mod tests {
         assert_eq!(wrong_variant.public_reason(), None);
         let injected_detail = ProofRoomError::verification(
             "proof-room.source-verifier.failed",
-            chio_web3::error::Web3ContractError::InvalidSettlement(format!(
+            chio_web3::error::Web3ContractError::SettlementDigestMismatch(format!(
                 "{reason}: private-marker"
             )),
         );

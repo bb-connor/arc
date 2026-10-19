@@ -14,6 +14,15 @@ pub const DISCLOSURE_VERIFIER_PRIVACY_PROFILE_SCHEMA_V1: &str =
 pub enum DisclosureLineageError {
     #[error("invalid disclosure lineage artifact: {0}")]
     InvalidArtifact(String),
+    #[error("invalid disclosure lineage artifact: {0}")]
+    DigestMismatch(String),
+    #[error("invalid disclosure lineage artifact: {0}")]
+    SignatureInvalid(String),
+    #[error("invalid disclosure lineage artifact: {0}")]
+    UnsupportedSchema(String),
+    /// The lineage names a feature this verifier does not support.
+    #[error("invalid disclosure lineage artifact: {0}")]
+    Unsupported(String),
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

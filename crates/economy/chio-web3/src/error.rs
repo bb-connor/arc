@@ -15,11 +15,26 @@ pub enum Web3ContractError {
     #[error("invalid binding: {0}")]
     InvalidBinding(String),
 
+    #[error("invalid binding: {0}")]
+    BindingSignatureInvalid(String),
+
     #[error("invalid proof: {0}")]
     InvalidProof(String),
 
     #[error("invalid settlement: {0}")]
     InvalidSettlement(String),
+
+    #[error("invalid proof: {0}")]
+    ProofDigestMismatch(String),
+
+    #[error("invalid settlement: {0}")]
+    SettlementDigestMismatch(String),
+
+    #[error("invalid proof: {0}")]
+    ProofSignatureInvalid(String),
+
+    #[error("invalid settlement: {0}")]
+    SettlementSignatureInvalid(String),
 
     #[error("invalid qualification case: {0}")]
     InvalidQualificationCase(String),
@@ -28,5 +43,9 @@ pub enum Web3ContractError {
 impl Web3ContractError {
     pub(crate) fn invalid_settlement(message: impl Into<String>) -> Self {
         Self::InvalidSettlement(message.into())
+    }
+
+    pub(crate) fn settlement_signature_invalid(message: impl Into<String>) -> Self {
+        Self::SettlementSignatureInvalid(message.into())
     }
 }

@@ -1183,6 +1183,7 @@ fn web3_chain_configuration_rejects_deployed_addresses_for_blocked_templates() {
 fn web3_dispatch_requires_web3_rail_kind() {
     let mut dispatch = sample_dispatch();
     dispatch.capital_instruction.body.rail.kind = CapitalExecutionRailKind::Api;
+    resign_dispatch_capital_instruction(&mut dispatch);
     assert!(matches!(
         validate_web3_settlement_dispatch(&dispatch),
         Err(Web3ContractError::InvalidSettlement(_))
@@ -1263,6 +1264,7 @@ fn web3_dispatch_rejects_mismatched_completion_flow_binding() {
     let mut dispatch = sample_dispatch();
     dispatch.capital_instruction.body.completion_flow_row_id =
         Some("economic-completion-flow:other-receipt".to_string());
+    resign_dispatch_capital_instruction(&mut dispatch);
     assert!(matches!(
         validate_web3_settlement_dispatch(&dispatch),
         Err(Web3ContractError::InvalidSettlement(_))
@@ -1292,7 +1294,7 @@ fn merkle_settlement_receipt_rejects_tampered_anchor_signature() {
 
     assert!(matches!(
         validate_web3_settlement_execution_receipt(&receipt),
-        Err(Web3ContractError::InvalidProof(message))
+        Err(Web3ContractError::ProofSignatureInvalid(message))
             if message.contains("checkpoint statement signature verification failed")
     ));
 }
@@ -1555,7 +1557,7 @@ fn public_settlement_proof_rejects_tampered_oracle_signature() {
 
     assert!(matches!(
         verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidProof(message))
+        Err(Web3ContractError::ProofSignatureInvalid(message))
             if message.contains("oracle conversion evidence signature verification failed")
     ));
 }
@@ -1746,7 +1748,7 @@ fn public_settlement_proof_rejects_public_witness_body_hash_mismatch() {
 
     assert!(matches!(
         verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidProof(message))
+        Err(Web3ContractError::ProofDigestMismatch(message))
             if message.contains("public settlement witness body hash mismatch")
     ));
 }
@@ -1775,7 +1777,7 @@ fn public_settlement_proof_rejects_wrong_escrow_runtime_codehash() {
 
     assert!(matches!(
         verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
+        Err(Web3ContractError::SettlementDigestMismatch(message))
             if message.contains("escrow runtime codehash")
     ));
 }
@@ -1946,7 +1948,7 @@ fn public_settlement_proof_rejects_tampered_bundle_signature_body() {
 
     assert!(matches!(
         verify_public_settlement_proof(&bundle, &sample_public_settlement_verifier_trust()),
-        Err(Web3ContractError::InvalidProof(message))
+        Err(Web3ContractError::ProofSignatureInvalid(message))
             if message.contains("public settlement bundle signature verification failed")
     ));
 }
@@ -2071,7 +2073,7 @@ fn public_settlement_proof_rejects_tampered_capital_instruction_signature() {
 
     assert!(matches!(
         verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
+        Err(Web3ContractError::SettlementSignatureInvalid(message))
             if message.contains("capital instruction signature verification failed")
     ));
 }
@@ -2085,7 +2087,7 @@ fn public_settlement_proof_rejects_tampered_bond_signature() {
 
     assert!(matches!(
         verify_sample_public_settlement_proof(&bundle),
-        Err(Web3ContractError::InvalidSettlement(message))
+        Err(Web3ContractError::SettlementSignatureInvalid(message))
             if message.contains("credit bond signature verification failed")
     ));
 }
@@ -2212,7 +2214,7 @@ fn public_settlement_proof_rejects_reorged_snapshot_when_independent_head_disagr
 
     assert!(matches!(
         verify_public_settlement_proof(&bundle, &trust),
-        Err(Web3ContractError::InvalidSettlement(message))
+        Err(Web3ContractError::SettlementDigestMismatch(message))
             if message.contains("public settlement independent head block hash mismatch")
     ));
 }

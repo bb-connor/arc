@@ -351,7 +351,7 @@ pub fn validate_risk_report_signature(
         return Err(claim_failed("risk comptroller report signer untrusted"));
     }
     let signature = Signature::from_hex(signature_hex)
-        .map_err(|_| claim_failed("risk comptroller report signature invalid"))?;
+        .map_err(|_| signature_invalid("risk comptroller report signature invalid"))?;
     let mut signed_value = report_value.clone();
     signed_value
         .as_object_mut()
@@ -359,11 +359,13 @@ pub fn validate_risk_report_signature(
         .remove("signature");
     let verified = public_key
         .verify_canonical(&signed_value, &signature)
-        .map_err(|_| claim_failed("risk comptroller report signature invalid"))?;
+        .map_err(|_| signature_invalid("risk comptroller report signature invalid"))?;
     if verified {
         Ok(())
     } else {
-        Err(claim_failed("risk comptroller report signature invalid"))
+        Err(signature_invalid(
+            "risk comptroller report signature invalid",
+        ))
     }
 }
 
@@ -1211,4 +1213,6 @@ fn validate_risk_claim_appeal(appeal: &RiskClaimAppeal) -> Result<(), Transactio
 
 #[path = "validation_helpers.rs"]
 mod validation_helpers;
-use validation_helpers::{claim_failed, optional_non_empty, parse_rfc3339_utc, require_non_empty};
+use validation_helpers::{
+    claim_failed, optional_non_empty, parse_rfc3339_utc, require_non_empty, signature_invalid,
+};

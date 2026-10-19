@@ -776,7 +776,7 @@ fn validate_collateral(
         return Err(claim_failed("collateral cross-currency netting rejected"));
     }
     if collateral.source_type != "bond" {
-        return Err(claim_failed("collateral source type unsupported"));
+        return Err(unsupported("collateral source type unsupported"));
     }
     if collateral.amount == 0 || collateral.available_amount == 0 {
         return Err(claim_failed("collateral amount missing"));
@@ -831,7 +831,7 @@ fn validate_guarantee(
         return Err(claim_failed("guarantee beneficiary mismatch"));
     }
     if guarantee.guarantee_type != "bounded_sla_remedy" {
-        return Err(claim_failed("guarantee type unsupported"));
+        return Err(unsupported("guarantee type unsupported"));
     }
     if guarantee.verdict != "backed" {
         return Err(claim_failed("guarantee was not backed"));
@@ -1122,4 +1122,8 @@ fn require_non_empty(value: &str, field: &'static str) -> Result<(), Transaction
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::TrustMarketClaimFailed(message.into())
+}
+
+fn unsupported(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::TrustMarketUnsupported(message.into())
 }

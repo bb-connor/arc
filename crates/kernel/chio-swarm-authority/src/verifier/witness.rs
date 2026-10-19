@@ -10,7 +10,10 @@ use crate::types::{
     CHIO_SWARM_DELEGATION_WITNESS_CHAIN_SCHEMA,
 };
 
-use super::util::{rejected, require_non_empty, require_same_graph, require_sha256};
+use super::util::{
+    rejected, require_non_empty, require_same_graph, require_sha256, signature_invalid,
+    unsupported, unsupported_schema,
+};
 
 pub(super) const DID_CHIO_PREFIX: &str = "did:chio:";
 
@@ -58,7 +61,7 @@ fn validate_witness_chain(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if chain.schema != CHIO_SWARM_DELEGATION_WITNESS_CHAIN_SCHEMA {
-        return Err(rejected(format!(
+        return Err(unsupported_schema(format!(
             "unsupported swarm delegation witness chain schema: {}",
             chain.schema
         )));
@@ -193,7 +196,7 @@ fn verify_witness_signature(
     let public_key = witness_issuer_public_key(&hop.issuer)?;
     ensure_witness_issuer_is_pinned(chain, &public_key, trusted_witness_issuer_keys)?;
     let signature = Signature::from_hex(&hop.witness_signature).map_err(|error| {
-        rejected(format!(
+        signature_invalid(format!(
             "swarm witness signature invalid: {}: {error}",
             chain.chain_id
         ))
@@ -205,7 +208,7 @@ fn verify_witness_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(signature_invalid(format!(
             "swarm witness signature invalid: {}",
             chain.chain_id
         )))
@@ -218,7 +221,7 @@ fn ensure_witness_issuer_is_pinned(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }

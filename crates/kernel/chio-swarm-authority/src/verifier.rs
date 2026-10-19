@@ -220,7 +220,7 @@ fn require_trusted_witness_issuer_keys(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(util::unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }
@@ -607,7 +607,7 @@ fn verify_task_graph_signature(
     let public_key = witness_issuer_public_key(&graph.issuer)?;
     ensure_task_graph_issuer_is_pinned(graph, &public_key, trusted_witness_issuer_keys)?;
     let signature = Signature::from_hex(&graph.signature).map_err(|error| {
-        rejected(format!(
+        util::signature_invalid(format!(
             "swarm task graph signature invalid: {}: {error}",
             graph.graph_id
         ))
@@ -619,7 +619,7 @@ fn verify_task_graph_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(util::signature_invalid(format!(
             "swarm task graph signature invalid: {}",
             graph.graph_id
         )))
@@ -632,7 +632,7 @@ fn ensure_task_graph_issuer_is_pinned(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(util::unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }
@@ -662,7 +662,7 @@ fn validate_route_plan_receipts<'a>(
     let mut routes = BTreeMap::new();
     for route in &bundle.route_plan_receipts {
         if route.schema != CHIO_SWARM_ROUTE_PLAN_RECEIPT_SCHEMA {
-            return Err(rejected(format!(
+            return Err(util::unsupported_schema(format!(
                 "unsupported swarm route-plan receipt schema: {}",
                 route.schema
             )));
@@ -743,7 +743,7 @@ fn validate_route_plan_egress_constraints(
     for constraint in &route.egress_constraints {
         require_non_empty(constraint, "swarm route-plan egress constraint")?;
         if constraint != "deny-private-network" {
-            return Err(rejected(format!(
+            return Err(util::unsupported(format!(
                 "unsupported swarm route-plan egress constraint: {}",
                 constraint
             )));
@@ -809,7 +809,7 @@ fn verify_route_plan_signature(
     let public_key = witness_issuer_public_key(&receipt.issuer)?;
     ensure_route_plan_issuer_is_pinned(receipt, &public_key, trusted_witness_issuer_keys)?;
     let signature = Signature::from_hex(&receipt.signature).map_err(|error| {
-        rejected(format!(
+        util::signature_invalid(format!(
             "swarm route-plan signature invalid: {}: {error}",
             receipt.route_plan_id
         ))
@@ -821,7 +821,7 @@ fn verify_route_plan_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(util::signature_invalid(format!(
             "swarm route-plan signature invalid: {}",
             receipt.route_plan_id
         )))
@@ -834,7 +834,7 @@ fn ensure_route_plan_issuer_is_pinned(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(util::unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }
@@ -899,7 +899,7 @@ fn validate_join_receipts<'a>(
         validate_actual_parent_receipt_subset(receipt)?;
         let parent_set_hash = join_parent_set_hash(receipt)?;
         if receipt.parent_set_hash != parent_set_hash {
-            return Err(rejected(format!(
+            return Err(util::digest_mismatch(format!(
                 "swarm join receipt parent set hash mismatch: {}",
                 receipt.join_id
             )));
@@ -982,7 +982,7 @@ fn validate_join_receipt_schema(
     now_unix_ms: u64,
 ) -> Result<(), SwarmAuthorityError> {
     if receipt.schema != CHIO_SWARM_JOIN_RECEIPT_SCHEMA {
-        return Err(rejected(format!(
+        return Err(util::unsupported_schema(format!(
             "unsupported swarm join receipt schema: {}",
             receipt.schema
         )));
@@ -1116,7 +1116,7 @@ fn verify_join_receipt_signature(
     let public_key = witness_issuer_public_key(&receipt.issuer)?;
     ensure_join_issuer_is_pinned(receipt, &public_key, trusted_witness_issuer_keys)?;
     let signature = Signature::from_hex(&receipt.signature).map_err(|error| {
-        rejected(format!(
+        util::signature_invalid(format!(
             "swarm join receipt signature invalid: {}: {error}",
             receipt.join_id
         ))
@@ -1128,7 +1128,7 @@ fn verify_join_receipt_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(util::signature_invalid(format!(
             "swarm join receipt signature invalid: {}",
             receipt.join_id
         )))
@@ -1141,7 +1141,7 @@ fn ensure_join_issuer_is_pinned(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(util::unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }
@@ -1215,7 +1215,7 @@ fn validate_revocation_epoch(
 ) -> Result<(), SwarmAuthorityError> {
     let epoch = &bundle.revocation_epoch;
     if epoch.schema != CHIO_SWARM_REVOCATION_EPOCH_SCHEMA {
-        return Err(rejected(format!(
+        return Err(util::unsupported_schema(format!(
             "unsupported swarm revocation epoch schema: {}",
             epoch.schema
         )));
@@ -1291,7 +1291,7 @@ fn verify_revocation_epoch_signature(
         )));
     }
     let signature = Signature::from_hex(&epoch.signature).map_err(|error| {
-        rejected(format!(
+        util::signature_invalid(format!(
             "swarm revocation epoch signature invalid: {}: {error}",
             epoch.epoch_id
         ))
@@ -1303,7 +1303,7 @@ fn verify_revocation_epoch_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(util::signature_invalid(format!(
             "swarm revocation epoch signature invalid: {}",
             epoch.epoch_id
         )))
@@ -1359,7 +1359,7 @@ fn validate_terminal_graph_receipt_schema(
     bundle: &SwarmAuthorityBundle,
 ) -> Result<(), SwarmAuthorityError> {
     if receipt.schema != CHIO_SWARM_TERMINAL_GRAPH_RECEIPT_SCHEMA {
-        return Err(rejected(format!(
+        return Err(util::unsupported_schema(format!(
             "unsupported swarm terminal receipt schema: {}",
             receipt.schema
         )));
@@ -1571,7 +1571,7 @@ fn verify_terminal_graph_receipt_signature(
     let public_key = witness_issuer_public_key(&receipt.issuer)?;
     ensure_terminal_receipt_issuer_is_pinned(receipt, &public_key, trusted_witness_issuer_keys)?;
     let signature = Signature::from_hex(&receipt.signature).map_err(|error| {
-        rejected(format!(
+        util::signature_invalid(format!(
             "swarm terminal receipt signature invalid: {}: {error}",
             receipt.receipt_id
         ))
@@ -1583,7 +1583,7 @@ fn verify_terminal_graph_receipt_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(util::signature_invalid(format!(
             "swarm terminal receipt signature invalid: {}",
             receipt.receipt_id
         )))
@@ -1596,7 +1596,7 @@ fn ensure_terminal_receipt_issuer_is_pinned(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(util::unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }
@@ -1680,7 +1680,7 @@ fn validate_continuation_token(
 ) -> Result<(), SwarmAuthorityError> {
     let bundle = context.bundle;
     if token.schema != CHIO_SWARM_CONTINUATION_TOKEN_SCHEMA {
-        return Err(rejected(format!(
+        return Err(util::unsupported_schema(format!(
             "unsupported swarm continuation token schema: {}",
             token.schema
         )));
@@ -1717,7 +1717,7 @@ fn validate_continuation_token(
         )));
     }
     if token.graph_sha256 != context.graph_sha256 {
-        return Err(rejected(format!(
+        return Err(util::digest_mismatch(format!(
             "swarm continuation graph digest mismatch: {}",
             token.token_id
         )));
@@ -1802,7 +1802,7 @@ fn validate_continuation_witness_chain(
     }
     let actual_sha256 = canonical_sha256(chain)?;
     if actual_sha256 != witness_chain_sha256 {
-        return Err(rejected(format!(
+        return Err(util::digest_mismatch(format!(
             "swarm continuation witness chain digest mismatch: {}",
             token.token_id
         )));
@@ -1817,7 +1817,7 @@ fn verify_continuation_token_signature(
     let public_key = witness_issuer_public_key(&token.issuer)?;
     ensure_continuation_issuer_is_pinned(token, &public_key, trusted_witness_issuer_keys)?;
     let signature = Signature::from_hex(&token.signature).map_err(|error| {
-        rejected(format!(
+        util::signature_invalid(format!(
             "swarm continuation signature invalid: {}: {error}",
             token.token_id
         ))
@@ -1829,7 +1829,7 @@ fn verify_continuation_token_signature(
     if verified {
         Ok(())
     } else {
-        Err(rejected(format!(
+        Err(util::signature_invalid(format!(
             "swarm continuation signature invalid: {}",
             token.token_id
         )))
@@ -1842,7 +1842,7 @@ fn ensure_continuation_issuer_is_pinned(
     trusted_witness_issuer_keys: &[PublicKey],
 ) -> Result<(), SwarmAuthorityError> {
     if trusted_witness_issuer_keys.is_empty() {
-        return Err(rejected(
+        return Err(util::unsupported(
             "trusted swarm witness keys missing: CHIO_SWARM_TRUSTED_WITNESS_KEYS must pin trusted swarm witness keys",
         ));
     }

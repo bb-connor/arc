@@ -99,11 +99,11 @@ pub(super) fn command_error(error: chio_proof_room::ProofRoomError) -> CliError 
                 "proof-room.receipt-coverage.status-mismatch",
             ),
             "proof-room.negative-case.unexpected-success" => (
-                &TRANSACTION_RUNTIME_PROOF_REJECTED,
+                &TRANSACTION_NEGATIVE_CASE_MISMATCH,
                 "proof-room.negative-case.unexpected-success",
             ),
             "proof-room.negative-case.failure-mismatch" => (
-                &TRANSACTION_RUNTIME_PROOF_REJECTED,
+                &TRANSACTION_NEGATIVE_CASE_MISMATCH,
                 "proof-room.negative-case.failure-mismatch",
             ),
             "proof-room.schema-violation" => (
@@ -124,6 +124,29 @@ mod tests {
     use super::*;
     use chio_test_support::ctx::{TestUnwrap, TestUnwrapErr};
     use std::error::Error;
+    #[test]
+    fn untrusted_signer_is_an_integrity_failure() {
+        let error = command_error(chio_proof_room::ProofRoomError::Validation(
+            "proof-room.signature.signer-untrusted: private-signer".into(),
+        ));
+        assert_eq!(
+            error.report().code,
+            chio_errors::_generated::error_codes::TRANSACTION_SIGNATURE_INVALID.urn
+        );
+        assert_eq!(super::super::proof_verify_exit_code(&error), 20);
+    }
+
+    #[test]
+    fn negative_case_outcomes_exit_40() {
+        for reason in [
+            "proof-room.negative-case.unexpected-success: case-a",
+            "proof-room.negative-case.failure-mismatch: case-a expected x got y",
+        ] {
+            let error = command_error(chio_proof_room::ProofRoomError::Validation(reason.into()));
+            assert_eq!(super::super::proof_verify_exit_code(&error), 40, "{reason}");
+        }
+    }
+
     #[test]
     fn public_proof_rejection_preserves_safe_reason_and_private_source() {
         let error = command_error(chio_proof_room::ProofRoomError::Validation(

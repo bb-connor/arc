@@ -290,7 +290,7 @@ pub(super) fn validate_evidence_export_bundle(
         return Err(claim_failed("approval case expired before export issuance"));
     }
     validate_sha256_hex(&export_bundle.bundle_digest)
-        .map_err(|_| claim_failed("export bundle digest mismatch"))?;
+        .map_err(|_| malformed("export bundle digest mismatch"))?;
 
     let canonical =
         chio_core_types::canonical_json_bytes(&export_bundle.artifacts).map_err(|error| {
@@ -300,7 +300,7 @@ pub(super) fn validate_evidence_export_bundle(
         })?;
     let actual_digest = chio_core_types::sha256_hex(&canonical);
     if actual_digest != export_bundle.bundle_digest {
-        return Err(claim_failed("export bundle digest mismatch"));
+        return Err(digest_mismatch("export bundle digest mismatch"));
     }
 
     let mut roles = BTreeSet::new();
@@ -415,7 +415,7 @@ pub(super) fn validate_telemetry_projection(
         })?;
         let actual_digest = chio_core_types::sha256_hex(bytes);
         if actual_digest != event.artifact_sha256 {
-            return Err(claim_failed("telemetry artifact digest mismatch"));
+            return Err(digest_mismatch("telemetry artifact digest mismatch"));
         }
         if let Some(receipt_ref) = event.receipt_ref.as_deref() {
             require_non_empty(receipt_ref, "receipt_ref")?;
@@ -426,9 +426,9 @@ pub(super) fn validate_telemetry_projection(
                 chio_transaction_passport::decode_evidence_json(receipt_bytes)?;
             let signature_valid = receipt
                 .verify_signature()
-                .map_err(|_| claim_failed("telemetry receipt signature invalid"))?;
+                .map_err(|_| signature_invalid("telemetry receipt signature invalid"))?;
             if !signature_valid {
-                return Err(claim_failed("telemetry receipt signature invalid"));
+                return Err(signature_invalid("telemetry receipt signature invalid"));
             }
             if !trusted_receipt_kernel_keys.contains(&receipt.kernel_key) {
                 return Err(claim_failed("telemetry receipt signer untrusted"));
@@ -454,7 +454,7 @@ fn validate_telemetry_receipt_binding(
     receipt: &ChioReceipt,
 ) -> Result<(), TransactionPassportError> {
     if receipt.content_hash != event.artifact_sha256 {
-        return Err(claim_failed("telemetry receipt content hash mismatch"));
+        return Err(digest_mismatch("telemetry receipt content hash mismatch"));
     }
     if receipt.tool_name != event.event_kind {
         return Err(claim_failed("telemetry receipt action mismatch"));
@@ -518,9 +518,11 @@ pub(super) fn validate_approval_case(
         return Err(claim_failed("approval case risk report mismatch"));
     }
     validate_sha256_hex(&approval.evidence_export_bundle_digest)
-        .map_err(|_| claim_failed("approval case export bundle digest mismatch"))?;
+        .map_err(|_| malformed("approval case export bundle digest mismatch"))?;
     if approval.evidence_export_bundle_digest != export_bundle.bundle_digest {
-        return Err(claim_failed("approval case export bundle digest mismatch"));
+        return Err(digest_mismatch(
+            "approval case export bundle digest mismatch",
+        ));
     }
     if approval.decision != "approved" || approval.decision_subject != "evidence-export" {
         return Err(claim_failed("evidence export approval denied"));
@@ -554,7 +556,7 @@ fn verify_approval_signature(
     trusted_approval_signer_keys: &[PublicKey],
 ) -> Result<(), TransactionPassportError> {
     let Some(signature_ref) = approval.signature.strip_prefix("sig-ed25519:") else {
-        return Err(claim_failed("approval signature unsupported"));
+        return Err(unsupported("approval signature unsupported"));
     };
     let Some((public_key_hex, signature_hex)) = signature_ref.split_once(':') else {
         return Err(claim_failed("approval signature malformed"));
@@ -567,14 +569,14 @@ fn verify_approval_signature(
         return Err(claim_failed("approval signer untrusted"));
     }
     let signature = Signature::from_hex(signature_hex)
-        .map_err(|_| claim_failed("approval signature invalid"))?;
+        .map_err(|_| signature_invalid("approval signature invalid"))?;
     let verified = public_key
         .verify_canonical(&approval_signature_body(approval), &signature)
-        .map_err(|_| claim_failed("approval signature invalid"))?;
+        .map_err(|_| signature_invalid("approval signature invalid"))?;
     if verified {
         Ok(())
     } else {
-        Err(claim_failed("approval signature invalid"))
+        Err(signature_invalid("approval signature invalid"))
     }
 }
 
@@ -671,14 +673,14 @@ fn validate_retention_class(retention_class: &str) -> Result<(), TransactionPass
         .strip_prefix("audit-")
         .and_then(|value| value.strip_suffix('d'))
     else {
-        return Err(claim_failed("data governance retention class unsupported"));
+        return Err(unsupported("data governance retention class unsupported"));
     };
     if days_text.is_empty() {
-        return Err(claim_failed("data governance retention class unsupported"));
+        return Err(unsupported("data governance retention class unsupported"));
     }
     let days = days_text
         .parse::<u64>()
-        .map_err(|_| claim_failed("data governance retention class unsupported"))?;
+        .map_err(|_| unsupported("data governance retention class unsupported"))?;
     if days < MIN_ENTERPRISE_AUDIT_RETENTION_DAYS {
         return Err(claim_failed(
             "data governance retention shorter than policy",
@@ -722,13 +724,13 @@ fn validate_export_artifact_ref(
     })?;
     let actual_digest = chio_core_types::sha256_hex(bytes);
     if actual_digest != artifact.sha256 {
-        return Err(TransactionPassportError::InvalidEnterpriseArtifact {
-            path: artifact.path.clone(),
-            message: format!(
-                "digest mismatch: expected {}, got {actual_digest}",
-                artifact.sha256
-            ),
-        });
+        return Err(
+            TransactionPassportError::EvidenceGraphArtifactDigestMismatch {
+                path: artifact.path.clone(),
+                expected: artifact.sha256.clone(),
+                actual: actual_digest,
+            },
+        );
     }
     Ok(())
 }
@@ -913,4 +915,20 @@ fn require_non_empty(value: &str, field: &'static str) -> Result<(), Transaction
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::EnterpriseExportClaimFailed(message.into())
+}
+
+fn signature_invalid(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::EnterpriseExportSignatureInvalid(message.into())
+}
+
+fn digest_mismatch(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::EnterpriseExportDigestMismatch(message.into())
+}
+
+fn malformed(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::EnterpriseExportMalformed(message.into())
+}
+
+fn unsupported(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::EnterpriseExportUnsupported(message.into())
 }

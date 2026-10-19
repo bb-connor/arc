@@ -400,7 +400,7 @@ pub(super) fn validate_execution_lease(
         validate_digest_field(field, digest)?;
     }
     if lease.policy_digest != policy_digest {
-        return Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        return Err(TransactionPassportError::RuntimeSecurityDigestMismatch(
             "policy digest mismatch".to_string(),
         ));
     }
@@ -523,7 +523,7 @@ pub(super) fn validate_execution_lease_context(
         }
     }
     if task_graph_sha256 != lease.task_graph_digest {
-        return Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        return Err(TransactionPassportError::RuntimeSecurityDigestMismatch(
             "execution lease task graph digest mismatch".to_string(),
         ));
     }
@@ -730,21 +730,21 @@ fn verify_join_receipt_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&receipt.issuer, "join receipt issuer")?;
     let signature = Signature::from_hex(&receipt.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "join receipt signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&join_receipt_signature_body(receipt)?, &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "join receipt signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "join receipt signature invalid".to_string(),
         ))
     }
@@ -780,7 +780,7 @@ pub(super) fn validate_request_digest_binding(
     require_non_empty(&request.method, "request digest method")?;
     validate_digest_field("request digest sha256", &request.sha256)?;
     if request.sha256 != lease.request_digest {
-        return Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        return Err(TransactionPassportError::RuntimeSecurityDigestMismatch(
             "execution lease request digest mismatch".to_string(),
         ));
     }
@@ -814,7 +814,7 @@ pub(super) fn validate_policy_activation_receipt(
     validate_digest_field("policy_digest", &receipt.policy_digest)?;
     validate_digest_field("previous_policy_digest", &receipt.previous_policy_digest)?;
     if receipt.policy_digest != policy_digest {
-        return Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        return Err(TransactionPassportError::RuntimeSecurityDigestMismatch(
             "policy activation digest mismatch".to_string(),
         ));
     }
@@ -1010,7 +1010,7 @@ pub(super) fn validate_route_plan_receipt(
         ));
     }
     if route_plan.policy_digest != lease.policy_digest {
-        return Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        return Err(TransactionPassportError::RuntimeSecurityDigestMismatch(
             "route plan receipt policy digest mismatch".to_string(),
         ));
     }
@@ -1147,12 +1147,12 @@ fn verify_runtime_trust_root_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(signer_identity, "runtime trust root")?;
     let signature = Signature::from_hex(&trust_root.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "runtime trust root signature invalid: {error}"
         ))
     })?;
     let mut body = serde_json::to_value(trust_root).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "runtime trust root signature invalid: {error}"
         ))
     })?;
@@ -1166,14 +1166,14 @@ fn verify_runtime_trust_root_signature(
     let verified = public_key
         .verify_canonical(&body, &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "runtime trust root signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "runtime trust root signature invalid".to_string(),
         ))
     }
@@ -1184,21 +1184,21 @@ fn verify_execution_lease_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&lease.issuer, "execution lease issuer")?;
     let signature = Signature::from_hex(&lease.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "execution lease signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&execution_lease_signature_body(lease), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "execution lease signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "execution lease signature invalid".to_string(),
         ))
     }
@@ -1209,7 +1209,7 @@ fn verify_task_graph_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&task_graph.issuer, "task graph issuer")?;
     let signature = Signature::from_hex(&task_graph.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "task graph signature invalid: {error}"
         ))
     })?;
@@ -1227,14 +1227,14 @@ fn verify_task_graph_signature(
     let verified = public_key
         .verify_canonical(&body, &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "task graph signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "task graph signature invalid".to_string(),
         ))
     }
@@ -1316,21 +1316,21 @@ fn verify_route_plan_receipt_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&route_plan.issuer, "route plan issuer")?;
     let signature = Signature::from_hex(&route_plan.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "route plan receipt signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&route_plan_receipt_signature_body(route_plan), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "route plan receipt signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "route plan receipt signature invalid".to_string(),
         ))
     }
@@ -1341,7 +1341,7 @@ fn verify_policy_activation_receipt_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&receipt.issuer, "policy activation issuer")?;
     let signature = Signature::from_hex(&receipt.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "policy activation receipt signature invalid: {error}"
         ))
     })?;
@@ -1351,14 +1351,14 @@ fn verify_policy_activation_receipt_signature(
             &signature,
         )
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "policy activation receipt signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "policy activation receipt signature invalid".to_string(),
         ))
     }
@@ -1369,21 +1369,21 @@ fn verify_attack_simulation_report_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&report.issuer, "attack simulation issuer")?;
     let signature = Signature::from_hex(&report.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "attack simulation report signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&attack_simulation_report_signature_body(report), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "attack simulation report signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "attack simulation report signature invalid".to_string(),
         ))
     }
@@ -1394,21 +1394,21 @@ fn verify_chaos_run_report_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&report.issuer, "chaos run issuer")?;
     let signature = Signature::from_hex(&report.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "chaos run report signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&chaos_run_report_signature_body(report), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "chaos run report signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "chaos run report signature invalid".to_string(),
         ))
     }
@@ -1666,21 +1666,21 @@ fn verify_revocation_freshness_signature(
     let public_key =
         self_certifying_public_key(&proof.oracle_id, "revocation freshness oracle id")?;
     let signature = Signature::from_hex(&proof.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "revocation freshness signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&revocation_freshness_signature_body(proof), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "revocation freshness signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "revocation freshness signature invalid".to_string(),
         ))
     }
@@ -1748,21 +1748,21 @@ fn verify_sandbox_attestation_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&sandbox.attester, "sandbox attester")?;
     let signature = Signature::from_hex(&sandbox.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "sandbox attestation signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&sandbox_attestation_signature_body(sandbox), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "sandbox attestation signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "sandbox attestation signature invalid".to_string(),
         ))
     }
@@ -1956,21 +1956,21 @@ fn verify_tool_server_ack_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&ack.tool_server_id, "tool-server id")?;
     let signature = Signature::from_hex(&ack.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "tool-server acknowledgement signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&tool_server_ack_signature_body(ack), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "tool-server acknowledgement signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "tool-server acknowledgement signature invalid".to_string(),
         ))
     }
@@ -1981,21 +1981,21 @@ fn verify_trusted_time_proof_signature(
 ) -> Result<(), TransactionPassportError> {
     let public_key = self_certifying_public_key(&proof.issuer, "trusted time issuer")?;
     let signature = Signature::from_hex(&proof.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "trusted time proof signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&trusted_time_proof_signature_body(proof), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "trusted time proof signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "trusted time proof signature invalid".to_string(),
         ))
     }
@@ -2119,7 +2119,7 @@ pub(super) fn validate_terminal_receipt(
     require_non_empty(&receipt.signature, "terminal receipt signature")?;
     validate_digest_field("policy_digest", &receipt.policy_digest)?;
     if receipt.policy_digest != policy_digest {
-        return Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        return Err(TransactionPassportError::RuntimeSecurityDigestMismatch(
             "terminal receipt policy digest mismatch".to_string(),
         ));
     }
@@ -2176,26 +2176,26 @@ fn verify_terminal_receipt_signature(
     receipt: &RuntimeTerminalReceipt,
 ) -> Result<(), TransactionPassportError> {
     let public_key = PublicKey::from_hex(&receipt.kernel_key).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "terminal receipt signature invalid: {error}"
         ))
     })?;
     let signature = Signature::from_hex(&receipt.signature).map_err(|error| {
-        TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+        TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
             "terminal receipt signature invalid: {error}"
         ))
     })?;
     let verified = public_key
         .verify_canonical(&terminal_receipt_signature_body(receipt), &signature)
         .map_err(|error| {
-            TransactionPassportError::RuntimeSecurityClaimFailed(format!(
+            TransactionPassportError::RuntimeSecuritySignatureInvalid(format!(
                 "terminal receipt signature invalid: {error}"
             ))
         })?;
     if verified {
         Ok(())
     } else {
-        Err(TransactionPassportError::RuntimeSecurityClaimFailed(
+        Err(TransactionPassportError::RuntimeSecuritySignatureInvalid(
             "terminal receipt signature invalid".to_string(),
         ))
     }

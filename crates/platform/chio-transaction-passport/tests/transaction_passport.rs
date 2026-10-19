@@ -1387,6 +1387,10 @@ fn standalone_minimal_passport_rejects_request_response_wrapper_digest_binding()
             .contains("receipt request digest mismatch"),
         "{error}"
     );
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::EvidenceGraphBindingDigestMismatch(_)
+    ));
 }
 
 #[test]
@@ -2396,6 +2400,10 @@ fn standalone_minimal_passport_rejects_detached_verifier_policy_node() {
     assert!(error
         .to_string()
         .contains("verifier policy evidence graph digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_transaction_passport::TransactionPassportError::EvidenceGraphBindingDigestMismatch(_)
+    ));
 }
 
 fn transparency_anchored_fixture(

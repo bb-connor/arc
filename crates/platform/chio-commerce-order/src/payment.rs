@@ -80,7 +80,7 @@ pub(super) fn validate_payment_lifecycle(
         ));
     }
     if payment.quote_sha256 != context.quote_sha256 {
-        return Err(CommerceOrderError::PaymentFailed(
+        return Err(CommerceOrderError::PaymentDigestMismatch(
             "payment quote digest mismatch".to_string(),
         ));
     }
@@ -186,8 +186,9 @@ fn verify_payment_lifecycle_signature(
             "payment signer untrusted".to_string(),
         ));
     }
-    let signature = Signature::from_hex(signature)
-        .map_err(|_| CommerceOrderError::PaymentFailed("payment signature invalid".to_string()))?;
+    let signature = Signature::from_hex(signature).map_err(|_| {
+        CommerceOrderError::PaymentSignatureInvalid("payment signature invalid".to_string())
+    })?;
     let mut signature_body = serde_json::to_value(payment).map_err(|error| {
         CommerceOrderError::PaymentFailed(format!("payment signature body invalid: {error}"))
     })?;
@@ -197,11 +198,13 @@ fn verify_payment_lifecycle_signature(
     body.remove("signature");
     let verified = signer_key
         .verify_canonical(&signature_body, &signature)
-        .map_err(|_| CommerceOrderError::PaymentFailed("payment signature invalid".to_string()))?;
+        .map_err(|_| {
+            CommerceOrderError::PaymentSignatureInvalid("payment signature invalid".to_string())
+        })?;
     if verified {
         Ok(())
     } else {
-        Err(CommerceOrderError::PaymentFailed(
+        Err(CommerceOrderError::PaymentSignatureInvalid(
             "payment signature invalid".to_string(),
         ))
     }

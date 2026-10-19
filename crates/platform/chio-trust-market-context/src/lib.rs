@@ -292,7 +292,7 @@ fn reject_required_unsupported_market_claims(
 ) -> Result<(), TransactionPassportError> {
     for claim in required_claims {
         if blocked_market_claim(claim) {
-            return Err(claim_failed(format!(
+            return Err(unsupported(format!(
                 "unsupported market claim cannot be required: {claim}"
             )));
         }
@@ -343,4 +343,8 @@ fn trust_market_policy_claim(required_claim: &str) -> bool {
 
 fn claim_failed(message: impl Into<String>) -> TransactionPassportError {
     TransactionPassportError::TrustMarketClaimFailed(message.into())
+}
+
+fn unsupported(message: impl Into<String>) -> TransactionPassportError {
+    TransactionPassportError::TrustMarketUnsupported(message.into())
 }

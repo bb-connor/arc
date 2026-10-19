@@ -7,14 +7,16 @@ use crate::types::{
     MAX_SWARM_GRAPH_EDGES, MAX_SWARM_GRAPH_JOINS, MAX_SWARM_GRAPH_TASKS,
 };
 
-use super::util::{rejected, require_non_empty, require_sha256, require_unique_strings};
+use super::util::{
+    rejected, require_non_empty, require_sha256, require_unique_strings, unsupported_schema,
+};
 
 pub(super) fn validate_task_graph(
     graph: &SwarmTaskGraph,
     now_unix_ms: u64,
 ) -> Result<(), SwarmAuthorityError> {
     if graph.schema != CHIO_SWARM_TASK_GRAPH_SCHEMA {
-        return Err(rejected(format!(
+        return Err(unsupported_schema(format!(
             "unsupported swarm task graph schema: {}",
             graph.schema
         )));

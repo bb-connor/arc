@@ -697,9 +697,11 @@ fn validate_root_graph_node_binding(
     }
     let sha256 = graph_node_string(node, "sha256")?;
     if sha256 != expected_sha256 {
-        return Err(TransactionPassportError::InvalidEvidenceGraphArtifact(
-            format!("{role} evidence graph digest mismatch"),
-        ));
+        return Err(
+            TransactionPassportError::EvidenceGraphBindingDigestMismatch(format!(
+                "{role} evidence graph digest mismatch"
+            )),
+        );
     }
     Ok(path.to_string())
 }

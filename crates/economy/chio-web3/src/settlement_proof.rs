@@ -221,7 +221,7 @@ fn validate_public_settlement_bundle_signature(
         ));
     }
     let signature = Signature::from_hex(&signature.signature).map_err(|error| {
-        Web3ContractError::InvalidProof(format!(
+        Web3ContractError::ProofSignatureInvalid(format!(
             "public settlement bundle signature invalid: {error}"
         ))
     })?;
@@ -234,7 +234,7 @@ fn validate_public_settlement_bundle_signature(
             ))
         })?
     {
-        return Err(Web3ContractError::InvalidProof(
+        return Err(Web3ContractError::ProofSignatureInvalid(
             "public settlement bundle signature verification failed".to_string(),
         ));
     }
@@ -437,7 +437,7 @@ fn validate_deployment_provenance(
         &provenance.root_registry_runtime_codehash,
         &bundle.chain_snapshot.root_registry_runtime_codehash,
     )? {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement deployment root registry runtime codehash mismatch".to_string(),
         ));
     }
@@ -453,7 +453,7 @@ fn validate_deployment_provenance(
         &provenance.identity_registry_runtime_codehash,
         &bundle.chain_snapshot.identity_registry_runtime_codehash,
     )? {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement deployment identity registry runtime codehash mismatch".to_string(),
         ));
     }
@@ -466,7 +466,7 @@ fn validate_deployment_provenance(
         &provenance.escrow_runtime_codehash,
         &bundle.chain_snapshot.escrow.escrow_runtime_codehash,
     )? {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement deployment escrow runtime codehash mismatch".to_string(),
         ));
     }
@@ -483,7 +483,7 @@ fn validate_deployment_provenance(
             &provenance.bond_vault_runtime_codehash,
             &bond.bond_vault_runtime_codehash,
         )? {
-            return Err(Web3ContractError::InvalidSettlement(
+            return Err(Web3ContractError::SettlementDigestMismatch(
                 "public settlement deployment bond vault runtime codehash mismatch".to_string(),
             ));
         }
@@ -657,7 +657,7 @@ fn validate_identity_registry_evidence_binding(
     if evidence.block_number == chain_anchor.block_number
         && evidence.block_hash != chain_anchor.block_hash
     {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement identity registry evidence block hash mismatch".to_string(),
         ));
     }
@@ -885,7 +885,7 @@ fn validate_public_witness(
 
     let expected_body_hash = public_settlement_witness_body_hash(witness)?;
     if witness.body_hash != expected_body_hash {
-        return Err(Web3ContractError::InvalidProof(
+        return Err(Web3ContractError::ProofDigestMismatch(
             "public settlement witness body hash mismatch".to_string(),
         ));
     }
@@ -1255,7 +1255,7 @@ fn validate_independent_chain_head(
     }
     let block = required_block_snapshot(bundle)?;
     if head.observed_block_hash != block.block_hash {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement independent head block hash mismatch".to_string(),
         ));
     }
@@ -1538,7 +1538,7 @@ fn validate_refund_event(
             .observed_execution
             .external_reference_id
     {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement refund event tx hash mismatch".to_string(),
         ));
     }
@@ -1709,7 +1709,7 @@ fn validate_block_snapshot(
         ));
     }
     if block.block_hash != chain_anchor.block_hash {
-        return Err(Web3ContractError::InvalidSettlement(
+        return Err(Web3ContractError::SettlementDigestMismatch(
             "public settlement block hash mismatch".to_string(),
         ));
     }

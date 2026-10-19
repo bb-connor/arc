@@ -479,6 +479,10 @@ fn disclosure_lineage_rejects_lineage_frontier_digest_mismatch() {
     assert!(error
         .to_string()
         .contains("lineage frontier digest mismatch"));
+    assert!(matches!(
+        error,
+        chio_disclosure_lineage::DisclosureLineageError::DigestMismatch(_)
+    ));
 }
 
 #[test]
