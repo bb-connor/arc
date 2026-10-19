@@ -2,10 +2,11 @@ use chio_test_support::prelude::*;
 
 use std::collections::BTreeMap;
 
+use chio_core_types::canonical::UntrustedJsonError;
 use chio_core_types::{sha256, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use chio_keyring::{
-    derive_key_id, KeyLogCheckpointExpectation, LogId, SignedKeyLogCheckpoint, WitnessId,
-    WitnessSignature, KEY_LOG_CHECKPOINT_SCHEMA, MAX_WITNESS_SIGNATURES,
+    derive_key_id, KeyLogCheckpointExpectation, KeyringError, LogId, SignedKeyLogCheckpoint,
+    WitnessId, WitnessSignature, KEY_LOG_CHECKPOINT_SCHEMA, MAX_WITNESS_SIGNATURES,
 };
 
 fn backend(seed: u8) -> Ed25519Backend {
@@ -25,26 +26,30 @@ fn review_checkpoint_rejects_universal_operator_and_witness_signatures() {
     let mut signed = checkpoint(&backend(10));
     signed.operator_key_id = derive_key_id(weak.algorithm(), &weak).test_unwrap();
     signed.operator_signature = signature.clone();
-    let operator_rejected = signed.verify_operator(&weak).is_err();
+    let operator_result = signed.verify_operator(&weak);
     let witness = WitnessSignature {
         witness_id: WitnessId::new("witness.weak").test_unwrap(),
         algorithm: weak.algorithm(),
         signature,
     };
-    let witness_rejected = witness.verify(&signed, &weak).is_err();
+    let witness_result = witness.verify(&signed, &weak);
     signed.witness_signatures = vec![witness];
-    let quorum_rejected = signed
-        .verify_witnesses(&BTreeMap::from([(
-            WitnessId::new("witness.weak").test_unwrap(),
-            weak,
-        )]))
-        .is_err();
+    let quorum_result = signed.verify_witnesses(&BTreeMap::from([(
+        WitnessId::new("witness.weak").test_unwrap(),
+        weak,
+    )]));
     assert!(
-        operator_rejected,
-        "universal operator signature was accepted"
+        matches!(operator_result, Err(KeyringError::InvalidSignature)),
+        "universal operator signature was accepted: {operator_result:?}"
     );
-    assert!(witness_rejected, "universal witness signature was accepted");
-    assert!(quorum_rejected, "weak witness reached quorum");
+    assert!(
+        matches!(witness_result, Err(KeyringError::InvalidSignature)),
+        "universal witness signature was accepted: {witness_result:?}"
+    );
+    assert!(
+        matches!(quorum_result, Err(KeyringError::InvalidSignature)),
+        "weak witness reached quorum: {quorum_result:?}"
+    );
 }
 
 #[test]
@@ -62,7 +67,18 @@ fn checkpoint_deserialization_rejects_oversized_witness_vectors() {
         })
         .collect();
     let encoded = serde_json::to_vec(&checkpoint).test_unwrap();
-    assert!(SignedKeyLogCheckpoint::from_canonical_bytes(&encoded).is_err());
+    assert_eq!(
+        checkpoint.witness_signatures.len(),
+        MAX_WITNESS_SIGNATURES + 1
+    );
+    let result = SignedKeyLogCheckpoint::from_canonical_bytes(&encoded);
+    assert!(
+        matches!(
+            result,
+            Err(KeyringError::UntrustedInput(UntrustedJsonError::Decode(_)))
+        ),
+        "{result:?}"
+    );
 }
 
 fn checkpoint(operator: &Ed25519Backend) -> SignedKeyLogCheckpoint {
@@ -93,9 +109,11 @@ fn checkpoint_operator_signature_and_identity_are_canonical() {
     checkpoint
         .verify_operator(&operator.public_key())
         .test_unwrap();
-    assert!(checkpoint
-        .verify_operator(&backend(11).public_key())
-        .is_err());
+    let result = checkpoint.verify_operator(&backend(11).public_key());
+    assert!(
+        matches!(result, Err(KeyringError::AlgorithmMismatch)),
+        "{result:?}"
+    );
 }
 
 #[test]
@@ -141,24 +159,49 @@ fn witness_signatures_bind_checkpoint_hash_and_require_distinct_known_quorum() {
     let mut altered_operator_envelope = checkpoint.clone();
     altered_operator_envelope.operator_signature =
         operator.sign_bytes(b"other statement").test_unwrap();
-    assert!(altered_operator_envelope
-        .verify_witness_signatures(&keys)
-        .is_err());
+    let result = altered_operator_envelope.verify_witness_signatures(&keys);
+    assert!(
+        matches!(result, Err(KeyringError::InvalidSignature)),
+        "{result:?}"
+    );
 
     let mut insufficient = checkpoint.clone();
     insufficient.witness_signatures.pop();
-    assert!(insufficient.verify_witnesses(&keys).is_err());
+    assert_eq!(insufficient.witness_signatures.len(), 1);
+    assert_eq!(
+        insufficient
+            .verify_witness_signatures(&keys)
+            .test_unwrap()
+            .len(),
+        1
+    );
+    let result = insufficient.verify_witnesses(&keys);
+    assert!(
+        matches!(result, Err(KeyringError::InvalidWitnessActivation)),
+        "{result:?}"
+    );
 
     checkpoint
         .witness_signatures
         .push(checkpoint.witness_signatures[0].clone());
-    assert!(checkpoint.verify_witnesses(&keys).is_err());
+    assert_eq!(checkpoint.witness_signatures.len(), 3);
+    let result = checkpoint.verify_witnesses(&keys);
+    assert!(
+        matches!(result, Err(KeyringError::DuplicateIdentifier)),
+        "{result:?}"
+    );
 
     let mut excessive = checkpoint;
     excessive
         .witness_signatures
         .push(excessive.witness_signatures[0].clone());
-    assert!(excessive.verify_witnesses(&keys).is_err());
+    assert_eq!(excessive.witness_signatures.len(), 4);
+    assert_eq!(keys.len(), 3);
+    let result = excessive.verify_witnesses(&keys);
+    assert!(
+        matches!(result, Err(KeyringError::InvalidWitnessActivation)),
+        "{result:?}"
+    );
 }
 
 #[test]
@@ -176,24 +219,36 @@ fn checkpoint_validation_rejects_root_size_sequence_and_predecessor_mismatch() {
         })
         .test_unwrap();
 
-    assert!(checkpoint
-        .validate(KeyLogCheckpointExpectation {
-            log_id: &LogId::new("log.enterprise.test").test_unwrap(),
-            sequence: 1,
-            tree_size: 1,
-            root: &sha256(b"root"),
-            previous_checkpoint_hash: None,
-            last_issued_at: None,
-        })
-        .is_err());
-    assert!(checkpoint
-        .validate(KeyLogCheckpointExpectation {
-            log_id: &LogId::new("log.enterprise.test").test_unwrap(),
-            sequence: 0,
-            tree_size: 2,
-            root: &sha256(b"root"),
-            previous_checkpoint_hash: None,
-            last_issued_at: None,
-        })
-        .is_err());
+    let sequence_result = checkpoint.validate(KeyLogCheckpointExpectation {
+        log_id: &LogId::new("log.enterprise.test").test_unwrap(),
+        sequence: 1,
+        tree_size: 1,
+        root: &sha256(b"root"),
+        previous_checkpoint_hash: None,
+        last_issued_at: None,
+    });
+    assert!(
+        matches!(
+            sequence_result,
+            Err(KeyringError::InvalidCheckpoint(
+                "checkpoint sequence mismatch"
+            ))
+        ),
+        "{sequence_result:?}"
+    );
+    let tree_size_result = checkpoint.validate(KeyLogCheckpointExpectation {
+        log_id: &LogId::new("log.enterprise.test").test_unwrap(),
+        sequence: 0,
+        tree_size: 2,
+        root: &sha256(b"root"),
+        previous_checkpoint_hash: None,
+        last_issued_at: None,
+    });
+    assert!(
+        matches!(
+            tree_size_result,
+            Err(KeyringError::InvalidCheckpoint("tree size mismatch"))
+        ),
+        "{tree_size_result:?}"
+    );
 }
