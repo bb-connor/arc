@@ -33,7 +33,7 @@ fn assert_registered_refusal(error: CliError, message: &str) -> TestResult {
 
 #[test]
 fn descriptor_sources_preserve_the_selected_value_and_input_bytes() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.json");
     let authority = descriptor()?;
     let mut bytes = canonical_json_bytes(&authority)?;
@@ -54,7 +54,7 @@ fn descriptor_sources_preserve_the_selected_value_and_input_bytes() -> TestResul
 
 #[test]
 fn configured_missing_file_is_an_io_refusal_without_creation() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("absent.json");
     let error = configured_dpop_replay_authority_from_path(Some(&path))
         .err()
@@ -71,7 +71,7 @@ fn configured_missing_file_is_an_io_refusal_without_creation() -> TestResult {
 #[cfg(unix)]
 #[test]
 fn descriptor_file_refuses_directories_and_symlinks() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let error = configured_dpop_replay_authority_from_path(Some(directory.path()))
         .err()
         .ok_or("directory accepted as an authority file")?;
@@ -100,7 +100,7 @@ fn descriptor_file_refuses_directories_and_symlinks() -> TestResult {
 
 #[test]
 fn descriptor_file_rejects_the_first_byte_over_its_bound() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.json");
     let mut bytes = canonical_json_bytes(&descriptor()?)?;
     bytes.resize(4097, b' ');
@@ -131,7 +131,7 @@ fn descriptor_file_rejects_the_first_byte_over_its_bound() -> TestResult {
 
 #[test]
 fn descriptor_file_rejects_duplicate_keys_before_typed_projection() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.json");
     let bytes = br#"{"proof_ttl_secs":300,"proof_ttl_secs":301}"#;
     fs::write(&path, bytes)?;
@@ -158,7 +158,7 @@ fn descriptor_file_rejects_duplicate_keys_before_typed_projection() -> TestResul
 
 #[test]
 fn descriptor_file_rejects_null_missing_and_invalid_authority_fields() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let path = directory.path().join("authority.json");
     let mut invalid = serde_json::to_value(descriptor()?)?;
     invalid["proof_ttl_secs"] = 0.into();
@@ -191,7 +191,7 @@ fn descriptor_file_rejects_null_missing_and_invalid_authority_fields() -> TestRe
 
 #[test]
 fn off_mode_refuses_even_an_activated_authority_without_attaching_stores() -> TestResult {
-    let directory = tempfile::tempdir()?;
+    let directory = chio_test_support::private_tempdir()?;
     let clock: Arc<dyn Clock> = Arc::new(FixedClock::new(1_800_000_000));
     let runtime = DurableAdmissionRuntime::open_with_clock(
         &directory.path().join("authority.db"),
