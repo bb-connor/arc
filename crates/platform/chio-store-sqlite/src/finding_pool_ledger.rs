@@ -42,8 +42,8 @@ use outbox::{
 use qualification::{
     acquire_domain_lease, bind_ledger_store, bind_receipt_authority, bind_receipt_configuration,
     bind_rollback_anchor, canonical_receipt_authority_json, open_rollback_anchor,
-    prepare_database_identity, verify_rollback_anchor, AnchoredLedgerTransaction,
-    FindingPoolDomainLease, QualifiedDatabaseIdentity,
+    prepare_database_identity, refuse_unauthored_receipt_outbox, verify_rollback_anchor,
+    AnchoredLedgerTransaction, FindingPoolDomainLease, QualifiedDatabaseIdentity,
 };
 use schema::{
     ensure_column, ensure_lifecycle_columns, ensure_outbox_delivery_claim_columns,
@@ -259,6 +259,7 @@ impl SqliteFindingPoolLedger {
                 store_identity,
                 &rollback_anchor,
             )?;
+            refuse_unauthored_receipt_outbox(&connection)?;
             ensure_lifecycle_columns(&connection)?;
             ensure_outbox_delivery_claim_columns(&connection)?;
             outbox_lease_epoch = domain_lease

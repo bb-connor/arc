@@ -40,6 +40,8 @@ use chio_swarm_authority::finding_pool::{
 use chio_swarm_authority::{SwarmBudgetPool, CHIO_SWARM_BUDGET_POOL_SCHEMA};
 use chio_test_support::prelude::*;
 
+#[path = "finding_pool_ledger/qualified_storage.rs"]
+mod qualified_storage;
 #[path = "finding_pool_ledger/tenant_isolation.rs"]
 mod tenant_isolation;
 
@@ -974,78 +976,6 @@ fn cognition_market_pool_receipts_survive_ordinary_kernel_key_rotation() {
 }
 
 #[test]
-fn qualified_pool_rejects_percent_decoded_nul_uris() {
-    for path in ["file:%00", "file::memory:%00", "file:pool?mode=memory%00"] {
-        assert!(
-            matches!(
-                open_qualified(path, ledger_domain()),
-                Err(FindingPoolLedgerError::Storage(_))
-            ),
-            "{path} must be rejected before SQLite opens it"
-        );
-    }
-}
-
-#[test]
-fn qualified_pool_creates_percent_decoded_uri_parent() {
-    let directory = tempfile::tempdir().test_expect("create ledger directory");
-    let decoded_parent = directory.path().join("pool");
-    let encoded_uri = format!(
-        "file:{}%2Fpool%2Fpool.sqlite3?mode=rwc",
-        directory.path().display()
-    );
-
-    drop(
-        open_qualified(&encoded_uri, ledger_domain())
-            .test_expect("open qualified ledger through encoded URI"),
-    );
-
-    assert!(decoded_parent.join("pool.sqlite3").is_file());
-}
-
-#[test]
-fn qualified_pool_rejects_sqlite_uris_that_disable_file_locking() {
-    let directory = tempfile::tempdir().test_expect("create ledger directory");
-    let database = directory.path().join("pool.sqlite3");
-    let base = format!("file:{}", database.display());
-    for path in [
-        format!("{base}?nolock=1"),
-        format!("{base}?%6eolock=1"),
-        format!("{base}?vfs=unix-none"),
-        format!("{base}?vfs=unix%2dnone"),
-    ] {
-        assert!(
-            matches!(
-                open_qualified(&path, ledger_domain()),
-                Err(FindingPoolLedgerError::Storage(_))
-            ),
-            "lockless SQLite URI {path:?} must not qualify"
-        );
-    }
-}
-
-#[test]
-fn qualified_pool_rejects_read_only_sqlite_uris() {
-    let directory = tempfile::tempdir().test_expect("create ledger directory");
-    let database = directory.path().join("pool.sqlite3");
-    drop(open_qualified(&database, ledger_domain()).test_expect("initialize writable pool ledger"));
-    let base = format!("file:{}", database.display());
-    for path in [
-        format!("{base}?mode=ro"),
-        format!("{base}?%6dode=%72o"),
-        format!("{base}?immutable=1"),
-    ] {
-        assert!(
-            matches!(
-                open_qualified(&path, ledger_domain()),
-                Err(FindingPoolLedgerError::Storage(_))
-            ),
-            "read-only SQLite URI {path:?} must not qualify"
-        );
-    }
-}
-
-#[test]
 fn cognition_market_pool_receipt_authority_is_pinned_ledger_wide() {
     let directory = tempfile::tempdir().test_expect("create ledger directory");
     let database = directory.path().join("finding-pool.sqlite3");
@@ -1053,15 +983,6 @@ fn cognition_market_pool_receipt_authority_is_pinned_ledger_wide() {
     let first = fixture_for_pool(100, 10_000, "receipt-authority-one", 71, 72, &ledger);
     debit(&ledger, &first, "purchase:receipt-authority-one", 10)
         .test_expect("record the first ledger authority");
-
-    let connection = rusqlite::Connection::open(&database).test_expect("open ledger metadata");
-    connection
-        .execute(
-            "UPDATE finding_pool_ledger_metadata SET receipt_authority_json = NULL",
-            [],
-        )
-        .test_expect("simulate the pre-binding schema migration");
-    drop(connection);
 
     let second = fixture_for_pool(100, 10_000, "receipt-authority-two", 73, 74, &ledger);
     assert_eq!(
@@ -1076,13 +997,58 @@ fn cognition_market_pool_receipt_authority_is_pinned_ledger_wide() {
 }
 
 #[test]
+fn cognition_market_pool_refuses_outbox_receipts_without_bound_authority() {
+    let directory = tempfile::tempdir().test_expect("create ledger directory");
+    let database = directory.path().join("finding-pool.sqlite3");
+    let ledger = open_qualified(&database, ledger_domain()).test_expect("open qualified ledger");
+    let fixture = fixture_for_pool(100, 10_000, "receipt-authority-unauthored", 71, 72, &ledger);
+    debit(
+        &ledger,
+        &fixture,
+        "purchase:receipt-authority-unauthored",
+        10,
+    )
+    .test_expect("record an outbox receipt under the bound authority");
+
+    let connection = rusqlite::Connection::open(&database).test_expect("open ledger metadata");
+    let receipt_sink_id = connection
+        .query_row(
+            "SELECT receipt_sink_id FROM finding_pool_ledger_metadata WHERE singleton = 1",
+            [],
+            |row| row.get::<_, String>(0),
+        )
+        .test_expect("read the bound receipt sink");
+    connection
+        .execute(
+            "UPDATE finding_pool_ledger_metadata SET receipt_authority_json = NULL",
+            [],
+        )
+        .test_expect("clear the bound receipt authority");
+    drop(connection);
+
+    let authority = fixture.receipt_authority.public_key();
+    assert_eq!(
+        ledger.bind_receipt_authority(&authority),
+        Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
+    );
+    assert_eq!(
+        ledger.bind_receipt_configuration(&authority, &receipt_sink_id),
+        Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
+    );
+    assert!(matches!(
+        open_qualified(&database, ledger_domain()),
+        Err(FindingPoolLedgerError::UnauthoredReceiptOutbox)
+    ));
+}
+
+#[test]
 fn cognition_market_pool_configuration_failure_is_atomic() {
     let directory = tempfile::tempdir().test_expect("create ledger directory");
     let ledger = open_qualified(directory.path().join("pool.sqlite3"), ledger_domain())
         .test_expect("open qualified ledger");
     ledger
         .bind_receipt_sink("receipt-sink:existing")
-        .test_expect("simulate legacy sink-only binding");
+        .test_expect("bind the receipt sink alone");
     let rejected_authority = Keypair::from_seed(&[73_u8; 32]).public_key();
     assert_eq!(
         ledger.bind_receipt_configuration(&rejected_authority, "receipt-sink:wrong"),
@@ -1851,48 +1817,6 @@ fn in_memory_receipt_stores_never_advertise_a_durable_pool_sink() {
 
 #[cfg(unix)]
 #[test]
-fn qualified_pool_rejects_a_symlink_database_path() {
-    use std::os::unix::fs::symlink;
-    use std::os::unix::fs::PermissionsExt as _;
-
-    let directory = tempfile::tempdir().test_expect("create ledger directory");
-    let target = directory.path().join("target.sqlite3");
-    let alias = directory.path().join("pool.sqlite3");
-    std::fs::File::create(&target).test_expect("create target database");
-    std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600))
-        .test_expect("secure target database");
-    symlink(&target, &alias).test_expect("create database symlink");
-
-    assert!(matches!(
-        open_qualified(&alias, format!("{}:symlink", ledger_domain())),
-        Err(FindingPoolLedgerError::Storage(_))
-    ));
-}
-
-#[cfg(unix)]
-#[test]
-fn qualified_pool_rejects_group_or_world_writable_database_files() {
-    use std::os::unix::fs::PermissionsExt as _;
-
-    for mode in [0o620, 0o602] {
-        let directory = tempfile::tempdir().test_expect("create ledger directory");
-        let database = directory.path().join("pool.sqlite3");
-        std::fs::File::create(&database).test_expect("create pool database");
-        std::fs::set_permissions(&database, std::fs::Permissions::from_mode(mode))
-            .test_expect("set unsafe pool database mode");
-        assert!(matches!(
-            open_qualified(
-                &database,
-                format!("{}:unsafe-mode-{mode:o}", ledger_domain()),
-            ),
-            Err(FindingPoolLedgerError::Storage(message))
-                if message.contains("unsafe ownership or permissions")
-        ));
-    }
-}
-
-#[cfg(unix)]
-#[test]
 fn finding_pool_receipt_sink_rejects_unsafe_file_permissions_and_links() {
     use std::os::unix::fs::PermissionsExt as _;
 
@@ -1937,34 +1861,4 @@ fn finding_pool_receipt_sink_rejects_a_writable_parent_directory() {
         Err(chio_kernel::ReceiptStoreError::Conflict(message))
             if message.contains("parent has unsafe ownership or permissions")
     ));
-}
-
-#[test]
-fn cognition_market_qualified_pool_refuses_in_memory_storage() {
-    for path in [
-        ":memory:",
-        "",
-        "file:",
-        "file://",
-        "file://localhost",
-        "file://?mode=rwc",
-        "file://localhost?mode=rwc",
-        "file://other-host/tmp/pool.sqlite3",
-        "file:?mode=rwc",
-        "file:pool?vfs=memdb",
-        "file:pool?mode%3Dmemory",
-        "file:pool?mode=%6demory",
-        "file:%3Amemory%3A",
-        "file::memory:#fragment",
-        "file:pool?mode=memory#fragment",
-        "file:pool?vfs=memdb#fragment",
-    ] {
-        assert!(
-            matches!(
-                open_qualified(path, ledger_domain()),
-                Err(FindingPoolLedgerError::Storage(_))
-            ),
-            "temporary SQLite path {path:?} must not qualify"
-        );
-    }
 }

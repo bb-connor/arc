@@ -259,7 +259,6 @@
     "crates/platform/chio-store-sqlite/src/finding_market_store/collateral_registration.rs",
     "crates/platform/chio-store-sqlite/src/finding_operator_bundle_store.rs",
     "crates/platform/chio-store-sqlite/src/finding_pool_ledger/outbox.rs",
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs",
     "crates/platform/chio-store-sqlite/src/frost_store/ceremony.rs",
     "crates/platform/chio-store-sqlite/src/frost_store/ceremony/custody_output.rs",
@@ -1433,7 +1432,6 @@
     "crates/platform/chio-store-sqlite/src/finding_market_store.rs::validate_activation_envelope::from_wire",
     "crates/platform/chio-store-sqlite/src/finding_market_store/collateral_registration.rs::register_allocation_idempotent::from_wire",
     "crates/platform/chio-store-sqlite/src/finding_pool_ledger/outbox.rs::claim_pending_mutation_receipts::from_wire",
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs::verify_legacy_outbox_authority::from_wire",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs::load_admission_state::from_wire",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs::load_authority_state::from_wire",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs::load_genesis_policy::from_wire",
@@ -14236,17 +14234,6 @@
       ],
       "retained_typed_conversions": []
     },
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs": {
-      "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
-      "migrations": [
-        [
-          "verify_legacy_outbox_authority",
-          "decode_signed",
-          "64 * 1024 * 1024"
-        ]
-      ],
-      "retained_typed_conversions": []
-    },
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs": {
       "contract": "Bounded native JSON decoding rejects duplicate keys and lossy numeric lexemes before typed allocation; the owner retains exact canonical equality where required and its existing signature, digest, identity, tenant, operation and mirrored-column checks. Parsing alone grants no authority.",
       "migrations": [
@@ -18199,7 +18186,6 @@
     "crates/platform/chio-store-sqlite/src/finding_market_store.rs::validate_activation_envelope::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/finding_market_store/collateral_registration.rs::register_allocation_idempotent::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/finding_pool_ledger/outbox.rs::claim_pending_mutation_receipts::from_wire#1::decode_signed",
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs::verify_legacy_outbox_authority::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs::load_admission_state::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs::load_authority_state::from_wire#1::decode_signed",
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs::load_genesis_policy::from_wire#1::decode_signed",
@@ -20901,11 +20887,6 @@
     ],
     "crates/platform/chio-store-sqlite/src/finding_pool_ledger/outbox.rs": [
       "claim_pending_mutation_receipts::original-json-reader::UntrustedJsonText"
-    ],
-    "crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs": [
-      "bind_receipt_authority::shared-reader::crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs::verify_legacy_outbox_authority",
-      "bind_receipt_configuration::shared-reader::crates/platform/chio-store-sqlite/src/finding_pool_ledger/qualification.rs::verify_legacy_outbox_authority",
-      "verify_legacy_outbox_authority::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/fiscal_store.rs": [
       "load_admission_state::original-json-reader::UntrustedJsonText",
