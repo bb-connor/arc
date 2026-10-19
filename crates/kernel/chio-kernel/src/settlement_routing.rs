@@ -324,7 +324,7 @@ mod tests {
         exposes_binding: bool,
     }
 
-    struct LegacyAtomicStore {
+    struct AtomicStoreWithoutTimeout {
         binding: SettlementStoreBinding,
     }
 
@@ -457,27 +457,18 @@ mod tests {
             self.exposes_binding.then_some(self.binding)
         }
 
-        fn append_chio_receipt_with_pending_observation(
+        fn append_chio_receipt_with_pending_observation_and_timeout(
             &self,
             _receipt: &ChioReceipt,
             _pending: &PendingSettlementObservation,
-        ) -> Result<(), ReceiptStoreError> {
+            _budget: std::time::Duration,
+        ) -> Result<Option<u64>, ReceiptStoreError> {
             match self.projection {
-                AtomicReceiptProjection::SettlementObservationV1 => Ok(()),
+                AtomicReceiptProjection::SettlementObservationV1 => Ok(None),
                 AtomicReceiptProjection::Unsupported => Err(ReceiptStoreError::Unsupported(
                     "atomic settlement observation projection".to_string(),
                 )),
             }
-        }
-
-        fn append_chio_receipt_with_pending_observation_and_timeout(
-            &self,
-            receipt: &ChioReceipt,
-            pending: &PendingSettlementObservation,
-            _budget: std::time::Duration,
-        ) -> Result<Option<u64>, ReceiptStoreError> {
-            self.append_chio_receipt_with_pending_observation(receipt, pending)?;
-            Ok(None)
         }
 
         fn append_child_receipt(
@@ -488,7 +479,7 @@ mod tests {
         }
     }
 
-    impl ReceiptStore for LegacyAtomicStore {
+    impl ReceiptStore for AtomicStoreWithoutTimeout {
         fn append_chio_receipt(&self, _receipt: &ChioReceipt) -> Result<(), ReceiptStoreError> {
             Ok(())
         }
@@ -499,14 +490,6 @@ mod tests {
 
         fn atomic_receipt_projection(&self) -> AtomicReceiptProjection {
             AtomicReceiptProjection::SettlementObservationV1
-        }
-
-        fn append_chio_receipt_with_pending_observation(
-            &self,
-            _receipt: &ChioReceipt,
-            _pending: &PendingSettlementObservation,
-        ) -> Result<(), ReceiptStoreError> {
-            Ok(())
         }
 
         fn append_child_receipt(
@@ -920,9 +903,9 @@ mod tests {
     }
 
     #[test]
-    fn installer_rejects_a_legacy_atomic_store_without_timeout_support() {
+    fn installer_rejects_an_atomic_store_without_timeout_support() {
         let mut kernel = kernel();
-        let store = Arc::new(LegacyAtomicStore {
+        let store = Arc::new(AtomicStoreWithoutTimeout {
             binding: SettlementStoreBinding::from_digest([9; 32]),
         });
         let receipt_store: Arc<dyn ReceiptStore> = store;

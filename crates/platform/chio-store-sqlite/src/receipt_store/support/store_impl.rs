@@ -586,22 +586,6 @@ impl ReceiptStore for SqliteReceiptStore {
         self.settlement_store_binding.is_some()
     }
 
-    fn append_chio_receipt_with_pending_observation(
-        &self,
-        receipt: &ChioReceipt,
-        pending: &PendingSettlementObservation,
-    ) -> Result<(), ReceiptStoreError> {
-        if self.settlement_store_binding.is_none() {
-            return Err(ReceiptStoreError::Unsupported(
-                "atomic settlement observation projection".to_string(),
-            ));
-        }
-        let job = Self::build_pending_observation_write_job(receipt, pending)?;
-        self.writer_handle()
-            .run_critical_receipt_write(job)
-            .map(|_| ())
-    }
-
     fn append_chio_receipt_with_pending_observation_and_timeout(
         &self,
         receipt: &ChioReceipt,

@@ -41,9 +41,8 @@ mod settlement_routing_tests {
         receipts: HashMap<String, ChioReceipt>,
         attempts: HashMap<String, PendingSettlementObservation>,
         inputs: Vec<SettlementRoutingInput>,
-        legacy_appends: usize,
+        plain_appends: usize,
         atomic_appends: usize,
-        legacy_atomic_appends: usize,
         timed_atomic_appends: usize,
         timed_atomic_budget_ms: Option<u64>,
         claim_calls: usize,
@@ -61,9 +60,8 @@ mod settlement_routing_tests {
                 receipts: HashMap::new(),
                 attempts: HashMap::new(),
                 inputs: Vec::new(),
-                legacy_appends: 0,
+                plain_appends: 0,
                 atomic_appends: 0,
-                legacy_atomic_appends: 0,
                 timed_atomic_appends: 0,
                 timed_atomic_budget_ms: None,
                 claim_calls: 0,
@@ -115,9 +113,9 @@ mod settlement_routing_tests {
             receipt: &ChioReceipt,
         ) -> Result<Option<u64>, ReceiptStoreError> {
             let mut state = self.state();
-            state.legacy_appends += 1;
+            state.plain_appends += 1;
             state.receipts.insert(receipt.id.clone(), receipt.clone());
-            Ok(Some(state.legacy_appends as u64))
+            Ok(Some(state.plain_appends as u64))
         }
 
         fn load_chio_receipt(
@@ -137,24 +135,6 @@ mod settlement_routing_tests {
 
         fn supports_atomic_receipt_projection_with_timeout(&self) -> bool {
             true
-        }
-
-        fn append_chio_receipt_with_pending_observation(
-            &self,
-            receipt: &ChioReceipt,
-            pending: &PendingSettlementObservation,
-        ) -> Result<(), ReceiptStoreError> {
-            let mut state = self.state();
-            state.atomic_appends += 1;
-            state.legacy_atomic_appends += 1;
-            if state.seed_fails {
-                return Err(ReceiptStoreError::Conflict(
-                    "forced atomic settlement seed failure".to_string(),
-                ));
-            }
-            state.receipts.insert(receipt.id.clone(), receipt.clone());
-            state.attempts.insert(receipt.id.clone(), *pending);
-            Ok(())
         }
 
         fn append_chio_receipt_with_pending_observation_and_timeout(
@@ -499,7 +479,7 @@ mod settlement_routing_tests {
     }
 
     #[test]
-    fn no_runtime_uses_the_legacy_append_without_routing() {
+    fn no_runtime_uses_plain_append_without_routing() {
         let keypair = Keypair::generate();
         let store = Arc::new(RoutingStore::new(ClaimMode::Claim, RouteMode::Contract));
         let mut kernel = test_kernel(&keypair);
@@ -509,7 +489,7 @@ mod settlement_routing_tests {
         assert!(kernel.record_chio_receipt(&receipt).is_ok());
 
         let state = store.state();
-        assert_eq!(state.legacy_appends, 1);
+        assert_eq!(state.plain_appends, 1);
         assert_eq!(state.atomic_appends, 0);
         assert_eq!(state.claim_calls, 0);
         assert_eq!(state.route_calls, 0);
@@ -534,7 +514,7 @@ mod settlement_routing_tests {
             .is_ok());
 
         let state = harness.store.state();
-        assert_eq!(state.legacy_appends, 1);
+        assert_eq!(state.plain_appends, 1);
         assert_eq!(state.atomic_appends, 0);
         assert_eq!(state.claim_calls, 0);
         assert_eq!(state.route_calls, 0);
@@ -556,7 +536,7 @@ mod settlement_routing_tests {
             .kernel
             .record_session_tool_failure(&context, &operation)?;
         let state = harness.store.state();
-        assert_eq!(state.legacy_appends, 1);
+        assert_eq!(state.plain_appends, 1);
         assert_eq!(state.atomic_appends, 0);
         assert_eq!(state.claim_calls, 0);
         assert_eq!(state.route_calls, 0);
@@ -585,7 +565,7 @@ mod settlement_routing_tests {
             .kernel
             .record_session_protocol_refusal(&context, &summary)?;
         let state = harness.store.state();
-        assert_eq!(state.legacy_appends, 1);
+        assert_eq!(state.plain_appends, 1);
         assert_eq!(state.atomic_appends, 0);
         assert_eq!(state.claim_calls, 0);
         assert_eq!(state.route_calls, 0);
@@ -607,7 +587,7 @@ mod settlement_routing_tests {
         assert!(harness.kernel.record_chio_receipt(&receipt).is_ok());
 
         let state = harness.store.state();
-        assert_eq!(state.legacy_appends, 0);
+        assert_eq!(state.plain_appends, 0);
         assert_eq!(state.atomic_appends, 1);
         assert_eq!(state.claim_calls, 1);
         assert_eq!(state.route_calls, 1);
@@ -643,9 +623,8 @@ mod settlement_routing_tests {
 
         let state = store.state();
         assert_eq!(state.timed_atomic_appends, 1);
-        assert_eq!(state.legacy_atomic_appends, 0);
         assert_eq!(state.timed_atomic_budget_ms, Some(321));
-        assert_eq!(state.legacy_appends, 0);
+        assert_eq!(state.plain_appends, 0);
         assert!(state.receipts.contains_key(&receipt.id));
     }
 
@@ -855,7 +834,7 @@ mod settlement_routing_tests {
             let state = harness.store.state();
             assert_eq!(state.timed_atomic_appends, 1);
             assert_eq!(state.atomic_appends, 1);
-            assert_eq!(state.legacy_appends, 0);
+            assert_eq!(state.plain_appends, 0);
             assert!(state.receipts.contains_key(&receipt.id));
             match state.attempts.get(&receipt.id) {
                 Some(pending) => *pending,

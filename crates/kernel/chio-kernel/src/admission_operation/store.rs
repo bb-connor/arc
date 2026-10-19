@@ -850,45 +850,25 @@ pub trait AdmissionOperationStore: Send + Sync {
     /// immutable operation IDs, so updating a lease cannot reorder the sweep.
     fn recovery_page(
         &self,
-        _query: AdmissionRecoveryPageQuery<'_>,
-    ) -> Result<AdmissionRecoveryPageV1, AdmissionRecoveryPortError> {
-        Err(AdmissionOperationStoreError::Unavailable(
-            "bounded recovery cursor pages are unsupported".into(),
-        )
-        .into())
-    }
+        query: AdmissionRecoveryPageQuery<'_>,
+    ) -> Result<AdmissionRecoveryPageV1, AdmissionRecoveryPortError>;
 
     fn load_recovery_status(
         &self,
-        _operation_id: &AdmissionOperationId,
-        _fence: &StoreMutationFence,
-        _trusted_now_unix_ms: u64,
-    ) -> Result<Option<AdmissionRecoveryStatusV1>, AdmissionRecoveryPortError> {
-        Err(AdmissionOperationStoreError::Unavailable(
-            "durable recovery deferrals are unsupported".into(),
-        )
-        .into())
-    }
+        operation_id: &AdmissionOperationId,
+        fence: &StoreMutationFence,
+        trusted_now_unix_ms: u64,
+    ) -> Result<Option<AdmissionRecoveryStatusV1>, AdmissionRecoveryPortError>;
 
     fn defer_recovery(
         &self,
-        _request: AdmissionRecoveryDeferralWrite<'_>,
-    ) -> Result<AdmissionRecoveryStatusV1, AdmissionRecoveryPortError> {
-        Err(AdmissionOperationStoreError::Unavailable(
-            "durable recovery deferrals are unsupported".into(),
-        )
-        .into())
-    }
+        request: AdmissionRecoveryDeferralWrite<'_>,
+    ) -> Result<AdmissionRecoveryStatusV1, AdmissionRecoveryPortError>;
 
     fn clear_recovery_deferral(
         &self,
-        _request: AdmissionRecoveryDeferralClear<'_>,
-    ) -> Result<(), AdmissionRecoveryPortError> {
-        Err(AdmissionOperationStoreError::Unavailable(
-            "durable recovery deferral clearing is unsupported".into(),
-        )
-        .into())
-    }
+        request: AdmissionRecoveryDeferralClear<'_>,
+    ) -> Result<(), AdmissionRecoveryPortError>;
 
     fn load_terminal_replay(
         &self,

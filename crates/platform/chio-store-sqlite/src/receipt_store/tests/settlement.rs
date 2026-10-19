@@ -79,16 +79,18 @@ fn open_existing_does_not_install_missing_settlement_schema(
     assert!(!ReceiptStore::supports_atomic_receipt_projection_with_timeout(&reopened));
     assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
     let unsupported_receipt = sample_receipt_with_id("rcpt-settlement-unsupported");
-    let unsupported = ReceiptStore::append_chio_receipt_with_pending_observation(
+    let unsupported = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
         &reopened,
         &unsupported_receipt,
         &chio_kernel::PendingSettlementObservation {
             next_visible_at_ms: 1,
         },
+        std::time::Duration::from_secs(2),
     );
     assert!(matches!(
         unsupported,
-        Err(ReceiptStoreError::Unsupported(_))
+        Err(ReceiptStoreError::Unsupported(message))
+            if message == "atomic settlement observation projection"
     ));
     assert!(reopened
         .load_chio_receipt(&unsupported_receipt.id)?
@@ -237,7 +239,12 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
         next_visible_at_ms: 9_001,
     };
 
-    ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+    ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        std::time::Duration::from_secs(2),
+    )?;
     let connection = store.connection()?;
     let row = connection.query_row(
         "SELECT finalized_at, work_kind, attempts, next_visible_at_ms, row_version, lease_owner, lease_token, lease_until_ms, reason_code, reason_detail_sha256 FROM settle_attempts WHERE receipt_id = ?1",
@@ -268,7 +275,12 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
     );
     drop(connection);
 
-    ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+    ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        std::time::Duration::from_secs(2),
+    )?;
     assert_eq!(attempt_count(&store, &receipt.id)?, 1);
 
     let conflicting = sample_receipt_with_id("rcpt-settlement-attempt-conflict");
@@ -282,21 +294,30 @@ fn atomic_receipt_append_seeds_attempt_zero_once() -> Result<(), Box<dyn std::er
             Ok(())
         }
     })?;
-    let conflict =
-        ReceiptStore::append_chio_receipt_with_pending_observation(&store, &conflicting, &pending);
-    assert!(conflict.is_err());
+    let conflict = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &conflicting,
+        &pending,
+        std::time::Duration::from_secs(2),
+    );
+    assert!(matches!(conflict, Err(ReceiptStoreError::Conflict(message))
+        if message == "settlement attempt zero conflicts with durable state"));
     assert!(store.load_chio_receipt(&conflicting.id)?.is_none());
     assert_eq!(attempt_count(&store, &conflicting.id)?, 1);
 
     let overflow = sample_receipt_with_id("rcpt-settlement-visible-overflow");
-    let overflow_result = ReceiptStore::append_chio_receipt_with_pending_observation(
+    let overflow_result = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
         &store,
         &overflow,
         &chio_kernel::PendingSettlementObservation {
             next_visible_at_ms: u64::MAX,
         },
+        std::time::Duration::from_secs(2),
     );
-    assert!(overflow_result.is_err());
+    assert!(
+        matches!(overflow_result, Err(ReceiptStoreError::Conflict(message))
+        if message == "settlement attempt visibility deadline value 18446744073709551615 exceeds SQLite INTEGER range")
+    );
     assert!(store.load_chio_receipt(&overflow.id)?.is_none());
 
     drop(store);
@@ -314,7 +335,12 @@ fn duplicate_receipt_without_settlement_obligation_fails_closed(
         next_visible_at_ms: 9_001,
     };
 
-    ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+    ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        std::time::Duration::from_secs(2),
+    )?;
     store.writer_handle().run_write({
         let receipt_id = receipt.id.clone();
         move |connection| {
@@ -326,9 +352,14 @@ fn duplicate_receipt_without_settlement_obligation_fails_closed(
         }
     })?;
 
-    let result =
-        ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending);
-    assert!(matches!(result, Err(ReceiptStoreError::Conflict(_))));
+    let result = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        std::time::Duration::from_secs(2),
+    );
+    assert!(matches!(result, Err(ReceiptStoreError::Conflict(message))
+        if message == format!("receipt `{}` exists without a settlement obligation", receipt.id)));
     assert_eq!(attempt_count(&store, &receipt.id)?, 0);
 
     drop(store);
@@ -400,7 +431,11 @@ fn timed_out_atomic_receipt_append_commits_once_after_writer_drains(
     )
     .err()
     .ok_or("atomic settlement append must time out behind the blocked writer")?;
-    assert!(matches!(error, ReceiptStoreError::Timeout { .. }));
+    assert!(matches!(
+        error,
+        ReceiptStoreError::Timeout { operation, timeout_ms: 25 }
+            if operation == "sqlite receipt commit write"
+    ));
     assert!(store.load_chio_receipt(&receipt.id)?.is_none());
     assert_eq!(attempt_count(&store, &receipt.id)?, 0);
     let timed_out = store.receipt_commit_actor.writer_counters();
@@ -468,12 +503,13 @@ fn atomic_settlement_write_failure_closes_serving_before_returning(
     })?;
 
     let receipt = sample_receipt_with_id("rcpt-settlement-write-failure");
-    let error = ReceiptStore::append_chio_receipt_with_pending_observation(
+    let error = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
         &store,
         &receipt,
         &chio_kernel::PendingSettlementObservation {
             next_visible_at_ms: 1,
         },
+        std::time::Duration::from_secs(2),
     )
     .err()
     .ok_or("a missing settlement projection must reject the atomic write")?;
@@ -525,7 +561,12 @@ fn receipt_retention_preserves_active_settlement_attempts() -> Result<(), Box<dy
     let pending = chio_kernel::PendingSettlementObservation {
         next_visible_at_ms: 1,
     };
-    ReceiptStore::append_chio_receipt_with_pending_observation(&store, &receipt, &pending)?;
+    ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
+        &store,
+        &receipt,
+        &pending,
+        std::time::Duration::from_secs(2),
+    )?;
     store.create_next_receipt_checkpoint(1, &receipt_test_keypair())?;
 
     assert_eq!(
