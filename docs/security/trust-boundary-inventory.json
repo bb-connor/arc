@@ -1525,7 +1525,7 @@
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire",
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire",
-    "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file::new",
+    "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded::from_wire",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire",
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire",
@@ -18306,7 +18306,7 @@
     "crates/products/chio-cli/src/cli/receipt_verify.rs::verify_original_receipt::from_wire#1::canonicalize",
     "crates/products/chio-cli/src/cli/replay/execute.rs::recompute_decision::from_wire#1::decode_canonical",
     "crates/products/chio-cli/src/cli/replay/validate.rs::validate_invocation_canonical::from_wire#1::decode_canonical",
-    "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file::new#1::decode_signed",
+    "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded::from_wire#1::decode_signed",
     "crates/products/chio-proof-room/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/protocol/chio-a2a-adapter/src/auth.rs::read_json_response_with_contract::from_wire#1::decode_document",
     "crates/protocol/chio-a2a-adapter/src/task_registry.rs::load::from_wire#1::decode_signed",
@@ -22375,7 +22375,8 @@
     ],
     "crates/products/chio-mercury/src/commands/shared/utils.rs": [
       "load_bundle_manifests::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file",
-      "read_json_file::original-json-reader::UntrustedJsonText"
+      "read_json_file::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded",
+      "read_json_file_bounded::original-json-reader::UntrustedJsonText"
     ],
     "crates/products/chio-mercury/src/main.rs": [
       "main::shared-reader::crates/products/chio-mercury/src/main.rs::run",
@@ -23879,11 +23880,14 @@
       "baseline_kind": "raw-input-baseline",
       "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
       "helper": "read_json_file",
-      "helper_source_sha256": "5690e2647dcdd9ca0674cde032b83d607d272dc5690529a6e2b7af91ffba1c6d",
-      "constructor_contract": "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file::new#1::decode_signed",
+      "helper_source_sha256": "04a67b38d23597da5e255283332686b3457faf8c85cef63cf9dfe7655380a8a5",
+      "reader": "read_json_file_bounded",
+      "reader_source_sha256": "f9b549eb1fd29faac859e9c234fa7f869988058e677a6c8d1d8b4af3585058bc",
+      "constructor_contract": "crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded::from_wire#1::decode_signed",
       "ingress": [
         "load_bundle_manifests::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file",
-        "read_json_file::original-json-reader::UntrustedJsonText"
+        "read_json_file::shared-reader::crates/products/chio-mercury/src/commands/shared/utils.rs::read_json_file_bounded",
+        "read_json_file_bounded::original-json-reader::UntrustedJsonText"
       ],
       "consumers": [
         {
@@ -23927,9 +23931,9 @@
           "source_sha256": "3fe54c5a3c9496a51483c665d7c10916c9407c0781454edd5cf2766407a5b640"
         }
       ],
-      "scope": "Original duplicate/lossless-number validation through decode_signed only. Parsing does not establish signature validity, trusted signer, capability authorization or file-wide input safety. UntrustedJsonText::new adds no byte cap.",
-      "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Bound file/caller memory, qualify native error/operator behavior and full owning native/trusted/hosted scope separately; scoped CR002 source changes do not close this cohort.",
-      "source_head": "787d303819c7da628dd4762cdb924624ef82a0a8"
+      "scope": "Original duplicate/lossless-number validation through decode_signed only. Parsing does not establish signature validity, trusted signer, capability authorization or file-wide input safety. read_json_file caps each file read at MAX_JSON_INPUT_BYTES through UntrustedJsonText::from_wire.",
+      "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Bound caller memory, qualify native error/operator behavior and full owning native/trusted/hosted scope separately; the file read bound and scoped CR002 source changes do not close this cohort.",
+      "source_head": "b4c0377dda5c7c4a04cd240a069c4bde271dd791"
     },
     "crates/sdk/chio-binding-helpers/src/receipt.rs": {
       "status": "direct-serde-site-migrated-original-debt-open",
