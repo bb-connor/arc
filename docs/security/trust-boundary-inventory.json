@@ -1277,7 +1277,7 @@
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire",
     "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire",
-    "crates/observability/chio-siem/src/manager.rs::poll_once::new",
+    "crates/observability/chio-siem/src/manager.rs::decode_receipt_row::new",
     "crates/platform/chio-commerce-order/src/input.rs::decode::from_wire",
     "crates/platform/chio-control-plane/src/attestation/model.rs::verify_and_appraise::from_wire",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire",
@@ -13061,6 +13061,10 @@
           "checked": true
         }
       ]
+    },
+    "crates/observability/chio-siem/src/manager.rs": {
+      "kind": "raw-input-baseline",
+      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     }
   },
   "tenant_runtime_families": {
@@ -18064,7 +18068,7 @@
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire#1::decode_document",
-    "crates/observability/chio-siem/src/manager.rs::poll_once::new#1::decode_signed",
+    "crates/observability/chio-siem/src/manager.rs::decode_receipt_row::new#1::decode_signed",
     "crates/platform/chio-commerce-order/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/model.rs::verify_and_appraise#4::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire#1::decode_signed",
@@ -23869,7 +23873,8 @@
       "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload"
     ],
     "crates/observability/chio-siem/src/manager.rs": [
-      "poll_once::original-json-reader::UntrustedJsonText"
+      "decode_receipt_row::original-json-reader::UntrustedJsonText",
+      "poll_once::shared-reader::crates/observability/chio-siem/src/manager.rs::decode_receipt_row"
     ]
   },
   "retired_direct_readers": {
@@ -23960,6 +23965,27 @@
       "scope": "Original duplicate/lossless-number validation through decode_signed only. Parsing does not establish signature validity, trusted signer, capability authorization or file-wide input safety. UntrustedJsonText::new adds no byte cap.",
       "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Bound file/caller memory, qualify native error/operator behavior and full owning native/trusted/hosted scope separately; scoped CR002 source changes do not close this cohort.",
       "source_head": "787d303819c7da628dd4762cdb924624ef82a0a8"
+    },
+    "crates/observability/chio-siem/src/manager.rs": {
+      "status": "direct-serde-site-migrated-original-debt-open",
+      "baseline_kind": "raw-input-baseline",
+      "baseline_contract_sha256": "16e47be434c6365e1aa520e63ca8c243ea21059266292d8b4beae272d039e48e",
+      "helper": "decode_receipt_row",
+      "helper_source_sha256": "3db8a7502735b7dd1f8475ce69f56c756610e6e5f8d45b613343a37f72144df8",
+      "constructor_contract": "crates/observability/chio-siem/src/manager.rs::decode_receipt_row::new#1::decode_signed",
+      "ingress": [
+        "decode_receipt_row::original-json-reader::UntrustedJsonText",
+        "poll_once::shared-reader::crates/observability/chio-siem/src/manager.rs::decode_receipt_row"
+      ],
+      "consumers": [
+        {
+          "path": "crates/observability/chio-siem/src/manager.rs",
+          "owner": "poll_once",
+          "source_sha256": "18167edbed5c415770121deca047fc072b11be211eb15017c358e9c928397f74"
+        }
+      ],
+      "scope": "Original duplicate/lossless-number validation of each retained receipt row through decode_signed only. Parsing does not establish signature validity or row provenance; malformed rows go to the durable dead-letter table. UntrustedJsonText::new adds no byte cap.",
+      "remaining_acceptance": "All original raw-input-baseline semantic debt remains open. Bound row memory and qualify exporter error behavior separately."
     }
   }
 }

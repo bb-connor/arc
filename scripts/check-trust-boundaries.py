@@ -40,7 +40,7 @@ DECODER_KINDS = {
 
 # The reviewed debt cohort survives scoped caller repairs and direct-site
 # migrations. Removing or promoting it requires an explicit source-gate review.
-RAW_INPUT_BASELINE_IDENTITIES_SHA256 = "d29c58598c05237da24eae2ae772acf5f9cbc23fa031424d8bd75385b5704eb4"
+RAW_INPUT_BASELINE_IDENTITIES_SHA256 = "049948d58a6c6c1ee334f7dd0886724dc786227068ee1df88b5be862318b2922"
 # Each retired helper names the inner reader that owns its single signed
 # decode and that reader's constructor. A distinct reader is private to the helper.
 RETIRED_DIRECT_HELPERS = {
@@ -48,6 +48,8 @@ RETIRED_DIRECT_HELPERS = {
         "read_json_file", "read_json_file_bounded", "from_wire"),
     "crates/sdk/chio-binding-helpers/src/receipt.rs": (
         "parse_receipt_json", "parse_receipt_json", "new"),
+    "crates/observability/chio-siem/src/manager.rs": (
+        "decode_receipt_row", "decode_receipt_row", "new"),
 }
 
 
