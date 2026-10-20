@@ -112,6 +112,22 @@ impl ChioKernel {
         };
         match evaluated {
             Ok(mut decision) => {
+                if let Some(key) =
+                    crate::kernel::reserved_hook_metadata_key(decision.metadata.as_ref())
+                {
+                    if let Some(metadata) = decision
+                        .metadata
+                        .as_mut()
+                        .and_then(serde_json::Value::as_object_mut)
+                    {
+                        metadata
+                            .retain(|name, _| !crate::kernel::is_hook_forbidden_metadata_key(name));
+                    }
+                    return RuntimeAdmissionDecision::deny(
+                        format!("{key} is reserved for kernel-derived receipts"),
+                        decision.metadata,
+                    );
+                }
                 if decision.allowed {
                     match decision.verified_treaty_material.take() {
                         Some(material) => {

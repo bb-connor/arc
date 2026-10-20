@@ -161,7 +161,9 @@ const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 12] = [
+/// Top-level receipt-metadata keys only the kernel writes. Caller or hook
+/// metadata that names one is refused before any effect.
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 32] = [
     crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
     "attribution",
     MANIFEST_SECURITY_METADATA_KEY,
@@ -174,7 +176,46 @@ const RESERVED_RECEIPT_METADATA_KEYS: [&str; 12] = [
     PROTOCOL_REFUSAL_METADATA_KEY,
     RUNTIME_ADMISSION_METADATA_KEY,
     "receipt_context",
+    "governed_transaction_diagnostics",
+    "model_metadata",
+    chio_core::receipt::metadata::CHANNEL_METADATA_KEY,
+    chio_core::receipt::metadata::DELIVERY_CONTRACT_METADATA_KEY,
+    chio_core::receipt::metadata::FINDING_DELIVERY_METADATA_KEY,
+    chio_core::receipt::metadata::FINDING_RECOVERY_METADATA_KEY,
+    crate::finding_purchase::FINDING_PURCHASE_REPLAY_SNAPSHOT_METADATA_KEY,
+    crate::finding_recovery::FINDING_RECOVERY_REPLAY_SNAPSHOT_METADATA_KEY,
+    crate::finding_denial::FINDING_DENIAL_METADATA_KEY,
+    "stream",
+    "threshold_approval",
+    "memory_provenance",
+    "post_invocation",
+    "execution_nonce",
+    "chio_kernel",
+    "runtime_admission",
+    "active_response_terminal_evidence",
+    "chio_http_receipt_v1",
+    chio_core::receipt::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
+    "original_metadata",
 ];
+
+/// A runtime-admission hook writes only `chio_runtime`; `runtime_admission` is
+/// the kernel's own record of the hook outcome. Every other reserved key is
+/// forbidden in hook metadata.
+fn is_hook_forbidden_metadata_key(key: &str) -> bool {
+    key != RUNTIME_ADMISSION_METADATA_KEY
+        && key != "runtime_admission"
+        && RESERVED_RECEIPT_METADATA_KEYS.contains(&key)
+}
+
+/// The first reserved key a runtime-admission hook may not write, if its
+/// metadata names one.
+fn reserved_hook_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
+    let object = metadata.and_then(serde_json::Value::as_object)?;
+    RESERVED_RECEIPT_METADATA_KEYS
+        .iter()
+        .copied()
+        .find(|key| object.contains_key(*key) && is_hook_forbidden_metadata_key(key))
+}
 
 fn reserved_receipt_metadata_key(metadata: Option<&serde_json::Value>) -> Option<&'static str> {
     let object = metadata.and_then(serde_json::Value::as_object)?;
@@ -850,36 +891,21 @@ fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
 fn extract_session_anchor_reference_from_metadata(
     metadata: Option<&serde_json::Value>,
 ) -> Option<chio_core::session::SessionAnchorReference> {
-    let metadata = metadata?;
-    let candidates = [
-        metadata
-            .get("governed_transaction")
-            .and_then(|value| value.get("call_chain")),
-        metadata.get("lineageReferences"),
-    ];
-
-    for candidate in candidates.into_iter().flatten() {
-        let Some(session_anchor_id) = candidate
-            .get("sessionAnchorId")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
-            continue;
-        };
-        let Some(session_anchor_hash) = candidate
-            .get("sessionAnchorHash")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
-            continue;
-        };
-        return Some(chio_core::session::SessionAnchorReference::new(
-            session_anchor_id,
-            session_anchor_hash,
-        ));
-    }
-
-    None
+    let call_chain = metadata?
+        .get("governed_transaction")
+        .and_then(|value| value.get("call_chain"))?;
+    let session_anchor_id = call_chain
+        .get("sessionAnchorId")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())?;
+    let session_anchor_hash = call_chain
+        .get("sessionAnchorHash")
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())?;
+    Some(chio_core::session::SessionAnchorReference::new(
+        session_anchor_id,
+        session_anchor_hash,
+    ))
 }
 
 /// A policy guard that the kernel evaluates before forwarding a tool call.
