@@ -6,6 +6,7 @@ everything in this tree is supporting material organized by audience.
 
 ## Start here
 
+- [Overview](start-here/OVERVIEW.md) - the long-form tour: quickstart, architecture, integrations, security and proofs
 - [Progressive Tutorial](start-here/PROGRESSIVE_TUTORIAL.md) - walk through Chio from scratch
 - [Native Adoption Guide](start-here/NATIVE_ADOPTION_GUIDE.md) - choose a native integration; process starters and coding sessions are experimental source-built Linux development profiles
 - [Vision](start-here/VISION.md) - what Chio is for and why
