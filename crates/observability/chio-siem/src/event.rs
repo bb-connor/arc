@@ -27,7 +27,10 @@ pub struct SiemEvent {
     pub receipt_kind: String,
     /// Runtime mediation boundary for this receipt.
     pub boundary_class: String,
-    /// Human-facing semantic result label.
+    /// Core semantic classification label (`ReceiptSemanticFields::result_label`),
+    /// except that an allow whose semantics authorize but whose source checks
+    /// fail is `Unverified`. Sinks export `sink_projection()`, which reports
+    /// every non-authorized mediated allow as `Unverified`.
     pub result: String,
     /// True when the receipt id, receipt signature, and action parameter hash verify.
     pub authoritative: bool,
@@ -222,6 +225,21 @@ mod tests {
         assert!(!event.signer_trusted);
         assert!(!event.authorized);
         assert_eq!(event.result, "Unverified");
+    }
+
+    #[test]
+    fn mediated_allow_without_mediated_trust_is_labelled_allowed() {
+        for trust_level in [TrustLevel::Verified, TrustLevel::Advisory] {
+            let mut receipt = signed_allow_receipt();
+            receipt.trust_level = trust_level;
+            let trusted = BTreeSet::from([receipt.kernel_key.to_hex()]);
+            let event = SiemEvent::from_receipt_with_trusted_kernel_keys(receipt, Some(&trusted));
+
+            assert!(!event.signature_valid);
+            assert!(!event.authorized);
+            assert_eq!(event.result, "Allowed");
+            assert_eq!(event.sink_projection().result_label(), "Unverified");
+        }
     }
 
     #[test]

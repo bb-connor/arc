@@ -423,6 +423,19 @@ fn chio_internal_tool_origin_roundtrips_as_closed_vocabulary() {
 }
 
 #[test]
+fn mediated_allow_without_mediated_trust_is_not_authorized() {
+    for trust_level in [TrustLevel::Verified, TrustLevel::Advisory] {
+        let semantics = ReceiptSemanticFields {
+            trust_level,
+            ..ReceiptSemanticFields::mediated_prevent()
+        };
+
+        assert!(!semantics.is_authorized(Some(&Decision::Allow)));
+        assert_eq!(semantics.result_label(Some(&Decision::Allow)), "Allowed");
+    }
+}
+
+#[test]
 fn trace_and_advisory_semantics_cannot_authorize() {
     let trace = ReceiptSemanticFields {
         receipt_kind: ReceiptKind::TraceObservation,
@@ -431,6 +444,7 @@ fn trace_and_advisory_semantics_cannot_authorize() {
         tool_origin: ToolOrigin::HostExecutedProviderReported,
         redaction_mode: RedactionMode::Summary,
         actor_chain: Vec::new(),
+        trust_level: TrustLevel::Verified,
     };
     let advisory = ReceiptSemanticFields {
         receipt_kind: ReceiptKind::AdvisoryEvaluation,
@@ -439,6 +453,7 @@ fn trace_and_advisory_semantics_cannot_authorize() {
         tool_origin: ToolOrigin::HostExecutedUnmediated,
         redaction_mode: RedactionMode::Redacted,
         actor_chain: Vec::new(),
+        trust_level: TrustLevel::Advisory,
     };
 
     assert!(trace.validate_decision(Some(&Decision::Allow)).is_err());

@@ -15,6 +15,7 @@ use chio_core::{
         scope::{ChioScope, Constraint, Operation, ToolGrant},
         token::{CapabilityToken, CapabilityTokenBody},
     },
+    receipt::body::chio_receipt_id,
     receipt::body::ChioReceipt,
     receipt::body::ChioReceiptBody,
     receipt::decision::Decision,
@@ -23,7 +24,9 @@ use chio_core::{
     receipt::kinds::ReceiptKind,
     receipt::kinds::RedactionMode,
     receipt::kinds::ToolOrigin,
+    receipt::kinds::TrustLevel,
     receipt::metadata::GuardEvidence,
+    receipt::signing::{bind_receipt_signing_nonce, ChioReceiptSigningBody},
     sha256_hex, Keypair,
 };
 use chio_manifest::{
@@ -162,7 +165,7 @@ fn base_receipt_body(
             "surface": "bindings-vectors",
             "version": 1
         })),
-        trust_level: chio_core::receipt::kinds::TrustLevel::default(),
+        trust_level: TrustLevel::default(),
         tenant_id: None,
         kernel_key: keypair.public_key(),
         bbs_projection_version: None,
@@ -755,6 +758,41 @@ fn null_observation_outcome_case(keypair: &Keypair) -> Value {
     })
 }
 
+fn mediated_allow_with_trust_level_case(keypair: &Keypair, trust_level: TrustLevel) -> Value {
+    let action = ToolCallAction::from_parameters(json!({
+        "path": "/workspace/docs/roadmap.md",
+        "mode": "read"
+    }))
+    .test_unwrap("trust level action");
+    let mut body = base_receipt_body(
+        &format!("rcpt-bindings-{}-trust", trust_level.as_str()),
+        action,
+        Decision::Allow,
+        keypair,
+    );
+    body.trust_level = trust_level;
+    bind_receipt_signing_nonce(&mut body);
+    body.id = chio_receipt_id(&body).test_unwrap("trust level receipt id");
+    let (signature, _bytes) = keypair
+        .sign_canonical(&ChioReceiptSigningBody::from(&body))
+        .test_unwrap("sign trust level receipt body");
+    let mut receipt_json = serde_json::to_value(&body).test_unwrap("serialize trust level body");
+    receipt_json["signature"] =
+        serde_json::to_value(&signature).test_unwrap("serialize trust level signature");
+    let decoded: ChioReceipt =
+        serde_json::from_value(receipt_json).test_unwrap("decode trust level receipt");
+    json!({
+        "id": format!("mediated_decision_with_{}_trust_level", trust_level.as_str()),
+        "description": format!(
+            "A mediated allow with {} trust has a valid id but is not signable and is not authorization.",
+            trust_level.as_str()
+        ),
+        "receipt": serde_json::to_value(&decoded).test_unwrap("serialize trust level receipt"),
+        "receipt_body_canonical_json": receipt_body_canonical_json(&decoded).test_unwrap("canonical trust level body"),
+        "expected": receipt_expectation(&decoded),
+    })
+}
+
 #[test]
 #[ignore = "regenerator: rewrite each expected block of the checked-in receipt corpus in place from verify_receipt and append missing cases; run with --ignored, then `cargo xtask freeze-vectors`"]
 fn refresh_receipt_vector_fixture() {
@@ -789,14 +827,21 @@ fn refresh_receipt_vector_fixture() {
         case["expected"] = expected;
     }
 
-    let null_case = null_observation_outcome_case(&keypair);
-    if !cases.iter().any(|case| case["id"] == null_case["id"]) {
+    let appended = [
+        null_observation_outcome_case(&keypair),
+        mediated_allow_with_trust_level_case(&keypair, TrustLevel::Verified),
+        mediated_allow_with_trust_level_case(&keypair, TrustLevel::Advisory),
+    ];
+    for extra in appended {
+        if cases.iter().any(|case| case["id"] == extra["id"]) {
+            continue;
+        }
         let close = raw.find("\n  ]").test_unwrap("locate end of receipt cases");
         raw.insert_str(
             close,
-            &format!(",\n    {}", indented_pretty_json(&null_case, "    ")),
+            &format!(",\n    {}", indented_pretty_json(&extra, "    ")),
         );
-        cases.push(null_case);
+        cases.push(extra);
     }
 
     let rewritten: Value = serde_json::from_str(&raw).test_unwrap("parse rewritten fixture");

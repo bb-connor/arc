@@ -112,19 +112,18 @@ mod tests {
     use chio_core::crypto::Keypair;
     use chio_core::receipt::{
         body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
-        kinds::TrustLevel, metadata::ReceiptSemanticFields,
+        metadata::ReceiptSemanticFields,
     };
     use chio_test_support::prelude::*;
 
     fn test_receipt(id: &str, decision: Decision) -> ChioReceipt {
-        test_receipt_with_semantics(id, decision, None, TrustLevel::Mediated)
+        test_receipt_with_semantics(id, decision, None)
     }
 
     fn test_receipt_with_semantics(
         id: &str,
         decision: Decision,
         semantics: Option<ReceiptSemanticFields>,
-        trust_level: TrustLevel,
     ) -> ChioReceipt {
         let kp = Keypair::generate();
         let action = match ToolCallAction::from_parameters(serde_json::json!({
@@ -158,7 +157,7 @@ mod tests {
             policy_hash: "policy-xyz".to_string(),
             evidence: Vec::new(),
             metadata: None,
-            trust_level,
+            trust_level: semantics.trust_level,
             tenant_id: None,
             kernel_key: kp.public_key(),
             bbs_projection_version: None,
@@ -186,7 +185,6 @@ mod tests {
             "trace-1",
             Decision::Allow,
             Some(ReceiptSemanticFields::trace_detect_only()),
-            TrustLevel::Verified,
         );
         let ev = receipt_to_ocsf(&receipt);
 

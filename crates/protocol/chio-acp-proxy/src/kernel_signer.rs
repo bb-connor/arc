@@ -450,15 +450,13 @@ impl ReceiptSigner for KernelReceiptSigner {
             } else {
                 None
             };
-        let (decision, trust_level, semantics) = match enforcement_mode {
+        let (decision, semantics) = match enforcement_mode {
             AcpEnforcementMode::AuditOnly => (
                 None,
-                chio_core::receipt::kinds::TrustLevel::Verified,
                 chio_core::receipt::metadata::ReceiptSemanticFields::trace_detect_only(),
             ),
             AcpEnforcementMode::CryptographicallyEnforced => (
                 Some(Decision::Allow),
-                chio_core::receipt::kinds::TrustLevel::Mediated,
                 chio_core::receipt::metadata::ReceiptSemanticFields::mediated_prevent(),
             ),
         };
@@ -542,7 +540,7 @@ impl ReceiptSigner for KernelReceiptSigner {
                     "authorization_parameter_hash": entry.authorization_parameter_hash,
                 }
             })),
-            trust_level,
+            trust_level: semantics.trust_level,
             tenant_id: authorization_context
                 .as_ref()
                 .and_then(|context| context.tenant_id.clone()),

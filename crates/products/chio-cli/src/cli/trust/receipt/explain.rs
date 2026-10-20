@@ -866,12 +866,6 @@ mod receipt_explain_tests {
             } else {
                 None
             };
-        let trust_level =
-            if semantics.receipt_kind == chio_core::receipt::kinds::ReceiptKind::MediatedDecision {
-                chio_core::receipt::kinds::TrustLevel::Mediated
-            } else {
-                chio_core::receipt::kinds::TrustLevel::Verified
-            };
         chio_core::receipt::body::ChioReceipt::sign(
             chio_core::receipt::body::ChioReceiptBody {
                 id: "ignored-before-content-id".to_string(),
@@ -894,7 +888,7 @@ mod receipt_explain_tests {
                 policy_hash: "policy-explain".to_string(),
                 evidence: Vec::new(),
                 metadata: None,
-                trust_level,
+                trust_level: semantics.trust_level,
                 tenant_id: None,
                 kernel_key: keypair.public_key(),
                 bbs_projection_version: None,
@@ -998,6 +992,22 @@ mod receipt_explain_tests {
         );
         assert_eq!(trace_explain["result"].as_str(), Some("Observed"));
         assert_eq!(trace_explain["authorized"].as_bool(), Some(false));
+
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_explain_labels_mediated_allow_without_mediated_trust_allowed(
+    ) -> Result<(), CliError> {
+        let receipt = signed_explain_receipt(chio_core::receipt::decision::Decision::Allow, None);
+        for trust_level in ["verified", "advisory"] {
+            let mut value = serde_json::to_value(&receipt)?;
+            value["trust_level"] = serde_json::json!(trust_level);
+            let explain = explain_receipt_value(&receipt.id, value, 1, 1)?;
+
+            assert_eq!(explain["result"].as_str(), Some("Allowed"));
+            assert_eq!(explain["authorized"].as_bool(), Some(false));
+        }
 
         Ok(())
     }
