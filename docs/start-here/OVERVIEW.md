@@ -98,7 +98,7 @@ writes the audit log. Chio is that layer for agents, and each part has a direct 
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="../assets/kernel-boundary-mobile.svg" />
-    <img src="../assets/kernel-boundary.svg" alt="The Chio kernel boundary: agents, sub-agents, and tool servers run untrusted in user space; every call crosses into the kernel, which verifies, budgets, guards, runs its decision models, dispatches, meters, and signs; protocol and provider adapters sit beneath it as drivers; every decision lands in an append-only receipt log." width="900" />
+    <img src="../assets/kernel-boundary.svg" alt="Two swarms under two kernels: their swarm runs under their kernel, joined by a treaty over iroh to your kernel, and both kernels sign. Your swarm, each grant narrower than its parent, runs under your kernel: a trusted compute base of capabilities, delegation, guards, budgets, revocation, information flow, processes, receipts, keys, secrets, sandbox and quarantine around its decision models. Your kernel dispatches through the adapter, the one door into the sandbox, to files, commands and services, and signs each decision. Below: supported harnesses and interfaces." width="900" />
   </picture>
 </p>
 
