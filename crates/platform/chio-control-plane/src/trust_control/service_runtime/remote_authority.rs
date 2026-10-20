@@ -243,7 +243,7 @@ impl RemoteCapabilityAuthority {
 
 impl CapabilityAuthority for RemoteCapabilityAuthority {
     /// A failed refresh, an unavailable cache or a missing current key
-    /// refuses instead of naming a stale key.
+    /// refuses issuance.
     fn authority_public_key(&self) -> Result<PublicKey, chio_kernel::KernelError> {
         self.refresh_status_if_stale().map_err(|error| {
             chio_kernel::KernelError::CapabilityIssuanceFailed(error.to_string())

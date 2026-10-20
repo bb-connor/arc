@@ -11,10 +11,14 @@ impl ChioKernel {
         self.threshold_approval_requirement_resolver = Some(resolver);
     }
 
+    /// An unreadable proposal signer is a governed denial on every path.
     pub(super) fn threshold_proposal_signing_key(
         &self,
     ) -> Result<chio_core::PublicKey, KernelError> {
-        self.receipt_signing_public_key()
+        self.signing_authority
+            .backend
+            .public_key()
+            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))
     }
 
     /// Reject incompatible retained authority before resuming acquisition or
@@ -41,10 +45,7 @@ impl ChioKernel {
     pub(super) fn ensure_threshold_proposal_signer_ready(
         &self,
     ) -> Result<SigningAlgorithm, KernelError> {
-        let algorithm = self
-            .threshold_proposal_signing_key()
-            .map_err(|error| KernelError::GovernedTransactionDenied(error.to_string()))?
-            .algorithm();
+        let algorithm = self.threshold_proposal_signing_key()?.algorithm();
         if !self
             .capability_crypto_floor
             .allowed_signing_algorithms()

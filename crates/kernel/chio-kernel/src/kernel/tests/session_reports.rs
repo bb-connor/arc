@@ -268,7 +268,17 @@ fn receipt_signing_public_key_fails_closed_on_unreadable_identity() -> TestResul
     ));
     assert!(matches!(
         kernel.trusted_threshold_proposal_authorities(),
-        Err(KernelError::ReceiptSigningFailed(reason))
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.threshold_proposal_signing_key(),
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.ensure_threshold_proposal_signer_ready(),
+        Err(KernelError::GovernedTransactionDenied(reason))
             if reason == "invalid public key: selector unavailable"
     ));
     assert!(kernel.receipt_log().receipts().is_empty());

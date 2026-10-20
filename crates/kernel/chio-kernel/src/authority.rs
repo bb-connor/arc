@@ -347,8 +347,8 @@ fn validate_issued_response_at(
 }
 
 pub trait CapabilityAuthority: Send + Sync {
-    /// The key this authority signs with now. An identity that cannot be
-    /// read returns an error and never an older key.
+    /// The key this authority signs with now. An unreadable identity is an
+    /// error.
     fn authority_public_key(&self) -> Result<PublicKey, KernelError>;
 
     /// Keys trusted as issuers of this authority's capabilities. An
@@ -632,8 +632,7 @@ impl GovernedCapabilityAuthority {
 }
 
 impl CapabilityAuthority for GovernedCapabilityAuthority {
-    /// An unreadable selector refuses issuance rather than naming an older
-    /// key as issuer.
+    /// An unreadable selector refuses issuance.
     fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
         self.backend
             .public_key()

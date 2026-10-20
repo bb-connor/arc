@@ -917,8 +917,7 @@ pub struct SigningOutcome {
 pub trait SigningBackend: Send + Sync {
     /// The identity this backend signs with now.
     ///
-    /// A backend whose current identity cannot be read returns an error and
-    /// never an older or default key. The algorithm is
+    /// An unreadable identity is an error. The algorithm is
     /// `public_key()?.algorithm()`.
     fn public_key(&self) -> Result<PublicKey>;
 

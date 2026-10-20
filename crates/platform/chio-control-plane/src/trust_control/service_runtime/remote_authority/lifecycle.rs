@@ -39,8 +39,8 @@ impl AuthorityKeyCache {
             return false;
         }
         let Some(state) = &self.issuer_state else {
-            // Older status protocols carry no historical-key deadlines. They
-            // can establish the current issuer, never indefinite old-key trust.
+            // Status without issuer lifecycle state (keyring and seed-file
+            // backends): trust only the current key.
             return self.current.as_ref() == Some(issuer);
         };
         state

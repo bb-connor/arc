@@ -312,7 +312,7 @@ impl ChioKernel {
         trusted
     }
 
-    /// An unreadable proposal signer refuses rather than shrinking the set.
+    /// An unreadable proposal signer is an error.
     pub(super) fn trusted_threshold_proposal_authorities(
         &self,
     ) -> Result<Vec<chio_core::PublicKey>, KernelError> {
