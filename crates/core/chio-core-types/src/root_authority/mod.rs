@@ -24,20 +24,22 @@ pub use claims::{
 };
 pub use consistency::{check_root_consistency, RootConsistencyError, RootConsistencyInput};
 pub use delegation_context::{
-    DelegationAnchor, DelegationContext, DelegationExchange, HolderClass,
-    CHIO_DELEGATION_CONTEXT_SCHEMA,
+    DelegationAnchor, DelegationAnchorFields, DelegationContext, DelegationContextFields,
+    DelegationExchange, HolderClass, CHIO_DELEGATION_CONTEXT_SCHEMA,
 };
 pub use idp_key_snapshot::{
-    IdpKeySnapshot, IdpKeySnapshotSignatureError, KeySnapshotSource, CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+    IdpKeySnapshot, IdpKeySnapshotFields, IdpKeySnapshotSignatureError, KeySnapshotSource,
+    CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
 };
-pub use jwk::{Jwk, JwkCurve, JwkKeyType, JwkUse, JwsAlgorithm};
+pub use jwk::{Jwk, JwkCurve, JwkFields, JwkKeyType, JwkUse, JwsAlgorithm};
 pub use provider_identity::{
-    EnterpriseProviderIdentity, InlineJwks, ProviderRecordKind, SubjectMapping,
-    CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
+    EnterpriseProviderIdentity, EnterpriseProviderIdentityFields, InlineJwks, ProviderRecordKind,
+    SubjectMapping, CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
 };
 pub use root_policy::{
     DisclosureDefault, InlineFields, LoadedRootPolicy, RootPolicy, RootPolicyDisclosure,
-    RootPolicyLoadError, RootPolicyMatch, RootPolicyRule, ToolDisclosure, CHIO_ROOT_POLICY_SCHEMA,
+    RootPolicyDisclosureFields, RootPolicyFields, RootPolicyLoadError, RootPolicyMatch,
+    RootPolicyRule, RootPolicyRuleFields, ToolDisclosure, CHIO_ROOT_POLICY_SCHEMA,
 };
 pub use wire::{HttpsUrl, Identifier, SaltRef, Sha256Digest, Text, Uri};
 

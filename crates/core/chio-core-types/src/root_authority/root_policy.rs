@@ -17,7 +17,7 @@ use super::delegation_context::HolderClass;
 use super::jwk::JwsAlgorithm;
 use super::wire::{
     canonical_public_key, canonical_public_keys, canonical_signature, check_items, check_nul_free,
-    check_schema, check_unique, validated_struct, Identifier, Sha256Digest,
+    check_schema, check_unique, validated_type, Identifier, Sha256Digest,
 };
 use super::RootAuthorityShapeError;
 
@@ -48,34 +48,39 @@ pub struct RootPolicyMatch {
     pub claims: Option<MatchClaims>,
 }
 
-validated_struct! {
-    /// One anchor rule.
-    #[derive(Debug, Clone, Serialize)]
-    pub struct RootPolicyRule {
-        pub rule_id: Identifier,
-        #[serde(rename = "match")]
-        pub match_: RootPolicyMatch,
-        /// Identity-provider scope value to the `server/tool` names it projects to.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub idp_scope_projection: Option<BTreeMap<String, Vec<Identifier>>>,
-        pub ceiling_scope: ChioScope,
-        pub ceiling_scope_hash: Sha256Digest,
-        pub recorded_claims: RecordedClaimModes,
-        pub holder_classes: Vec<HolderClass>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub capability_ttl_secs: Option<u64>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub max_assertion_lifetime_secs: Option<u64>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub max_clock_skew_secs: Option<u64>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub retain_idp_artifact: Option<bool>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub principal: Option<Identifier>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub tenant_value: Option<Identifier>,
-    }
+/// The members of [`RootPolicyRule`]; [`RootPolicyRule::new`] validates them.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RootPolicyRuleFields {
+    pub rule_id: Identifier,
+    #[serde(rename = "match")]
+    pub match_: RootPolicyMatch,
+    /// Identity-provider scope value to the `server/tool` names it projects to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub idp_scope_projection: Option<BTreeMap<String, Vec<Identifier>>>,
+    pub ceiling_scope: ChioScope,
+    pub ceiling_scope_hash: Sha256Digest,
+    pub recorded_claims: RecordedClaimModes,
+    pub holder_classes: Vec<HolderClass>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_ttl_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_assertion_lifetime_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_clock_skew_secs: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retain_idp_artifact: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub principal: Option<Identifier>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tenant_value: Option<Identifier>,
 }
+
+validated_type!(
+    /// One anchor rule.
+    #[derive(Debug, Clone)]
+    RootPolicyRule(RootPolicyRuleFields)
+);
 
 fn check_secs(
     field: &'static str,
@@ -94,7 +99,7 @@ fn check_secs(
     }
 }
 
-impl RootPolicyRule {
+impl RootPolicyRuleFields {
     pub fn validate(&self) -> Result<(), RootAuthorityShapeError> {
         let kind_value = self.match_.anchor_kind;
         let kind = kind_value.as_str();
@@ -202,7 +207,9 @@ impl RootPolicyRule {
             MAX_CLOCK_SKEW_SECS,
         )
     }
+}
 
+impl RootPolicyRule {
     /// The root lifetime bound in seconds.
     #[must_use]
     pub fn capability_ttl(&self) -> u64 {
@@ -281,17 +288,22 @@ pub struct ToolDisclosure {
     pub result: InlineFields,
 }
 
-validated_struct! {
-    /// The receipt disclosure policy. A tool not listed is fully committed.
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-    pub struct RootPolicyDisclosure {
-        pub default: DisclosureDefault,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        pub tools: Option<BTreeMap<String, ToolDisclosure>>,
-    }
+/// The members of [`RootPolicyDisclosure`]; [`RootPolicyDisclosure::new`] validates them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RootPolicyDisclosureFields {
+    pub default: DisclosureDefault,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<BTreeMap<String, ToolDisclosure>>,
 }
 
-impl RootPolicyDisclosure {
+validated_type!(
+    /// The receipt disclosure policy. A tool not listed is fully committed.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    RootPolicyDisclosure(RootPolicyDisclosureFields)
+);
+
+impl RootPolicyDisclosureFields {
     pub fn validate(&self) -> Result<(), RootAuthorityShapeError> {
         let Some(tools) = &self.tools else {
             return Ok(());
@@ -314,7 +326,9 @@ impl RootPolicyDisclosure {
         }
         Ok(())
     }
+}
 
+impl RootPolicyDisclosure {
     /// Whether any tool admits plaintext fields.
     #[must_use]
     pub fn has_tool_entries(&self) -> bool {
@@ -322,24 +336,29 @@ impl RootPolicyDisclosure {
     }
 }
 
-validated_struct! {
-    /// `chio.root-policy.v1`, signed by the provider's policy key.
-    #[derive(Debug, Clone, Serialize)]
-    pub struct RootPolicy {
-        pub schema: String,
-        pub policy_id: Identifier,
-        #[serde(deserialize_with = "canonical_public_key")]
-        pub policy_key: PublicKey,
-        #[serde(deserialize_with = "canonical_public_keys")]
-        pub exchange_keys: Vec<PublicKey>,
-        pub rules: Vec<RootPolicyRule>,
-        pub disclosure: RootPolicyDisclosure,
-        pub valid_from: u64,
-        pub valid_until: u64,
-        #[serde(deserialize_with = "canonical_signature")]
-        pub signature: Signature,
-    }
+/// The members of [`RootPolicy`]; [`RootPolicy::new`] validates them.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RootPolicyFields {
+    pub schema: String,
+    pub policy_id: Identifier,
+    #[serde(deserialize_with = "canonical_public_key")]
+    pub policy_key: PublicKey,
+    #[serde(deserialize_with = "canonical_public_keys")]
+    pub exchange_keys: Vec<PublicKey>,
+    pub rules: Vec<RootPolicyRule>,
+    pub disclosure: RootPolicyDisclosure,
+    pub valid_from: u64,
+    pub valid_until: u64,
+    #[serde(deserialize_with = "canonical_signature")]
+    pub signature: Signature,
 }
+
+validated_type!(
+    /// `chio.root-policy.v1`, signed by the provider's policy key.
+    #[derive(Debug, Clone)]
+    RootPolicy(RootPolicyFields)
+);
 
 /// Every policy member except `signature`.
 #[derive(Serialize)]
@@ -354,7 +373,7 @@ pub struct RootPolicySigningBody<'a> {
     pub valid_until: u64,
 }
 
-impl RootPolicy {
+impl RootPolicyFields {
     pub fn validate(&self) -> Result<(), RootAuthorityShapeError> {
         check_schema(&self.schema, CHIO_ROOT_POLICY_SCHEMA)?;
         check_items("exchange_keys", self.exchange_keys.len(), 1, 16)?;
@@ -365,7 +384,9 @@ impl RootPolicy {
         }
         self.disclosure.validate()
     }
+}
 
+impl RootPolicy {
     #[must_use]
     pub fn signing_body(&self) -> RootPolicySigningBody<'_> {
         RootPolicySigningBody {
@@ -395,7 +416,6 @@ impl RootPolicy {
         pinned_policy_key: &PublicKey,
         now: u64,
     ) -> Result<LoadedRootPolicy, RootPolicyLoadError> {
-        self.validate().map_err(RootPolicyLoadError::Shape)?;
         if &self.policy_key != pinned_policy_key {
             return Err(RootPolicyLoadError::PolicyKeyNotPinned);
         }
@@ -510,7 +530,6 @@ impl LoadedRootPolicy {
 /// Why a root policy refuses to load or is out of force.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RootPolicyLoadError {
-    Shape(RootAuthorityShapeError),
     PolicyKeyNotPinned,
     InvalidSignature,
     EmptyValidityWindow,
@@ -528,7 +547,6 @@ pub enum RootPolicyLoadError {
 impl fmt::Display for RootPolicyLoadError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Shape(error) => write!(formatter, "root policy is malformed: {error}"),
             Self::PolicyKeyNotPinned => {
                 formatter.write_str("root policy key differs from the pinned policy key")
             }

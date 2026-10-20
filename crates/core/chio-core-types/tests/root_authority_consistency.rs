@@ -112,12 +112,15 @@ fn policy_json() -> Value {
 fn signed_policy(edit: impl FnOnce(&mut Value)) -> RootPolicy {
     let mut value = policy_json();
     edit(&mut value);
-    let mut policy: RootPolicy = serde_json::from_value(value).unwrap();
-    policy.signature = policy_keypair()
-        .sign_canonical(&policy.signing_body())
-        .unwrap()
-        .0;
-    policy
+    let unsigned: RootPolicy = serde_json::from_value(value).unwrap();
+    resign(unsigned, &policy_keypair())
+}
+
+fn resign(policy: RootPolicy, signer: &Keypair) -> RootPolicy {
+    let signature = signer.sign_canonical(&policy.signing_body()).unwrap().0;
+    let mut fields = policy.into_fields();
+    fields.signature = signature;
+    RootPolicy::new(fields).unwrap()
 }
 
 fn load(policy: RootPolicy) -> Result<LoadedRootPolicy, RootPolicyLoadError> {
@@ -255,8 +258,9 @@ fn policy_load_refuses_an_unpinned_policy_key() {
 
 #[test]
 fn policy_load_refuses_a_body_changed_after_signing() {
-    let mut policy = signed_policy(|_| {});
-    policy.valid_until += 1;
+    let mut fields = signed_policy(|_| {}).into_fields();
+    fields.valid_until += 1;
+    let policy = RootPolicy::new(fields).unwrap();
     assert_eq!(
         load(policy).unwrap_err(),
         RootPolicyLoadError::InvalidSignature
@@ -265,11 +269,7 @@ fn policy_load_refuses_a_body_changed_after_signing() {
 
 #[test]
 fn policy_load_refuses_a_signature_by_another_key() {
-    let mut policy = signed_policy(|_| {});
-    policy.signature = other_keypair()
-        .sign_canonical(&policy.signing_body())
-        .unwrap()
-        .0;
+    let policy = resign(signed_policy(|_| {}), &other_keypair());
     assert_eq!(
         load(policy).unwrap_err(),
         RootPolicyLoadError::InvalidSignature
@@ -389,19 +389,19 @@ fn policy_load_refuses_a_ceiling_hash_that_does_not_recompute() {
 }
 
 #[test]
-fn policy_load_revalidates_a_policy_built_in_code() {
-    let mut policy = signed_policy(|_| {});
-    policy.exchange_keys = (0..17_u8)
+fn policy_built_in_code_is_validated_by_new() {
+    let mut fields = signed_policy(|_| {}).into_fields();
+    fields.exchange_keys = (0..17_u8)
         .map(|seed| Keypair::from_seed(&[seed; 32]).public_key())
         .collect();
     assert_eq!(
-        load(policy).unwrap_err(),
-        RootPolicyLoadError::Shape(RootAuthorityShapeError::Items {
+        RootPolicy::new(fields).unwrap_err(),
+        RootAuthorityShapeError::Items {
             field: "exchange_keys",
             min: 1,
             max: 16,
             actual: 17
-        })
+        }
     );
 }
 
@@ -713,7 +713,7 @@ fn artifact_retention_must_match_the_rule() {
 }
 
 fn snapshot_signed_by(exchange_key: &PublicKey, signer: &Keypair) -> IdpKeySnapshot {
-    let mut snapshot: IdpKeySnapshot = serde_json::from_value(json!({
+    let unsigned: IdpKeySnapshot = serde_json::from_value(json!({
         "schema": "chio.idp-key-snapshot.v1",
         "issuer": "https://acme.okta.com",
         "source": "https://acme.okta.com/oauth2/v1/keys",
@@ -723,8 +723,10 @@ fn snapshot_signed_by(exchange_key: &PublicKey, signer: &Keypair) -> IdpKeySnaps
         "signature": "00".repeat(64)
     }))
     .unwrap();
-    snapshot.signature = signer.sign_canonical(&snapshot.signing_body()).unwrap().0;
-    snapshot
+    let signature = signer.sign_canonical(&unsigned.signing_body()).unwrap().0;
+    let mut fields = unsigned.into_fields();
+    fields.signature = signature;
+    IdpKeySnapshot::new(fields).unwrap()
 }
 
 #[test]
@@ -761,4 +763,13 @@ fn key_snapshot_digest_is_domain_separated_and_covers_the_signature() {
     );
     let resigned = snapshot_signed_by(&pinned, &other_keypair());
     assert_ne!(resigned.digest().unwrap(), snapshot.digest().unwrap());
+}
+
+#[test]
+fn key_snapshot_digest_vector() {
+    let snapshot = snapshot_signed_by(&exchange_keypair().public_key(), &exchange_keypair());
+    assert_eq!(
+        snapshot.digest().unwrap().to_string(),
+        "sha256:01d8735e11a090cb4dba74f1c62ab185d6eaa9efb97a69b580e209a69e5805f7"
+    );
 }
