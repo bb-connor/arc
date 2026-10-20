@@ -1545,6 +1545,7 @@
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::from_wire",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/idp_keys/document.rs::admit_jwks_document::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire",
     "crates/protocol/chio-openapi/src/input.rs::decode::from_wire",
@@ -18361,6 +18362,7 @@
     "crates/protocol/chio-mcp-remote/src/input.rs::document::from_wire#1::decode_document",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/approval_policy.rs::load::from_wire#1::decode_signed",
     "crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape::from_wire#1::bounds_only",
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/idp_keys/document.rs::admit_jwks_document::from_wire#1::decode_external",
     "crates/protocol/chio-openai-adapter/src/input.rs::arguments::from_wire#1::decode_document",
     "crates/protocol/chio-openai-adapter/src/input.rs::read_json::from_wire#1::decode_document",
     "crates/protocol/chio-openapi/src/input.rs::decode::from_wire#1::decode_document",
@@ -22746,6 +22748,12 @@
       "handle_post::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/http_service.rs::initialize_request_shape",
       "handle_token_endpoint::request-form::TokenRequestForm",
       "initialize_request_shape::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/idp_keys/document.rs": [
+      "admit_jwks_document::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/idp_keys/source.rs": [
+      "install::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/idp_keys/document.rs::admit_jwks_document"
     ],
     "crates/protocol/chio-mcp-remote/src/remote_mcp/oauth/bearer_auth.rs": [
       "authenticate_token#2::http-response-json::json"
