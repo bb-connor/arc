@@ -63,7 +63,7 @@ ALLOWED = {
     ),
     "crates/protocol/chio-mcp-remote/src/remote_mcp/session_credentials/completed_result.rs": (
         1,
-        "the worker message Value is verified against the kernel signature; its reader is a listed follow-up",
+        "worker output lines are decoded by input::decode (decode_signed) in BroadcastJsonRpcWriter",
     ),
 }
 
