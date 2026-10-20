@@ -15,7 +15,7 @@ cargo build -p chio-kernel-core --no-default-features
 echo "[portable-kernel] building wasm32-unknown-unknown with --no-default-features"
 cargo build -p chio-kernel-core --target wasm32-unknown-unknown --no-default-features
 
-echo "[portable-kernel] testing chio-core-types library with --no-default-features"
-cargo test -p chio-core-types --lib --no-default-features
+echo "[portable-kernel] testing chio-core-types library and integration tests with --no-default-features"
+cargo test -p chio-core-types --tests --no-default-features
 
 echo "[portable-kernel] ok"
