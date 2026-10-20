@@ -52,8 +52,7 @@ impl fmt::Display for LoadedWeightsUnavailable {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for LoadedWeightsUnavailable {}
+impl core::error::Error for LoadedWeightsUnavailable {}
 
 /// Recomputes a loaded-weight digest from provider-owned bytes.
 pub trait LoadedWeights {

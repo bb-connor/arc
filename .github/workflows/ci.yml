@@ -547,6 +547,12 @@ jobs:
           fi
           echo "OK: the qualified cognition market is linked into the default control plane"
 
+      - name: chio-core-types no_std library tests
+        env:
+          CARGO_BUILD_JOBS: "1"
+          RUSTFLAGS: "${{ env.CHIO_CI_RUSTFLAGS }} -C debuginfo=0"
+        run: cargo test -p chio-core-types --lib --no-default-features
+
       - name: Wasm guards library tests
         env:
           CARGO_BUILD_JOBS: "1"
