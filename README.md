@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(max-width: 500px)" srcset="docs/assets/hero-mobile.svg" />
-    <img src="docs/assets/hero.svg" alt="Chio: the kernel for tomorrow's computer" width="900" />
+    <img src="docs/assets/hero.svg" alt="Chio: the kernel for tomorrow's computer. Research preview." width="900" />
   </picture>
 </p>
 
