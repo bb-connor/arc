@@ -196,6 +196,9 @@ impl KeySet {
 struct KeyState {
     current: Option<KeySet>,
     last_attempt: Option<u64>,
+    /// The last refresh failed or was cancelled. No key resolves until a
+    /// refresh succeeds and its set is recorded.
+    refresh_failed: bool,
 }
 
 impl KeyState {
@@ -316,6 +319,9 @@ impl PinnedIdpKeys {
     }
 
     fn is_current(&self, state: &KeyState, now: u64) -> bool {
+        if state.refresh_failed {
+            return false;
+        }
         match (&state.current, &self.origin) {
             (None, _) => false,
             (Some(_), Origin::Inline(_)) => true,
@@ -336,6 +342,7 @@ impl PinnedIdpKeys {
     /// Obtain the key set and install it; a changed set is signed and recorded first.
     async fn install(&self, state: &mut KeyState, now: u64) -> Result<(), KeyResolutionError> {
         state.last_attempt = Some(now);
+        state.refresh_failed = true;
         let keys = match &self.origin {
             Origin::Fetched { url, fetcher } => admit_jwks_document(&fetcher.fetch(url).await?)?,
             Origin::Inline(keys) => keys.clone(),
@@ -346,6 +353,7 @@ impl PinnedIdpKeys {
             .filter(|set| set.snapshot.keys == keys)
         {
             current.fetched_at = now;
+            state.refresh_failed = false;
             return Ok(());
         }
         let snapshot = self
@@ -356,6 +364,7 @@ impl PinnedIdpKeys {
             snapshot: Arc::new(snapshot),
             fetched_at: now,
         });
+        state.refresh_failed = false;
         Ok(())
     }
 }
