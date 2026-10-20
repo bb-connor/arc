@@ -67,7 +67,9 @@ where
     )
 }
 
-/// Settlement truth the signed receipt records for an observed invocation.
+/// Settlement state the signed receipt recorded when it was signed. This is a
+/// historical observation of the receipt, not a claim that the rail outcome is
+/// final.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
 pub enum ObservedSettlement {
@@ -687,7 +689,13 @@ mod tests {
             "exposure_units": 100,
             "rail": "x402",
         }));
-        assert!(unknown.is_err());
+        assert_eq!(
+            unknown.map_err(|error| error.to_string()),
+            Err(
+                "unknown field `rail`, expected one of `operation_id`, `hold_id`, `exposure_units`"
+                    .to_string()
+            )
+        );
     }
 
     #[test]
