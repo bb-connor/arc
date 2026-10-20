@@ -258,14 +258,69 @@ pub(super) fn verify_remote_import_boundary(
         response.text().test_unwrap()
     );
 
-    let response = client
-        .post(&endpoint)
-        .bearer_auth(token)
-        .json(&json!({"package": request["package"]}))
-        .send()
-        .test_unwrap();
-    assert_eq!(response.status(), reqwest::StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(response.text().test_unwrap().contains("trust"));
+    let store = SqliteReceiptStore::open(db).test_unwrap();
+    let refused = |body: String, status: reqwest::StatusCode, needle: &str| {
+        let response = client
+            .post(&endpoint)
+            .bearer_auth(token)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .body(body)
+            .send()
+            .test_unwrap();
+        assert_eq!(response.status(), status);
+        let text = response.text().test_unwrap();
+        assert!(text.contains(needle), "{text}");
+        assert!(store
+            .get_federated_share_for_capability("cap-remote-federated")
+            .test_unwrap()
+            .is_none());
+    };
+    let encoded = serde_json::to_string(&request).test_unwrap();
+
+    refused(
+        json!({"package": request["package"]}).to_string(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+        "evidence import request carries no trust file",
+    );
+
+    let mut anchored = request.clone();
+    anchored["trust"]["checkpoint_trust_anchor"] = json!({
+        "publicationIdentity": {"kind": "local_log", "identity": "local-log-1"},
+        "trustAnchorIdentity": {"kind": "transparency_root", "identity": "root-set-1"},
+        "trustAnchorRef": "anchor-root-1",
+        "signerCertRef": "cert-chain-1",
+        "publicationProfileVersion": "profile-1",
+        "unverifiedHint": true
+    });
+    refused(
+        anchored.to_string(),
+        reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+        "verifier trust file: decoded value drops input fields",
+    );
+
+    let duplicate_top = format!("{{\"trust\":{{}},{}", &encoded[1..]);
+    refused(
+        duplicate_top,
+        reqwest::StatusCode::BAD_REQUEST,
+        "urn:chio:error:attest:signed-json-invalid-input",
+    );
+    let duplicate_nested = encoded.replacen(
+        "\"toolReceipts\":",
+        "\"toolReceipts\":[],\"toolReceipts\":",
+        1,
+    );
+    assert_ne!(duplicate_nested, encoded);
+    refused(
+        duplicate_nested,
+        reqwest::StatusCode::BAD_REQUEST,
+        "urn:chio:error:attest:signed-json-invalid-input",
+    );
+
+    refused(
+        " ".repeat(64 * 1024 * 1024 + 1),
+        reqwest::StatusCode::PAYLOAD_TOO_LARGE,
+        "",
+    );
 
     let mut forged = request.clone();
     forged["package"]["bundle"]["toolReceipts"] = json!([]);
@@ -289,7 +344,6 @@ pub(super) fn verify_remote_import_boundary(
     assert_eq!(response.status(), reqwest::StatusCode::BAD_REQUEST);
     assert!(response.text().test_unwrap().contains("trusted kernel key"));
 
-    let store = SqliteReceiptStore::open(db).test_unwrap();
     assert!(store
         .get_federated_share_for_capability("cap-remote-federated")
         .test_unwrap()

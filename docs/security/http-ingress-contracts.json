@@ -969,7 +969,7 @@
       "source": "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs",
       "owner": "handle_evidence_import",
       "format": "signed-json",
-      "request_type": "evidence_export::RemoteEvidenceImportRequest",
+      "request_type": "serde_json::Value",
       "disposition": "bounded-signed-json",
       "reader": "signed",
       "max_bytes": 67108864,
@@ -977,7 +977,7 @@
       "method": "POST",
       "route": "EVIDENCE_IMPORT_PATH",
       "authentication": "Trust-control json_ingress::authenticate calls validate_service_auth before any body read; the handler repeats validate_service_auth after SignedJson extraction.",
-      "semantics": "Authenticated service administrators provide an explicit independent verification policy. The common verifier authenticates the envelope, manifest and complete decoded payload, pins every signer, binds receipt/checkpoint keys, and checks any externally supplied anchor before forwarding or store import. No trust is inferred from the package."
+      "semantics": "SignedJson decodes the original bounded bytes through decode_signed, refusing duplicate keys at any depth. The handler loads the trust section through VerifierTrust::load and requires the whole request to reserialize to its input. The common verifier then authenticates the envelope, manifest and complete decoded payload, pins every signer, binds receipt/checkpoint keys, and checks any externally supplied anchor before forwarding or store import. No trust is inferred from the package."
     },
     {
       "source": "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs",
