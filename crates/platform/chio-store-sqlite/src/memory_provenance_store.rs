@@ -81,13 +81,23 @@ pub struct SqliteMemoryProvenanceStore {
     pool: Pool<SqliteConnectionManager>,
 }
 
-/// Memory-provenance-store schema version; a database stamped otherwise is refused.
-const MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table, distinct from any co-located store's key.
 const MEMORY_PROVENANCE_STORE_SCHEMA_KEY: &str = "memory_provenance";
-/// Tables that identify a populated memory-provenance database as this store's.
-const MEMORY_PROVENANCE_STORE_ANCHOR_TABLES: &[&str] = &["chio_memory_provenance"];
+const MEMORY_PROVENANCE_SCHEMA: &str = r#"
+CREATE TABLE chio_memory_provenance (
+    seq           INTEGER PRIMARY KEY AUTOINCREMENT,
+    entry_id      TEXT NOT NULL UNIQUE,
+    store         TEXT NOT NULL,
+    entry_key     TEXT NOT NULL,
+    capability_id TEXT NOT NULL,
+    receipt_id    TEXT NOT NULL,
+    written_at    INTEGER NOT NULL,
+    prev_hash     TEXT NOT NULL,
+    hash          TEXT NOT NULL
+);
+
+CREATE INDEX idx_chio_memory_provenance_key
+    ON chio_memory_provenance(store, entry_key, seq);
+"#;
 
 impl SqliteMemoryProvenanceStore {
     /// Open the store at the given path, creating the parent directory
@@ -105,7 +115,7 @@ impl SqliteMemoryProvenanceStore {
             .max_size(8)
             .build(manager)?;
         let store = Self { pool };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
@@ -116,50 +126,37 @@ impl SqliteMemoryProvenanceStore {
             .max_size(1)
             .build(manager)?;
         let store = Self { pool };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
-    fn run_migrations(&self) -> Result<(), SqliteMemoryProvenanceStoreError> {
-        let conn = self
+    fn initialize_schema(&self) -> Result<(), SqliteMemoryProvenanceStoreError> {
+        let mut connection = self
             .pool
             .get()
             .map_err(|error| SqliteMemoryProvenanceStoreError(format!("pool acquire: {error}")))?;
-        crate::check_current_schema(
-            &conn,
-            MEMORY_PROVENANCE_STORE_SCHEMA_KEY,
-            MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION,
-            MEMORY_PROVENANCE_STORE_ANCHOR_TABLES,
+        let schema = crate::schema_version::SchemaTransaction::begin(
+            &mut connection,
+            &[MEMORY_PROVENANCE_STORE_SCHEMA_KEY],
         )
         .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
-        conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-
-            CREATE TABLE IF NOT EXISTS chio_memory_provenance (
-                seq           INTEGER PRIMARY KEY AUTOINCREMENT,
-                entry_id      TEXT NOT NULL UNIQUE,
-                store         TEXT NOT NULL,
-                entry_key     TEXT NOT NULL,
-                capability_id TEXT NOT NULL,
-                receipt_id    TEXT NOT NULL,
-                written_at    INTEGER NOT NULL,
-                prev_hash     TEXT NOT NULL,
-                hash          TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_memory_provenance_key
-                ON chio_memory_provenance(store, entry_key, seq);
-            "#,
+        if schema.is_fresh() {
+            schema
+                .connection()
+                .execute_batch(MEMORY_PROVENANCE_SCHEMA)?;
+            schema
+                .stamp(MEMORY_PROVENANCE_STORE_SCHEMA_KEY)
+                .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
+        }
+        schema
+            .validate_catalog(MEMORY_PROVENANCE_SCHEMA)
+            .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
+        schema
+            .commit()
+            .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )?;
-        crate::stamp_schema_version(
-            &conn,
-            MEMORY_PROVENANCE_STORE_SCHEMA_KEY,
-            MEMORY_PROVENANCE_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| SqliteMemoryProvenanceStoreError(error.to_string()))?;
         Ok(())
     }
 
