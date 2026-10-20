@@ -3,7 +3,9 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chio_core::crypto::{PublicKey, Signature as ChioSignature};
-use chio_core::root_authority::{Jwk, JwkCurve, JwkKeyType, JwsAlgorithm, Sha256Digest};
+use chio_core::root_authority::{
+    Identifier, Jwk, JwkCurve, JwkKeyType, JwsAlgorithm, Sha256Digest,
+};
 use chio_core::sha256;
 use p256::ecdsa::{Signature as P256Signature, VerifyingKey as P256VerifyingKey};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
@@ -29,7 +31,7 @@ const FORBIDDEN_HEADER_MEMBERS: [&str; 5] = ["jku", "x5u", "jwk", "x5c", "crit"]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JwsHeader {
     pub alg: JwsAlgorithm,
-    pub kid: String,
+    pub kid: Identifier,
     pub typ: Option<String>,
 }
 
@@ -83,8 +85,9 @@ impl CompactJws {
             .and_then(|alg| serde_json::from_value::<JwsAlgorithm>(alg).ok())
             .ok_or(RootExchangeError::AlgorithmNotAdmitted)?;
         let kid = match header.get("kid") {
-            Some(Value::String(kid)) if !kid.is_empty() => kid.clone(),
-            Some(_) => return Err(RootExchangeError::MalformedJws("kid is not a string")),
+            Some(Value::String(kid)) => Identifier::new(kid.as_str())
+                .map_err(|_| RootExchangeError::MalformedJws("kid is not an identifier"))?,
+            Some(_) => return Err(RootExchangeError::MalformedJws("kid is not an identifier")),
             None => return Err(RootExchangeError::KidMissing),
         };
         let typ = match header.get("typ") {
