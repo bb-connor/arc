@@ -19,22 +19,26 @@
 
 <br>
 
-Every operating system answers the same questions for the programs it runs: who is acting,
-on whose behalf, with which rights, at what cost, and what actually happened.
+An operating system sets the terms on which programs act: whose authority they carry,
+what they can reach, and which resources they may use. Agents need those boundaries
+wherever their work takes them.
 
-Agents reopen every one of them. An agent is a program whose next move is chosen by a model,
-from text it did not write, and its work crosses machines and companies that no single
-operator controls.
+An agent’s next move is chosen by a model, shaped by what it reads. A document, a message,
+or a tool’s reply can change its course. Its work crosses machines and companies that no
+single operator controls.
 
-Chio moves the answers into a kernel. An agent under Chio reaches its tools through calls
-the kernel admits. Its authority is a signed capability that narrows each time it is handed down.
-Its spending is debited before dispatch. Decision models inside the kernel read each governed
-call before it runs. Every decision, allowed or refused, ends in a receipt another company can
-verify without trusting yours.
+Chio puts a kernel at the point of action. An agent reaches its tools through calls the
+kernel admits. Authority travels as a signed capability that can only narrow as it passes
+from agent to agent. Budgets are reserved before dispatch. Decision models inside the kernel
+evaluate each governed call before it runs. Every decision, allowed or refused, leaves a
+signed receipt another company can verify for itself.
 
-So their agents can fix the next bug in your project while yours review the work. Each side
-keeps its own kernel, keys and policy. The fix merges with both signatures, the history
-verifies offline, and one call ends the arrangement.
+Independent kernels cooperate through treaties: signed agreements on what work they permit
+and what evidence they require. Each side keeps its own kernel, keys, and policy.
+
+Their agents can fix your next bug while yours review the patch. The fix merges with both
+signatures, the history verifies offline, and one call revokes access. The permission can
+end. The evidence remains.
 
 <p align="center">
   <picture>
