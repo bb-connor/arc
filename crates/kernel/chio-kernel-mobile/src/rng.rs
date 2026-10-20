@@ -7,17 +7,12 @@
 //!  - Android: `/dev/urandom` (via the libc fallback) or the `getrandom(2)`
 //!    syscall on API level 28+.
 //!
-//! Either way the adapter delegates to `getrandom::getrandom` without
-//! any platform-specific glue at the call site. If the underlying OS
-//! call fails the adapter falls back to zeroing the buffer so downstream
-//! flows that don't strictly need entropy (e.g. deterministic receipts
-//! built with a pre-generated id) still complete. Callers that do need
-//! entropy must surface the failure out-of-band; the kernel-core
-//! receipt flow checks its own return value.
+//! A failed OS call returns [`RngError`]; callers refuse the operation that
+//! needed the bytes.
 
 #![forbid(unsafe_code)]
 
-use chio_kernel_core::Rng;
+use chio_core_types::rng::{Rng, RngError};
 
 /// Mobile-suitable `Rng` delegating to the `getrandom` crate.
 #[derive(Debug, Clone, Copy, Default)]
@@ -32,21 +27,16 @@ impl MobileRng {
 }
 
 impl Rng for MobileRng {
-    fn fill_bytes(&self, dest: &mut [u8]) {
-        if getrandom::getrandom(dest).is_err() {
-            // Fail-closed: zero the buffer so callers that forward
-            // the bytes into signing / id generation produce
-            // deterministic non-random material rather than leaking
-            // uninitialised bytes. The receipt-signing path in
-            // chio-kernel-core checks `kernel_key` binding, so a
-            // receipt whose id fell through a zeroed RNG is still
-            // signature-valid; the operator is expected to detect
-            // the all-zero id pattern and rotate.
-            for byte in dest.iter_mut() {
-                *byte = 0;
-            }
-        }
+    fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        fill_from_source(dest, getrandom::getrandom)
     }
+}
+
+fn fill_from_source(
+    dest: &mut [u8],
+    source: impl FnOnce(&mut [u8]) -> Result<(), getrandom::Error>,
+) -> Result<(), RngError> {
+    source(dest).map_err(|_| RngError("mobile operating system entropy source failed"))
 }
 
 #[cfg(test)]
@@ -54,15 +44,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn mobile_rng_fills_buffer_with_plausible_entropy() {
+    fn mobile_rng_fills_buffer() {
         let rng = MobileRng::new();
-        let mut buf = [0u8; 32];
-        rng.fill_bytes(&mut buf);
-        // Probability of 32 zero bytes from a real CSPRNG is ~2^-256;
-        // a zero buffer means the OS call failed on this host, which
-        // is itself informative but should not fail in CI.
-        let total: u32 = buf.iter().map(|b| u32::from(*b)).sum();
-        // Don't assert; just prove the call doesn't panic.
-        let _ = total;
+        let mut first = [0u8; 32];
+        let mut second = [0u8; 32];
+        assert_eq!(rng.fill_bytes(&mut first), Ok(()));
+        assert_eq!(rng.fill_bytes(&mut second), Ok(()));
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn fill_failure_returns_error() {
+        let mut dest = [0xaa_u8; 32];
+        let result = fill_from_source(&mut dest, |_| Err(getrandom::Error::UNSUPPORTED));
+        assert_eq!(
+            result,
+            Err(RngError("mobile operating system entropy source failed"))
+        );
     }
 }

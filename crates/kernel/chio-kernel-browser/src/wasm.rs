@@ -8,7 +8,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use chio_core_types::capability::{features::CapabilityNegotiation, token::CapabilityToken};
-use chio_kernel_core::Rng as _;
+use chio_core_types::rng::Rng as _;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -229,8 +229,8 @@ fn parse_trusted_issuers_jsvalue(value: &JsValue) -> Result<Vec<String>, JsValue
 }
 
 /// Mint a fresh 32-byte signing seed using the browser's Web Crypto RNG
-/// and return it as lowercase hex. Surfaces entropy-source failures as
-/// structured errors instead of silently returning a zero-filled seed.
+/// and return it as lowercase hex. An entropy-source failure is a
+/// structured error and no seed is returned.
 #[wasm_bindgen]
 pub fn mint_signing_seed_hex() -> Result<String, JsValue> {
     let rng = WebCryptoRng::try_new().map_err(|error| {
@@ -240,12 +240,11 @@ pub fn mint_signing_seed_hex() -> Result<String, JsValue> {
         ))
     })?;
     let mut seed = [0u8; 32];
-    rng.fill_bytes(&mut seed);
-    if seed.iter().all(|b| *b == 0) {
-        return Err(to_js_error(&BindingError::new(
-            "weak_entropy",
-            "Web Crypto returned a zero-filled seed; refusing to use it",
-        )));
-    }
+    rng.fill_bytes(&mut seed).map_err(|error| {
+        to_js_error(&BindingError::new(
+            "entropy_unavailable",
+            format!("{error}"),
+        ))
+    })?;
     Ok(hex_encode_lower(&seed))
 }

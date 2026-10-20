@@ -203,6 +203,7 @@ members = [
     "examples/otel-genai",
     #
     # Tests
+    "crates/tooling/chio-fixture-rng",
     "crates/tooling/chio-test-support",
     "formal/diff-tests",
     "tests/e2e",

@@ -3,11 +3,11 @@ use std::sync::Arc;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use dashmap::mapref::entry::Entry;
-use rand::rngs::OsRng;
-use rand::RngCore;
 
+use crate::rng::OsEntropyRng;
 use crate::session::{PendingThresholdApproval, SessionAnchorSnapshot, SessionRequestStart};
 use chio_core::capability::governance::GovernedTransactionIntent;
+use chio_core_types::rng::Rng;
 
 use super::*;
 
@@ -35,21 +35,29 @@ pub use protocol_refusal::{
 mod nested_tool_call;
 pub use nested_tool_call::NestedToolCallProofs;
 
+#[cfg(test)]
+#[path = "session_ops/session_id_tests.rs"]
+mod session_id_tests;
+
 /// Number of CSPRNG bytes used to derive a fresh session id. 16 bytes (128 bits)
 /// is well above the birthday-bound budget for any realistic session population
 /// and matches the "URL-safe random handle" recipe used elsewhere in the
 /// workspace.
 const SESSION_ID_ENTROPY_BYTES: usize = 16;
 
-/// Mint a fresh URL-safe session identifier from the operating system's
-/// CSPRNG. Random handles prevent external enumeration of active tenants and
-/// close the session-fixation surface that sequential ids carry.
-fn generate_random_session_id() -> SessionId {
+/// Mint a fresh URL-safe session identifier from `rng`. Random handles prevent
+/// external enumeration of active tenants and close the session-fixation
+/// surface that sequential ids carry. An entropy failure refuses the session.
+fn generate_random_session_id(rng: &dyn Rng) -> Result<SessionId, KernelError> {
     let mut bytes = [0u8; SESSION_ID_ENTROPY_BYTES];
-    OsRng.fill_bytes(&mut bytes);
+    rng.fill_bytes(&mut bytes)
+        .map_err(|error| KernelError::Internal(format!("session id {error}")))?;
     // base64url without padding produces 22 chars for 16 bytes; the
     // `sess-` prefix preserves human readability for log scanning.
-    SessionId::new(format!("sess-{}", URL_SAFE_NO_PAD.encode(bytes)))
+    Ok(SessionId::new(format!(
+        "sess-{}",
+        URL_SAFE_NO_PAD.encode(bytes)
+    )))
 }
 
 fn map_session_persist_error(error: SessionPersistError<KernelError>) -> KernelError {
@@ -92,7 +100,7 @@ impl ChioKernel {
         agent_id: AgentId,
         issued_capabilities: Vec<CapabilityToken>,
     ) -> Result<SessionId, KernelError> {
-        let session_id = generate_random_session_id();
+        let session_id = generate_random_session_id(&OsEntropyRng)?;
 
         self.open_session_with_id(session_id, agent_id, issued_capabilities)
     }

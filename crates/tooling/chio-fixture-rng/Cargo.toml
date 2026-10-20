@@ -1,0 +1,20 @@
+[package]
+name = "chio-fixture-rng"
+description = "Deterministic ChaCha20 Rng for Chio fixture generators and tests; never part of a release build"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "chio_fixture_rng"
+
+[dependencies]
+chio-core-types = { workspace = true }
+rand_chacha = { workspace = true }
+sha2 = { workspace = true }
+
+[lints]
+workspace = true

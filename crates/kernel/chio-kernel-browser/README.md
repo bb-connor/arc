@@ -49,7 +49,7 @@ Native `BrowserClock` returns `ClockError::Unavailable`, and native
 `WebCryptoRng::try_new` returns an unavailable error. Web Crypto is read from
 `globalThis.crypto`, so browsers, Workers, Durable Objects, Deno and Node 20+
 work; a host without it gets an unavailable error.
-A failed RNG fill zeroes its output; seed minting rejects an all-zero seed.
+A failed RNG fill returns an error; seed minting then refuses.
 Native tests do not exercise JavaScript bindings or browser APIs.
 
 ## Related
