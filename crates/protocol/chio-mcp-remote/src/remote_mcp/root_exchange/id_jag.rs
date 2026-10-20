@@ -7,9 +7,10 @@ use super::claims::{
     audience_is, required_seconds, required_string, scope_values, seconds, string,
 };
 use super::error::RootExchangeError;
-use super::jws::CompactJws;
+use super::jws::VerifiedJws;
 
-/// The JWS `typ` of an ID-JAG.
+/// The JWS `typ` of an ID-JAG, per draft-ietf-oauth-identity-assertion-authz-grant-04
+/// section 3.1.
 pub const ID_JAG_MEDIA_TYPE: &str = "oauth-id-jag+jwt";
 
 /// The local authorization server and protected resource the ID-JAG targets.
@@ -62,16 +63,16 @@ fn mapped_claim(
 /// Check the claims of a signature-verified ID-JAG against its provider
 /// record and the authenticated client.
 pub fn verify_id_jag_claims(
-    jws: &CompactJws,
+    jws: &VerifiedJws,
     record: &EnterpriseProviderIdentity,
     audience: IdJagAudience<'_>,
     client_id: &str,
     timing: IdJagTiming,
 ) -> Result<VerifiedIdJag, RootExchangeError> {
-    if jws.header.typ.as_deref() != Some(ID_JAG_MEDIA_TYPE) {
+    if jws.header().typ.as_deref() != Some(ID_JAG_MEDIA_TYPE) {
         return Err(RootExchangeError::TypMismatch);
     }
-    let claims = &jws.claims;
+    let claims = jws.claims();
     let issuer = required_string(claims, "iss")?;
     if issuer != record.issuer.as_str() {
         return Err(RootExchangeError::IssuerMismatch);
@@ -120,8 +121,8 @@ pub fn verify_id_jag_claims(
         jti: jti.to_owned(),
         iat,
         exp,
-        alg: jws.header.alg,
-        kid: jws.header.kid.clone(),
+        alg: jws.header().alg,
+        kid: jws.header().kid.clone(),
         principal,
         tenant,
         scope_values: scope_values(claims)?,
