@@ -117,8 +117,8 @@ Further constraints:
 
 ## Review Focus
 
-1. **A consumer or parameter reader without a planned binding.** Expected: the census script (`docs/superpowers/plans/m1-item2-census/census.py`) classifies every production line its five patterns find (three line patterns for the receipt hashes, hash member names and `action.parameters`; one whole-file pattern for rustfmt-split `action` chains; one for JSON indexing of `action` parameters) with no `UNCLASSIFIED` row at each PR's base; at the F tip only kind D, GEN and DOC lines remain; every consumer that needs an opening fails with `OpeningUnavailable` when it is erased, unknown or the read is refused. A reader outside these patterns is not covered, so a reviewer who finds one adds a pattern. Pinned by the committed census TSV, the per-consumer tests in Tasks 7 and 16, and `compacted_replay_survives_erased_openings` (Task 7).
-2. **An opening written apart from its receipt.** Expected: on every hosted path (SQLite and trust-control), openings are written in the receipt's append transaction; no `put_openings` call exists outside it; a crash, a lost ACK or a retry leaves the receipt and its salts identical. Pinned by the Task 4 crash and ACK tests and the Task 7 recovery tests.
+1. **A consumer or parameter reader without a planned binding.** Expected: the census script (`docs/superpowers/plans/m1-item2-census/census.py`) classifies every production line its six patterns find (three line patterns for the receipt hashes, hash member names and `action.parameters`; three whole-file patterns for receipt `tenant_id` readers, rustfmt-split `action` chains and JSON indexing of `action` parameters) with no `UNCLASSIFIED` row at each PR's base; at the F tip only kind D, GEN and DOC lines remain; every consumer that needs an opening fails with `OpeningUnavailable` when it is erased, unknown or the read is refused. A reader outside these patterns is not covered, so a reviewer who finds one adds a pattern. Pinned by the committed census TSV, the per-consumer tests in Tasks 7 and 16, and `compacted_replay_survives_erased_openings` (Task 7).
+2. **An opening written apart from its receipt.** Expected: on every hosted path (SQLite and trust-control), openings are written in the receipt's append transaction, and every replicated import (receipt delta or snapshot) writes the receipt, its opening state and the cursor advance in one transaction; no `put_openings` call exists outside it; a crash, a lost ACK or a retry leaves the receipt and its salts identical. Pinned by the Task 4 crash and ACK tests and the Task 7 recovery tests.
 3. **A signing path that still accepts a hash or a commitment.** Expected: the only receipt signers take `ReceiptDraft`, `ReceiptPreimages` and `&dyn Rng`, including `chio-selective-disclosure` `sign_chio_receipt_with_bbs`. Pinned by `receipt_signers_take_preimages` (Task 6) and the Task 1 grep re-run at the F tip.
 4. **A salt that is not fresh, not 32 bytes, or seeded in a release build.** Expected: two salts per receipt from the producer's own `Rng`, refused when equal; fallible `Rng::fill_bytes`; no zero-fill fallback; `chio-fixture-rng` absent from the release dependency graph. Pinned by Task 2's tests and `scripts/check-fixture-rng.py` (Task 14).
 5. **Plaintext surviving in a signed field, or a required metadata block disappearing.** Expected: the marker property test passes across every guard evidence producer, the metadata merge and OCSF; an unregistered Chio-internal metadata key refuses signing; only caller and hook keys are dropped. Pinned by Task 5 and Task 8.
@@ -281,7 +281,7 @@ The Lambda extension emits an unsigned detect-only `EvaluateResponse` with no re
 | H. Format or projection reader | Reads the commitment value instead. | 14 lines: SIEM, sidecar, http-core evaluation, ACP telemetry and bounds, tower, verdict-matrix driver, dashboard |
 | S. SDK | SDK verifier, middleware or adapter reads commitments and openings (Tasks 12, 17). | 50 lines |
 | TN-C. Tenant from the verified store column | A generic tenant-scoped store read. It reads the store's tenant column, which append wrote from `SignedReceipt.tenant` and verified against whichever signed tenant form the receipt carries. | 9 lines: `append.rs:62`, `retained_read.rs:207,331`, `receipt_query/read.rs:225`, `receipt_query_snapshot/{fetch.rs:90,project.rs:101}`, `session_certificate_read.rs:305,347`, `read_boundary/projection.rs:76` |
-| TN-B. Verify the signed binding | A reader of a moved producer's receipt (native evidence, response simulation, security event, cage). It verifies the signed `tenant_binding` against its expected tenant with `TenantIndexKeySet::verify`, or compares two bindings by value under the same `key_id`; an absent binding or unknown `key_id` refuses. It never compares `Option` to `Option`, so `None == None` cannot pass. | 14 lines: `execution_validation.inc:502,683`, `ingest_active_defense.rs:189`, `native_evidence.rs:605`, `event_consumer/verification.rs:161,324`, `support/security_evidence.rs:60`, `declassification_codec.rs:115,144,175`, `active_defense_migration.rs:1084`, `cage_policy/evidence.rs:179,239`, `chio-cage/src/receipt.rs:378` |
+| TN-B. Verify the signed binding | A reader of a moved producer's receipt (native evidence, response simulation, security event, cage). It verifies the signed `tenant_binding` against its expected plaintext tenant with `TenantIndexKeySet::verify`; an absent binding or unknown `key_id` refuses. `cage_policy/evidence.rs:179,239` (lead r5 N1): the policy side is `CageReceiptRuntimePolicy`, whose `tenant_id` stays plaintext, so the check is `verify(policy.tenant_id, receipt.tenant_binding)`; a policy with no tenant requires a launch or terminal receipt with neither tenant form, and a binding or `tenant_id` present there refuses (tests `cage_policy_tenant_binding_matches`, `..._mismatch_refuses`, `..._no_tenant_neither_form_accepts`, `..._no_tenant_binding_present_refuses`). It never compares `Option` to `Option`, so `None == None` cannot pass. | 14 lines: `execution_validation.inc:502,683`, `ingest_active_defense.rs:189`, `native_evidence.rs:605`, `event_consumer/verification.rs:161,324`, `support/security_evidence.rs:60`, `declassification_codec.rs:115,144,175`, `active_defense_migration.rs:1084`, `cage_policy/evidence.rs:179,239`, `chio-cage/src/receipt.rs:378` |
 | TN-U. Ordinary producer tenant | The receipt's producer keeps the signed `tenant_id`; unchanged. | 15 lines |
 | TN-X, TN-H, TN-D | Body plumbing and projections that carry whichever tenant form is signed; tenant of non-receipt bodies (unchanged). | 6, 1, 32 lines |
 | GEN, DOC, T | Regenerated code, docs, and test modules the path heuristic misses. `evidence_export/verification.rs` lines are kind V and are applied in `chio-bundle-verify`, where 6a moved the file. | 30, 10, 14 lines |
@@ -418,12 +418,12 @@ Register `chio.receipt-disclosure.v1` as an unsigned artifact; the schema is `ad
 - Crash before commit: neither row exists and today's append-failure path applies. Crash after commit: both rows exist. A non-admission publication path that loses its in-memory `SignedReceipt` before the ACK either committed both rows or loses the receipt exactly as today; nothing re-signs.
 - Remote trust-control (`--control-url`, used by `chio mcp serve`, `chio run` and `serve-http`): F's remote append request carries the openings and trust-control writes the receipt and openings in one transaction on its own SQLite store. The client never stores openings locally. P-c adds two routes: the public `GET /v1/receipts/{id}/openings/status`, which returns only `{"state": "present" | "erased" | "unknown"}` and never a salt, and `POST /v1/receipts/{id}/openings/erase`; plus the internal opening read below.
 - Cluster replication (lead r2 P1-B option (a); transport per lead r3 P1-6):
-  - **Two streams.** Receipts keep their `seq` stream. Openings travel on a new openings stream: every write to `receipt_openings` (present rows at append, tombstones at erase) allocates a monotonic `openings_seq` from its own counter in the same transaction, so an erase emits a new `openings_seq` even though no receipt is appended. Each peer keeps `peer_openings_seq` beside `peer_tool_seq` in `partition.rs`, and `sync_peer_receipt_openings` in `cluster/deltas.rs` pulls `list_receipt_openings_after_seq` pages from a new internal peer route and advances the cursor per page.
+  - **Receipt deltas carry their openings (Root-2 r5, option (a)).** Each record of the receipt `seq` delta (`/v1/internal/receipts/tools/delta`, `list_tool_receipts_after_seq_with_context`) carries the receipt, its unsigned `tenant` and its complete current opening state as the source holds it when it serves the page: present salts, or tombstones if the source already erased them. The receiver imports each record through the same merge as a snapshot, writing the receipt row, its opening rows and the `peer_tool_seq` advance in one transaction, so no receipt becomes visible without its opening state, and a crash leaves either the whole record or nothing. A separate openings stream carries only later state changes: an erase allocates a monotonic `openings_seq` in the erasing transaction, each peer keeps `peer_openings_seq` beside `peer_tool_seq` in `partition.rs`, and `sync_peer_receipt_openings` pulls tombstone pages from `/v1/internal/receipts/openings/delta` and advances that cursor per page in the same transaction as the tombstones. The hosted append and every replicated import are therefore atomic per receipt; erasure reaches peers within one openings-sync interval (PROTOCOL 6 states this, lead r5 P3-3).
   - **Merge.** A tombstone always wins. A replicated tombstone for an unknown receipt id is stored (the table has no foreign key, and the replication path does not apply the client path's `ReceiptNotPublished` refusal); a later receipt or present-salt row for that id from any stream finds the tombstone and writes no salt. A present row for an id already present with identical salts is a no-op; with different salts it is recorded in a per-row `replication_quarantine` table (receipt id, salt_ref, origin node, reason) and skipped, and the page still advances, so a conflict never wedges the loop. The client retry path keeps its `ConflictingOpenings` refusal; the replication path never returns it.
-  - **Snapshots.** `cluster/snapshots.rs` exports `receipt_openings` rows (present and tombstone) beside the tool receipts (`snapshots.rs:166-171`) and imports them at `snapshots.rs:365-368` through the same merge as the stream, in the same transaction as the receipt rows, so a node rebuilt from a stale snapshot applies every tombstone it carries and the next openings-stream sync delivers the rest. No receipt-only import exists.
-  - **Retention.** Tombstones are not pruned with receipts. A tombstone row is kept until every peer's `peer_openings_seq` acknowledgement is past it and the receipt itself has been pruned on every node; retention prunes a receipt and its tombstone together only after that cluster-wide check.
-  - **Credential.** Peers authenticate with P-f peer credentials (one Ed25519 key per node, pinned in the cluster configuration beside `peer_urls`, scope `cluster-openings:replicate`) on the internal listener; `validate_cluster_peer_auth` checks the signature against the pinned key of the claimed `node_id`. The shared `service_token` HMAC no longer authenticates any cluster route.
-  - **Tests:** `erase_emits_new_openings_seq`, `erase_replicates_tombstone_to_peers`, `tombstone_before_receipt_prevents_resurrection`, `peer_delta_with_salts_does_not_resurrect_tombstone`, `snapshot_import_applies_tombstones`, `stale_snapshot_rebuild_does_not_resurrect_salts`, `conflicting_replicated_salts_quarantined_and_sync_advances`, `tombstone_retained_past_receipt_retention`, `client_service_token_cannot_read_replicated_salts`, `peer_offline_during_erase_erases_on_next_sync`.
+  - **Snapshots.** `cluster/snapshots.rs` exports `receipt_openings` rows (present and tombstone) beside the tool receipts (`snapshots.rs:166-171`) and imports them at `snapshots.rs:365-368` through the same merge as ordinary deltas, in the same transaction as the receipt rows, so a node rebuilt from a stale snapshot applies every tombstone it carries and the next openings-stream sync delivers the rest. No receipt-only import exists.
+  - **Retention (lead r5 P3-4).** Tombstones are not pruned with receipts. Each node reports, in its signed cluster status (`/v1/internal/cluster/status`), `pruned_through_seq` (the highest receipt `seq` it has pruned) and `openings_ack_seq` (the highest `openings_seq` it has applied from each peer). A tombstone row is deleted only when every configured peer reports `openings_ack_seq` past it and `pruned_through_seq` past its receipt's `seq`; a peer that never reports keeps the tombstone, which is safe and bounded only by that peer's return.
+  - **Credential.** Peers authenticate with P-f peer credentials (one Ed25519 key per node, pinned in the cluster configuration beside `peer_urls`, scope `cluster-openings:replicate`) on the internal listener; `validate_cluster_peer_auth` checks the signature against the pinned key of the claimed `node_id`. The signature covers at least what today's HMAC covers (lead r5 P3-4): the node id, the endpoint path, `issued_at` within the existing freshness window, the cluster term and the query cursor. The shared `service_token` HMAC no longer authenticates any cluster route.
+  - **Tests:** `receipt_delta_imports_receipt_and_openings_atomically`, `receipt_delta_first_then_openings_tombstone`, `openings_tombstone_first_then_receipt_delta`, `tombstone_first_for_unknown_receipt_then_delta_writes_no_salt`, `crash_between_receipt_delta_and_openings_stream_leaves_receipt_with_full_opening_state`, `crash_inside_receipt_delta_import_leaves_nothing`, `no_receipt_visible_without_opening_state`, `erase_emits_new_openings_seq`, `erase_replicates_tombstone_to_peers`, `peer_delta_with_salts_does_not_resurrect_tombstone`, `snapshot_import_applies_tombstones`, `stale_snapshot_rebuild_does_not_resurrect_salts`, `conflicting_replicated_salts_quarantined_and_sync_advances`, `tombstone_retained_until_every_peer_acks_and_prunes`, `client_credential_cannot_read_replicated_salts`, `peer_signature_covers_cursor_and_term`, `peer_offline_during_erase_erases_on_next_sync`.
 - Durable admission: when a terminal receipt is durably admitted before publication, the admission row holds the signed receipt and its openings, so recovery republishes the exact receipt and salts (Root-2 condition 3). The admission row's salts are cleared in the transaction that records the publication acknowledgement, because recovery needs them only before it; an `erase_openings` call before that point refuses with `ReceiptStoreError::ReceiptNotPublished`.
 - Idempotency: an append of a receipt id that exists with byte-identical receipt and salts is a no-op success; with different bytes or salts it refuses with `ReceiptStoreError::ConflictingOpenings`. A retry resends the same request, held in memory until ACK or recovered from the admission row. Nothing re-signs.
 - Erasure: `erase_openings(receipt_id, erased_at)` replaces the salt rows with tombstones in one transaction. A missing row reads as `OpeningState::Unknown`, never as erased or lost.
@@ -650,12 +650,15 @@ A required block that would carry argument or result values is redesigned in F t
 **Contract (one strict entry plus a gate).**
 - Every production raw decode of a committed-receipt type (receipts, receipt bodies, disclosure blocks, projections, the relay inputs, trust-control route bodies, receipt-store row decodes, SDK verifier entry points that sit in Rust) goes through `UntrustedJsonText::decode_signed`. Opening documents (`chio.receipt-disclosure.v1`) go through `decode_document`.
 - The public `Deserialize` impls stay, and the plan does not claim that a direct `T::deserialize` over raw bytes refuses a duplicate nested inside a `Value` member. The gate keeps such calls off production paths.
-- Gate: `scripts/check-committed-receipt-raw-decode.py` finds every non-test `serde_json::from_str`, `from_slice`, `from_reader`, `serde_json::Deserializer::from_*` feeding a `Deserialize` call, and any decode to `serde_json::Value` followed by `from_value`, whose target is a committed-receipt type (the `COMMITTED_RECEIPT_STRICT_TYPES` list, exported for the script) or whose input is a receipt row, route body or relay input, and fails unless the call is inside `UntrustedJsonText` or `decode_document`. The allowlist is the two entry points only.
+- Strict types are transitive (lead r5 N2): a type is strict when it is in `COMMITTED_RECEIPT_STRICT_TYPES` or contains one at any depth (`Vec<ChioReceipt>`, `Option<..>`, maps, tuples, `SignedExportEnvelope<..>`, request and response structs with a receipt member). The list is generated by a module walk in `chio-core-types` tests and exported for the gate.
+- Gate: `scripts/check-committed-receipt-raw-decode.py` finds every non-test decode whose target is a strict type outside `UntrustedJsonText::decode_signed` and `decode_document`: `serde_json::from_str`, `from_slice`, `from_reader`, `serde_json::Deserializer::from_*` feeding a `Deserialize` call, a decode to `serde_json::Value` followed by `from_value`, and serde-driven extractors (`axum::Json<T>`, `axum::extract::Query<T>`, `axum::Form<T>`, and any other extractor implemented with serde). Such routes use a new `SignedJson<T>` extractor whose body decode calls `decode_signed` (the remote append route `receipt_handlers.rs:121` first among them). The allowlist is the two entry points and `SignedJson`.
 
 **Tests.**
 - `raw_duplicate_keys_refused_by_decode_signed`: for every type in `COMMITTED_RECEIPT_STRICT_TYPES`, bytes with a duplicate key at the top level, in each nested Chio object and inside each `Value`-typed member refuse through `decode_signed` (and each public concrete decoder that wraps it) with the exact duplicate-key error.
 - `decode_signed_keeps_native_numeric_domain`: a receipt whose arguments carry a u64 above 2^53 and a `100.0` float decodes through `decode_signed` and re-encodes byte-identically, so P-e refuses nothing the native signed domain accepts.
 - `opening_document_duplicates_refused_by_decode_document`.
+- `http_append_route_refuses_duplicate_keys`: a `POST /v1/receipts/tools` body with a duplicate key inside a receipt's `metadata` is refused by `SignedJson` before the handler runs.
+- `strict_type_list_is_transitive`: a container of a strict type appears in the exported list.
 - `direct_raw_decode_of_receipt_types_is_gated`: the gate's behavior on a fixture tree with a raw `serde_json::from_str::<ChioReceipt>` outside the entry points (fails) and inside them (passes), run as part of the gate script's own invocation, not a separate test file.
 - The SDK verifiers (Task 17) run the same raw duplicate cases.
 
@@ -668,13 +671,242 @@ A required block that would carry argument or result values is redesigned in F t
 Trust-control today has one bearer secret, `config.service_token`, checked by `validate_service_auth` (`report_validation.rs:263-281`) on every client route and keying the cluster peer HMAC, plus per-tenant `tenant_read_tokens` (`service_types/config.rs:73`), and serves one router on one listener (`service_runtime/init.rs:325`), including the existing `/v1/internal/*` routes (`router.rs:373,389`). The internal opening read and salt-bearing replication need scoped, attributable credentials and a listener the public cannot reach (lead r4-delta e3). P-f builds them before P-c.
 
 **Interfaces.**
-- Config: `[[credentials]]` entries `{ id, secret_sha256, scopes: [..], deployment, tenant_authority: "deployment" | { tenant = ".." } }`, and `[cluster.peers]` entries `{ node_id, internal_url, public_key }`. `service_token` and `tenant_read_tokens` are replaced by credentials (`service_token` becomes a credential with the client scopes it has today, each tenant read token a `Tenant(t)` credential with `receipts:read`); no fallback reads the old keys.
-- Scopes: `receipts:read`, `receipts:append`, `receipt-openings:read`, `receipt-openings:erase`, `cluster-openings:replicate`, and one scope per existing client route family, mapped from today's behavior with no route losing access its callers have now.
+- Config: `[[credentials]]` entries `{ id, secret_sha256, scopes: [..], deployment, tenant_authority: "deployment" | { tenant = ".." } }`, and `[cluster.peers]` entries `{ node_id, internal_url, public_key }`. `service_token` and `tenant_read_tokens` are removed. The operator rewrites the configuration: the release notes and `chio trust config check` show the credential entries that reproduce today's access (the old service token's routes as one credential per caller role, each tenant read token as a `Tenant(t)` credential with `receipts:read` and `reports:read`). Nothing is migrated automatically, and a configuration that still names `service_token` or `tenant_read_tokens` refuses at startup.
+- Route authorization table (Root-2 r5). Today's `json_ingress::authenticate` middleware (`json_ingress.rs:276-312`) maps JSON ingress paths to an authentication class, and handlers recheck. P-f turns that map into one table covering every route on both listeners, enforced in the middleware for every request (not only JSON ingress) and rechecked by `validate_caller(required_scope)` in each handler. A request for a route absent from the table, or a credential naming a scope absent from the closed scope set, refuses. The table below is generated from the router at `origin/main` `2bfbbfff2b` by `docs/superpowers/plans/m1-item2-routes/trust_control_routes.py` (committed with its rules `scope_rules.tsv` and output `routes-2bfbbfff2b.tsv`; 220 routes, 0 unruled). It parses every `.route(` call in the trust-control router sources, resolves path constants and aliases, and records the authentication helper each handler (or a function it calls, two levels deep) uses today, so each row's credential kind follows today's check. Rows marked "unchanged" keep their existing non-credential authentication (anonymous public metadata, FROST session signatures, finding seller signatures, OID4VCI wallet tokens). The four rows marked "new in this plan" are the routes Task 4 adds.
+
+| Method | Route | Listener | Credential | Scope | Tenant authority |
+|---|---|---|---|---|---|
+| GET | `/.well-known/chio-oid4vp-verifier` | public | anonymous | `none` | n/a (public issuer and verifier metadata; unchanged) |
+| GET | `/.well-known/chio-passport-jwt-vc-json` | public | anonymous | `none` | n/a (public issuer and verifier metadata; unchanged) |
+| GET | `/.well-known/chio-passport-sd-jwt-vc` | public | anonymous | `none` | n/a (public issuer and verifier metadata; unchanged) |
+| GET | `/.well-known/jwks.json` | public | anonymous | `none` | n/a (public issuer and verifier metadata; unchanged) |
+| GET | `/.well-known/openid-credential-issuer` | public | anonymous | `none` | n/a (public issuer and verifier metadata; unchanged) |
+| POST | `/emergency-resume` | public | caller | `admin:emergency` | Deployment only |
+| GET | `/emergency-status` | public | caller | `admin:emergency` | Deployment only |
+| POST | `/emergency-stop` | public | caller | `admin:emergency` | Deployment only |
+| GET | `/health` | public | anonymous | `none` | n/a (liveness only; unchanged) |
+| GET | `/metrics` | public | caller | `metrics:read` | Deployment only |
+| POST | `/scim/v2/Users` | public | caller | `scim:write` | Deployment only |
+| DELETE | `/scim/v2/Users/{user_id}` | public | caller | `scim:write` | Deployment only |
+| POST | `/v1/admin/emergency-resume` | public | caller | `admin:emergency` | Deployment only |
+| GET | `/v1/admin/emergency-status` | public | caller | `admin:emergency` | Deployment only |
+| POST | `/v1/admin/emergency-stop` | public | caller | `admin:emergency` | Deployment only |
+| GET | `/v1/agents/{subject_key}/receipts` | public | caller | `receipts:read` | Tenant(t) sees only tenant t; Deployment sees its deployment |
+| GET | `/v1/authority` | public | deployment | `authority:read` | Deployment only |
+| POST | `/v1/authority` | public | caller | `authority:admin` | Deployment only |
+| POST | `/v1/authority/key-log/sync` | public | caller | `authority:admin` | Deployment only |
+| POST | `/v1/bond-losses/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/bonds/issue` | public | caller | `credit:write` | Deployment only |
+| GET | `/v1/budgets` | public | deployment | `budgets:read` | Deployment only |
+| POST | `/v1/budgets/authorize-exposure` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/capture-invocation` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/cumulative-approval/lookup` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/authorize` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/authorize-cumulative` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/cancel-captured` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/capture-invocation` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/capture-spend` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/reconcile` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/release` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/holds/reverse` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/increment` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/reconcile-spend` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/budgets/release-exposure` | public | deployment | `budgets:write` | Deployment only |
+| POST | `/v1/capabilities/issue` | public | deployment | `capabilities:issue` | Deployment only |
+| POST | `/v1/capital/allocations/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/capital/instructions/issue` | public | caller | `credit:write` | Deployment only |
+| GET | `/v1/certifications` | public | caller | `certifications:read` | Deployment only |
+| POST | `/v1/certifications` | public | caller | `certifications:write` | Deployment only |
+| POST | `/v1/certifications/discovery/consume` | public | caller | `certifications:write` | Deployment only |
+| POST | `/v1/certifications/discovery/publish` | public | caller | `certifications:write` | Deployment only |
+| GET | `/v1/certifications/discovery/resolve/{tool_server_id}` | public | caller | `certifications:read` | Deployment only |
+| GET | `/v1/certifications/discovery/search` | public | caller | `certifications:read` | Deployment only |
+| GET | `/v1/certifications/discovery/transparency` | public | caller | `certifications:read` | Deployment only |
+| GET | `/v1/certifications/resolve/{tool_server_id}` | public | caller | `certifications:read` | Deployment only |
+| GET | `/v1/certifications/{artifact_id}` | public | caller | `certifications:read` | Deployment only |
+| POST | `/v1/certifications/{artifact_id}/dispute` | public | caller | `certifications:write` | Deployment only |
+| POST | `/v1/certifications/{artifact_id}/revoke` | public | caller | `certifications:write` | Deployment only |
+| POST | `/v1/evidence/export` | public | caller | `evidence:read` | Tenant(t) exports only tenant t; Deployment its deployment |
+| POST | `/v1/evidence/import` | public | caller | `evidence:write` | Deployment only |
+| POST | `/v1/facilities/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/federation/capabilities/issue` | public | caller | `federation:write` | Deployment only |
+| GET | `/v1/federation/evidence-shares` | public | caller | `federation:read` | Deployment only |
+| GET | `/v1/federation/open-admission-policies` | public | caller | `federation:read` | Deployment only |
+| POST | `/v1/federation/open-admission-policies/evaluate` | public | caller | `federation:write` | Deployment only |
+| DELETE | `/v1/federation/open-admission-policies/{policy_id}` | public | caller | `federation:write` | Deployment only |
+| GET | `/v1/federation/open-admission-policies/{policy_id}` | public | caller | `federation:read` | Deployment only |
+| PUT | `/v1/federation/open-admission-policies/{policy_id}` | public | caller | `federation:write` | Deployment only |
+| GET | `/v1/federation/providers` | public | caller | `federation:read` | Deployment only |
+| DELETE | `/v1/federation/providers/{provider_id}` | public | caller | `federation:write` | Deployment only |
+| GET | `/v1/federation/providers/{provider_id}` | public | caller | `federation:read` | Deployment only |
+| PUT | `/v1/federation/providers/{provider_id}` | public | caller | `federation:write` | Deployment only |
+| POST | `/v1/findings/collateral` | public | caller | `findings:write` | Deployment only |
+| POST | `/v1/findings/operator/retractions` | public | finding seller (seller signature) | `none` | n/a (seller authentication; unchanged) |
+| POST | `/v1/findings/operator/verified-fixes` | public | finding seller (seller signature) | `none` | n/a (seller authentication; unchanged) |
+| POST | `/v1/findings/profiles` | public | caller | `findings:write` | Deployment only |
+| POST | `/v1/findings/publish` | public | caller | `findings:write` | Deployment only |
+| POST | `/v1/findings/recipes` | public | caller | `findings:write` | Deployment only |
+| GET | `/v1/findings/search` | public | anonymous | `none` | n/a (public listing reads; unchanged) |
+| POST | `/v1/findings/search` | public | anonymous | `none` | n/a (public listing search; unchanged) |
+| POST | `/v1/findings/status/{feed}/intents` | public | caller | `findings:write` | Deployment only |
+| GET | `/v1/findings/status/{feed}/proof/{finding_id}` | public | anonymous | `none` | n/a (public listing reads; unchanged) |
+| GET | `/v1/findings/status/{feed}/root` | public | anonymous | `none` | n/a (public listing reads; unchanged) |
+| GET | `/v1/findings/{finding_id}` | public | anonymous | `none` | n/a (public listing reads; unchanged) |
+| POST | `/v1/findings/{finding_id}/activate` | public | caller | `findings:write` | Deployment only |
+| GET | `/v1/findings/{finding_id}/admission` | public | anonymous | `none` | n/a (public listing reads; unchanged) |
+| POST | `/v1/findings/{finding_id}/challenges` | public | caller | `findings:write` | Deployment only |
+| GET | `/v1/findings/{finding_id}/challenges/{challenge_id}` | public | caller | `findings:read` | Deployment only |
+| POST | `/v1/findings/{finding_id}/operator/live-status` | public | caller | `findings:write` | Deployment only |
+| POST | `/v1/findings/{finding_id}/participation` | public | caller | `findings:write` | Deployment only |
+| GET | `/v1/findings/{finding_id}/proof` | public | anonymous | `none` | n/a (public listing reads; unchanged) |
+| POST | `/v1/findings/{finding_id}/purchase` | public | caller | `findings:write` | Deployment only |
+| POST | `/v1/fiscal/activations` | public | caller | `fiscal:write` | Deployment only |
+| POST | `/v1/fiscal/approvals` | public | caller | `fiscal:write` | Deployment only |
+| POST | `/v1/fiscal/marketplace/credit-limit` | public | caller | `reports:read` | Tenant(t) sees only tenant t; Deployment sees its deployment |
+| POST | `/v1/fiscal/marketplace/price` | public | caller | `fiscal:write` | Deployment only |
+| POST | `/v1/fiscal/proposals` | public | caller | `fiscal:write` | Deployment only |
+| POST | `/v1/fiscal/proposals/admit` | public | caller | `fiscal:write` | Deployment only |
+| POST | `/v1/fiscal/proposals/preview` | public | caller | `fiscal:write` | Deployment only |
+| POST | `/v1/fiscal/resolve` | public | caller | `fiscal:write` | Deployment only |
+| GET | `/v1/fiscal/runtime` | public | caller | `fiscal:read` | Deployment only |
+| POST | `/v1/frost/coordinator/sessions/cancel` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/frost/coordinator/sessions/claim` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/frost/coordinator/sessions/commitments` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/frost/coordinator/sessions/complete` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/frost/coordinator/sessions/package` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/frost/coordinator/sessions/renew` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/frost/coordinator/sessions/shares` | public | frost participant (session signature) | `none` | n/a (FROST session authentication; unchanged) |
+| POST | `/v1/internal/admission-authority` | internal | deployment | `admission-authority:write` | Deployment only |
+| GET | `/v1/internal/authority/snapshot` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/budgets/delta` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| POST | `/v1/internal/cluster/partition` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/cluster/snapshot` | internal | peer | `cluster-openings:replicate` (the snapshot carries openings) | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/cluster/status` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/lineage/delta` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/receipts/children/delta` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/receipts/tools/delta` | internal | peer | `cluster-openings:replicate` (the delta carries openings) | n/a (peer of the same cluster; pinned node key) |
+| GET | `/v1/internal/revocations/delta` | internal | peer | `cluster:replicate` | n/a (peer of the same cluster; pinned node key) |
+| POST | `/v1/liability/adjudications/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/auto-bind/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/bound-coverages/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/claim-payouts/instructions/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/claim-payouts/receipts/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/claim-responses/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/claim-settlements/instructions/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/claim-settlements/receipts/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/claims/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/disputes/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/placements/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/pricing-authorities/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/providers/issue` | public | caller | `credit:write` | Deployment only |
+| GET | `/v1/liability/providers/resolve` | public | caller | `credit:read` | Deployment only |
+| POST | `/v1/liability/quote-requests/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/liability/quote-responses/issue` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/lineage` | public | caller | `lineage:write` | Deployment only |
+| GET | `/v1/lineage/{capability_id}` | public | caller | `lineage:read` | Deployment only |
+| GET | `/v1/lineage/{capability_id}/chain` | public | caller | `lineage:read` | Deployment only |
+| POST | `/v1/metered-billing/reconcile` | public | deployment | `settlement:write` | Deployment only |
+| POST | `/v1/passport/challenges` | public | caller | `passport:write` | Deployment only |
+| POST | `/v1/passport/challenges/verify` | public | caller | `passport:write` | Deployment only |
+| POST | `/v1/passport/issuance/credential` | public | holder (OID4VCI pre-authorized code or access token) | `none` | n/a (wallet protocol credential; unchanged) |
+| POST | `/v1/passport/issuance/offers` | public | caller | `passport:write` | Deployment only |
+| POST | `/v1/passport/issuance/token` | public | holder (OID4VCI pre-authorized code or access token) | `none` | n/a (wallet protocol credential; unchanged) |
+| POST | `/v1/passport/oid4vp/requests` | public | caller | `passport:write` | Deployment only |
+| GET | `/v1/passport/statuses` | public | caller | `passport:read` | Deployment only |
+| POST | `/v1/passport/statuses` | public | caller | `passport:write` | Deployment only |
+| GET | `/v1/passport/statuses/resolve/{passport_id}` | public | caller | `passport:read` | Deployment only |
+| GET | `/v1/passport/statuses/{passport_id}` | public | caller | `passport:read` | Deployment only |
+| POST | `/v1/passport/statuses/{passport_id}/revoke` | public | caller | `passport:write` | Deployment only |
+| GET | `/v1/passport/verifier-policies` | public | caller | `passport:read` | Deployment only |
+| DELETE | `/v1/passport/verifier-policies/{policy_id}` | public | caller | `passport:write` | Deployment only |
+| GET | `/v1/passport/verifier-policies/{policy_id}` | public | caller | `passport:read` | Deployment only |
+| PUT | `/v1/passport/verifier-policies/{policy_id}` | public | caller | `passport:write` | Deployment only |
+| GET | `/v1/public/certifications/metadata` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/certifications/resolve/{tool_server_id}` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/certifications/search` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/certifications/transparency` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| POST | `/v1/public/passport/challenges/verify` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/challenges/{challenge_id}` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/discovery/issuer` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/discovery/transparency` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/discovery/verifier` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| POST | `/v1/public/passport/oid4vp/direct-post` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/oid4vp/launch/{request_id}` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/oid4vp/requests/{request_id}` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/statuses/resolve/{passport_id}` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/passport/wallet-exchanges/{request_id}` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/registry/listings/search` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/public/registry/namespace` | public | anonymous | `none` | n/a (public registry, certification and passport surfaces; unchanged) |
+| GET | `/v1/receipts/analytics` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/receipts/children` | public | caller | `receipts:read` | Tenant(t) sees only tenant t; Deployment sees its deployment |
+| POST | `/v1/receipts/children` | public | deployment | `receipts:append` | Deployment only |
+| GET | `/v1/receipts/query` | public | caller | `receipts:read` | Tenant(t) sees only tenant t; Deployment sees its deployment |
+| POST | `/v1/receipts/query/snapshot/recovery` | public | caller | `receipts:admin` | Deployment only |
+| GET | `/v1/receipts/tools` | public | caller | `receipts:read` | Tenant(t) sees only tenant t; Deployment sees its deployment |
+| POST | `/v1/receipts/tools` | public | deployment | `receipts:append` | Deployment only |
+| POST | `/v1/registry/governance/cases/evaluate` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/governance/cases/issue` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/governance/charters/issue` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/market/fees/issue` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/market/penalties/evaluate` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/market/penalties/issue` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/trust-activations/evaluate` | public | caller | `registry:write` | Deployment only |
+| POST | `/v1/registry/trust-activations/issue` | public | caller | `registry:write` | Deployment only |
+| GET | `/v1/reports/authorization-context` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/authorization-profile-metadata` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/authorization-review-pack` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/behavioral-feed` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/bond-loss-policy` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/bond-losses` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/bond-policy` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| POST | `/v1/reports/bonded-execution-simulation` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/bonds` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/capital-book` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/comptroller-surface` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/cost-attribution` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/credit-backtest` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/credit-scorecard` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/economic-completion-flow` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/economic-receipts` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/exposure-ledger` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/facilities` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/facility-policy` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/liability-claims` | public | caller | `reports:read` | Deployment only |
+| GET | `/v1/reports/liability-market` | public | caller | `reports:read` | Deployment only |
+| GET | `/v1/reports/liability-providers` | public | caller | `reports:read` | Deployment only |
+| GET | `/v1/reports/metered-billing` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/operator` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/provider-risk-package` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| POST | `/v1/reports/runtime-attestation-appraisal` | public | caller | `reports:read` | Deployment only |
+| POST | `/v1/reports/runtime-attestation-appraisal-result` | public | caller | `reports:read` | Deployment only |
+| POST | `/v1/reports/runtime-attestation-appraisal/import` | public | caller | `reports:read` | Deployment only |
+| GET | `/v1/reports/settlements` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/underwriting-decision` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| GET | `/v1/reports/underwriting-decisions` | public | caller | `reports:read` | Deployment only |
+| GET | `/v1/reports/underwriting-input` | public | caller | `reports:read` | Deployment only |
+| POST | `/v1/reports/underwriting-simulation` | public | caller | `reports:read` | Deployment only (today's admin report read context) |
+| POST | `/v1/reputation/compare/{subject_key}` | public | caller | `reputation:write` | Deployment only |
+| GET | `/v1/reputation/local/{subject_key}` | public | caller | `reputation:read` | Deployment only |
+| POST | `/v1/reputation/portable/evaluate` | public | caller | `reputation:write` | Deployment only |
+| POST | `/v1/reputation/portable/events/issue` | public | caller | `reputation:write` | Deployment only |
+| POST | `/v1/reputation/portable/summaries/issue` | public | caller | `reputation:write` | Deployment only |
+| GET | `/v1/revocations` | public | caller | `revocations:read` | Deployment only |
+| POST | `/v1/revocations` | public | caller | `revocations:write` | Deployment only |
+| POST | `/v1/settlements/reconcile` | public | deployment | `settlement:write` | Deployment only |
+| POST | `/v1/underwriting/appeals` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/underwriting/appeals/resolve` | public | caller | `credit:write` | Deployment only |
+| POST | `/v1/underwriting/decisions/issue` | public | caller | `credit:write` | Deployment only |
+| GET | `/v1/receipts/{id}/openings/status` (new in this plan) | public | caller | `receipts:read` | Tenant(t) only for receipts of tenant t (either signed form, checked server-side); Deployment for its deployment |
+| POST | `/v1/receipts/{id}/openings/erase` (new in this plan) | public | caller | `receipt-openings:erase` | Deployment only |
+| POST | `/v1/internal/receipts/openings/read` (new in this plan) | internal | deployment | `receipt-openings:read` | Deployment, or Tenant(t) checked against the receipt's signed tenant_id or a server-computed binding (Task 4) |
+| GET | `/v1/internal/receipts/openings/delta` (new in this plan; later state changes only) | internal | peer | `cluster-openings:replicate` | n/a (peer of the same cluster; pinned node key) |
+
+Closed scope set: `admin:emergency`, `admission-authority:write`, `attestation:write`, `authority:admin`, `authority:read`, `budgets:read`, `budgets:write`, `capabilities:issue`, `certifications:read`, `certifications:write`, `cluster:replicate`, `cluster-openings:replicate`, `credit:read`, `credit:write`, `evidence:read`, `evidence:write`, `federation:read`, `federation:write`, `findings:read`, `findings:write`, `fiscal:read`, `fiscal:write`, `lineage:read`, `lineage:write`, `metrics:read`, `passport:read`, `passport:write`, `receipt-openings:erase`, `receipt-openings:read`, `receipts:admin`, `receipts:append`, `receipts:read`, `registry:write`, `reports:read`, `reputation:read`, `reputation:write`, `revocations:read`, `revocations:write`, `scim:write`, `settlement:write`. Credential kinds: `caller` (an operator or service client), `deployment` (a kernel-hosting process or control-plane service of one deployment), `peer` (a cluster node, pinned Ed25519 key, internal listener only); a `peer` credential is refused on every public route and a `caller` or `deployment` credential on every peer route.
 - `validate_caller(&headers, required_scope) -> Result<AuthenticatedCaller>` with `AuthenticatedCaller { credential_id, deployment, tenant_authority, scopes }`, constant-time secret comparison, used by every route.
 - Internal listener: a second bind address `internal_listen`. Every `/v1/internal/*` route (the existing receipt delta and cluster snapshot routes, the new openings stream and openings read) is mounted only on the internal router; the public router has none of them. Peers use `internal_url`.
 - Peer auth: `validate_cluster_peer_auth` verifies an Ed25519 signature over the request by the claimed node's pinned key.
 
-**Tests:** `public_router_has_no_internal_paths`, `internal_listener_refuses_without_credential`, `scope_required_per_route`, `existing_client_routes_keep_access_under_mapped_scopes`, `tenant_credential_limited_to_its_tenant`, `service_token_secret_no_longer_authenticates_cluster_routes`, `peer_signature_from_unpinned_key_refused`, `old_config_keys_refuse_at_startup`.
+**Tests:** `route_table_covers_every_router_route` (the router's route list equals the table's), `unknown_route_refuses`, `credential_with_unknown_scope_refuses_at_startup`, `read_scope_cannot_write` (for each family, a `:read` credential on its write routes refuses), `write_scope_cannot_read_other_family`, `tenant_credential_cross_tenant_read_refused` (a `Tenant(a)` credential on `/v1/receipts/query`, `/v1/receipts/tools` and the reports for tenant b), `tenant_credential_refused_on_deployment_only_routes`, `peer_credential_refused_on_public_routes`, `caller_credential_refused_on_peer_routes`, `deployment_credential_of_other_deployment_refused`, `public_router_has_no_internal_paths`, `internal_listener_refuses_without_credential`, `scope_required_per_route`, `existing_client_routes_keep_access_under_mapped_scopes`, `tenant_credential_limited_to_its_tenant`, `service_token_secret_no_longer_authenticates_cluster_routes`, `peer_signature_from_unpinned_key_refused`, `old_config_keys_refuse_at_startup`.
 
 **Size:** 3-5 days, counted in the Size table. It changes trust-control configuration for every deployment (D17 item 8).
 
@@ -760,7 +992,7 @@ Contract move-in (in-place schemas README): `git mv` the staged `record.schema.j
   - `compacted_replay_survives_erased_openings` (erase the openings of a compacted admission, replay: completes with the same receipt; no wedge);
   - `compacted_replay_blob_mismatch_refuses` (the existing refusal, now against the row digest);
   - `compacted_replay_detects_blob_rewrite_when_opening_present` (a store that rewrites the blob and the row digest is refused when the opening is present, because the content commitment is recomputed over the blob; P2-C);
-  - `delivery_preparation_reads_launch_state_from_registered_key`, `authorization_projection_reads_payload_digest_from_row` (Root-held P-i sites);
+  - `delivery_preparation_reads_launch_state_from_signed_cage_receipt`, `authorization_projection_reads_payload_digest_from_row` (Root-held P-i sites);
   - `finding_memory_write_refuses_erased_parent_opening` (E-k);
   - `fresh_only_catalog_refuses_old_receipt_column_without_mutation` and `fresh_only_catalog_refuses_old_admission_row_without_mutation`: F's in-place `chio_tool_receipts.content_commitment` column and the two admission-row commitment columns are validated by the fresh-only v1 catalog for `SqliteReceiptStore` and `SqliteAdmissionOperationStore`, each refusing an old, unstamped or malformed layout with the exact error and no mutation (Root-2 condition 6);
   - `recovery_republishes_exact_receipt_and_salts` (crash after durable admission before publication);
@@ -957,7 +1189,7 @@ Changes before F (no signed bytes): P-a moves `Rng` and makes it fallible; P-b a
 Root-held files (Root-2 ACK before the lane edits them):
 - `crates/platform/chio-http-core/src/receipt.rs` (deleted in F).
 - `crates/kernel/chio-kernel/src/tool_outcome/caller_delivery.rs` and `tool_outcome/security_release/context.rs` (kind A0).
-- `crates/kernel/chio-kernel/src/admission_operation/projection/authorization.rs` (kind P-i, `operation_payload`) and `crates/kernel/chio-kernel/src/kernel/evaluation/delivery_preparation.rs` (kind P-i, launch state).
+- `crates/kernel/chio-kernel/src/admission_operation/projection/authorization.rs` (kind P-i: `operation_payload`, `session_id`, `tool_call_id` and `authorization_parameter_hash` from the authorization operation's admission row) and `crates/kernel/chio-kernel/src/kernel/evaluation/delivery_preparation.rs` (kind P-i, launch state).
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs` and `admission_coordinator/**`, `admission_operation/**`, the `admission_operation_store` and `dispatch_ledger/policy.rs` that consume the admission binding (kind A).
 - `crates/platform/chio-store-sqlite/src/serving_owner*` and the receipt store publication path (Task 4).
 - `crates/kernel/chio-kernel/src/kernel/construction.rs` and `kernel_struct.rs` (also edited by #1708).
@@ -1052,7 +1284,7 @@ Spec 13.2 sizes item 2 at L, 26-37 engineer-days. Estimate from the census:
 | F cage, control-plane, BBS producers and projection readers (Task 10), ACP (Task 11) | 3-4 |
 | F `HttpReceipt` deletion across 103 files and the middleware SDKs (Task 12) | 5-6 |
 | F group 5 producers, fixture RNG release gate (Tasks 13, 14) | 2-3 |
-| F readers and cross-artifact consumers: 470 census lines, P-ii rebuilds, carriers, the `security_event` projection, keyed digests and the split `delivery_contract` (Tasks 15, 16) | 6-9 |
+| F readers and cross-artifact consumers: 551 census lines, P-ii rebuilds, carriers, the `security_event` projection, keyed digests and the split `delivery_contract` (Tasks 15, 16) | 6-9 |
 | F vectors and SDK verifiers (Task 17) | 2-3 |
 | F fixture regeneration (Task 18) | 2-3 |
 | PROTOCOL, docs, formal (Tasks 19, 20) | 1-2 |
@@ -1076,7 +1308,7 @@ Each needs an owner decision. The plan is written against the recommended defaul
 9. **Salt-only openings in carriers.** Spec 7.7 lists only the caller copy, `caller` bundles and the PEP response. **Default:** amend spec 7.7 with: "A salt-only opening for the `<salt_ref>` commitment may accompany an artifact that carries that commitment's complete preimage. It is never written for a field whose preimage the artifact does not carry, and erasure does not reach openings already delivered in such artifacts." It applies only to the Task 16 carriers, each for its named `salt_ref`. It does not apply to the finding verifier, which holds only `payload_sha256` and binds to `delivery_contract` (kind F). The alternative, rebinding each carrier consumer to a receipt id recorded by a signed Chio artifact at signing time, adds about 3 days.
 10. **`/v1/evaluate` openings.** **Default:** none in M1 (spec 7.7 and the 13.1 caller-copy cut); mediated mode persists them, sidecar mode without a store drops them.
 11. **Signed tenant binding beyond the security producers.** The keyed `tenant_binding` member is an addition to spec 7.6, which today allows only a plaintext `tenant_id` or, with `authority`, no signed tenant at all. **Default:** add it to spec 7.6 in F's PROTOCOL commit for the native evidence, response simulation and cage producers only; every other producer keeps `tenant_id` until a later item decides whether all tenant-scoped receipts move to the binding.
-12. **Plaintext `delivery_contract` digests for finding-delivery grants.** **Default:** keep them plaintext, because they equal the finding's `payload_sha256`, which the listing publishes, and the finding verifier holds only that digest; every other `OutputDigestSha256` grant's `observed_digest` becomes a salted commitment. The entropy argument is the listing's: no new value is disclosed. The alternative commits the finding-delivery digests too and moves the finding verifier to an opening the listing would have to carry.
+12. **Plaintext `delivery_contract` digests for finding-delivery grants.** The kernel decides that a grant is a finding-delivery grant from the grant's signed constraint set (a `FindingDelivery` constraint on the capability), never from an argument or caller-supplied marker, so a caller cannot select the plaintext form. **Default:** keep them plaintext, because they equal the finding's `payload_sha256`, which the listing publishes, and the finding verifier holds only that digest; every other `OutputDigestSha256` grant's `observed_digest` becomes a salted commitment. The entropy argument is the listing's: no new value is disclosed. The alternative commits the finding-delivery digests too and moves the finding verifier to an opening the listing would have to carry.
 
 ## Unresolved in this revision
 
