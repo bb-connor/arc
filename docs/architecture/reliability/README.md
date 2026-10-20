@@ -52,7 +52,7 @@ invariants.
 | --- | --- | --- | --- | --- | --- |
 | [RFC-0001](./RFC-0001-hot-path-deadlines.md) | Hot-path deadlines and watchdogs | F01, F07 (with RFC-0006), F14 (with RFC-0011) | ADR-0006, ADR-0013 | RFC-0002 | ready |
 | [RFC-0002](./RFC-0002-unconditional-post-admission-unwind.md) | Unconditional post-admission unwind | F02, F08 | ADR-0003, ADR-0006 | none | ready |
-| [RFC-0003](./RFC-0003-dispatch-intent-journal.md) | Durable dispatch-intent journal | F04, F31, F70 and F71 (with RFC-0013) | ADR-0008, ADR-0013 | RFC-0006 | ready |
+| [RFC-0003](./RFC-0003-dispatch-intent-journal.md) | Durable dispatch-intent journal | F04, F31, F70 (with RFC-0013) | ADR-0008, ADR-0013 | RFC-0006 | ready |
 | [RFC-0004](./RFC-0004-bounded-memory-enomem-analog.md) | Bounded-memory architecture and the ENOMEM analog | F03, F06, F10, F12, F21, F25, F38, F39, F63 (with RFC-0010) | none | none | ready |
 | [RFC-0005](./RFC-0005-durable-by-default-wiring.md) | Durable-by-default store wiring and schema versioning | F19, F26, F60, F62, F64, F65 | ADR-0004, ADR-0013 | none | ready |
 | [RFC-0006](./RFC-0006-storage-hot-path.md) | Storage hot path: incremental verification, background checkpoints, single writer | F07, F22, F28, F29 | ADR-0008, ADR-0013 | none | ready |
