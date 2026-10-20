@@ -110,7 +110,11 @@ PROTOCOL 5.6 (merged) is normative for wire behaviour. This plan departs from th
    - **Atomicity:** the openings are inserted in the mint transaction.
    - **No plaintext:** only the salt is stored, never the opened value. The tenant knows its own principal and tenant value, so a `caller` bundle needs only the salt, and an `auditor_hash_only` bundle carries none (spec 9.4). Raw principal and tenant values are never written to any store row.
    - **Reads and erasure:** openings are read only through the scoped disclosure read that item 6 uses for the root's tenant, `context_openings(context_digest)`, which resolves the digest through the UNIQUE index on `anchored_roots.context_digest`. They are erased by `erase_root_openings(capability_id)`. After erasure the store never discloses the salts again, and the root stays valid. Erasure does not revoke a salt or opening already given to a party.
-   - **Retention:** openings are retained with their `anchored_roots` row. A tombstone outlives the row it erased, as in F18.
+   - **Retention, with no foreign key:** `root_context_openings` has no FK to `anchored_roots`, because an erased tombstone must outlive a pruned root. The contract is enforced explicitly, and foreign keys stay on for every other table:
+     - a `present` row exists only while its root row exists: the root prune transaction deletes the root's `present` rows and keeps its `erased` rows;
+     - open validates the table and refuses `RootOpeningOrphaned { capability_id }` for a `present` row without a root row;
+     - an insert for a `(capability_id, salt_ref)` that holds a tombstone refuses `RootOpeningErased`, so a salt is never resurrected, including by a later root reusing the id;
+     - tombstones are not pruned in v1. Growth is one row per erased salt, and erasure is operator-initiated. `serve-http` state never replicates (Decision 12), so no cross-node horizon applies.
    - **Marker test scope:** the Review Focus 3 property test covers the ordinary state tables. The disclosure tables are protected storage and are checked separately for salts only, with no values.
 9. **SCIM alias closure is coordinated with #1728 (P-g).** PR E deletes the `chio-mcp-remote` derivations (F5). The control-plane `derive_enterprise_subject_key` and the SCIM principal-hash aliases it produces close under #1728 (P-g), which is a named predecessor of PR E's identity closure. The Review Focus 5 grep is scoped to `chio-mcp-remote` and the `serve-http` CLI path, and does not claim the symbol vanishes repository-wide.
    - **P-g's `chio-mcp-remote` half:** merged #1728 keys both copies through one function (F23). PR E then deletes the `chio-mcp-remote` caller with `build_enterprise_identity_context`; the shared function stays for the control plane.
@@ -122,7 +126,7 @@ PROTOCOL 5.6 (merged) is normative for wire behaviour. This plan departs from th
      - A lookup or revocation match computes the candidate tag from the plaintext it holds (the exchange evidence at mint; the admin request or `chio mcp revoke` stdin for a revocation) under every loaded generation, active and retired, and matches on `(key_id, value)`. Candidates come from `TenantIndexKeySet::derive_in(key_id, purpose, preimage)` over `key_ids()`, both in the item 2 key-set section (#1734); `derive_in` refuses an unknown `key_id` with `TenantIndexKeyUnknown`. So the mint check catches an entry recorded under an older generation, and a revocation fans out to roots tagged under any loaded generation.
      - **No path compares keyed values across generations without a preimage.** Every tag match recomputes candidates from plaintext the path holds. Paths without plaintext never match tags: admission, capture and the receipt checks read item 5's `revoked_capabilities` by capability id, which the revocation fan-out has already marked. A root minted under generation N and revoked after rotation to N+1 is caught by the fan-out (the admin plaintext gives candidates under N and N+1). A revocation recorded under N and a mint under N+1 is caught by the mint check (the exchange evidence gives candidates under N and N+1), so that root is never minted. Bearer reuse of an existing mapping and session-held tokens resolve to a root by id and reach the same `revoked_capabilities` read. Recovery (Task A step 3) reruns the mint check with the retry's evidence. No other path reads tags for authorization.
      - A retired generation stays loaded while any stored tag or entry references its `key_id`. Startup refuses `tenant index key does not match the state directory` when a referenced `key_id` is not loaded. A presented value under an unknown `key_id` refuses `TenantIndexKeyUnknown`.
-   - **Item 5 amendment:** the fingerprint row and its HMAC domain `chio.tenant-index-key-fingerprint.v1` are dropped. Tag-kind entries store `key_id` beside the value. The target indexes become `(tag_key_id, subject_tag)` and `(tag_key_id, tenant_tag)`. The mint check and the fan-out match `(key_id, value)` over the candidates of every loaded generation. `startup_refuses_a_different_index_key` becomes PR A's `startup_refuses_a_missing_referenced_generation`, so item 5 PR 3 drops its copy and its 0.25 day.
+   - **Item 5 amendment:** the fingerprint row and its HMAC domain `chio.tenant-index-key-fingerprint.v1` are dropped. A tag-kind entry id changes across a rotation: the same subject revoked again under a new generation records a second entry and reports `newly_revoked` again; both entries deny. Tag-kind entries store `key_id` beside the value. The target indexes become `(tag_key_id, subject_tag)` and `(tag_key_id, tenant_tag)`. The mint check and the fan-out match `(key_id, value)` over the candidates of every loaded generation. `startup_refuses_a_different_index_key` becomes PR A's `startup_refuses_a_missing_referenced_generation`, so item 5 PR 3 drops its copy and its 0.25 day.
 11. **The trust-control exchange signer has its own route (lead decision; F21).**
    - **Configuration:** `--exchange-signer trust-control:<url>`, with `--exchange-signer-credential-file <path>` (a P-f `deployment` credential secret, mode 0600 and owned by the process user, scope `root-exchange:sign`; never `--control-token`) and `--exchange-signer-trusted-public-keys <hex,...>` (the rotating set of exchange keys trust-control may sign with, as `--control-authority-trusted-public-keys` is for the authority). Both are required with `trust-control:` and refused without it.
    - **Route:** `POST /v1/root-exchange/sign` on trust-control's public listener, `deployment` credential, scope `root-exchange:sign`, tenant authority Deployment only. P-f's credential rules apply unchanged, including the refusal of a credential of another deployment and of every `peer` credential. It forwards to the cluster leader and runs under the authority mutation fence and term check, as `/v1/capabilities/issue` does.
@@ -200,7 +204,7 @@ PROTOCOL 5.6 (merged) is normative for wire behaviour. This plan departs from th
   - `receipt_db_path`, `revocation_db_path`, `authority_db_path`, `budget_db_path` or `session_db_path` in `chio-mcp-remote` and the `serve-http` CLI path;
   - `control_url`, `control_token` or `open_remote` in `chio-mcp-remote` (Decision 1).
   The control-plane `derive_enterprise_subject_key` is outside the grep and closes under #1728 (P-g) (Decision 9). Pinned by a grep step in Task E-final and by the conformance peers running on `--state-dir`.
-6. **An authorization field changed after mint.** Expected: the global commit binds the canonical authorization projection: every authorization column of the root row and the digests of its blobs. Reading or opening a row recomputes the projection and refuses a mismatch. Pinned in PR A by one mutation test per column (`root_policy_rule_id`, `subject_tag`, `tenant_tag`, `replay_key_digest`, `client_id`, `artifact_digest`, `request_digest`, `expires_at`, `holder`, `anchor_kind`, `root_policy_digest`, `provider_identity_digest`, `key_snapshot_digest`, `context_digest`, the context blob and the capability blob).
+6. **An authorization field changed after mint.** Expected: the global commit binds the canonical authorization projection: every authorization column of the root row and the digests of its blobs. Reading or opening a row recomputes the projection and refuses a mismatch. Pinned in PR A by one mutation test per column (`root_policy_rule_id`, `tag_key_id` (including replacement with another loaded generation), `subject_tag`, `tenant_tag`, `replay_key_digest`, `replay_bound_at`, `client_id`, `artifact_digest`, `request_digest`, `expires_at`, `holder`, `anchor_kind`, `root_policy_digest`, `provider_identity_digest`, `key_snapshot_digest`, `context_digest`, the context blob and the capability blob).
 7. **A receipt relabeled to another tenant.** Expected: tenant export reads each tag row with its exact signed receipt and refuses unless the verified receipt's root capability id equals the row's, and the row's tag equals that root's projection-checked tag. Pinned in PR A2 by `swapping_root_id_and_tag_together_refuses_tenant_export`.
 
 ## File structure
@@ -263,7 +267,8 @@ CREATE TABLE exchange_replay (
   replay_key_digest TEXT PRIMARY KEY CHECK (HEX64(replay_key_digest)),  -- ReplayKey::digest()
   namespace TEXT NOT NULL CHECK (namespace IN (<the eight AnchorKind values>, 'client_assertion')),
   bound_at INTEGER NOT NULL CHECK (typeof(bound_at) = 'integer'),
-  retain_until INTEGER NOT NULL CHECK (typeof(retain_until) = 'integer' AND retain_until > bound_at)  -- exp + 60
+  retain_until INTEGER NOT NULL CHECK (typeof(retain_until) = 'integer' AND retain_until > bound_at),  -- exp + 60
+  capability_id TEXT CHECK ((namespace = 'client_assertion') = (capability_id IS NULL))  -- the root this binding issued; no FK (the root may outlive the row, never the reverse)
 );
 CREATE INDEX exchange_replay_retain ON exchange_replay(retain_until);
 
@@ -273,7 +278,8 @@ CREATE TABLE anchored_roots (
   subject_tag TEXT NOT NULL CHECK (HEX64(subject_tag)),
   tenant_tag TEXT CHECK (tenant_tag IS NULL OR HEX64(tenant_tag)),
   tag_key_id TEXT NOT NULL CHECK (HEX64(tag_key_id)),      -- generation key_id of both tags
-  replay_key_digest TEXT NOT NULL UNIQUE CHECK (HEX64(replay_key_digest)),
+  replay_key_digest TEXT NOT NULL CHECK (HEX64(replay_key_digest)),
+  replay_bound_at INTEGER NOT NULL CHECK (typeof(replay_bound_at) = 'integer'),  -- exchange_replay.bound_at of the binding that issued this root
   client_id TEXT NOT NULL,                 -- authenticated client (retry binding)
   artifact_digest TEXT NOT NULL CHECK (HEX64(artifact_digest)),
   request_digest TEXT NOT NULL CHECK (HEX64(request_digest)),
@@ -289,7 +295,8 @@ CREATE TABLE anchored_roots (
   minted_at INTEGER NOT NULL CHECK (typeof(minted_at) = 'integer' AND minted_at < expires_at),
   authorization_projection_digest TEXT NOT NULL CHECK (HEX64(authorization_projection_digest))
 );
--- indexes on root_policy_rule_id, (tag_key_id, subject_tag), (tag_key_id, tenant_tag) and tag_key_id (F12, Decision 10); replay_key_digest and context_digest are UNIQUE
+-- indexes on root_policy_rule_id, (tag_key_id, subject_tag), (tag_key_id, tenant_tag), tag_key_id and replay_key_digest (F12, Decision 10);
+CREATE UNIQUE INDEX anchored_roots_replay_binding ON anchored_roots(replay_key_digest, replay_bound_at);  -- one root per replay binding
 
 CREATE TABLE bearer_token_roots (
   token_digest TEXT PRIMARY KEY CHECK (HEX64(token_digest)),  -- SHA-256("chio.root-exchange.bearer-token.v1\0" || token)
@@ -314,8 +321,8 @@ CREATE TABLE retained_provider_identities (
   identity BLOB NOT NULL                   -- canonical chio.enterprise-provider-identity.v1
 );
 
-CREATE TABLE root_context_openings (       -- disclosure custody
-  capability_id TEXT NOT NULL REFERENCES anchored_roots(capability_id),
+CREATE TABLE root_context_openings (       -- disclosure custody; no FK: erased tombstones outlive their root
+  capability_id TEXT NOT NULL,
   salt_ref TEXT NOT NULL,                  -- SaltRef grammar: anchor.sub, anchor.tenant, anchor.claims.<name>
   state TEXT NOT NULL CHECK (state IN ('present','erased')),
   salt BLOB CHECK ((state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32)
@@ -346,10 +353,11 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
   1. Open an IMMEDIATE transaction through the serving writer; the serving-owner fence and authority-anchor checks run at begin, as for every serving write.
   2. Run the transaction-bound revocation check (Decision 7) over the root's rule id, replay key and candidate tags under every loaded generation (Decision 10). A match refuses with the item 5 entry id. A checker error rolls back and denies.
   3. Bind the replay key. An existing unexpired binding is resolved in this order:
-     - a stored root for the same replay key whose `client_id`, `artifact_digest` and `request_digest` all equal the request's is a recovery: the transaction rolls back its own rows and goes to Release with the stored root;
+     - the live binding names its root (`exchange_replay.capability_id`); that root, and only that root, is a recovery candidate when its `client_id`, `artifact_digest` and `request_digest` all equal the request's: the transaction rolls back its own rows and goes to Release with it. Recovery never looks a root up by replay key alone, so a retained historical root is never selected;
      - anything else refuses `AssertionReplay`.
      For bearer intake the client is the fixed value `bearer_intake`, so concurrent first sights of one token take the recovery branch.
-  4. Insert the `anchored_roots` row with its retry binding and `authorization_projection_digest`.
+  4. Insert the `anchored_roots` row with its retry binding, `replay_bound_at` equal to the new binding's `bound_at`, and `authorization_projection_digest`; the replay row records the root's `capability_id`.
+     **Replay keys are rebindable after retention.** Once a binding passes `retain_until` and is pruned, the same replay key may bind again (the artifact it came from is past `exp`, so only a new authenticated artifact can present it). The new root gets a new `replay_bound_at`, so it never collides with a retained old root, and item 5's `replay_key` revocation, which matches `replay_key_digest`, covers both.
   5. Insert the root's `root_context_openings` rows (Decision 8).
   6. For bearer intake, insert or replace the `bearer_token_roots` row under the per-kind rules in Bearer expiry.
   7. Insert the retained policy, provider identity and key snapshot rows by verified digest (Retention by digest).
@@ -370,7 +378,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
   - **Recovery runs the current authorization checks.** A root returned through step 3 must still be unexpired (`now < expires_at`), pass the revocation check of step 2 in the same transaction, name the loaded policy's digest, and, for provider-backed kinds, match the registry record's current identity digest. Otherwise the request refuses with the same error a fresh mint would get.
   - **Signer failure:** a failure before step 1 spends no exchange replay key. The client-assertion `jti` is spent at client authentication, by design.
 - **Authorization projection.** The canonical JSON of:
-  - `capability_id`, `root_policy_rule_id`, `subject_tag`, `tenant_tag`, `replay_key_digest`, `expires_at`, `holder` and `anchor_kind`;
+  - `capability_id`, `root_policy_rule_id`, `tag_key_id`, `subject_tag`, `tenant_tag`, `replay_key_digest`, `replay_bound_at`, `expires_at`, `holder` and `anchor_kind`;
   - the retry binding: `client_id`, `artifact_digest` and `request_digest`;
   - `root_policy_digest`, `provider_identity_digest`, `key_snapshot_digest` and `context_digest`;
   - `SHA-256(delegation_context)`, `SHA-256(root_capability)` and `minted_at`.
@@ -394,21 +402,21 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
   | `operator_static_bearer` | the mapped root | a fresh root, minted in one transaction that replaces the mapping; the replay key includes the new `expires_at` | a fresh root, through the same transaction |
 
   - **Mapping retention:** a mapping row is retained until `retain_until = max(root expires_at, token exp) + 60` and then pruned. Pruning therefore never changes the answer for a token that a verifier still accepts.
-- **Root retention.** In PR A no `anchored_roots` row is pruned; nothing mints in production before PR E. PR A2 adds the rule: a row and its openings are retained while the root is live (`expires_at > now`), whether or not a receipt references it. After expiry they are retained while any receipt, custody record or revocation entry references the root, and they are pruned only when the root is expired and unreferenced, in the same transaction as the receipt prune that removes the last reference. Admission refuses at `now >= expires_at` (half-open). An erased opening's tombstone outlives its row, as in F18.
+- **Root retention.** In PR A no `anchored_roots` row is pruned; nothing mints in production before PR E. PR A2 adds the rule: a row and its `present` openings are retained while the root is live (`expires_at > now`), whether or not a receipt references it. After expiry they are retained while any receipt, custody record or revocation entry references the root, and they are pruned only when the root is expired and unreferenced, in the same transaction as the receipt prune that removes the last reference. The same transaction deletes the root's expired `bearer_token_roots` rows; a mapping still inside its `retain_until` counts as a reference. Admission refuses at `now >= expires_at` (half-open). Erased tombstones outlive the root (Decision 8).
 - **Snapshots.** `KeySnapshotSink` (#1713) writes `idp_key_snapshots` by verified digest in its own transaction, before #1713 installs the new key set.
 - **Reads for item 6** (`RootAuthorityEvidenceStore`, F13), each with a typed missing-row error, never `Option`:
   - `presentation(root_capability_id)`: the projection-checked stored root and its delegation context; a missing row is `AnchoredRootMissing { capability_id }`, item 5's variant;
   - `delegation_context(&Sha256Digest)`: through the UNIQUE `context_digest` index, projection-checked;
   - `root_policy`, `provider_identity`, `idp_key_snapshot` by digest; a missing row maps to `attest:export-evidence-incomplete`;
   - `context_openings(&Sha256Digest)`: disclosure-scoped, present, erased or unknown;
-  - `receipts_for_tenant(&TenantTagSet, ..)`: PR A2. The set holds one `KeyedIndexValue` per loaded generation (`key_ids()` with `derive_in(TenantTag, ..)` over the caller's issuer and tenant value), and the read selects every row whose `(tag_key_id, tenant_tag)` is in it, so an export after a rotation includes receipts tagged under retired generations.
+  - `receipts_for_tenant(&[KeyedIndexValue], ..)` (item 6's signature on main): PR A2. The set holds one `KeyedIndexValue` per loaded generation (`key_ids()` with `derive_in(TenantTag, ..)` over the caller's issuer and tenant value), and the read selects every row whose `(tag_key_id, tenant_tag)` is in it, so an export after a rotation includes receipts tagged under retired generations.
 - **Tenant index.** `TenantIndex::open(&TenantIndexKeySet, store)` checks at open that every `key_id` referenced by `anchored_roots`, `receipt_tenant_tags` or item 5's tag-kind revocation entries is loaded (a generation referenced only by a revocation entry counts), and refuses `tenant index key does not match the state directory` otherwise (Decision 10). It exposes `derive_tags(issuer, subject, tenant)` under the active generation and `candidate_tags(issuer, subject, tenant)` under every loaded generation for matching, through `TenantIndexKeySet::derive` and `derive_in` (Decision 10), and refuses NUL in any input.
 
 **PR A2: receipt tenant tag (R1, Root-2: side table).** `receipt_tenant_tags` is authoritative derived state in the `serve-http` state directory only (Decision 12).
   - **How it is written:** only the serving-owner receipt append transaction writes it, on item 2 F's append (F19). That transaction reads the receipt's root capability id from the verified receipt's capability chain (in M1 the chain depth is 0, so it is the receipt's `capability_id`), reads `tenant_tag` from the projection-checked `anchored_roots` row, and writes it.
   - **No other writer:** no caller metadata, request field or separate tagging API writes it, and no import path exists (Decision 12).
   - **Keying:** the key is `(artifact_kind, receipt_id)`, so tool and child receipt id namespaces cannot collide. Task 0 also checks that receipt ids are unique within each kind.
-  - **Read binding:** `receipts_for_tenant` reads each tag row together with its stored signed receipt, verifies the receipt, and accepts the row only when the verified receipt's root capability id equals `root_capability_id` and `tenant_tag` equals that root's projection-checked tag. Changing both columns together to another valid root therefore refuses.
+  - **Read binding:** `receipts_for_tenant` reads each tag row together with its stored signed receipt, verifies the receipt, and accepts the row only when the verified receipt's root capability id equals `root_capability_id` and the full pair `(tag_key_id, tenant_tag)` equals that root's projection-checked pair. Changing both columns together to another valid root, or the `key_id` alone to another loaded generation, therefore refuses.
   - **Retention:** receipt retention deletes the tag row with its receipt, and prunes expired unreferenced roots (Root retention).
   - **Fail closed:** a receipt without a tag row, a row that fails the read binding, or a tag row for an unknown receipt refuses tenant export (`ReceiptTenantTagMissing`, `ReceiptTenantTagConflict`). It never broadens the selection.
 
@@ -473,6 +481,14 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
     - `tag_inputs_refuse_nul`
   - Other:
     - `expired_replay_row_is_pruned_and_rebindable_only_after_retention`
+    - `retained_old_root_expired_replay_new_artifact_mints_a_second_root` (both roots kept, distinct `replay_bound_at`)
+    - `recovery_selects_only_the_root_named_by_the_live_replay_row`
+    - `replay_key_revocation_covers_old_and_rebound_roots`
+    - `client_assertion_replay_row_names_no_root`
+    - `pruning_expired_unreferenced_root_keeps_erased_tombstones`
+    - `present_opening_without_root_refuses_open`
+    - `opening_insert_over_tombstone_refuses`
+    - `root_prune_waits_for_a_live_bearer_mapping`
     - `snapshot_sink_records_before_install`
     - `restored_snapshot_missing_a_root_refuses_open`
   - PR A2:
@@ -480,6 +496,7 @@ Every digest column is lowercase hex of a `Sha256Digest`; reads decode it to `Sh
     - `caller_supplied_tenant_metadata_is_ignored`
     - `tool_and_child_ids_do_not_collide`
     - `swapping_root_id_and_tag_together_refuses_tenant_export`
+    - `receipt_tag_key_id_replaced_with_another_loaded_generation_refuses_tenant_export`
     - `receipt_retention_deletes_its_tag`
     - `missing_tag_refuses_tenant_export`
     - `conflicting_tag_refuses_tenant_export`
@@ -718,7 +735,7 @@ Each lands in the named PR or is raised on the owning plan; none changes this pl
 | item 5 | the fingerprint becomes `tag_key_id` (no `chio.tenant-index-key-fingerprint.v1`); PR 3 drops `startup_refuses_a_different_index_key` and 0.25 day; delete the L456 and L457 409 rows, close Q4, delete R8's `serve-http` forwarding (Decisions 1, 10) | fingerprint: A; 409, Q4, R8: E |
 | item 5 | `oidc_jwt` without `jti` joins the L455 422 row (its replay key is the bearer token digest, not an assertion id) | raised on item 5 |
 | item 5 | tag-kind entry ids are not idempotent across a rotation: revoking the same subject again under a new generation records a second entry and reports `newly_revoked` again. Both entries deny, so behaviour stays correct; item 5 either states it or first looks up an existing entry under every loaded generation | raised on item 5 |
-| item 6 | the manifest and `ExportDisclosure::Caller` carry `tenant_tags` (one `KeyedIndexValue` per loaded generation) in place of one `TenantTag`; export computes the set; Review Focus 4 reads "equals one member of the manifest set" | arc-5b amends item 6 |
+| item 6 | the manifest and `ExportDisclosure::Caller` carry `tenant_tags: Vec<KeyedIndexValue>` (one per loaded generation, sorted by `key_id`) in place of one `TenantTag`; the schema change moves atomically with item 6's callers and verifier, with no singleton compatibility form | resolved by #1735 (merged) |
 | item 2 Task 5c | the `root-exchange:sign` scope and route row in P-f | arc-5b amends item 2 |
 | item 6 | `context_openings(context_digest)` resolves through the UNIQUE `context_digest` index (no Task 8 change); drop "bearer roots" from L133 (item 6 exports no bearer role) | raised on item 6 |
 | item 1 | census row for #1713's snapshot signer if #1713 merges before item 1; the D2 route under the pinned-route rule (F24) | raised on item 1; D2 |
