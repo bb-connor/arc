@@ -1652,6 +1652,9 @@ pub use session_ops::{
 // post-signing: hook failures never block the dispatch path.
 #[path = "settlement_observer.rs"]
 pub mod settlement_observer;
+// Drain of due settlement attempts through the installed settlement runtime.
+#[path = "settlement_drain.rs"]
+mod settlement_drain;
 // Mpsc-backed signing task. Owns a clone of the kernel signing keypair and
 // pulls signing requests from a bounded `tokio::sync::mpsc` channel so receipt
 // signing leaves the synchronous critical path.

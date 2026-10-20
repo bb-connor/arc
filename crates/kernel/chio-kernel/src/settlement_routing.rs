@@ -18,6 +18,8 @@ const MAX_TRANSCRIPT_ID_BYTES: usize = 512;
 
 const INLINE_SETTLEMENT_WORKER_ID: &str = "kernel-inline-observer";
 const INLINE_SETTLEMENT_LEASE_MS: u64 = 30_000;
+const DRAIN_SETTLEMENT_WORKER_ID: &str = "kernel-settlement-drain";
+const DRAIN_SETTLEMENT_LEASE_MS: u64 = 30_000;
 
 pub(crate) struct SettlementObserverRuntime {
     hook: Arc<dyn SettlementHook>,
@@ -81,6 +83,32 @@ impl SettlementObserverRuntime {
             }
         }
         Ok(claim)
+    }
+
+    pub(crate) fn claim_due(
+        &self,
+        now_ms: u64,
+        limit: usize,
+    ) -> Result<Vec<SettlementAttemptClaim>, SettlementRouteError> {
+        let claims = self.outcome_store.claim_due(
+            DRAIN_SETTLEMENT_WORKER_ID,
+            now_ms,
+            DRAIN_SETTLEMENT_LEASE_MS,
+            limit,
+        )?;
+        if claims.len() > limit
+            || claims.iter().any(|claim| {
+                claim.row_version == 0
+                    || claim.lease_owner != DRAIN_SETTLEMENT_WORKER_ID
+                    || claim.lease_token.is_empty()
+                    || claim.lease_until_ms <= now_ms
+            })
+        {
+            return Err(SettlementRouteError::InvalidRecord {
+                detail: "claimed settlement batch does not match the drain lease".to_string(),
+            });
+        }
+        Ok(claims)
     }
 
     pub(crate) fn record_claimed_status(
@@ -322,6 +350,7 @@ mod tests {
         projection: AtomicReceiptProjection,
         binding: SettlementStoreBinding,
         exposes_binding: bool,
+        reconciles: bool,
     }
 
     struct AtomicStoreWithoutTimeout {
@@ -378,7 +407,7 @@ mod tests {
             _lease_ms: u64,
             _limit: usize,
         ) -> Result<Vec<SettlementAttemptClaim>, SettlementRouteError> {
-            Ok(Vec::new())
+            self.claim.clone().map(|claim| claim.into_iter().collect())
         }
 
         fn record_claimed_outcome(
@@ -455,6 +484,10 @@ mod tests {
 
         fn settlement_store_binding(&self) -> Option<SettlementStoreBinding> {
             self.exposes_binding.then_some(self.binding)
+        }
+
+        fn supports_settlement_reconciliation(&self) -> bool {
+            self.reconciles
         }
 
         fn append_chio_receipt_with_pending_observation_and_timeout(
@@ -537,6 +570,7 @@ mod tests {
             projection,
             binding: SettlementStoreBinding::from_digest([binding_byte; 32]),
             exposes_binding: true,
+            reconciles: false,
         })
     }
 
@@ -545,6 +579,7 @@ mod tests {
             projection: AtomicReceiptProjection::SettlementObservationV1,
             binding: SettlementStoreBinding::from_digest([1; 32]),
             exposes_binding: false,
+            reconciles: false,
         })
     }
 
@@ -949,6 +984,104 @@ mod tests {
             ))
         ));
         assert!(kernel.settlement_observer().is_none());
+    }
+
+    #[test]
+    fn drain_claim_rejects_a_row_leased_to_another_worker() {
+        let store = RoutingOutcomeStore::with_claim(attempt_claim("receipt-a", 7));
+        let runtime = routing_runtime(&store);
+
+        let result = runtime.claim_due(1, 4);
+
+        assert_eq!(
+            result,
+            Err(SettlementRouteError::InvalidRecord {
+                detail: "claimed settlement batch does not match the drain lease".to_string(),
+            })
+        );
+        assert_eq!(store.recorded_len(), 0);
+    }
+
+    #[test]
+    fn ledger_install_refuses_a_kernel_without_a_receipt_store() {
+        let mut kernel = kernel();
+        let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
+
+        let result =
+            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+
+        assert!(matches!(
+            result,
+            Err(KernelError::SettlementConfiguration(
+                SettlementRuntimeConfigError::MissingReceiptStore
+            ))
+        ));
+        assert!(kernel.settlement_observer().is_none());
+    }
+
+    #[test]
+    fn ledger_install_refuses_a_store_that_cannot_record_reconciliations() {
+        let mut kernel = kernel();
+        let store = atomic_store(AtomicReceiptProjection::SettlementObservationV1);
+        assert!(kernel
+            .set_receipt_store_handle(receipt_store(&store))
+            .is_ok());
+
+        let result =
+            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+
+        assert!(matches!(
+            result,
+            Err(KernelError::SettlementConfiguration(
+                SettlementRuntimeConfigError::UnsupportedSettlementLedger
+            ))
+        ));
+        assert!(kernel.settlement_observer().is_none());
+    }
+
+    #[test]
+    fn ledger_install_keeps_the_atomic_projection_requirement() {
+        let mut kernel = kernel();
+        let store = Arc::new(TestAtomicStore {
+            projection: AtomicReceiptProjection::Unsupported,
+            binding: SettlementStoreBinding::from_digest([1; 32]),
+            exposes_binding: true,
+            reconciles: true,
+        });
+        assert!(kernel
+            .set_receipt_store_handle(receipt_store(&store))
+            .is_ok());
+
+        let result =
+            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+
+        assert!(matches!(
+            result,
+            Err(KernelError::SettlementConfiguration(
+                SettlementRuntimeConfigError::UnsupportedAtomicProjection
+            ))
+        ));
+        assert!(kernel.settlement_observer().is_none());
+    }
+
+    #[test]
+    fn ledger_install_succeeds_on_a_reconciling_atomic_store() {
+        let mut kernel = kernel();
+        let store = Arc::new(TestAtomicStore {
+            projection: AtomicReceiptProjection::SettlementObservationV1,
+            binding: SettlementStoreBinding::from_digest([1; 32]),
+            exposes_binding: true,
+            reconciles: true,
+        });
+        assert!(kernel
+            .set_receipt_store_handle(receipt_store(&store))
+            .is_ok());
+
+        let result =
+            kernel.install_settlement_ledger(outcome_store(&store), RetryPolicy::default());
+
+        assert!(result.is_ok());
+        assert!(kernel.settlement_observer().is_some());
     }
 
     #[test]

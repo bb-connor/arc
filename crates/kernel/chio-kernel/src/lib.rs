@@ -144,6 +144,10 @@ pub mod runtime;
 mod runtime_trace;
 pub mod session;
 #[cfg(not(loom))]
+mod settlement_ledger;
+#[cfg(not(loom))]
+pub use settlement_ledger::KernelSettlementLedgerHook;
+#[cfg(not(loom))]
 mod settlement_routing;
 #[cfg(not(loom))]
 pub mod stop;

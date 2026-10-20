@@ -53,6 +53,53 @@ impl SqliteReceiptStore {
         Ok(updated_at)
     }
 
+    /// Insert the settlement reconciliation of a stored receipt unless a row
+    /// already exists for it. Returns whether this call created the row; an
+    /// existing row is left unchanged. The receipt check and the insert run in
+    /// one writer transaction.
+    pub fn insert_settlement_reconciliation_if_absent(
+        &self,
+        receipt_id: &str,
+        reconciliation_state: SettlementReconciliationState,
+        note: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        let updated_at = unix_timestamp_now_i64(&self.clock)?;
+        let receipt_id_owned = receipt_id.to_string();
+        let note_owned = note.map(ToString::to_string);
+        self.writer_handle().run_write(move |connection| {
+            let transaction = connection.transaction()?;
+            let receipt_exists = transaction.query_row(
+                "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1)",
+                params![receipt_id_owned],
+                |row| row.get::<_, bool>(0),
+            )?;
+            if !receipt_exists {
+                return Err(ReceiptStoreError::NotFound(format!(
+                    "receipt {receipt_id_owned} does not exist"
+                )));
+            }
+            let inserted = transaction.execute(
+                r#"
+                INSERT INTO settlement_reconciliations (
+                    receipt_id,
+                    reconciliation_state,
+                    note,
+                    updated_at
+                ) VALUES (?1, ?2, ?3, ?4)
+                ON CONFLICT(receipt_id) DO NOTHING
+                "#,
+                params![
+                    receipt_id_owned,
+                    settlement_reconciliation_state_text(reconciliation_state),
+                    note_owned,
+                    updated_at
+                ],
+            )?;
+            transaction.commit()?;
+            Ok(inserted == 1)
+        })
+    }
+
     pub fn upsert_metered_billing_reconciliation(
         &self,
         receipt_id: &str,
