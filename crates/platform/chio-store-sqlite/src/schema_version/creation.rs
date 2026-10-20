@@ -62,8 +62,15 @@ impl<'connection> SchemaTransaction<'connection> {
         connection: &'connection mut Connection,
         namespaces: &[&str],
     ) -> Result<Self, SchemaVersionError> {
-        let declared = namespace_set(namespaces)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        Self::from_transaction(transaction, namespaces)
+    }
+
+    pub(crate) fn from_transaction(
+        transaction: Transaction<'connection>,
+        namespaces: &[&str],
+    ) -> Result<Self, SchemaVersionError> {
+        let declared = namespace_set(namespaces)?;
         let fresh = inspect_declared(&transaction, &declared)? == SchemaState::Unstamped;
         if fresh {
             transaction.execute_batch(METADATA_SCHEMA)?;

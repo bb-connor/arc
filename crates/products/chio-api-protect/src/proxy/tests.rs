@@ -182,7 +182,7 @@ fn test_state_with_receipt_db(
 ) -> Arc<ProxyState> {
     let keypair = Keypair::generate();
     let approval_store: Arc<dyn ApprovalStore> = if let Some(path) = receipt_db {
-        let _receipt = chio_store_sqlite::SqliteReceiptStore::open(path).test_unwrap();
+        chio_store_sqlite::initialize_receipt_approval_database(path).test_unwrap();
         Arc::new(SqliteApprovalStore::open_colocated_with_receipt_store(path).test_unwrap())
     } else {
         Arc::new(InMemoryApprovalStore::new())

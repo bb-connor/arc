@@ -10,7 +10,14 @@ pub(crate) fn validate(
 ) -> Result<(), SchemaVersionError> {
     let canonical = Connection::open_in_memory()?;
     canonical.execute_batch(canonical_ddl)?;
-    if catalog(connection)? != catalog(&canonical)? {
+    validate_against(connection, &canonical)
+}
+
+pub(crate) fn validate_against(
+    connection: &Connection,
+    canonical: &Connection,
+) -> Result<(), SchemaVersionError> {
+    if catalog(connection)? != catalog(canonical)? {
         return Err(SchemaVersionError::CatalogMismatch);
     }
     Ok(())

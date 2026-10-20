@@ -998,3 +998,5 @@ mod tests {
         }
     }
 }
+
+pub use receipt_store::initialize_receipt_approval_database;

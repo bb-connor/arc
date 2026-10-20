@@ -50,6 +50,7 @@ async fn evidence_sink_rejects_duplicate_http_receipt_and_exports_original() {
     use chio_kernel::EvidenceExportQuery;
     let directory = tempfile::tempdir().test_unwrap();
     let database = directory.path().join("receipts.db");
+    chio_store_sqlite::initialize_receipt_approval_database(&database).test_unwrap();
     let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database).test_unwrap();
     let _approval = SqliteApprovalStore::open_colocated_with_receipt_store(&database).test_unwrap();
     let state =
@@ -107,6 +108,7 @@ async fn native_redelivery_recognizes_identical_authenticated_retained_evidence(
     let directory = tempfile::tempdir().test_unwrap();
     let database = directory.path().join("receipts.db");
     let archive = directory.path().join("archive.db");
+    chio_store_sqlite::initialize_receipt_approval_database(&database).test_unwrap();
     let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database).test_unwrap();
     let _approval = SqliteApprovalStore::open_colocated_with_receipt_store(&database).test_unwrap();
     let state =
