@@ -4,9 +4,17 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
+use crate::root_exchange::exchange::EntropyFailure;
+use crate::root_exchange::OAuthErrorCode;
+use crate::root_exchange::{
+    jws::{CompactJws, VerifyingKey},
+    ClientRegistry, ConfidentialClient, ExchangeEntropy, ExchangeReplayStore, ExchangeServices,
+    IdJagGrant, IdpKey, IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord, ReplayBinding,
+    ReplayKey, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+};
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
@@ -19,11 +27,6 @@ use chio_core::root_authority::{
     Jwk, JwsAlgorithm, LoadedRootPolicy, RootConsistencyInput, RootPolicy, Sha256Digest,
 };
 use chio_core::{canonical_json_bytes, sha256};
-use chio_mcp_remote::root_exchange::{
-    jws::CompactJws, ClientRegistry, ConfidentialClient, ExchangeEntropy, ExchangeReplayStore,
-    ExchangeServices, IdJagGrant, IdpKey, IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord,
-    ReplayBinding, ReplayKey, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
-};
 use p256::ecdsa::signature::Signer as _;
 use p256::ecdsa::{Signature as P256Signature, SigningKey as P256SigningKey};
 use serde_json::{json, Map, Value};
@@ -260,14 +263,18 @@ impl ExchangeReplayStore for MemoryReplay {
     }
 }
 
-struct CountingEntropy(AtomicU64);
+struct CountingEntropy(AtomicU64, AtomicBool);
 
 impl ExchangeEntropy for CountingEntropy {
-    fn fill(&self, dest: &mut [u8]) {
+    fn fill(&self, dest: &mut [u8]) -> Result<(), EntropyFailure> {
+        if self.1.load(Ordering::SeqCst) {
+            return Err(EntropyFailure);
+        }
         let seed = self.0.fetch_add(1, Ordering::SeqCst);
         for (index, byte) in dest.iter_mut().enumerate() {
             *byte = (seed as u8).wrapping_mul(31).wrapping_add(index as u8);
         }
+        Ok(())
     }
 }
 
@@ -335,7 +342,7 @@ impl Harness {
     fn with(edit_record: impl FnOnce(&mut Value), edit_policy: impl FnOnce(&mut Value)) -> Self {
         let pinned = ProviderRecord::from_record(&provider_record(|_| {})).unwrap();
         let record = ProviderRecord::from_record(&provider_record(edit_record)).unwrap();
-        let policy = loaded_policy(pinned.identity_digest, edit_policy);
+        let policy = loaded_policy(*pinned.identity_digest(), edit_policy);
         let mut providers = BTreeMap::new();
         providers.insert("acme-okta".to_owned(), record);
         let clients = ClientRegistry::new(vec![ConfidentialClient {
@@ -357,7 +364,7 @@ impl Harness {
             exchange,
             keys: StubKeys::serving(&[idp_jwk(IDP_KID)]),
             replay: MemoryReplay::default(),
-            entropy: CountingEntropy(AtomicU64::new(1)),
+            entropy: CountingEntropy(AtomicU64::new(1), AtomicBool::new(false)),
         }
     }
 
@@ -407,11 +414,11 @@ async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
     let harness = Harness::new();
     let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
 
-    assert_eq!(prepared.holder, HolderClass::EdgeSession);
+    assert_eq!(prepared.holder(), HolderClass::EdgeSession);
     assert_eq!(prepared.body.issued_at, NOW);
     assert_eq!(prepared.body.expires_at, NOW + 290);
-    assert_eq!(prepared.anchor.assertion_exp, NOW + 290);
-    assert_eq!(prepared.anchor.anchored_at, NOW);
+    assert_eq!(prepared.anchor().assertion_exp, NOW + 290);
+    assert_eq!(prepared.anchor().anchored_at, NOW);
     let tools: Vec<_> = prepared
         .body
         .scope
@@ -421,23 +428,23 @@ async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
         .collect();
     assert_eq!(tools, ["search", "get"]);
     assert_eq!(
-        prepared.context.anchor.claims.client_id,
+        prepared.context().anchor.claims.client_id,
         Some(ClaimValue::Plain(
             chio_core::root_authority::Text::new(CLIENT_ID).unwrap()
         ))
     );
     assert_eq!(
-        prepared.context.anchor.key_snapshot_digest,
+        prepared.context().anchor.key_snapshot_digest,
         Some(snapshot_digest(&[idp_jwk(IDP_KID)]))
     );
     assert_eq!(harness.keys.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(prepared.openings.len(), 2);
+    assert_eq!(prepared.openings().len(), 2);
 
     let root = CapabilityToken::sign(prepared.body.clone(), &exchange_keypair()).unwrap();
     check_root_consistency(RootConsistencyInput {
         root: &root,
-        anchor: &prepared.anchor,
-        context: &prepared.context,
+        anchor: prepared.anchor(),
+        context: prepared.context(),
         policy: &harness.exchange.policy,
         sender_key: None,
     })
@@ -451,7 +458,7 @@ async fn caller_held_root_takes_the_sender_key_as_subject() {
     let body = jwt_bearer_body(&id_jag, &client_assertion(&client_assertion_claims()));
     let sender = Keypair::from_seed(&[9; 32]).public_key();
     let prepared = harness.run_body(&body, Some(&sender), NOW).await.unwrap();
-    assert_eq!(prepared.holder, HolderClass::Caller);
+    assert_eq!(prepared.holder(), HolderClass::Caller);
     assert_eq!(prepared.body.subject, sender);
 }
 
@@ -531,11 +538,32 @@ fn token_requests_outside_the_id_jag_grants_are_refused() {
         ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
         ("assertion", "a"),
         ("scope", "crm.read"),
+        ("resource", "https://mcp.provider.example/mcp"),
+    ]);
+    assert_eq!(IdJagGrant::parse(&unknown).unwrap().id_jag(), "a");
+    let empty_known = form(&[
+        ("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer"),
+        ("assertion", "a"),
+        ("client_id", ""),
+        ("client_id", ""),
     ]);
     assert_eq!(
-        IdJagGrant::parse(&unknown).unwrap_err(),
-        RootExchangeError::MalformedRequest("unknown parameter")
+        IdJagGrant::parse(&empty_known)
+            .unwrap()
+            .client_credentials()
+            .client_id,
+        None
     );
+    let not_utf8 =
+        b"grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=%FF".to_vec();
+    assert_eq!(
+        IdJagGrant::parse(&not_utf8).unwrap_err(),
+        RootExchangeError::MalformedRequest("parameter is not valid UTF-8")
+    );
+    let not_utf8_unknown =
+        b"grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=a&extra=%FF"
+            .to_vec();
+    assert!(IdJagGrant::parse(&not_utf8_unknown).is_ok());
 }
 
 async fn client_refusal(body: Vec<u8>) -> RootExchangeError {
@@ -993,7 +1021,7 @@ async fn root_lifetime_is_capped_by_the_assertion() {
     });
     let prepared = harness.run(id_jag_header(), claims).await.unwrap();
     assert_eq!(prepared.body.expires_at, NOW + 20);
-    assert_eq!(prepared.anchor.assertion_exp, NOW + 20);
+    assert_eq!(prepared.anchor().assertion_exp, NOW + 20);
 }
 
 #[tokio::test]
@@ -1020,12 +1048,12 @@ async fn committed_claims_carry_openings() {
         },
     );
     let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
-    let Some(ClaimValue::Committed(commitment)) = &prepared.context.anchor.claims.scope else {
+    let Some(ClaimValue::Committed(commitment)) = &prepared.context().anchor.claims.scope else {
         panic!("scope is not committed");
     };
     assert_eq!(commitment.salt_ref.as_str(), "anchor.claims.scope");
     let opening = prepared
-        .openings
+        .openings()
         .iter()
         .find(|opening| opening.salt_ref.as_str() == "anchor.claims.scope")
         .unwrap();
@@ -1108,7 +1136,7 @@ async fn client_assertion_nbf_sub_and_skew_rules_are_enforced() {
 }
 
 #[tokio::test]
-async fn late_refusal_does_not_spend_the_id_jag() {
+async fn parse_refusal_does_not_spend_the_id_jag() {
     let mut harness = Harness::new();
     harness.keys.any_kid = true;
     let oversized_kid = edit(id_jag_header(), |header| {
@@ -1170,4 +1198,128 @@ fn compact_jws_parse_refuses_key_location_members_and_symmetric_algs() {
             RootExchangeError::MalformedJws("kid is not an identifier")
         );
     }
+}
+
+fn second_rule(policy: &mut Value, rule_id: &str, record_id: &str) {
+    let mut rule = policy["rules"][0].clone();
+    rule["rule_id"] = json!(rule_id);
+    rule["match"]["provider_record_id"] = json!(record_id);
+    policy["rules"].as_array_mut().unwrap().push(rule);
+}
+
+#[tokio::test]
+async fn a_missing_provider_record_refuses_only_its_own_rules() {
+    let harness = Harness::with(
+        |_| {},
+        |policy| second_rule(policy, "other-agents", "missing-okta"),
+    );
+    harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
+
+    let mut orphaned = Harness::new();
+    orphaned.exchange.providers.clear();
+    let error = orphaned
+        .run(id_jag_header(), id_jag_claims())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error,
+        RootExchangeError::ProviderRecordMissing("acme-okta".to_owned())
+    );
+    assert_eq!(error.oauth_error(), OAuthErrorCode::ServerError);
+    assert_eq!(error.client_description(), None);
+}
+
+#[tokio::test]
+async fn a_record_registered_under_another_id_cannot_match() {
+    let mut harness = Harness::new();
+    let foreign = ProviderRecord::from_record(&provider_record(|record| {
+        record["provider_id"] = json!("other-okta")
+    }))
+    .unwrap();
+    harness
+        .exchange
+        .providers
+        .insert("acme-okta".to_owned(), foreign);
+    assert_eq!(
+        harness
+            .run(id_jag_header(), id_jag_claims())
+            .await
+            .unwrap_err(),
+        RootExchangeError::ProviderRecordInvalid {
+            record: "acme-okta".to_owned(),
+            reason: "registered under another provider_id".to_owned()
+        }
+    );
+}
+
+#[tokio::test]
+async fn root_lifetime_is_capped_by_the_policy_validity() {
+    let harness = Harness::with(|_| {}, |policy| policy["valid_until"] = json!(NOW + 100));
+    let prepared = harness.run(id_jag_header(), id_jag_claims()).await.unwrap();
+    assert_eq!(prepared.expires_at(), NOW + 100);
+    assert_eq!(prepared.anchor().assertion_exp, NOW + 290);
+}
+
+#[tokio::test]
+async fn entropy_failure_denies_and_spends_no_id_jag() {
+    let harness = Harness::new();
+    harness.entropy.1.store(true, Ordering::SeqCst);
+    let error = harness
+        .run(id_jag_header(), id_jag_claims())
+        .await
+        .unwrap_err();
+    assert_eq!(error, RootExchangeError::EntropyUnavailable);
+    assert_eq!(error.oauth_error(), OAuthErrorCode::ServerError);
+    assert!(harness
+        .replay
+        .bound
+        .lock()
+        .unwrap()
+        .keys()
+        .all(|key| key.id != "id-jag-1"));
+}
+
+#[tokio::test]
+async fn refusal_after_signature_and_claims_does_not_spend_the_id_jag() {
+    let edge_only = Harness::with(
+        |_| {},
+        |policy| policy["rules"][0]["holder_classes"] = json!(["edge_session"]),
+    );
+    let sender = Keypair::from_seed(&[9; 32]).public_key();
+    let body = jwt_bearer_body(&id_jag(), &client_assertion(&client_assertion_claims()));
+    assert_eq!(
+        edge_only
+            .run_body(&body, Some(&sender), NOW)
+            .await
+            .unwrap_err(),
+        RootExchangeError::HolderClassNotAllowed(HolderClass::Caller)
+    );
+    let bound = edge_only.replay.bound.lock().unwrap();
+    assert_eq!(bound.len(), 1);
+    assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+}
+
+#[tokio::test]
+async fn client_assertion_header_refusals_keep_their_reason() {
+    let with_crit = compact(
+        &json!({ "alg": "ES256", "kid": CLIENT_KID, "crit": ["exp"] }),
+        &client_assertion_claims(),
+        client_sign,
+    );
+    assert_eq!(
+        client_refusal(jwt_bearer_body(&id_jag(), &with_crit)).await,
+        RootExchangeError::ClientAssertionMalformed(Box::new(
+            RootExchangeError::ForbiddenHeaderMember("crit")
+        ))
+    );
+}
+
+#[test]
+fn signed_claims_reach_the_claim_rules_only_through_verification() {
+    let jws = CompactJws::parse(&id_jag()).unwrap();
+    let key = VerifyingKey::from_jwk(&serde_json::from_value(idp_jwk(IDP_KID)).unwrap()).unwrap();
+    let signed_iss = jws.claims()["iss"].clone();
+    let verified = jws.verify_with(&key).unwrap();
+    assert_eq!(verified.claims()["iss"], signed_iss);
+    assert_eq!(verified.header().kid.as_str(), IDP_KID);
 }

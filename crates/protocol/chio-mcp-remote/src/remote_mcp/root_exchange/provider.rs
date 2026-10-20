@@ -10,12 +10,13 @@ use chio_core::root_authority::{
 use super::error::RootExchangeError;
 
 /// A provider record that a root policy rule may reference, with its
-/// identity projection.
+/// identity projection. The projection and its digest are computed together
+/// at construction and cannot be changed apart.
 #[derive(Debug, Clone)]
 pub struct ProviderRecord {
-    pub identity: EnterpriseProviderIdentity,
-    pub identity_digest: Sha256Digest,
-    pub enabled: bool,
+    identity: EnterpriseProviderIdentity,
+    identity_digest: Sha256Digest,
+    enabled: bool,
 }
 
 fn invalid(record: &EnterpriseProviderRecord, reason: impl Into<String>) -> RootExchangeError {
@@ -101,5 +102,23 @@ impl ProviderRecord {
             identity_digest,
             enabled: record.enabled,
         })
+    }
+}
+
+impl ProviderRecord {
+    #[must_use]
+    pub fn identity(&self) -> &EnterpriseProviderIdentity {
+        &self.identity
+    }
+
+    /// `provider_identity_digest` of [`Self::identity`].
+    #[must_use]
+    pub fn identity_digest(&self) -> &Sha256Digest {
+        &self.identity_digest
+    }
+
+    #[must_use]
+    pub fn enabled(&self) -> bool {
+        self.enabled
     }
 }

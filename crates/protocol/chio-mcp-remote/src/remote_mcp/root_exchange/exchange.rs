@@ -10,9 +10,9 @@ use chio_core::capability::token::CapabilityTokenBody;
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::root_authority::{
     ClaimMode, ClaimValue, DelegationAnchor, DelegationAnchorFields, DelegationContext,
-    DelegationContextFields, DelegationExchange, HolderClass, Identifier, LoadedRootPolicy,
-    MatchClaims, ProviderRecordKind, RecordedClaims, RootAuthorityShapeError, RootPolicyRule,
-    SaltRef, SaltedCommitment, Sha256Digest, Text, Uri, CHIO_DELEGATION_CONTEXT_SCHEMA,
+    DelegationContextFields, DelegationExchange, HolderClass, LoadedRootPolicy, MatchClaims,
+    ProviderRecordKind, RecordedClaims, RootAuthorityShapeError, RootPolicyRule, SaltRef,
+    SaltedCommitment, Sha256Digest, Text, Uri, CHIO_DELEGATION_CONTEXT_SCHEMA,
 };
 use chio_core::Sha256State;
 use serde_json::{Map, Value};
@@ -30,10 +30,14 @@ const SUBJECT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.subject.v1\0"
 const TENANT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.tenant.v1\0";
 const CLAIM_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.claim.v1\0";
 
+/// The entropy source could not produce bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EntropyFailure;
+
 /// Cryptographically secure randomness for salts, edge-session subject keys
-/// and capability identifiers.
+/// and capability identifiers. A failure denies the exchange.
 pub trait ExchangeEntropy: Send + Sync {
-    fn fill(&self, dest: &mut [u8]);
+    fn fill(&self, dest: &mut [u8]) -> Result<(), EntropyFailure>;
 }
 
 /// Configuration of the exchange inside the provider's `serve-http` process.
@@ -74,21 +78,71 @@ pub struct ContextOpening {
 /// delegation context it is bound to and the openings of every commitment.
 ///
 /// It is not a capability. Issuing it needs `root_anchor` as a signed member
-/// of the capability body.
+/// of the capability body, so the unsigned body never leaves this module;
+/// callers read its members only.
 #[derive(Debug, Clone)]
 pub struct PreparedAnchoredRoot {
-    pub body: CapabilityTokenBody,
-    pub anchor: RootAnchor,
-    pub context: DelegationContext,
-    pub openings: Vec<ContextOpening>,
-    pub replay_key: ReplayKey,
-    pub holder: HolderClass,
+    pub(super) body: CapabilityTokenBody,
+    anchor: RootAnchor,
+    context: DelegationContext,
+    openings: Vec<ContextOpening>,
+    replay_key: ReplayKey,
+    holder: HolderClass,
 }
 
-fn random<const N: usize>(entropy: &dyn ExchangeEntropy) -> [u8; N] {
+impl PreparedAnchoredRoot {
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.body.id
+    }
+    #[must_use]
+    pub fn issuer(&self) -> &PublicKey {
+        &self.body.issuer
+    }
+    #[must_use]
+    pub fn subject(&self) -> &PublicKey {
+        &self.body.subject
+    }
+    #[must_use]
+    pub fn scope(&self) -> &ChioScope {
+        &self.body.scope
+    }
+    #[must_use]
+    pub fn issued_at(&self) -> u64 {
+        self.body.issued_at
+    }
+    #[must_use]
+    pub fn expires_at(&self) -> u64 {
+        self.body.expires_at
+    }
+    #[must_use]
+    pub fn anchor(&self) -> &RootAnchor {
+        &self.anchor
+    }
+    #[must_use]
+    pub fn context(&self) -> &DelegationContext {
+        &self.context
+    }
+    #[must_use]
+    pub fn openings(&self) -> &[ContextOpening] {
+        &self.openings
+    }
+    #[must_use]
+    pub fn replay_key(&self) -> &ReplayKey {
+        &self.replay_key
+    }
+    #[must_use]
+    pub fn holder(&self) -> HolderClass {
+        self.holder
+    }
+}
+
+fn random<const N: usize>(entropy: &dyn ExchangeEntropy) -> Result<[u8; N], RootExchangeError> {
     let mut bytes = [0_u8; N];
-    entropy.fill(&mut bytes);
-    bytes
+    entropy
+        .fill(&mut bytes)
+        .map_err(|EntropyFailure| RootExchangeError::EntropyUnavailable)?;
+    Ok(bytes)
 }
 
 fn commitment(domain: &[u8], parts: &[&[u8]]) -> Sha256Digest {
@@ -145,18 +199,22 @@ fn effective_scope(
         .idp_scope_projection
         .as_ref()
         .ok_or(RootExchangeError::ScopeNotProjected)?;
-    let mut tools: BTreeSet<&str> = BTreeSet::new();
+    let mut tools: BTreeSet<(&str, &str)> = BTreeSet::new();
     for value in scope_values {
         let projected = projection
             .get(value)
             .ok_or(RootExchangeError::ScopeNotProjected)?;
-        tools.extend(projected.iter().map(Identifier::as_str));
+        tools.extend(
+            projected
+                .iter()
+                .filter_map(|tool| tool.as_str().split_once('/')),
+        );
     }
     let grants: Vec<_> = rule
         .ceiling_scope
         .grants
         .iter()
-        .filter(|grant| tools.contains(format!("{}/{}", grant.server_id, grant.tool_name).as_str()))
+        .filter(|grant| tools.contains(&(grant.server_id.as_str(), grant.tool_name.as_str())))
         .cloned()
         .collect();
     if grants.is_empty() {
@@ -224,7 +282,7 @@ fn record_claims(
         let claim = match mode {
             ClaimMode::Plain => plain_claim(name, &value)?,
             ClaimMode::Committed => {
-                let salt = random::<32>(entropy);
+                let salt = random::<32>(entropy)?;
                 let canonical = canonical_json_bytes(&value)
                     .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
                 let reference = salt_ref(&format!("anchor.claims.{name}"))?;
@@ -252,7 +310,12 @@ fn record_claims(
             "azp" => &mut recorded.azp,
             "appid" => &mut recorded.appid,
             "oid" => &mut recorded.oid,
-            _ => &mut recorded.tid,
+            "tid" => &mut recorded.tid,
+            _ => {
+                return Err(RootExchangeError::Canonicalization(format!(
+                    "claim `{name}` has no recorded slot"
+                )))
+            }
         };
         *slot = Some(claim);
     }
@@ -266,7 +329,7 @@ fn salted(
     entropy: &dyn ExchangeEntropy,
     openings: &mut Vec<ContextOpening>,
 ) -> Result<SaltedCommitment, RootExchangeError> {
-    let salt = random::<32>(entropy);
+    let salt = random::<32>(entropy)?;
     let reference = salt_ref(reference)?;
     openings.push(ContextOpening {
         salt_ref: reference.clone(),
@@ -307,21 +370,21 @@ impl RootExchange {
             services.replay,
         )?;
 
-        let jws = CompactJws::parse(&grant.id_jag)?;
+        let jws = CompactJws::parse(grant.id_jag())?;
         let (rule, record) = self.match_rule(&jws)?;
-        let provider_id = record.identity.provider_id.as_str();
-        if !record.enabled {
+        let provider_id = record.identity().provider_id.as_str();
+        if !record.enabled() {
             return Err(RootExchangeError::ProviderRecordDisabled(
                 provider_id.to_owned(),
             ));
         }
-        if record.identity.kind != ProviderRecordKind::OidcJwks {
+        if record.identity().kind != ProviderRecordKind::OidcJwks {
             return Err(RootExchangeError::ProviderRecordInvalid {
                 record: provider_id.to_owned(),
                 reason: "record kind is not oidc_jwks".to_owned(),
             });
         }
-        if Some(&record.identity_digest) != rule.match_.provider_identity_digest.as_ref() {
+        if Some(record.identity_digest()) != rule.match_.provider_identity_digest.as_ref() {
             return Err(RootExchangeError::ProviderIdentityMismatch(
                 provider_id.to_owned(),
             ));
@@ -329,18 +392,18 @@ impl RootExchange {
         let resolved = services
             .keys
             .resolve(
-                &record.identity,
-                jws.header.kid.as_str(),
-                jws.header.alg,
+                record.identity(),
+                jws.header().kid.as_str(),
+                jws.header().alg,
                 now,
             )
             .await?;
         let key = VerifyingKey::from_jwk(&resolved.jwk).ok_or(RootExchangeError::IdpKeyUnusable)?;
-        jws.verify_with(&key)?;
+        let jws = jws.verify_with(&key)?;
         let skew = rule.max_clock_skew_secs.unwrap_or(0);
         let verified = verify_id_jag_claims(
             &jws,
-            &record.identity,
+            record.identity(),
             IdJagAudience {
                 authorization_server: &self.authorization_server,
                 protected_resource: &self.protected_resource,
@@ -370,7 +433,10 @@ impl RootExchange {
         {
             return Err(RootExchangeError::ProofRequiredGrantForEdgeSession);
         }
-        let expires_at = now.saturating_add(rule.capability_ttl()).min(verified.exp);
+        let expires_at = now
+            .saturating_add(rule.capability_ttl())
+            .min(verified.exp)
+            .min(self.policy.policy().valid_until);
         if expires_at <= now {
             return Err(RootExchangeError::RootLifetimeEmpty);
         }
@@ -384,7 +450,7 @@ impl RootExchange {
         };
         let subject = match sender_key {
             Some(key) => key.clone(),
-            None => Keypair::from_seed(&random::<32>(services.entropy)).public_key(),
+            None => Keypair::from_seed(&random::<32>(services.entropy)?).public_key(),
         };
         let subject_commitment = salted(
             SUBJECT_COMMITMENT_DOMAIN,
@@ -410,12 +476,12 @@ impl RootExchange {
         let anchor_fields = DelegationAnchorFields {
             kind: AnchorKind::OauthIdJag,
             issuer,
-            provider_record_id: Some(record.identity.provider_id.clone()),
-            provider_identity_digest: Some(record.identity_digest),
+            provider_record_id: Some(record.identity().provider_id.clone()),
+            provider_identity_digest: Some(*record.identity_digest()),
             key_snapshot_digest: Some(resolved.snapshot_digest),
             kid: Some(verified.kid.clone()),
             alg: Some(verified.alg),
-            artifact_digest: Some(jws.artifact_digest),
+            artifact_digest: Some(*jws.artifact_digest()),
             artifact_retained: false,
             replay_key_digest: replay_key.digest(),
             token_iat: verified.iat,
@@ -430,7 +496,7 @@ impl RootExchange {
             exchange: DelegationExchange {
                 exchange_key: self.exchange_key.clone(),
                 exchanged_at: now,
-                request_digest: grant.request_digest,
+                request_digest: *grant.request_digest(),
                 holder,
             },
             root_policy_rule_id: rule.rule_id.clone(),
@@ -445,7 +511,7 @@ impl RootExchange {
             assertion_exp: verified.exp,
         };
         let body = CapabilityTokenBody {
-            id: format!("cap_{}", hex_lower(&random::<16>(services.entropy))),
+            id: format!("cap_{}", hex_lower(&random::<16>(services.entropy)?)),
             issuer: self.exchange_key.clone(),
             subject,
             scope,
@@ -473,41 +539,53 @@ impl RootExchange {
     }
 
     /// The one `oauth_id_jag` rule whose provider record issues the token
-    /// and whose `match` members hold.
+    /// and whose `match` members hold. A rule whose provider record is
+    /// missing or registered under another id cannot match; that fault is
+    /// reported only when no usable rule matches.
     fn match_rule(
         &self,
         jws: &CompactJws,
     ) -> Result<(&RootPolicyRule, &ProviderRecord), RootExchangeError> {
-        let issuer = super::claims::required_string(&jws.claims, "iss")?;
-        let scope_values = super::claims::scope_values(&jws.claims)?;
+        let issuer = super::claims::required_string(jws.claims(), "iss")?;
+        let scope_values = super::claims::scope_values(jws.claims())?;
         let mut matched = Vec::new();
+        let mut unusable = None;
         for rule in &self.policy.policy().rules {
             if rule.match_.anchor_kind != AnchorKind::OauthIdJag {
                 continue;
             }
-            let record_id = rule
-                .match_
-                .provider_record_id
-                .as_ref()
-                .ok_or(RootExchangeError::KindNotExchanged(AnchorKind::OauthIdJag))?;
-            let record = self
-                .providers
-                .get(record_id.as_str())
-                .ok_or_else(|| RootExchangeError::ProviderRecordMissing(record_id.to_string()))?;
+            let Some(record_id) = rule.match_.provider_record_id.as_ref() else {
+                unusable.get_or_insert(RootExchangeError::KindNotExchanged(AnchorKind::OauthIdJag));
+                continue;
+            };
+            let Some(record) = self.providers.get(record_id.as_str()) else {
+                unusable.get_or_insert(RootExchangeError::ProviderRecordMissing(
+                    record_id.to_string(),
+                ));
+                continue;
+            };
+            if &record.identity().provider_id != record_id {
+                unusable.get_or_insert(RootExchangeError::ProviderRecordInvalid {
+                    record: record_id.to_string(),
+                    reason: "registered under another provider_id".to_owned(),
+                });
+                continue;
+            }
             let alg_allowed = rule
                 .match_
                 .allowed_algs
                 .as_ref()
-                .is_some_and(|algs| algs.contains(&jws.header.alg));
-            if record.identity.issuer.as_str() == issuer
+                .is_some_and(|algs| algs.contains(&jws.header().alg));
+            if record.identity().issuer.as_str() == issuer
                 && alg_allowed
-                && claims_match(rule.match_.claims.as_ref(), &jws.claims, &scope_values)
+                && claims_match(rule.match_.claims.as_ref(), jws.claims(), &scope_values)
             {
                 matched.push((rule, record));
             }
         }
-        match matched.as_slice() {
-            [single] => Ok(*single),
+        match (matched.as_slice(), unusable) {
+            ([single], _) => Ok(*single),
+            ([], Some(fault)) => Err(fault),
             _ => Err(RootExchangeError::RuleMatchCount {
                 matched: matched.len(),
             }),

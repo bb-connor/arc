@@ -36,14 +36,50 @@ pub struct JwsHeader {
 }
 
 /// A parsed compact JWS whose signature is not yet verified.
+///
+/// The header and claims are read-only views of the signed bytes; only
+/// [`CompactJws::verify_with`] turns them into a [`VerifiedJws`].
+///
+/// ```compile_fail
+/// use chio_mcp_remote::root_exchange::jws::CompactJws;
+/// fn tamper(jws: &mut CompactJws) {
+///     jws.claims.insert("iss".into(), "https://attacker.example".into());
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct CompactJws {
-    pub header: JwsHeader,
-    pub claims: Map<String, Value>,
+    header: JwsHeader,
+    claims: Map<String, Value>,
     signing_input: String,
     signature: Vec<u8>,
+    artifact_digest: Sha256Digest,
+}
+
+/// A JWS whose signature verified. Its header and claims are exactly the
+/// signed ones and cannot be changed.
+#[derive(Debug, Clone)]
+pub struct VerifiedJws {
+    header: JwsHeader,
+    claims: Map<String, Value>,
+    artifact_digest: Sha256Digest,
+}
+
+impl VerifiedJws {
+    #[must_use]
+    pub fn header(&self) -> &JwsHeader {
+        &self.header
+    }
+
+    #[must_use]
+    pub fn claims(&self) -> &Map<String, Value> {
+        &self.claims
+    }
+
     /// SHA-256 of the exact compact bytes received.
-    pub artifact_digest: Sha256Digest,
+    #[must_use]
+    pub fn artifact_digest(&self) -> &Sha256Digest {
+        &self.artifact_digest
+    }
 }
 
 fn decode_part(part: &str, what: &'static str) -> Result<Map<String, Value>, RootExchangeError> {
@@ -108,20 +144,35 @@ impl CompactJws {
         })
     }
 
+    /// The unverified header, for key selection only.
+    #[must_use]
+    pub fn header(&self) -> &JwsHeader {
+        &self.header
+    }
+
+    /// The unverified claims, for rule and key selection only.
+    #[must_use]
+    pub fn claims(&self) -> &Map<String, Value> {
+        &self.claims
+    }
+
     /// Verify the signature with `key`, which must admit the header `alg`.
-    pub fn verify_with(&self, key: &VerifyingKey) -> Result<(), RootExchangeError> {
+    pub fn verify_with(self, key: &VerifyingKey) -> Result<VerifiedJws, RootExchangeError> {
         if !key.admits(self.header.alg) {
             return Err(RootExchangeError::KeyAlgorithmMismatch);
         }
-        if key.verify(
+        if !key.verify(
             self.header.alg,
             self.signing_input.as_bytes(),
             &self.signature,
         ) {
-            Ok(())
-        } else {
-            Err(RootExchangeError::SignatureInvalid)
+            return Err(RootExchangeError::SignatureInvalid);
         }
+        Ok(VerifiedJws {
+            header: self.header,
+            claims: self.claims,
+            artifact_digest: self.artifact_digest,
+        })
     }
 }
 
