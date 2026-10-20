@@ -185,9 +185,11 @@ separate HTTP receipt artifact.
 - `tenant_tag`: required for `caller`. The bundle contains only receipts whose
   stored tag matches.
 - Artifact roles `capability_presentation`, `delegation_context`,
-  `root_policy`, `idp_key_snapshot`, `idp_artifact` (retained ID-JAG, auditor
-  profiles only), `receipt_disclosure`, `revocation_entry`,
-  `revocation_request`, `settlement_closure` and `pdp_decision_receipt`.
+  `root_policy`, `enterprise_provider_identity` (the identity projection of
+  every provider record a bundle's roots name), `idp_key_snapshot`,
+  `idp_artifact` (retained ID-JAG, auditor profiles only),
+  `receipt_disclosure`, `revocation_entry`, `revocation_request`,
+  `settlement_closure` and `pdp_decision_receipt`.
 
 The manifest is signed by the kernel key through
 `chio.evidence_export_commitment.v1`. Export refuses salt-only openings in
