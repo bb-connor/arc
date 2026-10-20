@@ -105,7 +105,7 @@ impl WatermarkFixture {
         arm_marker(&registry, "watermark-a-v1");
         let signer = Ed25519Backend::new(Keypair::from_seed(&[62_u8; 32]));
         let keys = Arc::new(SigningKeys(TrustedWatermarkKey {
-            public_key: signer.public_key(),
+            public_key: signer.keypair().public_key(),
             status: WatermarkKeyStatus::Active,
             not_before_unix_ms: 900,
             signing_cutoff_unix_ms: 2_000,

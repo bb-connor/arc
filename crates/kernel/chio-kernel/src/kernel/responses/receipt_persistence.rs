@@ -108,23 +108,20 @@ impl ChioKernel {
         authority: &dyn chio_core::crypto::SigningBackend,
         expected_key: Option<&chio_core::PublicKey>,
     ) -> Result<ChioReceipt, KernelError> {
+        let authority_key = crate::kernel::signing_authority::signing_identity(authority)?;
         if !self
             .signing_authority
             .floor
             .allowed_signing_algorithms()
-            .contains(&authority.algorithm())
+            .contains(&authority_key.algorithm())
         {
             return Err(KernelError::ReceiptSigningFailed(
                 "receipt authority does not satisfy the boot signing floor".into(),
             ));
         }
         let canonical_content = std::mem::take(&mut params.canonical_content);
-        let body = self.prepare_receipt_body(
-            params,
-            expected_key
-                .cloned()
-                .unwrap_or_else(|| authority.public_key()),
-        )?;
+        let body =
+            self.prepare_receipt_body(params, expected_key.cloned().unwrap_or(authority_key))?;
 
         // The signing handle binds the canonical content to body.content_hash.
         // Body assembly and persistence are outside the portable signing boundary.

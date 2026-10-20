@@ -361,9 +361,10 @@ pub fn sign_finding_with_backend(
     mut finding: Finding,
     backend: &dyn SigningBackend,
 ) -> Result<Finding, FindingError> {
-    if backend.algorithm() != SigningAlgorithm::Ed25519
-        || backend.public_key().is_weak_ed25519()
-        || finding.issuer != backend.public_key()
+    let backend_key = backend.public_key().map_err(|_| FindingError::Signing)?;
+    if backend_key.algorithm() != SigningAlgorithm::Ed25519
+        || backend_key.is_weak_ed25519()
+        || finding.issuer != backend_key
     {
         return Err(FindingError::Signing);
     }

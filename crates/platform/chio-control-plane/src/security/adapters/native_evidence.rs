@@ -117,7 +117,10 @@ impl NativeSecurityReceiptSink {
             metadata: Some(metadata),
             trust_level,
             tenant_id: Some(request.tenant_id.as_str().to_owned()),
-            kernel_key: self.signer.public_key(),
+            kernel_key: self
+                .signer
+                .public_key()
+                .map_err(|_| PortError::unavailable())?,
             bbs_projection_version: None,
         };
         ChioReceipt::sign_with_backend(receipt_body, self.signer.as_ref())
@@ -157,7 +160,10 @@ impl SecurityReceiptSink for NativeSecurityReceiptSink {
             &request.evidence_id,
             &body,
             &persisted,
-            &[self.signer.public_key()],
+            &[self
+                .signer
+                .public_key()
+                .map_err(|_| PortError::unavailable())?],
         )
         .map_err(|_| PortError::integrity_failure())?;
         tracing::debug!(target: "chio::response_lifecycle",
@@ -179,8 +185,16 @@ impl ExactSecurityReceiptSink for NativeSecurityReceiptSink {
         };
         let body =
             extract_active_defense_body(&signed).map_err(|_| PortError::integrity_failure())?;
-        verify_native_security_receipt(evidence_id, &body, &signed, &[self.signer.public_key()])
-            .map_err(|_| PortError::integrity_failure())?;
+        verify_native_security_receipt(
+            evidence_id,
+            &body,
+            &signed,
+            &[self
+                .signer
+                .public_key()
+                .map_err(|_| PortError::unavailable())?],
+        )
+        .map_err(|_| PortError::integrity_failure())?;
         let receipt = active_defense_append_request(&body)?;
         if receipt.evidence_id != *evidence_id {
             return Err(PortError::integrity_failure());
@@ -1442,15 +1456,29 @@ mod tests {
             .load_indexed_security_evidence(&evidence_id)
             .unwrap_or_else(|error| panic!("load receipt: {error}"))
             .unwrap_or_else(|| panic!("signed evidence missing"));
-        verify_native_security_receipt(&evidence_id, &body, &signed, &[signer.public_key()])
-            .unwrap_or_else(|error| panic!("verify signed reason: {error}"));
+        verify_native_security_receipt(
+            &evidence_id,
+            &body,
+            &signed,
+            &[signer
+                .public_key()
+                .unwrap_or_else(|error| panic!("signer key: {error}"))],
+        )
+        .unwrap_or_else(|error| panic!("verify signed reason: {error}"));
         let mut changed = body.clone();
         if let ActiveDefenseReceiptBody::SchedulerHealth(ref mut health) = changed {
             health.error_code = ErrorCode::new("substituted.reason")
                 .unwrap_or_else(|error| panic!("reason: {error}"));
         }
         assert!(matches!(
-            verify_native_security_receipt(&evidence_id, &changed, &signed, &[signer.public_key()]),
+            verify_native_security_receipt(
+                &evidence_id,
+                &changed,
+                &signed,
+                &[signer
+                    .public_key()
+                    .unwrap_or_else(|error| panic!("signer key: {error}"))]
+            ),
             Err(ActiveResponseFindingAuthorityError::Integrity(_))
         ));
         let chio_core::receipt::security::ActiveDefenseReceiptBody::SchedulerHealth(body) = body

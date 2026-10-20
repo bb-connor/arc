@@ -423,9 +423,14 @@ impl HostFixture {
             .unwrap_or_else(|error| panic!("tenant: {error}"));
         let session_id = SessionId::new("session-host-lifecycle")
             .unwrap_or_else(|error| panic!("session: {error}"));
-        let executor_identity =
-            ActiveResponseExecutorAuthorityIdentity::new(self.config.signer.public_key(), 1)
-                .unwrap_or_else(|error| panic!("executor identity: {error}"));
+        let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
+            self.config
+                .signer
+                .public_key()
+                .unwrap_or_else(|error| panic!("signing identity: {error}")),
+            1,
+        )
+        .unwrap_or_else(|error| panic!("executor identity: {error}"));
         let target = session_containment_target(&tenant_id, &session_id)
             .unwrap_or_else(|error| panic!("containment target: {error}"));
         let observed_base_version_hash =

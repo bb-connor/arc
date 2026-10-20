@@ -280,7 +280,7 @@ fn stage2_allow_hybrid_accepts_both_classical_and_hybrid_bundles() {
     // the initial ML-DSA-65 seed. New bundles are hybrid; classical bundles
     // are still accepted (the migration window).
     let hybrid = build_hybrid_backend(&stage2_pq_seed());
-    let body = migration_body(hybrid.public_key());
+    let body = migration_body(hybrid.public_key().unwrap());
     let hybrid_bundle = ChioReceipt::sign_with_backend(body, &hybrid).unwrap();
     assert_eq!(
         hybrid_bundle.signature.algorithm(),
@@ -305,12 +305,12 @@ fn stage3_pq_required_accepts_rolled_hybrid_and_rejects_v318_bundle() {
     // The roll: the public key under stage 3 differs from stage 2
     // because the PQ half changed (classical half is identical).
     assert_ne!(
-        stage2.public_key(),
-        stage3.public_key(),
+        stage2.public_key().unwrap(),
+        stage3.public_key().unwrap(),
         "key roll MUST produce a fresh kernel public key"
     );
 
-    let body = migration_body(stage3.public_key());
+    let body = migration_body(stage3.public_key().unwrap());
     let rolled_bundle = ChioReceipt::sign_with_backend(body, &stage3).unwrap();
     assert_eq!(
         rolled_bundle.signature.algorithm(),
@@ -333,13 +333,13 @@ fn stage3_pq_required_accepts_rolled_hybrid_and_rejects_v318_bundle() {
     // public key does not match), so a stale-key receipt does not slip
     // through after the roll. The floor allows the algorithm; the
     // cryptographic check is what fails (different PQ half).
-    let stage2_body = migration_body(stage2.public_key());
+    let stage2_body = migration_body(stage2.public_key().unwrap());
     let stage2_bundle = ChioReceipt::sign_with_backend(stage2_body, &stage2).unwrap();
     // Rebind the bundle's kernel_key to the rolled stage3 key to
     // simulate an attacker who copies the body but swaps the kernel_key
     // header. The signature MUST NOT verify under the rolled key.
     let mut stale_bundle = stage2_bundle;
-    stale_bundle.kernel_key = stage3.public_key();
+    stale_bundle.kernel_key = stage3.public_key().unwrap();
     assert!(
         !verify_under_floor(&stale_bundle, CryptoFloor::PqRequired),
         "stage-2 PQ signature must not verify under rolled stage-3 key"
@@ -366,7 +366,8 @@ fn end_to_end_migration_walks_three_stages() {
     // Stage 2: roll in the initial PQ key.
     let stage2 = build_hybrid_backend(&stage2_pq_seed());
     let stage2_bundle =
-        ChioReceipt::sign_with_backend(migration_body(stage2.public_key()), &stage2).unwrap();
+        ChioReceipt::sign_with_backend(migration_body(stage2.public_key().unwrap()), &stage2)
+            .unwrap();
     assert!(
         verify_under_floor(&stage2_bundle, CryptoFloor::AllowHybrid),
         "stage = 2 (allow_hybrid) MUST accept new hybrid bundle"
@@ -379,14 +380,15 @@ fn end_to_end_migration_walks_three_stages() {
     // The roll: PQ key changes between stage 2 and stage 3.
     let stage3 = build_hybrid_backend(&stage3_pq_seed());
     assert_ne!(
-        stage2.public_key(),
-        stage3.public_key(),
+        stage2.public_key().unwrap(),
+        stage3.public_key().unwrap(),
         "stage 2 -> stage 3 key roll MUST change the kernel public key"
     );
 
     // Stage 3: tighten the floor and verify the rolled bundle.
     let stage3_bundle =
-        ChioReceipt::sign_with_backend(migration_body(stage3.public_key()), &stage3).unwrap();
+        ChioReceipt::sign_with_backend(migration_body(stage3.public_key().unwrap()), &stage3)
+            .unwrap();
     assert!(
         verify_under_floor(&stage3_bundle, CryptoFloor::PqRequired),
         "stage = 3 (pq_required) MUST accept rolled hybrid bundle"

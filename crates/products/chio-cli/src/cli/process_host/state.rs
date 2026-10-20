@@ -511,7 +511,7 @@ pub(super) fn kernel_with_clock(
     if let Some(keyring) = &keyring {
         let governed = keyring.authority()?;
         kernel.set_capability_trust_root(
-            governed.authority_public_key(),
+            governed.authority_public_key()?,
             scope_hash(&root_scope).map_err(error)?,
         );
         kernel.set_capability_authority(

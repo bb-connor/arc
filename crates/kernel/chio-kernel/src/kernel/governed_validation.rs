@@ -312,13 +312,16 @@ impl ChioKernel {
         trusted
     }
 
-    pub(super) fn trusted_threshold_proposal_authorities(&self) -> Vec<chio_core::PublicKey> {
+    /// An unreadable proposal signer is an error.
+    pub(super) fn trusted_threshold_proposal_authorities(
+        &self,
+    ) -> Result<Vec<chio_core::PublicKey>, KernelError> {
         let mut trusted = self.trusted_governance_authorities();
-        let signing_key = self.threshold_proposal_signing_key();
+        let signing_key = self.threshold_proposal_signing_key()?;
         if !trusted.contains(&signing_key) {
             trusted.push(signing_key);
         }
-        trusted
+        Ok(trusted)
     }
 
     fn verify_governed_runtime_attestation(
@@ -576,7 +579,7 @@ impl ChioKernel {
                 policy_hash: &self.config.policy_hash,
                 proposal,
                 approval_tokens: &request.approval_tokens,
-                trusted_policy_authorities: &self.trusted_threshold_proposal_authorities(),
+                trusted_policy_authorities: &self.trusted_threshold_proposal_authorities()?,
                 allowed_signing_algorithms: self
                     .capability_crypto_floor
                     .allowed_signing_algorithms(),

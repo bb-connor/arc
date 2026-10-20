@@ -650,7 +650,9 @@ fn sign_authority_request(
     }
     let mut random = [0_u8; 32];
     OsRng.fill_bytes(&mut random);
-    let expected_broker = signer.public_key();
+    let expected_broker = signer
+        .public_key()
+        .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
     let body = AuthorityRequestBody {
         schema: AUTHORITY_RPC_SCHEMA.to_string(),
         request_id: hex::encode(random),
@@ -734,7 +736,9 @@ fn sign_authority_response(
 ) -> Result<SignedAuthorityResponse> {
     validate_identifier(request_id, "authority request id", 512)?;
     validate_digest(request_digest, "authority request digest")?;
-    let expected_authority = signer.public_key();
+    let expected_authority = signer
+        .public_key()
+        .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
     let body = AuthorityResponseBody {
         schema: AUTHORITY_RPC_SCHEMA.to_string(),
         request_id: request_id.to_string(),
@@ -794,7 +798,9 @@ pub(crate) fn sign_test_authority_exchange(
     verify_authority_exchange(
         request,
         response,
-        &authority_signer.public_key(),
+        &authority_signer
+            .public_key()
+            .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?,
         issued_at_unix_seconds,
         maximum_clock_skew_seconds,
     )

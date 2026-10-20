@@ -321,7 +321,7 @@ fn seed_subject_history(
         .expect("record capability snapshot");
 
     let subject_key = subject_kp.public_key().to_hex();
-    let issuer_key = authority.authority_public_key().to_hex();
+    let issuer_key = authority.authority_public_key().unwrap().to_hex();
     receipt_store
         .append_chio_receipt(&make_receipt(
             "rep-1",

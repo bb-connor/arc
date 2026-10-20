@@ -63,21 +63,21 @@ impl Fixture {
         KeyLogPolicy::new(KeyLogPolicyConfig {
             log_id: LogId::new("log.enterprise.receipt").test_unwrap(),
             authority_id: AuthorityId::new("authority.enterprise.receipt").test_unwrap(),
-            bootstrap_key: self.bootstrap.public_key(),
-            operator_key: self.operator.public_key(),
+            bootstrap_key: self.bootstrap.public_key().test_unwrap(),
+            operator_key: self.operator.public_key().test_unwrap(),
             witness_roster_id: WitnessRosterId::new("roster.enterprise.receipt.v1").test_unwrap(),
             witness_keys: BTreeMap::from([
                 (
                     WitnessId::new("witness.a").test_unwrap(),
-                    self.witness_a.public_key(),
+                    self.witness_a.public_key().test_unwrap(),
                 ),
                 (
                     WitnessId::new("witness.b").test_unwrap(),
-                    self.witness_b.public_key(),
+                    self.witness_b.public_key().test_unwrap(),
                 ),
                 (
                     WitnessId::new("witness.c").test_unwrap(),
-                    self.witness_c.public_key(),
+                    self.witness_c.public_key().test_unwrap(),
                 ),
             ]),
             recovery_policy_id: RecoveryPolicyId::new("recovery.enterprise.receipt.v1")
@@ -97,9 +97,13 @@ impl Fixture {
             event_id: EventId::new("event.receipt.genesis").test_unwrap(),
             previous_event_hash: None,
             authority_id: AuthorityId::new("authority.enterprise.receipt").test_unwrap(),
-            key_id: derive_key_id(self.old.algorithm(), &self.old.public_key()).test_unwrap(),
-            algorithm: self.old.algorithm(),
-            public_key: self.old.public_key(),
+            key_id: derive_key_id(
+                self.old.public_key().test_unwrap().algorithm(),
+                &self.old.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
+            algorithm: self.old.public_key().test_unwrap().algorithm(),
+            public_key: self.old.public_key().test_unwrap(),
             operation: KeyLogOperation::Genesis,
             effective_at: 1_000,
             verify_until: None,
@@ -122,9 +126,13 @@ impl Fixture {
             event_id: EventId::new("event.receipt.rotation").test_unwrap(),
             previous_event_hash: Some(genesis.envelope_hash().test_unwrap()),
             authority_id: genesis.body.authority_id.clone(),
-            key_id: derive_key_id(new.algorithm(), &new.public_key()).test_unwrap(),
-            algorithm: new.algorithm(),
-            public_key: new.public_key(),
+            key_id: derive_key_id(
+                new.public_key().test_unwrap().algorithm(),
+                &new.public_key().test_unwrap(),
+            )
+            .test_unwrap(),
+            algorithm: new.public_key().test_unwrap().algorithm(),
+            public_key: new.public_key().test_unwrap(),
             operation: KeyLogOperation::Rotate {
                 previous_key_id: genesis.body.key_id,
                 witness_roster_id: WitnessRosterId::new("roster.enterprise.receipt.v1")

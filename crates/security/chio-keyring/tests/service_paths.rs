@@ -362,7 +362,9 @@ fn unreachable_witness_client(socket: &Path) -> UnixKeyLogWitnessClient {
     UnixKeyLogWitnessClient::new(
         socket.to_path_buf(),
         WitnessId::new("witness.fake").test_unwrap(),
-        Ed25519Backend::new(Keypair::from_seed(&[7; 32])).public_key(),
+        Ed25519Backend::new(Keypair::from_seed(&[7; 32]))
+            .public_key()
+            .test_unwrap(),
         chio_core_types::sha256(b"chio.key-log.fake-service.binding"),
     )
     .test_unwrap()

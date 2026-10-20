@@ -895,7 +895,7 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
-  kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::unreadable_backend_key_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
   kernel::tests::durable_admission::return_context::nested_oversized_request_is_refused_before_admission \
@@ -947,7 +947,7 @@ run_exact_target --label "frozen durable receipt signing" --allow-filtered --exp
   kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
-  kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::unreadable_backend_key_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
   kernel::tests::durable_admission::return_context::signing::replay::compensated_cancellation_replay_uses_original_signer_without_reinvocation \

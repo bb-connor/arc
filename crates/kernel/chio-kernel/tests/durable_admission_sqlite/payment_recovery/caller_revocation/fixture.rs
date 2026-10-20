@@ -654,7 +654,7 @@ impl PendingCallers {
         assert!(response.receipt.verify_signature()?);
         assert_eq!(
             response.receipt.kernel_key,
-            self.kernel.receipt_signing_public_key()
+            self.kernel.receipt_signing_public_key()?
         );
         assert_eq!(response.receipt.capability_id, request.capability.id);
         assert_eq!(count.load(Ordering::SeqCst), 1);

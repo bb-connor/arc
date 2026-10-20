@@ -169,6 +169,11 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
             return Ok(None);
         }
 
+        let issuer_key = self
+            .backend
+            .public_key()
+            .map_err(|err| CreditEvaluatorError::Signing(err.to_string()))?;
+        let algorithm = issuer_key.algorithm();
         let body = IouEnvelopeBody {
             schema: IOU_ENVELOPE_SCHEMA.to_string(),
             iou_id: derive_iou_id(&receipt.id),
@@ -180,7 +185,7 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
             capability_id: receipt.capability_id.clone(),
             amount_units: financial.cost_charged,
             currency: financial.currency.clone(),
-            issuer_key: self.backend.public_key(),
+            issuer_key,
         };
 
         let (signature, _bytes) = sign_canonical_with_backend(&self.backend, &body)
@@ -188,7 +193,7 @@ impl<B: SigningBackend> CreditEvaluatorHook for LocalCreditAccount<B> {
 
         Ok(Some(IouEnvelope {
             body,
-            algorithm: Some(self.backend.algorithm()),
+            algorithm: Some(algorithm),
             signature,
         }))
     }

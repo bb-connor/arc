@@ -165,7 +165,7 @@ pub(super) fn sample_hybrid_receipt() -> ChioReceipt {
             metadata: None,
             trust_level: chio_core::receipt::kinds::TrustLevel::default(),
             tenant_id: None,
-            kernel_key: backend.public_key(),
+            kernel_key: backend.public_key().test_unwrap(),
             bbs_projection_version: None,
         },
         &backend,
@@ -188,7 +188,7 @@ pub(super) fn sample_hybrid_child_receipt() -> ChildRequestReceipt {
             outcome_hash: "outcome-hybrid-1".to_string(),
             policy_hash: "policy-hybrid-1".to_string(),
             metadata: None,
-            kernel_key: backend.public_key(),
+            kernel_key: backend.public_key().test_unwrap(),
         },
         &backend,
     )

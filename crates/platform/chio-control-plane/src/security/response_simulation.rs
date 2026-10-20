@@ -199,7 +199,7 @@ impl ProductionResponseSimulator {
         self.configuration_digest
     }
 
-    pub fn signing_identity(&self) -> chio_core::PublicKey {
+    pub fn signing_identity(&self) -> Result<chio_core::PublicKey, chio_core::Error> {
         self.signer.public_key()
     }
 
@@ -265,7 +265,10 @@ impl ProductionResponseSimulator {
         let report = verify_response_simulation_receipt(
             &receipt,
             &id,
-            &self.signer.public_key(),
+            &self
+                .signer
+                .public_key()
+                .map_err(|_| registered_port_error(PortError::unavailable()))?,
             self.configuration_digest,
         )
         .map_err(registered_port_error)?;
@@ -311,7 +314,11 @@ impl ProductionResponseSimulator {
         };
         let receipt = ChioReceipt::sign_with_backend(
             report
-                .receipt_body(self.signer.public_key())
+                .receipt_body(
+                    self.signer
+                        .public_key()
+                        .map_err(|_| PortError::unavailable())?,
+                )
                 .map_err(registered_port_error)?,
             self.signer.as_ref(),
         )
@@ -357,7 +364,10 @@ impl ProductionResponseSimulator {
         let verified = verify_response_simulation_receipt(
             &persisted,
             &id,
-            &self.signer.public_key(),
+            &self
+                .signer
+                .public_key()
+                .map_err(|_| registered_port_error(PortError::unavailable()))?,
             self.configuration_digest,
         )
         .map_err(registered_port_error)?;

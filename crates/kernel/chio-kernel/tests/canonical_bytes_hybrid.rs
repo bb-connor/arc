@@ -166,7 +166,7 @@ fn hybrid_signing_consumes_shared_canonical_bytes_and_verifies() {
     let pq = MlDsa65Backend::from_seed(&fixture_pq_seed());
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
 
-    let body = build_body(hybrid.public_key());
+    let body = build_body(hybrid.public_key().unwrap());
     let SignedHybridReceipt { receipt, canonical } =
         sign_receipt_body_hybrid_canonical(body, &hybrid, FIXTURE_CANONICAL_CONTENT).unwrap();
 
@@ -192,7 +192,7 @@ fn shared_canonical_bytes_are_arc_shareable_without_recanonicalization() {
     let classical_backend = Ed25519Backend::new(classical_kp);
     let pq = MlDsa65Backend::from_seed(&fixture_pq_seed());
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
-    let body = build_body(hybrid.public_key());
+    let body = build_body(hybrid.public_key().unwrap());
 
     let signed =
         sign_receipt_body_hybrid_canonical(body, &hybrid, FIXTURE_CANONICAL_CONTENT).unwrap();
@@ -272,7 +272,7 @@ fn shared_bytes_round_trip_through_serde_after_signing() {
     let classical_backend = Ed25519Backend::new(classical_kp);
     let pq = MlDsa65Backend::from_seed(&fixture_pq_seed());
     let hybrid = HybridBackend::new(Box::new(classical_backend), pq).unwrap();
-    let body = build_body(hybrid.public_key());
+    let body = build_body(hybrid.public_key().unwrap());
 
     let signed =
         sign_receipt_body_hybrid_canonical(body.clone(), &hybrid, FIXTURE_CANONICAL_CONTENT)
