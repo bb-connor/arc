@@ -1,0 +1,8 @@
+router_fn	method	route	handler	router_file	handler_file	current_auth
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/cancel	handle_cancel	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/claim	handle_claim	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/commitments	handle_commitment	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/complete	handle_complete	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/package	handle_package	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/renew	handle_renew	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate
+frost_coordinator_router	POST	/v1/frost/coordinator/sessions/shares	handle_share	trust_control/frost/coordinator.rs	trust_control/frost/coordinator.rs	authenticate

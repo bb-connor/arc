@@ -3,7 +3,6 @@
 ^/\.well-known/	GET	.	public	anonymous	none	n/a (public issuer and verifier metadata; unchanged)
 ^/v1/public/	.	.	public	anonymous	none	n/a (public registry, certification and passport surfaces; unchanged)
 ^/v1/passport/(issuance|token|credential)|/oid4vci/	.	redeem_pre_authorized_code|bearer_token_from_headers	public	holder (OID4VCI pre-authorized code or access token)	none	n/a (wallet protocol credential; unchanged)
-^/v1/frost/coordinator/	POST	authenticate	public	frost participant (session signature)	none	n/a (FROST session authentication; unchanged)
 ^/v1/findings/operator/	POST	seller_authentication_failed|authenticate	public	finding seller (seller signature)	none	n/a (seller authentication; unchanged)
 ^/v1/findings(/|$)	GET	^none$	public	anonymous	none	n/a (public listing reads; unchanged)
 ^/v1/findings/search$	POST	^none$	public	anonymous	none	n/a (public listing search; unchanged)

@@ -2,7 +2,8 @@
 
 Usage: python3 -I trust_control_routes.py <repo> <rev> <scope_rules.tsv> <out.tsv>
 Parses every `.route(` call in the trust-control router sources, resolves path constants,
-records each method and handler, finds the authentication helpers the handler calls,
+records each method and handler, writes routes whose router function no non-test code calls
+to a separate `-unmounted.tsv` (they are not in the table), finds the authentication helpers the handler calls,
 applies the first matching scope rule and exits 1 when a route has no rule.
 """
 import csv, re, subprocess, sys
@@ -209,12 +210,33 @@ def main():
             found = helpers_in(body, 2)
             return hpath, ",".join(found) or "none"
         return "", "handler-not-found"
+    mounted_cache = {}
+    def router_mounted(fn_name):
+        """A router function is mounted when non-test code outside its definition names it."""
+        if fn_name not in mounted_cache:
+            hits = git(repo, "grep", "-n", "-w", fn_name, rev, "--", "crates").splitlines()
+            uses = []
+            for hit in hits:
+                _, hit_path, _, line = hit.split(":", 3)
+                if "/tests/" in hit_path or hit_path.endswith("tests.rs") or "_tests" in hit_path:
+                    continue
+                if re.search(r"\bfn\s+" + re.escape(fn_name) + r"\b", line):
+                    continue
+                uses.append(hit)
+            mounted_cache[fn_name] = bool(uses)
+        return mounted_cache[fn_name]
     rows = []
+    unmounted = []
     for path in files:
         if not path.startswith(f"{CRATE}/trust_control"):
             continue
         text = strip_comments(show(repo, rev, path))
         for match in re.finditer(r"\.route\(", text):
+            enclosing = re.findall(r"\bfn\s+([a-z_][a-z0-9_]*)", text[:match.start()])
+            if not enclosing:
+                sys.stderr.write(f"route outside any function in {path}\n")
+                sys.exit(1)
+            mounted = router_mounted(enclosing[-1])
             args = balanced(text, match.end() - 1)
             first, _, rest = args.partition(",")
             first = first.strip()
@@ -227,7 +249,11 @@ def main():
             for method, handler in re.findall(r"\b(get|post|put|delete|patch)\(\s*([A-Za-z_][A-Za-z0-9_:]*)", rest):
                 hpath, auth = handler_auth(handler)
                 for route_path in sorted(route_paths):
-                    rows.append([method.upper(), route_path, handler.split("::")[-1], path.replace(CRATE + "/", ""), hpath.replace(CRATE + "/", ""), auth])
+                    row = [method.upper(), route_path, handler.split("::")[-1], path.replace(CRATE + "/", ""), hpath.replace(CRATE + "/", ""), auth]
+                    if mounted:
+                        rows.append(row)
+                    else:
+                        unmounted.append([enclosing[-1]] + row)
     rules = []
     with open(rules_path) as handle:
         for row in csv.reader(handle, delimiter="\t"):
@@ -255,7 +281,12 @@ def main():
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(["method", "route", "handler", "router_file", "handler_file", "current_auth", "listener", "credential", "scope", "tenant_authority"])
         writer.writerows(out)
-    print(f"rev={rev} routes={len(out)} unruled={missing}")
+    unmounted_path = out_path[:-4] + "-unmounted.tsv" if out_path.endswith(".tsv") else out_path + ".unmounted"
+    with open(unmounted_path, "w", newline="") as handle:
+        writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
+        writer.writerow(["router_fn", "method", "route", "handler", "router_file", "handler_file", "current_auth"])
+        writer.writerows(sorted(unmounted, key=lambda r: (r[2], r[1])))
+    print(f"rev={rev} routes={len(out) + len(unmounted)} mounted={len(out)} unmounted={len(unmounted)} unruled={missing}")
     if not out:
         sys.stderr.write("route census found no routes; refusing an empty census\n")
         sys.exit(1)
