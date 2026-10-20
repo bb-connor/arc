@@ -712,3 +712,91 @@ fn weak_or_absent_kernel_keys_are_refused_before_any_read() {
     let error = verify_package(&directory.path().join("missing"), &trust, None).test_unwrap_err();
     assert_eq!(error.kind(), BundleVerifyErrorKind::TrustInvalid);
 }
+
+const DUPLICATE_KEY: &str = "urn:chio:error:attest:signed-json-invalid-input";
+
+/// Insert a second copy of a member after the first `{` that follows `at`,
+/// then recommit the manifest file entry so only the duplicate differs.
+fn duplicate_nested_member(dir: &std::path::Path, file: &str, at: &str, member: &str) {
+    let path = dir.join(file);
+    let text = fs::read_to_string(&path).test_unwrap();
+    let start = text.find(at).test_unwrap() + at.len();
+    let brace = start + text[start..].find('{').test_unwrap() + 1;
+    let tampered = format!("{}{member},{}", &text[..brace], &text[brace..]);
+    fs::write(&path, &tampered).test_unwrap();
+    if file == "manifest.json" {
+        return;
+    }
+    let manifest_path = dir.join("manifest.json");
+    let mut manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(&manifest_path).test_unwrap()).test_unwrap();
+    for entry in manifest["files"].as_array_mut().test_unwrap() {
+        if entry["path"] == file {
+            entry["sha256"] = chio_core_types::hashing::sha256_hex(tampered.as_bytes()).into();
+            entry["bytes"] = tampered.len().into();
+        }
+    }
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&manifest).test_unwrap(),
+    )
+    .test_unwrap();
+}
+
+fn assert_duplicate_refused(dir: &std::path::Path) {
+    let error = verify_package(dir, &package_trust(), None).test_unwrap_err();
+    assert_eq!(
+        error.signed_json_source().map(|source| source.code()),
+        Some(DUPLICATE_KEY),
+        "{error}"
+    );
+    assert_eq!(error.exit_class(), ExitClass::ParseOrSchema);
+}
+
+#[test]
+fn nested_duplicate_key_in_manifest_is_refused() {
+    let (directory, _) = fixture();
+    duplicate_nested_member(
+        directory.path(),
+        "manifest.json",
+        "\"counts\"",
+        "\"toolReceipts\": 0",
+    );
+    assert_duplicate_refused(directory.path());
+}
+
+#[test]
+fn nested_duplicate_key_in_envelope_is_refused() {
+    let (directory, _) = fixture();
+    duplicate_nested_member(
+        directory.path(),
+        "export-envelope.json",
+        "\"body\"",
+        "\"schema\": \"chio.evidence_export_commitment.v1\"",
+    );
+    assert_duplicate_refused(directory.path());
+}
+
+#[test]
+fn nested_duplicate_key_in_an_ndjson_row_is_refused() {
+    let (directory, _) = fixture();
+    duplicate_nested_member(
+        directory.path(),
+        "receipts.ndjson",
+        "\"receipt\"",
+        "\"id\":\"receipt-export-1\"",
+    );
+    assert_duplicate_refused(directory.path());
+}
+
+#[test]
+fn nested_duplicate_key_in_a_json_file_is_refused() {
+    let (directory, _) = fixture();
+    duplicate_nested_member(
+        directory.path(),
+        "query.json",
+        "\"readBoundary\"",
+        "\"kind\": \"admin_all\"",
+    );
+    assert_duplicate_refused(directory.path());
+}

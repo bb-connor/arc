@@ -595,6 +595,35 @@ pub fn load_verified_evidence_package(
     Ok(verify_package(input, trust, Some(&HttpReceiptProjection))?)
 }
 
+/// Decode a remote import request. The route's ingress middleware has
+/// already read the original bounded bytes through the signed-JSON reader,
+/// which refuses duplicate keys at every depth. Here the trust section loads
+/// through `VerifierTrust::load` exactly as a trust file does, and the whole
+/// request must reserialize to its input, so no member is dropped.
+pub(crate) fn decode_remote_import_request(
+    value: serde_json::Value,
+) -> Result<RemoteEvidenceImportRequest, CliError> {
+    use chio_bundle_verify::BundleVerifyError;
+
+    let trust_value = value.get("trust").ok_or_else(|| {
+        BundleVerifyError::trust_invalid("evidence import request carries no trust file")
+    })?;
+    let trust_bytes = serde_json::to_vec(trust_value)?;
+    VerifierTrust::load(&trust_bytes)
+        .map_err(|error| BundleVerifyError::trust_invalid(error.to_string()))?;
+    let request = chio_security_types::strict_serde::lossless(
+        value,
+        serde_json::from_value::<RemoteEvidenceImportRequest>,
+        |typed: &RemoteEvidenceImportRequest| serde_json::to_value(typed),
+    )
+    .map_err(|error| {
+        BundleVerifyError::schema(format!(
+            "evidence import request does not match its schema: {error}"
+        ))
+    })?;
+    Ok(request)
+}
+
 /// Verify a decoded package with the verifier-owned `trust`.
 pub(crate) fn verify_import_package(
     package: &EvidenceImportPackage,
