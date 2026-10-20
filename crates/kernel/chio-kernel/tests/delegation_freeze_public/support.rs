@@ -112,7 +112,7 @@ pub struct Fixture {
     pub kernel: ChioKernel,
     pub issuer: Keypair,
     pub root: CapabilityToken,
-    root_holder: Keypair,
+    pub root_holder: Keypair,
     pub store: Arc<SqliteReceiptStore>,
     _directory: tempfile::TempDir,
     _clock: chio_test_support::clock::ClockScope,
@@ -207,6 +207,17 @@ impl Fixture {
         id: &str,
         lineage: Option<&str>,
     ) -> TestResult<CapabilityToken> {
+        self.delegated_by(parent, &self.root_holder, id, lineage)
+            .map(|(token, _holder)| token)
+    }
+
+    pub fn delegated_by(
+        &self,
+        parent: &CapabilityToken,
+        parent_holder: &Keypair,
+        id: &str,
+        lineage: Option<&str>,
+    ) -> TestResult<(CapabilityToken, Keypair)> {
         let child_holder = Keypair::generate();
         let link = DelegationLink::sign(
             DelegationLinkBody {
@@ -219,8 +230,10 @@ impl Fixture {
                 aggregate_budget: None,
                 cumulative_approval: None,
             },
-            &self.root_holder,
+            parent_holder,
         )?;
+        let mut delegation_chain = parent.delegation_chain.clone();
+        delegation_chain.push(link);
         let body = CapabilityTokenBody {
             id: id.into(),
             issuer: self.issuer.public_key(),
@@ -228,7 +241,7 @@ impl Fixture {
             scope: parent.scope.clone(),
             issued_at: parent.issued_at,
             expires_at: parent.expires_at,
-            delegation_chain: vec![link],
+            delegation_chain,
             aggregate_invocation_budget: None,
         };
         let token = match lineage {
@@ -240,7 +253,7 @@ impl Fixture {
             None => CapabilityToken::sign(body, &self.issuer)?,
         };
         assert!(token.verify_signature_at(parent.issued_at)?);
-        Ok(token)
+        Ok((token, child_holder))
     }
 
     pub fn bound_root(&self) -> TestResult<CapabilityToken> {

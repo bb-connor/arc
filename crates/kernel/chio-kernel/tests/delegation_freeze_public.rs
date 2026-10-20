@@ -386,3 +386,70 @@ fn child_bound_to_its_parent_lineage_subscribes_under_an_authority() -> TestResu
         .session_has_resource_subscription(&session, URI)?);
     Ok(())
 }
+
+#[test]
+fn matching_intermediate_cannot_hide_a_frozen_root_binding() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let root = fixture.recorded_bound_root(FROZEN)?;
+    let (intermediate, holder) = fixture.delegated_by(
+        &root,
+        &fixture.root_holder,
+        "intermediate-rebound",
+        Some(SIBLING),
+    )?;
+    fixture
+        .store
+        .record_capability_snapshot(&intermediate, Some(&root.id))?;
+    let (leaf, _) = fixture.delegated_by(
+        &intermediate,
+        &holder,
+        "leaf-matching-intermediate",
+        Some(SIBLING),
+    )?;
+    let session = fixture.open_for(&leaf)?;
+    let authority = fixture.install()?;
+    let result =
+        fixture
+            .kernel
+            .subscribe_session_resource(&session, &leaf, &leaf.subject.to_hex(), URI);
+    let expected = format!(
+        "delegated capability tenant and lineage binding differs from ancestor {}",
+        root.id
+    );
+    assert!(
+        matches!(&result, Err(KernelError::CapabilityIssuanceDenied(reason)) if *reason == expected),
+        "a matching intermediate must not hide a different root binding: {result:?}"
+    );
+    assert!(authority.queries()?.is_empty());
+    assert!(!fixture
+        .kernel
+        .session_has_resource_subscription(&session, URI)?);
+    Ok(())
+}
+
+#[test]
+fn matching_root_and_intermediate_bindings_allow_delegation() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let root = fixture.recorded_bound_root(SIBLING)?;
+    let (intermediate, holder) = fixture.delegated_by(
+        &root,
+        &fixture.root_holder,
+        "intermediate-matching-root",
+        Some(SIBLING),
+    )?;
+    fixture
+        .store
+        .record_capability_snapshot(&intermediate, Some(&root.id))?;
+    let (leaf, _) =
+        fixture.delegated_by(&intermediate, &holder, "leaf-matching-chain", Some(SIBLING))?;
+    let session = fixture.open_for(&leaf)?;
+    let authority = fixture.install()?;
+    fixture
+        .kernel
+        .subscribe_session_resource(&session, &leaf, &leaf.subject.to_hex(), URI)?;
+    assert_eq!(authority.queries()?.len(), 1);
+    assert!(fixture
+        .kernel
+        .session_has_resource_subscription(&session, URI)?);
+    Ok(())
+}

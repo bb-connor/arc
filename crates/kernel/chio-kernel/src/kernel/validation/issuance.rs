@@ -213,22 +213,23 @@ impl ChioKernel {
             else {
                 continue;
             };
-            return match binding {
+            match binding {
                 Some(binding)
                     if binding.tenant_id == ancestor_binding.tenant_id
-                        && binding.lineage_id == ancestor_binding.lineage_id =>
-                {
-                    Ok(())
+                        && binding.lineage_id == ancestor_binding.lineage_id => {}
+                Some(_) => {
+                    return Err(KernelError::CapabilityIssuanceDenied(format!(
+                        "delegated capability tenant and lineage binding differs from ancestor {}",
+                        ancestor.capability_id
+                    )));
                 }
-                Some(_) => Err(KernelError::CapabilityIssuanceDenied(format!(
-                    "delegated capability tenant and lineage binding differs from ancestor {}",
-                    ancestor.capability_id
-                ))),
-                None => Err(KernelError::CapabilityIssuanceDenied(format!(
-                    "delegated capability omits the tenant and lineage binding of ancestor {}",
-                    ancestor.capability_id
-                ))),
-            };
+                None => {
+                    return Err(KernelError::CapabilityIssuanceDenied(format!(
+                        "delegated capability omits the tenant and lineage binding of ancestor {}",
+                        ancestor.capability_id
+                    )));
+                }
+            }
         }
         Ok(())
     }
