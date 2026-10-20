@@ -17,6 +17,9 @@ pub struct IdpKey {
 /// `now` (Unix seconds). Keys come only from the record's own key source.
 /// An unknown `kid`, an unreachable or invalid key source, or a key that
 /// does not admit `alg` is an error; no fallback key is ever returned.
+/// `kid` is an opaque lookup key: it is NUL-free and at most 128 characters
+/// but otherwise unrestricted, so it is never interpolated into a path, URL
+/// or query.
 #[async_trait]
 pub trait IdpKeyLookup: Send + Sync {
     async fn resolve(
