@@ -428,11 +428,17 @@ struct AuthenticatedEvidenceExportResponse {
 pub(crate) async fn handle_evidence_import(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    SignedJson(request): SignedJson<evidence_export::RemoteEvidenceImportRequest>,
+    SignedJson(body): SignedJson<serde_json::Value>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
+    let request = match evidence_export::decode_remote_import_request(body) {
+        Ok(request) => request,
+        Err(error) => {
+            return plain_http_error(StatusCode::UNPROCESSABLE_ENTITY, &error.to_string());
+        }
+    };
     if let Err(error) = evidence_export::verify_import_package(&request.package, &request.trust) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }

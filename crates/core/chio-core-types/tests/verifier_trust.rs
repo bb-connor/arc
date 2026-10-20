@@ -144,3 +144,22 @@ fn wrong_schema_refuses() {
     value["schema"] = serde_json::json!("chio.verifier-trust.v2");
     assert!(matches!(load(&value), Err(VerifierTrustError::Shape(_))));
 }
+
+#[test]
+fn nested_duplicate_key_refuses_as_signed_json() {
+    let value = example("valid/verifier-trust.json");
+    let text = serde_json::to_string(&value).expect("encode");
+    let tampered = text.replacen(
+        "\"kid\":\"k-okta-1\"",
+        "\"kid\":\"k-okta-1\",\"kid\":\"k-okta-0\"",
+        1,
+    );
+    assert_ne!(tampered, text);
+    match VerifierTrust::load(tampered.as_bytes()) {
+        Err(VerifierTrustError::Decode(error)) => assert_eq!(
+            error.code(),
+            "urn:chio:error:attest:signed-json-invalid-input"
+        ),
+        other => panic!("nested duplicate key must refuse as signed JSON: {other:?}"),
+    }
+}
