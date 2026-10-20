@@ -251,19 +251,6 @@ pub struct RemoteServeHttpConfig {
     pub egress_contract: Option<HttpEgressContract>,
 }
 
-/// The enterprise provider registry file that bearer admission reads once per
-/// authenticated request.
-#[derive(Clone, Debug)]
-struct EnterpriseProviderRegistryFile {
-    path: Arc<PathBuf>,
-}
-
-impl EnterpriseProviderRegistryFile {
-    fn load(&self) -> Result<EnterpriseProviderRegistry, CliError> {
-        EnterpriseProviderRegistry::load(&self.path)
-    }
-}
-
 #[derive(Clone)]
 struct RemoteAppState {
     sessions: Arc<RemoteSessionLedger>,

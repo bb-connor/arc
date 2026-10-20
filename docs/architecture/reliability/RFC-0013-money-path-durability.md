@@ -1,6 +1,6 @@
-# RFC-0013: Money-path durability: payment journal, hold sweeper, settlement routing, fail-closed caps
+# RFC-0013: Money-path durability: payment journal, hold recovery, settlement routing, fail-closed caps
 
-- Status: Draft, corrected 2026-07-12
+- Status: Partially implemented (status as of 2026-10-19; see Implementation status)
 - Date: 2026-07-04
 - Extends: ADR-0006 (monetary budget semantics), ADR-0015 (predeclared escrow circuit breakers)
 - Depends on: RFC-0003 (durable admission-operation recovery)
@@ -14,17 +14,29 @@ settlement outcome on the floor at its only production call site. This RFC makes
 money path crash-safe and fail-closed. It adds a durable payment participant co-located
 with the budget holds (written before `adapter.authorize`, advanced around
 capture/release, closed after the receipt persists, reconciled on boot via an
-idempotent adapter query); a boot-plus-periodic sweeper for orphaned budget holds; a
+idempotent adapter query); recovery-driven resolution of orphaned budget holds; a
 routing consumer that feeds the discarded settlement-observer outcome into the
-existing `classify_attempt` retry envelope and `SqliteDeadLetterStore`; the intended
-production `SettlementHook` driver seam; a fail-closed `Deny(CurrencyMismatch)` in
-`BudgetTree` instead of a silent skip; a durable SQLite EIP-3009 nonce store; and a
-durability caveat plus snapshot seam for the process-local `BudgetEnforcer`. It is the
+existing `classify_attempt` retry envelope and `SqliteDeadLetterStore`; a production
+settlement ledger hook installed whenever a payment adapter is configured; a
+fail-closed `Deny(CurrencyMismatch)` in `BudgetTree` instead of a silent skip; and a
+durable SQLite EIP-3009 nonce store. It is the
 money-path specialization of RFC-0003. One `AdmissionOperation` is durable before
 the hold or payment participant and supplies the shared `operation_id`, dispatch
 truth, recovery fence, and retained request tombstone. This RFC owns payment
 participant state and rail reconciliation; it does not create another coordinator
 or claim that the budget database commits atomically with the receipt database.
+
+## Implementation status
+
+| Finding | Status | Code |
+| --- | --- | --- |
+| F70 | Implemented | Journal store `chio-store-sqlite/src/budget_store/payment_journal.rs` and composite schema `budget_store/composite_schema/payment/schema.sql`; kernel types `chio-kernel/src/payment/journal.rs`; `QualifiedAdmissionProjectionStore::load_payment_journal` and `advance_payment_journal`; idempotency contract and `settlement_state` on `PaymentAdapter` (`chio-kernel/src/payment.rs`). |
+| F71 | Resolved by RFC-0003 recovery and the reserved-hold reaper (see F71 below) | `reconcile_durable_admission_startup` (`kernel/admission_coordinator/recovery.rs`), `reconcile_recoverable_admissions_batch` (`recovery/batch.rs`), `reap_expired_reserved_budget_holds` (`kernel/reconciliation.rs`); periodic tick in `chio-api-protect/src/proxy/state/admission_maintenance.rs`. |
+| F68 | Implemented; active only while a settlement observer runtime is installed | Attempt-zero row seeded in the receipt append (`kernel/responses/receipt_persistence.rs`), inline claim and CAS completion (`settlement_routing.rs`), `settle_attempts` and `settle_dead_letters` in `chio-store-sqlite`, `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`. |
+| F69 | Open | No production `SettlementHook` exists and no production binary installs the settlement observer runtime. Nothing calls `SettlementOutcomeStore::claim_due`, so a `Retryable` row is never re-run after the inline attempt. |
+| F72 | Implemented | `BudgetDenyReason::CurrencyMismatch` (`chio-metering/src/budget_hierarchy.rs`), tests in `chio-metering/tests/budget_hierarchy.rs`. |
+| F73 | Open, low | `Eip3009NonceStore` has only `InMemoryEip3009NonceStore` (`chio-settle/src/payments.rs`); no production caller reserves EIP-3009 nonces. |
+| F74 | Closed by deletion | `BudgetEnforcer` no longer exists in `chio-metering`. |
 
 ## Motivation
 
@@ -187,7 +199,7 @@ default" that does not exist. At `DEFAULT_MAX_EIP3009_NONCE_ENTRIES = 65_536`
 
 ## Design
 
-The money path gains one durable payment participant, one recovery sweep, and one
+The money path gains one durable payment participant, recovery-driven hold resolution, and one
 routing consumer, plus four smaller fail-closed corrections. The RFC-0003
 `AdmissionOperation` is the sole saga coordinator. All new
 code uses `?` or explicit typed-error `match`; no `unwrap`/`expect`. Fail-closed is the
@@ -597,8 +609,7 @@ reversible release is safe.
   the journal, compare-and-swaps `HoldPlaced -> Closed`, compare-and-swaps the
   exact bound open hold/version to `Released`, subtracts its remaining exposure,
   and appends the digest-keyed `ReleaseExposure` mutation event. The general
-  `close_payment_journal` and `release_recovered_hold` methods cannot perform or
-  split this transition. A duplicate exact resolution is a no-op; a diagnostic
+  `close_payment_journal` method cannot perform or split this transition. A duplicate exact resolution is a no-op; a diagnostic
   status alone changes nothing, and any failure rolls back all rows. A later
   operation state is an invariant incident. For `ReversibleHold`,
   `Held { authorization_id }` records the returned id,
@@ -649,80 +660,31 @@ reversible release is safe.
 - Any adapter error or `settlement_state` returning `Unavailable`: set
   `ReconcileFailed` and raise an operator incident. Never silently close.
 
-### F71: open-hold sweeper
+### F71: open-hold recovery
 
-Extend `HoldDisposition` (`budget_store/model.rs:4-9`) with `Expired` (`as_str` ->
-`"expired"`) and `BudgetMutationKind` (`kernel/budget_store.rs:34-40`) with `ExpireHold`
-(`as_str` -> `"expire_hold"`). Add two `BudgetStore` methods:
+Age is never release authority, so there is no age-triggered sweeper and no
+`Expired` hold disposition. Open holds are resolved by the recovery paths that own
+the evidence for them:
 
-```rust
-/// Open holds whose created_at is older than the horizon, oldest first.
-fn list_open_holds_older_than(&self, older_than_unix_ms: u64, limit: usize)
-    -> Result<Vec<OpenHoldSummary>, BudgetStoreError>;
+- A hold bound to an admission operation or payment journal is resolved by RFC-0003
+  recovery: `reconcile_durable_admission_startup` at boot and
+  `reconcile_recoverable_admissions_batch` on a periodic tick. Recovery serializes
+  work by `operation_id`, reconciles the operation, tool outcome and payment
+  participant, and releases exposure only on a verified terminal resolution
+  (`MonetaryReleaseAuthority::{NoEffect, ContractualZeroCharge}`). A `HoldPlaced`
+  journal is resolved only by the no-authorization path in
+  `admission_coordinator/payment_compensation.rs`, so evidence insert, journal
+  closure and exposure release cannot be split across APIs or crashes.
+- A reserved hold that never reached dispatch is reaped by
+  `reap_expired_reserved_budget_holds`.
+- `chio api protect` runs the recovery batch and the reserved-hold reaper on its
+  admission maintenance tick. `serve-http` and the control plane reconcile at
+  startup only; their periodic tick lands with their payment adapter wiring.
 
-/// Release the remaining exposure after the recovery coordinator proves that the
-/// request cannot still move money. Idempotent by recovery_resolution_digest.
-fn release_recovered_hold(
-    &self,
-    hold_id: &str,
-    expected_hold_version: u64,
-    operation_id: &str,
-    resolution: RecoveredHoldResolution,
-    recovery_resolution_digest: &str,
-    serving_fence: &StoreMutationFence,
-) -> Result<bool, BudgetStoreError>;
-```
-
-`OpenHoldSummary` is a new read-model struct carrying `hold_id`, `operation_id`,
-`request_id`,
-hold version, `capability_id`, `grant_index`, `remaining_exposure_units`, and
-`created_at_unix_ms`. The hold table gains `operation_id`, `request_id`, and a
-monotonic version for all new rows. Legacy rows without an operation id are
-investigation-only and
-cannot be auto-expired.
-
-Age is a scan trigger, never release authority. There is no second recovery-
-authorization table. `RecoveredHoldResolution` carries the closed verified
-`MonetaryReleaseAuthority::{NoEffect, ContractualZeroCharge}` plus the exact
-terminal participant bindings; captured, settled-prepayment, pending, failed,
-and unknown outcomes are not representable as release authority. The registered recovery
-coordinator serializes work by `operation_id`, reconciles the operation, tool
-outcome and payment participant, and verifies that release authority before it
-calls `release_recovered_hold`. It derives
-`recovery_resolution_digest` from the canonical terminal rail/operation evidence and uses
-that digest as the budget mutation event id. A `Settling`, moved-funds `Settled`,
-`ReconcileFailed`, unproved `DispatchCommitted`, `OutcomeUnknownAfterDispatch`, unknown
-rail state, legacy hold without `operation_id`, or missing resolution never reaches
-the mutation call.
-
-`release_recovered_hold` runs one `Immediate` transaction that rechecks the hold's
-operation/request binding and expected version, requires it still be open,
-verifies the private-constructor release authority and terminal payment
-participant, and rejects a resolution that
-does not match the terminal local journal state, and inserts the digest-derived mutation
-event id before changing exposure. A duplicate event id returns `Ok(false)` without a
-second mutation. A fresh valid call subtracts `remaining_exposure_units` from
-`capability_grant_budgets.total_cost_exposed`, sets the hold
-`disposition = 'expired'`, and appends the `expire_hold` mutation event in that same
-transaction. Any stale, missing, or conflicting proof leaves exposure unchanged. It
-never touches `total_cost_realized_spend`.
-
-This generic sweeper method excludes a `HoldPlaced` payment journal. That state
-is resolved only by `resolve_hold_placed_no_authorization`, so evidence insert,
-journal closure and exposure release cannot be split across APIs or crashes.
-
-A kernel sweep task (boot-once, then periodic on `hold_sweep_interval`, default
-`300s`) first runs RFC-0003 and payment-journal reconciliation, then calls
-`list_open_holds_older_than(now - hold_expiry_horizon, batch)`. It expires only
-rows for which the recovery coordinator obtains a qualifying terminal resolution;
-all other old holds remain frozen and emit an incident. `hold_expiry_horizon` defaults to `3600s`
-and controls investigation timing only, not safety. A gauge
-metric `chio_budget_open_holds` and a counter `chio_budget_holds_expired_total`
-(both declared in `chio-metrics-spec` and exported through the kernel's
-Prometheus text exposition, per the F68 note) make the leak visible, and the CLI
-gains `chio budget holds list` and `chio budget holds review <hold-id>` to show
-the journal/intent and recovery resolution. No age-only manual release command
-bypasses the recovery proof.
+A hold that recovery cannot resolve (`Settling`, moved-funds `Settled`,
+`ReconcileFailed`, unproved `DispatchCommitted`, `OutcomeUnknownAfterDispatch`, or
+unknown rail state) stays open. The direction is fail-closed under-spend, and the
+unresolved operation surfaces as a recovery incident.
 
 ### F68: route the settlement-observer outcome
 
@@ -778,30 +740,42 @@ kernel metrics runtime; no shadow counter is introduced. Even before F69 ships,
 F68 therefore provides both durable attempt-zero work and loud terminal
 classification rather than a post-commit crash gap.
 
-### F69: production settlement driver seam
+### F69: production settlement ledger hook
 
-Specify the intended driver so `chio settle status` reports over tables real code
-writes. Ship a reference `OpsSettlementHook` in `chio-settle` implementing
-`SettlementHook` over `chio-settle/ops.rs`, and a `SettlementRuntime` task that:
+The production driver is `KernelSettlementLedgerHook` in `chio-kernel`. It is a
+local projection and never calls a rail. Rail truth is queried only by RFC-0003
+admission recovery, which owns the payment journal, the recovery lease and the
+`settlement_state` call. The hook reads the journal through
+`QualifiedAdmissionProjectionStore::load_payment_journal`, read-only, and acts only
+on the monotonic terminal states `Settled` and `Closed`; it never writes the
+journal. Because both terminal states are monotonic, a read outside the recovery
+lease cannot observe a state that later reverses.
 
-- drains `settle_attempts WHERE next_visible_at_ms <= now` on a tick,
-- claims a bounded batch with versioned leases, loads the bound receipts,
-  re-invokes the hook, and completes through the claimed-outcome CAS,
-- on `Accepted` verifies that the hook atomically created or found the idempotent
-  `settlement_reconciliations` work row before deleting observer work; a separate
-  credit worker may mint `iou_envelope` only from a canonical obligation whose
-  pre-action intent explicitly elected a credit facility, and
-- is wired into the CLI runtime behind a config flag `settlement.driver = { none, ops }`
-  (default `none`, so nothing changes until an operator opts in).
+| Terminal receipt | Hook action | Outcome |
+| --- | --- | --- |
+| Allow with `settlement_status = settled` | Upsert one `settled` `settlement_reconciliations` row carrying the rail and payment reference | `Accepted` |
+| Allow with `settlement_status = pending` or `failed` | None. Durable admission withholds pending terminal receipts, so this shape is a contract breach | `Permanent(UnsupportedEconomicForm)` |
+| Deny with a retained payment | None until the journal is terminal and a `chio.settlement-closure.v1` can be signed | `Retryable` |
+| Deny without a retained payment, zero charge, or no economics | None | `Skipped` |
 
-Add separate end-to-end cases for paid settlement retry/dead-letter and explicitly
-authorized credit obligation-to-IOU flow against a real kernel. A captured or prepaid
-receipt never mints an IOU for the same value. Until the driver ships, correct the two
-misleading docs: `construction.rs:483`
-and `hook.rs:7-9` must say routing to retry/dead-letter is wired only when a driver is
-installed, not unconditionally. This finding is not on the request-serving path
-(`production_path=false`); this RFC specifies the seam and the doc fix, and the driver
-implementation is a follow-up tracked in the wave-3 program.
+The hook contract is that a hook never mutates receipt rows or receipt bytes.
+`settlement_reconciliations` and closure rows are sidecar tables in the receipt
+database written through the serving writer.
+
+`ChioKernel::install_settlement_ledger(outcome_store, retry_policy)` builds the
+hook and installs it through `set_settlement_observer_runtime`. A host that
+configures a payment adapter installs the ledger, and startup refuses when the
+install fails (no atomic projection support, store binding mismatch). A host with
+no payment adapter installs nothing. There is no driver flag: an opt-in setting
+that defaults to off recreates the silent unpaid path that F68 and F69 close.
+
+`ChioKernel::drain_settlement_attempts(limit)` claims due rows through
+`SettlementOutcomeStore::claim_due`, rebuilds each observation from the stored
+receipt, re-invokes the hook, and completes through the claimed-outcome CAS. Hosts
+call it on their maintenance tick after the recovery batch, so a `Retryable` row is
+re-run until it resolves or dead-letters under `RetryPolicy`.
+
+Credit obligations and `iou_envelope` minting are not part of this driver.
 
 ### F72: fail-closed currency mismatch in BudgetTree
 
@@ -902,42 +876,15 @@ boundary. Pruning stays on explicit GC and never occurs inside insertion. The
 lane's future wiring is gated on this durable store, and the stale
 `payments.rs:366-371` doc is corrected to name it.
 
-### F74: BudgetEnforcer durability caveat + snapshot seam
+### F74: BudgetEnforcer durability
 
-`BudgetEnforcer` has no production consumer (the sole external `chio-metering` user,
-`crates/guards/chio-data-guards/src/warehouse_cost_guard.rs:55`, imports only
-`CostDimension`), so the minimum viable fix is a loud caveat plus an explicit
-snapshot/restore seam:
-
-```rust
-/// WARNING: counters are process-local and reset to zero on restart. This type does
-/// NOT persist cumulative spend; a restart re-opens the full budget. For durable
-/// enforcement use the kernel `BudgetStore` (crates/kernel/chio-kernel/src/budget_store.rs).
-/// Callers requiring cross-restart continuity MUST snapshot and restore explicitly.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct BudgetEnforcerSnapshot {
-    pub total_spent: u64,
-    pub session_spent: HashMap<String, u64>,
-    pub agent_spent: HashMap<String, u64>,
-    pub tool_spent: HashMap<String, u64>,
-}
-
-impl BudgetEnforcer {
-    #[must_use]
-    pub fn snapshot(&self) -> BudgetEnforcerSnapshot { /* clone counters */ }
-
-    #[must_use]
-    pub fn from_snapshot(policy: BudgetPolicy, snapshot: BudgetEnforcerSnapshot) -> Self { /* seed */ }
-}
-```
-
-The rustdoc caveat is the trap-defusing one-liner; the snapshot seam lets any future
-adopter persist and restore counters instead of silently losing them.
+Closed by deletion. `chio-metering::BudgetEnforcer` had no production consumer and
+has been removed, so no process-local budget counter remains.
 
 ### Error taxonomy (typed, fail-closed)
 
 - `BudgetStoreError::Invariant` (existing) carries the unsupported-store and
-  compare-and-set-mismatch cases for the payment journal and sweeper; a mismatched
+  compare-and-set-mismatch cases for the payment journal; a mismatched
   `advance_payment_journal` expected-state is a `Conflict`-shaped invariant, aborting
   fail-closed.
 - `DeadLetterStoreError::{ Backend, Conflict }` (existing,
@@ -954,23 +901,20 @@ adopter persist and restore counters instead of silently losing them.
 
 - `crates/platform/chio-store-sqlite`: `payment_journal` + `settle_attempts` +
   `eip3009_nonces`
-  DDL and methods, `SqliteEip3009NonceStore`, `HoldDisposition::Expired`,
-  recovery-gated sweeper queries, dead-letter/attempt wiring. ~520 LOC + ~360
-  LOC tests.
+  DDL and methods, `SqliteEip3009NonceStore`, dead-letter/attempt wiring,
+  `settlement_reconciliations` writer.
 - `crates/kernel/chio-kernel`: `PaymentJournalRecord`/`PaymentJournalState`, journal
-  and sweeper trait methods, `validation.rs` wiring, claimed-observer routing and
-  lease/CAS completion, `BudgetMutationKind::ExpireHold`, config, boot hooks. ~430 LOC
-  + ~320 LOC tests.
-- `crates/economy/chio-metering`: `BudgetDenyReason::CurrencyMismatch`, evaluate change,
-  `BudgetEnforcerSnapshot`. ~90 LOC + ~120 LOC tests.
-- `crates/economy/chio-settle`: `PaymentAdapter` doc/`settlement_state` amendment lives
-  in the kernel crate; `OpsSettlementHook` + `SettlementRuntime` driver seam. ~260 LOC
-  + ~200 LOC tests.
-- `crates/products/chio-cli`: `chio budget holds list/review`, `settlement.driver`
-  flag. ~120 LOC + ~90 LOC tests.
-- `crates/observability/chio-metrics-spec`: descriptor declarations for
-  `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`, `CHIO_BUDGET_OPEN_HOLDS`, and
-  `CHIO_BUDGET_HOLDS_EXPIRED_TOTAL`. ~25 LOC.
+  trait methods, `validation.rs` wiring, claimed-observer routing and lease/CAS
+  completion, `KernelSettlementLedgerHook`, `install_settlement_ledger`,
+  `drain_settlement_attempts`.
+- `crates/economy/chio-metering`: `BudgetDenyReason::CurrencyMismatch` and the evaluate
+  change.
+- `crates/economy/chio-settle`: `SettlementObservation` carries the settlement truth
+  the ledger hook needs.
+- `crates/products/chio-api-protect`: ledger install with startup refusal and the
+  drain on the admission maintenance tick.
+- `crates/observability/chio-metrics-spec`: descriptor declaration for
+  `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`.
 - No new crate. Unit and property tests run on the PR gate (well under a minute).
   Crash/kill-injection soak (SIGKILL between authorize and receipt commit; between
   authorize_budget_hold and reconcile) runs nightly in the load-chaos program, budgeted
@@ -994,26 +938,21 @@ adopter persist and restore counters instead of silently losing them.
 - `BudgetDenyReason` gains a `CurrencyMismatch` variant. It is config-as-data JSON
   (serde `tag = "reason"`, snake_case); additive, older readers that do not expect it
   fail closed on the deny rather than silently allowing.
-- New `BudgetMutationKind::ExpireHold` (`"expire_hold"`) and `HoldDisposition::Expired`
-  (`"expired"`) are additive string enum values in the durable budget log.
 
 ## Migration and compatibility
 
 - New tables and enum values are additive; older binaries ignore the tables and
   treat unknown mutation kinds/dispositions as opaque. The unshipped dead-letter
   body is a deliberate pre-release replacement, not a compatibility promise.
-- There are no historical journal, attempt, or nonce rows. Existing holds lack a
-  trustworthy `operation_id` and terminal recovery proof, so they are never
-  auto-expired merely because they predate the migration. They appear in the
-  review command and require an explicit reconciled resolution.
+- There are no historical journal, attempt, or nonce rows.
 - The bounded `chio.settle.dead-letter.v1` shape is the pre-release dead-letter
   contract. Readers convert the earlier string reason shape into a bounded
   backend failure digest; rows outside those two shapes fail closed.
 - Staged rollout. The payment participant is the money-path specialization of RFC-0003's
   `DurableAdmissionMode`; enable it with the `Monetary` class first (highest
   consequence), gated behind the same config. The F68 routing consumer ships enabled
-  (it only adds logging, metrics, and dead-letter rows). The F69 driver ships behind
-  `settlement.driver = none` by default. The durable EIP-3009 store becomes the wired
+  (it only adds logging, metrics, and dead-letter rows). The F69 ledger installs
+  whenever a payment adapter is configured. The durable EIP-3009 store becomes the wired
   default only once the lane is exercised.
 - Operator-visible behavior changes to document in release notes: newly surfaced
   dead-letter rows and `ReconcileFailed` incidents are "recovery working", not
@@ -1039,10 +978,9 @@ adopter persist and restore counters instead of silently losing them.
   exposure subtraction, and event insert inside
   `resolve_hold_placed_no_authorization`; every failure rolls back the whole
   transaction, exact replay is a no-op, and a stale hold/version or operation
-  proof rejects. `release_recovered_hold` rejects a
-  nonterminal participant, moved-funds resolution, missing/stale recovery digest,
-  `DispatchCommitted` or `OutcomeUnknownAfterDispatch` operation, and wrong hold
-  version and is idempotent by event id;
+  proof rejects. Recovery never releases a hold for a nonterminal participant,
+  moved-funds resolution, `DispatchCommitted` or `OutcomeUnknownAfterDispatch`
+  operation, or wrong hold version;
   `close_payment_journal` is idempotent;
   `settlement_state` default returns `Unavailable`.
 - Property: for a random interleaving of authorize/capture/release/crash, after boot
@@ -1067,13 +1005,13 @@ adopter persist and restore counters instead of silently losing them.
   every killed request ends attested-or-incident. F71's proof SIGKILLs between
   `authorize_budget_hold` and reconcile and asserts that the hold remains frozen
   while its payment participant or admission operation is nonterminal, then
-  expires exactly once only after
-  the coordinator proves and applies a terminal no-movement resolution.
+  releases exactly once only after recovery proves and applies a terminal
+  no-movement resolution.
 - Regression: SIGKILL after tool completion but before `Authorized -> Settling`;
   restart observes `DispatchCommitted`, never releases the hold, and either
   resumes a queryable outcome or retains `OutcomeUnknownAfterDispatch`.
 - Soak: sustained priced load with periodic kills; assert every old open hold is
-  either terminally proven no-movement and expired or paired with a named
+  either released by a terminal no-movement resolution or paired with a named
   nonterminal incident, `settle_attempts` drains, and no journal row is silently
   abandoned.
 - Formal-methods tie-in: the money-path invariant `moved_funds(request_id) ->
@@ -1092,22 +1030,23 @@ adopter persist and restore counters instead of silently losing them.
   queryable outcome or authenticated no-effect proof determines its disposition.
 - After a clean run's reconcile, `list_incomplete_payment_journal` returns empty
   and every remaining open hold has a named, nonterminal incident.
-- An old open hold is swept to `disposition='expired'` only after a matching
-  terminal no-movement resolution. The same transaction inserts the digest-keyed
-  mutation event, appends `expire_hold`, and drops `total_cost_exposed` by exactly
-  the released remainder. Age alone, `ReconcileFailed`, or unknown rail state
-  never releases capacity.
+- An open hold is released only by recovery after a matching terminal no-movement
+  resolution, or by the reserved-hold reaper for a hold that never reached
+  dispatch. Age alone, `ReconcileFailed`, or unknown rail state never releases
+  capacity.
 - A settlement hook returning `Retryable`/`Permanent`/error for a money-bearing receipt
   produces a `settle_attempts` or `settle_dead_letters` row plus a warn and a metric;
   `chio settle status` reports it. Nothing is dropped at `receipt_persistence.rs:185`.
+- With a payment adapter configured, the ledger installs or startup refuses. An
+  inline-settled Allow receipt yields one `settled` `settlement_reconciliations`
+  row, a `Retryable` attempt is re-run by the drain once due, and no receipt row or
+  byte changes.
 - `BudgetTree::evaluate` returns `Deny(CurrencyMismatch)` for a spend-capped node whose
   currency is absent or differs from the draft; no `Allow` with unlimited spend.
 - The EIP-3009 nonce store survives a restart (a previously recorded `(from,
   nonce)` reads `Replayed`), never exceeds its configured hard cap under
   concurrent insertion, and reopens capacity only through explicit GC of expired
   rows.
-- `BudgetEnforcer` carries the durability caveat and a working `snapshot`/`from_snapshot`
-  round-trip.
 
 ## Risks and alternatives
 
@@ -1122,10 +1061,6 @@ adopter persist and restore counters instead of silently losing them.
   query and only replays capture/release for adapters that declare idempotency; the
   in-tree final-prepayment adapters transition directly to `Settled` and never
   rely on a local no-op capture or release for recovery.
-- Sweeper aggressiveness: a short horizon can create noisy investigations but
-  cannot reclaim a live hold. The sweep requires a terminal no-movement recovery
-  proof and atomically excludes every nonterminal journal; the `3600s`
-  default controls alert timing only.
 - Alternative considered: putting the payment participant in the receipt database.
   A unified local file can make more projections atomic, but it is a breaking
   migration from independently configured budget and receipt stores and still
@@ -1148,14 +1083,12 @@ adopter persist and restore counters instead of silently losing them.
    projection, and incident binding used by this payment participant.
 2. F72 and the F68 routing consumer land next: both are small, self-contained,
    fail-closed corrections with no dependency on the journal.
-3. The payment participant (F70) and hold sweeper (F71) land together under
+3. The payment participant (F70) and recovery-driven hold resolution (F71) land together under
    `DurableAdmissionMode::Monetary`. RFC-0003 later releases with cumulative
    `SideEffecting` as the compiled production default after the kill-injection
    soak is green; RFC-0013 does not define a competing default.
-4. The durable EIP-3009 store (F73) and the `BudgetEnforcer` caveat/snapshot (F74) land
-   as independent hardening; the EIP-3009 store becomes the wired default only when the
-   lane is exercised.
-5. The F69 production driver (`OpsSettlementHook` + `SettlementRuntime`) is the
-   final step, behind `settlement.driver = ops`, turning eligible F68 work into
-   reconciliation rows and separately authorized credit obligations into bound
-   IOU envelopes.
+4. The durable EIP-3009 store (F73) lands as independent hardening and becomes the
+   wired default only when the lane is exercised.
+5. The F69 ledger hook installs whenever a payment adapter is configured, turning
+   eligible F68 work into reconciliation rows and draining retryable attempts on
+   the host maintenance tick.

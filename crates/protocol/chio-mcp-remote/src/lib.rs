@@ -8,9 +8,14 @@ use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, UnixMilli
 pub use clock::RemoteClock;
 mod oauth_error;
 pub use oauth_error::{OAuthError, OAuthRejection};
+#[path = "remote_mcp/enterprise_provider_registry.rs"]
+mod enterprise_provider_registry;
 mod input;
 #[path = "remote_mcp/sender_constraint.rs"]
 mod sender_constraint;
+use enterprise_provider_registry::{
+    EnterpriseProviderRegistryFile, EnterpriseProviderRegistryRefusal,
+};
 mod transport_identity;
 use input::{
     decode as decode_json, BoundedJson, SenderConstraintError, MAX_AUTH_JSON_BYTES,
