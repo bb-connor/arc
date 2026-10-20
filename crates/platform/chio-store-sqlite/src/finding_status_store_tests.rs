@@ -1835,14 +1835,20 @@ fn commit_clock_errors_leave_no_retraction_and_survive_restart() {
 fn finding_status_schema_other_than_current_is_refused() {
     for version in [0, 5] {
         let mut connection = rusqlite::Connection::open_in_memory().expect("open");
-        initialize_finding_status_schema(&mut connection).expect("initialize");
-        crate::stamp_schema_version(&connection, FINDING_STATUS_SCHEMA_KEY, version)
+        crate::test_schema::apply(
+            &mut connection,
+            &[FINDING_STATUS_SCHEMA_KEY],
+            initialize_finding_status_schema,
+            |error| FindingStatusStoreError::Invariant(error.to_string()),
+        )
+        .expect("initialize");
+        crate::test_schema::write_version(&connection, FINDING_STATUS_SCHEMA_KEY, version)
             .expect("stage schema version");
         let expected = format!(
             "database schema version {version} is not the current schema version 1; refusing to open"
         );
         assert!(matches!(
-            initialize_finding_status_schema(&mut connection),
+            crate::test_schema::apply(&mut connection, &[FINDING_STATUS_SCHEMA_KEY], initialize_finding_status_schema, |error| FindingStatusStoreError::Invariant(error.to_string())),
             Err(FindingStatusStoreError::Invariant(message)) if message == expected
         ));
     }
@@ -1851,12 +1857,18 @@ fn finding_status_schema_other_than_current_is_refused() {
 #[test]
 fn current_stamp_over_a_retired_status_shape_is_refused() {
     let mut connection = rusqlite::Connection::open_in_memory().expect("open");
-    initialize_finding_status_schema(&mut connection).expect("initialize");
+    crate::test_schema::apply(
+        &mut connection,
+        &[FINDING_STATUS_SCHEMA_KEY],
+        initialize_finding_status_schema,
+        |error| FindingStatusStoreError::Invariant(error.to_string()),
+    )
+    .expect("initialize");
     connection
         .execute_batch("DROP INDEX finding_status_epochs_by_operator;")
         .expect("drop index");
     assert!(matches!(
-        initialize_finding_status_schema(&mut connection),
+        crate::test_schema::apply(&mut connection, &[FINDING_STATUS_SCHEMA_KEY], initialize_finding_status_schema, |error| FindingStatusStoreError::Invariant(error.to_string())),
         Err(FindingStatusStoreError::Invariant(message))
             if message == "finding status schema differs from the canonical definition"
     ));

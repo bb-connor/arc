@@ -3,32 +3,18 @@ use super::*;
 type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 pub(crate) fn initialize_channel_lifecycle_schema(
-    connection: &mut Connection,
-) -> Result<(), SqliteServingOwnerError> {
-    let on_disk = crate::check_schema_version(
-        connection,
-        CHANNEL_LIFECYCLE_SCHEMA_KEY,
-        CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
-        CHANNEL_LIFECYCLE_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invalid_owner(error.to_string()))?;
-    if on_disk == CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION {
-        return verify_channel_lifecycle_invariants(connection);
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), SqliteServingOwnerError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction.execute_batch(CHANNEL_LIFECYCLE_SCHEMA)?;
+
+        schema
+            .stamp(CHANNEL_LIFECYCLE_SCHEMA_KEY)
+            .map_err(|error| invalid_owner(error.to_string()))?;
     }
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(CHANNEL_LIFECYCLE_SCHEMA)?;
-    crate::stamp_schema_version(
-        &transaction,
-        CHANNEL_LIFECYCLE_SCHEMA_KEY,
-        CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| invalid_owner(error.to_string()))?;
-    verify_channel_lifecycle_invariants(&transaction)?;
-    transaction.commit().map_err(|error| {
-        SqliteServingOwnerError::OutcomeUnknown(format!(
-            "sqlite channel lifecycle schema commit outcome is unknown: {error}"
-        ))
-    })
+    verify_channel_lifecycle_invariants(transaction)
 }
 
 pub(crate) fn verify_channel_lifecycle_invariants(

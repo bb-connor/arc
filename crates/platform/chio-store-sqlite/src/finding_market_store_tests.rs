@@ -1874,14 +1874,20 @@ mod connection_recovery;
 fn finding_market_schema_other_than_current_is_refused() {
     for version in [0, 3] {
         let mut connection = rusqlite::Connection::open_in_memory().expect("open");
-        initialize_finding_market_schema(&mut connection).expect("initialize");
-        crate::stamp_schema_version(&connection, FINDING_MARKET_SCHEMA_KEY, version)
+        crate::test_schema::apply(
+            &mut connection,
+            &[FINDING_MARKET_SCHEMA_KEY],
+            initialize_finding_market_schema,
+            |error| FindingMarketStoreError::Invariant(error.to_string()),
+        )
+        .expect("initialize");
+        crate::test_schema::write_version(&connection, FINDING_MARKET_SCHEMA_KEY, version)
             .expect("stage schema version");
         let expected = format!(
             "database schema version {version} is not the current schema version 1; refusing to open"
         );
         assert!(matches!(
-            initialize_finding_market_schema(&mut connection),
+            crate::test_schema::apply(&mut connection, &[FINDING_MARKET_SCHEMA_KEY], initialize_finding_market_schema, |error| FindingMarketStoreError::Invariant(error.to_string())),
             Err(FindingMarketStoreError::Invariant(message)) if message == expected
         ));
     }
@@ -1890,12 +1896,18 @@ fn finding_market_schema_other_than_current_is_refused() {
 #[test]
 fn current_stamp_over_a_retired_market_shape_is_refused() {
     let mut connection = rusqlite::Connection::open_in_memory().expect("open");
-    initialize_finding_market_schema(&mut connection).expect("initialize");
+    crate::test_schema::apply(
+        &mut connection,
+        &[FINDING_MARKET_SCHEMA_KEY],
+        initialize_finding_market_schema,
+        |error| FindingMarketStoreError::Invariant(error.to_string()),
+    )
+    .expect("initialize");
     connection
         .execute_batch("DROP INDEX findings_topic;")
         .expect("drop index");
     assert!(matches!(
-        initialize_finding_market_schema(&mut connection),
+        crate::test_schema::apply(&mut connection, &[FINDING_MARKET_SCHEMA_KEY], initialize_finding_market_schema, |error| FindingMarketStoreError::Invariant(error.to_string())),
         Err(FindingMarketStoreError::Invariant(message))
             if message == "finding market schema differs from the canonical definition"
     ));

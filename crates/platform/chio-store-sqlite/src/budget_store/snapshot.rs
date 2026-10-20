@@ -756,7 +756,7 @@ impl SqliteBudgetStore {
         Self::contiguous_snapshot_head_from(connection, 0)
     }
 
-    pub(super) fn rebuild_snapshot_proof_caches(
+    pub(crate) fn rebuild_snapshot_proof_caches(
         connection: &mut Connection,
     ) -> Result<(), BudgetStoreError> {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;

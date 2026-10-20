@@ -37,12 +37,6 @@ pub(crate) use persistence::{
 use qualification::*;
 
 const CHANNEL_RELEASE_PUBLISHER_SCHEMA_KEY: &str = "channel_release_publisher";
-pub(crate) const CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const CHANNEL_RELEASE_PUBLISHER_SCHEMA_ANCHORS: &[&str] = &[
-    "chio_channel_release_publisher_meta",
-    "chio_channel_release_publications",
-    "channel_lifecycle_records",
-];
 const CHANNEL_RELEASE_PUBLISHER_SCHEMA: &str = include_str!("channel_release_publisher_store.sql");
 
 const MAX_PUBLISHER_ARTIFACT_BYTES: usize = 1024 * 1024;

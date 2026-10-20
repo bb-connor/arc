@@ -118,7 +118,7 @@ fn ownerless_authority_refuses_tool_outcome_stamp_before_initialization(
     fs::set_permissions(&database, fs::Permissions::from_mode(0o600))?;
     let connection = Connection::open(&database)?;
     for found in [0, 4, i32::MAX] {
-        crate::stamp_schema_version(&connection, "tool_outcome", found)?;
+        crate::test_schema::write_version(&connection, "tool_outcome", found)?;
         assert_tool_outcome_preflight_refusal(
             &database,
             &lock_root,
@@ -142,7 +142,7 @@ fn provisioned_authority_refuses_tool_outcome_stamp_before_initialization(
         }
         let connection = Connection::open(&database)?;
         for found in [0, 4, i32::MAX] {
-            crate::stamp_schema_version(&connection, "tool_outcome", found)?;
+            crate::test_schema::write_version(&connection, "tool_outcome", found)?;
             assert_tool_outcome_preflight_refusal(
                 &database,
                 &lock_root,

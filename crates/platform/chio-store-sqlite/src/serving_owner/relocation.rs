@@ -33,8 +33,8 @@ use rusqlite::{config::DbConfig, params, Connection, OptionalExtension, Transact
 use serde::{Deserialize, Serialize};
 
 use super::global_commit_chain::verify_global_commit_chain;
-use super::lease_history::initialize_serving_lease_schema;
 use super::rollback_anchor::{ReplaceableAnchor, RollbackAnchor};
+use super::validate_serving_schema;
 use super::{
     acquire_serving_lock, canonical_lock_root, create_lock_file, database_parent,
     load_provisioning_record, load_provisioning_record_tx, metadata_device, metadata_inode,
@@ -106,10 +106,14 @@ pub(super) enum RelocationState {
 }
 
 pub(super) fn initialize_serving_relocation_schema(
-    connection: &Connection,
+    schema: &crate::schema_version::SchemaTransaction<'_>,
 ) -> Result<(), SqliteServingOwnerError> {
-    connection.execute_batch(SERVING_RELOCATION_SCHEMA)?;
-    verify_serving_relocation_schema(connection)
+    if schema.is_fresh() {
+        schema
+            .connection()
+            .execute_batch(SERVING_RELOCATION_SCHEMA)?;
+    }
+    verify_serving_relocation_schema(schema.connection())
 }
 
 pub(super) fn verify_serving_relocation_schema(
@@ -290,8 +294,7 @@ impl SqliteAuthorityStore {
             PRAGMA foreign_keys = ON;
             "#,
         )?;
-        initialize_serving_lease_schema(&connection)?;
-        initialize_serving_relocation_schema(&connection)?;
+        validate_serving_schema(&mut connection)?;
         let prior_export = match relocation_state(&connection)? {
             RelocationState::Exported(seal) => Some(seal),
             _ => None,

@@ -217,15 +217,12 @@ struct FactorAssignmentAuthoritySetReference {
 type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 pub(crate) fn initialize_global_commit_schema(
-    connection: &Connection,
+    schema: &crate::schema_version::SchemaTransaction<'_>,
 ) -> Result<(), SqliteServingOwnerError> {
-    let transaction = connection.unchecked_transaction()?;
-    if global_schema_catalog(&transaction)?.is_empty() {
-        transaction.execute_batch(GLOBAL_COMMIT_SCHEMA)?;
+    if schema.is_fresh() {
+        schema.connection().execute_batch(GLOBAL_COMMIT_SCHEMA)?;
     }
-    verify_global_commit_schema(&transaction)?;
-    transaction.commit()?;
-    Ok(())
+    verify_global_commit_schema(schema.connection())
 }
 
 pub(crate) fn verify_global_commit_schema(
@@ -240,21 +237,19 @@ pub(crate) fn verify_global_commit_schema(
 }
 
 pub(crate) fn seed_global_baseline(
-    connection: &mut Connection,
+    transaction: &Transaction<'_>,
 ) -> Result<(), SqliteServingOwnerError> {
-    let transaction = connection.transaction()?;
-    let head = load_global_commit_head(&transaction)?;
+    let head = load_global_commit_head(transaction)?;
     if head.head_sequence != 0 || head.chain_digest != GLOBAL_GENESIS_DIGEST {
-        transaction.rollback()?;
-        return verify_global_commit_chain(connection).map(|_| ());
+        return Err(invalid("new authority baseline is not pristine"));
     }
-    verify_pristine_baseline(&transaction)?;
+    verify_pristine_baseline(transaction)?;
     let store_uuid: String = transaction.query_row(
         "SELECT store_uuid FROM chio_serving_owner WHERE singleton = 1",
         [],
         |row| row.get(0),
     )?;
-    let baseline_digest = baseline_projection_digest(&transaction)?;
+    let baseline_digest = baseline_projection_digest(transaction)?;
     let projection_digest = projection_root_digest(&ProjectionRootEntry {
         format: "chio.sqlite-authority-projection-root.v1",
         previous_projection_digest: GLOBAL_GENESIS_DIGEST,
@@ -266,7 +261,7 @@ pub(crate) fn seed_global_baseline(
         projection_reference_digest: &baseline_digest,
     })?;
     append_entry(
-        &transaction,
+        transaction,
         "baseline",
         "baseline",
         "",
@@ -277,7 +272,6 @@ pub(crate) fn seed_global_baseline(
         None,
         0,
     )?;
-    transaction.commit()?;
     Ok(())
 }
 
@@ -1446,7 +1440,6 @@ pub(crate) fn verify_pristine_authority_tables(
             table.as_str(),
             "admission_authority_meta"
                 | "admission_authority_commits"
-                | "chio_authority_migrations"
                 | "admission_operation_commit_meta"
                 | "budget_replication_meta"
                 | "budget_snapshot_coverage"
@@ -1484,12 +1477,6 @@ fn verify_pristine_baseline(connection: &Connection) -> Result<(), SqliteServing
                 SELECT 1 FROM admission_authority_commits
                 WHERE commit_index = 1 AND kind = 'genesis'
                   AND capability_id IS NULL
-            )
-            AND (SELECT COUNT(*) FROM chio_authority_migrations) = 1
-            AND EXISTS(
-                SELECT 1 FROM chio_authority_migrations
-                WHERE migration_key = 'revocation-admission-authority-v1'
-                  AND completed_index = 1
             )
             AND (SELECT COUNT(*) FROM admission_operation_commit_meta) = 1
             AND EXISTS(
@@ -1537,171 +1524,9 @@ fn verify_live_baseline_projection(connection: &Connection) -> Result<(), Sqlite
     if committed == baseline_projection_digest(connection)? {
         return Ok(());
     }
-    let factor_assignment_empty = factor_assignment_projection_is_empty(connection)?;
-    if factor_assignment_empty
-        && committed == pre_factor_assignment_baseline_projection_digest(connection)?
-    {
-        return Ok(());
-    }
-    if factor_assignment_empty
-        && channel_release_projection_is_empty(connection)?
-        && committed == pre_channel_release_baseline_projection_digest(connection)?
-    {
-        return Ok(());
-    }
-    if factor_assignment_empty
-        && channel_release_projection_is_empty(connection)?
-        && channel_projection_is_empty(connection)?
-        && committed == pre_channel_baseline_projection_digest(connection)?
-    {
-        return Ok(());
-    }
-    if factor_assignment_empty
-        && channel_release_projection_is_empty(connection)?
-        && payment_projection_is_empty(connection)?
-        && committed == pre_payment_baseline_projection_digest(connection)?
-    {
-        return Ok(());
-    }
-    if factor_assignment_empty
-        && channel_release_projection_is_empty(connection)?
-        && channel_projection_is_empty(connection)?
-        && payment_projection_is_empty(connection)?
-        && committed == pre_channel_pre_payment_baseline_projection_digest(connection)?
-    {
-        return Ok(());
-    }
     Err(invalid(
         "global authority baseline does not match its live projection",
     ))
-}
-
-fn pre_factor_assignment_baseline_projection_digest(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    baseline_projection_digest_for_tables(
-        connection,
-        without_factor_assignment_tables(table_names(connection, false)?),
-    )
-}
-
-fn pre_channel_baseline_projection_digest(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    baseline_projection_digest_for_tables(
-        connection,
-        without_factor_assignment_tables(table_names(connection, false)?)
-            .into_iter()
-            .filter(|table| {
-                !table.starts_with("channel_") && !table.starts_with("chio_channel_release_")
-            })
-            .collect(),
-    )
-}
-
-fn pre_channel_release_baseline_projection_digest(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    baseline_projection_digest_for_tables(
-        connection,
-        without_factor_assignment_tables(table_names(connection, false)?)
-            .into_iter()
-            .filter(|table| !table.starts_with("chio_channel_release_"))
-            .collect(),
-    )
-}
-
-fn pre_payment_baseline_projection_digest(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    baseline_projection_digest_for_tables(
-        connection,
-        without_factor_assignment_tables(without_channel_release_tables(authority_table_names(
-            connection, true, false,
-        )?)),
-    )
-}
-
-fn pre_channel_pre_payment_baseline_projection_digest(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    baseline_projection_digest_for_tables(
-        connection,
-        without_factor_assignment_tables(authority_table_names(connection, true, false)?)
-            .into_iter()
-            .filter(|table| {
-                !table.starts_with("channel_") && !table.starts_with("chio_channel_release_")
-            })
-            .collect(),
-    )
-}
-
-fn payment_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
-    projection_is_empty(connection, "payment_")
-}
-
-fn channel_release_projection_is_empty(
-    connection: &Connection,
-) -> Result<bool, SqliteServingOwnerError> {
-    connection
-        .query_row(
-            r#"
-            SELECT
-                (SELECT COUNT(*) FROM chio_channel_release_publications) = 0
-                AND (SELECT COUNT(*) FROM chio_channel_release_publisher_meta) = 1
-                AND EXISTS(
-                    SELECT 1 FROM chio_channel_release_publisher_meta
-                    WHERE singleton = 1 AND trusted_time_high_water_unix_ms = 0
-                )
-            "#,
-            [],
-            |row| row.get::<_, bool>(0),
-        )
-        .map_err(Into::into)
-}
-
-fn channel_projection_is_empty(connection: &Connection) -> Result<bool, SqliteServingOwnerError> {
-    projection_is_empty(connection, "channel_")
-}
-
-fn factor_assignment_projection_is_empty(
-    connection: &Connection,
-) -> Result<bool, SqliteServingOwnerError> {
-    projection_is_empty(connection, "factor_assignment_")
-}
-
-fn projection_is_empty(
-    connection: &Connection,
-    table_prefix: &str,
-) -> Result<bool, SqliteServingOwnerError> {
-    for table in table_names(connection, false)? {
-        if !table.starts_with(table_prefix) {
-            continue;
-        }
-        let count = connection.query_row(
-            &format!("SELECT COUNT(*) FROM {}", quote_identifier(&table)),
-            [],
-            |row| row.get::<_, i64>(0),
-        )?;
-        if count != 0 {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
-fn without_channel_release_tables(tables: Vec<String>) -> Vec<String> {
-    tables
-        .into_iter()
-        .filter(|table| !table.starts_with("chio_channel_release_"))
-        .collect()
-}
-
-fn without_factor_assignment_tables(tables: Vec<String>) -> Vec<String> {
-    tables
-        .into_iter()
-        .filter(|table| !table.starts_with("factor_assignment_"))
-        .collect()
 }
 
 fn verify_global_projection_coverage(
@@ -2268,14 +2093,6 @@ fn table_names(
             .collect::<Result<Vec<_>, _>>()
             .map_err(Into::into);
     }
-    authority_table_names(connection, true, true)
-}
-
-fn authority_table_names(
-    connection: &Connection,
-    include_frost: bool,
-    include_payment: bool,
-) -> Result<Vec<String>, SqliteServingOwnerError> {
     let mut statement = connection.prepare(
         r#"
         SELECT name FROM sqlite_schema
@@ -2283,24 +2100,21 @@ fn authority_table_names(
           AND (
               name = 'capability_grant_budgets'
               OR name = 'revoked_capabilities'
-              OR name = 'chio_authority_migrations'
               OR name GLOB 'admission_operation*'
               OR name GLOB 'admission_authority_*'
               OR name GLOB 'budget_*'
               OR name GLOB 'channel_*'
               OR name GLOB 'chio_channel_release_*'
               OR name GLOB 'factor_assignment_*'
-              OR (?1 AND name GLOB 'frost_*')
-              OR (?2 AND name GLOB 'payment_*')
+              OR name GLOB 'frost_*'
+              OR name GLOB 'payment_*'
           )
           AND name NOT IN ('budget_ack_head_watermark', 'budget_origin_ack_heads')
         ORDER BY name
         "#,
     )?;
     let names = statement
-        .query_map(params![include_frost, include_payment], |row| {
-            row.get::<_, String>(0)
-        })?
+        .query_map([], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     Ok(names)
 }

@@ -635,11 +635,21 @@ fn committed_view_match_binds_all_channel_heads_by_resource_identity() -> TestRe
 #[test]
 fn obsolete_cache_schema_is_refused_without_rewriting() -> TestResult {
     let mut connection = Connection::open_in_memory()?;
-    initialize_economic_state_cache_schema(&mut connection)?;
-    crate::stamp_schema_version(&connection, ECONOMIC_STATE_CACHE_SCHEMA_KEY, 0)?;
-    let error = initialize_economic_state_cache_schema(&mut connection)
-        .err()
-        .ok_or("an obsolete economic cache schema opened")?;
+    crate::test_schema::apply(
+        &mut connection,
+        &[ECONOMIC_STATE_CACHE_SCHEMA_KEY],
+        initialize_economic_state_cache_schema,
+        |error| invariant(error.to_string()),
+    )?;
+    crate::test_schema::write_version(&connection, ECONOMIC_STATE_CACHE_SCHEMA_KEY, 0)?;
+    let error = crate::test_schema::apply(
+        &mut connection,
+        &[ECONOMIC_STATE_CACHE_SCHEMA_KEY],
+        initialize_economic_state_cache_schema,
+        |error| invariant(error.to_string()),
+    )
+    .err()
+    .ok_or("an obsolete economic cache schema opened")?;
     assert!(
         error.to_string().contains(
             "database schema version 0 is not the current schema version 1; refusing to open"

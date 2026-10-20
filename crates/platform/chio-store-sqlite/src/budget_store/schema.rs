@@ -69,15 +69,6 @@ pub(super) fn verify_budget_catalog(connection: &Connection) -> Result<(), Budge
     Ok(())
 }
 
-pub(super) fn require_empty_budget_catalog(
-    connection: &Connection,
-) -> Result<(), BudgetStoreError> {
-    if !budget_catalog(connection)?.is_empty() {
-        return Err(schema_shape_error());
-    }
-    Ok(())
-}
-
 pub(super) fn schema_shape_error() -> BudgetStoreError {
     BudgetStoreError::Invariant("budget schema does not match the current v1 shape".into())
 }

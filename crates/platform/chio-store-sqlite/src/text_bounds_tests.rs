@@ -336,7 +336,12 @@ fn fiscal_refuses_nul_padding() -> TestResult {
 #[test]
 fn frost_refuses_nul_padding() -> TestResult {
     let mut catalog = Connection::open_in_memory()?;
-    crate::frost_store::initialize_frost_schema(&mut catalog)?;
+    crate::test_schema::apply(
+        &mut catalog,
+        &["frost"],
+        crate::frost_store::initialize_frost_schema,
+        |error| crate::frost_store::FrostStoreError::InvalidState(error.to_string()),
+    )?;
     assert_column_refuses_nul_padding(
         &catalog,
         "frost_ceremonies",

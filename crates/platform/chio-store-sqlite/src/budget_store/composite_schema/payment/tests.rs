@@ -188,7 +188,7 @@ fn noncurrent_stamps_preserve_populated_payment_and_evidence() -> TestResult {
             original.authorization_id.as_deref(),
             Some("recorded-prepayment")
         );
-        let mut connection = Connection::open(&database)?;
+        let connection = Connection::open(&database)?;
         connection.execute_batch("PRAGMA foreign_keys=ON; CREATE TABLE retained_payment_evidence(operation_id TEXT PRIMARY KEY REFERENCES payment_journal(operation_id), bytes BLOB NOT NULL);")?;
         connection.execute(
             "INSERT INTO retained_payment_evidence VALUES(?1,?2)",
@@ -197,16 +197,13 @@ fn noncurrent_stamps_preserve_populated_payment_and_evidence() -> TestResult {
                 b"retained-payment-evidence".as_slice()
             ],
         )?;
-        crate::stamp_schema_version(&connection, "budget", found)?;
+        crate::test_schema::write_version(&connection, "budget", found)?;
         let before = snapshot(&connection)?;
         for _ in 0..2 {
             assert_stale(SqliteBudgetStore::open(&database), found);
             assert_eq!(snapshot(&connection)?, before);
         }
-        assert_stale(
-            SqliteBudgetStore::initialize_connection_offline(&mut connection),
-            found,
-        );
+        assert_stale(SqliteBudgetStore::open(&database), found);
         assert_eq!(snapshot(&connection)?, before);
     }
     Ok(())
@@ -340,12 +337,12 @@ fn create_catalog(database: &Path, sql: &str) -> TestResult {
     let connection = Connection::open(database)?;
     connection.execute_batch(sql)?;
     connection.pragma_update(None, "application_id", crate::CHIO_SQLITE_APPLICATION_ID)?;
-    crate::stamp_schema_version(&connection, "budget", 1)?;
+    crate::test_schema::write_version(&connection, "budget", 1)?;
     Ok(())
 }
 
 #[test]
-fn current_catalog_accepts_equivalent_unquoted_whitespace() -> TestResult {
+fn standalone_creation_requires_the_canonical_catalog_text() -> TestResult {
     let directory = tempfile::tempdir()?;
     let database = directory.path().join("payment-catalog-whitespace.db");
     let formatted = SCHEMA
@@ -354,8 +351,15 @@ fn current_catalog_accepts_equivalent_unquoted_whitespace() -> TestResult {
     assert_ne!(formatted, SCHEMA);
     create_catalog(&database, &formatted)?;
     verify_budget_catalog(&Connection::open(&database)?)?;
-    drop(SqliteBudgetStore::open(&database)?);
-    drop(SqliteBudgetStore::open(&database)?);
+    let connection = Connection::open(&database)?;
+    let before = snapshot(&connection)?;
+    for _ in 0..2 {
+        assert_invariant(
+            SqliteBudgetStore::open(&database),
+            "schema catalog differs from its canonical definition",
+        );
+        assert_eq!(snapshot(&connection)?, before);
+    }
     Ok(())
 }
 

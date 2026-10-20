@@ -353,7 +353,7 @@ fn sqlite_budget_store_refuses_incomplete_stamp_one_with_open_liability(
         "application_id",
         crate::schema_version::CHIO_SQLITE_APPLICATION_ID,
     )?;
-    crate::stamp_schema_version(&connection, "budget", 1)?;
+    crate::test_schema::write_version(&connection, "budget", 1)?;
     drop(connection);
 
     schema_contract::assert_refused_without_mutation(
@@ -635,7 +635,7 @@ fn sqlite_budget_store_refuses_noncurrent_stamps_without_mutation(
     for found in [0, 2, 12, BUDGET_STORE_SUPPORTED_SCHEMA_VERSION + 100] {
         let (_directory, path) = schema_contract::populated_database()?;
         let connection = Connection::open(&path)?;
-        crate::stamp_schema_version(&connection, "budget", found)?;
+        crate::test_schema::write_version(&connection, "budget", found)?;
         drop(connection);
 
         schema_contract::assert_stale_without_mutation(&path, found)?;

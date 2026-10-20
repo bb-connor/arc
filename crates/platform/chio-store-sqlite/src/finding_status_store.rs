@@ -47,12 +47,6 @@ use crate::serving_owner::SqliteServingOwner;
 use crate::store_connection::{StoreConnection, StoreGuard};
 
 const FINDING_STATUS_SCHEMA_KEY: &str = "finding_status";
-pub(crate) const FINDING_STATUS_SCHEMA_VERSION: i32 = 1;
-const FINDING_STATUS_SCHEMA_ANCHORS: &[&str] = &[
-    "finding_status_feeds",
-    "admission_operations",
-    "chio_serving_owner",
-];
 const FINDING_STATUS_SCHEMA: &str = include_str!("finding_status_store.sql");
 
 /// The single wire nonce selected for the `chio.finding.status.v1` key domain.

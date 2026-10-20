@@ -245,17 +245,8 @@ pub use security_participant_migration::{
 };
 
 const ADMISSION_OPERATION_SCHEMA_KEY: &str = "admission_operation";
+#[cfg(test)]
 pub(crate) const ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const ADMISSION_OPERATION_SCHEMA_ANCHORS: &[&str] = &[
-    "admission_operations",
-    "admission_operation_commits",
-    "admission_operation_recovery_deferrals",
-    "admission_operation_recovery_records",
-    "admission_operation_recovery_events",
-    "threshold_approval_proposals",
-    "chio_serving_owner",
-    "capability_grant_budgets",
-];
 const MAX_PERSISTED_OPERATION_BYTES: usize = 256 * 1024;
 const MAX_TERMINAL_PROJECTION_BYTES: usize = 4 * 1024 * 1024;
 const MAX_TERMINAL_MANIFEST_BYTES: usize = 256 * 1024;

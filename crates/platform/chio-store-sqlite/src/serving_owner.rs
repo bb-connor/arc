@@ -13,10 +13,8 @@ use chio_kernel::tool_outcome::ToolOutcomeStoreError;
 use chio_kernel::{BudgetStoreError, RevocationStoreError};
 use rusqlite::{params, Connection, OptionalExtension, Transaction, TransactionBehavior};
 
-use crate::budget_store::BUDGET_STORE_SUPPORTED_SCHEMA_VERSION;
 use crate::revocation_store::{
     initialize_revocation_schema, verify_admission_authority_invariants,
-    REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
 };
 use crate::store_connection::StoreConnection;
 use crate::{SqliteBudgetStore, SqliteRevocationStore};
@@ -35,7 +33,7 @@ use global_commit_chain::{
 };
 use global_commit_chain::{
     append_global_commit, initialize_global_commit_schema, reset_derived_budget_ack_cache,
-    seed_global_baseline, verify_global_commit_schema, verify_pristine_authority_tables,
+    seed_global_baseline,
 };
 use lease_history::{initialize_serving_lease_schema, verify_serving_lease_history};
 pub use relocation::{
@@ -51,6 +49,26 @@ pub(crate) fn verify_finding_market_projection_for_tests(
 ) -> Result<(), SqliteServingOwnerError> {
     global_commit_chain::verify_finding_challenge_projection_coverage(connection)
 }
+
+pub(crate) const SERVING_NAMESPACES: &[&str] = &[
+    "serving_owner",
+    "budget",
+    "revocation",
+    "frost",
+    "economic_state_cache",
+    "fiscal",
+    "admission_operation",
+    "channel_lifecycle",
+    "channel_release_publisher",
+    "work_delegation",
+    "work_graph",
+    "tool_outcome",
+    "finding_market",
+    "finding_purchase",
+    "finding_recovery",
+    "finding_challenge",
+    "finding_status",
+];
 
 const SERVING_OWNER_SCHEMA: &str = r#"
 CREATE TABLE chio_serving_owner (
@@ -382,32 +400,9 @@ impl SqliteAuthorityStore {
             validate_open_lock_file(&lock_root, &lock_file, &record)?;
             validate_provisioning_record(&canonical_database_path, &lock_root, &record)?;
             relocation::refuse_exported(&connection)?;
-            initialize_offline_authority_schemas(&mut connection, false)?;
-            initialize_serving_lease_schema(&connection)?;
-            relocation::initialize_serving_relocation_schema(&connection)?;
-            crate::admission_operation_store::initialize_admission_operation_schema(
-                &mut connection,
-            )?;
-            crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
-            crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
-                &mut connection,
-            )?;
-            crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
-            crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
-            crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection, false)
-                .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
-            crate::finding_market_store::initialize_finding_market_schema(&mut connection)
-                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-            crate::finding_purchase_store::initialize_finding_purchase_schema(&mut connection)
-                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-            crate::finding_recovery_store::initialize_finding_recovery_schema(&mut connection)
-                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-            crate::finding_challenge_store::initialize_finding_challenge_schema(&mut connection)
-                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-            crate::finding_status_store::initialize_finding_status_schema(&mut connection)
-                .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-            initialize_global_commit_schema(&connection)?;
-            seed_global_baseline(&mut connection)?;
+            validate_serving_schema(&mut connection)?;
+            SqliteBudgetStore::rebuild_snapshot_proof_caches(&mut connection)
+                .map_err(SqliteServingOwnerError::BudgetSchema)?;
             reset_derived_budget_ack_cache(&connection)?;
             verify_authority_store_invariants(&connection)?;
             validate_database_identity(&canonical_database_path, &expected_database)?;
@@ -428,56 +423,19 @@ impl SqliteAuthorityStore {
             return Ok(());
         }
         verify_path_available_for_new_identity(&lock_root, &canonical_database_path)?;
-        initialize_offline_authority_schemas(&mut connection, true)?;
+        let state = crate::schema_version::inspect_schema(&connection, SERVING_NAMESPACES)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+        if state != crate::SchemaState::Unstamped {
+            return Err(SqliteServingOwnerError::PartialProvision(
+                canonical_database_path.display().to_string(),
+            ));
+        }
         validate_database_identity(&canonical_database_path, &expected_database)?;
         let database_path = canonical_database_path;
-        for (key, supported) in [
-            ("budget", BUDGET_STORE_SUPPORTED_SCHEMA_VERSION),
-            ("revocation", REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION),
-            (
-                "admission_operation",
-                crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "frost",
-                crate::frost_store::FROST_STORE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "economic_state_cache",
-                crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "fiscal",
-                crate::fiscal_store::FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "channel_lifecycle",
-                crate::channel_lifecycle_store::CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "channel_release_publisher",
-                crate::channel_release_publisher_store::CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION,
-            ),
-        ] {
-            crate::check_schema_version(
-                &connection,
-                key,
-                supported,
-                &["capability_grant_budgets", "revoked_capabilities"],
-            )
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        }
-        connection.execute_batch("PRAGMA foreign_keys = ON;")?;
-        // Refuse a store the global baseline cannot adopt before anything is created,
-        // so a refused provision leaves the pre-existing database exactly as it was.
-        verify_pristine_authority_tables(&connection)?;
+        connection.execute_batch("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;")?;
 
         let store_uuid = next_store_uuid();
         let lock_path = lock_root.join(format!("{store_uuid}.lock"));
-        // The owner table and its row are created in a single transaction so a
-        // failure rolls the table back with the row. Nothing that depends on the
-        // owner table is created before that transaction commits, which leaves an
-        // interrupted provision recoverable rather than wedged half way.
         let mut lock_file_created = false;
         let provision_owner = (|| -> Result<(File, fs::Metadata), SqliteServingOwnerError> {
             let lock_file = create_lock_file(&lock_path)?;
@@ -489,8 +447,17 @@ impl SqliteAuthorityStore {
             validate_database_identity(&database_path, &expected_database)?;
             let database_metadata = fs::metadata(&database_path)?;
             validate_database_metadata(&database_metadata)?;
-            let transaction =
-                connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+            let schema = crate::schema_version::SchemaTransaction::begin(
+                &mut connection,
+                SERVING_NAMESPACES,
+            )
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+            if !schema.is_fresh() {
+                return Err(SqliteServingOwnerError::Invalid(
+                    "serving creation requires an empty database".into(),
+                ));
+            }
+            let transaction = schema.connection();
             transaction.execute_batch(SERVING_OWNER_SCHEMA)?;
             let changed = transaction.execute(
                 r#"
@@ -515,7 +482,11 @@ impl SqliteAuthorityStore {
                     "serving-owner insert did not affect exactly one row".to_string(),
                 ));
             }
-            transaction.commit().map_err(|error| {
+            initialize_serving_components(&schema)?;
+            seed_global_baseline(transaction)?;
+            validate_serving_catalog(transaction)?;
+            verify_authority_store_invariants(transaction)?;
+            schema.commit().map_err(|error| {
                 SqliteServingOwnerError::OutcomeUnknown(format!(
                     "sqlite authority provisioning commit outcome is unknown: {error}"
                 ))
@@ -534,30 +505,9 @@ impl SqliteAuthorityStore {
                 return Err(error);
             }
         };
-        verify_serving_owner_schema(&connection)?;
-        initialize_serving_lease_schema(&connection)?;
-        relocation::initialize_serving_relocation_schema(&connection)?;
-        crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
-        crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
-        crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
-            &mut connection,
-        )?;
-        crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
-        crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
-        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection, true)
-            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
-        crate::finding_market_store::initialize_finding_market_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_purchase_store::initialize_finding_purchase_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_recovery_store::initialize_finding_recovery_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_challenge_store::initialize_finding_challenge_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_status_store::initialize_finding_status_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        initialize_global_commit_schema(&connection)?;
-        seed_global_baseline(&mut connection)?;
+        connection.execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")?;
+        SqliteBudgetStore::rebuild_snapshot_proof_caches(&mut connection)
+            .map_err(SqliteServingOwnerError::BudgetSchema)?;
         reset_derived_budget_ack_cache(&connection)?;
         verify_authority_store_invariants(&connection)?;
         validate_database_identity(&database_path, &expected_database)?;
@@ -631,8 +581,7 @@ impl SqliteAuthorityStore {
         validate_open_lock_file(&lock_root, &lock_file, &record)?;
         validate_provisioning_record(&database_path, &lock_root, &record)?;
         relocation::refuse_exported(&connection)?;
-        SqliteBudgetStore::preflight_schema(&connection, false)
-            .map_err(SqliteServingOwnerError::BudgetSchema)?;
+        validate_serving_schema(&mut connection)?;
 
         connection.execute_batch(
             r#"
@@ -642,64 +591,7 @@ impl SqliteAuthorityStore {
             PRAGMA foreign_keys = ON;
             "#,
         )?;
-        initialize_serving_lease_schema(&connection)?;
-        relocation::initialize_serving_relocation_schema(&connection)?;
-        crate::admission_operation_store::initialize_admission_operation_schema(&mut connection)?;
-        crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(&mut connection)?;
-        crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(
-            &mut connection,
-        )?;
-        crate::delegation_store::initialize_work_delegation_schema(&mut connection)?;
-        crate::work_graph_store::initialize_work_graph_schema(&mut connection)?;
-        crate::tool_outcome_store::initialize_tool_outcome_schema(&mut connection, false)
-            .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
-        crate::finding_market_store::initialize_finding_market_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_purchase_store::initialize_finding_purchase_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_recovery_store::initialize_finding_recovery_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_challenge_store::initialize_finding_challenge_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        crate::finding_status_store::initialize_finding_status_schema(&mut connection)
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        verify_global_commit_schema(&connection)?;
         reset_derived_budget_ack_cache(&connection)?;
-        for (key, supported) in [
-            ("revocation", REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION),
-            (
-                "admission_operation",
-                crate::admission_operation_store::ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "frost",
-                crate::frost_store::FROST_STORE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "economic_state_cache",
-                crate::economic_state_cache::ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "fiscal",
-                crate::fiscal_store::FISCAL_STORE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "channel_lifecycle",
-                crate::channel_lifecycle_store::CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION,
-            ),
-            (
-                "channel_release_publisher",
-                crate::channel_release_publisher_store::CHANNEL_RELEASE_PUBLISHER_SUPPORTED_SCHEMA_VERSION,
-            ),
-        ] {
-            crate::check_schema_version(
-                &connection,
-                key,
-                supported,
-                &["capability_grant_budgets", "revoked_capabilities"],
-            )
-            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        }
         verify_authority_store_invariants(&connection)?;
         let rollback_anchor = RollbackAnchor::new(
             lock_file,
@@ -717,7 +609,9 @@ impl SqliteAuthorityStore {
         })?;
         let lease_id = next_lease_id()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        SqliteBudgetStore::preflight_schema(&transaction, false)
+        crate::schema_version::inspect_schema(&transaction, SERVING_NAMESPACES)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+        SqliteBudgetStore::validate_schema(&transaction)
             .map_err(SqliteServingOwnerError::BudgetSchema)?;
         let current = load_provisioning_record_tx(&transaction)?.ok_or_else(|| {
             SqliteServingOwnerError::NotProvisioned(database_path.display().to_string())
@@ -1033,49 +927,71 @@ impl SqliteAuthorityStore {
     }
 }
 
-fn initialize_offline_authority_schemas(
-    connection: &mut Connection,
-    allow_empty_budget: bool,
+fn initialize_serving_components(
+    schema: &crate::schema_version::SchemaTransaction<'_>,
 ) -> Result<(), SqliteServingOwnerError> {
-    SqliteBudgetStore::preflight_schema(connection, allow_empty_budget)
-        .map_err(SqliteServingOwnerError::BudgetSchema)?;
-    let has_revocation_schema = connection.query_row(
-        r#"
-        SELECT EXISTS(
-            SELECT 1 FROM sqlite_master
-            WHERE type = 'table' AND name = 'revoked_capabilities'
-        )
-        "#,
-        [],
-        |row| row.get::<_, bool>(0),
-    )?;
-    if has_revocation_schema {
-        crate::check_schema_version(
-            connection,
-            "revocation",
-            REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-            &["revoked_capabilities"],
-        )
+    SqliteBudgetStore::initialize_schema(schema).map_err(SqliteServingOwnerError::BudgetSchema)?;
+    initialize_revocation_schema(schema, true)
         .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::frost_store::initialize_frost_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::economic_state_cache::initialize_economic_state_cache_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::fiscal_store::initialize_fiscal_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    initialize_serving_lease_schema(schema)?;
+    relocation::initialize_serving_relocation_schema(schema)?;
+    crate::admission_operation_store::initialize_admission_operation_schema(schema)?;
+    crate::channel_lifecycle_store::initialize_channel_lifecycle_schema(schema)?;
+    crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(schema)?;
+    crate::delegation_store::initialize_work_delegation_schema(schema)?;
+    crate::work_graph_store::initialize_work_graph_schema(schema)?;
+    crate::tool_outcome_store::initialize_tool_outcome_schema(schema)
+        .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
+    crate::finding_market_store::initialize_finding_market_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::finding_purchase_store::initialize_finding_purchase_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::finding_recovery_store::initialize_finding_recovery_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::finding_challenge_store::initialize_finding_challenge_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    crate::finding_status_store::initialize_finding_status_schema(schema)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    initialize_global_commit_schema(schema)?;
+    if schema.is_fresh() {
+        schema
+            .stamp("serving_owner")
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     }
-    SqliteBudgetStore::initialize_connection_offline(connection)
-        .map_err(SqliteServingOwnerError::BudgetSchema)?;
-    initialize_revocation_schema(connection, true).map_err(|error| {
-        SqliteServingOwnerError::Invalid(format!("failed to initialize revocation schema: {error}"))
-    })?;
-    crate::stamp_schema_version(
-        connection,
-        "revocation",
-        REVOCATION_STORE_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-    crate::frost_store::initialize_frost_schema(connection)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-    crate::economic_state_cache::initialize_economic_state_cache_schema(connection)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-    crate::fiscal_store::initialize_fiscal_schema(connection)
-        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
     Ok(())
+}
+
+fn validate_serving_catalog(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+    let mut reference = Connection::open_in_memory()?;
+    let schema =
+        crate::schema_version::SchemaTransaction::begin(&mut reference, SERVING_NAMESPACES)
+            .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    initialize_serving_components(&schema)?;
+    schema.connection().execute_batch(SERVING_OWNER_SCHEMA)?;
+    crate::schema_catalog::validate_against(connection, schema.connection())
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))
+}
+
+fn validate_serving_schema(connection: &mut Connection) -> Result<(), SqliteServingOwnerError> {
+    let schema = crate::schema_version::SchemaTransaction::begin(connection, SERVING_NAMESPACES)
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    if schema.is_fresh() {
+        return Err(SqliteServingOwnerError::Invalid(
+            "serving database is not initialized".into(),
+        ));
+    }
+    verify_serving_owner_schema(schema.connection())?;
+    initialize_serving_components(&schema)?;
+    validate_serving_catalog(schema.connection())?;
+    schema
+        .commit()
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))
 }
 
 pub(crate) fn verify_budget_fence(

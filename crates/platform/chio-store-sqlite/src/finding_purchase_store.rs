@@ -86,12 +86,6 @@ use reservation_input::{encumbrance_matches, reservation_matches, validate_reser
 mod operator_recovery;
 
 const FINDING_PURCHASE_SCHEMA_KEY: &str = "finding_purchase";
-pub(crate) const FINDING_PURCHASE_SCHEMA_VERSION: i32 = 1;
-const FINDING_PURCHASE_SCHEMA_ANCHORS: &[&str] = &[
-    "purchase_reservations",
-    "admission_operations",
-    "chio_serving_owner",
-];
 const FINDING_PURCHASE_SCHEMA: &str = include_str!("finding_purchase_store.sql");
 
 /// Terminal record bodies are capped at 256 KiB, the persisted-operation
@@ -2746,32 +2740,20 @@ fn slot_state_from_name(name: &str) -> Result<FindingPurchaseSlotState, FindingP
 }
 
 pub(crate) fn initialize_finding_purchase_schema(
-    connection: &mut Connection,
-) -> Result<(), FindingPurchaseStoreError> {
-    let state = crate::check_current_schema(
-        connection,
-        FINDING_PURCHASE_SCHEMA_KEY,
-        FINDING_PURCHASE_SCHEMA_VERSION,
-        FINDING_PURCHASE_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if state == crate::SchemaState::Current {
-        return verify_finding_purchase_invariants(connection);
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), FindingPurchaseStoreError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction
+            .execute_batch(FINDING_PURCHASE_SCHEMA)
+            .map_err(sqlite_error)?;
+
+        schema
+            .stamp(FINDING_PURCHASE_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(FINDING_PURCHASE_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        FINDING_PURCHASE_SCHEMA_KEY,
-        FINDING_PURCHASE_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    verify_finding_purchase_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_finding_purchase_invariants(transaction)
 }
 
 /// Verify the purchase schema's shape: this database's table, index, and

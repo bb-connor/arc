@@ -2,6 +2,22 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+fn create_catalog(connection: &Connection) -> Result<(), SqliteServingOwnerError> {
+    let transaction = connection.unchecked_transaction()?;
+    let schema = crate::schema_version::SchemaTransaction::from_transaction(
+        transaction,
+        &["global_catalog_test"],
+    )
+    .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    initialize_global_commit_schema(&schema)?;
+    schema
+        .stamp("global_catalog_test")
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
+    schema
+        .commit()
+        .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))
+}
+
 fn seed_history(connection: &Connection) -> TestResult {
     let transaction = connection.unchecked_transaction()?;
     let reference = sha256_hex(b"global-catalog-baseline");
@@ -40,7 +56,7 @@ fn history_bytes(connection: &Connection) -> Result<Vec<u8>, Box<dyn std::error:
 }
 
 fn assert_catalog_refused(connection: &Connection) {
-    match initialize_global_commit_schema(connection) {
+    match verify_global_commit_schema(connection) {
         Err(SqliteServingOwnerError::Invalid(message)) => {
             assert_eq!(message, "global authority commit schema is not canonical");
         }
@@ -51,12 +67,12 @@ fn assert_catalog_refused(connection: &Connection) {
 #[test]
 fn canonical_global_catalog_reopens_without_rewriting_history() -> TestResult {
     let connection = Connection::open_in_memory()?;
-    initialize_global_commit_schema(&connection)?;
+    create_catalog(&connection)?;
     seed_history(&connection)?;
     let catalog = global_schema_catalog(&connection)?;
     let history = history_bytes(&connection)?;
     let head = load_global_commit_head(&connection)?;
-    initialize_global_commit_schema(&connection)?;
+    verify_global_commit_schema(&connection)?;
     assert_eq!(global_schema_catalog(&connection)?, catalog);
     assert_eq!(history_bytes(&connection)?, history);
     assert_eq!(load_global_commit_head(&connection)?, head);
@@ -195,7 +211,7 @@ fn failed_catalog_creation_rolls_back_every_created_object() -> TestResult {
         } => Authorization::Deny,
         _ => Authorization::Allow,
     }))?;
-    let result = initialize_global_commit_schema(&connection);
+    let result = create_catalog(&connection);
     connection.authorizer(None::<fn(AuthContext<'_>) -> Authorization>)?;
     match result {
         Err(SqliteServingOwnerError::Sqlite(rusqlite::Error::SqliteFailure(
@@ -214,7 +230,7 @@ fn failed_catalog_creation_rolls_back_every_created_object() -> TestResult {
     }
     assert!(connection.is_autocommit());
     assert_eq!(global_schema_catalog(&connection)?, Vec::new());
-    initialize_global_commit_schema(&connection)?;
+    create_catalog(&connection)?;
     verify_global_commit_schema(&connection)?;
     Ok(())
 }
@@ -239,7 +255,7 @@ fn differently_cased_reserved_names_refuse_without_catalog_changes() -> TestResu
 #[test]
 fn partial_catalog_with_a_genesis_head_refuses_without_repair() -> TestResult {
     let connection = Connection::open_in_memory()?;
-    initialize_global_commit_schema(&connection)?;
+    create_catalog(&connection)?;
     let head = load_global_commit_head(&connection)?;
     assert_eq!(head.head_sequence, 0);
     connection.execute_batch("DROP TABLE authority_global_commits")?;
