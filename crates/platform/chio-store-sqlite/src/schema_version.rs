@@ -25,7 +25,7 @@
 use rusqlite::{params, Connection, OptionalExtension};
 
 mod creation;
-pub use creation::SchemaTransaction;
+pub use creation::{inspect_schema, SchemaTransaction};
 
 /// ASCII "CHIO" as a big-endian `i32`, stamped into every Chio operator store.
 pub const CHIO_SQLITE_APPLICATION_ID: i32 = 0x4348_494f;
