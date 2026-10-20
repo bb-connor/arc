@@ -176,14 +176,29 @@ pub struct SqliteExecutionNonceStore {
     clock: StableReplayClock,
 }
 
-/// Execution-nonce-store schema revision. Bump on every schema-affecting change.
-const EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-/// Stable key under which this store records its schema revision in the shared
-/// keyed metadata table, distinct from any co-located store's key.
 const EXECUTION_NONCE_STORE_SCHEMA_KEY: &str = "execution_nonce";
-/// Tables shipped before schema stamping existed, used to adopt a pre-stamping
-/// execution-nonce database rather than reject it as foreign.
-const EXECUTION_NONCE_STORE_ANCHOR_TABLES: &[&str] = &["chio_execution_nonces"];
+const EXECUTION_NONCE_SCHEMA: &str = r#"
+CREATE TABLE chio_execution_nonces (
+    nonce_id    TEXT PRIMARY KEY,
+    consumed_at INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    dispatch_reservation_id TEXT
+);
+
+CREATE INDEX idx_chio_execution_nonces_expires_at
+    ON chio_execution_nonces(expires_at);
+
+CREATE TABLE chio_execution_nonce_clock (
+    singleton             INTEGER PRIMARY KEY CHECK (singleton = 1),
+    wall_clock_high_water INTEGER NOT NULL,
+    pruned_through        INTEGER NOT NULL DEFAULT -9223372036854775808
+);
+
+CREATE TABLE chio_execution_nonce_limits (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    capacity  INTEGER NOT NULL CHECK (capacity > 0)
+);
+"#;
 
 impl SqliteExecutionNonceStore {
     /// Open the store at the given path. Creates the parent directory
@@ -226,7 +241,7 @@ impl SqliteExecutionNonceStore {
             capacity,
             clock,
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         store.validate_retained_row_capacity()?;
         Ok(store)
     }
@@ -258,7 +273,7 @@ impl SqliteExecutionNonceStore {
             capacity,
             clock,
         };
-        store.run_migrations()?;
+        store.initialize_schema()?;
         store.validate_retained_row_capacity()?;
         Ok(store)
     }
@@ -272,110 +287,66 @@ impl SqliteExecutionNonceStore {
         Ok(())
     }
 
-    fn run_migrations(&self) -> Result<(), SqliteExecutionNonceStoreError> {
-        let mut conn = self.pool.get().map_err(|error| {
+    fn initialize_schema(&self) -> Result<(), SqliteExecutionNonceStoreError> {
+        let mut connection = self.pool.get().map_err(|error| {
             SqliteExecutionNonceStoreError::storage(format!("pool acquire: {error}"))
         })?;
-        let existing: bool = conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'chio_execution_nonces')", [], |row| row.get(0),
-        )?;
-        if existing {
-            let version: i32 = conn.query_row(
-                "SELECT version FROM chio_store_schema_versions WHERE store_key = ?1",
-                [EXECUTION_NONCE_STORE_SCHEMA_KEY],
-                |row| row.get(0),
-            )?;
-            if version != EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION {
-                return Err(SqliteExecutionNonceStoreError::storage(
-                    "unsupported execution nonce schema",
-                ));
-            }
-            // Existing stores must already carry the full owned-custody schema.
-            // Never synthesize a clock or ownership column from older rows.
-            conn.prepare("SELECT dispatch_reservation_id FROM chio_execution_nonces LIMIT 0")?;
-            conn.query_row(
-                "SELECT pruned_through FROM chio_execution_nonce_clock WHERE singleton = 1",
-                [],
-                |row| row.get::<_, i64>(0),
-            )?;
-            conn.query_row(
-                "SELECT capacity FROM chio_execution_nonce_limits WHERE singleton = 1",
-                [],
-                |row| row.get::<_, i64>(0),
-            )?;
-        }
-        crate::check_schema_version(
-            &conn,
-            EXECUTION_NONCE_STORE_SCHEMA_KEY,
-            EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
-            EXECUTION_NONCE_STORE_ANCHOR_TABLES,
+        let schema = crate::schema_version::SchemaTransaction::begin(
+            &mut connection,
+            &[EXECUTION_NONCE_STORE_SCHEMA_KEY],
         )
         .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
-        conn.execute_batch(
-            r#"
-            PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = FULL;
-            PRAGMA busy_timeout = 5000;
-            "#,
-        )?;
-
-        let tx = conn.transaction()?;
-        tx.execute_batch(
-            r#"
-            CREATE TABLE IF NOT EXISTS chio_execution_nonces (
-                nonce_id    TEXT PRIMARY KEY,
-                consumed_at INTEGER NOT NULL,
-                expires_at  INTEGER NOT NULL,
-                dispatch_reservation_id TEXT
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_chio_execution_nonces_expires_at
-                ON chio_execution_nonces(expires_at);
-
-            CREATE TABLE IF NOT EXISTS chio_execution_nonce_clock (
-                singleton             INTEGER PRIMARY KEY CHECK (singleton = 1),
-                wall_clock_high_water INTEGER NOT NULL,
-                pruned_through        INTEGER NOT NULL DEFAULT -9223372036854775808
-            );
-
-            CREATE TABLE IF NOT EXISTS chio_execution_nonce_limits (
-                singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
-                capacity  INTEGER NOT NULL CHECK (capacity > 0)
-            );
-            "#,
-        )?;
-
+        if schema.is_fresh() {
+            schema.connection().execute_batch(EXECUTION_NONCE_SCHEMA)?;
+        }
+        schema
+            .validate_catalog(EXECUTION_NONCE_SCHEMA)
+            .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
         let capacity = i64::try_from(self.capacity).map_err(|_| {
             SqliteExecutionNonceStoreError::storage(
                 "execution nonce store capacity exceeds SQLite integer range",
             )
         })?;
-        tx.execute(
-            "INSERT INTO chio_execution_nonce_limits (singleton, capacity) VALUES (1, ?1) ON CONFLICT(singleton) DO NOTHING",
-            params![capacity],
-        )?;
-
-        let migration_now = self
+        if !schema.is_fresh() {
+            schema.connection().query_row(
+                "SELECT pruned_through FROM chio_execution_nonce_clock WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?;
+            schema.connection().query_row(
+                "SELECT capacity FROM chio_execution_nonce_limits WHERE singleton = 1",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?;
+        }
+        let now = self
             .clock
             .expected_wall_now()
             .map_err(map_replay_clock_error)?;
-        tx.execute(
-            "INSERT INTO chio_execution_nonce_clock (singleton, wall_clock_high_water) VALUES (1, ?1) ON CONFLICT(singleton) DO NOTHING",
-            params![migration_now],
+        if schema.is_fresh() {
+            schema.connection().execute(
+                "INSERT INTO chio_execution_nonce_limits (singleton, capacity) VALUES (1, ?1)",
+                params![capacity],
+            )?;
+            schema.connection().execute(
+                "INSERT INTO chio_execution_nonce_clock (singleton, wall_clock_high_water) VALUES (1, ?1)",
+                params![now],
+            )?;
+            schema
+                .stamp(EXECUTION_NONCE_STORE_SCHEMA_KEY)
+                .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
+        } else {
+            schema.connection().execute(
+                "UPDATE chio_execution_nonce_clock SET wall_clock_high_water = MAX(wall_clock_high_water, ?1) WHERE singleton = 1",
+                params![now],
+            )?;
+        }
+        schema
+            .commit()
+            .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
+        connection.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
         )?;
-        tx.execute(
-            "UPDATE chio_execution_nonce_clock SET wall_clock_high_water = MAX(wall_clock_high_water, ?1) WHERE singleton = 1",
-            params![migration_now],
-        )?;
-
-        tx.commit()?;
-
-        crate::stamp_schema_version(
-            &conn,
-            EXECUTION_NONCE_STORE_SCHEMA_KEY,
-            EXECUTION_NONCE_STORE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| SqliteExecutionNonceStoreError::storage(error.to_string()))?;
         Ok(())
     }
 
@@ -1280,7 +1251,7 @@ mod tests {
             )
             .unwrap(),
         };
-        advanced.run_migrations().unwrap();
+        advanced.initialize_schema().unwrap();
         advanced.validate_retained_row_capacity().unwrap();
         drop(advanced);
 

@@ -1,7 +1,7 @@
 //! Public nonce custody contract with an injected clock and exact signed expiry.
 use chio_kernel::{ExecutionNonceStore, KernelError};
 use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
-use chio_store_sqlite::SqliteExecutionNonceStore;
+use chio_store_sqlite::{SqliteExecutionNonceStore, SqliteExecutionNonceStoreError};
 use chio_test_support::prelude::*;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -87,6 +87,67 @@ fn persists_consumed_marker_across_reopen() {
     assert!(!store
         .reserve_until("persistent-id", 10_120)
         .test_expect("replay"));
+}
+
+#[test]
+fn schema_reopen_refuses_a_deleted_stamp_without_repair() -> Result<(), Box<dyn std::error::Error>>
+{
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("nonce.sqlite");
+    let clock = TestClock::new();
+    let store = SqliteExecutionNonceStore::open_with_clock(&path, 4, clock.clone())?;
+    assert!(store.reserve_until("retained", 10_120)?);
+    drop(store);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute(
+        "DELETE FROM chio_store_schema_versions WHERE store_key = 'execution_nonce'",
+        [],
+    )?;
+    assert!(matches!(
+        SqliteExecutionNonceStore::open_with_clock(&path, 4, clock),
+        Err(SqliteExecutionNonceStoreError::Storage(message))
+            if message == "schema namespace execution_nonce is missing"
+    ));
+    let stamps: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_store_schema_versions WHERE store_key = 'execution_nonce'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(stamps, 0);
+    let retained: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_execution_nonces WHERE nonce_id = 'retained'",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(retained, 1);
+    Ok(())
+}
+
+#[test]
+fn schema_reopen_refuses_a_missing_index_without_repair() -> Result<(), Box<dyn std::error::Error>>
+{
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("nonce.sqlite");
+    let clock = TestClock::new();
+    drop(SqliteExecutionNonceStore::open_with_clock(
+        &path,
+        4,
+        clock.clone(),
+    )?);
+    let connection = rusqlite::Connection::open(&path)?;
+    connection.execute_batch("DROP INDEX idx_chio_execution_nonces_expires_at;")?;
+    assert!(matches!(
+        SqliteExecutionNonceStore::open_with_clock(&path, 4, clock),
+        Err(SqliteExecutionNonceStoreError::Storage(message))
+            if message == "schema catalog differs from its canonical definition"
+    ));
+    let present: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_chio_execution_nonces_expires_at')",
+        [],
+        |row| row.get(0),
+    )?;
+    assert!(!present);
+    Ok(())
 }
 
 #[test]
