@@ -1,0 +1,16 @@
+{
+  "schema": "chio.trust.passport-revocation-leaves.v1",
+  "after": 0,
+  "leaves": [
+    {
+      "seq": 1,
+      "subject": "sha256:passport-a",
+      "epochNonce": 8097314145853142528
+    },
+    {
+      "seq": 2,
+      "subject": "sha256:passport-b",
+      "epochNonce": 8097314145853142528
+    }
+  ]
+}

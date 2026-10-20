@@ -355,6 +355,8 @@ pub mod finding_verified_fix;
 mod ingress_lanes;
 #[path = "trust_control/passport_handlers.rs"]
 mod passport_handlers;
+
+mod passport_revocation_routes;
 #[path = "trust_control/receipt_handlers.rs"]
 mod receipt_handlers;
 #[path = "trust_control/receipt_query_service.rs"]
@@ -423,6 +425,7 @@ pub use self::finding_handlers::{
 pub(crate) use self::fiscal_handlers::*;
 pub(crate) use self::fiscal_runtime::*;
 pub(crate) use self::passport_handlers::*;
+pub(crate) use self::passport_revocation_routes::*;
 pub(crate) use self::receipt_handlers::*;
 pub(crate) use self::receipt_snapshot_admin::{
     handle_receipt_query_snapshot_recovery, RECEIPT_QUERY_SNAPSHOT_RECOVERY_PATH,

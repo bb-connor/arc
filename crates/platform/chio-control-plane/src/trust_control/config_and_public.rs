@@ -13,7 +13,7 @@ pub(crate) use generic_listing::{
 };
 #[cfg(test)]
 pub(crate) use public_authority_read::public_passport_credential_issuer;
-use public_authority_read::resolve_public_authority_signing_key_for_status;
+pub(crate) use public_authority_read::resolve_public_authority_signing_key_for_status;
 pub(crate) use public_authority_read::{
     public_authority_status, public_authority_verification_status,
     public_passport_credential_issuer_with_status, public_replicated_authority_verification_status,
@@ -1317,6 +1317,16 @@ pub(crate) fn resolve_oid4vp_verifier_signing_key(
 #[path = "config_and_public/portable_issuer_fetch.rs"]
 mod portable_issuer_fetch;
 pub(crate) use portable_issuer_fetch::*;
+#[path = "config_and_public/partner_revocation_sync.rs"]
+mod partner_revocation_sync;
+#[cfg(test)]
+pub(crate) use partner_revocation_sync::check_partner_passport_revocation_with;
+pub use partner_revocation_sync::sync_partner_revocation_mirror;
+#[cfg(test)]
+pub(crate) use partner_revocation_sync::PartnerRevocationFeed;
+pub(crate) use partner_revocation_sync::{
+    check_partner_passport_revocation, native_passport_issuers, VerifiedPassportIssuer,
+};
 pub(crate) fn build_enterprise_admission_audit(
     identity: &EnterpriseIdentityContext,
     subject_public_key: &str,
@@ -1614,6 +1624,7 @@ mod config_and_public_tests {
             verifier_policies_file: None,
             verifier_challenge_db_path: None,
             passport_statuses_file: None,
+            revocation_partners_file: None,
             passport_issuance_offers_file: None,
             certification_registry_file: None,
             certification_discovery_file: None,

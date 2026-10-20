@@ -373,7 +373,7 @@ ALLOWLIST: dict[str, AllowlistEntry] = {
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/finding_wedge_purchase_e2e_tests.rs": allow(
         "2027-01-31",
         "cognition purchase and recovery end-to-end regression suite with bounded buyer admission and durable replay coverage; capped to current size until split",
-        max_lines=7_502,
+        max_lines=7_503,
         max_fragments=3,
     ),
     "crates/platform/chio-store-sqlite/src/finding_market_store.rs": allow(

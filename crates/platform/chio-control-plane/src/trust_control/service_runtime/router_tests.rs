@@ -38,6 +38,10 @@ mod behavioral_signing_custody;
 #[path = "router_tests/federation_reputation_trust.rs"]
 mod federation_reputation_trust;
 
+#[cfg(unix)]
+#[path = "router_tests/passport_revocation_feed.rs"]
+mod passport_revocation_feed;
+
 fn metrics_state(service_token: &str) -> TrustServiceState {
     let config = TrustServiceConfig {
         transport: Default::default(),
@@ -61,6 +65,7 @@ fn metrics_state(service_token: &str) -> TrustServiceState {
         verifier_policies_file: None,
         verifier_challenge_db_path: None,
         passport_statuses_file: None,
+        revocation_partners_file: None,
         passport_issuance_offers_file: None,
         certification_registry_file: None,
         certification_discovery_file: None,

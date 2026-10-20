@@ -4690,6 +4690,41 @@ Portable lifecycle resolution itself remains Chio-native and operator-scoped:
   lifecycle distributions that omit TTL are not healthy states for portable
   consumers
 
+Trust-control also publishes its passport revocation set to federation
+partners:
+
+- `GET /v1/public/passport/revocations/root` returns a
+  `chio.trust.passport-revocation-root.v1` document whose `signedRoot` is the
+  oracle's `SignedEpochRoot`, signed with the trust-control authority key over the
+  `chio-revocation-oracle:v1:epoch-root` domain; its `issued_at_unix_ms` is
+  the signing time and its `signer_id` is the authority public key in hex
+- `GET /v1/public/passport/revocations/leaves?after={seq}` returns a
+  `chio.trust.passport-revocation-leaves.v1` page of the leaves with a sequence
+  number above `after`, in insertion order, at most 256 leaves and 512 KiB
+- a partner's operator-local revocation partner registry binds the issuer URL
+  carried as the signed `iss` of its passports to the pinned authority key and
+  a `revocationFreshnessTtlSeconds` of 1 to 300 seconds; an entry without the
+  TTL, or with a TTL outside that range, refuses the registry
+- the partner rebuilds the tree from the leaves and accepts the signed root
+  only when the rebuilt root, epoch and leaf count equal it; a root that does
+  not verify against the pinned key, rolls back the accepted epoch or signing
+  time, is dated more than 5 seconds ahead, or signs a second root for an
+  accepted epoch is refused, and a refused root leaves the mirror unchanged
+- a mirror whose accepted root is older than the TTL, or that holds no
+  verified root, is stale and denies fail closed
+- the verifier binds a presented passport to a partner by its verified issuer:
+  the signed `iss` of an OID4VP credential, compared to the registered issuer
+  under case-insensitive scheme and host, default port elision and trailing
+  path slashes, or a native credential issuer DID equal to the `did:chio` of
+  the partner's authority key; an `iss` that carries userinfo, a query or a
+  fragment is refused
+- every passport door applies the check: OID4VP direct post, federated issue,
+  and the service and public challenge verification routes; each reads the
+  partner registry on every check, syncs a stale mirror on demand, and refuses
+  the passport when the mirror stays stale, cannot be verified, or holds it
+- a mirror records each distinct conflicting root once, up to 256, and refuses
+  any further conflicting root once that bound is reached
+
 Chio now also ships one bounded public discovery layer over those existing
 issuer and verifier metadata surfaces:
 
