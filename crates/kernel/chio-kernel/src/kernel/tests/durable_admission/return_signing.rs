@@ -29,9 +29,9 @@ fn unfinished_return_cannot_be_signed_by_a_replacement_authority() -> TestResult
         &mut mutation,
         input(&request),
     )?;
-    let original_key = kernel.receipt_signing_public_key();
+    let original_key = kernel.receipt_signing_public_key().unwrap();
     replace_receipt_authority(&mut kernel);
-    assert_ne!(kernel.receipt_signing_public_key(), original_key);
+    assert_ne!(kernel.receipt_signing_public_key().unwrap(), original_key);
     let returned = kernel.record_durable_tool_return(
         &mut admission,
         DurableToolReturnInput {
@@ -112,7 +112,7 @@ fn completed_replay_retains_signer(nested: bool) -> TestResult {
     assert!(response.receipt.verify_signature()?);
     let original_key = response.receipt.kernel_key.clone();
     replace_receipt_authority(&mut kernel);
-    assert_ne!(kernel.receipt_signing_public_key(), original_key);
+    assert_ne!(kernel.receipt_signing_public_key().unwrap(), original_key);
     let replay = kernel.evaluate_tool_call_blocking(&request)?;
     assert_same_receipt(&replay.receipt, &response.receipt);
     assert_eq!(replay.output, response.output);

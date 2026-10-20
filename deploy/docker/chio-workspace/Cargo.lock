@@ -3769,6 +3769,7 @@ dependencies = [
  "chio-credit",
  "chio-custody-hw",
  "chio-federation",
+ "chio-kernel",
  "chio-kernel-core",
  "chio-link",
  "chio-log-redact",

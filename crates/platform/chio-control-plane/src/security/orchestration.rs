@@ -695,8 +695,7 @@ impl ProductionDeclassificationReceiptLifecycle {
         self.outbox.clone()
     }
 
-    #[must_use]
-    pub(super) fn signer_public_key(&self) -> chio_core::PublicKey {
+    pub(super) fn signer_public_key(&self) -> Result<chio_core::PublicKey, chio_core::Error> {
         self.signer.public_key()
     }
 }
@@ -946,7 +945,9 @@ impl ProductionActiveDefenseOrchestrator {
         let finding_authority: Arc<dyn ActiveResponseFindingAuthority> =
             Arc::new(NativeActiveResponseFindingAuthority::new(
                 Arc::clone(&indexed_evidence_store),
-                vec![lifecycle.signer_public_key()],
+                vec![lifecycle
+                    .signer_public_key()
+                    .map_err(|_| PortError::unavailable())?],
             )?);
         let attestor = Arc::new(AttestedCorrelationWriter::new(
             Arc::clone(&receipt_sink),

@@ -519,7 +519,9 @@ fn privileged_audit_socket_round_trip_retains_runner_reference_precommitment() {
     let runner_gid = rustix::process::getegid().as_raw();
     let broker_signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
-    let trusted_broker = broker_signer.public_key();
+    let trusted_broker = broker_signer
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
     assert_eq!(trusted_broker, fixture.audit_receipt_signer);
     let endpoint = BrokerPrivilegedAuditEndpoint::bind(
         BrokerPrivilegedAuditEndpointConfig {
@@ -690,7 +692,9 @@ fn privileged_audit_socket_propagates_terminal_persistence_failure() {
     let runner_gid = rustix::process::getegid().as_raw();
     let broker_signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
-    let trusted_broker = broker_signer.public_key();
+    let trusted_broker = broker_signer
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
     let endpoint = BrokerPrivilegedAuditEndpoint::bind(
         BrokerPrivilegedAuditEndpointConfig {
             socket_path: socket_path.clone(),
@@ -802,7 +806,9 @@ fn an_authority_outage_fails_only_its_audit_session() {
     let runner_gid = rustix::process::getegid().as_raw();
     let broker_signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
-    let trusted_broker = broker_signer.public_key();
+    let trusted_broker = broker_signer
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
     let endpoint = BrokerPrivilegedAuditEndpoint::bind(
         BrokerPrivilegedAuditEndpointConfig {
             socket_path: socket_path.clone(),
@@ -900,7 +906,9 @@ fn a_credential_store_fault_during_an_audit_ends_the_audit_endpoint() {
     let runner_gid = rustix::process::getegid().as_raw();
     let broker_signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
-    let trusted_broker = broker_signer.public_key();
+    let trusted_broker = broker_signer
+        .public_key()
+        .unwrap_or_else(|error| panic!("signing identity: {error}"));
     let endpoint = BrokerPrivilegedAuditEndpoint::bind(
         BrokerPrivilegedAuditEndpointConfig {
             socket_path: socket_path.clone(),
@@ -1461,7 +1469,10 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
                 broker_instance_id: "test-broker-instance",
                 tenant_scope: "tenant-a",
                 runner_id: "test-enterprise-runner",
-                trusted_runner: &fixture.audit_runner.public_key(),
+                trusted_runner: &fixture
+                    .audit_runner
+                    .public_key()
+                    .unwrap_or_else(|error| panic!("signing identity: {error}")),
             },
             20,
         ),
@@ -1511,7 +1522,11 @@ fn audit_comparison_requires_exact_runner_and_durable_one_shot_governance() {
             threshold: 1,
             maximum_token_lifetime_seconds: 300,
         },
-        fixture.service.receipt_signer.public_key(),
+        fixture
+            .service
+            .receipt_signer
+            .public_key()
+            .unwrap_or_else(|error| panic!("signing identity: {error}")),
         Arc::new(trusted_time::FixedClock::new(20)),
     )
     .test_expect("reopen audit replay store");

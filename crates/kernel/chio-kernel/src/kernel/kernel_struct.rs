@@ -572,10 +572,9 @@ pub struct ChioKernel {
     pub(super) native_egress_checkpoint_hook: Option<super::NativeSecurityEgressCheckpointHook>,
     #[cfg(feature = "admission-test-support")]
     pub(super) native_capture_checkpoint_hook: Option<super::NativeSecurityCaptureCheckpointHook>,
-    /// Unsafe opt-in for development fixtures that exercise the non-durable
-    /// financial lifecycle. Production construction leaves this false, so a
-    /// financial hold cannot cross a connector boundary without durable recovery
-    /// coverage.
+    /// Test-support switch that lets a financial hold cross a connector
+    /// boundary without durable recovery coverage. Construction leaves it false.
+    #[cfg(any(test, feature = "admission-test-support"))]
     pub(super) unsafe_ephemeral_financial_dispatch: bool,
     /// Guards are stored behind `Arc` so a single guard can be cloned into a
     /// `spawn_blocking` task without moving the whole pipeline, letting the

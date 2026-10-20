@@ -260,6 +260,19 @@ pub const TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED: ErrorCodeSpec = ErrorCodeSpe
     consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
 };
 
+pub const TRANSACTION_VERIFIER_CONTEXT_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transaction:verifier-context-invalid",
+    domain: Domain::Transaction,
+    severity: Severity::Error,
+    summary: "The trust context pinned for the verifier is malformed or inconsistent.",
+    help: "Correct the pinned verifier trust context (keys, digests, authority documents, or settlement settings) and rerun the verifier.",
+    string_code: "CHIO-TRANSACTION-VERIFIER-CONTEXT-INVALID",
+    jsonrpc_code: Some(7119),
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
+};
+
 pub const TRANSACTION_NEGATIVE_CASE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:transaction:negative-case-mismatch",
     domain: Domain::Transaction,
@@ -3756,6 +3769,19 @@ pub const TRANSPORT_INVALID_PROXY_HEADER: ErrorCodeSpec = ErrorCodeSpec {
     consumed_by: &["chio-mcp-remote"],
 };
 
+pub const TRANSPORT_SESSION_SPAWN_FAILED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transport:session-spawn-failed",
+    domain: Domain::Transport,
+    severity: Severity::Error,
+    summary: "The remote MCP edge could not construct a session for an admitted request.",
+    help: "Retry later; the operator must inspect the server log for the construction failure.",
+    string_code: "CHIO-TRANSPORT-SESSION-SPAWN-FAILED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-mcp-remote"],
+};
+
 pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_PASSPORT_SCHEMA_UNSUPPORTED,
     TRANSACTION_PASSPORT_HASH_MISMATCH,
@@ -3775,6 +3801,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_ARTIFACT_SCHEMA_INVALID,
     TRANSACTION_SIGNATURE_INVALID,
     TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
+    TRANSACTION_VERIFIER_CONTEXT_INVALID,
     TRANSACTION_NEGATIVE_CASE_MISMATCH,
     CAPABILITY_SCOPE_EXCEEDED,
     CAPABILITY_EXPIRED,
@@ -4037,6 +4064,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     KERNEL_MEDIATED_DENIAL,
     TRANSPORT_UNTRUSTED_PROXY,
     TRANSPORT_INVALID_PROXY_HEADER,
+    TRANSPORT_SESSION_SPAWN_FAILED,
 ];
 
 #[must_use]

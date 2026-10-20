@@ -6,7 +6,7 @@ pub(super) fn parse_graph_artifact_paths(
 ) -> Result<GraphArtifactPaths, CliError> {
     let graph: GraphArtifactPaths = crate::input::json(evidence_graph_bytes)?;
     if graph.nodes.len() > crate::input::collection::MAX_ENTRIES {
-        return Err(CliError::cli_other_error("proof graph node limit exceeded"));
+        return Err(artifact_schema_invalid("proof graph node limit exceeded"));
     }
     Ok(graph)
 }
@@ -19,10 +19,10 @@ pub(super) fn select_required_graph_node<'a>(
     let matches = graph_nodes_by_role(nodes, role);
     match matches.as_slice() {
         [node] => Ok(node),
-        [] => Err(CliError::cli_other_error(format!(
+        [] => Err(claim_rejected(format!(
             "proof verify: missing {label} artifact role: {role}",
         ))),
-        _ => Err(CliError::cli_other_error(format!(
+        _ => Err(artifact_schema_invalid(format!(
             "proof verify: multiple {label} artifact roles: {role}",
         ))),
     }
@@ -43,10 +43,10 @@ pub(super) fn select_required_graph_node_by_path<'a>(
     let matches: Vec<&GraphArtifactNode> = nodes.iter().filter(|node| node.path == path).collect();
     match matches.as_slice() {
         [node] => Ok(node),
-        [] => Err(CliError::cli_other_error(format!(
+        [] => Err(graph_not_closed(format!(
             "proof verify: missing {label} artifact path: {path}",
         ))),
-        _ => Err(CliError::cli_other_error(format!(
+        _ => Err(artifact_schema_invalid(format!(
             "proof verify: multiple {label} artifact paths: {path}",
         ))),
     }
@@ -98,7 +98,7 @@ pub(super) fn load_optional_graph_json_artifact<T: for<'de> serde::Deserialize<'
     match matches.as_slice() {
         [node] => load_graph_json_artifact(bundle_dir, node, expected_schema, label).map(Some),
         [] => Ok(None),
-        _ => Err(CliError::cli_other_error(format!(
+        _ => Err(artifact_schema_invalid(format!(
             "proof verify: multiple {label} artifact roles: {role}",
         ))),
     }
@@ -155,7 +155,7 @@ pub(super) fn load_graph_bytes_artifact_bounded(
 ) -> Result<Vec<u8>, CliError> {
     let schema = graph_node_schema(node, label)?;
     if schema != expected_schema {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_schema_invalid(format!(
             "proof verify: unsupported {label} artifact schema for {}: {schema}",
             node.path,
         )));
@@ -166,7 +166,7 @@ pub(super) fn load_graph_bytes_artifact_bounded(
     let actual_digest = chio_core::sha256_hex(&bytes);
     let expected_digest = graph_node_sha256(node, label)?;
     if actual_digest != expected_digest {
-        return Err(CliError::cli_other_error(format!(
+        return Err(artifact_digest_mismatch(format!(
             "proof verify: {label} artifact digest mismatch for {}: expected {}, got {}",
             node.path, expected_digest, actual_digest,
         )));
@@ -179,7 +179,7 @@ pub(super) fn graph_node_schema<'a>(
     label: &str,
 ) -> Result<&'a str, CliError> {
     node.schema.as_deref().ok_or_else(|| {
-        CliError::cli_other_error(format!(
+        artifact_schema_invalid(format!(
             "proof verify: missing {label} artifact schema for {}",
             node.path,
         ))
@@ -191,7 +191,7 @@ pub(super) fn graph_node_sha256<'a>(
     label: &str,
 ) -> Result<&'a str, CliError> {
     node.sha256.as_deref().ok_or_else(|| {
-        CliError::cli_other_error(format!(
+        artifact_schema_invalid(format!(
             "proof verify: missing {label} artifact digest for {}",
             node.path,
         ))

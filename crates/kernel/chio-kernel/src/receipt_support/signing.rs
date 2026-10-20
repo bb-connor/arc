@@ -282,7 +282,9 @@ pub fn sign_receipt_body_hybrid_canonical(
     // Fail-closed kernel-key match BEFORE any cryptographic work. Mirrors
     // `chio_kernel_core::sign_receipt` so the byte-identity contract holds
     // when callers route through either entrypoint.
-    let backend_pk: PublicKey = backend.public_key();
+    let backend_pk: PublicKey = backend
+        .public_key()
+        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))?;
     if body.kernel_key.algorithm() != backend_pk.algorithm() || body.kernel_key != backend_pk {
         return Err(KernelError::ReceiptSigningFailed(
             "kernel signing key does not match receipt body kernel_key".to_string(),
@@ -365,7 +367,7 @@ pub fn sign_receipt_body_hybrid_canonical(
         bbs_projection_version: None,
         kernel_key: body.kernel_key,
         bbs_signature: None,
-        algorithm: Some(backend.algorithm()),
+        algorithm: Some(backend_pk.algorithm()),
         signature,
     };
 

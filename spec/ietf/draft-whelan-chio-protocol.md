@@ -4153,7 +4153,7 @@ JSON-RPC code, if any; and reference. Codes are decimal integers from
 namespace and are not values in this registry.
 Experts check that the retry guidance distinguishes a changed condition
 from repeating an unsafe side effect. The initial allocations follow.
-Core allocations reference this document. Values 7100 through 7118 are
+Core allocations reference this document. Values 7100 through 7119 are
 reserved for related transaction profiles, rather than allocated by this
 document; their diagnostic names below describe current implementation
 usage. A future Specification Required registration supplies a permanent
@@ -4336,6 +4336,12 @@ public specification before assigning any reserved value.
   retry `do_not_retry`.
   Related-profile diagnostic name: `transaction_negative_case_mismatch`.
   Regenerate the negative case so it fails with its declared failure code, or correct the declared code.
+
+7119 (`transaction_verifier_context_invalid`):
+: Category `transaction`; transient `false`;
+  retry `do_not_retry`.
+  Related-profile diagnostic name: `transaction_verifier_context_invalid`.
+  Correct the pinned verifier trust context (keys, digests, authority documents, or settlement settings) and rerun the verifier.
 
 ## Chio Signature Suites {#iana-signature-suites}
 

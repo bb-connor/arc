@@ -9,7 +9,8 @@ use chio_errors::_generated::error_codes::{
     TRANSACTION_SIGNATURE_INVALID, TRANSACTION_RECEIPT_UNCHECKPOINTED,
     TRANSACTION_REQUIRED_CLAIM_MISSING, TRANSACTION_RUNTIME_PROOF_REJECTED,
     TRANSACTION_SETTLEMENT_UNVERIFIED,
-    TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED, TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
+    TRANSACTION_TRANSPARENCY_PREVIEW_NOT_ALLOWED, TRANSACTION_VERIFIER_CONTEXT_INVALID,
+    TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
 };
 use chio_errors::ErrorCodeSpec;
 
@@ -96,30 +97,16 @@ const PROOF_VERIFY_EXIT_BY_CODE: &[(&ErrorCodeSpec, i32)] = &[
         &TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
         PROOF_VERIFY_EXIT_UNSUPPORTED_FEATURE,
     ),
+    (
+        &TRANSACTION_VERIFIER_CONTEXT_INVALID,
+        PROOF_VERIFY_EXIT_UNSUPPORTED_FEATURE,
+    ),
 ];
 
-/// A registry code decides the exit class before any message is read. The
-/// message fallback below applies only to errors that carry no transaction
-/// code, and never yields 40.
+/// The exit class is a function of the registry code alone; the message is
+/// never read.
 pub(super) fn proof_verify_exit_code(error: &CliError) -> i32 {
-    let report = error.report();
-    if let Some(exit_code) = proof_verify_registry_exit_code(report.code.as_str()) {
-        return exit_code;
-    }
-    let message = report.message.as_str();
-    if proof_verify_required_claim_failed(message) {
-        return PROOF_VERIFY_EXIT_REQUIRED_CLAIM_FAILED;
-    }
-    if proof_verify_integrity_failed(message) {
-        return PROOF_VERIFY_EXIT_INTEGRITY_FAILURE;
-    }
-    if proof_verify_parse_or_schema_failed(message) {
-        return PROOF_VERIFY_EXIT_PARSE_OR_SCHEMA_FAILURE;
-    }
-    if proof_verify_unsupported_feature(message) {
-        return PROOF_VERIFY_EXIT_UNSUPPORTED_FEATURE;
-    }
-    PROOF_VERIFY_EXIT_GENERIC
+    proof_verify_registry_exit_code(error.report().code.as_str()).unwrap_or(PROOF_VERIFY_EXIT_GENERIC)
 }
 
 fn proof_verify_registry_exit_code(code: &str) -> Option<i32> {
@@ -133,43 +120,6 @@ fn proof_verify_registry_exit_code(code: &str) -> Option<i32> {
         return Some(PROOF_VERIFY_EXIT_PARSE_OR_SCHEMA_FAILURE);
     }
     None
-}
-
-fn proof_verify_required_claim_failed(message: &str) -> bool {
-    message.contains("required proof claim not verified")
-        || message.contains("required proof claim family missing")
-        || message.contains("required proof runtime authority missing")
-        || message.contains("required delegation claim not verified")
-        || message.contains("required commerce claim not verified")
-        || message.contains("required disclosure lineage claim not verified")
-        || message.contains("required swarm claim not verified")
-        || message.contains("required public settlement claim not verified")
-}
-
-fn proof_verify_integrity_failed(message: &str) -> bool {
-    message.contains("digest mismatch")
-        || message.contains("hash mismatch")
-        || message.contains("proof-room.signature.")
-        || message.contains("signature invalid")
-        || message.contains("signature verification failed")
-        || message.contains("manifest integrity")
-}
-
-fn proof_verify_parse_or_schema_failed(message: &str) -> bool {
-    message.contains("unsupported transaction passport schema")
-        || message.contains("unsupported verifier policy schema")
-        || message.contains("unsupported evidence graph schema")
-        || message.contains("unsupported required proof claim")
-        || message.contains("proof-room.schema-violation")
-        || message.contains("json error")
-        || message.contains("missing field")
-}
-
-fn proof_verify_unsupported_feature(message: &str) -> bool {
-    message.contains("unsupported proof feature")
-        || message.contains("must pin trusted")
-        || message.contains("missing disclosure crypto verification context")
-        || message.contains("missing disclosure selective disclosure proof")
 }
 
 pub(super) fn map_proof_error(
@@ -459,6 +409,14 @@ pub(super) fn graph_not_closed(message: impl Into<String>) -> CliError {
 
 pub(super) fn verifier_feature_unsupported(message: impl Into<String>) -> CliError {
     CliError::registry_error(&TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED, message)
+}
+
+pub(super) fn verifier_context_invalid(message: impl Into<String>) -> CliError {
+    CliError::registry_error(&TRANSACTION_VERIFIER_CONTEXT_INVALID, message)
+}
+
+pub(super) fn authorization_not_bound(message: impl Into<String>) -> CliError {
+    CliError::registry_error(&TRANSACTION_AUTHORIZATION_NOT_BOUND, message)
 }
 
 fn evidence_graph_artifact_spec(message: &str) -> &'static ErrorCodeSpec {

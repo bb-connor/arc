@@ -67,7 +67,8 @@ pub enum ReceiptSigningError {
 ///   `content_hash` does not match `sha256_hex(canonical_content)`.
 /// - [`ReceiptSigningError::KernelKeyMismatch`] when `body.kernel_key` does not
 ///   match `backend.public_key()`.
-/// - [`ReceiptSigningError::SigningFailed`] when canonical signing fails.
+/// - [`ReceiptSigningError::SigningFailed`] when the backend identity cannot be
+///   read or canonical signing fails.
 pub fn sign_receipt(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
@@ -127,12 +128,28 @@ pub fn sign_receipt(
 ///
 /// - [`ReceiptSigningError::KernelKeyMismatch`] when `body.kernel_key` does not
 ///   match `backend.public_key()`.
-/// - [`ReceiptSigningError::SigningFailed`] when canonical signing fails.
+/// - [`ReceiptSigningError::SigningFailed`] when the backend identity cannot be
+///   read or canonical signing fails.
 pub fn sign_receipt_relaying_trusted_body(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,
 ) -> Result<ChioReceipt, ReceiptSigningError> {
-    let backend_key = backend.public_key();
+    let backend_key = match backend.public_key() {
+        Ok(key) => key,
+        Err(error) => {
+            // The proof models the refusal, not the rendering of its error.
+            #[cfg(kani)]
+            {
+                core::mem::forget(body);
+                core::mem::forget(error);
+                return Err(ReceiptSigningError::SigningFailed(
+                    alloc::string::String::new(),
+                ));
+            }
+            #[cfg(not(kani))]
+            return Err(ReceiptSigningError::SigningFailed(error.to_string()));
+        }
+    };
     let key_mismatch =
         body.kernel_key.algorithm() != backend_key.algorithm() || body.kernel_key != backend_key;
     // The proof models authorization and signing, not heap reclamation. Keep
@@ -157,6 +174,7 @@ pub fn sign_receipt_relaying_trusted_body(
         let signature = backend
             .sign_bytes(b"kani-receipt-signing-model")
             .map_err(|error| ReceiptSigningError::SigningFailed(error.to_string()))?;
+        let algorithm = body.kernel_key.algorithm();
         return Ok(ChioReceipt {
             id: body.id,
             timestamp: body.timestamp,
@@ -180,7 +198,7 @@ pub fn sign_receipt_relaying_trusted_body(
             bbs_projection_version: body.bbs_projection_version,
             kernel_key: body.kernel_key,
             bbs_signature: None,
-            algorithm: Some(backend.algorithm()),
+            algorithm: Some(algorithm),
             signature,
         });
     }
@@ -221,7 +239,8 @@ pub fn sign_receipt_relaying_trusted_body(
 ///   `content_hash` does not match the handle's recomputed hash.
 /// - [`ReceiptSigningError::KernelKeyMismatch`] when `body.kernel_key` does not
 ///   match `backend.public_key()`.
-/// - [`ReceiptSigningError::SigningFailed`] when canonical signing fails.
+/// - [`ReceiptSigningError::SigningFailed`] when the backend identity cannot be
+///   read or canonical signing fails.
 pub fn sign_receipt_with_handle(
     body: ChioReceiptBody,
     backend: &dyn SigningBackend,

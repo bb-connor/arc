@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::admission_operation::AdmissionMutationSequencer;
-use chio_core::crypto::{Ed25519Backend, SigningAlgorithm, SigningBackend, SigningOutcome};
+use chio_core::crypto::{Ed25519Backend, SigningBackend, SigningOutcome};
 use chio_core::{PublicKey, Signature};
 use std::sync::{mpsc, Mutex};
 
@@ -25,10 +25,7 @@ struct SigningProbe {
 }
 
 impl SigningBackend for SigningProbe {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.inner.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.inner.public_key()
     }
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature, chio_core::Error> {

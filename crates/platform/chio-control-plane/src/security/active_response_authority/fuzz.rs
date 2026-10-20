@@ -15,7 +15,7 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
             user_id: 1000,
             group_id: 1000,
         },
-        trusted_client: signer.public_key(),
+        trusted_client: signer.public_key()?,
         deployment_digest: Digest32::new([3; 32]),
         store_digest: Digest32::new([4; 32]),
         timeout_ms: 1000,
@@ -28,13 +28,13 @@ fn drive(data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
         store_digest: config.store_digest,
         request_id: RequestId::new("fuzz-authority-request")?,
         issued_at_unix_seconds: 1000,
-        client: signer.public_key(),
+        client: signer.public_key()?,
         operation: ActiveResponseAuthorityOperation::Health,
     };
     let signature = signer.sign_bytes(&active_response_authority_request_signing_bytes(&body)?)?;
     let signed = SignedActiveResponseAuthorityRequest {
         body,
-        algorithm: signer.algorithm(),
+        algorithm: signer.public_key()?.algorithm(),
         signature,
     };
     let valid = canonical_json_bytes(&signed)?;

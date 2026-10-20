@@ -63,7 +63,7 @@ side effects.
 | `default` | Yes | Enables `delegation`. |
 | `delegation` | Yes | Enables core delegation types and consultation of an installed recursive revocation view. |
 | `finding-market` | No | Compiles finding purchase/recovery enforcement, pool ledger, and swarm authority dependency. |
-| `admission-test-support` | No | Exposes admission qualification checkpoints, including capture-only native checkpoints. |
+| `admission-test-support` | No | Exposes admission qualification checkpoints, including capture-only native checkpoints, and the switch that lets test fixtures dispatch financial calls without durable admission. |
 | `pq` | No | Enables core PQ support and the boot-gated hybrid signing configuration. |
 | `otel` | No | Adds semantic-convention constants for GenAI tool-call telemetry. |
 | `dhat-heap` | No | Enables the heap-profiling dispatch benchmark target. |

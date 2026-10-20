@@ -605,6 +605,7 @@ run_exact_target --label "kernel-owned native egress" --allow-filtered --expecte
   kernel::tests::durable_admission::native_egress::native_egress_observation_time_must_fall_inside_the_read_interval \
   kernel::tests::durable_admission::native_egress::native_egress_operation_change_after_preparation_prevents_acquisition \
   kernel::tests::durable_admission::native_egress::capture_once::direct::native_direct_retention_is_classified_by_committed_egress_readback \
+  kernel::tests::durable_admission::native_egress::capture_once::native_checkpoint_capture_is_single_use_and_classified_by_store_entry \
   kernel::tests::durable_admission::native_egress::capture_once::native_lifecycle_capture_is_single_use_and_classified_by_store_entry \
   kernel::tests::durable_admission::native_egress::capture_once::retained::native_authority_retention_classifies_failures_by_first_durable_write \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_egress
@@ -894,7 +895,7 @@ run_exact_target --label "frozen dispatch participant context" --allow-filtered 
   kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
-  kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::unreadable_backend_key_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
   kernel::tests::durable_admission::return_context::nested_oversized_request_is_refused_before_admission \
@@ -946,7 +947,7 @@ run_exact_target --label "frozen durable receipt signing" --allow-filtered --exp
   kernel::tests::durable_admission::return_context::signing::raw_signing_identity_codec_rejects_missing_identity_wrong_schema_and_invalid_floor \
   kernel::tests::durable_admission::return_context::signing::unfinished_return_cannot_be_signed_by_a_replacement_authority \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::malformed_retained_identity_stays_global_before_signer_comparison \
-  kernel::tests::durable_admission::return_context::signing::recovery_classification::misreported_backend_algorithm_stays_global_with_a_replaced_signer \
+  kernel::tests::durable_admission::return_context::signing::recovery_classification::unreadable_backend_key_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::panicking_backend_key_selection_stays_global \
   kernel::tests::durable_admission::return_context::signing::recovery_classification::replaced_signer_defers_until_the_original_authority_returns \
   kernel::tests::durable_admission::return_context::signing::replay::compensated_cancellation_replay_uses_original_signer_without_reinvocation \

@@ -212,8 +212,8 @@ struct PinnedWorkloadAuthority {
 }
 
 impl CapabilityAuthority for PinnedWorkloadAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.key.clone()
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
+        Ok(self.key.clone())
     }
 
     fn workload_binding(&self) -> Option<CapabilityAuthorityWorkloadBinding> {

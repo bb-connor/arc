@@ -1146,8 +1146,7 @@ fn terminal_constraint_or_storage(error: rusqlite::Error) -> BrokerError {
 #[cfg(test)]
 mod tests {
     use chio_core_types::{
-        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-        SigningOutcome,
+        Ed25519Backend, Error, Keypair, PublicKey, Signature, SigningBackend, SigningOutcome,
     };
     use chio_test_support::prelude::*;
 
@@ -1181,12 +1180,8 @@ mod tests {
     }
 
     impl SigningBackend for AtomicOnlyBackend {
-        fn algorithm(&self) -> SigningAlgorithm {
-            self.keypair.public_key().algorithm()
-        }
-
-        fn public_key(&self) -> PublicKey {
-            self.keypair.public_key()
+        fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+            Ok(self.keypair.public_key())
         }
 
         fn sign_bytes(&self, _message: &[u8]) -> chio_core_types::Result<Signature> {

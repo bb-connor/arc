@@ -126,7 +126,7 @@ impl FindingChallengeCoordinator {
         body.bond_snapshot_envelope_sha256 = self.envelope_digest(bond_snapshot)?;
         body.finalized_at = now;
         body.finalization_authority_id = self.finalization_pin.authority_id.clone();
-        body.finalization_key = self.finalization_authority.public_key();
+        body.finalization_key = role_key(self.finalization_authority.as_ref())?;
         body.finalization_key_epoch = self.finalization_pin.key_epoch;
         body.finalization_valid_from = self.finalization_pin.valid_from;
         body.finalization_valid_until = self.finalization_pin.valid_until;
@@ -153,7 +153,7 @@ impl FindingChallengeCoordinator {
             "settlement observer",
         )?;
         let pins = FindingEnforcementPins {
-            finalization_authority: self.finalization_authority.public_key(),
+            finalization_authority: role_key(self.finalization_authority.as_ref())?,
             settlement_observer,
             seller: durable_seller,
             finality_requirement: self.pins.settlement_finality_requirement,

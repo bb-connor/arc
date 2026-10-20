@@ -170,7 +170,9 @@ pub fn sign_register_attempt_authorization(
             "register-attempt authorization time is invalid".to_string(),
         ));
     }
-    let expected_authority = signer.public_key();
+    let expected_authority = signer
+        .public_key()
+        .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
     let body = RegisterAttemptAuthorizationBody {
         schema: REGISTER_ATTEMPT_AUTHORIZATION_SCHEMA.to_string(),
         action,

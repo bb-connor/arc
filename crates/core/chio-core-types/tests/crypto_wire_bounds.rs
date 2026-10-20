@@ -548,7 +548,7 @@ fn hybrid_backend_signatures_verify_after_wire_and_json_round_trip() -> TestResu
 #[cfg(any(feature = "fips", feature = "pq"))]
 fn assert_signed_round_trip(backend: &dyn chio_core_types::SigningBackend) -> TestResult {
     let message = b"bounded crypto wire verification";
-    let key = backend.public_key();
+    let key = backend.public_key()?;
     let signature = backend.sign_bytes(message)?;
     let key_wire = key.to_hex();
     let signature_wire = signature.to_hex();

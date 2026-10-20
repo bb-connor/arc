@@ -200,7 +200,7 @@ impl FindingChallengeCoordinator {
             penalty_calculation,
             retry_deadline,
             evaluator_authority_id: self.evaluator_pin.authority_id.clone(),
-            evaluator_key: self.evaluator_authority.public_key(),
+            evaluator_key: role_key(self.evaluator_authority.as_ref())?,
             // The epoch the outcome carries is the pinned one, which the
             // request has just been held to, so the signed artifact states
             // the deployment's epoch rather than the caller's claim.
@@ -239,7 +239,7 @@ impl FindingChallengeCoordinator {
                 .record_authenticated_upheld_verdict_with_exposure_fence(
                     &body.challenge_id,
                     &signed,
-                    &self.evaluator_authority.public_key(),
+                    &role_key(self.evaluator_authority.as_ref())?,
                     &admission.body.backing_allocation_id,
                     calculation.open_per_sale_encumbrance_units,
                     request.now,
@@ -247,7 +247,7 @@ impl FindingChallengeCoordinator {
             None => self.challenges.record_authenticated_verdict(
                 &body.challenge_id,
                 &signed,
-                &self.evaluator_authority.public_key(),
+                &role_key(self.evaluator_authority.as_ref())?,
                 request.now,
             ),
         }

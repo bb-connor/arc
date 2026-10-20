@@ -156,13 +156,16 @@ pub fn issue_session_compliance_certificate(
         });
     }
 
+    let signer_key = backend
+        .public_key()
+        .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
     let (signature, _bytes) = sign_canonical_with_backend(backend, &body)
         .map_err(|error| ComplianceCertificateError::SigningFailed(error.to_string()))?;
 
     Ok(SessionComplianceCertificate {
         body,
-        signer_key: backend.public_key(),
-        algorithm: backend.algorithm(),
+        algorithm: signer_key.algorithm(),
+        signer_key,
         signature,
     })
 }

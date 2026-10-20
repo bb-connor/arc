@@ -339,6 +339,17 @@
         "guidance": "Regenerate the negative case so it fails with its declared failure code, or correct the declared code."
       },
       "nativeWireName": "transaction_negative_case_mismatch"
+    },
+    {
+      "code": 7119,
+      "name": "transaction_verifier_context_invalid",
+      "category": "transaction",
+      "transient": false,
+      "retry": {
+        "strategy": "do_not_retry",
+        "guidance": "Correct the pinned verifier trust context (keys, digests, authority documents, or settlement settings) and rerun the verifier."
+      },
+      "nativeWireName": "transaction_verifier_context_invalid"
     }
   ]
 }

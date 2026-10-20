@@ -150,7 +150,9 @@ impl ActiveDefenseDeploymentConfig {
             (ResponseExecutionMode::Live, None) => Ok(ActiveResponseExecutionProfile::Live),
             (ResponseExecutionMode::DryRun, Some(simulator))
                 if simulator.configuration_digest() == self.deployment_digest
-                    && simulator.signing_identity() == self.secret_broker.receipt_signing_identity =>
+                    && simulator
+                        .signing_identity()
+                        .is_ok_and(|key| key == self.secret_broker.receipt_signing_identity) =>
             {
                 Ok(ActiveResponseExecutionProfile::DryRun(simulator))
             }

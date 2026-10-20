@@ -25,7 +25,7 @@ fn protocol_refusal_is_a_bounded_nonauthorizing_observation() -> TestResult {
     let receipt = kernel.record_session_protocol_refusal(&context, &summary)?;
     assert!(receipt.verify_signature()?);
     assert!(receipt.action.verify_hash()?);
-    assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key());
+    assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key()?);
     assert_eq!(receipt.receipt_kind, ReceiptKind::TraceObservation);
     assert_eq!(receipt.boundary_class, BoundaryClass::DetectOnly);
     assert_eq!(receipt.tool_origin, ToolOrigin::ChioInternal);

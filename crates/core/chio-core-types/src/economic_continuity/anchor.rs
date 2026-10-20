@@ -134,9 +134,8 @@ impl fmt::Display for EconomicStateAnchorError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for EconomicStateAnchorError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+impl core::error::Error for EconomicStateAnchorError {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
         match self {
             Self::UntrustedInput(error) => Some(error),
             _ => None,

@@ -137,7 +137,7 @@ fn finalizing_with_output(
             ledger: &store
                 .load_native_dispatch_ledger(&captured.operation_id, &fence, now_ms()?)?
                 .ok_or("original native ledger")?,
-            receipt_signing_public_key: fixture.kernel.receipt_signing_public_key(),
+            receipt_signing_public_key: fixture.kernel.receipt_signing_public_key()?,
             // open_kernel installs this original classical floor, including
             // a P256/P384 fixture when the FIPS backend is selected.
             receipt_crypto_floor:

@@ -80,7 +80,7 @@ fn rotation_rolls_back_seed_head_and_history_when_trust_insert_fails() -> TestRe
     assert_eq!(authority.snapshot()?, before);
     assert_eq!(authority.local_keypair()?.seed_hex(), seed_before);
     assert_eq!(
-        authority.authority_public_key().to_hex(),
+        authority.authority_public_key()?.to_hex(),
         before.public_key_hex
     );
     connection.execute_batch("DROP TRIGGER fail_trust")?;
@@ -314,5 +314,34 @@ fn injected_clock_failure_preserves_authority_and_cluster_fence() -> TestResult 
     assert_eq!(authority.cluster_fence()?, fence);
     clock.0.store(false, Ordering::SeqCst);
     assert_eq!(authority.rotate()?.generation, before.generation + 1);
+    Ok(())
+}
+
+#[test]
+fn authority_identity_refuses_when_status_cannot_be_read() -> TestResult {
+    use chio_security_types::clock::{Clock, ClockError, ClockReading, FixedClock};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    struct ControlledClock(AtomicBool);
+    impl Clock for ControlledClock {
+        fn read(&self) -> Result<ClockReading, ClockError> {
+            if self.0.load(Ordering::SeqCst) {
+                Err(ClockError::Unavailable)
+            } else {
+                FixedClock::new(1_000).read()
+            }
+        }
+    }
+    let root = chio_test_support::private_tempdir()?;
+    let clock = Arc::new(ControlledClock(AtomicBool::new(false)));
+    let authority =
+        SqliteCapabilityAuthority::open_with_clock(root.path().join("identity.db"), clock.clone())?;
+    authority.authority_public_key()?;
+    clock.0.store(true, Ordering::SeqCst);
+    let expected = AuthorityStoreError::Clock(ClockError::Unavailable).to_string();
+    assert!(matches!(
+        authority.authority_public_key(),
+        Err(KernelError::CapabilityIssuanceFailed(message)) if message == expected
+    ));
+    assert!(authority.trusted_public_keys().is_empty());
     Ok(())
 }

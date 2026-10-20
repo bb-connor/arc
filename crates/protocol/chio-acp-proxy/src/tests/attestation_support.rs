@@ -246,7 +246,6 @@ fn make_authorization_receipt(
         tool_call_id,
         tool_name,
         Decision::Allow,
-        chio_core::receipt::kinds::TrustLevel::Mediated,
         chio_core::receipt::metadata::ReceiptSemanticFields::mediated_prevent(),
     )
 }
@@ -260,7 +259,6 @@ fn make_authorization_receipt_with_semantics(
     tool_call_id: &str,
     tool_name: &str,
     decision: Decision,
-    trust_level: chio_core::receipt::kinds::TrustLevel,
     semantics: chio_core::receipt::metadata::ReceiptSemanticFields,
 ) -> ChioReceipt {
     let operation_payload = test_authorization_operation_payload();
@@ -308,7 +306,7 @@ fn make_authorization_receipt_with_semantics(
                     "request_id": request_id,
                 }
             })),
-            trust_level,
+            trust_level: semantics.trust_level,
             kernel_key: signer.public_key(),
             bbs_projection_version: None,
             tenant_id: None,

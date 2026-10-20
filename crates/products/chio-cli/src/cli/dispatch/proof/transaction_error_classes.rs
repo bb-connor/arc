@@ -469,20 +469,32 @@ fn expected_runtime(error: &chio_runtime_core::ChioRuntimeError) -> i32 {
 #[test]
 fn every_runtime_proof_variant_has_its_exit_class() {
     use chio_runtime_core::ChioRuntimeError as E;
-    let samples = vec![
-        E::Rejected {
-            code: "runtime_proof_regeneration_report_hash_mismatch",
-            detail: text(),
-        },
-        E::Rejected {
-            code: "runtime_proof_regeneration_source_record_mismatch",
-            detail: text(),
-        },
+    let mut samples: Vec<E> = [
+        "runtime_proof_regeneration_report_hash_mismatch",
+        "runtime_proof_regeneration_workflow_hash_mismatch",
+        "runtime_proof_regeneration_manifest_hash_mismatch",
+        "runtime_proof_regeneration_package_hash_mismatch",
+        "runtime_proof_regeneration_verifier_hash_mismatch",
+        "runtime_proof_regeneration_workflow_receipt_hash_mismatch",
+        "runtime_proof_regeneration_source_record_mismatch",
+        "runtime_proof_regeneration_manifest_artifact_mismatch",
+        "runtime_proof_regeneration_evidence_not_accepted",
+        "runtime_proof_parity_accepted_with_mismatches",
+    ]
+    .into_iter()
+    .map(|code| E::Rejected {
+        code,
+        detail: "digest mismatch unsupported transaction passport schema".to_string(),
+    })
+    .collect();
+    samples.extend([
+        E::UntrustedInput(chio_core::canonical::UntrustedJsonError::Decode(json_error())),
+        E::Clock(chio_security_types::clock::ClockError::Expired),
         E::DuplicateAdmissionBundle,
         E::Store(text()),
         E::Io(std::io::Error::other("io")),
         E::Json(json_error()),
         E::Canonical(text()),
-    ];
+    ]);
     assert_classes(samples, expected_runtime, map_runtime_proof_error);
 }

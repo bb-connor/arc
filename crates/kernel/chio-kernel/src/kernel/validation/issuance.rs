@@ -29,7 +29,7 @@ impl ChioKernel {
             subject,
             &scope,
             ttl_seconds,
-            &self.capability_authority.authority_public_key(),
+            &self.capability_authority.authority_public_key()?,
             self.capability_issuance_now()?,
             crate::authority::DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS,
         )?;
@@ -111,7 +111,7 @@ impl ChioKernel {
             subject,
             &scope,
             ttl_seconds,
-            &self.capability_authority.authority_public_key(),
+            &self.capability_authority.authority_public_key()?,
             self.capability_issuance_now()?,
             crate::authority::DEFAULT_CAPABILITY_ISSUANCE_CLOCK_SKEW_SECONDS,
             expected_binding.as_ref(),

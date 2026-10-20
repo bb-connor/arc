@@ -611,7 +611,7 @@ fn final_f11_repair_loaded_signer_rechecks_quorum_before_issuance() {
     let admitted = load_authority_status_for_state(state).test_unwrap();
     let authority = load_capability_authority(state).test_unwrap();
     assert_eq!(
-        Some(authority.authority_public_key().to_hex()),
+        Some(authority.authority_public_key().test_unwrap().to_hex()),
         admitted.public_key
     );
     update_peer_state(

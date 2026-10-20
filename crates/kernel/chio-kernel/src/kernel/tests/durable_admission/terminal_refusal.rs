@@ -327,7 +327,7 @@ fn unknown_projection_refuses_a_replacement_signer() -> TestResult {
     use crate::admission_operation::{AdmissionRecoveryError, AdmissionRecoveryFailureKind};
     let (mut kernel, request, store, calls) = durable_admission_fixture("refusal-original-signer");
     let operation = committed_operation(&kernel, &request)?;
-    let original_key = kernel.receipt_signing_public_key();
+    let original_key = kernel.receipt_signing_public_key().unwrap();
     kernel.signing_authority =
         crate::kernel::signing_authority::KernelSigningAuthority::classical(&Keypair::generate());
     let error = kernel

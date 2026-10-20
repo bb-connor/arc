@@ -89,13 +89,9 @@ impl ProductionActiveResponseAuthorityClient {
         config: &ProductionActiveResponseAuthorityFileConfig,
         client_signer: &Arc<dyn SigningBackend>,
     ) -> Result<PublicKey, String> {
-        let signer_key = client_signer.public_key();
-        if signer_key.algorithm() != client_signer.algorithm() {
-            return Err(
-                "active-response authority client signer algorithm does not match its public key"
-                    .to_string(),
-            );
-        }
+        let signer_key = client_signer
+            .public_key()
+            .map_err(|error| error.to_string())?;
         if config.trusted_authority == signer_key {
             return Err(
                 "active-response authority client and response authority signing roles must use distinct keys"
@@ -176,9 +172,11 @@ impl ProductionActiveResponseAuthorityClient {
             return Err(PortError::unavailable());
         }
         let expected_client = self.client_identity.clone();
-        if self.client_signer.public_key() != expected_client
-            || self.client_signer.algorithm() != expected_client.algorithm()
-        {
+        let signer_key = self
+            .client_signer
+            .public_key()
+            .map_err(|_| PortError::unavailable())?;
+        if signer_key != expected_client {
             return Err(PortError::integrity_failure());
         }
         let body = ActiveResponseAuthorityRequestBody {

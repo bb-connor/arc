@@ -34,6 +34,7 @@ libc = { workspace = true }
 work = ["dep:chio-workflow"]
 
 [dev-dependencies]
+chio-kernel = { workspace = true, features = ["admission-test-support"] }
 jsonschema = { workspace = true }
 chio-test-support = { workspace = true }
 async-trait = { workspace = true }

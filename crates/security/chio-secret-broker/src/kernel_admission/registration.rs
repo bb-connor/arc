@@ -7,7 +7,7 @@ use crate::registration::broker_execute_request_registration_digest;
 use crate::service::broker_request_digest;
 use crate::store::{derive_attempt_ids_for_operation, AttemptRegistration};
 use crate::{validate_identifier, Result};
-use chio_core_types::{PublicKey, Signature, SigningAlgorithm, SigningBackend, SigningOutcome};
+use chio_core_types::{PublicKey, Signature, SigningBackend, SigningOutcome};
 use chio_kernel::admission_operation::{
     AdmissionDigest, AdmissionIdentifier, AdmissionOperationBindingV1,
 };
@@ -47,7 +47,9 @@ impl BrokerAdmissionParticipant {
             "revocation authority domain",
             512,
         )?;
-        let authority_key = authority_signer.public_key();
+        let authority_key = authority_signer
+            .public_key()
+            .map_err(|error| crate::BrokerError::AuthorityUnavailable(error.to_string()))?;
         let configuration = canonical(&serde_json::json!({
             "schema": PARTICIPANT_ID,
             "socket_path": config.socket_path.to_str().ok_or_else(rejected)?,
@@ -242,11 +244,8 @@ struct RegistrationSigner {
 }
 
 impl SigningBackend for RegistrationSigner {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.key.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
-        self.key.clone()
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
+        Ok(self.key.clone())
     }
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {
         self.sign_bytes_with_identity(message)

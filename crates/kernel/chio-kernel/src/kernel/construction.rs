@@ -272,6 +272,7 @@ impl ChioKernel {
             native_egress_checkpoint_hook: None,
             #[cfg(feature = "admission-test-support")]
             native_capture_checkpoint_hook: None,
+            #[cfg(any(test, feature = "admission-test-support"))]
             unsafe_ephemeral_financial_dispatch: false,
             guards: std::sync::Arc::new(Vec::new()),
             post_invocation_pipeline: crate::post_invocation::PostInvocationPipeline::new(),
@@ -797,14 +798,27 @@ impl ChioKernel {
         Ok(())
     }
 
-    /// Enable non-durable financial dispatch for development.
+    /// Let financial holds cross the tool-server boundary without durable
+    /// admission coverage.
     ///
-    /// This is an unsafe opt-in. Ambiguous connector outcomes can retain budget
-    /// or rail holds permanently because no recovery operation survives restart.
-    /// Production deployments should install a
-    /// qualified durable admission store instead.
+    /// Test-support only. Ambiguous connector outcomes can retain budget or
+    /// rail holds permanently because no recovery operation survives restart.
+    #[cfg(any(test, feature = "admission-test-support"))]
     pub fn enable_unsafe_ephemeral_financial_dispatch_for_development(&mut self) {
         self.unsafe_ephemeral_financial_dispatch = true;
+    }
+
+    /// Whether financial dispatch may proceed without durable admission
+    /// coverage. Always false outside test-support builds.
+    pub(super) fn ephemeral_financial_dispatch_allowed(&self) -> bool {
+        #[cfg(any(test, feature = "admission-test-support"))]
+        {
+            self.unsafe_ephemeral_financial_dispatch
+        }
+        #[cfg(not(any(test, feature = "admission-test-support")))]
+        {
+            false
+        }
     }
 
     pub fn set_channel_terminal_authority(
