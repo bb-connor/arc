@@ -281,20 +281,14 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
         )
         .into());
     }
-    if crate::check_current_schema(
-        connection,
-        AUTHORITY_STORE_SCHEMA_KEY,
-        AUTHORITY_STORE_SCHEMA_VERSION,
-        AUTHORITY_STORE_ANCHOR_TABLES,
-    )
-    .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?
+    if crate::schema_version::inspect_schema(connection, &[AUTHORITY_STORE_SCHEMA_KEY])
+        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?
         != crate::SchemaState::Current
     {
-        return Err(AuthorityStoreError::Schema(
-            "authority storage is provisioned without a schema stamp".into(),
-        )
-        .into());
+        return Err(AuthorityInspectionError::Uninitialized);
     }
+    crate::schema_version::validate_catalog(connection, AUTHORITY_SCHEMA)
+        .map_err(|error| AuthorityStoreError::Schema(error.to_string()))?;
     let journal_mode: String = connection.query_row("PRAGMA journal_mode", [], |row| row.get(0))?;
     if !journal_mode.eq_ignore_ascii_case("wal") {
         return Err(AuthorityStoreError::Schema(format!(
@@ -310,6 +304,7 @@ fn validate_existing_schema(connection: &Connection) -> Result<(), AuthorityInsp
     if !bootstrapped {
         return Err(AuthorityInspectionError::Uninitialized);
     }
+    SqliteCapabilityAuthority::validate_required_rows(connection)?;
     Ok(())
 }
 

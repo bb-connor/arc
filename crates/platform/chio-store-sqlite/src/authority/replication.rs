@@ -7,7 +7,6 @@ use chio_kernel::authority::replication::{
 use chio_security_types::clock::{ClockError, UnixMillis};
 
 mod persistence;
-pub(super) use persistence::ensure_schema;
 use persistence::*;
 pub(super) use persistence::{persist_snapshot, read_snapshot};
 #[cfg(test)]

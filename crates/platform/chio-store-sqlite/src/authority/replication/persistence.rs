@@ -9,26 +9,6 @@ pub(super) struct ReplicationState {
     pub observed_ms: u64,
 }
 
-pub(crate) fn ensure_schema(connection: &Connection) -> Result<(), AuthorityStoreError> {
-    connection.execute_batch(
-        "CREATE TABLE IF NOT EXISTS authority_replication (
-            singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
-            anchor_json TEXT NOT NULL,
-            head_commitment TEXT NOT NULL,
-            chain_json TEXT NOT NULL,
-            latest_envelope_json TEXT,
-            observed_ms INTEGER NOT NULL CHECK (observed_ms >= 0)
-        );
-        CREATE TRIGGER IF NOT EXISTS authority_replication_anchor_immutable
-        BEFORE UPDATE OF anchor_json ON authority_replication
-        BEGIN SELECT RAISE(ABORT, 'authority replication anchor is immutable'); END;
-        CREATE TRIGGER IF NOT EXISTS authority_replication_no_delete
-        BEFORE DELETE ON authority_replication
-        BEGIN SELECT RAISE(ABORT, 'authority replication anchor is immutable'); END;",
-    )?;
-    Ok(())
-}
-
 pub(in crate::authority) fn read_snapshot(
     connection: &Connection,
 ) -> Result<AuthoritySnapshot, AuthorityStoreError> {

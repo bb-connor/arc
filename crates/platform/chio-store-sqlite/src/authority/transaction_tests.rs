@@ -40,6 +40,7 @@ fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult
     let path = directory.path().join("stamped.db");
     drop(SqliteCapabilityAuthority::open(&path)?);
     let connection = Connection::open(&path)?;
+    connection.execute_batch("PRAGMA ignore_check_constraints = ON;")?;
     connection.execute(
         "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = ?1",
         [AUTHORITY_STORE_SCHEMA_KEY],
@@ -49,6 +50,7 @@ fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult
         Err(AuthorityStoreError::Schema(message))
             if message == "database schema version 2 is not the current schema version 1; refusing to open"
     ));
+    connection.execute_batch("PRAGMA ignore_check_constraints = OFF;")?;
     connection.execute(
         "DELETE FROM chio_store_schema_versions WHERE store_key = ?1",
         [AUTHORITY_STORE_SCHEMA_KEY],
@@ -56,7 +58,7 @@ fn authority_storage_outside_schema_v1_is_refused_without_writes() -> TestResult
     assert!(matches!(
         SqliteCapabilityAuthority::open(&path),
         Err(AuthorityStoreError::Schema(message))
-            if message == "authority storage is provisioned without a schema stamp"
+            if message == "schema namespace authority is missing"
     ));
     Ok(())
 }
