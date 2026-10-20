@@ -21,6 +21,16 @@ const INLINE_SETTLEMENT_LEASE_MS: u64 = 30_000;
 const DRAIN_SETTLEMENT_WORKER_ID: &str = "kernel-settlement-drain";
 const DRAIN_SETTLEMENT_LEASE_MS: u64 = 30_000;
 
+/// Durable result of completing one claimed settlement attempt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettlementCompletion {
+    /// The outcome was committed under this worker's claim.
+    Recorded(SettlementRoute),
+    /// Another worker reclaimed the row after this lease lapsed, so nothing
+    /// was written for this claim.
+    LostLease,
+}
+
 pub(crate) struct SettlementObserverRuntime {
     hook: Arc<dyn SettlementHook>,
     outcome_store: Arc<dyn SettlementOutcomeStore>,
@@ -111,18 +121,36 @@ impl SettlementObserverRuntime {
         Ok(claims)
     }
 
+    /// Complete the inline post-signing claim without blocking the caller. A
+    /// persistence failure is counted as unresolved and the row stays durable
+    /// for the drain.
     pub(crate) fn record_claimed_status(
         &self,
         claim: &SettlementAttemptClaim,
         status: &SettlementObserverStatus,
         observed_at_ms: u64,
     ) {
+        if let Err(error) = self.complete_claim(claim, status, observed_at_ms) {
+            tracing::debug!(
+                receipt_id = claim.receipt_id.as_str(),
+                error = %error,
+                "inline settlement completion left the attempt for the drain"
+            );
+        }
+    }
+
+    pub(crate) fn complete_claim(
+        &self,
+        claim: &SettlementAttemptClaim,
+        status: &SettlementObserverStatus,
+        observed_at_ms: u64,
+    ) -> Result<SettlementCompletion, SettlementRouteError> {
         self.record_claimed_status_with_metrics(
             claim,
             status,
             observed_at_ms,
             &RuntimeSettlementRoutingMetrics,
-        );
+        )
     }
 
     fn record_claimed_status_with_metrics(
@@ -131,9 +159,11 @@ impl SettlementObserverRuntime {
         status: &SettlementObserverStatus,
         observed_at_ms: u64,
         metrics: &dyn SettlementRoutingMetrics,
-    ) {
+    ) -> Result<SettlementCompletion, SettlementRouteError> {
         let Some(input) = normalize_status(status) else {
-            return;
+            return Err(SettlementRouteError::InvalidRecord {
+                detail: "settlement status has no registered hook outcome".to_string(),
+            });
         };
         let outcome_class = settlement_outcome_class(&input);
         let route = self.outcome_store.record_claimed_outcome(
@@ -163,6 +193,11 @@ impl SettlementObserverRuntime {
                 settlement_persistence_class(&route),
                 metrics,
             );
+        }
+        match route {
+            Ok(route) => Ok(SettlementCompletion::Recorded(route)),
+            Err(SettlementRouteError::Conflict { .. }) => Ok(SettlementCompletion::LostLease),
+            Err(error) => Err(error),
         }
     }
 }
@@ -837,7 +872,7 @@ mod tests {
             let store = RoutingOutcomeStore::new(route);
             let runtime = routing_runtime(&store);
             let metrics = FakeRoutingMetrics::default();
-            runtime.record_claimed_status_with_metrics(
+            let _completion = runtime.record_claimed_status_with_metrics(
                 &attempt_claim("receipt-1", 1),
                 &status,
                 2,
@@ -984,6 +1019,70 @@ mod tests {
             ))
         ));
         assert!(kernel.settlement_observer().is_none());
+    }
+
+    #[test]
+    fn claim_completion_reports_persistence_failures_and_lost_leases() {
+        let accepted = SettlementObserverStatus::Observed {
+            outcome: SettlementOutcome::accepted("accepted"),
+        };
+        let cases = [
+            (
+                Ok(SettlementRoute::NoAction),
+                Ok(SettlementCompletion::Recorded(SettlementRoute::NoAction)),
+            ),
+            (
+                Err(SettlementRouteError::Conflict {
+                    detail: "stale lease".to_string(),
+                }),
+                Ok(SettlementCompletion::LostLease),
+            ),
+            (
+                Err(SettlementRouteError::Backend {
+                    detail: "disk full".to_string(),
+                }),
+                Err(SettlementRouteError::Backend {
+                    detail: "disk full".to_string(),
+                }),
+            ),
+            (
+                Err(SettlementRouteError::InvalidRecord {
+                    detail: "corrupt row".to_string(),
+                }),
+                Err(SettlementRouteError::InvalidRecord {
+                    detail: "corrupt row".to_string(),
+                }),
+            ),
+        ];
+        for (route, expected) in cases {
+            let store = RoutingOutcomeStore::new(route);
+            let runtime = routing_runtime(&store);
+
+            let completion = runtime.complete_claim(&attempt_claim("receipt-1", 1), &accepted, 2);
+
+            assert_eq!(completion, expected);
+            assert_eq!(store.recorded_len(), 1);
+        }
+    }
+
+    #[test]
+    fn claim_completion_refuses_an_unregistered_status() {
+        let store = RoutingOutcomeStore::new(Ok(SettlementRoute::NoAction));
+        let runtime = routing_runtime(&store);
+
+        let completion = runtime.complete_claim(
+            &attempt_claim("receipt-1", 1),
+            &SettlementObserverStatus::NotRegistered,
+            2,
+        );
+
+        assert_eq!(
+            completion,
+            Err(SettlementRouteError::InvalidRecord {
+                detail: "settlement status has no registered hook outcome".to_string(),
+            })
+        );
+        assert_eq!(store.recorded_len(), 0);
     }
 
     #[test]

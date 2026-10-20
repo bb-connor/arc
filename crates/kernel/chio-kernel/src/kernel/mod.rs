@@ -1622,6 +1622,7 @@ pub mod settlement_observer;
 // Drain of due settlement attempts through the installed settlement runtime.
 #[path = "settlement_drain.rs"]
 mod settlement_drain;
+pub use settlement_drain::SettlementDrainReport;
 // Mpsc-backed signing task. Owns a clone of the kernel signing keypair and
 // pulls signing requests from a bounded `tokio::sync::mpsc` channel so receipt
 // signing leaves the synchronous critical path.

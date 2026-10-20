@@ -379,6 +379,9 @@ pub enum KernelError {
     #[error("settlement runtime configuration failed: {0}")]
     SettlementConfiguration(#[from] SettlementRuntimeConfigError),
 
+    #[error("settlement drain failed: {0}")]
+    SettlementDrain(chio_settle::SettlementRouteError),
+
     #[error("execution nonce verification failed: {0}")]
     ExecutionNonce(#[source] crate::execution_nonce::ExecutionNonceError),
 
@@ -851,6 +854,15 @@ impl KernelError {
                 serde_json::json!({ "kind": error.as_str() }),
                 "Install a receipt store and outcome store backed by the same atomic settlement writer, then correct the retry policy or backend capability before startup.",
             ),
+            Self::SettlementDrain(error) => self.report_with_context(
+                "CHIO-KERNEL-SETTLEMENT-DRAIN",
+                serde_json::json!({ "class": match error.class() {
+                    chio_settle::SettlementRouteErrorClass::Backend => "backend",
+                    chio_settle::SettlementRouteErrorClass::Conflict => "conflict",
+                    chio_settle::SettlementRouteErrorClass::InvalidRecord => "invalid_record",
+                } }),
+                "Restore the settlement outcome store; claimed attempts stay leased until their lease lapses and the next drain reclaims them.",
+            ),
             Self::FinancialBudgetExceeded { total, committed } => self.report_with_context(
                 "urn:chio:error:kernel:financial-budget-exceeded", serde_json::json!({"total": total, "committed": committed}),
                 "Reconcile the grant accounting invariant before signing financial evidence.",
@@ -1015,6 +1027,20 @@ mod overload_tests {
         assert_eq!(
             report.context.get("resource").and_then(|v| v.as_str()),
             Some("AdmissionKeys")
+        );
+    }
+
+    #[test]
+    fn settlement_drain_reports_its_failure_class() {
+        let error = KernelError::SettlementDrain(chio_settle::SettlementRouteError::Backend {
+            detail: "disk full".to_string(),
+        });
+        let report = error.report();
+
+        assert_eq!(report.code, "CHIO-KERNEL-SETTLEMENT-DRAIN");
+        assert_eq!(
+            report.context.get("class").and_then(|value| value.as_str()),
+            Some("backend")
         );
     }
 

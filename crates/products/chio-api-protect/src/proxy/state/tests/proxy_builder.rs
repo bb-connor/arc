@@ -377,6 +377,32 @@ paths: {}
     Ok(())
 }
 
+#[tokio::test]
+async fn payment_adapter_without_any_budget_authority_refuses_startup(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut config = minimal_config();
+    config.spec_content =
+        Some("openapi: 3.0.3\ninfo:\n  title: Ledger\n  version: 1.0.0\npaths: {}\n".into());
+    assert!(config.receipt_db.is_none());
+    assert!(config.budget_db.is_none());
+    assert!(config.control_url.is_none());
+    let outcome = ProtectProxy::new(config)
+        .with_payment_adapter(Some(Box::new(
+            chio_kernel::payment::SimPaymentAdapter::new(),
+        )))
+        .run_with_observer(|_| panic!("sidecar served a payment adapter without its ledger"))
+        .await;
+    assert!(
+        matches!(
+            &outcome,
+            Err(ProtectError::Config(message)) if message
+                == "a payment adapter requires a durable receipt store for its settlement ledger"
+        ),
+        "{outcome:?}"
+    );
+    Ok(())
+}
+
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn payment_adapter_installs_the_settlement_ledger_on_the_durable_receipt_store(

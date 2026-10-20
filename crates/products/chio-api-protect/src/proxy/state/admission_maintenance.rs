@@ -276,7 +276,7 @@ fn run_worker(
             state.health.settlement_drained = state
                 .health
                 .settlement_drained
-                .saturating_add(u64::try_from(drained).unwrap_or(u64::MAX));
+                .saturating_add(u64::try_from(drained.completed).unwrap_or(u64::MAX));
         })?;
         let reaped = if hold_capable {
             let now = kernel.authority_clock_reading()?.unix_millis().get() / 1_000;

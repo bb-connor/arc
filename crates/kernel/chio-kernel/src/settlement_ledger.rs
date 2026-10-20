@@ -21,13 +21,15 @@ const RETAINED_PAYMENT_DETAIL: &str = "retained payment awaits payment journal r
 ///
 /// - A charge whose receipt records `settled` gets one `reconciled`
 ///   `settlement_reconciliations` row carrying the payment reference, written
-///   through the receipt store's serving writer. An existing row is kept, so a
-///   lease replay never overrides an operator decision.
+///   through the receipt store's serving writer. The row records the signed
+///   receipt's historical settlement observation; it does not establish rail
+///   finality. An existing row is kept, so a lease replay never overrides an
+///   operator decision.
 /// - A charge whose receipt records any other status is permanent. Durable
 ///   admission withholds pending terminal receipts, so a signed non-final
 ///   charge is a contract breach for the operator.
-/// - A retained payment stays retryable until admission recovery resolves its
-///   payment journal and a settlement closure can be emitted.
+/// - A retained payment stays retryable, and dead-letters once the configured
+///   retry policy is exhausted, until a bound settlement closure can be emitted.
 pub struct KernelSettlementLedgerHook {
     receipt_store: Arc<dyn ReceiptStore>,
 }
