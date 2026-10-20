@@ -17,12 +17,13 @@ pub struct SaltedCommitment {
 
 /// A recorded claim: a plain string, a plain list of strings, or a committed value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(untagged)]
+#[serde(untagged, remote = "Self")]
 pub enum ClaimValue {
     Plain(Text),
     List(Vec<Text>),
     Committed(SaltedCommitment),
 }
+chio_security_types::lossless_serde!(ClaimValue);
 
 impl ClaimValue {
     #[must_use]

@@ -1,12 +1,11 @@
 //! `chio.idp-key-snapshot.v1`: the key set the exchange observed for one provider record.
 
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::crypto::{PublicKey, Signature};
-use crate::error::Result;
 
 use super::jwk::Jwk;
 use super::wire::{
@@ -119,9 +118,48 @@ impl IdpKeySnapshot {
         }
     }
 
-    /// Whether `signature` verifies under `exchange_key` over the signing body.
-    pub fn verify_signature(&self) -> Result<bool> {
-        self.exchange_key
+    /// Verify `signature` over the signing body under `pinned_exchange_key`,
+    /// which `exchange_key` must equal.
+    pub fn verify_signature(
+        &self,
+        pinned_exchange_key: &PublicKey,
+    ) -> core::result::Result<(), IdpKeySnapshotSignatureError> {
+        if &self.exchange_key != pinned_exchange_key {
+            return Err(IdpKeySnapshotSignatureError::ExchangeKeyNotPinned);
+        }
+        let verified = pinned_exchange_key
             .verify_canonical_strict(&self.signing_body(), &self.signature)
+            .map_err(|error| IdpKeySnapshotSignatureError::Canonicalization(error.to_string()))?;
+        if verified {
+            Ok(())
+        } else {
+            Err(IdpKeySnapshotSignatureError::InvalidSignature)
+        }
     }
 }
+
+/// Why a key snapshot signature is refused.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IdpKeySnapshotSignatureError {
+    /// `exchange_key` is not the pinned exchange key.
+    ExchangeKeyNotPinned,
+    /// The signature does not verify under the pinned exchange key.
+    InvalidSignature,
+    Canonicalization(String),
+}
+
+impl core::fmt::Display for IdpKeySnapshotSignatureError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::ExchangeKeyNotPinned => {
+                formatter.write_str("key snapshot exchange_key is not the pinned exchange key")
+            }
+            Self::InvalidSignature => formatter.write_str("key snapshot signature is invalid"),
+            Self::Canonicalization(error) => {
+                write!(formatter, "key snapshot canonicalization failed: {error}")
+            }
+        }
+    }
+}
+
+impl core::error::Error for IdpKeySnapshotSignatureError {}

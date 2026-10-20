@@ -110,7 +110,6 @@ pub use capability_verify::{
     verify_capability_with_negotiated_floor, CapabilityError, CapabilityEvidenceContext,
     CapabilityFeatureContext, TrustRootResolver, VerifiedCapability,
 };
-pub use capability_verify::{AnchoredRootError, AnchoredTrustRoot, VerifiedAnchoredRoot};
 pub use clock::{Clock, FixedClock};
 pub use evaluate::{
     evaluate, evaluate_with_crypto_floor, evaluate_with_crypto_floor_and_budgets,

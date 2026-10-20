@@ -11,7 +11,6 @@ use crate::canonical::canonical_json_bytes;
 use crate::capability::anchor::{AnchorKind, ROOT_POLICY_DIGEST_DOMAIN};
 use crate::capability::scope::ChioScope;
 use crate::crypto::{PublicKey, Signature};
-use crate::hashing::sha256;
 
 use super::claims::{MatchClaims, RecordedClaimModes};
 use super::delegation_context::HolderClass;
@@ -227,8 +226,7 @@ impl RootPolicyRule {
 
     /// SHA-256 of the canonical `ceiling_scope`.
     pub fn compute_ceiling_scope_hash(&self) -> crate::error::Result<Sha256Digest> {
-        let canonical = canonical_json_bytes(&self.ceiling_scope)?;
-        Ok(Sha256Digest::from_hash(sha256(&canonical)))
+        Sha256Digest::of_scope(&self.ceiling_scope)
     }
 }
 

@@ -1,14 +1,18 @@
-//! Bindings between a root capability, its `root_anchor`, the delegation
-//! context and the loaded root policy. Every check is offline and takes no clock.
+//! Consistency of a root capability with a `root_anchor`, a delegation
+//! context and the loaded root policy. Every check is offline and takes no
+//! clock.
+//!
+//! These checks authenticate nothing. The anchor and the context are unsigned
+//! inputs here, so a substituted anchor and context that agree with each
+//! other and with the root pass. Authenticating the pairing needs the anchor
+//! read from the signed capability body.
 
 use alloc::string::{String, ToString};
 use core::fmt;
 
-use crate::canonical::canonical_json_bytes;
 use crate::capability::anchor::{AnchorKind, RootAnchor};
 use crate::capability::token::CapabilityToken;
 use crate::crypto::PublicKey;
-use crate::hashing::sha256;
 
 use super::delegation_context::{DelegationContext, HolderClass};
 use super::root_policy::{LoadedRootPolicy, RootPolicyRule};
@@ -16,7 +20,7 @@ use super::wire::Sha256Digest;
 
 /// The root, its anchor and the evidence it is checked against.
 #[derive(Debug, Clone, Copy)]
-pub struct RootBindingInput<'a> {
+pub struct RootConsistencyInput<'a> {
     pub root: &'a CapabilityToken,
     pub anchor: &'a RootAnchor,
     pub context: &'a DelegationContext,
@@ -25,9 +29,9 @@ pub struct RootBindingInput<'a> {
     pub sender_key: Option<&'a PublicKey>,
 }
 
-/// Why a root does not bind to its anchor, context or policy.
+/// Why a root disagrees with its anchor, context or policy.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RootBindingError {
+pub enum RootConsistencyError {
     NotARoot,
     RootPolicyDigestMismatch,
     ContextDigestMismatch,
@@ -54,7 +58,7 @@ pub enum RootBindingError {
     Canonicalization(String),
 }
 
-impl fmt::Display for RootBindingError {
+impl fmt::Display for RootConsistencyError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::NotARoot => {
@@ -143,9 +147,9 @@ impl fmt::Display for RootBindingError {
     }
 }
 
-impl core::error::Error for RootBindingError {}
+impl core::error::Error for RootConsistencyError {}
 
-fn require(holds: bool, error: RootBindingError) -> Result<(), RootBindingError> {
+fn require(holds: bool, error: RootConsistencyError) -> Result<(), RootConsistencyError> {
     if holds {
         Ok(())
     } else {
@@ -153,10 +157,11 @@ fn require(holds: bool, error: RootBindingError) -> Result<(), RootBindingError>
     }
 }
 
-/// Check every binding of a depth-0 anchored root. Signature, issuer trust
-/// and time-window checks belong to the capability verifier.
-pub fn check_root_binding(input: RootBindingInput<'_>) -> Result<(), RootBindingError> {
-    let RootBindingInput {
+/// Check that a depth-0 root agrees with `anchor`, `context` and `policy`.
+/// Signature, issuer trust and time-window checks belong to the capability
+/// verifier; the pairing of `anchor` with `root` is not authenticated.
+pub fn check_root_consistency(input: RootConsistencyInput<'_>) -> Result<(), RootConsistencyError> {
+    let RootConsistencyInput {
         root,
         anchor,
         context,
@@ -164,76 +169,74 @@ pub fn check_root_binding(input: RootBindingInput<'_>) -> Result<(), RootBinding
         sender_key,
     } = input;
     let canonicalization =
-        |error: crate::Error| RootBindingError::Canonicalization(error.to_string());
+        |error: crate::Error| RootConsistencyError::Canonicalization(error.to_string());
 
     require(
         root.delegation_chain.is_empty() && root.attenuation_proof.is_none(),
-        RootBindingError::NotARoot,
+        RootConsistencyError::NotARoot,
     )?;
     require(
         &anchor.root_policy_digest == policy.digest(),
-        RootBindingError::RootPolicyDigestMismatch,
+        RootConsistencyError::RootPolicyDigestMismatch,
     )?;
     require(
         context.digest().map_err(canonicalization)? == anchor.context_digest,
-        RootBindingError::ContextDigestMismatch,
+        RootConsistencyError::ContextDigestMismatch,
     )?;
     require(
         anchor.kind == context.anchor.kind,
-        RootBindingError::AnchorKindMismatch,
+        RootConsistencyError::AnchorKindMismatch,
     )?;
     require(
         anchor.assertion_exp == context.anchor.token_exp,
-        RootBindingError::AssertionExpMismatch,
+        RootConsistencyError::AssertionExpMismatch,
     )?;
     require(
         anchor.anchored_at == context.exchange.exchanged_at,
-        RootBindingError::AnchoredAtMismatch,
+        RootConsistencyError::AnchoredAtMismatch,
     )?;
     require(
         root.expires_at <= anchor.assertion_exp,
-        RootBindingError::ExpiresAfterAssertion {
+        RootConsistencyError::ExpiresAfterAssertion {
             expires_at: root.expires_at,
             assertion_exp: anchor.assertion_exp,
         },
     )?;
     require(
         root.issuer == context.exchange.exchange_key,
-        RootBindingError::ExchangeKeyMismatch,
+        RootConsistencyError::ExchangeKeyMismatch,
     )?;
     require(
         policy.lists_exchange_key(&root.issuer),
-        RootBindingError::ExchangeKeyNotListed,
+        RootConsistencyError::ExchangeKeyNotListed,
     )?;
-    let scope_digest = Sha256Digest::from_hash(sha256(
-        &canonical_json_bytes(&root.scope).map_err(canonicalization)?,
-    ));
+    let scope_digest = Sha256Digest::of_scope(&root.scope).map_err(canonicalization)?;
     require(
         scope_digest == context.effective_root_scope_hash,
-        RootBindingError::ScopeHashMismatch,
+        RootConsistencyError::ScopeHashMismatch,
     )?;
 
     let rule = policy
         .rule(&context.root_policy_rule_id)
-        .ok_or(RootBindingError::UnknownRule)?;
+        .ok_or(RootConsistencyError::UnknownRule)?;
     require(
         rule.match_.anchor_kind == anchor.kind,
-        RootBindingError::RuleKindMismatch,
+        RootConsistencyError::RuleKindMismatch,
     )?;
     check_holder(root, context.exchange.holder, rule, sender_key)?;
     require(
         context.anchor.provider_record_id == rule.match_.provider_record_id
             && context.anchor.provider_identity_digest == rule.match_.provider_identity_digest,
-        RootBindingError::ProviderMismatch,
+        RootConsistencyError::ProviderMismatch,
     )?;
     require(
         root.scope.is_subset_of(&rule.ceiling_scope),
-        RootBindingError::ScopeExceedsCeiling,
+        RootConsistencyError::ScopeExceedsCeiling,
     )?;
     let lifetime = root.expires_at.saturating_sub(root.issued_at);
     require(
         lifetime <= rule.capability_ttl(),
-        RootBindingError::LifetimeExceedsRule {
+        RootConsistencyError::LifetimeExceedsRule {
             lifetime,
             capability_ttl: rule.capability_ttl(),
         },
@@ -246,14 +249,14 @@ pub fn check_root_binding(input: RootBindingInput<'_>) -> Result<(), RootBinding
                 .saturating_sub(context.anchor.token_iat);
             require(
                 lifetime <= max,
-                RootBindingError::AssertionLifetimeExceedsRule { lifetime, max },
+                RootConsistencyError::AssertionLifetimeExceedsRule { lifetime, max },
             )?;
         }
     }
     check_recorded_claims(context, rule)?;
     require(
         context.anchor.artifact_retained == rule.retain_idp_artifact.unwrap_or(false),
-        RootBindingError::ArtifactRetentionMismatch,
+        RootConsistencyError::ArtifactRetentionMismatch,
     )
 }
 
@@ -262,24 +265,25 @@ fn check_holder(
     holder: HolderClass,
     rule: &RootPolicyRule,
     sender_key: Option<&PublicKey>,
-) -> Result<(), RootBindingError> {
+) -> Result<(), RootConsistencyError> {
     require(
         rule.holder_classes.contains(&holder),
-        RootBindingError::HolderClassNotAllowed { holder },
+        RootConsistencyError::HolderClassNotAllowed { holder },
     )?;
     match (holder, sender_key) {
-        (HolderClass::Caller, Some(key)) => {
-            require(&root.subject == key, RootBindingError::SubjectNotSenderKey)
-        }
-        (HolderClass::Caller, None) => Err(RootBindingError::SenderKeyMissing),
-        (HolderClass::EdgeSession, Some(_)) => Err(RootBindingError::SenderKeyOnEdgeSession),
+        (HolderClass::Caller, Some(key)) => require(
+            &root.subject == key,
+            RootConsistencyError::SubjectNotSenderKey,
+        ),
+        (HolderClass::Caller, None) => Err(RootConsistencyError::SenderKeyMissing),
+        (HolderClass::EdgeSession, Some(_)) => Err(RootConsistencyError::SenderKeyOnEdgeSession),
         (HolderClass::EdgeSession, None) => require(
             !root
                 .scope
                 .grants
                 .iter()
                 .any(|grant| grant.dpop_required == Some(true)),
-            RootBindingError::ProofRequiredGrantOnEdgeSession,
+            RootConsistencyError::ProofRequiredGrantOnEdgeSession,
         ),
     }
 }
@@ -287,7 +291,7 @@ fn check_holder(
 fn check_recorded_claims(
     context: &DelegationContext,
     rule: &RootPolicyRule,
-) -> Result<(), RootBindingError> {
+) -> Result<(), RootConsistencyError> {
     let recorded = context.anchor.claims.entries();
     let modes = rule.recorded_claims.entries();
     for ((claim, value), (_, mode)) in recorded.into_iter().zip(modes) {
@@ -298,7 +302,7 @@ fn check_recorded_claims(
         };
         require(
             consistent,
-            RootBindingError::RecordedClaimsMismatch { claim },
+            RootConsistencyError::RecordedClaimsMismatch { claim },
         )?;
     }
     Ok(())
