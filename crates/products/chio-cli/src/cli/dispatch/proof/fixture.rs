@@ -1643,6 +1643,9 @@ fn normalize_commerce_order_passport_binding(
     if !out.join("evidence-graph.json").is_file() || !out.join("order-context.json").is_file() {
         return Ok(());
     }
+    if out.join("authority-receipts").is_dir() {
+        add_commerce_event_authority_receipts(out)?;
+    }
     if descriptor.id == "commerce-offline-psp" {
         strip_collected_bundle_outputs(out)?;
         return refresh_commerce_order_passport_bundle(out);
