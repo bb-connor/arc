@@ -9,8 +9,8 @@ use crate::crypto::{PublicKey, Signature};
 
 use super::jwk::Jwk;
 use super::wire::{
-    canonical_public_key, canonical_signature, check_items, check_schema, validated_struct,
-    HttpsUrl, Sha256Digest, Uri,
+    canonical_public_key, canonical_signature, check_items, check_schema, validated_type, HttpsUrl,
+    Sha256Digest, Uri,
 };
 use super::RootAuthorityShapeError;
 
@@ -75,21 +75,26 @@ impl<'de> Deserialize<'de> for KeySnapshotSource {
     }
 }
 
-validated_struct! {
-    /// The provider's signed statement of the keys an identity provider published.
-    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-    pub struct IdpKeySnapshot {
-        pub schema: String,
-        pub issuer: Uri,
-        pub source: KeySnapshotSource,
-        pub keys: Vec<Jwk>,
-        pub observed_at: u64,
-        #[serde(deserialize_with = "canonical_public_key")]
-        pub exchange_key: PublicKey,
-        #[serde(deserialize_with = "canonical_signature")]
-        pub signature: Signature,
-    }
+/// The members of [`IdpKeySnapshot`]; [`IdpKeySnapshot::new`] validates them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IdpKeySnapshotFields {
+    pub schema: String,
+    pub issuer: Uri,
+    pub source: KeySnapshotSource,
+    pub keys: Vec<Jwk>,
+    pub observed_at: u64,
+    #[serde(deserialize_with = "canonical_public_key")]
+    pub exchange_key: PublicKey,
+    #[serde(deserialize_with = "canonical_signature")]
+    pub signature: Signature,
 }
+
+validated_type!(
+    /// The provider's signed statement of the keys an identity provider published.
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    IdpKeySnapshot(IdpKeySnapshotFields)
+);
 
 /// Every snapshot member except `signature`.
 #[derive(Serialize)]
@@ -102,12 +107,14 @@ pub struct IdpKeySnapshotSigningBody<'a> {
     pub exchange_key: &'a PublicKey,
 }
 
-impl IdpKeySnapshot {
+impl IdpKeySnapshotFields {
     pub fn validate(&self) -> core::result::Result<(), RootAuthorityShapeError> {
         check_schema(&self.schema, CHIO_IDP_KEY_SNAPSHOT_SCHEMA)?;
         check_items("keys", self.keys.len(), 0, 64)
     }
+}
 
+impl IdpKeySnapshot {
     #[must_use]
     pub fn signing_body(&self) -> IdpKeySnapshotSigningBody<'_> {
         IdpKeySnapshotSigningBody {
@@ -136,6 +143,8 @@ impl IdpKeySnapshot {
         &self,
         pinned_exchange_key: &PublicKey,
     ) -> core::result::Result<(), IdpKeySnapshotSignatureError> {
+        self.validate()
+            .map_err(IdpKeySnapshotSignatureError::Shape)?;
         if &self.exchange_key != pinned_exchange_key {
             return Err(IdpKeySnapshotSignatureError::ExchangeKeyNotPinned);
         }
@@ -153,6 +162,8 @@ impl IdpKeySnapshot {
 /// Why a key snapshot signature is refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdpKeySnapshotSignatureError {
+    /// The snapshot breaks a `chio.idp-key-snapshot.v1` rule.
+    Shape(RootAuthorityShapeError),
     /// `exchange_key` is not the pinned exchange key.
     ExchangeKeyNotPinned,
     /// The signature does not verify under the pinned exchange key.
@@ -163,6 +174,7 @@ pub enum IdpKeySnapshotSignatureError {
 impl core::fmt::Display for IdpKeySnapshotSignatureError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::Shape(error) => write!(formatter, "key snapshot is malformed: {error}"),
             Self::ExchangeKeyNotPinned => {
                 formatter.write_str("key snapshot exchange_key is not the pinned exchange key")
             }

@@ -12,45 +12,53 @@ use crate::hashing::{Hash, Sha256State};
 
 use super::RootAuthorityShapeError;
 
-/// Declares a struct whose only decoder is a validating `Deserialize`.
+/// Declares `$name`, a validated wrapper around its `$fields` struct.
 ///
-/// The struct derives what its attributes name (including `Serialize`). A
-/// private field-for-field twin carries the derived, strict decoder; the
-/// public impl decodes the twin, moves its fields over and calls `validate`.
-/// No unvalidated decoder is reachable from outside this macro.
-macro_rules! validated_struct {
-    (
-        $(#[$meta:meta])*
-        $vis:vis struct $name:ident {
-            $( $(#[$field_meta:meta])* $field_vis:vis $field:ident : $ty:ty ),* $(,)?
-        }
-    ) => {
+/// `$name::new` and the `Deserialize` impl are the only ways to build one,
+/// and both run `$fields::validate`. Fields are read through `Deref`; a
+/// changed value is rebuilt from [`into_fields`](#method.into_fields) and
+/// validated again. `Serialize` is transparent, so the wire form is the
+/// fields' own.
+macro_rules! validated_type {
+    ($(#[$meta:meta])* $name:ident($fields:ident)) => {
         $(#[$meta])*
-        $vis struct $name {
-            $( $(#[$field_meta])* $field_vis $field: $ty ),*
+        #[derive(serde::Serialize)]
+        #[serde(transparent)]
+        pub struct $name($fields);
+
+        impl $name {
+            /// Validate `fields` and wrap them.
+            pub fn new(fields: $fields) -> core::result::Result<Self, RootAuthorityShapeError> {
+                fields.validate()?;
+                Ok(Self(fields))
+            }
+
+            /// The validated fields, for building a changed value through `new`.
+            #[must_use]
+            pub fn into_fields(self) -> $fields {
+                self.0
+            }
         }
 
-        const _: () = {
-            #[derive(serde::Deserialize)]
-            #[serde(deny_unknown_fields)]
-            struct Unchecked {
-                $( $(#[$field_meta])* $field: $ty ),*
-            }
+        impl core::ops::Deref for $name {
+            type Target = $fields;
 
-            impl<'de> serde::Deserialize<'de> for $name {
-                fn deserialize<D: serde::Deserializer<'de>>(
-                    deserializer: D,
-                ) -> core::result::Result<Self, D::Error> {
-                    let Unchecked { $($field),* } = Unchecked::deserialize(deserializer)?;
-                    let value = $name { $($field),* };
-                    value.validate().map_err(serde::de::Error::custom)?;
-                    Ok(value)
-                }
+            fn deref(&self) -> &$fields {
+                &self.0
             }
-        };
+        }
+
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(
+                deserializer: D,
+            ) -> core::result::Result<Self, D::Error> {
+                let fields = <$fields as serde::Deserialize>::deserialize(deserializer)?;
+                Self::new(fields).map_err(serde::de::Error::custom)
+            }
+        }
     };
 }
-pub(crate) use validated_struct;
+pub(crate) use validated_type;
 
 /// `^[^\u0000\s]` characters: NUL and the ECMAScript `\s` class.
 fn is_nul_or_space(character: char) -> bool {
