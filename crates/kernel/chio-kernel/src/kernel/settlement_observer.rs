@@ -110,11 +110,17 @@ fn budget_hold_id(metadata: &serde_json::Value) -> Result<Option<String>, Settle
 fn retained_payment_settlement(
     metadata: &serde_json::Value,
 ) -> Option<Result<ObservedSettlement, SettlementFailureReason>> {
-    let financial = metadata.get("financial")?.as_object()?;
-    if financial.get("payment_authorization_ambiguous") != Some(&serde_json::Value::Bool(true)) {
-        return None;
+    let financial = match metadata.get("financial")? {
+        serde_json::Value::Object(financial) => financial,
+        _ => return Some(Err(malformed("financial metadata is not an object"))),
+    };
+    match financial.get("payment_authorization_ambiguous") {
+        None | Some(serde_json::Value::Bool(false)) => None,
+        Some(serde_json::Value::Bool(true)) => Some(retained_payment_fields(metadata, financial)),
+        Some(_) => Some(Err(malformed(
+            "payment authorization ambiguity marker is not a boolean",
+        ))),
     }
-    Some(retained_payment_fields(metadata, financial))
 }
 
 fn retained_payment_fields(
@@ -804,6 +810,56 @@ mod tests {
                 exposure_units: 100,
             }
         );
+    }
+
+    #[test]
+    fn build_observation_skips_a_denial_with_an_absent_or_false_ambiguity_marker() {
+        let cases = [
+            serde_json::json!({}),
+            serde_json::json!({"financial": {"cost_charged": 0, "currency": "USD"}}),
+            serde_json::json!({"financial": {"payment_authorization_ambiguous": false}}),
+        ];
+        for metadata in cases {
+            let receipt = sign_with(metadata.clone(), denied());
+            assert_eq!(
+                build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                SettlementObservationBuild::Skipped(SettlementSkipReason::Denied),
+                "{metadata}"
+            );
+        }
+    }
+
+    #[test]
+    fn build_observation_rejects_a_denial_with_malformed_ambiguity_evidence() {
+        let cases = [
+            (
+                serde_json::json!({"financial": "invalid"}),
+                "financial metadata is not an object",
+            ),
+            (
+                serde_json::json!({"financial": {"payment_authorization_ambiguous": "true"}}),
+                "payment authorization ambiguity marker is not a boolean",
+            ),
+            (
+                serde_json::json!({"financial": {"payment_authorization_ambiguous": null}}),
+                "payment authorization ambiguity marker is not a boolean",
+            ),
+            (
+                serde_json::json!({"financial": {"payment_authorization_ambiguous": 1}}),
+                "payment authorization ambiguity marker is not a boolean",
+            ),
+        ];
+        for (metadata, detail) in cases {
+            let receipt = sign_with(metadata.clone(), denied());
+            assert_eq!(
+                build_observation(&receipt, std::slice::from_ref(&receipt.kernel_key)),
+                SettlementObservationBuild::Permanent(SettlementFailureReason::from_detail(
+                    SettlementFailureCode::MalformedFinancialMetadata,
+                    detail,
+                )),
+                "{metadata}"
+            );
+        }
     }
 
     #[test]
