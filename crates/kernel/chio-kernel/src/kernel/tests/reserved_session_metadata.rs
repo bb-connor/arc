@@ -1,6 +1,10 @@
 //! Untrusted metadata must reject before request ownership or runtime release.
 use super::*;
 
+#[path = "reserved_session_metadata/hook_reserved_key.rs"]
+mod hook_reserved_key;
+#[path = "reserved_session_metadata/kernel_written.rs"]
+mod kernel_written;
 #[path = "reserved_session_metadata/runtime_hook.rs"]
 mod runtime_hook;
 
