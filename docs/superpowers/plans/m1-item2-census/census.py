@@ -16,6 +16,7 @@ SCOPE = ["crates", "sdks", "xtask"]
 # Patterns over whole file text, for chains rustfmt splits across lines and for JSON indexing.
 MULTILINE = {
     "params_split": (r"\baction\s*\n\s*\.(parameters|parameter_hash)\b", ["crates", "xtask"], "*.rs"),
+    "tenant": (r"\b\w*(receipt|body|signed|launch|terminal)\s*(\(\))?\s*\.\s*tenant_id\b", ["crates"], "*.rs"),
     "params_json": (r"(\[\s*[\"']action[\"']\s*\]|\baction)\s*(\[\s*[\"'](parameters|parameter_hash)[\"']\s*\]|\.get\(\s*[\"'](parameters|parameter_hash)[\"'])", ["sdks", "crates"], None),
 }
 TEST_PATH = re.compile(r"(^|/)(tests?|benches|examples|fixtures)/|(_tests?|/tests)\.rs$|_tests/|test_support|test_hooks|\.test\.(ts|tsx)$|/test_[^/]*\.py$|_test\.go$|Test\.(kt|cs)$|Tests\.cs$|e2e_tests")
@@ -28,12 +29,12 @@ def grep(repo, rev, pattern):
         yield path, int(line), text.strip()
 
 def grep_multiline(repo, rev, pattern, scope, glob):
-    paths = subprocess.run(["git", "-C", repo, "grep", "-l", "-I", "-E", r"parameters|parameter_hash", rev, "--", *scope],
+    paths = subprocess.run(["git", "-C", repo, "grep", "-l", "-I", "-E", r"parameters|parameter_hash|tenant_id", rev, "--", *scope],
                            capture_output=True, text=True, check=False).stdout.split()
     regex = re.compile(pattern)
     for entry in paths:
         path = entry.split(":", 1)[1]
-        if glob == "*.rs" and not path.endswith(".rs"):
+        if glob == "*.rs" and not path.endswith((".rs", ".inc")):
             continue
         text = subprocess.run(["git", "-C", repo, "show", f"{rev}:{path}"], capture_output=True, text=True).stdout
         lines = text.splitlines()
