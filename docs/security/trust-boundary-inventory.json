@@ -7727,7 +7727,8 @@
       "attachment_profile::custom_deserialize"
     ],
     "crates/security/chio-security-types/src/strict_serde.rs": [
-      "lossless::custom_deserialize"
+      "lossless::custom_deserialize",
+      "schema::custom_deserialize"
     ],
     "crates/security/chio-semantic-contracts/src/effect.rs": [
       "recovery_profile::custom_deserialize"
@@ -12886,7 +12887,7 @@
     },
     "crates/security/chio-security-types/src/strict_serde.rs": {
       "kind": "typed-field-deserializer",
-      "contract": "lossless_serde! derives a private remote mirror of each enum and implements Deserialize by decoding through a Value, running the mirror decoder and refusing any value that does not reserialize to its input, so unit variants of internally tagged enums cannot discard fields. The trait impl is the only public decoder. It runs inside an outer reader and constructs no authority token.",
+      "contract": "lossless_serde! derives a private remote mirror of each enum and implements Deserialize by reading the input into a Value that refuses a repeated object key at every depth, running the mirror decoder and refusing any value that does not reserialize to its input, so neither a duplicate key nor a field beside a unit variant tag can be discarded. The trait impl is the only public decoder. It runs inside an outer reader and constructs no authority token.",
       "readers": [
         {
           "reader": "deserialize",
@@ -12896,7 +12897,8 @@
           "apis": [
             "serde::Deserializer"
           ],
-          "checked": true
+          "checked": true,
+          "instances": 2
         }
       ]
     },
