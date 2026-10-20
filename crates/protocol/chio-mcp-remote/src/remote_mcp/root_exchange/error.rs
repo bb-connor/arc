@@ -50,6 +50,8 @@ pub enum RootExchangeError {
     ClientNotConfidential,
     #[error("client assertion is invalid: {0}")]
     ClientAssertionInvalid(&'static str),
+    #[error("client assertion is not an admissible compact JWS: {0}")]
+    ClientAssertionMalformed(Box<RootExchangeError>),
     #[error("client assertion signature is invalid")]
     ClientAssertionSignatureInvalid,
     #[error("client assertion jti was already used")]
@@ -128,6 +130,8 @@ pub enum RootExchangeError {
     #[error("anchor kind {} is not exchanged here", .0.as_str())]
     KindNotExchanged(AnchorKind),
 
+    #[error("entropy source failed")]
+    EntropyUnavailable,
     #[error("replay store is unavailable: {0}")]
     ReplayStoreUnavailable(String),
     #[error("canonicalization failed: {0}")]
@@ -135,7 +139,9 @@ pub enum RootExchangeError {
 }
 
 impl RootExchangeError {
-    /// The OAuth error code the token endpoint answers with.
+    /// The OAuth error code the token endpoint answers with. Faults of the
+    /// provider's own configuration or services are `server_error` or
+    /// `temporarily_unavailable`, never a judgement on the client's grant.
     #[must_use]
     pub fn oauth_error(&self) -> OAuthErrorCode {
         match self {
@@ -147,14 +153,57 @@ impl RootExchangeError {
             | Self::ClientAssertionTypeUnsupported
             | Self::ClientNotConfidential
             | Self::ClientAssertionInvalid(_)
+            | Self::ClientAssertionMalformed(_)
             | Self::ClientAssertionSignatureInvalid
             | Self::ClientAssertionReplay => OAuthErrorCode::InvalidClient,
+            Self::MalformedJws(_)
+            | Self::ForbiddenHeaderMember(_)
+            | Self::AlgorithmNotAdmitted
+            | Self::KidMissing
+            | Self::TypMismatch
+            | Self::UnknownKid
+            | Self::KeyAlgorithmMismatch
+            | Self::SignatureInvalid
+            | Self::ClaimMissing(_)
+            | Self::ClaimInvalid(_)
+            | Self::IssuerMismatch
+            | Self::AudienceMismatch
+            | Self::ClientIdMismatch
+            | Self::ResourceMismatch
+            | Self::AssertionExpired
+            | Self::AssertionIssuedInFuture
+            | Self::AssertionNotYetValid
+            | Self::AssertionLifetimeTooLong { .. }
+            | Self::AssertionReplay
+            | Self::RuleMatchCount { .. }
+            | Self::HolderClassNotAllowed(_)
+            | Self::ProofRequiredGrantForEdgeSession
+            | Self::RecordedClaimMissing(_)
+            | Self::RootLifetimeEmpty => OAuthErrorCode::InvalidGrant,
             Self::ScopeNotProjected | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
             Self::KeysUnavailable(_) | Self::ReplayStoreUnavailable(_) => {
                 OAuthErrorCode::TemporarilyUnavailable
             }
-            Self::Canonicalization(_) => OAuthErrorCode::ServerError,
-            _ => OAuthErrorCode::InvalidGrant,
+            Self::IdpKeyUnusable
+            | Self::ProviderRecordMissing(_)
+            | Self::ProviderRecordDisabled(_)
+            | Self::ProviderRecordInvalid { .. }
+            | Self::ProviderIdentityMismatch(_)
+            | Self::PolicyOutOfForce
+            | Self::KindNotExchanged(_)
+            | Self::EntropyUnavailable
+            | Self::Canonicalization(_) => OAuthErrorCode::ServerError,
+        }
+    }
+
+    /// The `error_description` a client may see. `server_error` and
+    /// `temporarily_unavailable` carry none, so no configuration or backend
+    /// detail reaches the client.
+    #[must_use]
+    pub fn client_description(&self) -> Option<String> {
+        match self.oauth_error() {
+            OAuthErrorCode::ServerError | OAuthErrorCode::TemporarilyUnavailable => None,
+            _ => Some(self.to_string()),
         }
     }
 }

@@ -83,8 +83,9 @@ pub struct ClientAuthContext<'a> {
     pub max_clock_skew_secs: u64,
 }
 
-/// Authenticate a confidential client. Every refusal leaves no replay state
-/// except a spent `jti` of an assertion that otherwise verified.
+/// Authenticate a confidential client. A refusal leaves no replay state;
+/// an assertion that verifies has its `jti` spent, whatever happens to the
+/// rest of the token request.
 pub fn authenticate_client(
     registry: &ClientRegistry,
     credentials: ClientCredentials<'_>,
@@ -98,15 +99,29 @@ pub fn authenticate_client(
         return Err(RootExchangeError::ClientAssertionTypeUnsupported);
     }
     let jws = CompactJws::parse(assertion)
-        .map_err(|_| RootExchangeError::ClientAssertionInvalid("not a compact JWS"))?;
+        .map_err(|error| RootExchangeError::ClientAssertionMalformed(Box::new(error)))?;
     let claim = |error: RootExchangeError| match error {
         RootExchangeError::ClaimMissing(_) => {
             RootExchangeError::ClientAssertionInvalid("claim missing")
         }
         _ => RootExchangeError::ClientAssertionInvalid("claim malformed"),
     };
-    let issuer = required_string(&jws.claims, "iss").map_err(claim)?;
-    let subject = required_string(&jws.claims, "sub").map_err(claim)?;
+    let named_client = required_string(jws.claims(), "iss").map_err(claim)?;
+    let client = registry
+        .clients
+        .get(named_client)
+        .ok_or(RootExchangeError::ClientNotConfidential)?;
+    if jws.header().kid.as_str() != client.kid {
+        return Err(RootExchangeError::ClientAssertionInvalid(
+            "kid is not the registered key",
+        ));
+    }
+    let verified = jws
+        .verify_with(&client.key)
+        .map_err(|_| RootExchangeError::ClientAssertionSignatureInvalid)?;
+    let claims = verified.claims();
+    let issuer = required_string(claims, "iss").map_err(claim)?;
+    let subject = required_string(claims, "sub").map_err(claim)?;
     if subject != issuer {
         return Err(RootExchangeError::ClientAssertionInvalid(
             "sub differs from iss",
@@ -120,24 +135,13 @@ pub fn authenticate_client(
             "client_id differs from iss",
         ));
     }
-    let client = registry
-        .clients
-        .get(issuer)
-        .ok_or(RootExchangeError::ClientNotConfidential)?;
-    if jws.header.kid.as_str() != client.kid {
-        return Err(RootExchangeError::ClientAssertionInvalid(
-            "kid is not the registered key",
-        ));
-    }
-    jws.verify_with(&client.key)
-        .map_err(|_| RootExchangeError::ClientAssertionSignatureInvalid)?;
-    if !audience_is(&jws.claims, context.token_endpoint) {
+    if !audience_is(claims, context.token_endpoint) {
         return Err(RootExchangeError::ClientAssertionInvalid(
             "aud is not the token endpoint",
         ));
     }
-    let exp = required_seconds(&jws.claims, "exp").map_err(claim)?;
-    let iat = required_seconds(&jws.claims, "iat").map_err(claim)?;
+    let exp = required_seconds(claims, "exp").map_err(claim)?;
+    let iat = required_seconds(claims, "iat").map_err(claim)?;
     if exp <= iat || exp - iat > MAX_CLIENT_ASSERTION_LIFETIME_SECS {
         return Err(RootExchangeError::ClientAssertionInvalid(
             "lifetime exceeds 60 seconds",
@@ -154,13 +158,13 @@ pub fn authenticate_client(
             "issued in the future",
         ));
     }
-    if seconds(&jws.claims, "nbf")
+    if seconds(claims, "nbf")
         .map_err(claim)?
         .is_some_and(|nbf| nbf > context.now.saturating_add(skew))
     {
         return Err(RootExchangeError::ClientAssertionInvalid("not yet valid"));
     }
-    let jti = required_string(&jws.claims, "jti").map_err(claim)?;
+    let jti = required_string(claims, "jti").map_err(claim)?;
     let key = ReplayKey {
         namespace: ReplayNamespace::ClientAssertion,
         issuer: issuer.to_owned(),
