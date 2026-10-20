@@ -26,7 +26,7 @@ def require_commit(repo, rev):
 def self_check(script, repo, rev, workdir, cases):
     """Run this script on known-bad inputs and require a nonzero exit for each."""
     import os
-    failed = False
+    failed = resolver_self_check()
     for name, rev_arg, rules_text in cases:
         rules_path = os.path.join(workdir, f"selfcheck-{name}.rules.tsv")
         out_path = os.path.join(workdir, f"selfcheck-{name}.out.tsv")
@@ -51,6 +51,53 @@ AUTH_HELPERS = [
     "run_public_authority_trust_read", "bearer_token_from_headers", "redeem_pre_authorized_code",
     "authenticate",
 ]
+
+CONTROL_CRATE = CRATE.split("/src", 1)[0]
+
+def crate_of(path):
+    return path.split("/src/", 1)[0]
+
+def crate_ident(crate_dir):
+    return crate_dir.rsplit("/", 1)[-1].replace("-", "_")
+
+def resolve_const(name, defs, qualifier=None):
+    """Resolve a path constant to its values, or None when unresolved or ambiguous.
+
+    defs maps a constant name to {crate_dir: set(values)}. A qualifier names the
+    crate the router imports the constant from; without one, the trust-control
+    crate's own definition wins, and a name defined only in several other crates
+    is ambiguous.
+    """
+    by_crate = defs.get(name, {})
+    if qualifier is not None:
+        matches = [c for c in by_crate if crate_ident(c) == qualifier]
+        return set(by_crate[matches[0]]) if len(matches) == 1 else None
+    if CONTROL_CRATE in by_crate:
+        return set(by_crate[CONTROL_CRATE])
+    if len(by_crate) == 1:
+        return set(next(iter(by_crate.values())))
+    return None
+
+def resolver_self_check():
+    """Same-named constants in other crates must not shadow the trust-control crate's own."""
+    other = "crates/platform/chio-http-core"
+    third = "crates/protocol/chio-mcp-remote"
+    defs = {
+        "STOP_PATH": {CONTROL_CRATE: {"/v1/admin/stop"}, other: {"/stop"}},
+        "SHARED_PATH": {other: {"/a"}, third: {"/b"}},
+    }
+    cases = [
+        ("same-name-other-crate", resolve_const("STOP_PATH", defs), {"/v1/admin/stop"}),
+        ("qualified-other-crate", resolve_const("STOP_PATH", defs, "chio_http_core"), {"/stop"}),
+        ("ambiguous-other-crates", resolve_const("SHARED_PATH", defs), None),
+        ("unknown-name", resolve_const("MISSING_PATH", defs), None),
+    ]
+    failed = False
+    for name, got, want in cases:
+        ok = got == want
+        print(f"self-check resolver {name}: " + ("ok" if ok else f"WRONG got {got} want {want}"))
+        failed = failed or not ok
+    return failed
 
 def git(repo, *args):
     return run_git(repo, list(args), allow_no_match=args[0] == "grep")
@@ -85,19 +132,38 @@ def main():
     files = git(repo, "grep", "-l", "-E", r"\.route\(", rev, "--", f"{CRATE}/trust_control").split()
     files = [f.split(":", 1)[1] for f in files]
     files = [f for f in files if "_tests" not in f and not f.endswith("tests.rs") and "/tests/" not in f]
-    consts = {}
+    defs = {}
     aliases = {}
     const_files = git(repo, "grep", "-l", "-E", r"const [A-Z0-9_]+: &str =", rev, "--", "crates").split()
     for entry in const_files:
-        text = show(repo, rev, entry.split(":", 1)[1])
+        source_path = entry.split(":", 1)[1]
+        crate_dir = crate_of(source_path)
+        text = show(repo, rev, source_path)
         for match in re.finditer(r"const ([A-Z0-9_]+): &str =\s*\"(/[^\"]*)\"", text):
-            consts.setdefault(match.group(1), set()).add(match.group(2))
+            defs.setdefault(match.group(1), {}).setdefault(crate_dir, set()).add(match.group(2))
         for match in re.finditer(r"const ([A-Z0-9_]+): &str =\s*([A-Z0-9_]+)\s*;", text):
-            aliases[match.group(1)] = match.group(2)
+            aliases[(crate_dir, match.group(1))] = match.group(2)
     for _ in range(4):
-        for name, target in aliases.items():
-            if name not in consts and target in consts:
-                consts[name] = set(consts[target])
+        for (crate_dir, name), target in aliases.items():
+            if crate_dir in defs.get(name, {}):
+                continue
+            if crate_dir in defs.get(target, {}):
+                defs.setdefault(name, {})[crate_dir] = set(defs[target][crate_dir])
+            else:
+                imported = resolve_const(target, defs)
+                if imported:
+                    defs.setdefault(name, {})[crate_dir] = imported
+    def route_consts(first, router_text):
+        segments = first.split("::")
+        name = segments[-1]
+        qualifier = None
+        if len(segments) > 1 and segments[0] not in ("crate", "super", "self"):
+            qualifier = segments[0]
+        elif len(segments) == 1:
+            imported = re.search(r"\buse\s+([a-z_][a-z0-9_]*)::[^;]*\b" + re.escape(name) + r"\b[^;]*;", router_text)
+            if imported and imported.group(1) not in ("crate", "super", "self"):
+                qualifier = imported.group(1)
+        return resolve_const(name, defs, qualifier)
     sources = {}
     for path in git(repo, "ls-tree", "-r", "--name-only", rev, "--", f"{CRATE}/trust_control").split():
         if path.endswith((".rs", ".inc")):
@@ -143,27 +209,6 @@ def main():
             found = helpers_in(body, 2)
             return hpath, ",".join(found) or "none"
         return "", "handler-not-found"
-    def handler_auth_unused(name):
-        short = name.split("::")[-1]
-        for path, text in sources.items():
-            match = re.search(r"\bfn " + re.escape(short) + r"\b[^{]*\{", text)
-            if not match:
-                continue
-            depth, index = 0, match.end() - 1
-            for index in range(match.end() - 1, len(text)):
-                if text[index] == "{":
-                    depth += 1
-                elif text[index] == "}":
-                    depth -= 1
-                    if depth == 0:
-                        break
-            body = text[match.end():index]
-            found = [h for h in AUTH_HELPERS if h in body]
-            if not found:
-                found = sorted(set(re.findall(r"\b([a-z_]*(?:principal|auth|token|secret|credential|session_key|bearer)[a-z_]*)\(", body)))
-                found = [f"other:{h}" for h in found if not h.startswith("validate_")]
-            return path, ",".join(found) or "none-in-handler"
-        return "", "handler-not-found"
     rows = []
     for path in files:
         if not path.startswith(f"{CRATE}/trust_control"):
@@ -178,7 +223,7 @@ def main():
             elif first.startswith("&format!") or "format!" in first:
                 route_paths = {first}
             else:
-                route_paths = consts.get(first.split("::")[-1], {f"UNRESOLVED:{first}"})
+                route_paths = route_consts(first, text) or {f"UNRESOLVED:{first}"}
             for method, handler in re.findall(r"\b(get|post|put|delete|patch)\(\s*([A-Za-z_][A-Za-z0-9_:]*)", rest):
                 hpath, auth = handler_auth(handler)
                 for route_path in sorted(route_paths):

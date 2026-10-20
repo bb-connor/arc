@@ -8,6 +8,7 @@
 ^/v1/findings(/|$)	GET	^none$	public	anonymous	none	n/a (public listing reads; unchanged)
 ^/v1/findings/search$	POST	^none$	public	anonymous	none	n/a (public listing search; unchanged)
 ^/v1/internal/admission-authority$	POST	.	internal	deployment	admission-authority:write	Deployment only
+^/v1/internal/(cluster/snapshot|receipts/tools/delta)$	GET	validate_cluster_peer_auth	internal	peer	cluster-openings:replicate	n/a (peer of the same cluster; pinned node key; the response carries openings)
 ^/v1/internal/	.	validate_cluster_peer_auth	internal	peer	cluster:replicate	n/a (peer of the same cluster; pinned node key)
 ^/v1/receipts/(tools|children)$	POST	.	public	deployment	receipts:append	Deployment only
 ^/v1/(receipts|agents)/	GET	resolve_control_read_principal	public	caller	receipts:read	Tenant(t) sees only tenant t; Deployment sees its deployment
