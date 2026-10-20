@@ -116,12 +116,12 @@ const BBS_SIGNATURE_MEMBERS = new Set([
   "message_count",
   "signature_hex",
 ]);
-const DECISION_MEMBERS: Record<string, Set<string>> = {
-  allow: new Set(["verdict"]),
-  deny: new Set(["verdict", "reason", "guard"]),
-  cancelled: new Set(["verdict", "reason"]),
-  incomplete: new Set(["verdict", "reason"]),
-};
+const DECISION_MEMBERS = new Map<string, Set<string>>([
+  ["allow", new Set(["verdict"])],
+  ["deny", new Set(["verdict", "reason", "guard"])],
+  ["cancelled", new Set(["verdict", "reason"])],
+  ["incomplete", new Set(["verdict", "reason"])],
+]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -150,7 +150,7 @@ function requireClosedReceipt(receipt: ChioReceipt): void {
   const decision = value.decision;
   if (isObject(decision)) {
     const verdict = typeof decision.verdict === "string" ? decision.verdict : "";
-    requireMembers(decision, DECISION_MEMBERS[verdict] ?? new Set(["verdict"]), "/decision");
+    requireMembers(decision, DECISION_MEMBERS.get(verdict) ?? new Set(["verdict"]), "/decision");
   }
   for (const [name, allowed] of [
     ["actor_chain", ACTOR_MEMBERS],

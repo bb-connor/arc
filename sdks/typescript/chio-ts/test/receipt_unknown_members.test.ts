@@ -86,3 +86,16 @@ test("the protocol-primitives unknown-field case is refused", async () => {
       error instanceof ChioInvariantError && error.message === "unknown receipt member: /unsigned_extension",
   );
 });
+
+test("prototype-named verdicts verify as invalid and still refuse padding", async () => {
+  for (const verdict of ["__proto__", "constructor", "toString"]) {
+    const value = await receipt("allow_receipt");
+    value.decision = { verdict };
+    const candidate = value as unknown as ChioReceipt;
+    const verification = verifyReceiptWithTrustedSigners(candidate, [candidate.kernel_key]);
+    assert.equal(verification.ok, false, verdict);
+    assert.equal(verification.authorized, false, verdict);
+    value.decision = { verdict, pad: 0 };
+    assertRefused(value, "/decision/pad");
+  }
+});
