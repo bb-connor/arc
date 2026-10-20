@@ -231,9 +231,6 @@ fn evaluate_response_serializes_execution_nonce_field() {
 
 #[test]
 fn evaluate_response_omits_nonce_when_absent() {
-    // Backward compatibility: a kernel without nonce support serializes
-    // the response without an `execution_nonce` field so older clients
-    // can parse it.
     let kp = Keypair::generate();
     let http_rcpt = http_receipt(&kp, "http-rcpt-absent");
     let response = EvaluateResponse {

@@ -288,8 +288,8 @@ impl ChioKernel {
     /// Build receipt metadata describing the provenance record that governs
     /// the memory read identified by `(store, key)`.
     ///
-    /// Returns `None` when no provenance store has been installed
-    /// (backward-compatible no-op), and returns an `unverified` metadata
+    /// Returns `None` when no provenance store has been installed,
+    /// and returns an `unverified` metadata
     /// object when the store is installed but the key has no chain
     /// entry OR the chain is tampered / unavailable. This is the
     /// fail-closed signal: the receipt explicitly records that the
