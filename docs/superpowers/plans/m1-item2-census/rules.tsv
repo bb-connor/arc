@@ -1,0 +1,128 @@
+# path_regex	line_regex	kind	replacement
+/_generated/		GEN	regenerated from the moved-in record schema (Task 6 codegen)
+\.md$		DOC	rewritten for commitments with the doc sweep (Task 19)
+(merkle\.rs|chio-anchor/src/batch\.rs|chio-web3/src/anchors\.rs|checkpoint/consistency\.rs|chio-transaction-passport/src/minimal\.rs)	verify_hash	D	Merkle inclusion verify_hash, unrelated to receipts; unchanged
+chio-api-protect/src/proxy/router\.rs	request\.content_hash\(\)	D	HTTP request body digest; feeds the tagged HTTP body preimage (Task 12)
+chio-http-core/src/authority\.rs	\.content_hash\(\)	D	HTTP request body digest; feeds the tagged HTTP body preimage (Task 12)
+chio-acp-proxy/src/kernel_signer\.rs	entry\.content_hash	D	ACP audit entry digest; stays an audit-log field and never reaches the signer (Task 11)
+chio-acp-proxy/src/receipt\.rs		D	ACP audit receipt doc comment on the audit entry digest; unchanged
+chio-sdk-python/src/chio_sdk/testing\.py	governed_intent_hash	D	approval token parameter hash; not a receipt field
+chio_langgraph/approval\.py	\"parameter_hash\": self	D	approval request parameter hash; not a receipt field
+chio-core-types/src/receipt/(body|signing|decision)\.rs		X	replaced by ReceiptDraft, ReceiptPreimages, commitments and SignedReceipt; verify_hash and from_parameters deleted (Task 6)
+chio-kernel-core/src/(receipts|kani_public_harnesses)\.rs		X	committed portable signer; relay signer deleted; Kani harness on the commitment layout (Tasks 6, 20)
+chio-kernel/src/receipt_support/signing\.rs		X	hosted signer computes commitments from preimages and drawn salts (Task 7)
+chio-kernel/src/kernel/(construction|signing_task)\.rs		X	doc and recompute check move to the committed signer (Task 7)
+chio-kernel-(browser|mobile)/src/	body\.content_hash	X	relay doc comments rewritten with the preimage-taking relay (Task 9)
+chio-kernel-browser/src/pure\.rs	verify_hash	V	verify_hash deleted; the browser verifier checks the signature and opens with supplied openings (Task 9)
+chio-cpp-kernel-ffi/src/lib\.rs		X	relay doc comments rewritten with the preimage-taking C ABI signer (Task 9)
+chio-http-core/src/receipt\.rs		X	HttpReceipt and its projection deleted (Task 12)
+chio-http-core/src/authority\.rs		R	HTTP authority signs chio.receipt.v1 with HttpCallPreimages (Task 12)
+chio-http-core/src/evaluation\.rs		H	format check moves to the commitment value (Task 12)
+	verify_hash\(\)	V	verify_hash deleted: the parameter commitment is signed and has no unsalted hash to recheck; the caller keeps its signature check (kind V)
+admission_operation/projection/authorization\.rs	parameters	P-i	operation_payload digest read from the authorization operation's admission row (binding digest), never from receipt parameters; Root-held
+admission_operation/projection/authorization\.rs		A	consumer receipt parameter commitment compared with the commitment recorded on the consumer operation row; Root-held
+kernel/evaluation/delivery_preparation\.rs		P-i	launch state read from the registered Chio-internal metadata key launch.state (closed enum, no argument value), written by the launch producer; Root-held
+admission_operation/projection/refusal_receipt\.rs		A	refusal receipt content commitment compared with the commitment recorded on the operation row
+admission_operation/remote_projection\.rs		A	delivery observed digest compared with the row's output digest; receipt commitment compared with the row's recorded commitment
+admission_operation/projection\.rs		A	receipt commitments compared with the commitments recorded on the operation row in the terminal transaction
+active_response_coordinator/execution_validation\.inc		F	bind to the signed active_defense projection; the coordinator holds the body, checks matches_projection with persisted openings and opens the content commitment
+kernel/admission_coordinator\.rs		A0	admission binding digest from canonical_parameter_digest(request.arguments); stays inside the admission store
+admission_coordinator/refusal\.rs	from_parameters	R	refusal receipt built as a ReceiptDraft with request arguments as the parameter preimage
+admission_coordinator/refusal\.rs		A	refusal receipt content commitment compared with the row's recorded commitment (empty output preimage at signing)
+return_context/caller\.rs		A0	caller return context compares canonical_parameter_digest(arguments) with the operation binding digest
+terminal/compacted_replay\.rs		A	parameters: row request digest plus receipt commitment equality with the row; blob: row output digest, and when opening_state is Present also recompute the content commitment over the blob (P2-C)
+terminal/receipt_content\.rs		A	terminal content plumbing carries the output preimage and the row output digest
+admission_coordinator/terminal\.rs	from_parameters	A0	request digest from canonical_parameter_digest; receipt built as a ReceiptDraft
+admission_coordinator/terminal\.rs		A	terminal receipt commitments compared with the row's recorded commitments; observed digests stay row-internal
+admission_terminal_receipt\.rs	content_hash: 	R	terminal receipt producer sets the content preimage; commitment computed by the signer (Task 7)
+admission_terminal_receipt\.rs	^let action = ToolCallAction::from_parameters	R	terminal receipt built as a ReceiptDraft with its JSON parameters as preimage
+admission_terminal_receipt\.rs		A	executor receipt binding: receipt commitments compared with the row's recorded commitments; executor receipt hash stays row-internal
+effect_obligation/preparation\.rs	from_parameters|parameter_hash: action	A0	obligation parameter digest from canonical_parameter_digest
+effect_obligation/preparation\.rs		A	obligation binding compared with the row's recorded parameter commitment
+kernel/nonce_admission\.rs		B	execution nonce minted from canonical_parameter_digest at signing; the nonce holder already holds the arguments (P2-D)
+kernel/reconciliation\.rs	from_parameters|bound_to	B	nonce parameter binding checked at signing against canonical_parameter_digest(arguments)
+kernel/responses/allow_responses\.rs	contract\.expected_digest	E-k	kernel opens the parent's content commitment with the parent's persisted opening over the written content; ReceiptOpeningUnavailable when erased or unknown; expected_digest stays an unsalted internal digest compared with written_content_digest
+kernel/responses/allow_responses\.rs	child\.content_hash	C	lineage column copies the child's content commitment value
+chio-kernel/src/kernel/(responses/(allow|deny|pending|terminal)_responses|session_ops|session_ops/protocol_refusal|session_ops/reports|kernel_drop_guard|admission_terminal_receipt)\.rs		R	producer site: ReceiptDraft plus ReceiptPreimages (request arguments, receipt content) signed with the kernel Rng (Task 7)
+kernel/reconciliation\.rs		R	producer site: ReceiptDraft plus preimages (Task 7)
+kernel/responses/receipt_persistence\.rs		R	kernel receipt builder takes the draft and ReceiptSigningHandle content (Task 7)
+kernel/settlement_observer\.rs		C	SettlementObservation.content_hash becomes content_commitment (#1705)
+kernel/validation/tool_output\.rs		A0	tool output binding digest from canonical_parameter_digest
+kernel/verified_treaty\.rs	outcome_sha256	C	treaty outcome_commitment copies the receipt content commitment value
+kernel/verified_treaty\.rs	receipt\.action	B	treaty request binding checked at signing with the request in hand
+kernel/verified_treaty\.rs		A0	treaty request_sha256 from canonical_parameter_digest; the treaty peer holds the arguments (P2-D)
+receipt_support/coupling\.rs		A	coupling compares draft and expected draft; commitments compared after signing
+chio-kernel/src/response_simulation_report\.rs		F	producer builds the response_simulation projection; full report is the content preimage
+tool_outcome/caller_delivery\.rs		A0	caller delivery parameters_digest from canonical_parameter_digest; the caller holds the arguments (P2-D); Root-held
+chio-kernel/src/execution_nonce\.rs		A0	nonce field name for the request digest; unchanged meaning
+chio-kernel/src/transport\.rs|chio-core-types/src/message\.rs|chio-store-sqlite/src/(iou_store|evidence_export)\.rs|trust_control/cluster_and_reports\.rs		T	test module site: rebuilt on the receipt testing helper
+chio-core-types/src/receipt/authoritative_spend\.rs	from_parameters|parameter_hash: receipt	T	test module site: rebuilt on the receipt testing helper
+chio-core-types/src/receipt/authoritative_spend\.rs		B	offline parameter check deleted; binding via signed budget_authority.execution_nonce_id; PROTOCOL drops the offline parameter-binding claim (OQ8)
+chio-runtime-harness/src/(buyer_closure|proof_parity)\.rs		C	copies the parameter commitment value
+chio-runtime-harness/src/treaty\.rs		R	producer site with the caller's Rng (Task 14)
+chio-lineage/src/ingest_active_defense\.rs		F	bind to the signed active_defense projection digests and commitments; never sees a raw identifier
+chio-otel-receipt-exporter/src/sink\.rs		R	producer site (Task 13)
+chio-siem/		H	projection reads commitment values; parameter_hash fields deleted (Task 15)
+chio-agent-web-interop/src/interop\.rs		E/P-ii	content: open with the salt-only content opening carried in the envelope over the subject bytes it already carries; parameters: rebuild the exact canonical parameter object from envelope fields and open with the carried params opening
+chio-commerce-order/src/		E	open with the salt-only content opening in the commerce authority receipt artifact over the event bytes in the bundle
+evidence_export/verification\.rs		MOVED	file moved to chio-bundle-verify by item 6 part 6a; its verify_hash calls are deleted there (kind V)
+chio-control-plane/src/(keyring_runtime|trust_control/config_and_public)\.rs		R	producer site (Task 10)
+security/adapters/native_evidence\.rs	from_parameters\(json!\(\{$	R	native evidence producer builds the active_defense projection (Task 10)
+security/adapters/native_evidence\.rs		F	reader binds to the signed active_defense projection
+security/event_consumer/verification\.rs		F	reader binds to the signed active_defense projection
+trust_control/finding_purchase_routes\.rs	parameters	P-i	finding_id read from the registered metadata key finding_delivery.finding_id (public listing id)
+trust_control/finding_purchase_routes\.rs		F	bind to the signed delivery_contract digests equal to finding.payload_sha256
+trust_control/finding_retraction_resolver\.rs		F	memory write digest read from the child receipt's signed delivery_contract.observed_digest instead of hashing parameters
+trust_control/finding_verified_fix\.rs	parameter_hash: receipt	C	verified-fix nonce binding copies the parameter commitment value
+trust_control/finding_verified_fix\.rs		R	producer site with the evidence body as preimage (Task 10)
+chio-enterprise-export/src/artifacts\.rs		E/P-ii	content: open with the carried content opening over the artifact bytes (raw bytes wrapped as {kind: bytes, b64u}); parameters: rebuild {artifact_ref, artifact_sha256, event_id} from the event and open with the carried params opening
+chio-store-sqlite/src/finding_pool_ledger\.rs		E/P-ii	rebuild the expected parameter object and output from ledger data and open with the opening read from the same store; OpeningUnavailable when erased or unknown
+chio-store-sqlite/src/receipt_store\.rs		A	append test hook keys on the receipt id
+chio-store-sqlite/src/receipt_query_snapshot/project\.rs|chio-store-sqlite/src/receipt_store/(append|evidence_retention|reports/read_boundary|reports/read_boundary/projection)\.rs		A	column content_hash becomes content_commitment in place (fresh-only v1 catalog)
+chio-store-sqlite/src/receipt_store/support/security_evidence\.rs		F	security evidence index binds to the signed active_defense projection
+chio-finding-market-store-postgres/		V	verify_hash deleted
+chio-api-protect/src/proxy/sidecar\.rs		H	format check moves to the commitment value; parameter_hash_valid deleted
+dashboard/src/components/ReceiptTable\.tsx		H	dashboard shows the parameter commitment and a committed label
+chio-cli/src/active_defense_migration\.rs		V	verify_hash deleted
+proof/fixture(_agent_web)?\.rs		R	fixture producer re-signs from recorded preimages with FixtureRng (Task 14)
+process_host/(call_evidence|run_evidence)(/export|/outcomes_export)?\.rs	from_parameters|body\.content_hash	R	chio run producer: evidence object as parameter and content preimage; openings written with the export (Task 13)
+process_host/swarm/requests\.rs		R	chio run swarm bootstrap producer (Task 13)
+process_host/nonce_evidence\.rs		C	nonce evidence copies the parameter commitment; binding check opens with the export's persisted opening
+process_host/		P-ii	the export holds the evidence object; open the receipt's params commitment with the export's persisted opening, then read fields from the held object; OpeningUnavailable when absent
+chio-cli/src/cli/process_response_verify\.rs		E/P-ii	verifier holds the request and output; opens with the persisted chio run openings
+chio-cli/src/cli/session/response\.rs		E	session response check opens the content commitment with the store opening over the original bytes
+chio-mercury-core/src/proof_package\.rs		P-ii	proof package carries the canonical step parameter object and a salt-only params opening; verifier rebuilds and opens
+chio-mercury/src/|chio-wall/src/		R	producer site (Task 13)
+chio-acp-proxy/src/compliance/bundle/bounds\.rs		H	bounds and budget run over the commitment values
+chio-acp-proxy/src/kernel_signer\.rs	authorization_receipt\.action\.parameters	P-i	authorization parameters read from the proxy's own authorization request record that produced the receipt; receipt bound by id and parameter commitment
+chio-acp-proxy/src/kernel_signer\.rs		R	ACP producer passes session update preimages (Task 11)
+chio-acp-proxy/src/telemetry\.rs		H	telemetry exports the commitment values
+chio-mcp-remote/src/remote_mcp/session_credentials\.rs		C	DeliveryAcknowledgement.result_hash becomes result_commitment
+session_credentials/completed_result\.rs		A/E	parameters: credential call row records the receipt parameter commitment at completion and compares by equality; output: open the content commitment with the opening from the same process's receipt store; OpeningUnavailable when erased or unknown
+chio-tower/		H	reads chio.receipt.v1 from the authority
+chio-binding-helpers/src/receipt\.rs		V	verify_hash deleted; receipt verification reports signature and commitment shape
+chio-cage/src/receipt\.rs	parameters|content_hash|canonical	F	cage verifier binds to signed cage_receipt metadata after the CageEnforcementRecord field audit (P-d); no disclosure file
+chio-cage/src/receipt\.rs		R	cage producer with host Rng (Task 10)
+chio-conformance/src/native_suite\.rs		R	native suite producer with the caller's Rng (Task 14)
+verdict_matrix/src/driver\.rs		H	driver asserts commitments (Task 15)
+chio-trace-validate/		V	verify_hash deleted
+chio-attest-buyer-core/src/report\.rs		C	report compares commitment values copied into the step
+chio-attest-loopback/src/runtime_validation\.rs	parameters	P-ii	rebuild {workflowId, caseRef, tool} from the step and open with the package's params opening
+chio-attest-loopback/src/runtime_validation\.rs		C	step output and args fields compare commitment values
+chio-attest-loopback/src/lib\.rs	from_parameters	R	loopback producer with the caller's Rng (Task 14)
+chio-attest-loopback/src/(lib|package)\.rs		C	copies commitment values into step and package
+chio-federation/src/		C	tool_args and outcome bindings copy commitment values
+chio-finding-challenge/src/replay_contradiction\.rs	parameters	P-ii	challenger rebuilds the expected action object and opens with the carried params opening
+chio-finding-challenge/src/		F	bind to the signed delivery_contract digests
+chio-finding-verifier/src/		F	bind to the signed delivery_contract digests equal to payload_sha256
+chio-open-market/src/recovery\.rs		F	bind to the signed delivery_contract digests
+chio-reputation/		V	verify_hash deleted
+chio-selective-disclosure/src/lib\.rs		C	BBS projection content slot carries the content commitment value
+chio-tee/src/runner\.rs		B	runner holds the invocation it ran and checks with SignedReceipt openings at signing
+chio-credit/src/		C	receivable copies the content commitment value; shape check on the commitment
+chio-settle/src/evm/prepare\.rs|chio-web3/src/settlement\.rs		E	anchor proof carries a salt-only content opening; checker rebuilds the preimage from public parts and opens
+chio-settle/src/finding_enforcement/plan\.rs		P-ii	rebuild the anchor parameter object from verified data and open with the proof's params opening
+chio-settle/src/finding_enforcement/test_anchor_proof\.rs		T	test support
+chio-economy|chio-open-market		F	
+^sdks/jvm/chio-streaming-flink/src/integrationTest/		T	integration test fixtures rebuilt
+^sdks/		S	SDK verifier, middleware or adapter reads commitments and openings (Tasks 12, 17); unsalted parameter and content fields deleted

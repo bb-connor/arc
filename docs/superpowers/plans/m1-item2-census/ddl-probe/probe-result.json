@@ -1,0 +1,167 @@
+{
+ "sqlite": "3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)",
+ "results": [
+  {
+   "case": "present_blob32",
+   "expected_accept": true,
+   "accepted": true,
+   "stdout": "present|blob|32",
+   "stderr": ""
+  },
+  {
+   "case": "erased_null",
+   "expected_accept": true,
+   "accepted": true,
+   "stdout": "erased|null|",
+   "stderr": ""
+  },
+  {
+   "case": "claim_salt_ref_present",
+   "expected_accept": true,
+   "accepted": true,
+   "stdout": "present|blob|32",
+   "stderr": ""
+  },
+  {
+   "case": "erased_blob1",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "erased_blob32",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "erased_text",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "present_text32",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "present_null",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "present_blob31",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "present_blob33",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "present_integer",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL) (19)"
+  },
+  {
+   "case": "state_lost",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(state) = 'text' AND state IN ('present', 'erased') (19)"
+  },
+  {
+   "case": "salt_ref_uppercase",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_double_dot",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_trailing_dot",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_leading_digit",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_dash",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_empty",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_65_chars",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "receipt_id_uppercase",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(receipt_id) = 'text' AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*' (19)"
+  },
+  {
+   "case": "receipt_id_63",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(receipt_id) = 'text' AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*' (19)"
+  },
+  {
+   "case": "state_at_text",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(state_at) = 'integer' AND state_at >= 0 (19)"
+  },
+  {
+   "case": "state_at_negative",
+   "expected_accept": false,
+   "accepted": false,
+   "stdout": "",
+   "stderr": "Runtime error near line 11: CHECK constraint failed: typeof(state_at) = 'integer' AND state_at >= 0 (19)"
+  }
+ ],
+ "all_as_expected": true
+}

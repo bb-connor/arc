@@ -10,7 +10,7 @@
 |---|---|---|---|
 | P-a | `refactor(core-types): move the Rng seam into core types and make it fallible` | none | Task 2 |
 | P-b | `feat(core-types): receipt commitment and disclosure types with openers` | none (additive) | Task 3 |
-| P-c | `feat(store): receipt openings persist with the receipt append` | none (additive table, unused until the format PR) | Task 4 |
+| P-c | `feat(store): receipt openings table, reads and erasure` | none (additive table, reads and erase routes; the append writes openings only in F) | Task 4 |
 | P-d | `feat(kernel): guard evidence declarations and the receipt metadata key registry` | none (declarations and registry; dropping and refusal off) | Task 5 |
 | F | `feat(core-types): committed receipts for every producer` | every receipt | Tasks 6 to 19 |
 
@@ -20,7 +20,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-17-relying-party-wedge-design.md`, sections 2.2 (D2, D17), 2.5 (G1, G3, G4, G13, G14, G15, G18), 7.4 (producers without a root policy), 7.6, 7.7, 7.8, 8.4, 9.4, 10.1 to 10.3, 10.7, 10.10, 11, 13.2, 13.3. Inputs: `docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md`, `docs/superpowers/specs/relying-party-wedge/protocol/protocol-6-committed-receipts.md`, `docs/superpowers/specs/relying-party-wedge/in-place-schemas/receipt/record.schema.json` and its README, `docs/superpowers/specs/relying-party-wedge/verdict-matrix/` (`receipt_disclosure`), `tests/bindings/vectors/receipt/committed/v1.json`, `scripts/gen-signing-wrapper-vectors.py`, the item 1 plan `docs/superpowers/plans/2026-10-20-m1-item1-signing-wrapper.md`, the item 6 plan (part 6a moves `chio-control-plane/src/evidence_export/verification.rs` into `chio-bundle-verify`), and `docs/adr/ADR-0019-kernel-delivery-contract.md` item 7 (the receipt-metadata key registry).
 
-**Builds on:** #1715 (fwdcompat receipts, option 2: `deny_unknown_fields` across the receipt trees, `Decision` and `OperationTerminalState` through `chio_security_types::lossless_serde!`, commerce routing off the receipt bytes) and #1716 (closed receipt decode in the Go, Python and TypeScript verifiers). Item 2 keeps both contracts and extends them to the new members: every new receipt block is `deny_unknown_fields`; every new tagged enum and closed union decodes through `chio_security_types::lossless_serde!`, the path #1706 already uses inside `chio-core-types` (no local helper, G18); the commerce authority receipt route stays outside the signed bytes; and each SDK verifier's closed layer list gains the new blocks. Item 2 also reuses #1706's `root_authority::wire::SaltRef` (an open dotted string of at most 64 characters), `Sha256Digest`, `RootAnchor` and `HolderClass`.
+**Builds on:** #1715 (fwdcompat receipts, option 2: `deny_unknown_fields` across the receipt trees, `Decision` and `OperationTerminalState` through `chio_security_types::lossless_serde!`, commerce routing off the receipt bytes) and #1716 (closed receipt decode in the Go, Python and TypeScript verifiers). Item 2 keeps both contracts and extends them to the new members: every new receipt block is `deny_unknown_fields`; every new tagged enum and closed union decodes through `chio_security_types::lossless_serde!`, the path #1706 already uses inside `chio-core-types` (no local helper, G18); the commerce authority receipt route stays outside the signed bytes; and each SDK verifier's closed layer list gains the new blocks. #1723 (the shared `lossless_serde!` fix, at `852c60127f`) is the predecessor of the strictness gate: its macro takes the enum definition, and a private remote mirror leaves the trait impl as the only reachable decoder, so `Type::deserialize` is the concrete decode path; its 11 census types carry exact concrete-path refusal tests. #1715 and #1706's `ClaimValue` rebase onto it. Every committed-receipt type in this plan decodes through the #1723 macro (or `deny_unknown_fields` for plain structs) and gets a concrete-path refusal test of the same shape (Task 6). Item 2 also reuses #1706's `root_authority::wire::SaltRef` (an open dotted string of at most 64 characters), `Sha256Digest`, `RootAnchor` and `HolderClass`.
 
 **Census base:** facts below were measured at `origin/main` `fcc31d25fb` (consumers) and `a93a2f69a3` (producers and fixtures), where neither item 1 nor #1715 is merged. Task 1 re-runs every census at each PR's integrated base and updates the counts in that PR's body. Counts from any earlier base are planning figures only.
 
@@ -94,7 +94,7 @@ Producers without a root policy (spec 7.4):
 Further constraints:
 
 - M1 scope (spec 13.1 cut 1): every receipt is fully committed. `parameters_inline` and `result_inline` exist in the types, the schema and the verifiers, and the signer refuses to set them. Inline disclosure lands in M2.
-- Merge order (precondition): #1674, #1601 (merged), #1607, #1715, #1716, #1706, #1705, #1710, #1708, the Root-2 K-stack in Root-2's order (T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, KERN-TRACE-LOCK-FSYNC), subtree188a, the pending store schema-adoption cleanup, item 6 part 6a, item 1; then P-a to P-d in that order; then F. #1710 is an explicit predecessor of F (Root-2 condition 7), not "whichever lands second". Item 3's capability change (`root_anchor` in the capability body) follows F. Root-2's order is not an approval of any candidate head.
+- Merge order (precondition): #1674, #1601 (merged), #1607, #1723 (`852c60127f`), #1715 and #1706 (both rebased onto #1723), #1716, #1705, #1710, #1708, the Root-2 K-stack in Root-2's order (T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, KERN-TRACE-LOCK-FSYNC), #1722 (subtree cancellation, draft at `188a6af6ff`), item 6 part 6a, item 1, and the store schema-adoption cleanup (no PR or implementation yet; it is the last serial store item and an explicit unresolved predecessor, never a guessed PR number); then P-a to P-d in that order; then F. P-c also waits for #1722 and the schema-adoption cleanup, because it adds a store table. #1710 is an explicit predecessor of F (Root-2 condition 7), not "whichever lands second". Item 3's capability change (`root_anchor` in the capability body) follows F. Root-2's order is not an approval of any candidate head.
 - Preconditions (D17): the "D17 Coordination" list is acknowledged by the lead and Root-2 on `ws2:~/lanes/claude-pr1160-evidence/lead2/sync.md` before F opens. Each Root-held file in that list has Root-2's ACK before the lane edits it.
 - Precursors are byte-neutral: each one's tip passes the full changed-crate suites and `cs cargo xtask gen signed-fixtures --check` with no fixture change.
 - F is one PR, squash-merged. Commits follow "Commit Grouping" for F: the inventory's five groups in order, and inside them each producer's salt-source wiring in its own commit. Intermediate commits need not build. Each group's last commit passes `cs cargo check -p <crate>` for the crates that group finishes.
@@ -102,7 +102,8 @@ Further constraints:
 - A signed or durably admitted receipt keeps its exact receipt id and its exact salts across every retry and recovery. Nothing re-signs with new entropy to recover an ambiguous append (Root-2 condition 3).
 - No legacy, compat or dual paths; everything is v1. No `parameter_hash` or `content_hash` alias, no `redaction_mode` reader, no relay signer that accepts a hash, no second HTTP receipt, no default trait method standing in for a declaration, no store migration or adoption fallback (the DDL changes in place, and v1 catalog validation refuses any other layout).
 - Fail-closed: salt generation failure, a malformed `salt_ref`, a commitment that does not recompute, `tenant_id` beside `authority`, an inline field without a root policy, an unregistered Chio-internal metadata key, an unavailable opening where a consumer needs one, and a decode error each refuse with an explicit error.
-- Strict decoding (G18) for every type added or changed: `deny_unknown_fields` at every level, closed string enums for `alg` and `holder`, `lossless_serde!` for tagged enums, no `#[serde(flatten)]`. Opaque caller data (`parameters_inline`, `result_inline`, an opening's `payload`, `metadata` values) stays opaque.
+- Strict decoding (G18) for every type added or changed: `deny_unknown_fields` at every level, closed string enums for `alg` and `holder`, `lossless_serde!` for tagged enums, no `#[serde(flatten)]`. Opaque caller data (`parameters_inline`, `result_inline`, an opening's `payload`, caller `metadata` values) stays opaque.
+- Strictness gate (mandatory, Root-2 r2 request 3): every committed-receipt type, existing and new, goes through the #1723 macro (or `deny_unknown_fields` for a plain struct) and passes `committed_receipt_types_refuse_padding_and_lossy_decode` (Task 6) through each of its decode paths: the trait path `T::deserialize`, `serde_json::from_str`, `serde_json::from_value` and every public concrete decoder. A type absent from that test's list cannot merge. Neither a variant shape elsewhere (#1706's `ClaimValue`) nor the derive attributes count as evidence.
 - Clock reads only through the approved seams; fixtures use fixed timestamps (`issued_at = 1792234800`). Run `python3 scripts/check-security-clocks.py`.
 - Clippy denies `unwrap_used` and `expect_used` outside tests. Format with `cs cargo fmt --all`.
 - No em dashes (U+2014) in any file. No narrative or meta comments; comments state invariants and contracts.
@@ -114,12 +115,14 @@ Further constraints:
 
 ## Review Focus
 
-1. **A consumer still binding to an unsalted receipt hash, or binding to a commitment it cannot check.** Expected: every row of the Task 1 consumer table has its planned binding at the F tip, `git grep -n -E "action\.parameter_hash|\.content_hash\b"` over `crates` returns only unrelated same-name fields listed as kind D, and every consumer that needs an opening fails with `OpeningUnavailable` when it is erased or unknown. Pinned by the per-consumer tests named in Tasks 7 and 16, and by `compacted_replay_survives_erased_openings` (Task 7).
+1. **A consumer or parameter reader without a planned binding.** Expected: the census script (`docs/superpowers/plans/m1-item2-census/census.py`) classifies every production line at each PR's base with no `UNCLASSIFIED` row; at the F tip only kind D, GEN and DOC lines remain; every consumer that needs an opening fails with `OpeningUnavailable` when it is erased or unknown. Pinned by the committed census TSV, the per-consumer tests in Tasks 7 and 16, and `compacted_replay_survives_erased_openings` (Task 7).
 2. **An opening written apart from its receipt.** Expected: on every hosted path (SQLite and trust-control), openings are written in the receipt's append transaction; no `put_openings` call exists outside it; a crash, a lost ACK or a retry leaves the receipt and its salts identical. Pinned by the Task 4 crash and ACK tests and the Task 7 recovery tests.
 3. **A signing path that still accepts a hash or a commitment.** Expected: the only receipt signers take `ReceiptDraft`, `ReceiptPreimages` and `&dyn Rng`, including `chio-selective-disclosure` `sign_chio_receipt_with_bbs`. Pinned by `receipt_signers_take_preimages` (Task 6) and the Task 1 grep re-run at the F tip.
 4. **A salt that is not fresh, not 32 bytes, or seeded in a release build.** Expected: two salts per receipt from the producer's own `Rng`, refused when equal; fallible `Rng::fill_bytes`; no zero-fill fallback; `chio-fixture-rng` absent from the release dependency graph. Pinned by Task 2's tests and `scripts/check-fixture-rng.py` (Task 14).
 5. **Plaintext surviving in a signed field, or a required metadata block disappearing.** Expected: the marker property test passes across every guard evidence producer, the metadata merge and OCSF; an unregistered Chio-internal metadata key refuses signing; only caller and hook keys are dropped. Pinned by Task 5 and Task 8.
 6. **A regenerated fixture that changed more than the committed fields.** Expected: the changed values are the committed members, signatures, receipt ids and digests traced to them, and the consumer artifacts whose member changes the consumer table names. Pinned by the extended fixture diff aid (Task 18).
+7. **A committed-receipt type that decodes padding, duplicates or a lossy shape on one path.** Expected: every type in `COMMITTED_RECEIPT_STRICT_TYPES` refuses a padded member at every level, a duplicate member and a padded unit-tagged variant, and re-encodes losslessly, through the trait, `from_str`, `from_value` and its public concrete decoder. Pinned by `committed_receipt_types_refuse_padding_and_lossy_decode` (Task 6), which runs on #1723's decoder.
+8. **A raw tenant or plan identifier in a signed metadata projection.** Expected: the `active_defense` and `response_simulation` projections carry digests, enums, timestamps, counters and salted commitments, and no raw `TenantId`, `ActionId`, finding id, submitter or affected id. Pinned by `security_projections_carry_no_raw_identifiers` and the marker property test over those producers (Tasks 5 and 8).
 
 ---
 
@@ -212,12 +215,8 @@ git grep -n -E "use [a-z_:]*(sign_receipt|ChioReceipt)[a-z_]* as " -- crates sdk
 git grep -n -E "pub fn [a-z_]*sign[a-z_]*\(" -- crates | grep -i receipt
 ```
   The last grep lists every public function with `sign` and `receipt` in its name; each hit is either a producer row or recorded as not a `chio.receipt.v1` signer. Expected at `a93a2f69a3`: the inventory's 54 call sites plus `chio-selective-disclosure` `sign_chio_receipt_with_bbs` (through `ChioReceipt::sign_prepared_with_bbs_using_handle`), which the inventory regex missed.
-- [ ] **Step 3: Consumer census.** Every non-test reader, comparer or copier of the receipt hashes, and every caller of `ToolCallAction::from_parameters` (which F deletes):
-```bash
-git grep -n -E "action\.parameter_hash|\.content_hash\b|ToolCallAction::from_parameters|verify_hash\(" -- crates sdks ':!**/tests/**' ':!*_tests.rs' ':!**/tests.rs' ':!**/_generated/**'
-git grep -n -E '"content_hash"|"parameter_hash"' -- crates sdks ':!**/tests/**'
-```
-  Expected at `fcc31d25fb`: 483 hit lines in 190 files. Each hit is classified into exactly one kind of the consumer table below; a hit that fits no kind stops the lane for a plan update.
+- [ ] **Step 3: Consumer census (script and committed output).** `docs/superpowers/plans/m1-item2-census/census.py` lists every line under `crates`, `sdks` and `xtask` that matches one of three patterns: the receipt hashes and their helpers (`action\.parameter_hash|\.content_hash\b|ToolCallAction::from_parameters|verify_hash\(`), the hash member names (`"content_hash"|"parameter_hash"`), and the plaintext parameter readers (`action\.parameters\b`). It marks each line test or production (test paths and `#[cfg(test)]` modules), applies the first matching rule of `rules.tsv` (path regex, line regex, kind, replacement source), writes `census-<rev>.tsv`, and exits 1 when any production line has no rule. Run: `python3 -I docs/superpowers/plans/m1-item2-census/census.py <repo> <rev> docs/superpowers/plans/m1-item2-census/rules.tsv docs/superpowers/plans/m1-item2-census/census-<rev>.tsv`.
+  Committed output at `fcc31d25fb`: `census-fcc31d25fb.tsv`, 1085 lines in 434 files (the three patterns over `crates`, `sdks` and `xtask`, tests included), of which 460 production lines in 181 files, 0 unclassified. Production lines by kind: R 60, S 49, V 45, X 44, A 41, P-ii 33, F 31, GEN 30, C 27, D 17, A0 17, T 14 (test modules the path heuristic misses), H 14, DOC 10, B 8, E/P-ii 7, E 5, P-i 4, E-k 2, A/E 2. The lead's r2 count (530 lines in 215 files) covers only the first two patterns over `crates` and `sdks`; the committed census supersedes both earlier figures. Task 1 re-runs the script at each PR's base and commits the new TSV; a new unclassified production line stops the lane for a plan update.
 - [ ] **Step 4: Other censuses.**
 ```bash
 git grep -n -E "content_hash|parameter_hash|RedactionMode|redaction_mode" -- crates sdks xtask ':!**/_generated/**'
@@ -257,19 +256,29 @@ git grep -l -E '"content_hash"|"parameter_hash"|"redaction_mode"' -- '*.json' '*
 
 The Lambda extension emits an unsigned detect-only `EvaluateResponse` with no receipt body, hash or arguments, so it is not a producer; Task 13 pins that.
 
-**Consumer table** (Step 3 output; one kind per site; rows at `fcc31d25fb`):
+**Consumer kinds** (each production line of the census carries exactly one; `rules.tsv` names the replacement source per site):
 
-| Kind | Rule | Sites |
+| Kind | Rule | Production sites (census) |
 |---|---|---|
-| A. Store-internal binding | The kernel or store row keeps its own digest of material it already retains (the operation binding's request digest, the retained output blob digest, the session credential call row's result digest), and records the receipt's `parameter_commitment.value` and `content_commitment.value` in the same transaction that durably admits or terminates the operation. Replay and recovery compare receipt to row by commitment equality and blob to row by the row's digest. They never read openings, so erasure or loss of an opening cannot wedge them. The row's request and output digests stay unsalted inside the store only; the same store already retains the request and output themselves, so no new disclosure results. | `admission_operation/projection.rs:241,243,1233`, `projection/authorization.rs:111`, `projection/refusal_receipt.rs:54`, `remote_projection.rs:1325`, `admission_coordinator/terminal.rs:800-801` and its content plumbing, `terminal/compacted_replay.rs:192,264`, `return_context/caller.rs:103`, `admission_coordinator/refusal.rs:482`, `admission_terminal_receipt.rs:807-809`, `effect_obligation/preparation.rs:62`, `receipt_support/coupling.rs:29-30`, `responses/receipt_persistence.rs:158-216`, `chio-store-sqlite` `receipt_store/{append.rs:61,evidence_retention.rs:782,964,1101,reports/read_boundary/projection.rs:91,support/security_evidence.rs:61}`, `receipt_query_snapshot/project.rs:34,68,111,144`, `finding_pool_ledger.rs:1573` (as kind E when the ledger checks a delivery payload), `chio-mcp-remote` `session_credentials/completed_result.rs:133,154`, `session_credentials.rs:795` |
-| A0. Request digest helper | `ToolCallAction::from_parameters` used only to hash request arguments for a non-receipt binding (operation binding, execution nonce, treaty request, obligation, caller delivery). Replaced by `chio_core_types::receipt::canonical_parameter_digest(&Value) -> Result<Sha256Hex>`, which never appears in a receipt. | `admission_coordinator.rs:820-826`, `refusal.rs:273,462`, `terminal.rs:706,1542`, `compacted_replay.rs:182`, `nonce_admission.rs:241`, `reconciliation.rs:157-162`, `effect_obligation/preparation.rs:98,126`, `validation/tool_output.rs:548-563`, `verified_treaty.rs:104-119,210`, `tool_outcome/caller_delivery.rs:60-64`, `execution_nonce.rs`, `admission_operation/execution_nonce{,/profile}.rs` |
-| B. At-signing check | The check runs in the signing process before or right after signing, with the preimage in hand and the salts from `SignedReceipt.openings`; it recomputes the commitment. | `verified_treaty.rs:257` (receipt parameters equal the treaty request), `kernel/receipt_support/signing.rs:274`, `chio-kernel-core` `receipts.rs`, `nonce_admission.rs:79` and `authoritative_spend.rs:243,422` (nonce parameter binding; the offline check in `authoritative_spend` reduces to the receipt's signed `execution_nonce_id` equal to the nonce id, open question 8) |
-| C. Copy the commitment value | A later artifact copies a receipt hash today. It copies the commitment value instead, in a member renamed to say so, and compares by equality. The artifact's bytes change (D17). | `verified_treaty.rs:269` (`outcome_sha256` becomes `outcome_commitment`), federation `bilateral_dsse/builder.rs:186`, `bilateral_dsse/verify.rs:476`, `bilateral_verifier/cosign.rs:188`, `bilateral_verifier/treaty.rs:357`; `chio-attest-loopback` `lib.rs:326,456,512`, `package.rs:91`, `runtime_validation.rs:211,276`; `chio-attest-buyer-core/src/report.rs:741,959`; `chio-credit/src/receivable_iou.rs:188,818,949`; `settlement_observer.rs:222` (#1705's `SettlementObservation.content_hash` becomes `content_commitment`); `allow_responses.rs:547,879,947` (child contract `expected_digest` against the parent's content commitment); `chio-runtime-harness` `buyer_closure.rs:90`, `proof_parity.rs:335`; `finding_verified_fix.rs:1371`; `chio-acp-proxy` `telemetry.rs:313`, `compliance/bundle/bounds.rs:98`; `chio-selective-disclosure/src/lib.rs:234` (BBS message slot); `chio-tee` `tap.rs`, `runner.rs`; `chio-cli/src/cli/process_host/nonce_evidence.rs:91,103` |
-| D. Unrelated same-name field | Not a receipt hash; unchanged. | `chio-policy/src/receipt.rs` (policy receipt), `chio-http-core/src/request.rs` `content_hash()` (request body digest; feeds the HTTP preimage and is otherwise internal), `chio-api-protect/src/proxy/router.rs:418,505`, approval-store and admission-operation `parameter_hash` columns, `chio-acp-proxy` audit entry `content_hash` and `authorization_parameter_hash` |
-| E. Open with a persisted opening | The verifier holds the preimage (or the payload digest's preimage) and the producer's operator persists the opening. The verifier reads the opening from the operator's store or from the evidence that carries it and calls `open_receipt`. An erased, lost or absent opening fails closed with `OpeningUnavailable { state: Erased | Unknown }`. | finding market: `chio-finding-verifier/src/verify.rs:524`, `chio-finding-challenge/src/{standing.rs:187,replay_contradiction.rs:254}`, `chio-open-market/src/recovery.rs:320`, `trust_control/finding_purchase_routes.rs:392`, `finding_pool_ledger.rs:1573`; commerce: `chio-commerce-order/src/{replay.rs:362,settlement.rs:158}` (the opening rides in the commerce authority receipt artifact beside #1715's route); `chio-enterprise-export/src/artifacts.rs:456`; `chio-agent-web-interop/src/interop.rs:996`; cage reader `chio-cage/src/receipt.rs:395`; `chio run`: `process_host/{call_evidence.rs:130,304,348,367,run_evidence/verify.rs:181}`, `process_response_verify.rs:335`, `session/response.rs:134` |
-| F. Bind to signed Chio-internal metadata | The content is a Chio-internal body already carried in signed `metadata` under a registered key declared committed-safe (Task 5). The reader verifies that body and the receipt's signature, and stops comparing the content commitment; the producer's preimages are that body, so the commitment is redundant and documented as such. | native evidence: `execution_validation.inc:467-503,587-684`, `native_evidence.rs:558-606`, `chio-lineage/src/ingest_active_defense.rs:164-193`, `event_consumer/verification.rs:295-325`, store `support/security_evidence.rs:61`; response simulation: `response_simulation_report.rs` `verify_response_simulation_receipt`, `active_response_simulation.rs:135` |
-| G. External protocol | Off-chain anchor proof checks compare the anchored receipt's content binding with an expected value. `contracts/src` names no receipt hash at `fcc31d25fb`, so the contracts under the web3 freeze are unchanged; the expected value the off-chain checker derives becomes `content_commitment.value` (same 32-byte width). If Task 1 finds a contract or deployed artifact that recomputes the hash, the lane stops and escalates under the freeze. | `chio-settle/src/evm/prepare.rs:524`, `chio-web3/src/settlement.rs:698`, `chio-anchor/src/functions.rs:342`, `chio-settle/src/hook.rs` |
-| H. Format-only reader | Checks shape (lowercase hex) or projects the value. Moves to the commitment value. | `chio-http-core/src/evaluation.rs:52`, `chio-api-protect/src/proxy/sidecar.rs:861`, `chio-siem` (`ocsf.rs:72`, `sink_projection.rs:199,202`, `alerting/projection.rs:26`, `event.rs:42`), verdict-matrix `driver.rs:877`, `chio-cli` `trust/receipt/{health,explain}.rs`, `chio-eval-receipt/src/verify.rs`, `chio-binding-helpers/src/receipt.rs` |
+| R. Producer site | Builds a receipt. Becomes a `ReceiptDraft` plus `ReceiptPreimages`, signed with its producer's `Rng` (producer table). | 60 lines: kernel responses, terminal receipts, session ops, drop guard, reconciliation, receipt persistence; control-plane, cage, ACP, HTTP authority, OTel, Mercury, Wall, `chio run`, fixtures, harness, conformance, attest loopback |
+| X. Signer internals | Core and kernel signing internals, relay doc comments. Replaced by the committed signer. | 44 lines in `chio-core-types` receipt modules, `chio-kernel-core`, kernel signing, browser, mobile and C ABI docs, `chio-http-core/src/receipt.rs` (deleted) |
+| A. Store-internal binding | The kernel or store row keeps its own digest of material it already retains (the operation binding's request digest, the retained output blob digest) and records the receipt's `parameter_commitment.value` and `content_commitment.value` in the same transaction that durably admits or terminates the operation. Replay and recovery compare receipt to row by commitment equality and blob to row by the row's digest; when `opening_state` is `Present` they also recompute the content commitment over the blob, so the signed receipt still covers the blob link (P2-C). They never require an opening, so erasure cannot wedge them. Row digests stay inside the store, which already retains the request and output. | 41 lines: admission projection, authorization consumer check (Root-held), refusal, remote projection, terminal, compacted replay, admission terminal receipt, effect obligation, coupling, store columns (`chio_tool_receipts`, query snapshot, read boundary, evidence retention) |
+| A0. Request digest helper | `ToolCallAction::from_parameters` used only to hash request arguments for a non-receipt binding. Replaced by `canonical_parameter_digest(&Value)`. The digest leaves the store in three signed artifacts (execution nonce `NonceBinding.parameter_hash`, treaty `request_sha256`, caller delivery `parameters_digest`); every holder of each already holds the arguments (the tool server, the treaty peer, the caller), so it adds no oracle (P2-D). | 17 lines |
+| B. At-signing check | Runs in the signing process with the preimage in hand and the salts from `SignedReceipt.openings`. | 8 lines: nonce admission and reconciliation, treaty request binding, `authoritative_spend` (offline parameter check deleted, OQ8), `chio-tee` runner |
+| C. Copy the commitment value | A later artifact copies the commitment value in a renamed member and compares by equality (D17 item 2). | 27 lines: treaty outcome, federation DSSE and cosign, attest loopback and buyer report, IOU receivable, settlement observation (#1705), lineage column, runtime-harness buyer closure and proof parity, verified-fix nonce, `chio run` nonce evidence, BBS projection slot, `DeliveryAcknowledgement.result_hash` (becomes `result_commitment`) |
+| D. Unrelated | Merkle `verify_hash`, HTTP request body digest, ACP audit entry digest, approval parameter hashes. Unchanged. | 17 lines |
+| E. Open with a carried opening | The carrier holds the commitment's complete preimage in plaintext and carries a salt-only opening for that one `salt_ref` (OQ9). The verifier rebuilds the preimage from the carrier and opens; an absent opening fails with `OpeningUnavailable`. In each of these flows the carrier already holds an unsalted digest of the same content, so the content commitment hides nothing new there. | 5 lines: commerce replay and settlement (event bytes in the bundle), settle and web3 anchor proofs (preimage rebuilt from public parts by `settlement_anchor_receipt_content_hash_parts`; the anchor proof gains `content_opening`), session response |
+| E-k. Kernel opens with its own store | The kernel opens a receipt's commitment with the opening from its own receipt store and refuses with `ReceiptOpeningUnavailable` when the state is `Erased` or `Unknown`. | 2 lines: `allow_responses.rs:547,879` (finding memory write: the parent's content commitment opens over the written content; `contract.expected_digest` stays an unsalted internal digest compared with `written_content_digest`); test `finding_memory_write_refuses_erased_parent_opening` |
+| A/E. Credential row plus own store | `chio-mcp-remote` completed result: the session credential call row records the receipt's parameter commitment when the in-process kernel completes the call and compares by equality; the delivered output opens the content commitment with the opening from the same process's receipt store. | 2 lines: `completed_result.rs:133,154`; test `completed_result_refuses_erased_opening` |
+| E/P-ii. Carrier with parameter rebuild | As E for content; for parameters the verifier rebuilds the exact canonical parameter object from carrier fields and opens with a carried `params` opening. Preimage forms per site: enterprise export content is the artifact bytes as `{"kind":"bytes","b64u":..}` (a JSON value the producer wraps), parameters `{artifact_ref, artifact_sha256, event_id}`; agent-web content is the subject bytes in the same wrapped form, parameters rebuilt from the envelope; finding pool ledger rebuilds both from ledger data and reads the opening from the same store; `process_response_verify` holds request and output and opens with the `chio run` export's openings. | 7 lines |
+| F. Bind to a signed Chio-internal projection or contract | The reader binds to a signed metadata block that carries no argument or result value: the `active_defense` and `response_simulation` projections (Task 5), the `delivery_contract` digests (finding verifier, challenge standing and replay contradiction, open-market recovery, purchase routes, retraction resolver), or the audited `cage_receipt`. | 31 lines |
+| P-i. Parameter value from kernel or registered state | The reader extracts a value from `action.parameters`. It reads the value instead from the kernel's own row or a registered Chio-internal metadata key that carries no argument value. | 4 lines: `authorization.rs:64` (`operation_payload` digest from the authorization operation's admission row, Root-held), `delivery_preparation.rs:37` (launch state from registered key `launch.state`, a closed enum, Root-held), `finding_purchase_routes.rs:295` (`finding_id` from registered key `finding_delivery.finding_id`, a public listing id), ACP `kernel_signer.rs:240` (authorization parameters from the proxy's own authorization request record) |
+| P-ii. Parameter value from a rebuilt object | The verifier holds or rebuilds the exact canonical parameter object, opens the `params` commitment with a persisted or carried opening, then reads values from the object it holds. | 33 lines: `chio run` process-host evidence (the export holds the evidence object and writes its openings), Mercury proof package, attest loopback runtime validation, settle finding enforcement, finding challenge replay contradiction |
+| P-iii. Deleted as redundant | None in the census at `fcc31d25fb`. | 0 |
+| V. `verify_hash()` caller | Deleted: the parameter commitment is signed and has no unsalted hash to recheck. The caller keeps its signature check; report fields named `parameter_hash_valid` are deleted. | 45 lines |
+| H. Format or projection reader | Reads the commitment value instead. | 14 lines: SIEM, sidecar, http-core evaluation, ACP telemetry and bounds, tower, verdict-matrix driver, dashboard |
+| S. SDK | SDK verifier, middleware or adapter reads commitments and openings (Tasks 12, 17). | 49 lines |
+| GEN, DOC, T | Regenerated code, docs, and test modules the path heuristic misses. `evidence_export/verification.rs` lines are kind V and are applied in `chio-bundle-verify`, where 6a moved the file. | 30, 10, 14 lines |
 
 Test-only sites (`from_parameters` in tests, fixtures inside test modules) move to a test helper `chio_core_types::receipt::testing::draft_for(params)` behind `#[cfg(any(test, feature = "test-support"))]`.
 
@@ -388,56 +397,88 @@ Register `chio.receipt-disclosure.v1` as an unsigned artifact; the schema is `ad
 
 ---
 
-### Task 4: P-c, openings persist with the receipt append (additive)
+### Task 4: P-c, the openings table, reads and erasure (additive); the atomic append in F
 
-**Files:** `crates/kernel/chio-kernel/src/receipt_store.rs` (trait), `crates/platform/chio-store-sqlite/src/receipt_store/{bootstrap/open.rs,append.rs,openings.rs (new)}`, the publication batch from #1708, `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs` and the trust-control receipt append route and handler, the store's v1 catalog validation.
+**Files:** `crates/kernel/chio-kernel/src/receipt_store.rs` (trait), every `ReceiptStore` impl (58 at `fcc31d25fb`, 16 non-test: `SqliteReceiptStore`, `SqliteAdmissionOperationStore`, `RemoteReceiptStore`, `RemoteAdmissionAuthority`, `chio-federation` `InMemoryReceiptStore` and the kernel, tower and broker test doubles), `crates/platform/chio-store-sqlite/src/receipt_store/{bootstrap/open.rs,append.rs,openings.rs (new)}`, `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs`, the trust-control receipt routes, `crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs` (`sync_peer_tool_receipts`), the store's v1 catalog validation.
 
-**Design (P1-1, P2-2, Root-2 conditions 1 to 3, 6):**
-- Openings are written in the same transaction as the receipt they open. There is no separate `put_openings` call and no separate failure to handle. A receipt append that fails takes its openings with it, and the kernel's existing append-failure handling applies unchanged. Spec 8.4's "opening marked lost" state therefore cannot arise on a hosted path (open question 2 records the spec amendment).
-- SQLite: the openings rows join the receipt row in the #1708 publication batch, under the same writer and inside the same guard. No extra I/O runs inside the publication guard beyond the rows of that batch; alerts and callbacks run after the guard is released (Root-2 condition 2).
-- Remote trust-control (`--control-url`, used by `chio mcp serve`, `chio run` and `serve-http`): the remote append request carries the openings, and trust-control writes the receipt and openings in one transaction on its own SQLite store. The remote `ReceiptStore` client never stores openings locally. Erase and read go through two new trust-control routes under the same token. This keeps the remote store path (D1, F14).
-- Durable admission: when a terminal receipt is durably admitted before publication, the admission row stores the signed receipt and its openings together, so recovery republishes the exact receipt and salts (Root-2 condition 3).
-- Idempotency: an append of a receipt id that exists with byte-identical receipt and salts is a no-op success; with different bytes or salts it refuses with `ReceiptStoreError::ConflictingOpenings`. A retry after a lost ACK resends the same request, held in memory until ACK or recovered from the admission row. Nothing re-signs.
-- Erasure: `erase_openings(receipt_id)` replaces the salt rows with a tombstone in one transaction. An append retry after erasure finds the receipt present and does not resurrect salts. A missing row reads as `OpeningState::Unknown`, never as erased or lost.
+**Split between P-c and F (P3-2).** P-c adds the table, the read and erase methods on every impl, the trust-control read and erase routes, tombstone replication and catalog validation. It adds no append argument and no transitional path. F changes `append_chio_receipt` to take `&SignedReceipt` and writes the openings, in one change, so no dual append exists on `main` at any point.
+
+**Design (Root-2 conditions 1 to 3 and 6; lead r2 P1-B, P1-C, P2-B, c2):**
+- Openings are written inside the store-owned `ReceiptStore::append_chio_receipt` transaction, under #1708's existing fence (rank 1) and receipts (rank 2) guards. No lock, rank or callback is added, and the projection guard (rank 3) is unchanged. A successful append acknowledges the commit of the receipt and its openings together; an error does not prove non-commit, so the idempotent retry below covers the unknown-ACK case. The replay path (`receipts(true)`) reads `opening_state` only outside the publication guards. There is no separate opening write, so spec 8.4's "opening marked lost" state cannot arise on a hosted path (OQ2).
+- Crash before commit: neither row exists and today's append-failure path applies. Crash after commit: both rows exist. A non-admission publication path that loses its in-memory `SignedReceipt` before the ACK either committed both rows or loses the receipt exactly as today; nothing re-signs.
+- Remote trust-control (`--control-url`, used by `chio mcp serve`, `chio run` and `serve-http`): F's remote append request carries the openings and trust-control writes the receipt and openings in one transaction on its own SQLite store. The client never stores openings locally. P-c adds `GET /v1/receipts/{id}/openings` (state only, never salts) and `POST /v1/receipts/{id}/openings/erase` under the same token.
+- Cluster replication (P1-B, option (a)): `sync_peer_tool_receipts` replicates openings rows and tombstones with each receipt delta, through the same `append_chio_receipt(&SignedReceipt)` path (F); there is no receipt-only append. A tombstone always wins a merge: a peer holding `present` salts that receives a tombstone erases them, and a later delta carrying `present` salts for a tombstoned receipt does not resurrect them. `erase_openings` on any node writes a tombstone delta that peers pull on their next sync. Tests: `erase_replicates_tombstone_to_peers`, `peer_delta_with_salts_does_not_resurrect_tombstone`, `peer_offline_during_erase_erases_on_next_sync`.
+- Durable admission: when a terminal receipt is durably admitted before publication, the admission row holds the signed receipt and its openings, so recovery republishes the exact receipt and salts (Root-2 condition 3). The admission row's salts are cleared in the transaction that records the publication acknowledgement, because recovery needs them only before it; an `erase_openings` call before that point refuses with `ReceiptStoreError::ReceiptNotPublished`.
+- Idempotency: an append of a receipt id that exists with byte-identical receipt and salts is a no-op success; with different bytes or salts it refuses with `ReceiptStoreError::ConflictingOpenings`. A retry resends the same request, held in memory until ACK or recovered from the admission row. Nothing re-signs.
+- Erasure: `erase_openings(receipt_id, erased_at)` replaces the salt rows with tombstones in one transaction. A missing row reads as `OpeningState::Unknown`, never as erased or lost.
+- Stores without openings: every one of the 58 impls implements `opening_state` and `erase_openings` explicitly (no default method). A store that keeps no openings (test doubles, `InMemoryReceiptStore`) returns `Unknown` from `opening_state` and `Ok(())` from `erase_openings`, because no salt exists to erase.
+
+**Salt copies and erasure (P1-C).** Every place a salt is stored, and whether `erase_openings` reaches it:
+
+| Copy | Erasure |
+|---|---|
+| `receipt_openings` rows (local SQLite, trust-control) | tombstoned |
+| cluster peers' `receipt_openings` | tombstone replicates; a peer offline during the erase erases on its next sync |
+| admission row (pre-publication only) | cleared at the publication acknowledgement; test `admission_row_salts_cleared_at_publication`; erase before publication refuses |
+| in-memory `SignedReceipt`, retry buffers | zeroized on drop (`Salt: ZeroizeOnDrop`) |
+| `chio run` disclosure documents written beside the evidence export | not reached: the export is the operator's own file once written |
+| kind E carriers (commerce authority receipt artifacts, enterprise export events, agent-web envelopes, settle and web3 anchor proofs, Mercury and attest-loopback packages, finding challenge evidence) | not reached: each carrier already holds the committed preimage in plaintext, so its salt reveals nothing the carrier does not hold |
+| SDK and caller copies (none in M1; `/v1/evaluate` returns no openings) | n/a |
+
+PROTOCOL 6 (F) states that erasure makes the stored openings permanently unavailable and does not reach openings already delivered in exports or carriers. Test `erase_clears_store_and_admission_copies`.
 
 **Interfaces:**
 
 ```rust
 pub trait ReceiptStore {
-    /// Appends the receipt and its openings atomically. Replaces `append_chio_receipt` and
-    /// every `append_chio_receipt_*` variant's receipt argument with `&SignedReceipt` (one path).
+    /// F: appends the receipt and its openings in one store transaction. Replaces the current
+    /// receipt argument of `append_chio_receipt` and every `append_chio_receipt_*` variant.
     fn append_chio_receipt(&self, signed: &SignedReceipt) -> Result<(), ReceiptStoreError>;
+    /// P-c. Required on every impl.
     fn opening_state(&self, receipt_id: &str) -> Result<OpeningState, ReceiptStoreError>;
+    /// P-c. Required on every impl.
     fn erase_openings(&self, receipt_id: &str, erased_at: u64) -> Result<(), ReceiptStoreError>;
 }
 ```
-
-In P-c the trait gains the two read and erase methods and the table; the append signature change itself lands in F with `SignedReceipt` (P-c is additive: its append path accepts an optional openings argument internally, and F removes the option).
 
 DDL (fresh-only v1; catalog validation refuses any other layout with an exact error and mutates nothing, Root-2 condition 6):
 
 ```sql
 CREATE TABLE receipt_openings (
-  receipt_id TEXT NOT NULL CHECK (length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
-  salt_ref TEXT NOT NULL CHECK (length(salt_ref) BETWEEN 1 AND 64 AND instr(salt_ref, char(0)) = 0),
-  state TEXT NOT NULL CHECK (state IN ('present','erased')),
-  salt BLOB CHECK ((state = 'present') = (salt IS NOT NULL AND length(salt) = 32)),
-  state_at INTEGER NOT NULL,
+  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  salt_ref TEXT NOT NULL CHECK (typeof(salt_ref) = 'text' AND length(salt_ref) BETWEEN 1 AND 64 AND salt_ref GLOB '[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.'),
+  state TEXT NOT NULL CHECK (typeof(state) = 'text' AND state IN ('present', 'erased')),
+  salt BLOB,
+  state_at INTEGER NOT NULL CHECK (typeof(state_at) = 'integer' AND state_at >= 0),
+  CHECK ((state = 'present' AND typeof(salt) = 'blob' AND length(salt) = 32) OR (state = 'erased' AND salt IS NULL)),
   PRIMARY KEY (receipt_id, salt_ref)
 ) WITHOUT ROWID;
 ```
 
-`salt_ref` follows #1706's grammar, so delegation-context claim salts (`anchor.claims.*`) fit without a later table change. Writer custody and fencing follow the existing serving writer.
+The state check has two explicit branches (Root-2 r2 request 1): present means `typeof(salt) = 'blob'` and `length(salt) = 32`; erased means `salt IS NULL`. The `salt` column has BLOB affinity, so SQLite performs no type conversion and a TEXT or INTEGER value reaches the check as itself. The `salt_ref` check is #1706's grammar `^[a-z][a-z0-9_]*(\.[a-z0-9_]+)*$` with at most 64 characters, written as GLOB clauses: the first character is a lowercase letter, every character is in `[a-z0-9_.]`, no empty segment (`..`) and no trailing `.`. Delegation-context claim salts (`anchor.claims.*`) fit without a later table change. The same grammar is enforced at the Rust boundary: every write takes a `SaltRef` (decoded through #1706's checked constructor) and every read decodes the column through that constructor, refusing a row that fails it with `ReceiptStoreError::CorruptOpeningRow`. Writer custody and fencing follow the existing serving writer.
 
-- [ ] **Step 1: Failing tests** (SQLite, `chio-kernel --test durable_admission_sqlite`, trust-control client and server):
-  - `append_writes_receipt_and_openings_atomically` (fault injected after the receipt row: neither row exists);
-  - `crash_after_commit_before_ack_retains_salts` (commit, drop the ACK, restart, retry: same receipt id and salts, no duplicate);
-  - `retry_with_conflicting_salts_refuses`;
-  - `erase_then_retry_keeps_tombstone`;
-  - `missing_row_reads_unknown`;
-  - `concurrent_append_replay_and_failure` (append, replay and an injected append failure race under #1708's ordering; no lock held during alert callbacks);
-  - `unknown_ack_remote_append_is_idempotent` (trust-control);
-  - `old_layout_refuses_without_mutation` (catalog validation).
+The DDL was checked with `/usr/bin/sqlite3` 3.51.0 (the Mac CLI; ws2 has no sqlite3 binary), not with cargo. The probe script and its result are `ws2:~/lanes/claude-pr1160-evidence/m1i2/r3/{ddl.sql,probe.py,probe-result.json}`; `probe-result.json` has sha256 `81eb045ed330d2200ec9f9a547840cce72c616162a092cf6b71b8a6d27b7826c`. All 23 cases behaved as expected:
+
+| Case | Expected | Observed |
+|---|---|---|
+| present, 32-byte BLOB (control) | accept | accept |
+| erased, NULL (control) | accept | accept |
+| present, `anchor.claims.client_id` salt_ref (control) | accept | accept |
+| erased, 1-byte BLOB (Root-2 probe case) | refuse | refuse |
+| erased, 32-byte BLOB | refuse | refuse |
+| erased, TEXT | refuse | refuse |
+| present, 32-character TEXT (Root-2 probe case) | refuse | refuse |
+| present, NULL | refuse | refuse |
+| present, 31-byte BLOB; 33-byte BLOB; INTEGER | refuse | refuse |
+| state `lost` | refuse | refuse |
+| salt_ref uppercase, `..`, trailing `.`, leading digit, `-`, empty, 65 characters | refuse | refuse |
+| receipt_id uppercase hex; 63 characters | refuse | refuse |
+| state_at TEXT; negative | refuse | refuse |
+
+P-c turns each row into a named Rust test in `chio-store-sqlite` that executes the same INSERT against the crate's DDL and asserts the exact `CHECK constraint failed` refusal or the stored `(state, typeof(salt), length(salt))` for the controls: `opening_row_accepts_present_blob32`, `opening_row_accepts_erased_null`, `opening_row_accepts_claim_salt_ref`, `opening_row_refuses_erased_with_blob1`, `opening_row_refuses_erased_with_blob32`, `opening_row_refuses_erased_with_text`, `opening_row_refuses_present_with_text32`, `opening_row_refuses_present_with_null`, `opening_row_refuses_present_with_blob31`, `opening_row_refuses_present_with_blob33`, `opening_row_refuses_present_with_integer`, `opening_row_refuses_lost_state`, one `opening_row_refuses_salt_ref_<case>` per grammar case, `opening_row_refuses_receipt_id_<case>` and `opening_row_refuses_state_at_<case>`. Erasure is an `UPDATE ... SET state = 'erased', salt = NULL`; `erase_leaving_salt_refuses` pins that an UPDATE changing only `state` fails the check.
+
+- [ ] **Step 1: Failing tests in P-c** (SQLite, trust-control client and server, cluster): the DDL tests above; `missing_row_reads_unknown`; `erase_writes_tombstones`; `erase_route_refuses_without_token`; the three cluster tombstone tests; `every_store_impl_answers_opening_state` (one case per non-test impl); `old_layout_refuses_without_mutation` (catalog validation of `receipt_openings`).
+- [ ] **Failing tests in F** (Task 7 runs them): `append_writes_receipt_and_openings_atomically` (fault injected after the receipt row: neither row exists); `crash_after_commit_before_ack_retains_salts` (commit, drop the ACK, restart, retry: same receipt id and salts, no duplicate); `retry_with_conflicting_salts_refuses`; `erase_then_retry_keeps_tombstone`; `unknown_ack_remote_append_is_idempotent` (trust-control); `admission_row_salts_cleared_at_publication`; `erase_clears_store_and_admission_copies`; and extensions of #1708's ordering tests in `crates/kernel/chio-kernel/src/kernel/tests/receipt_publication/{concurrency,ordering,durable}.rs` that append with openings concurrently with replay and an injected append failure, asserting #1708's rank order and that replay reads `opening_state` outside the guards.
 - [ ] **Step 2: Implement, run** `cs cargo test -p chio-store-sqlite -p chio-kernel -p chio-control-plane --no-fail-fast`, clippy, `cs cargo xtask gen signed-fixtures --check` (no change). Expected: PASS.
 
 ---
@@ -464,17 +505,76 @@ Metadata key registry (ADR-0019 item 7, built here as that ADR schedules): a nam
 
 ```rust
 pub enum MetadataKeyOrigin { ChioInternal, CallerOrHook }
-pub enum MetadataDisclosure { /// carries no argument or result value
-    CommittedSafe, /// carries an argument or result value
+pub enum MetadataDisclosure {
+    /// Carries no argument or result value. `reason` records the field audit.
+    CommittedSafe,
+    /// Carries an argument or result value; refused in signed metadata.
     Unsafe }
-pub struct MetadataKeySpec { pub key: &'static str, pub origin: MetadataKeyOrigin, pub disclosure: MetadataDisclosure, pub schema: Option<&'static str> }
+pub struct MetadataKeySpec { pub key: &'static str, pub origin: MetadataKeyOrigin, pub disclosure: MetadataDisclosure,
+    pub schema: Option<&'static str>, pub reason: &'static str }
 pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec];
 pub fn metadata_key_spec(key: &str) -> Option<&'static MetadataKeySpec>;
 ```
 
-Every Chio-internal key the Task 1 metadata census found is registered with its declaration, including the operational blocks admission, active response and settlement need (`admission_operation`, `budget_authority`, `financial`, `execution_nonce_id`, `delivery_contract`, `caller_delivery`, `lineage`, `parent_receipt_ids`, `route_selection`, `security_event_projection`, `active_defense_body`, `receipt_context`, `chio_runtime`, `post_invocation`, `mercury`). `active_defense_body` and the response simulation report are Chio-internal bodies the kernel generates, not caller data; they are declared `CommittedSafe`, and the consumer table's kind F records that their content commitments are redundant. A required block that would carry argument or result values is redesigned in F to a committed-safe typed form or the producer fails closed (Root-2 condition 5); Task 1 lists any such block, and an unexpected one stops the lane. The scattered key literals move to the registry constants; PROTOCOL 6.4 gains the normative key table; the kernel's reserved-key collision assertion and metadata-is-object assertion run before body construction. Dropping and refusal stay off in P-d and are switched on in F (Task 8).
+Every Chio-internal key the Task 1 metadata census found is registered with its declaration, including the operational blocks admission, active response and settlement need (`admission_operation`, `budget_authority`, `financial`, `execution_nonce_id`, `delivery_contract`, `caller_delivery`, `lineage`, `parent_receipt_ids`, `route_selection`, `security_event_projection`, `receipt_context`, `chio_runtime`, `post_invocation`, `mercury`), each with a `reason` naming its field audit. Three keys are added for the parameter readers of the census (kind P-i): `launch` (closed `state` enum written by the native launch producer; read by `delivery_preparation.rs`), `finding_delivery` (`finding_id`, a public listing id; read by `finding_purchase_routes.rs`), and the existing `delivery_contract` is registered with the reason that its `expected_digest` and `observed_digest` equal the finding's `payload_sha256`, which the listing already publishes, so the block adds no disclosure (finding verifier, challenge and recovery readers bind to it, kind F). A key that carries an argument or result value has no committed-safe declaration; the lead's proposed third class for Chio-internal plaintext is not needed because no registered key carries a result after the projections below. Being generated by the kernel does not make a block committed-safe (Root-2 r2 request 2). `active_defense_body` and `response_simulation_report` are each the content preimage of their receipt and carry raw tenant and plan identifiers, so neither is registered. Each is replaced by a safe projection that P-d builds and tests and F switches on (option (a) of the request).
 
-- [ ] **Step 1: Failing tests:** `unsafe_required_guard_refuses_registration`; `every_guard_declares` (compiles only when every impl declares); `wasm_guard_declares_unsafe`; `registry_covers_census_keys` (every key the census found is registered); `reserved_key_from_caller_refuses`.
+Field audit of `active_defense_body` (`ActiveDefenseReceiptBody`, 12 variants, at `fcc31d25fb`):
+
+| Field | Variants | Class | Projection |
+|---|---|---|---|
+| `header.tenant_id: TenantId` | all 12 | raw tenant id | salted commitment, `salt_ref` `active_defense.tenant` |
+| `header.transition_id`, `header.prior_receipt_ids` | all 12 | Chio record and receipt ids | kept (kernel-minted opaque ids; receipt ids are public by spec) |
+| `header.schema_version`, `occurred_at_unix_ms` | all 12 | metadata | kept |
+| `policy.policy_version`, `policy.policy_hash` | policy-bound variants and `response.policy` | policy identity | kept |
+| `response.action_id: ActionId` | ResponsePlan, ResponseStateTransition, EffectTransition, ResponseCompletion, LiftRollbackCompletion, SchedulerHealth | raw plan identifier | salted commitment, `salt_ref` `active_defense.action` |
+| `response.trigger_finding_id`, `response.trigger_finding_receipt_id` | same six | raw finding identifiers | salted commitments, `active_defense.finding` and `active_defense.finding_receipt` |
+| `response.plan_hash`, `trigger_finding_hash`, `affected_set_hash`, `plan_expires_at_unix_ms` | same six | digests and time | kept (the affected ids themselves appear only as `affected_set_hash`) |
+| `grant_id: GrantId` | DeclassificationConsumption, DeclassificationOutcome | raw grant identifier | salted commitment, `active_defense.grant` |
+| `request_id: RequestId` | TripwireObservation | raw request identifier | salted commitment, `active_defense.request` |
+| `finding_id: RecordId`, `ordered_source_receipt_ids` | CorrelatedFinding | finding id; receipt ids | finding id committed (`active_defense.finding`); receipt ids kept |
+| `event_id`, `ordered_event_ids`, `lineage_seed` | most variants | Chio event and lineage ids | kept (kernel-minted, opaque) |
+| `scheduler_lease_owner_id` | ResponseStateTransition, EffectTransition | internal lease owner | kept |
+| every `*_hash`, `*_digests`, enum, counter, `error_code`, fencing token | all | digests, enums, counters | kept |
+
+Field audit of `response_simulation_report` (`ResponseSimulationReport`):
+
+| Field | Class | Projection |
+|---|---|---|
+| `plan` (`ResponsePlan`: `tenant_id`, `action_id`, `trigger_finding_id`, `trigger_finding_receipt_id`, `affected_ids`, `submitter`, `effects`, `operator_capability`, ...) | raw tenant, plan, subject and affected identifiers | dropped; the projection keeps `plan_hash`, `policy_hash`, `affected_set_hash`, `created_at_unix_ms`, `expires_at_unix_ms` and a salted commitment to `tenant_id` (`response_simulation.tenant`) |
+| `snapshot` (`tenant_id`, `plan_hash`, `states`, `scopes`) | raw tenant and per-subject state | dropped; the projection keeps `snapshot_digest` (domain hash over the canonical snapshot) and `captured_at_unix_ms` |
+| `evaluation` (steps and states per phase) | per-subject outcomes | dropped; the projection keeps `evaluation_digest` |
+| `schema`, `configuration_digest`, `authorization_capability_hash`, `governed_intent_hash`, `policy_decision_hash`, `approval_set_hash`, `authorized_at_unix_ms` | schema, digests, time | kept |
+| `response_simulation_evidence_id` | domain hash over tenant, action, `plan_hash` and configuration digest; `plan_hash` makes it high-entropy | kept |
+
+Field audit of `cage_receipt` (`CageReceiptBody`): `schema`, `attempt_id` (cage-minted), `stage` (enum), `bindings` (digests), `admitted_policy_digest`, `enforcement_record`, `started_at_unix_ms`, `recorded_at_unix_ms`. P-d audits `CageEnforcementRecord` member by member. If it carries no process argument, path, environment value or tenant identifier, `cage_receipt` is registered `CommittedSafe` and the cage reader binds to it (kind F, no disclosure file). If it does, the cage gets a projection like `active_defense`, with the same tests. The receipt's top-level `tenant_id` from the cage signing context is dropped as for the two producers below.
+
+Projection types, in `chio-core-types` beside `ActiveDefenseReceiptBody` and in `chio-kernel` beside `ResponseSimulationReport`:
+
+```rust
+/// Signed metadata block `active_defense`. Same variant set as `ActiveDefenseReceiptBody`,
+/// each identifier the audit marks raw replaced by a `SaltedCommitment` (#1706 shape).
+pub enum ActiveDefenseReceiptProjection { /* 12 variants, closed structs, lossless_serde! */ }
+impl ActiveDefenseReceiptBody {
+    /// Draws one salt per committed identifier from `rng`; returns the projection and its openings.
+    pub fn project(&self, rng: &dyn Rng) -> Result<(ActiveDefenseReceiptProjection, ProjectionOpenings)>;
+    /// True when `projection` opens to this body with `openings`.
+    pub fn matches_projection(&self, projection: &ActiveDefenseReceiptProjection, openings: &ProjectionOpenings) -> bool;
+}
+/// Signed metadata block `response_simulation`.
+#[serde(deny_unknown_fields)]
+pub struct ResponseSimulationProjection { /* kept fields above, tenant commitment, three digests */ }
+impl ResponseSimulationReport {
+    pub fn project(&self, rng: &dyn Rng) -> Result<(ResponseSimulationProjection, ProjectionOpenings)>;
+}
+```
+
+The projection openings are stored with the receipt's own openings in `receipt_openings` (the producers run where a receipt store exists: the kernel's active-response coordinator and the control plane's security store), under the `salt_ref`s named above. Both projections are registered `ChioInternal`, `CommittedSafe`. The full body and the full report stay the content preimages, so the content commitment hides them. Readers change in F (consumer kind F, Task 10): a reader that holds the full body or report (the coordinator, the control-plane security store) checks `matches_projection` with the persisted openings and opens the content commitment; a reader that holds only the receipt (lineage ingest, the security event consumer) uses the projection's digests and commitments and never sees a raw identifier. An erased or unknown projection opening fails closed with `OpeningUnavailable`.
+
+The top-level receipt `tenant_id` that `ResponseSimulationReport::receipt_body` sets today is a separate member that spec 7.6 permits on receipts without `authority`. F stops setting it for both producers, so their receipts carry no raw tenant id anywhere; tenant-scoped store queries for these receipts use the store's tenant column written from the producer's own context.
+
+A required block that would carry argument or result values is redesigned in F to a committed-safe typed form or the producer fails closed (Root-2 condition 5); Task 1 lists any such block, and an unexpected one stops the lane. The scattered key literals move to the registry constants; PROTOCOL 6.4 gains the normative key table; the kernel's reserved-key collision assertion and metadata-is-object assertion run before body construction. Dropping and refusal stay off in P-d and are switched on in F (Task 8).
+
+- [ ] **Step 1: Failing tests:** `unsafe_required_guard_refuses_registration`; `security_projections_carry_no_raw_identifiers` (random marker tenant, action, finding, grant, request, submitter and affected ids through every `ActiveDefenseReceiptBody` variant and a `ResponseSimulationReport`; no marker raw, hex or base64 in either projection); `projection_opens_to_its_body`; `every_guard_declares` (compiles only when every impl declares); `wasm_guard_declares_unsafe`; `registry_covers_census_keys` (every key the census found is registered); `reserved_key_from_caller_refuses`.
 - [ ] **Step 2: Implement, run** `cs cargo test -p chio-kernel-core -p chio-kernel -p chio-guards -p chio-external-guards -p chio-wasm-guards -p chio-security-kernel -p chio-core-types --no-fail-fast`, clippy, `cs cargo xtask gen signed-fixtures --check` (no change). Expected: PASS.
 
 ---
@@ -540,6 +640,7 @@ Signer order: kernel key check against `backend.public_key()?`, two salt draws (
 Contract move-in (in-place schemas README): `git mv` the staged `record.schema.json` over the live file after removing `enforcement`, the `pdp_decision`, `prevent_external` and `delegated` values and rule, and `settlement`; re-diff against live and carry in #1715's closed layers and item 1's `algorithm` removal first. `content_commitment` is required. Register `urn:chio:error:attest:receipt-tenant-id-with-authority`. Regenerate code in four languages.
 
 - [ ] **Step 1: Failing tests** in `committed_receipt_negatives.rs` and `receipts.rs`: `equal_salts_refuse`, `rng_failure_refuses_signing` (no backend call), `tenant_id_with_authority_refuses_signing`, `padded_blocks_fail_decoding` (each new block and `authority.root_anchor`), `removed_members_fail_decoding` (`content_hash`, `redaction_mode`, `action.parameters`, `action.parameter_hash`), `commitment_salt_ref_checked_by_position`, `kernel_key_mismatch_refuses_before_salts`, `receipt_signers_take_preimages` (calls every public receipt signer in core-types, kernel-core and selective-disclosure with the new signatures).
+- [ ] **Strictness gate (mandatory).** `crates/core/chio-core-types/tests/receipt_strict_decode.rs` (from #1715) gains `committed_receipt_types_refuse_padding_and_lossy_decode`, driven by `COMMITTED_RECEIPT_STRICT_TYPES`, which lists every committed-receipt type: `ChioReceipt`, `ChioReceiptBody`, `ChioReceiptIdInput`, `ChioReceiptSigningBody`, `ToolCallAction`, `ReceiptCommitment`, `CommitmentAlg`, `DisclosureBlock`, `ReceiptAuthority` (with `RootAnchor` and `HolderClass`), `Decision`, `OperationTerminalState`, `GuardEvidence`, `ActorRef`, `ReceiptDisclosure`, `Opening`, `ActiveDefenseReceiptProjection` (each variant), `ResponseSimulationProjection`, the relay `content` input union and the HTTP `HttpBody` tag. For each type, in the shape of #1723's concrete-path tests: a padded member at every nesting level, a duplicate member, and for each tagged variant (unit variants included) a padded variant such as `{"verdict":"allow","pad":0}`, each refused with the exact error, through `T::deserialize(&mut serde_json::Deserializer::from_str(..))`, `serde_json::from_str::<T>`, `serde_json::from_value::<T>` and every public concrete decoder of the type; and a lossless round trip (the decoded value re-encodes to exactly the input). A type missing from the list fails `committed_receipt_strict_types_cover_the_module` (a module walk over the public receipt and disclosure types). The same cases run against #1716's SDK decoders in Task 17.
 - [ ] **Step 2: Run** `cs cargo test -p chio-core-types -p chio-kernel-core --no-fail-fast` (expected: PASS except golden signatures, listed for Task 18).
 
 ---
@@ -557,6 +658,10 @@ Contract move-in (in-place schemas README): `git mv` the staged `record.schema.j
   - `kernel_receipt_openings_persist_with_append`; `deny_receipt_commits_empty_output`;
   - `compacted_replay_survives_erased_openings` (erase the openings of a compacted admission, replay: completes with the same receipt; no wedge);
   - `compacted_replay_blob_mismatch_refuses` (the existing refusal, now against the row digest);
+  - `compacted_replay_detects_blob_rewrite_when_opening_present` (a store that rewrites the blob and the row digest is refused when the opening is present, because the content commitment is recomputed over the blob; P2-C);
+  - `delivery_preparation_reads_launch_state_from_registered_key`, `authorization_projection_reads_payload_digest_from_row` (Root-held P-i sites);
+  - `finding_memory_write_refuses_erased_parent_opening` (E-k);
+  - `fresh_only_catalog_refuses_old_receipt_column_without_mutation` and `fresh_only_catalog_refuses_old_admission_row_without_mutation`: F's in-place `chio_tool_receipts.content_commitment` column and the two admission-row commitment columns are validated by the fresh-only v1 catalog for `SqliteReceiptStore` and `SqliteAdmissionOperationStore`, each refusing an old, unstamped or malformed layout with the exact error and no mutation (Root-2 condition 6);
   - `recovery_republishes_exact_receipt_and_salts` (crash after durable admission before publication);
   - `post_effect_stop_races_receipt_append` (C6: a durable stop racing the append still withholds post-effect output, Root-2 condition 4);
   - the existing T7, native-ledger and D5 admission and security dispatch identity and refusal tests keep their assertions; where a signature or API changes they are rewritten to assert the same refusal, not only regenerated (Root-2 condition 4);
@@ -569,8 +674,8 @@ Contract move-in (in-place schemas README): `git mv` the staged `record.schema.j
 
 ### Task 8: F commit 5, evidence and metadata enforcement
 
-- Receipt assembly drops `GuardEvidence.details` of guards declared `Unsafe`, drops every caller or hook metadata key (origin `CallerOrHook`, untrusted input, spec 8.4), and refuses signing with `Error::UnregisteredMetadataKey(key)` for a Chio-internal key absent from the registry or declared `Unsafe` (P1-4). A revocation entry id in deny evidence (spec 7.11) is `Safe`.
-- [ ] **Step 1: Failing tests:** `undeclared_guard_evidence_field_dropped` (backing staged `receipt-disclosure-003`); `unregistered_internal_metadata_key_refuses`; `caller_metadata_dropped`; `required_operational_blocks_survive` (admission, budget authority, settlement and active-response blocks present after assembly); `receipt_marker_property` (proptest with `PROPTEST_CASES=512`: random 16-byte markers through every guard evidence producer, the metadata merge and the `chio-siem` OCSF projection; no marker raw, hex or base64 in the signed body, evidence, metadata or OCSF; backing staged `receipt-disclosure-004`); `stream_chunk_digests_absent` (backing `receipt-disclosure-006`).
+- Receipt assembly drops `GuardEvidence.details` of guards declared `Unsafe`, drops every caller or hook metadata key (origin `CallerOrHook`, untrusted input, spec 8.4), and refuses signing with `Error::UnregisteredMetadataKey(key)` for a Chio-internal key absent from the registry or declared `Unsafe`. A revocation entry id in deny evidence (spec 7.11) is `Safe`.
+- [ ] **Step 1: Failing tests:** `undeclared_guard_evidence_field_dropped` (backing staged `receipt-disclosure-003`); `unregistered_internal_metadata_key_refuses`; `caller_metadata_dropped`; `required_operational_blocks_survive` (admission, budget authority, settlement and active-response blocks present after assembly); `receipt_marker_property` (proptest with `PROPTEST_CASES=512`: random 16-byte markers through every guard evidence producer, the metadata merge, the native evidence, response simulation and cage producers (markers placed in nested tenant, plan, finding and subject identifiers) and the `chio-siem` OCSF projection; no marker raw, hex or base64 in the signed body, evidence, metadata or OCSF; backing staged `receipt-disclosure-004`); `stream_chunk_digests_absent` (backing `receipt-disclosure-006`).
 - [ ] **Step 2: Run** `cs cargo test -p chio-kernel -p chio-guards -p chio-external-guards -p chio-security-kernel -p chio-siem --no-fail-fast`, clippy. Expected: PASS.
 
 ---
@@ -593,9 +698,9 @@ Per-producer opening decisions for receipts that are content-checked downstream 
 
 | Producer | Downstream content checks | Decision | Reader after F | Fail-closed test |
 |---|---|---|---|---|
-| Cage | `chio-cage` receipt verification (`receipt.rs:395`) | (a) persist: the cage host writes `<receipt_id>.disclosure.json` (value payloads) beside the cage evidence it already writes | opens with the persisted document and its own canonical output | `cage_reader_refuses_missing_opening` (`OpeningUnavailable { Unknown }`) |
-| Native evidence | `execution_validation.inc` (two), `verify_native_security_receipt`, lineage active-defense ingest, store `security_evidence.rs`, security event consumer | (b) rebind: readers verify the signed `metadata.active_defense_body` (registered, `CommittedSafe`) and its digest binding; the content commitment is redundant | body from signed metadata | `native_evidence_reader_refuses_missing_body`, `..._refuses_tampered_body` |
-| Response simulation | `verify_response_simulation_receipt`, `verify_active_response_simulation` | (b) rebind to the signed report in metadata | report from signed metadata | `simulation_reader_refuses_missing_report` |
+| Cage | `chio-cage` receipt verification (`receipt.rs:395,410`) | (b) rebind to the audited signed `cage_receipt` (or its projection, per the P-d audit); no disclosure file and no salt copy | `cage_receipt` from signed metadata | `cage_reader_refuses_missing_metadata`, `cage_reader_refuses_tampered_metadata` |
+| Native evidence | `execution_validation.inc` (two), `verify_native_security_receipt`, lineage active-defense ingest, store `security_evidence.rs`, security event consumer | (b) rebind: the producer writes the `active_defense` projection (Task 5); a reader holding the body checks `matches_projection` with the persisted projection openings and opens the content commitment; a receipt-only reader uses the projection's digests and commitments | projection from signed metadata | `native_evidence_reader_refuses_missing_projection`, `..._refuses_tampered_projection`, `..._refuses_erased_projection_opening` |
+| Response simulation | `verify_response_simulation_receipt`, `verify_active_response_simulation` | (b) rebind: `verify_response_simulation_receipt` takes the report from the caller's security store, checks `report.validate()`, `matches_projection` against the signed `response_simulation` projection with the persisted openings, and opens the content commitment over the report | projection plus the held report | `simulation_reader_refuses_missing_projection`, `..._refuses_erased_opening`, `..._refuses_report_projection_mismatch` |
 | Verified-fix evidence | finding verified-fix verifier, finding market (kind E) | (a) persist in the trust-control receipt store (append with openings) | opens from the store | `verified_fix_reader_refuses_erased_opening` (`Erased`) |
 | Keyring projection, SCIM deprovision | none | openings dropped; commitments permanently hiding | n/a | n/a |
 | BBS selective disclosure | BBS projection verifiers | the projection's content slot carries `content_commitment.value` and its action slot the canonical `action` (commitment only) | BBS verify over the committed projection | `bbs_projection_has_no_unsalted_digest` |
@@ -627,7 +732,7 @@ Each commit converts one producer to `ChioReceipt::sign*` with a draft, preimage
       pub response: Option<serde_json::Value>,
   }
   /// The body is always committed as the raw bytes the upstream received or returned, tagged
-  /// (P1-5): `{"kind":"bytes","content_type":<string or null>,"b64u":<unpadded base64url>}`
+  /// (unambiguous by tag): `{"kind":"bytes","content_type":<string or null>,"b64u":<unpadded base64url>}`
   /// or `{"kind":"absent"}`. No JSON parsing, so the preimage is unambiguous and WYSIWYS holds.
   impl HttpAuthority {
       pub fn sign_decision_receipt(&self, draft: ReceiptDraft, preimages: &HttpCallPreimages, rng: &dyn Rng) -> Result<SignedReceipt>;
@@ -677,17 +782,22 @@ OCSF 1.3.0 reads commitment values only (spec 7.13); `parameter_hash_valid`, the
 
 ### Task 16: F commit 31, cross-artifact consumers
 
-Applies kinds C, E and G of the consumer table outside the kernel. Each artifact whose member changes is listed in D17. For kind E, each consumer reads the opening from where its producer persists it:
+Applies kinds C, E, E/P-ii, F, P-ii and V of the census outside the kernel; each site's replacement source is its `rules.tsv` row. Carrier members (D17 item 3), each holding a salt-only opening for exactly the named `salt_ref` and only where the carrier holds that commitment's complete preimage:
 
-| Consumer | Opening source |
-|---|---|
-| finding market (`chio-finding-verifier`, `chio-finding-challenge`, `chio-open-market` recovery, trust-control purchase routes, `finding_pool_ledger`) | the trust-control receipt store; challenge evidence carries a salt-only opening for the payload the challenger holds |
-| commerce-order replay and settlement | a salt-only opening in the commerce authority receipt artifact (beside #1715's route; the event bytes are in the same bundle) |
-| enterprise export, agent-web interop | a salt-only opening carried with the event or envelope that already carries the artifact digest's preimage |
+| Carrier | Member | `salt_ref` | Preimage the verifier rebuilds |
+|---|---|---|---|
+| commerce authority receipt artifact | `content_opening` | `content` | the event bytes in the bundle |
+| settle and web3 anchor proof | `content_opening` | `content` | `settlement_anchor_receipt_content_hash_parts(...)` from public fields |
+| enterprise export event | `content_opening`, `params_opening` | `content`, `params` | artifact bytes wrapped `{"kind":"bytes","b64u":..}`; `{artifact_ref, artifact_sha256, event_id}` |
+| agent-web envelope | `content_opening`, `params_opening` | `content`, `params` | subject bytes wrapped as above; the envelope's parameter object |
+| Mercury proof package step | `params_opening` | `params` | the step's canonical parameter object |
+| attest-loopback package step | `params_opening` | `params` | `{workflowId, caseRef, tool}` from the step |
+| settle finding-enforcement proof | `params_opening` | `params` | `finding_enforcement_anchor_parameters(verified)` |
+| finding challenge replay evidence | `params_opening` | `params` | the expected action object the challenger rebuilds |
 
-Salt-only openings outside spec 7.7's list are an owner decision (open question 9). Each kind E consumer gets `<consumer>_refuses_unavailable_opening` with the explicit `OpeningUnavailable` state; each kind C consumer gets `<consumer>_binds_commitment_value`; each kind G checker gets `<checker>_expects_content_commitment`.
+The finding verifier, challenge standing, open-market recovery and purchase routes hold only `payload_sha256`; they bind to the signed `delivery_contract` (kind F), never to an opening. Each carrier keeps G15's same-salt rejection per document. Tests: each E and P-ii consumer gets `<consumer>_refuses_unavailable_opening` with the explicit `OpeningUnavailable` state and `<consumer>_opens_rebuilt_preimage`; each C consumer `<consumer>_binds_commitment_value`; each F consumer `<consumer>_refuses_tampered_contract`.
 
-- [ ] Run the touched crates' tests (`chio-federation`, `chio-attest-loopback`, `chio-attest-buyer-core`, `chio-credit`, `chio-settle`, `chio-web3`, `chio-anchor`, `chio-open-market`, `chio-enterprise-export`, `chio-agent-web-interop`, `chio-commerce-order`, `chio-finding-verifier`, `chio-finding-challenge`, `chio-mcp-remote`, `chio-runtime-harness`, `chio-tee`), clippy. Then the Task 1 consumer grep returns only kind D sites.
+- [ ] Run the touched crates' tests (`chio-federation`, `chio-attest-loopback`, `chio-attest-buyer-core`, `chio-credit`, `chio-settle`, `chio-web3`, `chio-open-market`, `chio-mercury-core`, `chio-trace-validate`, `chio-reputation`, `chio-enterprise-export`, `chio-agent-web-interop`, `chio-commerce-order`, `chio-finding-verifier`, `chio-finding-challenge`, `chio-mcp-remote`, `chio-runtime-harness`, `chio-tee`), clippy. Then the census script at the F tip finds no production line of kinds A, A0, B, C, E, E-k, A/E, E/P-ii, F, H, P-i, P-ii, R, S, V or X (each site was changed) and only kind D, GEN regenerated and DOC rewritten lines remain.
 
 ---
 
@@ -732,22 +842,25 @@ F changes the signed bytes of every `chio.receipt.v1` receipt and deletes the on
 Signed artifacts whose bytes change in F:
 1. Every `chio.receipt.v1` receipt and every receipt id (`ChioReceiptIdInput` contains the body), and transitively every artifact embedding a receipt id, digest or whole receipt: child receipts, lineage statements, checkpoints and inclusion proofs, evidence export manifests and their commitments, commerce authority receipt artifacts, session compliance certificates, proof-room graph nodes, passports and bundle manifests.
 2. Kind C consumer artifacts, whose renamed member now carries a commitment value: verified treaties (`outcome_commitment`), federation bilateral DSSE envelopes and cosign bindings, attest loopback issuance requests and packages, attest buyer reports, IOU receivables, settlement observations (#1705), child contracts, runtime-harness buyer closures and proof parity records, verified-fix nonce bindings, ACP telemetry and compliance bundles, BBS selective-disclosure projections, TEE tap and runner records, `chio run` nonce evidence.
-3. Kind E carriers gain a salt-only opening member: commerce authority receipt artifacts, finding challenge evidence, enterprise export events, agent-web envelopes.
+3. Carriers gain salt-only opening members (Task 16 table): commerce authority receipt artifacts, settle and web3 anchor proofs, enterprise export events, agent-web envelopes, Mercury and attest-loopback package steps, settle finding-enforcement proofs, finding challenge replay evidence. Signed metadata changes: `active_defense_body` is replaced by the `active_defense` projection, `response_simulation_report` by the `response_simulation` projection, `cage_receipt` per its audit, and `launch` and `finding_delivery` are new registered keys. `DeliveryAcknowledgement.result_hash` becomes `result_commitment`.
 4. `HttpReceipt` is deleted; `/v1/evaluate` carries `chio.receipt.v1` without openings; every HTTP middleware SDK and example changes.
 5. Relay APIs (browser, mobile, C ABI, TS workers, edge and deno, Swift) change.
 6. Store: `chio_tool_receipts.content_hash` becomes `content_commitment` in place, the admission operation row gains the two commitment columns, `receipt_openings` is used; the trust-control append request carries openings.
 
-Changes before F (no signed bytes): P-a moves `Rng` and makes it fallible; P-b adds types; P-c adds `receipt_openings`, the trust-control read and erase routes and the append's openings argument; P-d adds `evidence_declaration` to every guard and the metadata registry. In-flight branches that implement `Rng`, a guard, a receipt store or a metadata key rebase on these.
+Changes before F (no signed bytes): P-a moves `Rng` and makes it fallible; P-b adds types; P-c adds `receipt_openings`, `opening_state` and `erase_openings` on all 58 `ReceiptStore` impls, the trust-control read and erase routes and cluster tombstone replication (no append change); P-d adds `evidence_declaration` to every guard and the metadata registry. In-flight branches that implement `Rng`, a guard, a receipt store or a metadata key rebase on these.
 
 Root-held files (Root-2 ACK before the lane edits them):
 - `crates/platform/chio-http-core/src/receipt.rs` (deleted in F).
 - `crates/kernel/chio-kernel/src/tool_outcome/caller_delivery.rs` and `tool_outcome/security_release/context.rs` (kind A0).
+- `crates/kernel/chio-kernel/src/admission_operation/projection/authorization.rs` (kind P-i, `operation_payload`) and `crates/kernel/chio-kernel/src/kernel/evaluation/delivery_preparation.rs` (kind P-i, launch state).
 - `crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs` and `admission_coordinator/**`, `admission_operation/**`, the `admission_operation_store` and `dispatch_ledger/policy.rs` that consume the admission binding (kind A).
 - `crates/platform/chio-store-sqlite/src/serving_owner*` and the receipt store publication path (Task 4).
 - `crates/kernel/chio-kernel/src/kernel/construction.rs` and `kernel_struct.rs` (also edited by #1708).
 - `crates/tooling/chio-bundle-verify` verification module (moved there by 6a; item 2 edits only the extracted verifier).
+- `crates/platform/chio-control-plane/src/trust_control/cluster/deltas.rs` (`sync_peer_tool_receipts`, openings and tombstone replication) and the trust-control receipt routes.
 
 Shared files with in-flight work:
+- #1723 (`852c60127f`): the shared decoder; lands first, and #1715 and #1706 rebase onto it.
 - #1715 and #1716: receipt structs, `receipt_strict_decode.rs`, the commerce authority decoder, SDK `invariants/receipt.*`. Both land first.
 - Item 1: lands first; F signs through `sign_wrapped` and regenerates through its command, with the proof-room row's feature change.
 - Item 6 part 6a: lands first; F edits `chio-bundle-verify`, never `evidence_export/verification.rs`.
@@ -755,10 +868,10 @@ Shared files with in-flight work:
 - #1674: lands first; receipt signing files shared.
 - #1705 (settlement observations): `observation_for` and `tests/settlement_observer_byte_identity.rs`; lands before F; F renames `SettlementObservation.content_hash` to `content_commitment` and rewrites the byte-identity test's expected bytes through its generator.
 - #1710 (settlement ledger hook): lands before F (explicit). F keeps its seeding, durable append and drain reconciliation tests with exact receipt references after id changes.
-- #1708 (concurrent publication): lands before P-c; openings join its publication batch; its lock ordering and projection visibility boundary are preserved.
+- #1708 (concurrent publication): lands before P-c; openings are written inside the store-owned append under its fence and receipts guards, with no new lock, rank or callback; the projection guard and visibility boundary are unchanged.
 - #1682 (C6) and #1717: store receipt and query snapshot files, including the adjacent `receipt_query_snapshot/project.rs` and `receipt_store/evidence_retention.rs` that F changes.
 - K-stack (#1675, #1678, #1701, #1269, KERN-TRACE-LOCK-FSYNC): merged before item 1; F keeps every K-stack invariant test's assertions.
-- subtree188a and the pending store schema-adoption cleanup: predecessors of P-c and F (Root-2 condition 7).
+- #1722 (subtree cancellation, draft at `188a6af6ff`) and the store schema-adoption cleanup (no PR yet; the last serial store item): predecessors of P-c and F (Root-2 condition 7).
 - #1607: shares the registry, `MANIFEST.sha256` and `wire-schemas.lock`; lands first.
 - Item 3: follows F and fills `ReceiptAuthority` from verified capability state.
 
@@ -823,23 +936,23 @@ Spec 13.2 sizes item 2 at L, 26-37 engineer-days. Estimate from the census:
 |---|---|
 | P-a `Rng` move, fallible fill, `OsEntropyRng`, `chio-fixture-rng` | 1-2 |
 | P-b types, opener, document schema, SDK openers, vector cross-check of the opener | 2-3 |
-| P-c openings in the append transaction (SQLite, #1708 batch, trust-control route and client, admission row), crash, ACK and erase tests | 3-4 |
-| P-d `evidence_declaration` on 111 impls including `WasmGuard` and `ScopedAsyncGuard`, metadata key registry (ADR-0019 item 7) with census | 3-4 |
-| F core body, schema move-in, portable signer (Task 6) | 2-3 |
-| F hosted kernel salt wiring across 421 construction sites and 20 producers; kernel and store consumer bindings (kinds A, A0, B) and their recovery and C6 tests (Task 7) | 5-7 |
-| F evidence and metadata enforcement, marker property (Task 8) | 1-2 |
+| P-c openings table with the exact DDL tests, reads and erasure on 58 store impls, trust-control routes, cluster tombstone replication | 3-5 |
+| P-d `evidence_declaration` on 111 impls, metadata key registry with field audits, `active_defense` (12 variants) and `response_simulation` projections, cage audit | 4-6 |
+| F core body, schema move-in, portable signer, strictness gate over every committed-receipt type (Task 6) | 3-4 |
+| F hosted kernel salt wiring across 421 construction sites; atomic append with openings under #1708's guards; kernel and store consumer bindings (A, A0, B, E-k, P-i) and their recovery, C6, compacted-replay and catalog tests (Task 7) | 6-8 |
+| F evidence and metadata enforcement, marker property over the projections (Task 8) | 1-2 |
 | F relays (Task 9) | 2-3 |
-| F cage, control-plane, BBS producers with the per-producer opening decisions (Task 10), ACP (Task 11) | 3-4 |
+| F cage, control-plane, BBS producers and projection readers (Task 10), ACP (Task 11) | 3-4 |
 | F `HttpReceipt` deletion across 103 files and the middleware SDKs (Task 12) | 5-6 |
 | F group 5 producers, fixture RNG release gate (Tasks 13, 14) | 2-3 |
-| F readers and cross-artifact consumers (kinds C, E, G across about 25 crates) (Tasks 15, 16) | 3-5 |
+| F readers and cross-artifact consumers: 460 census lines, P-ii rebuilds, carriers (Tasks 15, 16) | 5-7 |
 | F vectors and SDK verifiers (Task 17) | 2-3 |
 | F fixture regeneration (Task 18) | 2-3 |
 | PROTOCOL, docs, formal (Tasks 19, 20) | 1-2 |
-| Integration, native-cage runs on four PRs, review rounds | 3-4 |
-| Total | 40-58 |
+| Integration, native-cage runs on five PRs, review rounds | 3-4 |
+| Total | 45-65 |
 
-The parts sum to 40-58. Shared setup across the five PRs (one census, one D17 round, one regeneration) and agent assistance on the mechanical guard and construction-site edits bring the plan to **L, 38-52 engineer-days, planning figure 44**. That is 12 to 15 days above spec 13.2 (26-37). The excess is the consumer bindings that 13.2 did not count (about 40 sites binding to the unsalted hashes, 6-9 days), openings in the append transaction for local and remote stores (2-3 days), the metadata key registry (1-2 days), guard declarations across 111 impls (1-2 days), and the five-PR shape (1 day of integration). The M1 total is 124-177 engineer-days: 13.2's 104-148, plus 3-8 for item 1 (26-40), 5-6 for item 6's merged plan, and 12-15 for item 2.
+The parts sum to 45-65. Shared setup across the five PRs and agent assistance on the mechanical guard, construction-site and census edits bring the plan to **L, 43-60 engineer-days, planning figure 50**, in line with the lead's 42-59 plus the projections and the strictness gate from Root-2's r2. That is 17 to 23 days above spec 13.2 (26-37). The excess is the census-wide consumer bindings and parameter readers (460 production lines; 8-11 days), openings in the append transaction with replication and erasure coverage (3-4 days), the metadata registry with field audits and two projections (3-4 days), guard declarations across 111 impls (1-2 days), the strictness gate (1 day) and the five-PR shape (1 day). The M1 total is 129-185 engineer-days: 13.2's 104-148, plus 3-8 for item 1 (26-40), 5-6 for item 6's merged plan, and 17-23 for item 2.
 
 ## Open Questions
 
@@ -850,17 +963,18 @@ Each needs an owner decision. The plan is written against the recommended defaul
 3. **When the kernel fills `authority`.** **Default:** F adds the type, the `tenant_id` refusal, the schema and the vectors; every producer sets `authority: None`; item 3 fills it.
 4. **`receipt_disclosure` verdict-matrix category.** **Default:** stays staged; F lands the kernel tests behind 001 to 006 and the error code.
 5. **Metadata policy.** **Default:** drop guard evidence declared `Unsafe` and every caller or hook metadata key; refuse signing on an unregistered or `Unsafe` Chio-internal key; register every internal key in the ADR-0019 item 7 registry in P-d.
-6. **`active_defense_body` and the simulation report in metadata.** **Default:** both are Chio-internal bodies the kernel generates, registered `CommittedSafe`; their content commitments are redundant and documented; their readers bind to the signed metadata (consumer kind F).
+6. **Security bodies in signed metadata.** **Default:** option (a) of Root-2's r2 request 2: `active_defense_body` and `response_simulation_report` leave signed metadata; each is replaced by an audited projection that commits the raw tenant and plan identifiers (Task 5), and `cage_receipt` follows its audit. No privacy-contract change is needed. The alternative, option (b), keeps the full bodies as public Chio-internal metadata, which requires amending spec 7.6 and the fully-committed claim; this plan does not take it.
 7. **HTTP body preimage.** **Default:** always the raw bytes, tagged: `{"kind":"bytes","content_type":..,"b64u":..}` or `{"kind":"absent"}`, never parsed; vectors pin the lookalike pair.
-8. **Offline nonce parameter binding in `authoritative_spend`.** The offline check compares the nonce's bound parameter digest with the receipt's `parameter_hash`, which F removes. **Default:** the parameter binding is checked at signing time by the kernel (it already is in `reconciliation.rs`), and the offline check reduces to the receipt's signed `execution_nonce_id` equal to the nonce id.
-9. **Salt-only openings for verifiers that hold the preimage.** Spec 7.7 lists only the caller copy, `caller` bundles and the PEP response. Kind E consumers (finding market, commerce replay, enterprise export, agent-web interop) need a salt-only opening, and each holder already has the payload, so spec 9.4's dictionary concern does not apply. **Default:** amend spec 7.7 to add "evidence for a verifier that holds the committed payload", in F's PROTOCOL commit. The alternative is to rebind each of those consumers to a receipt id recorded by a signed Chio artifact at signing time, which adds about 3 days.
+8. **Offline nonce parameter binding in `authoritative_spend`.** The offline check compares the nonce's bound parameter digest with the receipt's `parameter_hash`, which F removes; the spend receipt differs from the allow receipt the nonce was minted from, so no commitment equality can replace it. **Default:** the parameter binding is checked at signing time by the kernel (`reconciliation.rs`), and the offline check reduces to the signed `budget_authority.execution_nonce_id` equal to the nonce id. This default holds only if PROTOCOL drops the offline parameter-binding claim for authoritative spend; F's PROTOCOL commit drops it.
+9. **Salt-only openings in carriers.** Spec 7.7 lists only the caller copy, `caller` bundles and the PEP response. **Default:** amend spec 7.7 with: "A salt-only opening for the `<salt_ref>` commitment may accompany an artifact that carries that commitment's complete preimage. It is never written for a field whose preimage the artifact does not carry, and erasure does not reach openings already delivered in such artifacts." It applies only to the Task 16 carriers, each for its named `salt_ref`. It does not apply to the finding verifier, which holds only `payload_sha256` and binds to `delivery_contract` (kind F). The alternative, rebinding each carrier consumer to a receipt id recorded by a signed Chio artifact at signing time, adds about 3 days.
 10. **`/v1/evaluate` openings.** **Default:** none in M1 (spec 7.7 and the 13.1 caller-copy cut); mediated mode persists them, sidecar mode without a store drops them.
 
 ## Unresolved in this revision
 
-- The shared `lossless_serde!` decoder PR is removed as a precondition (it is an independent decoder fix). Item 2 uses `chio_security_types::lossless_serde!` as #1706 does.
-- "subtree188a" and "the pending store schema-adoption cleanup" are named as predecessors from Root-2's review; Task 1 records their PR numbers, which this plan could not find by name.
-- The kind E salt-only openings depend on open question 9. If the owner rejects the amendment, Task 16 switches those consumers to the rebind alternative and the size rises by about 3 days.
+- The store schema-adoption cleanup has no PR or implementation yet. It is the last serial store item and an explicit unresolved predecessor of P-c and F; this plan names no PR number for it.
+- #1722 is a draft at `188a6af6ff`; it is not compiled or runtime-green yet, and its native stage 1 and 2 follow C6.
+- Open questions 2 (openings in the append transaction versus spec 8.4), 8 and 9 need owner decisions and PROTOCOL amendments. If 9 is rejected, Task 16 switches the carrier consumers to the rebind alternative and the size rises by about 3 days.
+- The `CageEnforcementRecord` audit happens in P-d; its outcome decides between registering `cage_receipt` and building a cage projection.
 
 ## Spec coverage
 
