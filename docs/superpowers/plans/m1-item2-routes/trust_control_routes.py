@@ -7,6 +7,41 @@ applies the first matching scope rule and exits 1 when a route has no rule.
 """
 import csv, re, subprocess, sys
 
+class GitError(SystemExit):
+    pass
+
+def run_git(repo, args, allow_no_match=False):
+    """Run git and fail closed: any failure other than an empty grep exits 2."""
+    proc = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, check=False)
+    if proc.returncode == 0:
+        return proc.stdout
+    if allow_no_match and proc.returncode == 1 and not proc.stderr.strip():
+        return ""
+    sys.stderr.write(f"git {' '.join(args[:3])} failed ({proc.returncode}): {proc.stderr.strip()}\n")
+    raise GitError(2)
+
+def require_commit(repo, rev):
+    run_git(repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"])
+
+def self_check(script, repo, rev, workdir, cases):
+    """Run this script on known-bad inputs and require a nonzero exit for each."""
+    import os
+    failed = False
+    for name, rev_arg, rules_text in cases:
+        rules_path = os.path.join(workdir, f"selfcheck-{name}.rules.tsv")
+        out_path = os.path.join(workdir, f"selfcheck-{name}.out.tsv")
+        with open(rules_path, "w") as handle:
+            handle.write(rules_text)
+        proc = subprocess.run([sys.executable, "-I", script, repo, rev_arg or rev, rules_path, out_path],
+                              capture_output=True, text=True, check=False)
+        verdict = "refused" if proc.returncode != 0 else "ACCEPTED"
+        print(f"self-check {name}: exit {proc.returncode} {verdict}")
+        failed = failed or proc.returncode == 0
+        for path in (rules_path, out_path):
+            if os.path.exists(path):
+                os.remove(path)
+    sys.exit(1 if failed else 0)
+
 CRATE = "crates/platform/chio-control-plane/src"
 AUTH_HELPERS = [
     "validate_cluster_peer_auth", "validate_service_auth", "validate_authority_workload_auth",
@@ -18,7 +53,7 @@ AUTH_HELPERS = [
 ]
 
 def git(repo, *args):
-    return subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, check=False).stdout
+    return run_git(repo, list(args), allow_no_match=args[0] == "grep")
 
 def show(repo, rev, path):
     return git(repo, "show", f"{rev}:{path}")
@@ -38,7 +73,15 @@ def strip_comments(text):
     return re.sub(r"//[^\n]*", "", text)
 
 def main():
+    if sys.argv[1] == "--self-check":
+        repo, rev, workdir = sys.argv[2:5]
+        self_check(__file__, repo, rev, workdir, [
+            ("bad-revision", "routes-self-check-nonexistent-ref", ".\t.\t.\tpublic\tcaller\tx:read\tDeployment only\n"),
+            ("fallback-unmapped", None, ".\t.\t.\tpublic\tcaller\tUNMAPPED\tUNMAPPED\n"),
+            ("no-rules", None, "# no rules\n"),
+        ])
     repo, rev, rules_path, out_path = sys.argv[1:5]
+    require_commit(repo, rev)
     files = git(repo, "grep", "-l", "-E", r"\.route\(", rev, "--", f"{CRATE}/trust_control").split()
     files = [f.split(":", 1)[1] for f in files]
     files = [f for f in files if "_tests" not in f and not f.endswith("tests.rs") and "/tests/" not in f]
@@ -156,14 +199,21 @@ def main():
         if result is None:
             missing += 1
             result = ["UNRULED", "", "", ""]
+        elif any("UNMAPPED" in c for c in result):
+            missing += 1
         else:
             result = [c.replace("{rw}", "read" if method == "GET" else "write") for c in result]
+        if route_path.startswith("UNRESOLVED:") or auth == "handler-not-found":
+            missing += 1
         out.append(row + result)
     with open(out_path, "w", newline="") as handle:
         writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
         writer.writerow(["method", "route", "handler", "router_file", "handler_file", "current_auth", "listener", "credential", "scope", "tenant_authority"])
         writer.writerows(out)
     print(f"rev={rev} routes={len(out)} unruled={missing}")
+    if not out:
+        sys.stderr.write("route census found no routes; refusing an empty census\n")
+        sys.exit(1)
     sys.exit(1 if missing else 0)
 
 if __name__ == "__main__":

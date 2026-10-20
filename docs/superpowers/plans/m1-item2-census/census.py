@@ -7,6 +7,41 @@ line has no rule.
 """
 import csv, re, subprocess, sys
 
+class GitError(SystemExit):
+    pass
+
+def run_git(repo, args, allow_no_match=False):
+    """Run git and fail closed: any failure other than an empty grep exits 2."""
+    proc = subprocess.run(["git", "-C", repo, *args], capture_output=True, text=True, check=False)
+    if proc.returncode == 0:
+        return proc.stdout
+    if allow_no_match and proc.returncode == 1 and not proc.stderr.strip():
+        return ""
+    sys.stderr.write(f"git {' '.join(args[:3])} failed ({proc.returncode}): {proc.stderr.strip()}\n")
+    raise GitError(2)
+
+def require_commit(repo, rev):
+    run_git(repo, ["rev-parse", "--verify", "--quiet", f"{rev}^{{commit}}"])
+
+def self_check(script, repo, rev, workdir, cases):
+    """Run this script on known-bad inputs and require a nonzero exit for each."""
+    import os
+    failed = False
+    for name, rev_arg, rules_text in cases:
+        rules_path = os.path.join(workdir, f"selfcheck-{name}.rules.tsv")
+        out_path = os.path.join(workdir, f"selfcheck-{name}.out.tsv")
+        with open(rules_path, "w") as handle:
+            handle.write(rules_text)
+        proc = subprocess.run([sys.executable, "-I", script, repo, rev_arg or rev, rules_path, out_path],
+                              capture_output=True, text=True, check=False)
+        verdict = "refused" if proc.returncode != 0 else "ACCEPTED"
+        print(f"self-check {name}: exit {proc.returncode} {verdict}")
+        failed = failed or proc.returncode == 0
+        for path in (rules_path, out_path):
+            if os.path.exists(path):
+                os.remove(path)
+    sys.exit(1 if failed else 0)
+
 PATTERNS = {
     "hash": r"action\.parameter_hash|\.content_hash\b|ToolCallAction::from_parameters|verify_hash\(",
     "hash_key": r"\"content_hash\"|\"parameter_hash\"",
@@ -22,21 +57,19 @@ MULTILINE = {
 TEST_PATH = re.compile(r"(^|/)(tests?|benches|examples|fixtures)/|(_tests?|/tests)\.rs$|_tests/|test_support|test_hooks|\.test\.(ts|tsx)$|/test_[^/]*\.py$|_test\.go$|Test\.(kt|cs)$|Tests\.cs$|e2e_tests")
 
 def grep(repo, rev, pattern):
-    out = subprocess.run(["git", "-C", repo, "grep", "-n", "-I", "-E", pattern, rev, "--", *SCOPE],
-                         capture_output=True, text=True, check=False).stdout
+    out = run_git(repo, ["grep", "-n", "-I", "-E", pattern, rev, "--", *SCOPE], allow_no_match=True)
     for raw in out.splitlines():
         _, path, line, text = raw.split(":", 3)
         yield path, int(line), text.strip()
 
 def grep_multiline(repo, rev, pattern, scope, glob):
-    paths = subprocess.run(["git", "-C", repo, "grep", "-l", "-I", "-E", r"parameters|parameter_hash|tenant_id", rev, "--", *scope],
-                           capture_output=True, text=True, check=False).stdout.split()
+    paths = run_git(repo, ["grep", "-l", "-I", "-E", r"parameters|parameter_hash|tenant_id", rev, "--", *scope], allow_no_match=True).split()
     regex = re.compile(pattern)
     for entry in paths:
         path = entry.split(":", 1)[1]
         if glob == "*.rs" and not path.endswith((".rs", ".inc")):
             continue
-        text = subprocess.run(["git", "-C", repo, "show", f"{rev}:{path}"], capture_output=True, text=True).stdout
+        text = run_git(repo, ["show", f"{rev}:{path}"])
         lines = text.splitlines()
         for match in regex.finditer(text):
             line = text.count("\n", 0, match.end()) + 1
@@ -48,7 +81,7 @@ def test_module_lines(repo, rev, path, cache={}):
         return cache[path]
     lines = set()
     if path.endswith((".rs", ".inc")):
-        src = subprocess.run(["git", "-C", repo, "show", f"{rev}:{path}"], capture_output=True, text=True).stdout.splitlines()
+        src = run_git(repo, ["show", f"{rev}:{path}"]).splitlines()
         depth, start = 0, None
         pending = False
         for number, text in enumerate(src, 1):
@@ -67,7 +100,14 @@ def test_module_lines(repo, rev, path, cache={}):
     return lines
 
 def main():
+    if sys.argv[1] == "--self-check":
+        repo, rev, workdir = sys.argv[2:5]
+        self_check(__file__, repo, rev, workdir, [
+            ("bad-revision", "census-self-check-nonexistent-ref", "# no rules\n"),
+            ("unclassified-lines", None, "# no rules\n"),
+        ])
     repo, rev, rules_path, out_path = sys.argv[1:5]
+    require_commit(repo, rev)
     rules = []
     with open(rules_path) as handle:
         for row in csv.reader(handle, delimiter="\t"):
@@ -102,6 +142,9 @@ def main():
     prod = sum(1 for r in rows if r[2] == "prod")
     files = len({r[0] for r in rows})
     print(f"rev={rev} lines={len(rows)} files={files} prod_lines={prod} unclassified_prod={unclassified}")
+    if not rows or prod == 0:
+        sys.stderr.write("census found no lines; refusing an empty census\n")
+        sys.exit(1)
     sys.exit(1 if unclassified else 0)
 
 if __name__ == "__main__":
