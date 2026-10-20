@@ -201,6 +201,65 @@ pub struct GuardEvidence {
     pub details: Option<String>,
 }
 
+/// Whether a guard's evidence `details` may appear in a committed receipt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceDisclosure {
+    /// `details` never carries an argument or result value.
+    Safe,
+    /// `details` may carry an argument or result value.
+    Unsafe,
+}
+
+/// A guard's declaration about the `details` of the evidence it emits.
+///
+/// The three constants are the only values. A guard that requires its
+/// `details` and declares them unsafe cannot be expressed, so no such guard
+/// can be registered:
+///
+/// ```compile_fail
+/// use chio_core_types::receipt::metadata::{EvidenceDisclosure, GuardEvidenceDeclaration};
+/// let _ = GuardEvidenceDeclaration {
+///     details: EvidenceDisclosure::Unsafe,
+///     details_required: true,
+/// };
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GuardEvidenceDeclaration {
+    details: EvidenceDisclosure,
+    details_required: bool,
+}
+
+impl GuardEvidenceDeclaration {
+    /// `details` never carry an argument or result value and may be dropped.
+    pub const SAFE: Self = Self {
+        details: EvidenceDisclosure::Safe,
+        details_required: false,
+    };
+
+    /// `details` never carry an argument or result value and must be kept.
+    pub const SAFE_REQUIRED: Self = Self {
+        details: EvidenceDisclosure::Safe,
+        details_required: true,
+    };
+
+    /// `details` may carry an argument or result value and are dropped
+    /// before signing a committed receipt.
+    pub const UNSAFE: Self = Self {
+        details: EvidenceDisclosure::Unsafe,
+        details_required: false,
+    };
+
+    #[must_use]
+    pub const fn details(self) -> EvidenceDisclosure {
+        self.details
+    }
+
+    #[must_use]
+    pub const fn details_required(self) -> bool {
+        self.details_required
+    }
+}
+
 // Reserved top-level keys in the `ChioReceipt::metadata` object.
 //
 // ADR-0018 item 7 makes this registry normative: the kernel merges its typed
@@ -602,6 +661,13 @@ pub struct ReceiptAttributionMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grant_index: Option<u32>,
 }
+
+mod key_registry;
+
+pub use key_registry::{
+    check_internal_receipt_metadata, metadata_key_spec, MetadataDisclosure, MetadataKeyOrigin,
+    MetadataKeySpec, RECEIPT_METADATA_KEYS,
+};
 
 #[cfg(test)]
 mod tests {
