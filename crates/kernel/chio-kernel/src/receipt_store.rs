@@ -514,6 +514,27 @@ pub trait ReceiptStore: Send + Sync {
             "atomic settlement observation projection".to_string(),
         ))
     }
+    /// Whether this store implements `record_settlement_reconciliation`. The
+    /// kernel settlement ledger installs only on a store that reports `true`.
+    fn supports_settlement_reconciliation(&self) -> bool {
+        false
+    }
+    /// Record the settlement reconciliation of a stored receipt through the
+    /// serving writer unless a row already exists for it. The write never
+    /// touches receipt rows or receipt bytes, and an existing row (including
+    /// one an operator set) is left unchanged. `note` carries the rail payment
+    /// reference. Returns whether this call created the row; a receipt that is
+    /// not stored is `NotFound`.
+    fn record_settlement_reconciliation(
+        &self,
+        _receipt_id: &str,
+        _state: crate::operator_report::SettlementReconciliationState,
+        _note: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        Err(ReceiptStoreError::Unsupported(
+            "settlement reconciliation".to_string(),
+        ))
+    }
     /// Load a chio receipt by id. The provided default returns `None`; a store
     /// backing a store-authoritative deployment MUST override this (and
     /// `load_child_receipt`) with a real point lookup.

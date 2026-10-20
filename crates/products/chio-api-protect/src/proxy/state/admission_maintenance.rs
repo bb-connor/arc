@@ -6,6 +6,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
 const ADMISSION_CANDIDATES_PER_TICK: usize = 16;
+const SETTLEMENT_ATTEMPTS_PER_TICK: usize = 64;
 const JOIN_POLL_INTERVAL: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,6 +24,7 @@ pub(crate) struct MaintenanceHealth {
     pub(crate) ticks_completed: u64,
     pub(crate) recovered: u64,
     pub(crate) reaped: u64,
+    pub(crate) settlement_drained: u64,
     pub(crate) busy_skips: u64,
     pub(crate) worker_running: bool,
     pub(crate) worker_joined: bool,
@@ -53,6 +55,7 @@ impl MaintenanceControl {
                     ticks_completed: 0,
                     recovered: 0,
                     reaped: 0,
+                    settlement_drained: 0,
                     busy_skips: 0,
                     worker_running: true,
                     worker_joined: false,
@@ -267,6 +270,13 @@ fn run_worker(
                 .health
                 .recovered
                 .saturating_add(u64::try_from(recovered).unwrap_or(u64::MAX));
+        })?;
+        let drained = kernel.drain_settlement_attempts(SETTLEMENT_ATTEMPTS_PER_TICK)?;
+        control.update(|state| {
+            state.health.settlement_drained = state
+                .health
+                .settlement_drained
+                .saturating_add(u64::try_from(drained).unwrap_or(u64::MAX));
         })?;
         let reaped = if hold_capable {
             let now = kernel.authority_clock_reading()?.unix_millis().get() / 1_000;

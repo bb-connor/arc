@@ -4360,6 +4360,17 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
+      "owner": "insert_settlement_reconciliation_if_absent",
+      "sha256": "8cfe0e2d76a1bed39b0c842664363b8dfd749e69abf577960e166258cc91c206",
+      "tables": [
+        "chio_tool_receipts"
+      ],
+      "sql": "SELECT EXISTS(SELECT 1 FROM chio_tool_receipts WHERE receipt_id = ?1)",
+      "principal": "receipt-integrity",
+      "contract": "Kernel settlement ledger check that a claimed settlement attempt names a stored receipt. The receipt id comes from the kernel settlement outbox, never from tenant input, and the write adds only a sidecar reconciliation row."
+    },
+    {
+      "path": "crates/platform/chio-store-sqlite/src/receipt_store/reports/reconciliation.rs",
       "owner": "query_metered_billing_reconciliation_report",
       "sha256": "dfe17e802091282a481d3df852ac36f4a47d9a104f38d77a739c69f60041c81b",
       "tables": [

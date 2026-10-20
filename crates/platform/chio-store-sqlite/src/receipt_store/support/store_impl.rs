@@ -586,6 +586,19 @@ impl ReceiptStore for SqliteReceiptStore {
         self.settlement_store_binding.is_some()
     }
 
+    fn supports_settlement_reconciliation(&self) -> bool {
+        true
+    }
+
+    fn record_settlement_reconciliation(
+        &self,
+        receipt_id: &str,
+        state: SettlementReconciliationState,
+        note: Option<&str>,
+    ) -> Result<bool, ReceiptStoreError> {
+        self.insert_settlement_reconciliation_if_absent(receipt_id, state, note)
+    }
+
     fn append_chio_receipt_with_pending_observation_and_timeout(
         &self,
         receipt: &ChioReceipt,

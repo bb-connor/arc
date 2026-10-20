@@ -54,6 +54,8 @@ pub enum SettlementRuntimeConfigError {
     StoreBindingMismatch,
     #[error("receipt store cannot be replaced while a settlement observer runtime is installed")]
     ReceiptStoreReplacement,
+    #[error("receipt store cannot record settlement reconciliations for the settlement ledger")]
+    UnsupportedSettlementLedger,
 }
 
 impl SettlementRuntimeConfigError {
@@ -65,6 +67,7 @@ impl SettlementRuntimeConfigError {
             Self::MissingStoreBinding => "missing_store_binding",
             Self::StoreBindingMismatch => "store_binding_mismatch",
             Self::ReceiptStoreReplacement => "receipt_store_replacement",
+            Self::UnsupportedSettlementLedger => "unsupported_settlement_ledger",
         }
     }
 }

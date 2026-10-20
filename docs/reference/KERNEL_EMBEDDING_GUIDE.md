@@ -49,9 +49,37 @@ kernel.set_settlement_observer_runtime(hook, outcome_store, retry_policy)?;
 Propagate the error or fail startup on it. A discarded error leaves the kernel
 dispatching charges with settlement uninstalled.
 
-No production `SettlementHook` ships in-tree yet, and no host drains
-`settle_attempts` after the inline attempt (RFC-0013 F69). A host that installs
-its own hook owns that drain.
+### Settlement ledger
+
+A host that configures a payment adapter installs the kernel settlement ledger
+and refuses to start when the install fails:
+
+```rust
+kernel.install_settlement_ledger(outcome_store, retry_policy)?;
+```
+
+`install_settlement_ledger` builds `KernelSettlementLedgerHook` over the
+configured receipt store and installs it through
+`set_settlement_observer_runtime`. The receipt store must also return `true`
+from `supports_settlement_reconciliation`; otherwise the install fails with
+`UnsupportedSettlementLedger`. The hook records one `reconciled`
+`settlement_reconciliations` row for each charge whose receipt records
+`settled`, dead-letters a charge whose receipt records any other status, and
+keeps a retained payment retryable. It never mutates receipt rows or bytes.
+
+The host drains due attempts from its maintenance tick:
+
+```rust
+let claimed = kernel.drain_settlement_attempts(limit)?;
+```
+
+The drain claims due `settle_attempts` rows, rebuilds each observation from the
+stored receipt, and completes it through the claimed-outcome CAS, so a
+`Retryable` attempt re-runs once its retry deadline passes. A receipt committed
+through durable admission is seeded without an inline claim, so the drain is
+the first hook invocation for it. `chio api protect`
+installs the ledger whenever a payment adapter is configured and drains on its
+admission maintenance tick.
 
 ### Required receipt-store capabilities
 
@@ -87,6 +115,7 @@ Installation failures surface as `KernelError::SettlementConfiguration`:
 | `MissingStoreBinding` | store returns `None` from `settlement_store_binding` |
 | `StoreBindingMismatch` | receipt store and outcome store name different backends |
 | `ReceiptStoreReplacement` | the receipt store is replaced while a settlement runtime is installed |
+| `UnsupportedSettlementLedger` | the receipt store cannot record settlement reconciliations for the ledger |
 
 ## Delegated revocation
 

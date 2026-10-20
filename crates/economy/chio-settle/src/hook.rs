@@ -233,6 +233,10 @@ pub enum SettlementFailureCode {
     Signature,
     Verification,
     Backend,
+    /// The payment journal has not reached a terminal state yet.
+    AwaitingRailResolution,
+    /// The receipt records an economic form the settlement hook cannot complete.
+    UnsupportedEconomicForm,
 }
 
 /// Unknown durable settlement failure code.
@@ -259,11 +263,16 @@ impl SettlementFailureCode {
             Self::Signature => "signature",
             Self::Verification => "verification",
             Self::Backend => "backend",
+            Self::AwaitingRailResolution => "awaiting_rail_resolution",
+            Self::UnsupportedEconomicForm => "unsupported_economic_form",
         }
     }
 
     const fn allows_retry(self) -> bool {
-        matches!(self, Self::Rpc | Self::Backend)
+        matches!(
+            self,
+            Self::Rpc | Self::Backend | Self::AwaitingRailResolution
+        )
     }
 }
 
@@ -286,6 +295,8 @@ impl TryFrom<&str> for SettlementFailureCode {
             "signature" => Ok(Self::Signature),
             "verification" => Ok(Self::Verification),
             "backend" => Ok(Self::Backend),
+            "awaiting_rail_resolution" => Ok(Self::AwaitingRailResolution),
+            "unsupported_economic_form" => Ok(Self::UnsupportedEconomicForm),
             _ => Err(SettlementFailureCodeParseError),
         }
     }
@@ -757,6 +768,29 @@ mod tests {
         let ok = SettlementOutcome::accepted("ts-1");
         assert!(!ok.is_retryable());
         assert!(!ok.is_permanent());
+    }
+
+    #[test]
+    fn ledger_failure_codes_round_trip_with_their_retry_class() {
+        for (code, label, retryable) in [
+            (
+                SettlementFailureCode::AwaitingRailResolution,
+                "awaiting_rail_resolution",
+                true,
+            ),
+            (
+                SettlementFailureCode::UnsupportedEconomicForm,
+                "unsupported_economic_form",
+                false,
+            ),
+        ] {
+            assert_eq!(code.as_str(), label);
+            assert_eq!(SettlementFailureCode::try_from(label), Ok(code));
+            assert_eq!(
+                SettlementOutcome::retryable(failure(code, label)).is_retryable(),
+                retryable
+            );
+        }
     }
 
     #[test]
