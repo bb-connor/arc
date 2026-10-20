@@ -1,7 +1,7 @@
 """Census of receipt-hash and receipt-parameter consumers for the committed-receipt change.
 
 Usage: python3 -I census.py <repo> <rev> <rules.tsv> <out.tsv>
-Lists every line at <rev> that matches one of PATTERNS, marks it test or production,
+Lists every line at <rev> that matches one of PATTERNS, or ends a MULTILINE match (rustfmt-split chains, JSON indexing), marks it test or production,
 assigns it the first matching rule from <rules.tsv>, and exits 1 when any production
 line has no rule.
 """
@@ -13,6 +13,11 @@ PATTERNS = {
     "params": r"action\.parameters\b",
 }
 SCOPE = ["crates", "sdks", "xtask"]
+# Patterns over whole file text, for chains rustfmt splits across lines and for JSON indexing.
+MULTILINE = {
+    "params_split": (r"\baction\s*\n\s*\.(parameters|parameter_hash)\b", ["crates", "xtask"], "*.rs"),
+    "params_json": (r"(\[\s*[\"']action[\"']\s*\]|\baction)\s*(\[\s*[\"'](parameters|parameter_hash)[\"']\s*\]|\.get\(\s*[\"'](parameters|parameter_hash)[\"'])", ["sdks", "crates"], None),
+}
 TEST_PATH = re.compile(r"(^|/)(tests?|benches|examples|fixtures)/|(_tests?|/tests)\.rs$|_tests/|test_support|test_hooks|\.test\.(ts|tsx)$|/test_[^/]*\.py$|_test\.go$|Test\.(kt|cs)$|Tests\.cs$|e2e_tests")
 
 def grep(repo, rev, pattern):
@@ -21,6 +26,20 @@ def grep(repo, rev, pattern):
     for raw in out.splitlines():
         _, path, line, text = raw.split(":", 3)
         yield path, int(line), text.strip()
+
+def grep_multiline(repo, rev, pattern, scope, glob):
+    paths = subprocess.run(["git", "-C", repo, "grep", "-l", "-I", "-E", r"parameters|parameter_hash", rev, "--", *scope],
+                           capture_output=True, text=True, check=False).stdout.split()
+    regex = re.compile(pattern)
+    for entry in paths:
+        path = entry.split(":", 1)[1]
+        if glob == "*.rs" and not path.endswith(".rs"):
+            continue
+        text = subprocess.run(["git", "-C", repo, "show", f"{rev}:{path}"], capture_output=True, text=True).stdout
+        lines = text.splitlines()
+        for match in regex.finditer(text):
+            line = text.count("\n", 0, match.end()) + 1
+            yield path, line, lines[line - 1].strip()
 
 def test_module_lines(repo, rev, path, cache={}):
     """Line numbers inside a `#[cfg(test)] mod` block of a Rust file."""
@@ -58,6 +77,9 @@ def main():
     hits = {}
     for name, pattern in PATTERNS.items():
         for path, line, text in grep(repo, rev, pattern):
+            hits.setdefault((path, line), [text, set()])[1].add(name)
+    for name, (pattern, scope, glob) in MULTILINE.items():
+        for path, line, text in grep_multiline(repo, rev, pattern, scope, glob):
             hits.setdefault((path, line), [text, set()])[1].add(name)
     rows, unclassified = [], 0
     for (path, line), (text, names) in sorted(hits.items()):

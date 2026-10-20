@@ -1,4 +1,10 @@
 # path_regex	line_regex	kind	replacement
+chio_mini_swe/repository_proof\.py		P-ii	repository proof rebuilds the request object it holds and opens the params commitment with the proof's params opening
+chio-mcp-edge/src/runtime/requests\.rs		P-iii	deny log line reads the request's own uri, which is in scope; the receipt parameter read is deleted
+chio-open-market/src/recovery\.rs	^\.parameters	P-iii	deleted: redundant with delivery.finding_id checked at line 321
+chio-commerce-order/src/settlement\.rs	^\.parameters	E/P-ii	settlement dispatch fields read from the replayed dispatch event in the bundle; the carried params_opening opens the receipt's parameter commitment over the rebuilt object
+proof/fixture_agent_web\.rs	^\.parameters	P-i	agent_web_receipt_ref read from the fixture index or the receipt metadata only; the parameter fallback is deleted
+chio-cage/src/receipt\.rs	content_hash = handle\.content_hash|from_parameters\(parameters\)	R	cage producer with host Rng (Task 10)
 /_generated/		GEN	regenerated from the moved-in record schema (Task 6 codegen)
 \.md$		DOC	rewritten for commitments with the doc sweep (Task 19)
 (merkle\.rs|chio-anchor/src/batch\.rs|chio-web3/src/anchors\.rs|checkpoint/consistency\.rs|chio-transaction-passport/src/minimal\.rs)	verify_hash	D	Merkle inclusion verify_hash, unrelated to receipts; unchanged
@@ -19,7 +25,7 @@ chio-http-core/src/receipt\.rs		X	HttpReceipt and its projection deleted (Task 1
 chio-http-core/src/authority\.rs		R	HTTP authority signs chio.receipt.v1 with HttpCallPreimages (Task 12)
 chio-http-core/src/evaluation\.rs		H	format check moves to the commitment value (Task 12)
 	verify_hash\(\)	V	verify_hash deleted: the parameter commitment is signed and has no unsalted hash to recheck; the caller keeps its signature check (kind V)
-admission_operation/projection/authorization\.rs	parameters	P-i	operation_payload digest read from the authorization operation's admission row (binding digest), never from receipt parameters; Root-held
+admission_operation/projection/authorization\.rs	parameters	P-i	the authorization receipt's parameter values are read from the authorization operation's admission row, never from receipt parameters: operation_payload digest from the row binding; session_id and tool_call_id from the row's session and tool-call columns; authorization_parameter_hash from the row's request digest (canonical_parameter_digest); each compared with consumption; Root-held
 admission_operation/projection/authorization\.rs		A	consumer receipt parameter commitment compared with the commitment recorded on the consumer operation row; Root-held
 kernel/evaluation/delivery_preparation\.rs		P-i	launch state read from the registered Chio-internal metadata key launch.state (closed enum, no argument value), written by the launch producer; Root-held
 admission_operation/projection/refusal_receipt\.rs		A	refusal receipt content commitment compared with the commitment recorded on the operation row
@@ -41,7 +47,7 @@ effect_obligation/preparation\.rs	from_parameters|parameter_hash: action	A0	obli
 effect_obligation/preparation\.rs		A	obligation binding compared with the row's recorded parameter commitment
 kernel/nonce_admission\.rs		B	execution nonce minted from canonical_parameter_digest at signing; the nonce holder already holds the arguments (P2-D)
 kernel/reconciliation\.rs	from_parameters|bound_to	B	nonce parameter binding checked at signing against canonical_parameter_digest(arguments)
-kernel/responses/allow_responses\.rs	contract\.expected_digest	E-k	kernel opens the parent's content commitment with the parent's persisted opening over the written content; ReceiptOpeningUnavailable when erased or unknown; expected_digest stays an unsalted internal digest compared with written_content_digest
+kernel/responses/allow_responses\.rs	contract\.expected_digest	E-k	kernel opens the parent's content commitment over the written content with the parent's opening from its local store or, under --control-url, the internal openings:read route (receipt-openings:read scope); ReceiptOpeningUnavailable when erased or unknown; expected_digest stays an unsalted internal digest compared with written_content_digest
 kernel/responses/allow_responses\.rs	child\.content_hash	C	lineage column copies the child's content commitment value
 chio-kernel/src/kernel/(responses/(allow|deny|pending|terminal)_responses|session_ops|session_ops/protocol_refusal|session_ops/reports|kernel_drop_guard|admission_terminal_receipt)\.rs		R	producer site: ReceiptDraft plus ReceiptPreimages (request arguments, receipt content) signed with the kernel Rng (Task 7)
 kernel/reconciliation\.rs		R	producer site: ReceiptDraft plus preimages (Task 7)
@@ -72,7 +78,7 @@ security/adapters/native_evidence\.rs		F	reader binds to the signed active_defen
 security/event_consumer/verification\.rs		F	reader binds to the signed active_defense projection
 trust_control/finding_purchase_routes\.rs	parameters	P-i	finding_id read from the registered metadata key finding_delivery.finding_id (public listing id)
 trust_control/finding_purchase_routes\.rs		F	bind to the signed delivery_contract digests equal to finding.payload_sha256
-trust_control/finding_retraction_resolver\.rs		F	memory write digest read from the child receipt's signed delivery_contract.observed_digest instead of hashing parameters
+trust_control/finding_retraction_resolver\.rs		F	memory write digest read from the PARENT delivery receipt's signed delivery_contract.observed_digest, reached through the child's signed parent link; the kernel proved written_content_digest == expected_digest == parent content before signing the child
 trust_control/finding_verified_fix\.rs	parameter_hash: receipt	C	verified-fix nonce binding copies the parameter commitment value
 trust_control/finding_verified_fix\.rs		R	producer site with the evidence body as preimage (Task 10)
 chio-enterprise-export/src/artifacts\.rs		E/P-ii	content: open with the carried content opening over the artifact bytes (raw bytes wrapped as {kind: bytes, b64u}); parameters: rebuild {artifact_ref, artifact_sha256, event_id} from the event and open with the carried params opening
@@ -98,7 +104,7 @@ chio-acp-proxy/src/kernel_signer\.rs	authorization_receipt\.action\.parameters	P
 chio-acp-proxy/src/kernel_signer\.rs		R	ACP producer passes session update preimages (Task 11)
 chio-acp-proxy/src/telemetry\.rs		H	telemetry exports the commitment values
 chio-mcp-remote/src/remote_mcp/session_credentials\.rs		C	DeliveryAcknowledgement.result_hash becomes result_commitment
-session_credentials/completed_result\.rs		A/E	parameters: credential call row records the receipt parameter commitment at completion and compares by equality; output: open the content commitment with the opening from the same process's receipt store; OpeningUnavailable when erased or unknown
+session_credentials/completed_result\.rs		A/E	parameters: open the receipt's params commitment over the call's own arguments, which the credential call row holds from call creation (independent of the receipt), with the opening from the kernel's SignedReceipt or the store; output: open the content commitment the same way; local store or, under --control-url, the internal openings:read route; OpeningUnavailable when erased or unknown
 chio-tower/		H	reads chio.receipt.v1 from the authority
 chio-binding-helpers/src/receipt\.rs		V	verify_hash deleted; receipt verification reports signature and commitment shape
 chio-cage/src/receipt\.rs	parameters|content_hash|canonical	F	cage verifier binds to signed cage_receipt metadata after the CageEnforcementRecord field audit (P-d); no disclosure file
