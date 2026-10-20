@@ -124,7 +124,7 @@ pub fn authenticate_client(
         .clients
         .get(issuer)
         .ok_or(RootExchangeError::ClientNotConfidential)?;
-    if jws.header.kid != client.kid {
+    if jws.header.kid.as_str() != client.kid {
         return Err(RootExchangeError::ClientAssertionInvalid(
             "kid is not the registered key",
         ));

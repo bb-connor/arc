@@ -9,11 +9,12 @@ use chio_core::capability::scope::ChioScope;
 use chio_core::capability::token::CapabilityTokenBody;
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::root_authority::{
-    ClaimMode, ClaimValue, DelegationAnchor, DelegationContext, DelegationExchange, HolderClass,
-    Identifier, LoadedRootPolicy, MatchClaims, ProviderRecordKind, RecordedClaims, RootPolicyRule,
+    ClaimMode, ClaimValue, DelegationAnchor, DelegationAnchorFields, DelegationContext,
+    DelegationContextFields, DelegationExchange, HolderClass, Identifier, LoadedRootPolicy,
+    MatchClaims, ProviderRecordKind, RecordedClaims, RootAuthorityShapeError, RootPolicyRule,
     SaltRef, SaltedCommitment, Sha256Digest, Text, Uri, CHIO_DELEGATION_CONTEXT_SCHEMA,
 };
-use chio_core::{sha256, Sha256State};
+use chio_core::Sha256State;
 use serde_json::{Map, Value};
 
 use super::client_auth::{authenticate_client, ClientAuthContext, ClientRegistry};
@@ -327,7 +328,12 @@ impl RootExchange {
         }
         let resolved = services
             .keys
-            .resolve(&record.identity, &jws.header.kid, jws.header.alg, now)
+            .resolve(
+                &record.identity,
+                jws.header.kid.as_str(),
+                jws.header.alg,
+                now,
+            )
             .await?;
         let key = VerifyingKey::from_jwk(&resolved.jwk).ok_or(RootExchangeError::IdpKeyUnusable)?;
         jws.verify_with(&key)?;
@@ -396,31 +402,31 @@ impl RootExchange {
         )?;
         let canonical =
             |error: chio_core::Error| RootExchangeError::Canonicalization(error.to_string());
-        let effective_root_scope_hash =
-            Sha256Digest::from_hash(sha256(&canonical_json_bytes(&scope).map_err(canonical)?));
-        let kid = Identifier::new(verified.kid.as_str())
-            .map_err(|_| RootExchangeError::ClaimInvalid("kid"))?;
+        let effective_root_scope_hash = Sha256Digest::of_scope(&scope).map_err(canonical)?;
         let issuer = Uri::new(verified.issuer.as_str())
             .map_err(|_| RootExchangeError::ClaimInvalid("iss"))?;
-        let context = DelegationContext {
+        let shape =
+            |error: RootAuthorityShapeError| RootExchangeError::Canonicalization(error.to_string());
+        let anchor_fields = DelegationAnchorFields {
+            kind: AnchorKind::OauthIdJag,
+            issuer,
+            provider_record_id: Some(record.identity.provider_id.clone()),
+            provider_identity_digest: Some(record.identity_digest),
+            key_snapshot_digest: Some(resolved.snapshot_digest),
+            kid: Some(verified.kid.clone()),
+            alg: Some(verified.alg),
+            artifact_digest: Some(jws.artifact_digest),
+            artifact_retained: false,
+            replay_key_digest: replay_key.digest(),
+            token_iat: verified.iat,
+            token_exp: verified.exp,
+            subject: subject_commitment,
+            tenant: tenant_commitment,
+            claims,
+        };
+        let context = DelegationContext::new(DelegationContextFields {
             schema: CHIO_DELEGATION_CONTEXT_SCHEMA.to_owned(),
-            anchor: DelegationAnchor {
-                kind: AnchorKind::OauthIdJag,
-                issuer,
-                provider_record_id: Some(record.identity.provider_id.clone()),
-                provider_identity_digest: Some(record.identity_digest),
-                key_snapshot_digest: Some(resolved.snapshot_digest),
-                kid: Some(kid),
-                alg: Some(verified.alg),
-                artifact_digest: Some(jws.artifact_digest),
-                artifact_retained: false,
-                replay_key_digest: replay_key.digest(),
-                token_iat: verified.iat,
-                token_exp: verified.exp,
-                subject: subject_commitment,
-                tenant: tenant_commitment,
-                claims,
-            },
+            anchor: DelegationAnchor::new(anchor_fields).map_err(shape)?,
             exchange: DelegationExchange {
                 exchange_key: self.exchange_key.clone(),
                 exchanged_at: now,
@@ -429,10 +435,8 @@ impl RootExchange {
             },
             root_policy_rule_id: rule.rule_id.clone(),
             effective_root_scope_hash,
-        };
-        context
-            .validate()
-            .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;
+        })
+        .map_err(shape)?;
         let anchor = RootAnchor {
             kind: AnchorKind::OauthIdJag,
             context_digest: context.digest().map_err(canonical)?,
