@@ -105,8 +105,7 @@ impl fmt::Display for EconomicContinuityError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for EconomicContinuityError {}
+impl core::error::Error for EconomicContinuityError {}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

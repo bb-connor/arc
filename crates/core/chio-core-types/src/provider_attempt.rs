@@ -110,8 +110,7 @@ impl fmt::Display for ProviderAttemptValidationError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for ProviderAttemptValidationError {}
+impl core::error::Error for ProviderAttemptValidationError {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

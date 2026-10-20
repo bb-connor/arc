@@ -119,7 +119,7 @@ impl Fixture {
     }
 
     fn assert_authority(&self, receipt: &ChioReceipt) -> TestResult {
-        assert_eq!(receipt.kernel_key, self.kernel.receipt_signing_public_key());
+        assert_eq!(receipt.kernel_key, self.kernel.receipt_signing_public_key().unwrap());
         assert_eq!(
             receipt.policy_hash,
             chio_core::sha256_hex(b"test-runtime-policy")

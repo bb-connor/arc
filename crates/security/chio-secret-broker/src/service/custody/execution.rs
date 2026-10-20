@@ -834,7 +834,13 @@ impl BrokerService {
         response: &BrokerExecuteResponse,
     ) -> Result<()> {
         response.evidence.validate()?;
-        verify_execution_receipt(&response.receipt, &self.receipt_signer.public_key())?;
+        verify_execution_receipt(
+            &response.receipt,
+            &self
+                .receipt_signer
+                .public_key()
+                .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?,
+        )?;
         let receipt = &response.receipt.body;
         let evidence = &response.evidence;
         let request_digest = broker_request_digest(request)?;

@@ -526,7 +526,10 @@ mod tests {
         // key, and (with the empty-signature refusal in `sign_capability`)
         // that an unsigned issued capability is impossible.
         let backend = Ed25519Backend::new(Keypair::from_seed(&[5u8; 32]));
-        let public = backend.public_key();
+        let public = match backend.public_key() {
+            Ok(key) => key,
+            Err(e) => panic!("backend public key must read: {e}"),
+        };
         let svc = IssuerService::with_signer("urn:chio:audience:kernel", Arc::new(backend));
         let req = MintRequest {
             audience: "urn:chio:audience:kernel".into(),

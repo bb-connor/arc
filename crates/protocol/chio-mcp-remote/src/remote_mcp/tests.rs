@@ -37,6 +37,8 @@ mod sender_dpop_refusal;
 mod session_recovery;
 #[path = "tests/session_runtime.rs"]
 mod session_runtime;
+#[path = "tests/session_spawn_failure.rs"]
+mod session_spawn_failure;
 #[path = "tests/terminal_reason.rs"]
 mod terminal_reason;
 

@@ -125,7 +125,7 @@ expected_counts = {
     "native authority admission integration": 17,
     "physical dispatch hold ownership": 9,
     "kernel-owned native preparation": 11,
-    "kernel-owned native egress": 11,
+    "kernel-owned native egress": 12,
     "qualified recovery lease boundary": 5,
     "runtime recovery lease containment": 1,
     "prepared flow dispatch binding": 13,

@@ -57,7 +57,8 @@ impl ChioKernel {
         Ok(ThresholdApprovalCollector::new(
             store,
             self.config.policy_hash.clone(),
-            self.trusted_threshold_proposal_authorities(),
+            self.trusted_threshold_proposal_authorities()
+                .map_err(denied)?,
             Arc::new(resolver),
         ))
     }

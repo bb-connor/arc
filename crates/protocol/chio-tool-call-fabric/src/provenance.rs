@@ -92,12 +92,13 @@ pub fn sign_provenance(
     stamp: &ProvenanceStamp,
     backend: &dyn SigningBackend,
 ) -> Result<SignedProvenance, ProvenanceError> {
+    let public_key = backend.public_key()?;
     let (signature, signed_bytes) = sign_canonical_with_backend(backend, stamp)?;
     Ok(SignedProvenance {
         stamp: stamp.clone(),
         signed_bytes,
-        algorithm: backend.algorithm(),
-        public_key: backend.public_key(),
+        algorithm: public_key.algorithm(),
+        public_key,
         signature,
     })
 }
@@ -162,7 +163,7 @@ mod tests {
         assert_eq!(envelope.stamp, stamp);
         assert_eq!(envelope.algorithm, SigningAlgorithm::Ed25519);
         let pk = verify_signed_provenance(&envelope).unwrap();
-        assert_eq!(pk, &backend.public_key());
+        assert_eq!(pk, &backend.public_key().unwrap());
     }
 
     #[test]
@@ -191,7 +192,7 @@ mod tests {
         let backend_b = Ed25519Backend::generate();
         let stamp = sample_stamp();
         let mut envelope = sign_provenance(&stamp, &backend_a).unwrap();
-        envelope.public_key = backend_b.public_key();
+        envelope.public_key = backend_b.public_key().unwrap();
         let err = verify_signed_provenance(&envelope).unwrap_err();
         matches!(err, ProvenanceError::SignatureMismatch);
     }

@@ -4,9 +4,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
-use chio_core_types::{
-    Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-};
+use chio_core_types::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use chio_decoy::{
     Clock, DecoyCreateRequest, PrivateDecoyRegistry, SecretMaterial, SignedWatermarkEnvelope,
     TrustedWatermarkKey, WatermarkIssueError, WatermarkIssueRequest, WatermarkIssuer,
@@ -210,11 +208,7 @@ impl CountingSigner {
 }
 
 impl SigningBackend for CountingSigner {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.backend.algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> chio_core_types::Result<PublicKey> {
         self.backend.public_key()
     }
 
@@ -264,7 +258,9 @@ impl Fixture {
         keys.values.lock().test_expect("keys lock").insert(
             (tenant_id.clone(), key_id.clone()),
             TrustedWatermarkKey {
-                public_key: signer.public_key(),
+                public_key: signer
+                    .public_key()
+                    .unwrap_or_else(|error| panic!("signing identity: {error}")),
                 status: WatermarkKeyStatus::Active,
                 not_before_unix_ms: 900,
                 signing_cutoff_unix_ms: 2_000,

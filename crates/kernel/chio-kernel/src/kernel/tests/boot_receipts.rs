@@ -20,7 +20,7 @@ fn session_reports_use_boot_selected_hybrid_authority() -> TestResult {
         let (context, operation) = super::session_reports::report_operation(&kernel)?;
         let backend = configure(&mut kernel, floor)?;
         let receipt = kernel.record_session_tool_failure(&context, &operation)?;
-        assert_eq!(receipt.kernel_key, backend.public_key());
+        assert_eq!(receipt.kernel_key, backend.public_key()?);
         assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Hybrid));
         assert!(receipt.verify_signature_with_floor(
             chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired
@@ -110,7 +110,7 @@ fn hybrid_inline_receipt_uses_boot_verified_authority() -> TestResult {
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
     assert!(
-        receipt.kernel_key == backend.public_key(),
+        receipt.kernel_key == backend.public_key()?,
         "inline signer ignored boot authority"
     );
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Hybrid));
@@ -127,14 +127,14 @@ fn hybrid_channel_receipt_uses_boot_verified_authority() -> TestResult {
     let body = kernel.build_and_sign_receipt(params(CONTENT)?)?.body();
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
     let body = ChioReceiptBody {
-        kernel_key: backend.public_key(),
+        kernel_key: backend.public_key()?,
         ..body
     };
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
     let receipt = runtime.block_on(kernel.sign_receipt_via_channel(body, CONTENT.to_vec()))?;
-    assert_eq!(receipt.kernel_key, backend.public_key());
+    assert_eq!(receipt.kernel_key, backend.public_key()?);
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::Hybrid));
     assert!(receipt.verify_signature()?);
     runtime.block_on(kernel.shutdown());
@@ -150,7 +150,7 @@ fn hybrid_durable_dispatch_and_replay_retain_original_receipt() -> TestResult {
     let first = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(first.verdict, Verdict::Allow, "{:?}", first.reason);
     assert!(
-        first.receipt.kernel_key == backend.public_key(),
+        first.receipt.kernel_key == backend.public_key()?,
         "dispatch ignored boot authority"
     );
     assert!(first.receipt.verify_signature()?);
@@ -174,12 +174,12 @@ fn pq_required_capability_dispatch_produces_pq_receipt() -> TestResult {
     let (mut kernel, mut request, _, invocations) = durable_admission_fixture("boot-pq-dispatch");
     let backend = configure(&mut kernel, KernelCryptoFloor::PqRequired)?;
     let mut capability = request.capability.body();
-    capability.issuer = backend.public_key();
-    kernel.config.ca_public_keys.push(backend.public_key());
+    capability.issuer = backend.public_key()?;
+    kernel.config.ca_public_keys.push(backend.public_key()?);
     request.capability = CapabilityToken::sign_with_backend(capability, backend.as_ref())?;
     let first = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(first.verdict, Verdict::Allow, "{:?}", first.reason);
-    assert!(first.receipt.kernel_key == backend.public_key());
+    assert!(first.receipt.kernel_key == backend.public_key()?);
     assert!(first.receipt.verify_signature_with_floor(
         chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired,
     )?);
@@ -196,7 +196,7 @@ fn pq_boot_denial_is_signed_without_dispatch() -> TestResult {
     let backend = configure(&mut kernel, KernelCryptoFloor::PqRequired)?;
     let response = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(response.receipt.kernel_key == backend.public_key());
+    assert!(response.receipt.kernel_key == backend.public_key()?);
     assert!(response.receipt.verify_signature_with_floor(
         chio_core::receipt::crypto_floor::ReceiptCryptoFloor::PqRequired,
     )?);
@@ -265,7 +265,7 @@ fn hybrid_budget_fallback_preserves_authority_and_byte_identity() -> TestResult 
         !kernel.signing_task_handle().is_spawned(),
         "oversized preimage must use the bounded-memory fallback"
     );
-    assert!(channel.kernel_key == backend.public_key());
+    assert!(channel.kernel_key == backend.public_key()?);
     assert!(channel.verify_signature()?);
     // ML-DSA uses randomized signatures. Both paths must bind the same canonical
     // body, not manufacture an identical fresh signature.
@@ -317,9 +317,9 @@ fn dropped_boot_handle_preserves_receipt_authority_without_issuer_trust() -> Tes
     let mut kernel = make_kernel(make_config());
     let classical = kernel.public_key();
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
-    let key = backend.public_key();
+    let key = backend.public_key().unwrap();
     drop(backend);
-    assert!(kernel.receipt_signing_public_key() == key);
+    assert!(kernel.receipt_signing_public_key().unwrap() == key);
     assert!(kernel.public_key() == classical);
     assert!(!kernel.capability_issuer_is_trusted(&key));
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
@@ -387,8 +387,8 @@ fn hybrid_full_queue_fallback_uses_same_authority() -> TestResult {
         };
         let fallback = result?;
         let queued = first.await?;
-        assert!(fallback.kernel_key == backend.public_key());
-        assert!(queued.kernel_key == backend.public_key());
+        assert!(fallback.kernel_key == backend.public_key().unwrap());
+        assert!(queued.kernel_key == backend.public_key().unwrap());
         assert!(fallback.verify_signature()? && queued.verify_signature()?);
         assert!(canonical_json_bytes(&fallback.body())? == canonical_json_bytes(&queued.body())?);
         kernel.shutdown().await;
@@ -431,7 +431,7 @@ fn failed_boot_quote_preserves_running_receipt_signer() -> TestResult {
         KernelCryptoFloor::AllowHybrid
     );
     let receipt = runtime.block_on(kernel.sign_receipt_via_channel(body, CONTENT.to_vec()))?;
-    assert!(receipt.kernel_key == backend.public_key());
+    assert!(receipt.kernel_key == backend.public_key()?);
     assert!(receipt.verify_signature()?);
     runtime.block_on(kernel.shutdown());
     Ok(())
@@ -442,11 +442,8 @@ fn failed_boot_quote_preserves_running_receipt_signer() -> TestResult {
 fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResult {
     struct UnavailableSigner(PublicKey);
     impl SigningBackend for UnavailableSigner {
-        fn algorithm(&self) -> SigningAlgorithm {
-            self.0.algorithm()
-        }
-        fn public_key(&self) -> PublicKey {
-            self.0.clone()
+        fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+            Ok(self.0.clone())
         }
         fn sign_bytes(&self, _: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
             Err(chio_core::Error::InvalidSignature(
@@ -480,7 +477,7 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
         extra_metadata: None,
     };
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
-    kernel.signing_authority.backend = Arc::new(UnavailableSigner(backend.public_key()));
+    kernel.signing_authority.backend = Arc::new(UnavailableSigner(backend.public_key()?));
     let error = kernel
         .evaluate_tool_call_blocking(&request)
         .err()
@@ -498,13 +495,13 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
     let observation = kernel.record_session_tool_failure(&context, &operation)?;
     assert!(observation.decision.is_none());
     assert!(observation.financial_budget_authority_metadata().is_none());
-    assert!(observation.kernel_key == backend.public_key());
+    assert!(observation.kernel_key == backend.public_key()?);
     assert!(observation.verify_signature()?);
     assert_eq!(store.operation().state(), outcome_state);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let recovered = kernel.evaluate_tool_call_blocking(&request)?;
     assert_eq!(recovered.verdict, Verdict::Allow, "{:?}", recovered.reason);
-    assert!(recovered.receipt.kernel_key == backend.public_key());
+    assert!(recovered.receipt.kernel_key == backend.public_key()?);
     assert!(recovered.receipt.verify_signature()?);
     assert_eq!(invocations.load(Ordering::SeqCst), 1);
     let replay = kernel.evaluate_tool_call_blocking(&request)?;
@@ -520,7 +517,7 @@ fn failed_receipt_signing_recovers_tool_outcome_without_redispatch() -> TestResu
 #[test]
 fn capability_only_floor_setter_does_not_reconfigure_receipt_authority() -> TestResult {
     let mut kernel = make_kernel(make_config());
-    let previous_key = kernel.receipt_signing_public_key();
+    let previous_key = kernel.receipt_signing_public_key().unwrap();
     kernel.set_capability_crypto_floor(KernelCryptoFloor::PqRequired);
     let receipt = kernel.build_and_sign_receipt(params(CONTENT)?)?;
     assert!(receipt.kernel_key == previous_key);
@@ -562,7 +559,7 @@ fn hybrid_boot_preserves_separate_pool_receipt_authority() -> TestResult {
     let backend = configure(&mut kernel, KernelCryptoFloor::AllowHybrid)?;
     let receipt = kernel.build_finding_pool_mutation_receipt(&pool_mutation())?;
     assert!(receipt.kernel_key == pool_key.public_key());
-    assert!(receipt.kernel_key != backend.public_key());
+    assert!(receipt.kernel_key != backend.public_key()?);
     assert_eq!(receipt.tenant_id.as_deref(), Some("boot-receipt-tenant"));
     assert!(receipt.verify_signature()?);
     Ok(())

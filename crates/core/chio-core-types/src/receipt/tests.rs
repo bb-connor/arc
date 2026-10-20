@@ -273,7 +273,7 @@ fn receipt_floor_accepts_hybrid_under_pq_required() {
     let pq = MlDsa65Backend::from_seed(&seed);
     let backend = HybridBackend::new(Box::new(Ed25519Backend::new(kp.clone())), pq).unwrap();
     let mut body = make_receipt_body(&kp);
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
 
     assert_eq!(receipt.signature.algorithm(), SigningAlgorithm::Hybrid);
@@ -292,7 +292,7 @@ fn receipt_floor_rejects_hybrid_under_allow_classical() {
     let pq = MlDsa65Backend::from_seed(&seed);
     let backend = HybridBackend::new(Box::new(Ed25519Backend::new(kp.clone())), pq).unwrap();
     let mut body = make_receipt_body(&kp);
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
 
     let err = receipt
@@ -423,6 +423,19 @@ fn chio_internal_tool_origin_roundtrips_as_closed_vocabulary() {
 }
 
 #[test]
+fn mediated_allow_without_mediated_trust_is_not_authorized() {
+    for trust_level in [TrustLevel::Verified, TrustLevel::Advisory] {
+        let semantics = ReceiptSemanticFields {
+            trust_level,
+            ..ReceiptSemanticFields::mediated_prevent()
+        };
+
+        assert!(!semantics.is_authorized(Some(&Decision::Allow)));
+        assert_eq!(semantics.result_label(Some(&Decision::Allow)), "Allowed");
+    }
+}
+
+#[test]
 fn trace_and_advisory_semantics_cannot_authorize() {
     let trace = ReceiptSemanticFields {
         receipt_kind: ReceiptKind::TraceObservation,
@@ -431,6 +444,7 @@ fn trace_and_advisory_semantics_cannot_authorize() {
         tool_origin: ToolOrigin::HostExecutedProviderReported,
         redaction_mode: RedactionMode::Summary,
         actor_chain: Vec::new(),
+        trust_level: TrustLevel::Verified,
     };
     let advisory = ReceiptSemanticFields {
         receipt_kind: ReceiptKind::AdvisoryEvaluation,
@@ -439,6 +453,7 @@ fn trace_and_advisory_semantics_cannot_authorize() {
         tool_origin: ToolOrigin::HostExecutedUnmediated,
         redaction_mode: RedactionMode::Redacted,
         actor_chain: Vec::new(),
+        trust_level: TrustLevel::Advisory,
     };
 
     assert!(trace.validate_decision(Some(&Decision::Allow)).is_err());
@@ -1379,7 +1394,7 @@ fn receipt_signs_and_verifies_under_p256_backend() {
     use crate::crypto::{P256Backend, SigningAlgorithm, SigningBackend};
     let backend = P256Backend::generate().expect("p256 backend");
     let mut body = make_receipt_body(&Keypair::generate());
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.public_key().unwrap();
     let receipt = ChioReceipt::sign_with_backend(body, &backend).unwrap();
     assert_eq!(receipt.algorithm, Some(SigningAlgorithm::P256));
     assert!(receipt.verify_signature().unwrap());

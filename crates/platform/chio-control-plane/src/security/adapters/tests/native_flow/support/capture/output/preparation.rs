@@ -30,7 +30,7 @@ struct ReentrantWorkloadAuthority {
 }
 
 impl CapabilityAuthority for ReentrantWorkloadAuthority {
-    fn authority_public_key(&self) -> chio_core::PublicKey {
+    fn authority_public_key(&self) -> Result<chio_core::PublicKey, chio_kernel::KernelError> {
         self.inner.authority_public_key()
     }
 

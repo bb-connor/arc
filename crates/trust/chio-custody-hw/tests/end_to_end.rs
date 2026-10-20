@@ -100,7 +100,10 @@ fn passkey_to_capability_to_kernel_call_then_revoke_within_one_epoch() {
     // Stage 1: assemble the issuer with all three security surfaces
     // (signer, replay nonce store, revocation cascade).
     let backend = Ed25519Backend::new(Keypair::from_seed(&[71u8; 32]));
-    let issuer_public = backend.public_key();
+    let issuer_public = match backend.public_key() {
+        Ok(key) => key,
+        Err(e) => panic!("backend public key must read: {e}"),
+    };
     let signer: Arc<dyn SigningBackend> = Arc::new(backend);
     let nonce_store: Arc<dyn PasskeyNonceStore> = Arc::new(InMemoryPasskeyNonceStore::new());
     let oracle = Arc::new(InMemoryCredentialRevocationOracle::new());
@@ -170,7 +173,10 @@ fn replay_of_minted_capability_is_blocked_by_nonce_store() {
     // (still-valid first-mint capability accepted) through the issuer
     // surface.
     let backend = Ed25519Backend::new(Keypair::from_seed(&[83u8; 32]));
-    let issuer_public = backend.public_key();
+    let issuer_public = match backend.public_key() {
+        Ok(key) => key,
+        Err(e) => panic!("backend public key must read: {e}"),
+    };
     let signer: Arc<dyn SigningBackend> = Arc::new(backend);
     let nonce_store: Arc<dyn PasskeyNonceStore> = Arc::new(InMemoryPasskeyNonceStore::new());
     let issuer = IssuerService::with_signer(AUDIENCE, signer).with_nonce_store(nonce_store);

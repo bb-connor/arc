@@ -2,8 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use chio_core::{
-    canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature,
-    SigningAlgorithm, SigningBackend,
+    canonical_json_bytes, sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend,
 };
 use chio_secure_ipc::PeerIdentity as BrokerPeerIdentity;
 #[cfg(target_os = "linux")]
@@ -212,16 +211,12 @@ struct SwitchingBackend {
 }
 
 impl SigningBackend for SwitchingBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Ed25519
-    }
-
-    fn public_key(&self) -> PublicKey {
-        if self.rotated.load(Ordering::SeqCst) {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Ok(if self.rotated.load(Ordering::SeqCst) {
             self.replacement.public_key()
         } else {
             self.initial.public_key()
-        }
+        })
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core_types::Result<Signature> {

@@ -288,7 +288,7 @@ fn audit_reference_open_preserves_auth_phase_order_and_healthy_comparison() -> T
     let path = directory.path().join("audit-custody").join("audit.sock");
     let signer: Arc<dyn SigningBackend> =
         Arc::new(Ed25519Backend::new(Keypair::from_seed(&[3; 32])));
-    let trusted = signer.public_key();
+    let trusted = signer.public_key()?;
     let endpoint = BrokerPrivilegedAuditEndpoint::bind(
         BrokerPrivilegedAuditEndpointConfig {
             socket_path: path.clone(),
