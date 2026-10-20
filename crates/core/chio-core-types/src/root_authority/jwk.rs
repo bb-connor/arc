@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use serde::{Deserialize, Serialize};
 
-use super::wire::{check_items, validated_serde, Base64Text, Base64UrlText, Identifier, Uri};
+use super::wire::{check_items, validated_struct, Base64Text, Base64UrlText, Identifier, Uri};
 use super::RootAuthorityShapeError;
 
 /// Asymmetric JWS algorithms. `none` and the HMAC algorithms are never admitted.
@@ -60,42 +60,41 @@ pub enum JwkUse {
     Sig,
 }
 
-/// A public JSON Web Key. Private key members are not admitted.
-///
-/// `RSA` keys carry `n` and `e` and no curve members; `EC` keys carry a
-/// NIST curve, `x` and `y`; `OKP` keys carry `Ed25519` and `x` only.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct Jwk {
-    pub kid: Identifier,
-    pub kty: JwkKeyType,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alg: Option<JwsAlgorithm>,
-    #[serde(rename = "use", default, skip_serializing_if = "Option::is_none")]
-    pub key_use: Option<JwkUse>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub n: Option<Base64UrlText<1400>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub e: Option<Base64UrlText<16>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub crv: Option<JwkCurve>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub x: Option<Base64UrlText<128>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub y: Option<Base64UrlText<128>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub x5c: Option<Vec<Base64Text<16384>>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub x5t: Option<Base64UrlText<64>>,
-    #[serde(rename = "x5t#S256", default, skip_serializing_if = "Option::is_none")]
-    pub x5t_s256: Option<Base64UrlText<64>>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub issuer: Option<Uri>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub cloud_instance_name: Option<Identifier>,
+validated_struct! {
+    /// A public JSON Web Key. Private key members are not admitted.
+    ///
+    /// `RSA` keys carry `n` and `e` and no curve members; `EC` keys carry a
+    /// NIST curve, `x` and `y`; `OKP` keys carry `Ed25519` and `x` only.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    pub struct Jwk {
+        pub kid: Identifier,
+        pub kty: JwkKeyType,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub alg: Option<JwsAlgorithm>,
+        #[serde(rename = "use", default, skip_serializing_if = "Option::is_none")]
+        pub key_use: Option<JwkUse>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub n: Option<Base64UrlText<1400>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub e: Option<Base64UrlText<16>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub crv: Option<JwkCurve>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub x: Option<Base64UrlText<128>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub y: Option<Base64UrlText<128>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub x5c: Option<Vec<Base64Text<16384>>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub x5t: Option<Base64UrlText<64>>,
+        #[serde(rename = "x5t#S256", default, skip_serializing_if = "Option::is_none")]
+        pub x5t_s256: Option<Base64UrlText<64>>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub issuer: Option<Uri>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub cloud_instance_name: Option<Identifier>,
+    }
 }
-
-validated_serde!(Jwk);
 
 impl Jwk {
     pub fn validate(&self) -> Result<(), RootAuthorityShapeError> {

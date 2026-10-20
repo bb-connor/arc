@@ -10,7 +10,7 @@ use crate::error::Result;
 
 use super::jwk::Jwk;
 use super::wire::{
-    check_items, check_schema, check_unique, validated_serde, HttpsUrl, Identifier, Sha256Digest,
+    check_items, check_schema, check_unique, validated_struct, HttpsUrl, Identifier, Sha256Digest,
     Uri,
 };
 use super::RootAuthorityShapeError;
@@ -53,31 +53,30 @@ pub struct SubjectMapping {
     pub tenant_id_field: Identifier,
 }
 
-/// The unsigned, content-addressed identity projection of one enterprise provider record.
-///
-/// An `oidc_jwks` record has exactly one of `jwks_url` or `jwks` and no
-/// `introspection_url`; an `oauth_introspection` record has
-/// `introspection_url` and no key source.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct EnterpriseProviderIdentity {
-    pub schema: String,
-    pub provider_id: Identifier,
-    pub kind: ProviderRecordKind,
-    pub issuer: Uri,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub jwks_url: Option<HttpsUrl>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub jwks: Option<InlineJwks>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub introspection_url: Option<HttpsUrl>,
-    /// The record's `trust_boundary.allowed_audiences`.
-    pub audiences: Vec<Uri>,
-    pub subject_mapping: SubjectMapping,
-    pub trust_material_ref: Identifier,
+validated_struct! {
+    /// The unsigned, content-addressed identity projection of one enterprise provider record.
+    ///
+    /// An `oidc_jwks` record has exactly one of `jwks_url` or `jwks` and no
+    /// `introspection_url`; an `oauth_introspection` record has
+    /// `introspection_url` and no key source.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    pub struct EnterpriseProviderIdentity {
+        pub schema: String,
+        pub provider_id: Identifier,
+        pub kind: ProviderRecordKind,
+        pub issuer: Uri,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub jwks_url: Option<HttpsUrl>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub jwks: Option<InlineJwks>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub introspection_url: Option<HttpsUrl>,
+        /// The record's `trust_boundary.allowed_audiences`.
+        pub audiences: Vec<Uri>,
+        pub subject_mapping: SubjectMapping,
+        pub trust_material_ref: Identifier,
+    }
 }
-
-validated_serde!(EnterpriseProviderIdentity);
 
 impl EnterpriseProviderIdentity {
     pub fn validate(&self) -> core::result::Result<(), RootAuthorityShapeError> {
