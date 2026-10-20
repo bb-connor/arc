@@ -7746,6 +7746,9 @@
     ],
     "crates/kernel/chio-kernel/src/tool_outcome/test_support.rs": [
       "returned_value::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
+      "parse::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -13060,6 +13063,22 @@
     "crates/observability/chio-siem/src/manager.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts the JWS header alg of a JSON value decoded by the bounded original-byte reader in input.rs. The assertion grants nothing until its signature verifies against a pinned key.",
+      "readers": [
+        {
+          "reader": "parse",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
     }
   },
   "tenant_runtime_families": {
@@ -23882,6 +23901,11 @@
     ],
     "crates/tooling/chio-trace-validate/src/decode.rs": [
       "decode_observations::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
+      "decode_part::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::decode",
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part",
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part"
     ]
   },
   "retired_direct_readers": {
