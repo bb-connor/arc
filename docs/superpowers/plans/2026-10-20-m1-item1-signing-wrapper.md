@@ -127,7 +127,7 @@ A diff touching `.github/workflows/` is handed to the lead to push from the Mac 
 
 **Files:** none changed. Output goes to `ws2:~/lanes/claude-pr1160-evidence/m1i1/census-<base>.md`.
 
-- [ ] **Step 1: Preconditions.** `gh pr view <N> --repo bb-connor/arc --json state` reports `MERGED` for #1674, #1601, #1607, #1709, the fwdcompat receipt change, #1675, #1682, #1678, #1701 and #1269, and KERN-TRACE-LOCK-FSYNC is merged. If any is open, the lane waits; it does not reorder. Create the worktree at that integrated base: `git -C /home/connor/backbay/arc fetch -q https://github.com/bb-connor/arc.git main:refs/remotes/origin/main && git -C /home/connor/backbay/arc worktree add -b feat/m1-signing-wrapper ~/lanes/m1i1 origin/main`.
+- [ ] **Step 1: Preconditions.** `gh pr view <N> --repo bb-connor/arc --json state` reports `MERGED` for #1674, #1601, #1607, #1723, #1706, #1709, the fwdcompat receipt change, #1675, #1682, #1678, #1701 and #1269, and KERN-TRACE-LOCK-FSYNC is merged. If any is open, the lane waits; it does not reorder. Create the worktree at that integrated base: `git -C /home/connor/backbay/arc fetch -q https://github.com/bb-connor/arc.git main:refs/remotes/origin/main && git -C /home/connor/backbay/arc worktree add -b feat/m1-signing-wrapper ~/lanes/m1i1 origin/main`.
 - [ ] **Step 2: Re-run the inventory greps at the integrated base** from the inventory's Method section plus:
 ```bash
 git grep -n -E "\.sign\(|\.sign_bytes(_with_identity|_for_identity)?\(|sign_canonical|sign_shared_canonical|verify_canonical|verify_shared_canonical|\.verify(_strict)?\(" -- crates sdks/lambda ':!**/tests/**' ':!*_tests.rs' ':!**/tests.rs' ':!**/benches/**'
@@ -509,7 +509,7 @@ Fixtures whose bytes change: every set in Task 11. Shared with in-flight work:
 - `tests/bindings/fixtures/dpop-authority-v1.json`: owned by the DPoP lane; #1489 is merged, so no conflict, bytes only.
 - M1 item 3 lands in two parts. #1706 adds the anchored-root types and the root-authority artifacts with no verifier and no signed-byte change, and merges before this PR. The `root_anchor` member in the capability signing body merges after this PR. It rebases on this PR and regenerates capability fixtures through `cs cargo xtask gen signed-fixtures`.
 
-Merge order (precondition for this PR): #1674, #1601, #1607, #1709 and fwdcompat receipts; the K-stack in Root-2's order, T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, then KERN-TRACE-LOCK-FSYNC; then this PR. Anchored-root capability changes (M1 item 3) and M1 item 2 follow this PR. The census and every signed fixture are refreshed at the integrated base that contains all predecessors.
+Merge order (precondition for this PR): #1674, #1601, #1607, the wedge PRs #1723, #1706 and #1709 in that order (#1713 follows #1709), and fwdcompat receipts; the K-stack in Root-2's order, T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, then KERN-TRACE-LOCK-FSYNC; then this PR. Anchored-root capability changes (M1 item 3) and M1 item 2 follow this PR. The census and every signed fixture are refreshed at the integrated base that contains all predecessors.
 
 ## Verification
 
