@@ -564,12 +564,8 @@ pub fn verify_capability_full_with_evidence(
     Ok(verified)
 }
 
-#[path = "capability_verify/anchored.rs"]
-mod anchored;
 #[path = "capability_verify/lineage.rs"]
 mod lineage;
-
-pub use anchored::{AnchoredRootError, AnchoredTrustRoot, VerifiedAnchoredRoot};
 
 fn validate_peer_capabilities(peer: &CapabilityNegotiation) -> Result<(), CapabilityError> {
     peer.validate().map_err(|error| {

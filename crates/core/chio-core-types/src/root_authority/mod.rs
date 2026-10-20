@@ -1,7 +1,7 @@
 //! Root-authority artifacts: the delegation context an exchange records for
 //! each anchored root, the provider-signed root policy, provider identity
-//! projections, identity-provider key snapshots, and the offline bindings
-//! between a root capability and that evidence.
+//! projections, identity-provider key snapshots, and offline consistency
+//! checks between a root capability and that evidence.
 //!
 //! Decoding is strict: unknown members, out-of-range values and every
 //! per-kind presence rule of the `root_authority` wire schemas reject at
@@ -9,8 +9,8 @@
 
 use core::fmt;
 
-pub mod binding;
 pub mod claims;
+pub mod consistency;
 pub mod delegation_context;
 pub mod idp_key_snapshot;
 pub mod jwk;
@@ -18,16 +18,18 @@ pub mod provider_identity;
 pub mod root_policy;
 pub mod wire;
 
-pub use binding::{check_root_binding, RootBindingError, RootBindingInput};
 pub use claims::{
     ClaimMode, ClaimSet, ClaimValue, MatchClaims, RecordedClaimModes, RecordedClaims,
     SaltedCommitment,
 };
+pub use consistency::{check_root_consistency, RootConsistencyError, RootConsistencyInput};
 pub use delegation_context::{
     DelegationAnchor, DelegationContext, DelegationExchange, HolderClass,
     CHIO_DELEGATION_CONTEXT_SCHEMA,
 };
-pub use idp_key_snapshot::{IdpKeySnapshot, KeySnapshotSource, CHIO_IDP_KEY_SNAPSHOT_SCHEMA};
+pub use idp_key_snapshot::{
+    IdpKeySnapshot, IdpKeySnapshotSignatureError, KeySnapshotSource, CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+};
 pub use jwk::{Jwk, JwkCurve, JwkKeyType, JwkUse, JwsAlgorithm};
 pub use provider_identity::{
     EnterpriseProviderIdentity, InlineJwks, ProviderRecordKind, SubjectMapping,

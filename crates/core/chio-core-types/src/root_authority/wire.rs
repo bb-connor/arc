@@ -5,6 +5,8 @@ use core::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::capability::attenuation::scope_hash;
+use crate::capability::scope::ChioScope;
 use crate::crypto::{PublicKey, Signature};
 use crate::hashing::{Hash, Sha256State};
 
@@ -234,6 +236,15 @@ impl Sha256Digest {
         state.update(domain);
         state.update(body);
         Self::from_hash(state.finalize())
+    }
+
+    /// SHA-256 of the canonical scope, as [`scope_hash`] computes it.
+    pub fn of_scope(scope: &ChioScope) -> crate::Result<Self> {
+        let hex_digest = scope_hash(scope)?;
+        let mut bytes = [0; 32];
+        hex::decode_to_slice(hex_digest, &mut bytes)
+            .map_err(|error| crate::Error::InvalidHex(error.to_string()))?;
+        Ok(Self(bytes))
     }
 
     /// Parse the `sha256:<64 lowercase hex>` encoding.

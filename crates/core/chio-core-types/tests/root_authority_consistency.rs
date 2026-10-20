@@ -1,6 +1,6 @@
-//! Root policy load rules and the bindings between an anchored root, its
-//! delegation context and the loaded root policy. Every refusal is pinned to
-//! its exact error.
+//! Root policy load rules, key snapshot signatures and the consistency of an
+//! anchored root with its delegation context and the loaded root policy.
+//! Every refusal is pinned to its exact error.
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use chio_core_types::capability::anchor::{AnchorKind, RootAnchor};
@@ -9,8 +9,9 @@ use chio_core_types::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core_types::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core_types::crypto::{Keypair, PublicKey};
 use chio_core_types::root_authority::{
-    check_root_binding, DelegationContext, HolderClass, LoadedRootPolicy, RootAuthorityShapeError,
-    RootBindingError, RootBindingInput, RootPolicy, RootPolicyLoadError, Sha256Digest,
+    check_root_consistency, DelegationContext, HolderClass, IdpKeySnapshot,
+    IdpKeySnapshotSignatureError, LoadedRootPolicy, RootAuthorityShapeError, RootConsistencyError,
+    RootConsistencyInput, RootPolicy, RootPolicyLoadError, Sha256Digest,
 };
 use chio_core_types::{canonical_json_bytes, sha256};
 use serde_json::{json, Value};
@@ -208,8 +209,8 @@ impl Fixture {
         }
     }
 
-    fn check(&self) -> Result<(), RootBindingError> {
-        check_root_binding(RootBindingInput {
+    fn check(&self) -> Result<(), RootConsistencyError> {
+        check_root_consistency(RootConsistencyInput {
             root: &self.root,
             anchor: &self.anchor,
             context: &self.context,
@@ -219,10 +220,10 @@ impl Fixture {
     }
 }
 
-fn binding_error(
+fn consistency_error(
     edit_policy: impl FnOnce(&mut Value),
     edit_context: impl FnOnce(&mut Value),
-) -> RootBindingError {
+) -> RootConsistencyError {
     Fixture::with(
         edit_policy,
         edit_context,
@@ -405,7 +406,7 @@ fn policy_load_revalidates_a_policy_built_in_code() {
 }
 
 #[test]
-fn root_binds_to_its_anchor_context_and_policy() {
+fn root_agrees_with_its_anchor_context_and_policy() {
     assert_eq!(Fixture::new().check(), Ok(()));
 }
 
@@ -440,7 +441,7 @@ fn delegated_token_is_not_a_root() {
         )
         .unwrap(),
     );
-    assert_eq!(fixture.check(), Err(RootBindingError::NotARoot));
+    assert_eq!(fixture.check(), Err(RootConsistencyError::NotARoot));
 }
 
 #[test]
@@ -449,7 +450,7 @@ fn anchor_naming_another_policy_denies() {
     fixture.anchor.root_policy_digest = Sha256Digest::from_bytes([7; 32]);
     assert_eq!(
         fixture.check(),
-        Err(RootBindingError::RootPolicyDigestMismatch)
+        Err(RootConsistencyError::RootPolicyDigestMismatch)
     );
 }
 
@@ -459,7 +460,7 @@ fn anchor_naming_another_context_denies() {
     fixture.anchor.context_digest = Sha256Digest::from_bytes([7; 32]);
     assert_eq!(
         fixture.check(),
-        Err(RootBindingError::ContextDigestMismatch)
+        Err(RootConsistencyError::ContextDigestMismatch)
     );
 }
 
@@ -467,32 +468,41 @@ fn anchor_naming_another_context_denies() {
 fn anchor_kind_must_equal_the_context_kind() {
     let mut fixture = Fixture::new();
     fixture.anchor.kind = AnchorKind::OidcJwt;
-    assert_eq!(fixture.check(), Err(RootBindingError::AnchorKindMismatch));
+    assert_eq!(
+        fixture.check(),
+        Err(RootConsistencyError::AnchorKindMismatch)
+    );
 }
 
 #[test]
 fn assertion_exp_must_equal_the_token_exp() {
     let mut fixture = Fixture::new();
     fixture.anchor.assertion_exp += 1;
-    assert_eq!(fixture.check(), Err(RootBindingError::AssertionExpMismatch));
+    assert_eq!(
+        fixture.check(),
+        Err(RootConsistencyError::AssertionExpMismatch)
+    );
 }
 
 #[test]
 fn anchored_at_must_equal_the_exchange_time() {
     let mut fixture = Fixture::new();
     fixture.anchor.anchored_at += 1;
-    assert_eq!(fixture.check(), Err(RootBindingError::AnchoredAtMismatch));
+    assert_eq!(
+        fixture.check(),
+        Err(RootConsistencyError::AnchoredAtMismatch)
+    );
 }
 
 #[test]
 fn root_expiring_after_the_assertion_denies() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| context["anchor"]["token_exp"] = json!(EXPIRES_AT - 1),
     );
     assert_eq!(
         error,
-        RootBindingError::ExpiresAfterAssertion {
+        RootConsistencyError::ExpiresAfterAssertion {
             expires_at: EXPIRES_AT,
             assertion_exp: EXPIRES_AT - 1
         }
@@ -501,11 +511,11 @@ fn root_expiring_after_the_assertion_denies() {
 
 #[test]
 fn root_issuer_must_equal_the_context_exchange_key() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| context["exchange"]["exchange_key"] = json!(other_keypair().public_key()),
     );
-    assert_eq!(error, RootBindingError::ExchangeKeyMismatch);
+    assert_eq!(error, RootConsistencyError::ExchangeKeyMismatch);
 }
 
 #[test]
@@ -518,47 +528,47 @@ fn root_signed_by_an_unlisted_exchange_key_denies() {
     )
     .check()
     .unwrap_err();
-    assert_eq!(error, RootBindingError::ExchangeKeyNotListed);
+    assert_eq!(error, RootConsistencyError::ExchangeKeyNotListed);
 }
 
 #[test]
 fn root_scope_must_hash_to_the_effective_root_scope_hash() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| {
             context["effective_root_scope_hash"] = json!(format!("sha256:{}", "00".repeat(32)));
         },
     );
-    assert_eq!(error, RootBindingError::ScopeHashMismatch);
+    assert_eq!(error, RootConsistencyError::ScopeHashMismatch);
 }
 
 #[test]
 fn context_naming_an_unknown_rule_denies() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| context["root_policy_rule_id"] = json!("missing-rule"),
     );
-    assert_eq!(error, RootBindingError::UnknownRule);
+    assert_eq!(error, RootConsistencyError::UnknownRule);
 }
 
 #[test]
 fn rule_kind_must_equal_the_anchor_kind() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| context["anchor"]["kind"] = json!("oidc_jwt"),
     );
-    assert_eq!(error, RootBindingError::RuleKindMismatch);
+    assert_eq!(error, RootConsistencyError::RuleKindMismatch);
 }
 
 #[test]
 fn holder_class_outside_the_rule_denies() {
-    let error = binding_error(
+    let error = consistency_error(
         |policy| policy["rules"][0]["holder_classes"] = json!(["caller"]),
         |_| {},
     );
     assert_eq!(
         error,
-        RootBindingError::HolderClassNotAllowed {
+        RootConsistencyError::HolderClassNotAllowed {
             holder: HolderClass::EdgeSession
         }
     );
@@ -566,11 +576,11 @@ fn holder_class_outside_the_rule_denies() {
 
 #[test]
 fn caller_root_without_a_sender_key_denies() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| context["exchange"]["holder"] = json!("caller"),
     );
-    assert_eq!(error, RootBindingError::SenderKeyMissing);
+    assert_eq!(error, RootConsistencyError::SenderKeyMissing);
 }
 
 #[test]
@@ -582,7 +592,10 @@ fn caller_root_subject_must_be_the_sender_key() {
         vec![grant("search")],
     );
     fixture.sender_key = Some(policy_keypair().public_key());
-    assert_eq!(fixture.check(), Err(RootBindingError::SubjectNotSenderKey));
+    assert_eq!(
+        fixture.check(),
+        Err(RootConsistencyError::SubjectNotSenderKey)
+    );
 }
 
 #[test]
@@ -591,7 +604,7 @@ fn edge_session_root_presented_with_a_sender_key_denies() {
     fixture.sender_key = Some(other_keypair().public_key());
     assert_eq!(
         fixture.check(),
-        Err(RootBindingError::SenderKeyOnEdgeSession)
+        Err(RootConsistencyError::SenderKeyOnEdgeSession)
     );
 }
 
@@ -602,19 +615,19 @@ fn edge_session_root_with_a_proof_required_grant_denies() {
     let error = Fixture::with(|_| {}, |_| {}, &exchange_keypair(), vec![proof_required])
         .check()
         .unwrap_err();
-    assert_eq!(error, RootBindingError::ProofRequiredGrantOnEdgeSession);
+    assert_eq!(error, RootConsistencyError::ProofRequiredGrantOnEdgeSession);
 }
 
 #[test]
 fn context_provider_record_must_equal_the_rule() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| {
             context["anchor"]["provider_identity_digest"] =
                 json!(format!("sha256:{}", "00".repeat(32)));
         },
     );
-    assert_eq!(error, RootBindingError::ProviderMismatch);
+    assert_eq!(error, RootConsistencyError::ProviderMismatch);
 }
 
 #[test]
@@ -627,18 +640,18 @@ fn root_scope_beyond_the_ceiling_denies() {
     )
     .check()
     .unwrap_err();
-    assert_eq!(error, RootBindingError::ScopeExceedsCeiling);
+    assert_eq!(error, RootConsistencyError::ScopeExceedsCeiling);
 }
 
 #[test]
 fn root_lifetime_beyond_the_rule_ttl_denies() {
-    let error = binding_error(
+    let error = consistency_error(
         |policy| policy["rules"][0]["capability_ttl_secs"] = json!(60),
         |_| {},
     );
     assert_eq!(
         error,
-        RootBindingError::LifetimeExceedsRule {
+        RootConsistencyError::LifetimeExceedsRule {
             lifetime: EXPIRES_AT - ISSUED_AT,
             capability_ttl: 60
         }
@@ -647,13 +660,13 @@ fn root_lifetime_beyond_the_rule_ttl_denies() {
 
 #[test]
 fn assertion_lifetime_beyond_the_rule_bound_denies() {
-    let error = binding_error(
+    let error = consistency_error(
         |policy| policy["rules"][0]["max_assertion_lifetime_secs"] = json!(100),
         |_| {},
     );
     assert_eq!(
         error,
-        RootBindingError::AssertionLifetimeExceedsRule {
+        RootConsistencyError::AssertionLifetimeExceedsRule {
             lifetime: 300,
             max: 100
         }
@@ -662,15 +675,15 @@ fn assertion_lifetime_beyond_the_rule_bound_denies() {
 
 #[test]
 fn recorded_claims_must_match_the_rule_modes() {
-    let unlisted = binding_error(
+    let unlisted = consistency_error(
         |_| {},
         |context| context["anchor"]["claims"]["scope"] = json!(["crm.read"]),
     );
     assert_eq!(
         unlisted,
-        RootBindingError::RecordedClaimsMismatch { claim: "scope" }
+        RootConsistencyError::RecordedClaimsMismatch { claim: "scope" }
     );
-    let committed = binding_error(
+    let committed = consistency_error(
         |_| {},
         |context| {
             context["anchor"]["claims"]["client_id"] = json!({
@@ -681,20 +694,57 @@ fn recorded_claims_must_match_the_rule_modes() {
     );
     assert_eq!(
         committed,
-        RootBindingError::RecordedClaimsMismatch { claim: "client_id" }
+        RootConsistencyError::RecordedClaimsMismatch { claim: "client_id" }
     );
-    let missing = binding_error(|_| {}, |context| context["anchor"]["claims"] = json!({}));
+    let missing = consistency_error(|_| {}, |context| context["anchor"]["claims"] = json!({}));
     assert_eq!(
         missing,
-        RootBindingError::RecordedClaimsMismatch { claim: "client_id" }
+        RootConsistencyError::RecordedClaimsMismatch { claim: "client_id" }
     );
 }
 
 #[test]
 fn artifact_retention_must_match_the_rule() {
-    let error = binding_error(
+    let error = consistency_error(
         |_| {},
         |context| context["anchor"]["artifact_retained"] = json!(true),
     );
-    assert_eq!(error, RootBindingError::ArtifactRetentionMismatch);
+    assert_eq!(error, RootConsistencyError::ArtifactRetentionMismatch);
+}
+
+fn snapshot_signed_by(exchange_key: &PublicKey, signer: &Keypair) -> IdpKeySnapshot {
+    let mut snapshot: IdpKeySnapshot = serde_json::from_value(json!({
+        "schema": "chio.idp-key-snapshot.v1",
+        "issuer": "https://acme.okta.com",
+        "source": "https://acme.okta.com/oauth2/v1/keys",
+        "keys": [{ "kid": "k-okta-1", "kty": "OKP", "crv": "Ed25519", "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo" }],
+        "observed_at": NOW,
+        "exchange_key": exchange_key,
+        "signature": "00".repeat(64)
+    }))
+    .unwrap();
+    snapshot.signature = signer.sign_canonical(&snapshot.signing_body()).unwrap().0;
+    snapshot
+}
+
+#[test]
+fn key_snapshot_verifies_under_the_pinned_exchange_key() {
+    let pinned = exchange_keypair().public_key();
+    let snapshot = snapshot_signed_by(&pinned, &exchange_keypair());
+    assert_eq!(snapshot.verify_signature(&pinned), Ok(()));
+}
+
+#[test]
+fn key_snapshot_signed_by_a_key_that_is_not_pinned_is_refused() {
+    let pinned = exchange_keypair().public_key();
+    let self_asserted = snapshot_signed_by(&other_keypair().public_key(), &other_keypair());
+    assert_eq!(
+        self_asserted.verify_signature(&pinned),
+        Err(IdpKeySnapshotSignatureError::ExchangeKeyNotPinned)
+    );
+    let forged = snapshot_signed_by(&pinned, &other_keypair());
+    assert_eq!(
+        forged.verify_signature(&pinned),
+        Err(IdpKeySnapshotSignatureError::InvalidSignature)
+    );
 }
