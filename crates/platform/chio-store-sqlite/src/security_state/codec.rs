@@ -28,7 +28,13 @@ pub(super) fn schema_version_error(error: crate::SchemaVersionError) -> PortErro
         ),
         crate::SchemaVersionError::ForeignDatabase { .. }
         | crate::SchemaVersionError::MismatchedStore { .. }
-        | crate::SchemaVersionError::FutureSchema { .. } => PortError::integrity_failure(),
+        | crate::SchemaVersionError::FutureSchema { .. }
+        | crate::SchemaVersionError::InvalidCreationPlan
+        | crate::SchemaVersionError::MissingSchema { .. }
+        | crate::SchemaVersionError::CreationNotAllowed
+        | crate::SchemaVersionError::MalformedMetadata
+        | crate::SchemaVersionError::UnexpectedNamespaces
+        | crate::SchemaVersionError::CatalogMismatch => PortError::integrity_failure(),
     }
 }
 

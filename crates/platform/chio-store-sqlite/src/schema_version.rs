@@ -24,6 +24,9 @@
 
 use rusqlite::{params, Connection, OptionalExtension};
 
+mod creation;
+pub use creation::SchemaTransaction;
+
 /// ASCII "CHIO" as a big-endian `i32`, stamped into every Chio operator store.
 pub const CHIO_SQLITE_APPLICATION_ID: i32 = 0x4348_494f;
 
@@ -38,6 +41,18 @@ const SCHEMA_VERSION_TABLE: &str = "chio_store_schema_versions";
 pub enum SchemaVersionError {
     #[error("sqlite error: {0}")]
     Sqlite(#[from] rusqlite::Error),
+    #[error("schema creation requires distinct nonempty namespace keys")]
+    InvalidCreationPlan,
+    #[error("schema namespace {store_key} is missing")]
+    MissingSchema { store_key: String },
+    #[error("schema creation is not allowed for this namespace")]
+    CreationNotAllowed,
+    #[error("schema metadata differs from its canonical definition")]
+    MalformedMetadata,
+    #[error("schema metadata contains undeclared namespaces")]
+    UnexpectedNamespaces,
+    #[error("schema catalog differs from its canonical definition")]
+    CatalogMismatch,
     #[error("database application_id {found:#x} is not a Chio store (expected {expected:#x})")]
     ForeignDatabase { found: i32, expected: i32 },
     #[error(
@@ -80,13 +95,28 @@ pub fn check_current_schema(
     anchor_tables: &[&str],
 ) -> Result<SchemaState, SchemaVersionError> {
     let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-    if app_id == 0 && user_table_count(conn)? != 0 {
+    let catalog_empty: bool = conn.query_row(
+        "SELECT NOT EXISTS(SELECT 1 FROM sqlite_schema)",
+        [],
+        |row| row.get(0),
+    )?;
+    if app_id == 0 && catalog_empty {
+        return Ok(SchemaState::Unstamped);
+    }
+    if app_id != CHIO_SQLITE_APPLICATION_ID {
         return Err(SchemaVersionError::ForeignDatabase {
             found: app_id,
             expected: CHIO_SQLITE_APPLICATION_ID,
         });
     }
-    check_store_identity(conn, anchor_tables)?;
+    if !database_belongs_to_store(conn, anchor_tables)? {
+        return Err(SchemaVersionError::MismatchedStore {
+            expected_anchors: anchor_tables
+                .iter()
+                .map(|table| table.to_string())
+                .collect(),
+        });
+    }
     match read_store_schema_version(conn, store_key)? {
         None => Ok(SchemaState::Unstamped),
         Some(found) if found == current_version => Ok(SchemaState::Current),
@@ -240,6 +270,12 @@ pub fn stamp_schema_version(
     store_key: &str,
     version: i32,
 ) -> Result<(), SchemaVersionError> {
+    if version != 1 {
+        return Err(SchemaVersionError::StaleSchema {
+            found: version,
+            current: 1,
+        });
+    }
     conn.execute_batch(&format!(
         "CREATE TABLE IF NOT EXISTS {SCHEMA_VERSION_TABLE} (
              store_key TEXT PRIMARY KEY,
@@ -247,10 +283,7 @@ pub fn stamp_schema_version(
          );"
     ))?;
     conn.execute(
-        &format!(
-            "INSERT INTO {SCHEMA_VERSION_TABLE} (store_key, version) VALUES (?1, ?2) \
-             ON CONFLICT(store_key) DO UPDATE SET version = excluded.version"
-        ),
+        &format!("INSERT INTO {SCHEMA_VERSION_TABLE} (store_key, version) VALUES (?1, ?2)"),
         params![store_key, version],
     )?;
     Ok(())
@@ -263,6 +296,75 @@ mod tests {
 
     const SUPPORTED: i32 = 0;
     const STORE_KEY: &str = "receipt";
+
+    #[test]
+    fn creation_stamp_cannot_overwrite_an_existing_namespace(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        stamp_schema_version(&conn, STORE_KEY, 1)?;
+        let result = stamp_schema_version(&conn, STORE_KEY, 1);
+        assert!(matches!(
+            result,
+            Err(SchemaVersionError::Sqlite(rusqlite::Error::SqliteFailure(error, _)))
+                if error.code == rusqlite::ErrorCode::ConstraintViolation
+        ));
+        assert_eq!(read_store_schema_version(&conn, STORE_KEY)?, Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn creation_stamp_refuses_non_v1() -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        let result = stamp_schema_version(&conn, STORE_KEY, 2);
+        assert!(matches!(
+            result,
+            Err(SchemaVersionError::StaleSchema {
+                found: 2,
+                current: 1
+            })
+        ));
+        let objects: i64 =
+            conn.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
+        assert_eq!(objects, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn inspection_preserves_an_empty_database() -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        assert_eq!(
+            check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"])?,
+            SchemaState::Unstamped
+        );
+        let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+        assert_eq!(app_id, 0);
+        let objects: i64 =
+            conn.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
+        assert_eq!(objects, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn inspection_refuses_a_view_only_catalog() -> Result<(), Box<dyn std::error::Error>> {
+        let conn = Connection::open_in_memory()?;
+        conn.execute_batch("CREATE VIEW foreign_view AS SELECT 7 AS value;")?;
+        let result = check_current_schema(&conn, STORE_KEY, 1, &["chio_tool_receipts"]);
+        assert!(matches!(
+            result,
+            Err(SchemaVersionError::ForeignDatabase {
+                found: 0,
+                expected: CHIO_SQLITE_APPLICATION_ID
+            })
+        ));
+        let app_id: i32 = conn.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+        assert_eq!(app_id, 0);
+        let value: i64 = conn.query_row("SELECT value FROM foreign_view", [], |row| row.get(0))?;
+        assert_eq!(value, 7);
+        let objects: i64 =
+            conn.query_row("SELECT COUNT(*) FROM sqlite_schema", [], |row| row.get(0))?;
+        assert_eq!(objects, 1);
+        Ok(())
+    }
 
     #[test]
     fn fresh_empty_db_adopts_v0_and_stamps_application_id() -> Result<(), Box<dyn std::error::Error>>
