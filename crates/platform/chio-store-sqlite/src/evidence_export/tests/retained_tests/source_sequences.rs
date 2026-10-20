@@ -1,6 +1,33 @@
 //! Unsigned archive cursor projections must remain unique and complete.
 use super::*;
 
+fn corrupt_archive_projection(
+    connection: &Connection,
+    mutation: impl FnOnce() -> rusqlite::Result<()>,
+) -> rusqlite::Result<()> {
+    let tx =
+        rusqlite::Transaction::new_unchecked(connection, rusqlite::TransactionBehavior::Immediate)?;
+    let mut guards = Vec::new();
+    for name in [
+        "chio_tool_receipts_reject_update",
+        "chio_child_receipts_reject_update",
+        "claim_receipt_log_entries_reject_update",
+    ] {
+        let sql: String = tx.query_row(
+            "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
+            [name],
+            |row| row.get(0),
+        )?;
+        guards.push(sql);
+        tx.execute_batch(&format!("DROP TRIGGER {name}"))?;
+    }
+    mutation()?;
+    for sql in guards {
+        tx.execute_batch(&sql)?;
+    }
+    tx.commit()
+}
+
 #[test]
 fn p0p1_retained_filter_rejects_extra_unconstrained_source_or_lineage_rows() {
     for lineage in [false, true] {
@@ -39,12 +66,13 @@ fn p0p1_retained_filter_rejects_extra_unconstrained_source_or_lineage_rows() {
 fn p0p1_retained_pages_reject_archive_source_sequence_collision() {
     let (_directory, store, archive) = retained_fixture();
     let connection = Connection::open(&archive).unwrap();
-    connection
-        .execute_batch(
+    corrupt_archive_projection(&connection, || {
+        connection.execute_batch(
             "UPDATE chio_tool_receipts SET seq = 3 WHERE seq = 1;
          UPDATE claim_receipt_log_entries SET source_seq = 3 WHERE entry_seq = 1;",
         )
-        .unwrap();
+    })
+    .unwrap();
     let error = store
         .query_receipts(&ReceiptQuery {
             limit: 1,
@@ -59,15 +87,16 @@ fn p0p1_retained_pages_reject_duplicate_archive_sequences_without_schema_trust()
     let (_directory, store, archive) = retained_fixture();
     let connection = Connection::open(&archive).unwrap();
     // Payload authentication does not authenticate the archive DDL.
-    connection
-        .execute_batch(
+    corrupt_archive_projection(&connection, || {
+        connection.execute_batch(
             "CREATE TABLE unconstrained_receipts AS SELECT * FROM chio_tool_receipts;
          DROP TABLE chio_tool_receipts;
          ALTER TABLE unconstrained_receipts RENAME TO chio_tool_receipts;
          UPDATE chio_tool_receipts SET seq = 1;
          UPDATE claim_receipt_log_entries SET source_seq = 1 WHERE receipt_kind = 'tool_receipt';",
         )
-        .unwrap();
+    })
+    .unwrap();
     let error = store
         .query_receipts(&ReceiptQuery {
             limit: 1,
@@ -82,15 +111,15 @@ fn p0p1_retained_export_rejects_source_sequences_beyond_live_allocator() {
     for (table, entry) in [("chio_tool_receipts", 1), ("chio_child_receipts", 3)] {
         let (_directory, store, archive) = retained_fixture();
         let connection = Connection::open(&archive).unwrap();
-        connection
-            .execute(&format!("UPDATE {table} SET seq = 1000 WHERE seq = 1"), [])
-            .unwrap();
-        connection
-            .execute(
+        corrupt_archive_projection(&connection, || {
+            connection.execute(&format!("UPDATE {table} SET seq = 1000 WHERE seq = 1"), [])?;
+            connection.execute(
                 "UPDATE claim_receipt_log_entries SET source_seq = 1000 WHERE entry_seq = ?1",
                 [entry],
-            )
-            .unwrap();
+            )?;
+            Ok(())
+        })
+        .unwrap();
         let error = store
             .build_evidence_export_bundle(&EvidenceExportQuery::admin_all())
             .unwrap_err();
@@ -118,12 +147,13 @@ fn p0p1_retained_export_rejects_collision_at_native_page_boundary() {
             .unwrap();
     }
     let connection = Connection::open(&archive).unwrap();
-    connection
-        .execute_batch(
+    corrupt_archive_projection(&connection, || {
+        connection.execute_batch(
             "UPDATE chio_tool_receipts SET seq = 201 WHERE seq = 1;
          UPDATE claim_receipt_log_entries SET source_seq = 201 WHERE entry_seq = 1;",
         )
-        .unwrap();
+    })
+    .unwrap();
     let error = store
         .build_evidence_export_bundle(&EvidenceExportQuery::admin_all())
         .unwrap_err();

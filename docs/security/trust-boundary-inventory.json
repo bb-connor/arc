@@ -4495,17 +4495,6 @@
     },
     {
       "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs",
-      "owner": "backfill_provenance_lineage_tables",
-      "sha256": "45af9378bee1a5ca07e74b7f1cf0899b47a630540a7c4c8790349038df2fb4d5",
-      "tables": [
-        "chio_tool_receipts"
-      ],
-      "sql": "SELECT receipt_id FROM chio_tool_receipts ORDER BY timestamp ASC, seq ASC",
-      "principal": "receipt-integrity",
-      "contract": "Kernel/store-owned integrity, append, retention or provenance operation; remote point reads require authenticated AdminService and a sealed context."
-    },
-    {
-      "path": "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs",
       "owner": "ensure_receipt_lineage_statement_for_receipt_id_tx",
       "sha256": "64a0804960ba1dd8c0b9b9b6b5e62d1dec304e37aaf6901f1460057195122cc6",
       "tables": [
@@ -20381,7 +20370,6 @@
       "admission_operation_schema_sql::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/security_participant_state/schema.rs::sql",
       "initialize_admission_operation_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::admission_operation_schema_sql",
       "initialize_admission_operation_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_invariants",
-      "initialize_admission_operation_schema::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs::verify_admission_operation_invariants",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_claim/records.rs::verify_all",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/dpop_replay/records.rs::verify_all_records",
       "verify_admission_operation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/governed_approval_claim/records.rs::verify_all",
@@ -20824,7 +20812,6 @@
     ],
     "crates/platform/chio-store-sqlite/src/delegation_store/schema.rs": [
       "initialize_work_delegation_schema::shared-reader::crates/platform/chio-store-sqlite/src/delegation_store/schema.rs::verify_work_delegation_invariants",
-      "initialize_work_delegation_schema::shared-reader::crates/platform/chio-store-sqlite/src/delegation_store/schema.rs::verify_work_delegation_invariants",
       "verify_work_delegation_invariants::shared-reader::crates/platform/chio-store-sqlite/src/delegation_store.rs::read"
     ],
     "crates/platform/chio-store-sqlite/src/economic_state_cache/persistence.rs": [
@@ -21090,8 +21077,8 @@
       "table::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_projection.rs": [
-      "backfill_checkpoint_transparency_projections::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row",
-      "validate_adopted_claim_log_delta::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::trusted_retention_watermark"
+      "validate_adopted_claim_log_delta::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::trusted_retention_watermark",
+      "validate_checkpoint_transparency_projections::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::parse_persisted_checkpoint_row"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs": [
       "advance_verified_checkpoint_chain_frontier::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/checkpoint_validate.rs::load_checkpoint_chain_leaf_hashes",
@@ -21139,8 +21126,6 @@
       "reconcile_receipt_cost_projection::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs": [
-      "backfill_provenance_lineage_tables::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/lineage.rs::ensure_receipt_lineage_statement_for_receipt_id_tx",
-      "backfill_provenance_lineage_tables::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_child_receipt",
       "ensure_receipt_lineage_statement_for_receipt_id_tx::shared-reader::crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs::decode_verified_chio_receipt"
     ],
     "crates/platform/chio-store-sqlite/src/receipt_store/support/receipt_verify.rs": [
@@ -21650,24 +21635,28 @@
       "validate_stored_session_throttle_command::shared-reader::crates/platform/chio-store-sqlite/src/security_state/session_throttle.rs::validate_session_throttle_command_common"
     ],
     "crates/platform/chio-store-sqlite/src/serving_owner.rs": [
-      "initialize_offline_authority_schemas::shared-reader::crates/platform/chio-store-sqlite/src/frost_store/mod.rs::initialize_frost_schema",
+      "initialize_serving_components::shared-reader::crates/platform/chio-store-sqlite/src/frost_store/mod.rs::initialize_frost_schema",
+      "initialize_serving_components::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::initialize_work_graph_schema",
+      "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::validate_serving_schema",
       "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_path_available_for_new_identity",
       "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::ensure",
       "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::inspect",
-      "open_serving_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::initialize_work_graph_schema",
-      "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::initialize_offline_authority_schemas",
-      "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::initialize_offline_authority_schemas",
+      "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::initialize_serving_components",
+      "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::validate_serving_catalog",
+      "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::validate_serving_schema",
+      "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_path_available_for_new_identity",
       "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::ensure",
       "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::ensure",
       "provision::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::inspect",
-      "provision::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::initialize_work_graph_schema",
-      "provision::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::initialize_work_graph_schema",
+      "validate_serving_catalog::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::initialize_serving_components",
+      "validate_serving_schema::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::initialize_serving_components",
+      "validate_serving_schema::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::validate_serving_catalog",
       "verify_authority_store_invariants::shared-reader::crates/platform/chio-store-sqlite/src/frost_store/mod.rs::verify_frost_store_invariants",
       "verify_authority_store_invariants::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::verify_work_graph_invariants",
       "verify_path_available_for_new_identity::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::inspect"
@@ -21679,6 +21668,7 @@
       "remove_for_relocation::original-json-reader::UntrustedJsonText"
     ],
     "crates/platform/chio-store-sqlite/src/serving_owner/relocation.rs": [
+      "export_for_relocation_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::validate_serving_schema",
       "export_for_relocation_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "export_for_relocation_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner.rs::verify_authority_store_invariants",
       "export_for_relocation_with_clock::shared-reader::crates/platform/chio-store-sqlite/src/serving_owner/path_identity.rs::inspect",
@@ -21731,7 +21721,6 @@
     "crates/platform/chio-store-sqlite/src/work_graph_store.rs": [
       "decode::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::decode_bundle",
       "decode_bundle::original-json-reader::UntrustedJsonText",
-      "initialize_work_graph_schema::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::verify_work_graph_invariants",
       "initialize_work_graph_schema::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::verify_work_graph_invariants",
       "verify_work_graph_invariants::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::decode_bundle",
       "version::shared-reader::crates/platform/chio-store-sqlite/src/work_graph_store.rs::decode_bundle"

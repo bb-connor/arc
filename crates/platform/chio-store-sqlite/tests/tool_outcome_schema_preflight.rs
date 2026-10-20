@@ -19,11 +19,14 @@ fn provision_refuses_noncurrent_outcome_stamp_before_writes() -> Result<(), Box<
     SqliteAuthorityStore::provision(&database, &locks)?;
     {
         let connection = Connection::open(&database)?;
+        connection.execute_batch("PRAGMA ignore_check_constraints = ON")?;
         connection.execute(
             "UPDATE chio_store_schema_versions SET version = 4 WHERE store_key = 'tool_outcome'",
             [],
         )?;
-        connection.execute_batch("PRAGMA wal_checkpoint(TRUNCATE);")?;
+        connection.execute_batch(
+            "PRAGMA ignore_check_constraints = OFF; PRAGMA wal_checkpoint(TRUNCATE);",
+        )?;
     }
     let image = fs::read(&database)?;
     let error = SqliteAuthorityStore::provision(&database, &locks)

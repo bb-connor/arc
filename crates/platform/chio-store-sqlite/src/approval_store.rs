@@ -979,15 +979,11 @@ mod tests {
     use chio_kernel::ThresholdApprovalContextResolver;
     use chio_kernel::{ThresholdApprovalCollector, ThresholdApprovalCollectorState};
     use std::sync::Arc;
-    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn explicit_pair_creation_supports_a_file_uri_with_query() {
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time before epoch")
-            .as_nanos();
-        let base = std::env::temp_dir().join(format!("chio-approval-uri-{nonce}"));
+        let directory = tempfile::tempdir().expect("temporary approval directory");
+        let base = directory.path();
         let db = base.join("nested").join("receipts.db");
         let parent = db.parent().expect("db path has a parent");
         assert!(
@@ -1012,8 +1008,6 @@ mod tests {
             parent.exists(),
             "the real parent directory must be created before SQLite opens the URI"
         );
-
-        let _ = fs::remove_dir_all(&base);
     }
 
     fn sample_request(id: &str, hash: &str) -> ApprovalRequest {
