@@ -41,8 +41,17 @@ pub(crate) fn peer(node_id: &str, keypair: &Keypair, scopes: &[&str]) -> String 
     )
 }
 
+pub(crate) const SELF_NODE: &str = "https://node-a.example:9101";
+
 pub(crate) fn config(body: &str) -> String {
-    format!("deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:9101\"\n{body}")
+    let cluster = if body.contains("[[cluster.peers]]") {
+        format!(
+            "[cluster]\nnode_id = \"{SELF_NODE}\"\nnode_key_file = \"/nonexistent/node-a.seed\"\n"
+        )
+    } else {
+        String::new()
+    };
+    format!("deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:9101\"\n{cluster}{body}")
 }
 
 fn reader() -> String {
@@ -233,6 +242,17 @@ fn peer_shape_refusals_name_their_rule() {
         refusal(&with_peer(peer(node, &keypair, &[]))),
         TrustAccessError::PeerNoScopes(node.to_string())
     );
+    assert_eq!(
+        refusal(&with_peer(peer(
+            node,
+            &keypair,
+            &["cluster:replicate", "cluster:replicate"]
+        ))),
+        TrustAccessError::DuplicatePeerScope {
+            node_id: node.to_string(),
+            scope: Scope::ClusterReplicate,
+        }
+    );
     let twice = format!(
         "{}{}",
         peer(node, &keypair, &["cluster:replicate"]),
@@ -362,55 +382,95 @@ fn tenant_credential_limited_to_its_tenant() {
     );
 }
 
-#[test]
-fn peer_signature_binds_node_path_query_and_time() {
-    let keypair = Keypair::generate();
-    let node = "https://node-b.example:9101";
-    let access = TrustAccessConfig::from_toml_str(&config(&format!(
+fn peer_access(node: &str, keypair: &Keypair, scopes: &[&str]) -> TrustAccessConfig {
+    TrustAccessConfig::from_toml_str(&config(&format!(
         "{}{}",
         reader(),
-        peer(node, &keypair, &["cluster:replicate"])
+        peer(node, keypair, scopes)
     )))
-    .test_unwrap();
+    .test_unwrap()
+}
+
+const ISSUED_AT: i64 = 1_792_234_800;
+const NODE_B: &str = "https://node-b.example:9101";
+
+#[test]
+fn peer_signature_binds_node_path_query_body_and_time() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/revocations/delta",
         query: "afterSeq=7",
+        body: b"",
     };
-    let issued_at = 1_792_234_800;
-    let headers = signed_peer_headers(&keypair, node, &target, issued_at, Some(3));
+    let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, Some(3));
     let peer = access
         .peers
-        .verify(&headers, &target, issued_at, Scope::ClusterReplicate)
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
         .test_unwrap();
-    assert_eq!(peer.node_id, node);
+    assert_eq!(peer.node_id, NODE_B);
     assert_eq!(peer.term, Some(3));
-    let moved = PeerRequestTarget {
-        path: "/v1/internal/budgets/delta",
-        ..target
-    };
+    for (changed, expected) in [
+        (
+            PeerRequestTarget {
+                path: "/v1/internal/budgets/delta",
+                ..target
+            },
+            PeerAuthError::BadSignature,
+        ),
+        (
+            PeerRequestTarget {
+                query: "afterSeq=0",
+                ..target
+            },
+            PeerAuthError::BadSignature,
+        ),
+        (
+            PeerRequestTarget {
+                method: "POST",
+                ..target
+            },
+            PeerAuthError::BadSignature,
+        ),
+        (
+            PeerRequestTarget {
+                body: b"{}",
+                ..target
+            },
+            PeerAuthError::BodyMismatch,
+        ),
+    ] {
+        assert_eq!(
+            access
+                .peers
+                .verify(
+                    &headers,
+                    &changed,
+                    ISSUED_AT,
+                    Scope::ClusterReplicate,
+                    &PeerNonceCache::default(),
+                )
+                .test_unwrap_err(),
+            expected
+        );
+    }
     assert_eq!(
         access
             .peers
-            .verify(&headers, &moved, issued_at, Scope::ClusterReplicate)
-            .test_unwrap_err(),
-        PeerAuthError::BadSignature
-    );
-    let other_cursor = PeerRequestTarget {
-        query: "afterSeq=0",
-        ..target
-    };
-    assert_eq!(
-        access
-            .peers
-            .verify(&headers, &other_cursor, issued_at, Scope::ClusterReplicate)
-            .test_unwrap_err(),
-        PeerAuthError::BadSignature
-    );
-    assert_eq!(
-        access
-            .peers
-            .verify(&headers, &target, issued_at + 61, Scope::ClusterReplicate)
+            .verify(
+                &headers,
+                &target,
+                ISSUED_AT + 61,
+                Scope::ClusterReplicate,
+                &PeerNonceCache::default(),
+            )
             .test_unwrap_err(),
         PeerAuthError::Stale
     );
@@ -420,8 +480,9 @@ fn peer_signature_binds_node_path_query_and_time() {
             .verify(
                 &headers,
                 &target,
-                issued_at,
-                Scope::ClusterOpeningsReplicate
+                ISSUED_AT,
+                Scope::ClusterOpeningsReplicate,
+                &PeerNonceCache::default(),
             )
             .test_unwrap_err(),
         PeerAuthError::MissingScope(Scope::ClusterOpeningsReplicate)
@@ -429,44 +490,228 @@ fn peer_signature_binds_node_path_query_and_time() {
 }
 
 #[test]
-fn peer_signature_from_unpinned_key_refused() {
-    let pinned = Keypair::generate();
-    let impostor = Keypair::generate();
-    let node = "https://node-b.example:9101";
-    let access = TrustAccessConfig::from_toml_str(&config(&format!(
-        "{}{}",
-        reader(),
-        peer(node, &pinned, &["cluster:replicate"])
-    )))
-    .test_unwrap();
+fn peer_body_digest_mismatch_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let signed = PeerRequestTarget {
+        method: "POST",
+        path: "/v1/internal/cluster/partition",
+        query: "",
+        body: br#"{"blocked":["https://node-c.example:9101"]}"#,
+    };
+    let headers = signed_peer_headers(&keypair, NODE_B, &signed, ISSUED_AT, Some(2));
+    let swapped = PeerRequestTarget {
+        body: br#"{"blocked":[]}"#,
+        ..signed
+    };
+    let error = access
+        .peers
+        .verify(
+            &headers,
+            &swapped,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap_err();
+    assert_eq!(error, PeerAuthError::BodyMismatch);
+    assert_eq!(
+        error.to_string(),
+        "cluster peer request body does not match its signed digest"
+    );
+    access
+        .peers
+        .verify(
+            &headers,
+            &signed,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap();
+}
+
+#[test]
+fn peer_nonce_replay_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
     let target = PeerRequestTarget {
         method: "GET",
         path: "/v1/internal/cluster/status",
         query: "",
+        body: b"",
     };
-    let issued_at = 1_792_234_800;
-    let forged = signed_peer_headers(&impostor, node, &target, issued_at, None);
+    let nonces = PeerNonceCache::default();
+    let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &nonces,
+        )
+        .test_unwrap();
+    let error = access
+        .peers
+        .verify(
+            &headers,
+            &target,
+            ISSUED_AT + 59,
+            Scope::ClusterReplicate,
+            &nonces,
+        )
+        .test_unwrap_err();
+    assert_eq!(error, PeerAuthError::ReplayedNonce);
+    assert_eq!(error.to_string(), "cluster peer nonce was already used");
+    let fresh = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+    access
+        .peers
+        .verify(
+            &fresh,
+            &target,
+            ISSUED_AT + 1,
+            Scope::ClusterReplicate,
+            &nonces,
+        )
+        .test_unwrap();
+}
+
+#[test]
+fn peer_nonce_cache_refuses_when_full() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = PeerRequestTarget {
+        method: "GET",
+        path: "/v1/internal/cluster/status",
+        query: "",
+        body: b"",
+    };
+    let nonces = PeerNonceCache::default();
+    for index in 0..CLUSTER_PEER_NONCE_CACHE_CAPACITY {
+        nonces
+            .record(NODE_B, &format!("{index:064x}"), ISSUED_AT, ISSUED_AT)
+            .test_unwrap();
+    }
+    let headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
     assert_eq!(
         access
             .peers
-            .verify(&forged, &target, issued_at, Scope::ClusterReplicate)
+            .verify(
+                &headers,
+                &target,
+                ISSUED_AT,
+                Scope::ClusterReplicate,
+                &nonces
+            )
             .test_unwrap_err(),
-        PeerAuthError::BadSignature
+        PeerAuthError::ReplayCacheUnavailable
     );
+    let after_window = ISSUED_AT + CLUSTER_PEER_SIGNATURE_MAX_SKEW_SECS + 1;
+    let later = signed_peer_headers(&keypair, NODE_B, &target, after_window, None);
+    access
+        .peers
+        .verify(
+            &later,
+            &target,
+            after_window,
+            Scope::ClusterReplicate,
+            &nonces,
+        )
+        .test_unwrap();
+}
+
+#[test]
+fn peer_headers_must_carry_nonce_and_body_digest() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = PeerRequestTarget {
+        method: "GET",
+        path: "/v1/internal/cluster/status",
+        query: "",
+        body: b"",
+    };
+    for header in [CLUSTER_AUTH_NONCE_HEADER, CLUSTER_AUTH_BODY_SHA256_HEADER] {
+        let mut headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, None);
+        headers.remove(header);
+        assert_eq!(
+            access
+                .peers
+                .verify(
+                    &headers,
+                    &target,
+                    ISSUED_AT,
+                    Scope::ClusterReplicate,
+                    &PeerNonceCache::default(),
+                )
+                .test_unwrap_err(),
+            PeerAuthError::Unauthenticated
+        );
+    }
+}
+
+#[test]
+fn peer_signature_from_unpinned_key_refused() {
+    let pinned = Keypair::generate();
+    let impostor = Keypair::generate();
+    let access = peer_access(NODE_B, &pinned, &["cluster:replicate"]);
+    let target = PeerRequestTarget {
+        method: "GET",
+        path: "/v1/internal/cluster/status",
+        query: "",
+        body: b"",
+    };
+    let forged = signed_peer_headers(&impostor, NODE_B, &target, ISSUED_AT, None);
+    let wrong_key = access
+        .peers
+        .verify(
+            &forged,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap_err();
+    assert_eq!(wrong_key, PeerAuthError::BadSignature);
     let unknown_node = signed_peer_headers(
         &impostor,
         "https://node-x.example:9101",
         &target,
-        issued_at,
+        ISSUED_AT,
         None,
     );
-    assert_eq!(
-        access
-            .peers
-            .verify(&unknown_node, &target, issued_at, Scope::ClusterReplicate)
-            .test_unwrap_err(),
-        PeerAuthError::UnpinnedNode
-    );
+    let unpinned = access
+        .peers
+        .verify(
+            &unknown_node,
+            &target,
+            ISSUED_AT,
+            Scope::ClusterReplicate,
+            &PeerNonceCache::default(),
+        )
+        .test_unwrap_err();
+    assert_eq!(unpinned, wrong_key);
+    assert_eq!(unpinned.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[test]
+fn credential_debug_redacts_secret_digests() {
+    let access = TrustAccessConfig::from_toml_str(&config(&reader())).test_unwrap();
+    let rendered = format!("{access:?}");
+    assert!(rendered.contains("[REDACTED]"), "{rendered}");
+    assert!(!rendered.contains(&digest("reader-secret")), "{rendered}");
+    let bytes = parse_secret_digest("reader", &digest("reader-secret")).test_unwrap();
+    assert!(!rendered.contains(&format!("{bytes:?}")), "{rendered}");
+}
+
+static NONCE_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+pub(crate) fn fresh_nonce() -> [u8; 32] {
+    let mut nonce = [0x5a_u8; 32];
+    let counter = NONCE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    nonce[..8].copy_from_slice(&counter.to_be_bytes());
+    nonce
 }
 
 pub(crate) fn signed_peer_headers(
@@ -476,21 +721,41 @@ pub(crate) fn signed_peer_headers(
     issued_at: i64,
     term: Option<u64>,
 ) -> HeaderMap {
-    let signature =
-        sign_cluster_peer_request(keypair, node_id, target, issued_at, term).test_unwrap();
+    signed_peer_headers_for(keypair, node_id, SELF_NODE, target, issued_at, term)
+}
+
+pub(crate) fn signed_peer_headers_for(
+    keypair: &Keypair,
+    node_id: &str,
+    recipient: &str,
+    target: &PeerRequestTarget<'_>,
+    issued_at: i64,
+    term: Option<u64>,
+) -> HeaderMap {
+    let addressing = PeerAddressing {
+        deployment: DEPLOYMENT,
+        sender: node_id,
+        recipient,
+    };
+    let signed = sign_cluster_peer_request(
+        keypair,
+        &addressing,
+        target,
+        &fresh_nonce(),
+        issued_at,
+        term,
+    )
+    .test_unwrap();
     let mut headers = HeaderMap::new();
-    headers.insert(
-        CLUSTER_NODE_ID_HEADER,
-        HeaderValue::from_str(node_id).test_unwrap(),
-    );
-    headers.insert(
-        CLUSTER_AUTH_ISSUED_AT_HEADER,
-        HeaderValue::from_str(&issued_at.to_string()).test_unwrap(),
-    );
-    headers.insert(
-        CLUSTER_AUTH_SIGNATURE_HEADER,
-        HeaderValue::from_str(&signature).test_unwrap(),
-    );
+    for (name, value) in [
+        (CLUSTER_NODE_ID_HEADER, node_id.to_string()),
+        (CLUSTER_AUTH_ISSUED_AT_HEADER, issued_at.to_string()),
+        (CLUSTER_AUTH_SIGNATURE_HEADER, signed.signature),
+        (CLUSTER_AUTH_NONCE_HEADER, signed.nonce),
+        (CLUSTER_AUTH_BODY_SHA256_HEADER, signed.body_sha256),
+    ] {
+        headers.insert(name, HeaderValue::from_str(&value).test_unwrap());
+    }
     if let Some(term) = term {
         headers.insert(
             CLUSTER_AUTH_TERM_HEADER,
@@ -498,4 +763,154 @@ pub(crate) fn signed_peer_headers(
         );
     }
     headers
+}
+
+#[test]
+fn peer_request_for_another_receiver_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = PeerRequestTarget {
+        method: "POST",
+        path: "/v1/internal/cluster/partition",
+        query: "",
+        body: br#"{"blocked":[]}"#,
+    };
+    let for_node_c = signed_peer_headers_for(
+        &keypair,
+        NODE_B,
+        "https://node-c.example:9101",
+        &target,
+        ISSUED_AT,
+        Some(2),
+    );
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &for_node_c,
+                &target,
+                ISSUED_AT,
+                Scope::ClusterReplicate,
+                &PeerNonceCache::default(),
+            )
+            .test_unwrap_err(),
+        PeerAuthError::BadSignature
+    );
+}
+
+#[test]
+fn peer_request_for_another_deployment_refuses() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = PeerRequestTarget {
+        method: "POST",
+        path: "/v1/internal/cluster/partition",
+        query: "",
+        body: br#"{"blocked":[]}"#,
+    };
+    let other_deployment = sign_cluster_peer_request(
+        &keypair,
+        &PeerAddressing {
+            deployment: "dep-b",
+            sender: NODE_B,
+            recipient: SELF_NODE,
+        },
+        &target,
+        &fresh_nonce(),
+        ISSUED_AT,
+        Some(2),
+    )
+    .test_unwrap();
+    let mut headers = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, Some(2));
+    for (name, value) in [
+        (CLUSTER_AUTH_SIGNATURE_HEADER, other_deployment.signature),
+        (CLUSTER_AUTH_NONCE_HEADER, other_deployment.nonce),
+    ] {
+        headers.insert(name, HeaderValue::from_str(&value).test_unwrap());
+    }
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &headers,
+                &target,
+                ISSUED_AT,
+                Scope::ClusterReplicate,
+                &PeerNonceCache::default(),
+            )
+            .test_unwrap_err(),
+        PeerAuthError::BadSignature
+    );
+}
+
+#[test]
+fn peer_retry_with_new_nonce_accepted() {
+    let keypair = Keypair::generate();
+    let access = peer_access(NODE_B, &keypair, &["cluster:replicate"]);
+    let target = PeerRequestTarget {
+        method: "POST",
+        path: "/v1/internal/cluster/partition",
+        query: "",
+        body: br#"{"blocked":[]}"#,
+    };
+    let nonces = PeerNonceCache::default();
+    let first = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT, Some(2));
+    access
+        .peers
+        .verify(&first, &target, ISSUED_AT, Scope::ClusterReplicate, &nonces)
+        .test_unwrap();
+    assert_eq!(
+        access
+            .peers
+            .verify(
+                &first,
+                &target,
+                ISSUED_AT + 1,
+                Scope::ClusterReplicate,
+                &nonces
+            )
+            .test_unwrap_err(),
+        PeerAuthError::ReplayedNonce
+    );
+    let retry = signed_peer_headers(&keypair, NODE_B, &target, ISSUED_AT + 1, Some(2));
+    access
+        .peers
+        .verify(
+            &retry,
+            &target,
+            ISSUED_AT + 1,
+            Scope::ClusterReplicate,
+            &nonces,
+        )
+        .test_unwrap();
+}
+
+#[test]
+fn cluster_identity_rules_refuse_at_startup() {
+    let keypair = Keypair::generate();
+    let peers_without_identity = format!(
+        "deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:9101\"\n{}{}",
+        reader(),
+        peer(NODE_B, &keypair, &["cluster:replicate"])
+    );
+    assert_eq!(
+        refusal(&peers_without_identity),
+        TrustAccessError::ClusterIdentityRequired
+    );
+    let identity_without_peers = format!(
+        "deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:9101\"\n[cluster]\nnode_id = \"{SELF_NODE}\"\nnode_key_file = \"/k\"\n{}",
+        reader()
+    );
+    assert_eq!(
+        refusal(&identity_without_peers),
+        TrustAccessError::ClusterIdentityWithoutPeers
+    );
+    assert_eq!(
+        refusal(&config(&format!(
+            "{}{}",
+            reader(),
+            peer(SELF_NODE, &keypair, &["cluster:replicate"])
+        ))),
+        TrustAccessError::SelfPinned(SELF_NODE.to_string())
+    );
 }

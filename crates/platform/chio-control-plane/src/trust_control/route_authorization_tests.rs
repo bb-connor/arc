@@ -11,7 +11,7 @@ use chio_test_support::prelude::*;
 use tower::ServiceExt;
 
 use super::super::caller_credentials::tests::{
-    config, credential, peer, signed_peer_headers, DEPLOYMENT,
+    config, credential, peer, signed_peer_headers, signed_peer_headers_for, DEPLOYMENT,
 };
 use super::super::caller_credentials::TrustAccessConfig;
 use super::*;
@@ -353,15 +353,34 @@ async fn call(
     query: &str,
     headers: HeaderMap,
 ) -> (StatusCode, String) {
+    send(
+        router,
+        rule.method.as_str(),
+        rule,
+        query,
+        headers,
+        Vec::new(),
+    )
+    .await
+}
+
+async fn send(
+    router: &Router,
+    method: &str,
+    rule: &RouteRule,
+    query: &str,
+    headers: HeaderMap,
+    body: Vec<u8>,
+) -> (StatusCode, String) {
     let uri = if query.is_empty() {
         concrete(rule.path)
     } else {
         format!("{}?{query}", concrete(rule.path))
     };
     let mut request = HttpRequest::builder()
-        .method(rule.method.as_str())
+        .method(method)
         .uri(uri)
-        .body(Body::empty())
+        .body(Body::from(body))
         .test_unwrap();
     *request.headers_mut() = headers;
     let response = router.clone().oneshot(request).await.test_unwrap();
@@ -373,11 +392,23 @@ async fn call(
 }
 
 fn peer_headers(keypair: &Keypair, node: &str, rule: &RouteRule, query: &str) -> HeaderMap {
+    signed_request_headers(keypair, node, rule.method.as_str(), rule, query, b"")
+}
+
+fn signed_request_headers(
+    keypair: &Keypair,
+    node: &str,
+    method: &str,
+    rule: &RouteRule,
+    query: &str,
+    body: &[u8],
+) -> HeaderMap {
     let path = concrete(rule.path);
     let target = PeerRequestTarget {
-        method: rule.method.as_str(),
+        method,
         path: &path,
         query,
+        body,
     };
     signed_peer_headers(
         keypair,
@@ -627,7 +658,7 @@ async fn pinned_peers_reach_peer_routes_within_their_scopes() {
         let (status, body) = call(&fixture.internal, rule, query, replayed).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
         assert!(
-            body.contains("does not verify under the pinned key"),
+            body.contains("does not verify under a pinned key"),
             "{body}"
         );
     }
@@ -762,4 +793,122 @@ async fn existing_client_routes_keep_access_under_mapped_scopes() {
             );
         }
     }
+}
+
+fn peer_row(path: &str) -> &'static RouteRule {
+    ROUTE_TABLE
+        .iter()
+        .find(|rule| rule.path == path && rule.credential == RouteCredential::Peer)
+        .test_unwrap()
+}
+
+#[tokio::test]
+async fn peer_partition_body_is_bound_by_the_signature() {
+    let fixture = fixture();
+    let rule = peer_row("/v1/internal/cluster/partition");
+    assert_eq!(rule.method, RouteMethod::Post);
+    let signed_body = br#"{"blocked":["https://node-c.example:9101"]}"#.to_vec();
+    let headers = signed_request_headers(&fixture.node_b, NODE_B, "POST", rule, "", &signed_body);
+    let (status, body) = send(
+        &fixture.internal,
+        "POST",
+        rule,
+        "",
+        headers.clone(),
+        br#"{"blocked":[]}"#.to_vec(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(
+        body.contains("cluster peer request body does not match its signed digest"),
+        "{body}"
+    );
+    let (status, body) = send(&fixture.internal, "POST", rule, "", headers, signed_body).await;
+    assert_eq!((status, body), (StatusCode::OK, format!("peer:{NODE_B}")));
+}
+
+#[tokio::test]
+async fn peer_request_replay_refused() {
+    let fixture = fixture();
+    let rule = peer_row("/v1/internal/cluster/status");
+    let headers = peer_headers(&fixture.node_b, NODE_B, rule, "");
+    let (status, _) = call(&fixture.internal, rule, "", headers.clone()).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, body) = call(&fixture.internal, rule, "", headers).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(
+        body.contains("cluster peer nonce was already used"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn peer_route_body_over_bound_refused() {
+    let fixture = fixture();
+    let rule = peer_row("/v1/internal/cluster/partition");
+    let oversized = vec![b'x'; PEER_ROUTE_MAX_BODY_BYTES + 1];
+    let headers = signed_request_headers(&fixture.node_b, NODE_B, "POST", rule, "", &oversized);
+    let (status, body) = send(&fixture.internal, "POST", rule, "", headers, oversized).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert!(
+        body.contains("cluster peer request body exceeds its bound"),
+        "{body}"
+    );
+}
+
+#[tokio::test]
+async fn head_follows_get_rows() {
+    let fixture = fixture();
+    for rule in ROUTE_TABLE
+        .iter()
+        .filter(|rule| rule.method == RouteMethod::Get)
+    {
+        let router = router_for(&fixture, rule);
+        let (allowed, refused) = match rule.credential {
+            RouteCredential::Peer => (
+                signed_request_headers(&fixture.node_b, NODE_B, "HEAD", rule, "", b""),
+                HeaderMap::new(),
+            ),
+            RouteCredential::Deployment => (bearer("kernel-secret"), HeaderMap::new()),
+            RouteCredential::Caller => (bearer("operator-secret"), HeaderMap::new()),
+            _ => (HeaderMap::new(), bearer("operator-secret")),
+        };
+        let (status, _) = send(router, "HEAD", rule, "", allowed, Vec::new()).await;
+        assert_eq!(status, StatusCode::OK, "HEAD {}", rule.path);
+        if matches!(
+            rule.credential,
+            RouteCredential::Peer | RouteCredential::Deployment | RouteCredential::Caller
+        ) {
+            let (status, _) = send(router, "HEAD", rule, "", refused, Vec::new()).await;
+            assert_eq!(status, StatusCode::UNAUTHORIZED, "HEAD {}", rule.path);
+        }
+    }
+}
+
+#[tokio::test]
+async fn peer_authorization_for_another_receiver_refused() {
+    let fixture = fixture();
+    let rule = peer_row("/v1/internal/cluster/partition");
+    let body = br#"{"blocked":[]}"#.to_vec();
+    let path = concrete(rule.path);
+    let target = PeerRequestTarget {
+        method: "POST",
+        path: &path,
+        query: "",
+        body: &body,
+    };
+    let headers = signed_peer_headers_for(
+        &fixture.node_b,
+        NODE_B,
+        NODE_C,
+        &target,
+        i64::try_from(NOW).test_unwrap(),
+        Some(4),
+    );
+    let (status, response) = send(&fixture.internal, "POST", rule, "", headers, body).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert!(
+        response.contains("cluster peer signature does not verify under a pinned key"),
+        "{response}"
+    );
 }
