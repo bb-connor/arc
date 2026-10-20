@@ -2,8 +2,9 @@
 
 use chio_control_plane::enterprise_federation::{EnterpriseProviderKind, EnterpriseProviderRecord};
 use chio_core::root_authority::{
-    EnterpriseProviderIdentity, HttpsUrl, Identifier, ProviderRecordKind, Sha256Digest,
-    SubjectMapping, Uri, CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
+    EnterpriseProviderIdentity, EnterpriseProviderIdentityFields, HttpsUrl, Identifier,
+    ProviderRecordKind, Sha256Digest, SubjectMapping, Uri,
+    CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA,
 };
 
 use super::error::RootExchangeError;
@@ -46,7 +47,7 @@ impl ProviderRecord {
                 .transpose()
                 .map_err(|error| invalid(record, format!("{field}: {error}")))
         };
-        let identity = EnterpriseProviderIdentity {
+        let identity = EnterpriseProviderIdentity::new(EnterpriseProviderIdentityFields {
             schema: CHIO_ENTERPRISE_PROVIDER_IDENTITY_SCHEMA.to_owned(),
             provider_id: Identifier::new(record.provider_id.as_str())
                 .map_err(|error| invalid(record, error.to_string()))?,
@@ -90,10 +91,8 @@ impl ProviderRecord {
                     .ok_or_else(|| invalid(record, "provenance.trust_material_ref is missing"))?,
             )
             .map_err(|error| invalid(record, error.to_string()))?,
-        };
-        identity
-            .validate()
-            .map_err(|error| invalid(record, error.to_string()))?;
+        })
+        .map_err(|error| invalid(record, error.to_string()))?;
         let identity_digest = identity
             .digest()
             .map_err(|error| RootExchangeError::Canonicalization(error.to_string()))?;

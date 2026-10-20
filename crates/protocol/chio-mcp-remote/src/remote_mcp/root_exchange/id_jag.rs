@@ -1,6 +1,6 @@
 //! Claim rules of an Identity Assertion JWT Authorization Grant.
 
-use chio_core::root_authority::{EnterpriseProviderIdentity, JwsAlgorithm};
+use chio_core::root_authority::{EnterpriseProviderIdentity, Identifier, JwsAlgorithm};
 use serde_json::{Map, Value};
 
 use super::claims::{
@@ -37,7 +37,7 @@ pub struct VerifiedIdJag {
     pub iat: u64,
     pub exp: u64,
     pub alg: JwsAlgorithm,
-    pub kid: String,
+    pub kid: Identifier,
     pub principal: String,
     pub tenant: String,
     pub scope_values: Vec<String>,

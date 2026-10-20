@@ -15,14 +15,14 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::root_authority::{
-    check_root_consistency, ClaimValue, EnterpriseProviderIdentity, HolderClass, Jwk, JwsAlgorithm,
-    LoadedRootPolicy, RootConsistencyInput, RootPolicy, Sha256Digest,
+    check_root_consistency, ClaimValue, EnterpriseProviderIdentity, HolderClass, IdpKeySnapshot,
+    Jwk, JwsAlgorithm, LoadedRootPolicy, RootConsistencyInput, RootPolicy, Sha256Digest,
 };
 use chio_core::{canonical_json_bytes, sha256};
 use chio_mcp_remote::root_exchange::{
-    ClientRegistry, ConfidentialClient, ExchangeEntropy, ExchangeReplayStore, ExchangeServices,
-    IdJagGrant, IdpKey, IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord, ReplayBinding,
-    ReplayKey, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    jws::CompactJws, ClientRegistry, ConfidentialClient, ExchangeEntropy, ExchangeReplayStore,
+    ExchangeServices, IdJagGrant, IdpKey, IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord,
+    ReplayBinding, ReplayKey, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use p256::ecdsa::signature::Signer as _;
 use p256::ecdsa::{Signature as P256Signature, SigningKey as P256SigningKey};
@@ -31,7 +31,6 @@ use serde_json::{json, Map, Value};
 const NOW: u64 = 1_792_234_800;
 const ISSUER: &str = "https://acme.okta.com";
 const JWKS_URL: &str = "https://acme.okta.com/oauth2/v1/keys";
-const SNAPSHOT_DIGEST: Sha256Digest = Sha256Digest::from_bytes([0x3a; 32]);
 const AS_ISSUER: &str = "https://mcp.provider.example";
 const TOKEN_ENDPOINT: &str = "https://mcp.provider.example/oauth/token";
 const RESOURCE: &str = "https://mcp.provider.example/mcp";
@@ -58,6 +57,31 @@ fn exchange_keypair() -> Keypair {
 
 fn policy_keypair() -> Keypair {
     Keypair::from_seed(&[1; 32])
+}
+
+/// The digest of a signed snapshot holding `keys`, as the key source reports it.
+fn snapshot_digest(keys: &[Value]) -> Sha256Digest {
+    let unsigned: IdpKeySnapshot = serde_json::from_value(json!({
+        "schema": "chio.idp-key-snapshot.v1",
+        "issuer": ISSUER,
+        "source": JWKS_URL,
+        "keys": keys,
+        "observed_at": NOW - 60,
+        "exchange_key": exchange_keypair().public_key(),
+        "signature": "00".repeat(64)
+    }))
+    .unwrap();
+    let signature = exchange_keypair()
+        .sign_canonical(&unsigned.signing_body())
+        .unwrap()
+        .0;
+    let mut fields = unsigned.into_fields();
+    fields.signature = signature;
+    let snapshot = IdpKeySnapshot::new(fields).unwrap();
+    snapshot
+        .verify_signature(&exchange_keypair().public_key())
+        .unwrap();
+    snapshot.digest().unwrap()
 }
 
 fn idp_jwk(kid: &str) -> Value {
@@ -207,12 +231,17 @@ fn loaded_policy(identity_digest: Sha256Digest, edit: impl FnOnce(&mut Value)) -
         "signature": "00".repeat(64)
     });
     edit(&mut value);
-    let mut policy: RootPolicy = serde_json::from_value(value).unwrap();
-    policy.signature = policy_keypair()
-        .sign_canonical(&policy.signing_body())
+    let unsigned: RootPolicy = serde_json::from_value(value).unwrap();
+    let signature = policy_keypair()
+        .sign_canonical(&unsigned.signing_body())
         .unwrap()
         .0;
-    policy.load(&policy_keypair().public_key(), NOW).unwrap()
+    let mut fields = unsigned.into_fields();
+    fields.signature = signature;
+    RootPolicy::new(fields)
+        .unwrap()
+        .load(&policy_keypair().public_key(), NOW)
+        .unwrap()
 }
 
 #[derive(Default)]
@@ -244,6 +273,7 @@ impl ExchangeEntropy for CountingEntropy {
 
 struct StubKeys {
     keys: Vec<Jwk>,
+    snapshot_digest: Sha256Digest,
     failure: Option<RootExchangeError>,
     any_kid: bool,
     calls: AtomicUsize,
@@ -256,6 +286,7 @@ impl StubKeys {
                 .iter()
                 .map(|key| serde_json::from_value(key.clone()).unwrap())
                 .collect(),
+            snapshot_digest: snapshot_digest(keys),
             failure: None,
             any_kid: false,
             calls: AtomicUsize::new(0),
@@ -283,7 +314,7 @@ impl IdpKeyLookup for StubKeys {
             .find(|key| self.any_kid || key.kid.as_str() == kid)
             .map(|jwk| IdpKey {
                 jwk: jwk.clone(),
-                snapshot_digest: SNAPSHOT_DIGEST,
+                snapshot_digest: self.snapshot_digest,
             })
             .ok_or(RootExchangeError::UnknownKid)
     }
@@ -397,7 +428,7 @@ async fn id_jag_exchange_prepares_a_root_consistent_with_its_anchor() {
     );
     assert_eq!(
         prepared.context.anchor.key_snapshot_digest,
-        Some(SNAPSHOT_DIGEST)
+        Some(snapshot_digest(&[idp_jwk(IDP_KID)]))
     );
     assert_eq!(harness.keys.calls.load(Ordering::SeqCst), 1);
     assert_eq!(prepared.openings.len(), 2);
@@ -1090,9 +1121,53 @@ async fn late_refusal_does_not_spend_the_id_jag() {
             .run_body(&jwt_bearer_body(&id_jag, &assertion), None, NOW)
             .await
             .unwrap_err(),
-        RootExchangeError::ClaimInvalid("kid")
+        RootExchangeError::MalformedJws("kid is not an identifier")
     );
     let bound = harness.replay.bound.lock().unwrap();
     assert!(bound.keys().all(|key| key.id != "id-jag-1"));
     assert_eq!(bound.len(), 1);
+}
+
+fn parse_refusal(header: Value) -> RootExchangeError {
+    CompactJws::parse(&compact(&header, &id_jag_claims(), idp_sign)).unwrap_err()
+}
+
+#[test]
+fn compact_jws_parse_refuses_key_location_members_and_symmetric_algs() {
+    for member in ["jku", "x5u", "jwk", "x5c", "crit"] {
+        let header = edit(id_jag_header(), |header| {
+            header.insert(member.into(), json!("present"));
+        });
+        assert_eq!(
+            parse_refusal(header),
+            RootExchangeError::ForbiddenHeaderMember(member)
+        );
+    }
+    for alg in ["HS256", "HS384", "HS512", "none"] {
+        let header = edit(id_jag_header(), |header| {
+            header.insert("alg".into(), json!(alg));
+        });
+        assert_eq!(
+            parse_refusal(header),
+            RootExchangeError::AlgorithmNotAdmitted
+        );
+    }
+    let without_kid = edit(id_jag_header(), |header| {
+        header.remove("kid");
+    });
+    assert_eq!(parse_refusal(without_kid), RootExchangeError::KidMissing);
+    for kid in [
+        json!(""),
+        json!("k".repeat(129)),
+        json!("k\u{0}1"),
+        json!(7),
+    ] {
+        let header = edit(id_jag_header(), |header| {
+            header.insert("kid".into(), kid.clone());
+        });
+        assert_eq!(
+            parse_refusal(header),
+            RootExchangeError::MalformedJws("kid is not an identifier")
+        );
+    }
 }
