@@ -1,0 +1,39 @@
+# path_re	method_re	auth_re	listener	credential	scope	tenant_authority
+^/health$	GET	.	public	anonymous	none	n/a (liveness only; unchanged)
+^/\.well-known/	GET	.	public	anonymous	none	n/a (public issuer and verifier metadata; unchanged)
+^/v1/public/	.	.	public	anonymous	none	n/a (public registry, certification and passport surfaces; unchanged)
+^/v1/passport/(issuance|token|credential)|/oid4vci/	.	redeem_pre_authorized_code|bearer_token_from_headers	public	holder (OID4VCI pre-authorized code or access token)	none	n/a (wallet protocol credential; unchanged)
+^/v1/findings/operator/	POST	seller_authentication_failed|authenticate	public	finding seller (seller signature)	none	n/a (seller authentication; unchanged)
+^/v1/findings(/|$)	GET	^none$	public	anonymous	none	n/a (public listing reads; unchanged)
+^/v1/findings/search$	POST	^none$	public	anonymous	none	n/a (public listing search; unchanged)
+^/v1/internal/admission-authority$	POST	.	internal	deployment	admission-authority:write	Deployment only
+^/v1/internal/(cluster/snapshot|receipts/tools/delta)$	GET	validate_cluster_peer_auth	internal	peer	cluster-openings:replicate	n/a (peer of the same cluster; pinned node key; the response carries openings)
+^/v1/internal/	.	validate_cluster_peer_auth	internal	peer	cluster:replicate	n/a (peer of the same cluster; pinned node key)
+^/v1/receipts/(tools|children)$	POST	.	public	deployment	receipts:append	Deployment only
+^/v1/(receipts|agents)/	GET	resolve_control_read_principal	public	caller	receipts:read	Tenant(t) sees only tenant t; Deployment sees its deployment
+^/v1/evidence/export$	POST	resolve_control_read_principal	public	caller	evidence:read	Tenant(t) exports only tenant t; Deployment its deployment
+^/v1/(reports|fiscal/marketplace)/	.	resolve_control_read_principal	public	caller	reports:read	Tenant(t) sees only tenant t; Deployment sees its deployment
+^/v1/authority$	GET	.	public	deployment	authority:read	Deployment only
+^/v1/authority($|/)	POST	.	public	caller	authority:admin	Deployment only
+^/v1/capabilities/issue$	POST	.	public	deployment	capabilities:issue	Deployment only
+^(/v1/admin)?/emergency-	.	.	public	caller	admin:emergency	Deployment only
+^/metrics$	GET	.	public	caller	metrics:read	Deployment only
+^/scim/	.	.	public	caller	scim:write	Deployment only
+^/v1/budgets	.	.	public	deployment	budgets:{rw}	Deployment only
+^/v1/(federation|federation-policies)	.	.	public	caller	federation:{rw}	Deployment only
+^/v1/(certifications|certification)	.	.	public	caller	certifications:{rw}	Deployment only
+^/v1/passport	.	.	public	caller	passport:{rw}	Deployment only
+^/v1/(liability|bonds|bond-losses|facilities|capital|underwriting)	.	.	public	caller	credit:{rw}	Deployment only
+^/v1/reports/	.	validate_service_auth	public	caller	reports:read	Deployment only
+^/v1/(reports/|receipts/analytics$)	.	resolve_admin_report_read_context	public	caller	reports:read	Deployment only (today's admin report read context)
+^/v1/fiscal	.	.	public	caller	fiscal:{rw}	Deployment only
+^/v1/reputation	.	.	public	caller	reputation:{rw}	Deployment only
+^/v1/registry	.	.	public	caller	registry:{rw}	Deployment only
+^/v1/(settlements|metered-billing)	.	.	public	deployment	settlement:write	Deployment only
+^/v1/lineage	.	.	public	caller	lineage:{rw}	Deployment only
+^/v1/revocations	.	.	public	caller	revocations:{rw}	Deployment only
+^/v1/evidence/import$	POST	.	public	caller	evidence:write	Deployment only
+^/v1/findings	.	validate_service_auth	public	caller	findings:{rw}	Deployment only
+^/v1/runtime-attestation|/appraisal	.	.	public	caller	attestation:write	Deployment only
+^/v1/receipts/query/snapshot|snapshot.*recover|/recovery	.	.	public	caller	receipts:admin	Deployment only
+^/v1/	.	validate_service_auth	public	caller	UNMAPPED	UNMAPPED

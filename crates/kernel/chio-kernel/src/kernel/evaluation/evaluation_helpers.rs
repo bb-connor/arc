@@ -1192,3 +1192,7 @@ mod delivery_candidate_tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "replayed_cancellation_tests.rs"]
+mod replayed_cancellation_tests;
