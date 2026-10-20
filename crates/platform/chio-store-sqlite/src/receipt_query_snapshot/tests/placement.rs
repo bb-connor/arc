@@ -278,6 +278,99 @@ fn a_build_waits_out_parent_lock_contention_until_cancelled() {
     drop(db);
 }
 
+/// Wall time scripted for the builder thread: its first read is `script[0]`,
+/// its second releases `holder` and reads `script[1]`, and later ones read
+/// `script[2]`. Every other thread reads `script[0]`.
+struct ScriptedClock {
+    builder: std::sync::Mutex<Option<std::thread::ThreadId>>,
+    reads: std::sync::atomic::AtomicUsize,
+    script: [u64; 3],
+    holder: std::sync::Mutex<Option<File>>,
+}
+
+impl Clock for ScriptedClock {
+    fn read(&self) -> Result<ClockReading, ClockError> {
+        let builder = *self.builder.lock().unwrap() == Some(std::thread::current().id());
+        let millis = if builder {
+            let read = self.reads.fetch_add(1, Ordering::SeqCst);
+            if read == 1 {
+                drop(self.holder.lock().unwrap().take());
+            }
+            self.script[read.min(2)]
+        } else {
+            self.script[0]
+        };
+        Ok(ClockReading::new(
+            UnixMillis::new(millis),
+            MonotonicInstant::from_nanos(millis.saturating_mul(1_000_000)),
+        ))
+    }
+}
+
+/// Build while the snapshot parent is locked; the lock is released at the
+/// builder's second clock read. The outcome carries the number of snapshot
+/// databases the built snapshot left in place.
+fn build_released_by_the_clock(script: [u64; 3]) -> Result<usize, WalkError> {
+    let directory = tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let clock = Arc::new(ScriptedClock {
+        builder: std::sync::Mutex::new(None),
+        reads: std::sync::atomic::AtomicUsize::new(0),
+        script,
+        holder: std::sync::Mutex::new(None),
+    });
+    let store =
+        SqliteReceiptStore::open_with_clock(directory.path().join("live.db"), clock.clone())
+            .unwrap();
+    let parent = directory.path().join(PARENT_NAME);
+    private_directory(&parent);
+    *clock.holder.lock().unwrap() = Some(hold_lock(&parent));
+    let cancel = Arc::new(AtomicBool::new(false));
+    let walk_limits = WalkLimits {
+        busy_timeout: BUSY_TIMEOUT,
+        ..limits()
+    };
+    let ctx = context(&store, &cancel, walk_limits);
+    let contended = target(&ctx);
+    let outcome = std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                *clock.builder.lock().unwrap() = Some(std::thread::current().id());
+                build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {})
+                    .map(|_| snapshot_databases(directory.path()).len())
+            })
+            .join()
+            .unwrap()
+    });
+    assert!(
+        clock.holder.lock().unwrap().is_none(),
+        "the lock was never released"
+    );
+    if outcome.is_err() {
+        assert_eq!(snapshot_databases(directory.path()), Vec::<PathBuf>::new());
+    }
+    outcome
+}
+
+const START_MS: u64 = 1_760_000_000_000;
+
+#[test]
+fn a_parent_lock_released_after_the_deadline_is_not_retried() {
+    let budget = u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap();
+    // Within budget before the backoff, past the deadline after it.
+    let outcome =
+        build_released_by_the_clock([START_MS, START_MS + budget - 1, START_MS + budget + 1]);
+    assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
+}
+
+#[test]
+fn a_parent_lock_released_within_the_budget_is_provisioned() {
+    let outcome = build_released_by_the_clock([START_MS, START_MS + 1_000, START_MS + 2_000]);
+    assert_eq!(outcome, Ok(1));
+}
+
 #[test]
 fn a_parent_lock_held_past_the_busy_timeout_is_unavailable() {
     let (directory, clock, store) = stepped_store();
