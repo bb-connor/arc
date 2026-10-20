@@ -7752,6 +7752,9 @@
     ],
     "crates/kernel/chio-kernel/src/tool_outcome/test_support.rs": [
       "returned_value::from_value"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
+      "parse::from_value"
     ]
   },
   "decoder_file_contracts": {
@@ -13057,6 +13060,22 @@
       "readers": [
         {
           "reader": "returned_value",
+          "decoders": [
+            "from_value"
+          ],
+          "apis": [
+            "serde_json::from_value"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": {
+      "kind": "typed-value-conversion",
+      "contract": "Converts the JWS header alg of a JSON value decoded by the bounded original-byte reader in input.rs. The assertion grants nothing until its signature verifies against a pinned key.",
+      "readers": [
+        {
+          "reader": "parse",
           "decoders": [
             "from_value"
           ],
@@ -23865,6 +23884,11 @@
       "load_owned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
       "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload",
       "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload"
+    ],
+    "crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs": [
+      "decode_part::shared-reader::crates/protocol/chio-mcp-remote/src/input.rs::decode",
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part",
+      "parse::shared-reader::crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/jws.rs::decode_part"
     ]
   },
   "retired_direct_readers": {
