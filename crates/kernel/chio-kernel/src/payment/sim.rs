@@ -7,7 +7,7 @@
 
 use crate::payment::{
     PaymentAdapter, PaymentAuthorization, PaymentAuthorizationState, PaymentAuthorizeRequest,
-    PaymentError, PaymentResult, RailSettlementStatus,
+    PaymentError, PaymentRailMode, PaymentResult, RailSettlementStatus,
 };
 
 /// Deterministic no-broadcast payment adapter.
@@ -33,6 +33,14 @@ impl SimPaymentAdapter {
 }
 
 impl PaymentAdapter for SimPaymentAdapter {
+    fn rail_id(&self) -> &'static str {
+        "sim"
+    }
+
+    fn rail_mode(&self) -> Option<PaymentRailMode> {
+        Some(PaymentRailMode::PrepaidFinal)
+    }
+
     fn authorize(
         &self,
         request: &PaymentAuthorizeRequest,

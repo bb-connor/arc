@@ -86,8 +86,9 @@ impl ToolServerConnection for SimFlatCostServer {
 
 /// Dispatch entry-point for `chio mcp governed-sim`.
 ///
-/// Builds an ephemeral kernel, registers a flat-cost tool server, wires the
-/// selected payment adapter, and executes one governed MustPrepay tool call.
+/// Builds a kernel backed by a durable admission authority in a private
+/// temporary directory, registers a flat-cost tool server, wires the selected
+/// payment adapter, and executes one governed MustPrepay tool call.
 /// Writes the signed receipt bundle to `--out` regardless of verdict, then
 /// returns an error (exit 1) on denial so the no-key CI lane can capture the
 /// nonzero exit code for the fail-closed assertion.
@@ -98,12 +99,25 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         ));
     }
 
-    let kernel_kp = Keypair::generate();
+    let state = tempfile::Builder::new()
+        .prefix("chio-governed-sim-")
+        .tempdir()
+        .map_err(|e| CliError::cli_io_error(format!("simulation state directory: {e}")))?;
+    let state_root = std::fs::canonicalize(state.path())
+        .map_err(|e| CliError::cli_io_error(format!("simulation state directory: {e}")))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&state_root, std::fs::Permissions::from_mode(0o700))
+            .map_err(|e| CliError::cli_io_error(format!("simulation state directory: {e}")))?;
+    }
+    let admission =
+        chio_control_plane::DurableAdmissionRuntime::open(&state_root.join("authority.db"))?;
     let mut kernel = chio_kernel::ChioKernel::new(KernelConfig {
-        keypair: kernel_kp.clone(),
+        keypair: admission.kernel_keypair(),
         ca_public_keys: vec![],
         max_delegation_depth: 5,
-        policy_hash: "governed-x402-sim-smoke".to_string(),
+        policy_hash: chio_core::sha256_hex(b"governed-x402-sim-smoke"),
         allow_sampling: false,
         allow_sampling_tool_use: false,
         allow_elicitation: false,
@@ -117,9 +131,7 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
         memory_budget: chio_kernel::MemoryBudgetConfig::defaults(),
         deadlines: chio_kernel::HotPathDeadlineConfig::default(),
     });
-    // This command is an explicit local payment simulation. Production kernels
-    // keep the safe default and require durable admission before financial dispatch.
-    kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();
+    admission.attach(&mut kernel, None)?;
     let approver = Keypair::generate();
     kernel
         .set_governed_approval_policy("governed-sim".into(), vec![approver.public_key()])
@@ -273,4 +285,48 @@ pub(crate) fn cmd_mcp_governed_sim(args: &GovernedSimArgs) -> Result<(), CliErro
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chio_test_support::prelude::*;
+
+    fn run(payment_adapter: &str) -> (Result<(), CliError>, serde_json::Value) {
+        let dir = chio_test_support::private_tempdir().test_unwrap();
+        let out = dir.path().join("receipt.json");
+        let result = cmd_mcp_governed_sim(&GovernedSimArgs {
+            payment_adapter: payment_adapter.to_string(),
+            governed_mustprepay: true,
+            out: out.clone(),
+        });
+        let receipt = serde_json::from_slice(&std::fs::read(&out).test_unwrap()).test_unwrap();
+        (result, receipt)
+    }
+
+    #[test]
+    fn sim_adapter_settles_under_durable_admission() {
+        let (result, receipt) = run("sim");
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(receipt["decision"]["verdict"], "allow", "{receipt}");
+        let financial = &receipt["metadata"]["financial"];
+        let payment_reference = financial["payment_reference"].as_str().unwrap_or_default();
+        assert!(payment_reference.starts_with("sim-"), "{financial}");
+        assert_eq!(financial["settlement_status"], "settled", "{financial}");
+    }
+
+    #[test]
+    fn absent_payment_adapter_is_refused() {
+        let (result, receipt) = run("none");
+        let error = result.err().test_expect("absent payment adapter must be refused");
+        let reason = "durable admission failed: durable monetary admission requires a qualified payment adapter";
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("governed MustPrepay denied: {reason}")),
+            "{error}"
+        );
+        assert_eq!(receipt["decision"]["verdict"], "deny", "{receipt}");
+        assert_eq!(receipt["decision"]["reason"], reason, "{receipt}");
+    }
 }
