@@ -290,7 +290,9 @@ impl ExporterManager {
         let mut max_seq = self.cursor;
 
         for (seq, raw_json) in &rows {
-            match serde_json::from_str::<chio_core::receipt::body::ChioReceipt>(raw_json) {
+            match chio_core::canonical::UntrustedJsonText::new(raw_json)
+                .decode_signed::<chio_core::receipt::body::ChioReceipt>()
+            {
                 Ok(receipt) => {
                     events.push(SiemEvent::from_receipt_with_trusted_kernel_keys(
                         receipt,

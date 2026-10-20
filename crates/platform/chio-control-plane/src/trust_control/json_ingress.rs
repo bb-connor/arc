@@ -218,6 +218,49 @@ fn validate_signed(bytes: &[u8], bound: usize) -> Result<(), UntrustedJsonError>
     Ok(())
 }
 
+/// Body extractor for a route whose contract is [`Mode::Signed`]. It decodes
+/// the original bytes through `decode_signed`, so a duplicate key at any depth,
+/// including inside a `Value` member, refuses before the handler runs.
+pub(crate) struct SignedJson<T>(pub T);
+
+impl<S, T> axum::extract::FromRequest<S> for SignedJson<T>
+where
+    S: Send + Sync,
+    T: serde::de::DeserializeOwned,
+{
+    type Rejection = Response;
+
+    async fn from_request(request: Request, _state: &S) -> Result<Self, Self::Rejection> {
+        let bound = match request_contract(&request)? {
+            Some((Mode::Signed, bound, _)) => bound,
+            Some((Mode::Document, _, _)) | None => {
+                return Err(plain_http_error(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "signed JSON body has no signed route contract",
+                ));
+            }
+        };
+        if !selects_json(request.headers()) {
+            return Err(plain_http_error(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "JSON request body requires an application/json media type",
+            ));
+        }
+        let bytes = read_body(request.into_body(), bound)
+            .await
+            .map_err(IntoResponse::into_response)?;
+        UntrustedJsonText::from_wire(&bytes, bound)
+            .and_then(|input| input.decode_signed())
+            .map(Self)
+            .map_err(|error| match error {
+                UntrustedJsonError::Decode(_) => {
+                    plain_http_error(StatusCode::UNPROCESSABLE_ENTITY, &error.to_string())
+                }
+                error => InputError::Json(error).into_response(),
+            })
+    }
+}
+
 fn validate_document(bytes: &[u8], bound: usize) -> Result<(), UntrustedJsonError> {
     UntrustedJsonText::from_wire(bytes, bound)?.decode_document::<serde_json::Value>()?;
     Ok(())
@@ -394,3 +437,7 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
     next.run(Request::from_parts(parts, Body::from(bytes)))
         .await
 }
+
+#[cfg(test)]
+#[path = "json_ingress_tests.rs"]
+mod tests;
