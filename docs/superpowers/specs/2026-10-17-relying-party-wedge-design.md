@@ -848,9 +848,8 @@ Caller-side revocation (M2):
 
 Tags (D8):
 
-- `tenant_tag = HMAC-SHA256(tenant_tag_key, "chio.tenant-tag.v1\0" || issuer || "\0" || tenant_value)` where `issuer` is the provider record's issuer and `tenant_value` is the claim named by the record's `subject_mapping.tenant_id_field` (G17).
-- `subject_tag = HMAC-SHA256(subject_tag_key, "chio.subject-tag.v1\0" || issuer || "\0" || subject)`.
-- Both tag keys derive from one generation of the provider's tenant index key set (`--tenant-index-keys <dir>`, 32-byte keys, the set the committed receipt binding uses): `HMAC-SHA256(generation_key, "chio.tenant-index-purpose.v1\0" || label)`, with label `anchored-root-tenant-tag` or `anchored-root-subject-tag`. The state directory pins that generation on first open; the set may rotate, and the pinned generation must stay loaded. The keys never leave the process and are not signing keys.
+- `tenant_tag` and `subject_tag` are keyed index values of the provider's tenant index key set (`--tenant-index-keys <dir>`, the set the committed receipt binding uses), under its purpose subkeys as the M1 item 2 plan defines them (Task 5, "Purpose subkeys"): `tenant_tag` under `tenant-tag` over `"chio.tenant-tag.v1" || 0x00 || len32(issuer) || issuer || len32(tenant_value) || tenant_value`, where `issuer` is the provider record's issuer and `tenant_value` is the claim named by the record's `subject_mapping.tenant_id_field` (G17); `subject_tag` under `root-subject` over `"chio.root-subject.v1" || 0x00 || len32(issuer) || issuer || len32(subject) || subject`.
+- Each tag carries its generation `key_id`. The state directory pins one generation on first open and derives every tag under it, so tags stay equal to revocation entries across rotation; the pinned generation must stay loaded. The keys never leave the process and are not signing keys.
 - Tags are stored in SQLite columns beside each root and receipt. They are not part of any signed artifact. No plaintext tenant id or subject is stored outside the salted commitments in the delegation context.
 
 New manifest members:
