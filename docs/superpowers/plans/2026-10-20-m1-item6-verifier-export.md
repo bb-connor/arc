@@ -39,6 +39,8 @@ Export refusals (spec 8.4):
 
 > Export refuses salt-only openings in auditor profiles, and refuses `caller` exports without a `tenant_tag`.
 
+The tenant index key set rotates (item 2 key-set section, all-generation match mode), so one tenant has one tag per loaded generation. This plan reads `tenant_tag` in the quoted spec text as the tenant's tag set: selection and the manifest use every loaded generation (Decision 9), and Task 10 moves that wording into `spec/PROTOCOL.md`.
+
 Policy export (spec 7.4):
 
 > Exactly one policy is loaded. A root whose `root_policy_digest` names another policy denies. Every policy a bundle's roots reference is exported with the bundle.
@@ -83,7 +85,7 @@ Further constraints:
 1. **A verifier path that reaches the network, a database or the clock.** Expected: `cs cargo tree -p chio-bundle-verify -e normal` contains no `tokio`, `rusqlite`, `reqwest`, `ureq`, `hyper`, `chio-kernel` (hosted), `chio-control-plane` or `chio-store-sqlite`; `check-security-clocks.py` covers the crate with no inventory entry; the air-gap run in Verification exits 0 inside a network namespace. Pinned in Task 3 by `scripts/check-offline-verifier-deps.py` and in Task 9 by the `unshare --net` run.
 2. **A bundle member that chooses its own trust.** Expected: every key the verifier accepts comes from `chio.verifier-trust.v1`; the root policy's own `policy_key` and `exchange_keys` are checked against the trust file's `root_policy_keys` and `exchange_keys`, never trusted on their own; the provider identity digest is recomputed from the exported projection, never read. Pinned by the self-asserted-key negatives in Task 6.
 3. **An opening that verifies from its own payload.** Expected: the content preimage comes only from the caller-supplied data file (or its absence, G13), the domain comes from the commitment's position (7.6), a duplicated salt marks the receipt as tampered disclosure (G15), and a `payload: null` opening in an `auditor_hash_only` bundle fails decoding of that bundle. Pinned in Task 7.
-4. **A caller bundle that leaks another tenant.** Expected: every receipt, context, root, opening, snapshot, projection and revocation entry in a `caller` bundle is reachable from a receipt whose stored tenant tag equals the manifest `tenantTag`; no salt for another tenant's commitment appears. Pinned by `caller_bundle_contains_only_own_tenant` (two tenants, marker values) in Task 8 and scenario 010.
+4. **A caller bundle that leaks another tenant.** Expected: every receipt, context, root, opening, snapshot, projection and revocation entry in a `caller` bundle is reachable from a receipt whose stored `(tag_key_id, tag)` is in the manifest `tenantTags` set, and that set holds one tag for every generation loaded at export; no salt for another tenant's commitment appears. Pinned by `caller_bundle_contains_only_own_tenant` (two tenants, marker values) in Task 8 and scenario 010.
 5. **An exit class that disagrees with `chio proof verify`.** Expected: 0, 1, 2, 10, 20, 30, 40 and 50 mean the same thing in both tools; every `attest:bundle-*` and `attest:export-*` code maps to exactly one class; the message is never read. Pinned by `every_bundle_error_has_its_exit_class` in Task 4.
 6. **A byte change hidden in the model move.** Expected: Task 2 changes no serialized byte: every export fixture, proof-room fixture and conformance snapshot is identical before and after. Pinned by `--check` runs of every fixture generator in Task 2.
 
@@ -130,7 +132,7 @@ Item 6 lands as three squash-merged PRs. The table is the answer to "which parts
 
 6b must wait: the identity root column verifies `root_anchor` inside the signed capability body (item 3 part 2, after item 1), roots, policies and snapshots through `verify_wrapped` (item 1), and openings against commitments (item 2). Writing 6b before them would verify formats that do not exist yet. 6b is tested with bundles assembled from typed constructors in `tests/`, so it does not wait for item 4.
 
-6c must wait: the roles it exports are rows that item 4 writes (anchored roots, delegation contexts, IdP key snapshots, tenant and subject tags, bearer roots), item 2 writes (disclosure openings) and item 5 writes (revocation entries with target kinds). Item 4 also provides historical root policy and provider identity record retention, stored by digest alongside `anchored_roots` and `idp_key_snapshots`, and the tenant tag beside each receipt row; 6c only reads them (Decision 3).
+6c must wait: the roles it exports are rows that item 4 writes (anchored roots, delegation contexts, IdP key snapshots, tenant and subject tags, bearer roots), item 2 writes (disclosure openings) and item 5 writes (revocation entries with target kinds). Item 4 also provides historical root policy and provider identity record retention, stored by digest alongside `anchored_roots` and `idp_key_snapshots`, and the tenant tag with its `tag_key_id` beside each receipt row; 6c only reads them (Decision 3).
 
 ---
 
@@ -147,7 +149,7 @@ git grep -n -E "trusted-kernel-pubkey|trusted-anchor-file|trusted_kernel_pubkey|
 ```
   Expected at `a93a2f69a`: the evidence model in `crates/kernel/chio-kernel/src/{evidence_export,checkpoint,capability_lineage}.rs`; `verification.rs` 730 lines; verify consumers in `chio-cli` (`receipt_evidence.rs:194,198`, `tests/evidence_export.rs`, `tests/evidence_export/package_trust.rs`), trust-control (`receipt_handlers.rs:436`), `chio-mercury` (`builders.rs:11-12`) and `scripts/smoke/chio-cli-smoke.sh:337,405,416`. Record every hit with `file:line`.
 - [ ] **Step 3: Dependency census.** `cs cargo tree -p chio-kernel-core -e normal --prefix none | sort -u` and the same for `chio-core-types`: record that neither reaches `tokio`, `rusqlite` or an HTTP client (true at `a93a2f69a`).
-- [ ] **Step 4: For 6c only, the item 2, 4 and 5 store census.** Record the table and column names that hold disclosure openings, anchored roots (rule id, subject tag, tenant tag), delegation contexts, context salts (`anchor.sub`, `anchor.tenant`), IdP key snapshots, capability presentations, revocation entries and the receipt tenant tag. Each read in Task 8 names one of them. Include the item 4 tables that hold historical root policies and provider identity records by digest. A role without a store row is an item 4 or item 5 gap, reported to the lead before Task 8 starts; 6c adds no store table.
+- [ ] **Step 4: For 6c only, the item 2, 4 and 5 store census.** Record the table and column names that hold disclosure openings, anchored roots (rule id, subject tag, tenant tag), delegation contexts, context salts (`anchor.sub`, `anchor.tenant`), IdP key snapshots, capability presentations, revocation entries and the receipt tenant tag with its `tag_key_id`. Each read in Task 8 names one of them. Include the item 4 tables that hold historical root policies and provider identity records by digest. A role without a store row is an item 4 or item 5 gap, reported to the lead before Task 8 starts; 6c adds no store table.
 - [ ] **Step 5: Coordination.** Post `<UTC> <lane>: m1i6 <part> heads-up: <surfaces>; byte change: <none|list>` to `sync.md`.
 
 ---
@@ -272,7 +274,7 @@ chio-verify <BUNDLE_DIR> --trust <FILE> [--caller-data <FILE>] [--json]
 - `--json`: print the report as `chio.bundle-verify-report.v1` on stdout; print a rejection as one JSON error report on stderr whose `code` names it, as `chio proof verify --json` does.
 - No `--online` in M1 (spec 10.9 places it in M3 behind a feature).
 
-**Outputs:** a report with one row per tool receipt and five columns, each `{class, reason_code?}` where `class` is one of `verified`, `observed`, `asserted`, `unverifiable`, `rejected`, plus bundle-level members (`disclosure_profile`, `tenant_tag`, `tenant_confirmed`, `envelope_signer`, `required_columns`, `exit_class`).
+**Outputs:** a report with one row per tool receipt and five columns, each `{class, reason_code?}` where `class` is one of `verified`, `observed`, `asserted`, `unverifiable`, `rejected`, plus bundle-level members (`disclosure_profile`, `tenant_tags`, `tenant_confirmed`, `envelope_signer`, `required_columns`, `exit_class`).
 
 ```rust
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -428,9 +430,6 @@ Rules:
 #[serde(rename_all = "snake_case")]
 pub enum DisclosureProfile { Caller, AuditorFull, AuditorHashOnly }
 
-/// HMAC-SHA256 tenant tag, 64 lowercase hex characters.
-pub struct TenantTag([u8; 32]);
-
 pub enum ArtifactRole {
     CapabilityPresentation, DelegationContext, RootPolicy, EnterpriseProviderIdentity,
     IdpKeySnapshot, IdpArtifact, ReceiptDisclosure, RevocationEntry, RevocationRequest,
@@ -438,19 +437,19 @@ pub enum ArtifactRole {
 }
 ```
 
-`EvidenceExportManifest` gains `disclosure_profile: DisclosureProfile`, `tenant_tag: Option<TenantTag>` (present exactly for `caller`) and `artifacts: Vec<ArtifactEntry { role, path }>`.
+`EvidenceExportManifest` gains `disclosure_profile: DisclosureProfile`, `tenant_tags: Option<Vec<KeyedIndexValue>>` (present, non-empty and sorted by `key_id` exactly for `caller`; `KeyedIndexValue` is the item 2 key-set type) and `artifacts: Vec<ArtifactEntry { role, path }>`.
 
 ```rust
 // chio-control-plane::evidence_export
 pub enum ExportDisclosure {
-    Caller { tenant_tag: TenantTag },
+    Caller { tenant_tags: Vec<KeyedIndexValue> },
     AuditorHashOnly,
 }
 
 /// Reads root-authority evidence and openings from the provider's state.
 /// Implemented by chio-store-sqlite over the serve-http state directory database.
 pub trait RootAuthorityEvidenceStore {
-    fn receipts_for_tenant(&self, tag: &TenantTag, query: &EvidenceExportQuery) -> Result<Vec<EvidenceToolReceiptRecord>, EvidenceStoreError>;
+    fn receipts_for_tenant(&self, tags: &[KeyedIndexValue], query: &EvidenceExportQuery) -> Result<Vec<EvidenceToolReceiptRecord>, EvidenceStoreError>;
     fn presentation(&self, root_capability_id: &str) -> Result<CapabilityPresentation, EvidenceStoreError>;
     fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext, EvidenceStoreError>;
     fn root_policy(&self, digest: &Sha256Digest) -> Result<RootPolicy, EvidenceStoreError>;
@@ -472,7 +471,7 @@ pub fn assemble_export(
 ```
 
 Profile rules:
-- `caller`: receipts are exactly those whose stored tenant tag equals the tag; openings carry the `params`, `content`, `anchor.sub` and `anchor.tenant` salts with `payload: null`; a receipt whose opening is marked lost (spec 8.4) is exported without an opening and reported in the manifest counts.
+- `caller`: receipts are exactly those whose stored `(tag_key_id, tag)` is in the tag set. The set holds `derive_in(key_id, tenant-tag, preimage)` for every `key_id` in `TenantIndexKeySet::key_ids()`, so receipts tagged under a retired generation are selected with the active one. The manifest's `tenant_tags` is that set, sorted by `key_id`. Openings carry the `params`, `content`, `anchor.sub` and `anchor.tenant` salts with `payload: null`; a receipt whose opening is marked lost (spec 8.4) is exported without an opening and reported in the manifest counts.
 - `auditor_hash_only`: no `receipt_disclosure` role and no salts. Asked to include an opening (any `salt` member): refused with `urn:chio:error:attest:export-salt-only-opening` (scenario 008).
 - `auditor_full`: refused in M1 with `urn:chio:error:attest:export-profile-unavailable`.
 - `caller` without a tenant: refused with `urn:chio:error:attest:export-tenant-tag-required` (scenario 009).
@@ -481,14 +480,16 @@ Profile rules:
 
 The provider identity role (G17): for every exported context with a `provider_record_id`, the bundle carries the `chio.enterprise-provider-identity.v1` projection whose digest equals the context's `provider_identity_digest`. The exporter reads the projection by digest from the retention item 4 provides, never from the live registry, because the live record may have changed identity under a re-signed policy (Decision 3). The role is `enterprise_provider_identity` and its file is `root-authority/provider-identities.ndjson`. The staged manifest schema omits this role from `artifactEntry.role`; this task adds it before moving the schema in, and Task 10 adds it to the PROTOCOL "Export profiles" list.
 
-Bundle files added (each listed in `files` and, for a role, in `artifacts`): `root-authority/presentations.ndjson`, `root-authority/delegation-contexts.ndjson`, `root-authority/root-policies.ndjson`, `root-authority/provider-identities.ndjson`, `root-authority/idp-key-snapshots.ndjson`, `disclosure/openings.ndjson`, `revocations.ndjson`.
+Bundle files added (each listed in `files` and, for a role, in `artifacts`): `root-authority/presentations.ndjson`, `root-authority/delegation-contexts.ndjson`, `root-authority/root-policies.ndjson`, `root-authority/provider-identities.ndjson`, `root-authority/idp-key-snapshots.ndjson`, `disclosure/receipt-tenant-tags.ndjson` (`caller` only: one `{receipt_id, tag: KeyedIndexValue}` row per exported receipt, copied from the store), `disclosure/openings.ndjson`, `revocations.ndjson`.
 
 Provider side:
-- `serve-http` gains `POST /admin/evidence/export` (admin authentication as `/admin/revocations`). Body: `{"profile": "caller" | "auditor_hash_only", "tenant": {"issuer": "...", "value": "..."} | null, "query": EvidenceExportQuery, "require_proofs": bool}`. The handler computes the tenant tag with the in-process index key (spec 7.12), assembles the bundle through the serving database, and returns the unsigned bundle with transparency. NUL in `issuer` or `value` is refused (spec 7).
+- `serve-http` gains `POST /admin/evidence/export` (admin authentication as `/admin/revocations`). Body: `{"profile": "caller" | "auditor_hash_only", "tenant": {"issuer": "...", "value": "..."} | null, "query": EvidenceExportQuery, "require_proofs": bool}`. The handler computes the tenant's tag set with the in-process index key set (spec 7.12): `derive_in(key_id, tenant-tag, "chio.tenant-tag.v1" || 0x00 || issuer || 0x00 || value)` for each `key_id` in `key_ids()`. It assembles the bundle through the serving database, and returns the unsigned bundle with transparency. NUL in `issuer` or `value` is refused (spec 7).
 - `chio evidence export --edge-url <URL> --admin-token-file <FILE> --disclosure-profile <caller|auditor_hash_only> [--tenant-issuer <ISS> --tenant-value <VALUE>] --kernel-seed-file <FILE> --output <DIR>`: calls the route, writes the package, signs the commitment with the kernel key, and runs `chio_bundle_verify::verify_package` on its own output against a trust file holding the kernel key before returning (fail-closed self check). `--disclosure-profile` is required for every export; there is no default profile.
 
-- [ ] **Step 1: Failing tests.** `chio-control-plane` `evidence_export/tests.rs`: `caller_bundle_contains_only_own_tenant` (two tenants with 16-byte random marker principals and tenant values; no marker, raw, hex or base64, from tenant B appears anywhere in tenant A's bundle, and no salt for a tenant B commitment appears); `auditor_hash_only_has_no_salts`; `auditor_salt_only_opening_refused`; `caller_without_tenant_refused`; `auditor_full_refused`; `caller_with_plaintext_tenant_query_refused`; `missing_provider_identity_fails_export`; `projection_exported_by_digest_after_registry_identity_change` (record changes under a re-signed policy; the bundle carries the old projection for old roots and the new one for new roots); every exported bundle verifies with `chio-bundle-verify` and exits 0 with `required_columns = ["decision", "delegation_chain"]`. `chio-mcp-remote`: route refuses without admin auth; NUL refused; the index key never appears in the response or logs.
-- [ ] **Step 2: Move the manifest schema in** per the staged README move-in rule (`git mv` over the live path, add `enterprise_provider_identity` to the role enum, refresh `MANIFEST.sha256`, regenerate code in four languages, make `wire_protocol_schema.rs` green).
+Verifier side (`caller` bundles): `chio-bundle-verify` checks that `tenant_tags` is non-empty, sorted by `key_id` and has one entry per `key_id`, that `disclosure/receipt-tenant-tags.ndjson` has exactly one row for each exported receipt, and that every row's `(key_id, tag)` is in `tenant_tags`. Any failure is `urn:chio:error:attest:bundle-tenant-tag-outside-set` (exit 20, added to Task 4's code table and pinned by `every_bundle_error_has_its_exit_class`). The verifier has no index key, so it cannot recompute a tag or prove the set covers every generation; it proves that no exported receipt lies outside the exporter's declared set. Completeness across generations is the exporter's duty (the set is computed from `key_ids()` and the store query is bound to it) and is pinned by the rotation tests in Step 1.
+
+- [ ] **Step 1: Failing tests.** `chio-control-plane` `evidence_export/tests.rs`: `caller_bundle_contains_only_own_tenant` (two tenants with 16-byte random marker principals and tenant values; no marker, raw, hex or base64, from tenant B appears anywhere in tenant A's bundle, and no salt for a tenant B commitment appears); `caller_export_after_rotation_includes_older_generation_receipts` (append receipts for the tenant under generation N, rotate to N+1 with N retired and loaded, append more, export; every receipt from both generations is present, the manifest `tenant_tags` holds one entry per generation sorted by `key_id`, and `chio-bundle-verify` exits 0); `caller_export_after_rotation_excludes_other_tenant_in_every_generation` (a second tenant's receipts under both generations stay out); `manifest_omitting_a_generation_fails_verification` (the same bundle with the generation N entry removed from `tenant_tags` fails with `attest:bundle-tenant-tag-outside-set`, exit 20, and so does a bundle whose `receipt-tenant-tags.ndjson` row carries a tag outside the set or has no row for a receipt); `auditor_hash_only_has_no_salts`; `auditor_salt_only_opening_refused`; `caller_without_tenant_refused`; `auditor_full_refused`; `caller_with_plaintext_tenant_query_refused`; `missing_provider_identity_fails_export`; `projection_exported_by_digest_after_registry_identity_change` (record changes under a re-signed policy; the bundle carries the old projection for old roots and the new one for new roots); every exported bundle verifies with `chio-bundle-verify` and exits 0 with `required_columns = ["decision", "delegation_chain"]`. `chio-mcp-remote`: route refuses without admin auth; NUL refused; the index key never appears in the response or logs.
+- [ ] **Step 2: Move the manifest schema in** per the staged README move-in rule (`git mv` over the live path, add `enterprise_provider_identity` to the role enum, replace the single `tenantTag` member with a `tenantTags` array of keyed index values (`minItems` 1, present exactly for `caller`), refresh `MANIFEST.sha256`, regenerate code in four languages, make `wire_protocol_schema.rs` green).
 - [ ] **Step 3: Implement**; register the four `attest:export-*` codes.
 - [ ] **Step 4: Run** `cs cargo test -p chio-control-plane -p chio-store-sqlite -p chio-mcp-remote --no-fail-fast`, `cs cargo test -p chio-cli --test evidence_export --no-fail-fast`, `for lang in rust ts go python; do cs cargo xtask codegen --lang "$lang" || exit 1; done`, `cs make -C ~/lanes/m1i6 codegen-check`, `python3 scripts/check-wire-schemas.py`, `bash scripts/check-chio-schema-registry.sh`, `python3 scripts/check-error-urn-registry.py`. Expected: PASS.
 
@@ -506,7 +507,7 @@ Provider side:
 
 ### Task 10: PROTOCOL, CLI docs and claims (6c)
 
-- [ ] **Step 1:** Move the staged "Export profiles" subsection into `spec/PROTOCOL.md` section 6 with the `enterprise_provider_identity` role added and a sentence that the provider's enabled state is not in any bundle. Write `docs/cli/evidence.md` (export flags, profiles, refusals) and keep `docs/cli/bundle-verify.md` current.
+- [ ] **Step 1:** Move the staged "Export profiles" subsection into `spec/PROTOCOL.md` section 6 with the `enterprise_provider_identity` role added and a sentence that the provider's enabled state is not in any bundle. Replace the staged `tenant_tag` wording with the `tenant_tags` set (Decision 9). Write `docs/cli/evidence.md` (export flags, profiles, refusals) and keep `docs/cli/bundle-verify.md` current.
 - [ ] **Step 2:** `docs/reference/CLAIM_REGISTRY.md`: no row is added by this PR. The spec 12 M1 statement enters only with item 7's recorded live run.
 - [ ] **Step 3:** `grep -rn $'\xe2\x80\x94' <changed files>; test $? -eq 1`; `grep -n -i -E '\bM[0-3]\b|wedge|pilot|docs/superpowers' spec/PROTOCOL.md docs/cli/*.md crates/tooling/chio-bundle-verify/README.md; test $? -eq 1`; `bash scripts/check-chio-owned-v1-only.sh`; `cs cargo test -p chio-spec-validate --no-fail-fast`.
 
@@ -562,25 +563,26 @@ Spec 13.2 sizes item 6 at M, 7-11 engineer-days, including the provider identity
 | Port today's verification, delete `verification.rs`, move verify, import, mercury and smoke callers to `--trust` (Task 5) | 1-2 |
 | Identity root and delegation chain columns with the provider identity role (Task 6) | 2-3 |
 | Content column, openings, caller data, bundle vectors (Task 7) | 1-2 |
-| Export profiles, roles, admin route, CLI, manifest schema move-in; reads of the item 4 retention (Task 8) | 2 |
+| Export profiles, roles, admin route, CLI, manifest schema move-in; reads of the item 4 retention; tag-set selection and its verifier check (Task 8) | 2.5 |
 | Scenarios 007 to 010, air-gap run, PROTOCOL and docs (Tasks 9, 10) | 1 |
 | Integration, native-cage runs, review rounds across three PRs | 1-2 |
-| Total | 12-17 |
+| Total | 12.5-17.5 |
 
-Item 6 is L, 12-17 engineer-days (the range straddles 15, so it takes the larger label), against 13.2's M, 7-11. Historical policy and provider identity retention is item 4's work and is not counted here. The excess of 5 to 6 days has three sources 13.2 did not count: moving the evidence model out of the hosted kernel so the verifier can avoid `tokio` and `rusqlite` (2-3), replacing every verify and import caller of the control-plane verifier, including trust-control and `chio-mercury` (about 1), and splitting the item into three PRs around items 1 to 5 (about 1). Dropping `auditor_hash_only` (spec 13.4, founder approval) would save about 1 day. The M1 total moves from 13.2's 104-148 to 109-154 with this estimate alone, and to 112-162 together with the item 1 plan's 26-40.
+Item 6 is L, 12.5-17.5 engineer-days (the range straddles 15, so it takes the larger label), against 13.2's M, 7-11. Historical policy and provider identity retention is item 4's work and is not counted here. The excess of 5.5 to 6.5 days has four sources 13.2 did not count: moving the evidence model out of the hosted kernel so the verifier can avoid `tokio` and `rusqlite` (2-3), replacing every verify and import caller of the control-plane verifier, including trust-control and `chio-mercury` (about 1), splitting the item into three PRs around items 1 to 5 (about 1), and rotation-safe caller selection (0.5). Dropping `auditor_hash_only` (spec 13.4, founder approval) would save about 1 day. The M1 total moves from 13.2's 104-148 to 109.5-154.5 with this estimate alone, and to 112.5-162.5 together with the item 1 plan's 26-40.
 
 ## Decisions
 
 Accepted as written by the lead on 2026-10-20 (approval of #1719), with decision 3 amended so that item 4 provides the retention. Each entry states the question and the decision this plan implements.
 
 1. **Identity root ceiling in M1 (Task 6).** Spec 11.4 lists `verified` conditions that include the M2 retained ID-JAG, and spec 9.6 says the column is `asserted` without a retained artifact. With retention cut to M2, no M1 bundle can make the identity root column `verified`, so a trust file that requires it always exits 10. Decision: the column is `asserted` at best in M1; `docs/cli/bundle-verify.md` and the example trust file require `decision`, `delegation_chain` and `content` only; `verified` becomes reachable with M2 retention and pinned `idp_keys`. Rejected alternative: let `required_columns` name a minimum class per column (a change to the M0 `chio.verifier-trust.v1` schema).
-2. **Tenant selection input (Task 8).** Spec 10.8 names `chio evidence export --disclosure-profile --tenant`, but `--tenant` already filters on the plaintext receipt `tenant_id`, which a receipt with `authority` omits. Decision: `--tenant-issuer` and `--tenant-value` select a `caller` bundle by tag, computed inside `serve-http`; the existing `--tenant` stays the plaintext filter for receipts without `authority` and is refused together with `caller`.
-3. **Retained root policies, provider identity projections and receipt tenant tags (Task 8, depends on item 4).** A bundle must carry every policy and every projection its roots reference (spec 7.4, 7.12), but `serve-http` loads one policy and reads the live registry, and spec 10.7 lists no table for past policies or projections. Selecting a tenant's receipts also needs a tenant tag beside each receipt row. Decision: item 4 provides historical root policy and provider identity record retention, stored by digest alongside `anchored_roots` and `idp_key_snapshots`, and the receipt append writes the tenant tag from the root row. 6c only reads them and adds no table.
+2. **Tenant selection input (Task 8).** Spec 10.8 names `chio evidence export --disclosure-profile --tenant`, but `--tenant` already filters on the plaintext receipt `tenant_id`, which a receipt with `authority` omits. Decision: `--tenant-issuer` and `--tenant-value` select a `caller` bundle by the tenant's tag set, computed inside `serve-http`; the existing `--tenant` stays the plaintext filter for receipts without `authority` and is refused together with `caller`.
+3. **Retained root policies, provider identity projections and receipt tenant tags (Task 8, depends on item 4).** A bundle must carry every policy and every projection its roots reference (spec 7.4, 7.12), but `serve-http` loads one policy and reads the live registry, and spec 10.7 lists no table for past policies or projections. Selecting a tenant's receipts also needs a tenant tag beside each receipt row. Decision: item 4 provides historical root policy and provider identity record retention, stored by digest alongside `anchored_roots` and `idp_key_snapshots`, and the receipt append writes the tenant tag, with its `tag_key_id`, from the root row. 6c only reads them and adds no table.
 4. **Revocation coverage offline (Task 6).** A verifier cannot recompute a subject or tenant tag (it has no index key), so it cannot match `anchor_subject` and `tenant_tag` entries to roots on its own. Decision: each exported entry carries the item 5 entry plus an unsigned `covered_capability_ids` list computed at export; the verifier recomputes coverage itself for `capability_id`, `root_policy_rule` and `replay_key` targets and requires the exporter's list to agree, and reports tag-target coverage as provider-asserted. A covering entry counts only when its `revoked_at` is at or before the receipt timestamp.
 5. **Checkpoint anchor binding in the trust file (Task 5).** Today `chio evidence verify --trusted-anchor-file` supplies a `CheckpointPublicationTrustAnchorBinding` that `chio.verifier-trust.v1` has no member for. Decision: add an optional `checkpoint_trust_anchor` member to `chio.verifier-trust.v1` in place (unshipped, v1), so one verifier-owned file carries all trust; no second trust flag.
 6. **Trust-file key minimums for bundles without roots (Task 3).** The M0 schema requires at least one exchange key and one root policy key, but bundles from producers without a root policy (`chio run`, `chio mcp serve`, `api protect` before M3) contain no roots. Decision: keep `kernel_keys` at 1 to 64 and allow 0 to 64 for `exchange_keys` and `root_policy_keys`; a bundle with anchored receipts and an empty role exits 50 with `attest:bundle-trust-missing`. This changes the staged invalid example `verifier-trust.empty-kernel-keys` description only.
 7. **Where export runs (Task 8).** The state directory is held under an exclusive lock by the running `serve-http` (D4), and the index key never leaves that process (spec 7.12). Decision: export runs inside `serve-http` behind `POST /admin/evidence/export`; the CLI writes the package and signs the commitment with the kernel seed file. Rejected alternative: an offline `chio evidence export --state-dir` that takes the lock itself and therefore needs the edge stopped.
 8. **New unsigned schema ids (Tasks 4, 7).** The report and the caller-data input need wire shapes the spec does not name. Decision: `chio.bundle-verify-report.v1` and `chio.verifier-caller-data.v1` under `spec/schemas/chio-wire/v1/export/`, unsigned, so neither enters `KNOWN_SIGNED_ARTIFACT_SCHEMAS`.
+9. **Caller selection spans every loaded tag generation (Task 8).** The tenant index key set rotates and item 4 stores one tenant tag with its `key_id` per receipt, so a single tag selects only the receipts of one generation, and an export after a rotation would omit the older ones while still verifying. Decision: selection uses the tenant's tag set, `derive_in(key_id, tenant-tag, preimage)` over `key_ids()`; the store query matches `(tag_key_id, tag)` against that set; the manifest carries `tenant_tags: Vec<KeyedIndexValue>` sorted by `key_id`; the bundle carries each receipt's stored tag, and the offline verifier checks every one is in the manifest set. Cost: about 0.5 day in Task 8. Rejected alternative: select by the active generation only, which silently drops earlier receipts.
 
 ## Spec coverage
 
