@@ -212,3 +212,51 @@ fn the_direct_decoders_refuse_a_padded_unit_variant() {
         Some(chio_security_types::strict_serde::DROPPED_INPUT)
     );
 }
+
+#[test]
+fn the_receipt_enums_refuse_a_raw_duplicate_key() {
+    for (decision, key) in [
+        (r#"{"verdict":"allow","verdict":"allow"}"#, "verdict"),
+        (
+            r#"{"verdict":"deny","reason":"a","reason":"b","guard":"g"}"#,
+            "reason",
+        ),
+    ] {
+        let expected = format!(
+            "{}: {key:?}",
+            chio_security_types::strict_serde::DUPLICATE_KEY
+        );
+        let direct = <Decision>::deserialize(&mut serde_json::Deserializer::from_str(decision))
+            .err()
+            .map(|error| error.to_string());
+        assert!(
+            direct
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{direct:?}"
+        );
+        let decoded = serde_json::from_str::<Decision>(decision)
+            .err()
+            .map(|error| error.to_string());
+        assert!(
+            decoded
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{decoded:?}"
+        );
+    }
+    let state = r#"{"state":"cancelled","reason":"a","reason":"b"}"#;
+    let expected = format!(
+        "{}: \"reason\"",
+        chio_security_types::strict_serde::DUPLICATE_KEY
+    );
+    let decoded = serde_json::from_str::<OperationTerminalState>(state)
+        .err()
+        .map(|error| error.to_string());
+    assert!(
+        decoded
+            .as_deref()
+            .is_some_and(|error| error.starts_with(&expected)),
+        "{decoded:?}"
+    );
+}
