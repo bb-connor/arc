@@ -35,6 +35,91 @@ impl Drop for TestEnvGuard {
     }
 }
 
+fn proof_test_rejection<T>(result: Result<T, CliError>) -> CliError {
+    match result {
+        Ok(_) => panic!("expected a proof verify rejection"),
+        Err(error) => error,
+    }
+}
+
+fn assert_proof_rejection(error: CliError, spec: &chio_errors::ErrorCodeSpec, exit_code: i32) {
+    assert_eq!(error.report().code, spec.urn, "{error}");
+    assert_eq!(proof_verify_exit_code(&error), exit_code, "{error}");
+}
+
+#[test]
+fn graph_artifact_rejections_ignore_bundle_supplied_text() {
+    use chio_errors::_generated::error_codes::{
+        TRANSACTION_ARTIFACT_HASH_MISMATCH, TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+        TRANSACTION_CLAIM_REJECTED, TRANSACTION_GRAPH_NOT_CLOSED,
+    };
+    let steering = "required proof claim not verified digest mismatch must pin trusted";
+    let dir = proof_test_ok(tempfile::tempdir(), "tempdir");
+    proof_test_ok(std::fs::write(dir.path().join("a.json"), b"{}"), "artifact");
+    let node = |path: &str, schema: Option<&str>, sha256: Option<&str>| GraphArtifactNode {
+        id: None,
+        path: path.into(),
+        role: "risk-comptroller-report".into(),
+        schema: schema.map(Into::into),
+        sha256: sha256.map(Into::into),
+    };
+    assert_proof_rejection(
+        proof_test_rejection(graph_node_schema(&node(steering, None, None), "risk")),
+        &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+        30,
+    );
+    assert_proof_rejection(
+        proof_test_rejection(graph_node_sha256(&node(steering, None, None), "risk")),
+        &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+        30,
+    );
+    assert_proof_rejection(
+        proof_test_rejection(select_required_graph_node(&[], steering, "risk")),
+        &TRANSACTION_CLAIM_REJECTED,
+        10,
+    );
+    assert_proof_rejection(
+        proof_test_rejection(select_required_graph_node_by_path(&[], steering, "risk")),
+        &TRANSACTION_GRAPH_NOT_CLOSED,
+        20,
+    );
+    let twice = [node(steering, None, None), node(steering, None, None)];
+    assert_proof_rejection(
+        proof_test_rejection(select_required_graph_node_by_path(&twice, steering, "risk")),
+        &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+        30,
+    );
+    assert_proof_rejection(
+        proof_test_rejection(load_graph_bytes_artifact(
+            dir.path(),
+            &node("a.json", Some(steering), Some("00")),
+            "chio.risk.comptroller-report.v1",
+            "risk",
+        )),
+        &TRANSACTION_ARTIFACT_SCHEMA_INVALID,
+        30,
+    );
+    assert_proof_rejection(
+        proof_test_rejection(load_graph_bytes_artifact(
+            dir.path(),
+            &node("a.json", Some("chio.risk.comptroller-report.v1"), Some(steering)),
+            "chio.risk.comptroller-report.v1",
+            "risk",
+        )),
+        &TRANSACTION_ARTIFACT_HASH_MISMATCH,
+        20,
+    );
+}
+
+#[test]
+fn an_error_without_a_transaction_code_exits_generic_whatever_its_message() {
+    let steering = "proof verify: required proof claim not verified: x digest mismatch \
+                    json error must pin trusted unsupported proof feature";
+    assert_eq!(proof_verify_exit_code(&CliError::cli_other_error(steering)), 1);
+    assert_eq!(proof_verify_exit_code(&CliError::cli_io_error(steering)), 1);
+    assert_eq!(proof_verify_exit_code(&CliError::Other(steering.to_string())), 1);
+}
+
 fn proof_test_ok<T, E: std::fmt::Display>(result: Result<T, E>, context: &str) -> T {
     match result {
         Ok(value) => value,

@@ -260,6 +260,19 @@ pub const TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED: ErrorCodeSpec = ErrorCodeSpe
     consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
 };
 
+pub const TRANSACTION_VERIFIER_CONTEXT_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:transaction:verifier-context-invalid",
+    domain: Domain::Transaction,
+    severity: Severity::Error,
+    summary: "The trust context pinned for the verifier is malformed or inconsistent.",
+    help: "Correct the pinned verifier trust context (keys, digests, authority documents, or settlement settings) and rerun the verifier.",
+    string_code: "CHIO-TRANSACTION-VERIFIER-CONTEXT-INVALID",
+    jsonrpc_code: Some(7119),
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-transaction-passport", "chio-cli", "chio-proof-room"],
+};
+
 pub const TRANSACTION_NEGATIVE_CASE_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:transaction:negative-case-mismatch",
     domain: Domain::Transaction,
@@ -3775,6 +3788,7 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     TRANSACTION_ARTIFACT_SCHEMA_INVALID,
     TRANSACTION_SIGNATURE_INVALID,
     TRANSACTION_VERIFIER_FEATURE_UNSUPPORTED,
+    TRANSACTION_VERIFIER_CONTEXT_INVALID,
     TRANSACTION_NEGATIVE_CASE_MISMATCH,
     CAPABILITY_SCOPE_EXCEEDED,
     CAPABILITY_EXPIRED,
