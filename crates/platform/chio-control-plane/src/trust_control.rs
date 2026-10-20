@@ -298,6 +298,8 @@ use crate::{
 mod authority_handlers;
 #[path = "trust_control/budget_handlers.rs"]
 mod budget_handlers;
+#[path = "trust_control/caller_credentials.rs"]
+pub mod caller_credentials;
 #[path = "trust_control/capital_and_liability.rs"]
 mod capital_and_liability;
 #[path = "trust_control/certification_handlers.rs"]
@@ -371,6 +373,8 @@ pub(crate) mod report_validation;
 pub mod reports;
 #[path = "trust_control/risk_finance_handlers.rs"]
 mod risk_finance_handlers;
+#[path = "trust_control/route_authorization.rs"]
+pub mod route_authorization;
 #[path = "trust_control/service_runtime.rs"]
 pub mod service_runtime;
 #[path = "trust_control/service_types.rs"]
