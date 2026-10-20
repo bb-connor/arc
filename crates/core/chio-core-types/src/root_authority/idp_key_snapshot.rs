@@ -9,7 +9,7 @@ use crate::crypto::{PublicKey, Signature};
 
 use super::jwk::Jwk;
 use super::wire::{
-    canonical_public_key, canonical_signature, check_items, check_schema, validated_serde,
+    canonical_public_key, canonical_signature, check_items, check_schema, validated_struct,
     HttpsUrl, Uri,
 };
 use super::RootAuthorityShapeError;
@@ -72,22 +72,21 @@ impl<'de> Deserialize<'de> for KeySnapshotSource {
     }
 }
 
-/// The provider's signed statement of the keys an identity provider published.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct IdpKeySnapshot {
-    pub schema: String,
-    pub issuer: Uri,
-    pub source: KeySnapshotSource,
-    pub keys: Vec<Jwk>,
-    pub observed_at: u64,
-    #[serde(deserialize_with = "canonical_public_key")]
-    pub exchange_key: PublicKey,
-    #[serde(deserialize_with = "canonical_signature")]
-    pub signature: Signature,
+validated_struct! {
+    /// The provider's signed statement of the keys an identity provider published.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    pub struct IdpKeySnapshot {
+        pub schema: String,
+        pub issuer: Uri,
+        pub source: KeySnapshotSource,
+        pub keys: Vec<Jwk>,
+        pub observed_at: u64,
+        #[serde(deserialize_with = "canonical_public_key")]
+        pub exchange_key: PublicKey,
+        #[serde(deserialize_with = "canonical_signature")]
+        pub signature: Signature,
+    }
 }
-
-validated_serde!(IdpKeySnapshot);
 
 /// Every snapshot member except `signature`.
 #[derive(Serialize)]

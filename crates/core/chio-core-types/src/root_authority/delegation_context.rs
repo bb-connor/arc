@@ -12,7 +12,7 @@ use crate::error::Result;
 use super::claims::{RecordedClaims, SaltedCommitment};
 use super::jwk::JwsAlgorithm;
 use super::wire::{
-    canonical_public_key, check_schema, validated_serde, Identifier, Sha256Digest, Uri,
+    canonical_public_key, check_schema, validated_struct, Identifier, Sha256Digest, Uri,
 };
 use super::RootAuthorityShapeError;
 
@@ -47,34 +47,33 @@ impl HolderClass {
     }
 }
 
-/// The verified assertion an exchange anchored a root to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct DelegationAnchor {
-    pub kind: AnchorKind,
-    pub issuer: Uri,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider_record_id: Option<Identifier>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider_identity_digest: Option<Sha256Digest>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub key_snapshot_digest: Option<Sha256Digest>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub kid: Option<Identifier>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub alg: Option<JwsAlgorithm>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub artifact_digest: Option<Sha256Digest>,
-    pub artifact_retained: bool,
-    pub replay_key_digest: Sha256Digest,
-    pub token_iat: u64,
-    pub token_exp: u64,
-    pub subject: SaltedCommitment,
-    pub tenant: SaltedCommitment,
-    pub claims: RecordedClaims,
+validated_struct! {
+    /// The verified assertion an exchange anchored a root to.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    pub struct DelegationAnchor {
+        pub kind: AnchorKind,
+        pub issuer: Uri,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub provider_record_id: Option<Identifier>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub provider_identity_digest: Option<Sha256Digest>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub key_snapshot_digest: Option<Sha256Digest>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub kid: Option<Identifier>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub alg: Option<JwsAlgorithm>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub artifact_digest: Option<Sha256Digest>,
+        pub artifact_retained: bool,
+        pub replay_key_digest: Sha256Digest,
+        pub token_iat: u64,
+        pub token_exp: u64,
+        pub subject: SaltedCommitment,
+        pub tenant: SaltedCommitment,
+        pub claims: RecordedClaims,
+    }
 }
-
-validated_serde!(DelegationAnchor);
 
 impl DelegationAnchor {
     pub fn validate(&self) -> core::result::Result<(), RootAuthorityShapeError> {
@@ -162,21 +161,20 @@ pub struct DelegationExchange {
     pub holder: HolderClass,
 }
 
-/// `chio.delegation-context.v1`. Unsigned; bound into the signed root
-/// through `root_anchor.context_digest`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct DelegationContext {
-    pub schema: String,
-    pub anchor: DelegationAnchor,
-    pub exchange: DelegationExchange,
-    /// `rule_id` of the root policy rule that matched.
-    pub root_policy_rule_id: Identifier,
-    /// Equals the scope hash of the minted root.
-    pub effective_root_scope_hash: Sha256Digest,
+validated_struct! {
+    /// `chio.delegation-context.v1`. Unsigned; bound into the signed root
+    /// through `root_anchor.context_digest`.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    pub struct DelegationContext {
+        pub schema: String,
+        pub anchor: DelegationAnchor,
+        pub exchange: DelegationExchange,
+        /// `rule_id` of the root policy rule that matched.
+        pub root_policy_rule_id: Identifier,
+        /// Equals the scope hash of the minted root.
+        pub effective_root_scope_hash: Sha256Digest,
+    }
 }
-
-validated_serde!(DelegationContext);
 
 impl DelegationContext {
     pub fn validate(&self) -> core::result::Result<(), RootAuthorityShapeError> {

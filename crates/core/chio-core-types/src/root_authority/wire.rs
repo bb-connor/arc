@@ -12,31 +12,45 @@ use crate::hashing::{Hash, Sha256State};
 
 use super::RootAuthorityShapeError;
 
-/// Implements `Serialize` and a validating `Deserialize` for a struct whose
-/// derives carry `#[serde(remote = "Self")]`. Decoding calls `validate`.
-macro_rules! validated_serde {
-    ($ty:ty) => {
-        impl serde::Serialize for $ty {
-            fn serialize<S: serde::Serializer>(
-                &self,
-                serializer: S,
-            ) -> core::result::Result<S::Ok, S::Error> {
-                <$ty>::serialize(self, serializer)
-            }
+/// Declares a struct whose only decoder is a validating `Deserialize`.
+///
+/// The struct derives what its attributes name (including `Serialize`). A
+/// private field-for-field twin carries the derived, strict decoder; the
+/// public impl decodes the twin, moves its fields over and calls `validate`.
+/// No unvalidated decoder is reachable from outside this macro.
+macro_rules! validated_struct {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident {
+            $( $(#[$field_meta:meta])* $field_vis:vis $field:ident : $ty:ty ),* $(,)?
+        }
+    ) => {
+        $(#[$meta])*
+        $vis struct $name {
+            $( $(#[$field_meta])* $field_vis $field: $ty ),*
         }
 
-        impl<'de> serde::Deserialize<'de> for $ty {
-            fn deserialize<D: serde::Deserializer<'de>>(
-                deserializer: D,
-            ) -> core::result::Result<Self, D::Error> {
-                let value = <$ty>::deserialize(deserializer)?;
-                value.validate().map_err(serde::de::Error::custom)?;
-                Ok(value)
+        const _: () = {
+            #[derive(serde::Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct Unchecked {
+                $( $(#[$field_meta])* $field: $ty ),*
             }
-        }
+
+            impl<'de> serde::Deserialize<'de> for $name {
+                fn deserialize<D: serde::Deserializer<'de>>(
+                    deserializer: D,
+                ) -> core::result::Result<Self, D::Error> {
+                    let Unchecked { $($field),* } = Unchecked::deserialize(deserializer)?;
+                    let value = $name { $($field),* };
+                    value.validate().map_err(serde::de::Error::custom)?;
+                    Ok(value)
+                }
+            }
+        };
     };
 }
-pub(crate) use validated_serde;
+pub(crate) use validated_struct;
 
 /// `^[^\u0000\s]` characters: NUL and the ECMAScript `\s` class.
 fn is_nul_or_space(character: char) -> bool {

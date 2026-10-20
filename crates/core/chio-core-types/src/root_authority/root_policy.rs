@@ -17,7 +17,7 @@ use super::delegation_context::HolderClass;
 use super::jwk::JwsAlgorithm;
 use super::wire::{
     canonical_public_key, canonical_public_keys, canonical_signature, check_items, check_nul_free,
-    check_schema, check_unique, validated_serde, Identifier, Sha256Digest,
+    check_schema, check_unique, validated_struct, Identifier, Sha256Digest,
 };
 use super::RootAuthorityShapeError;
 
@@ -48,35 +48,34 @@ pub struct RootPolicyMatch {
     pub claims: Option<MatchClaims>,
 }
 
-/// One anchor rule.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct RootPolicyRule {
-    pub rule_id: Identifier,
-    #[serde(rename = "match")]
-    pub match_: RootPolicyMatch,
-    /// Identity-provider scope value to the `server/tool` names it projects to.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub idp_scope_projection: Option<BTreeMap<String, Vec<Identifier>>>,
-    pub ceiling_scope: ChioScope,
-    pub ceiling_scope_hash: Sha256Digest,
-    pub recorded_claims: RecordedClaimModes,
-    pub holder_classes: Vec<HolderClass>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub capability_ttl_secs: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_assertion_lifetime_secs: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub max_clock_skew_secs: Option<u64>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub retain_idp_artifact: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub principal: Option<Identifier>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tenant_value: Option<Identifier>,
+validated_struct! {
+    /// One anchor rule.
+    #[derive(Debug, Clone, Serialize)]
+    pub struct RootPolicyRule {
+        pub rule_id: Identifier,
+        #[serde(rename = "match")]
+        pub match_: RootPolicyMatch,
+        /// Identity-provider scope value to the `server/tool` names it projects to.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub idp_scope_projection: Option<BTreeMap<String, Vec<Identifier>>>,
+        pub ceiling_scope: ChioScope,
+        pub ceiling_scope_hash: Sha256Digest,
+        pub recorded_claims: RecordedClaimModes,
+        pub holder_classes: Vec<HolderClass>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub capability_ttl_secs: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub max_assertion_lifetime_secs: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub max_clock_skew_secs: Option<u64>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub retain_idp_artifact: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub principal: Option<Identifier>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub tenant_value: Option<Identifier>,
+    }
 }
-
-validated_serde!(RootPolicyRule);
 
 fn check_secs(
     field: &'static str,
@@ -282,16 +281,15 @@ pub struct ToolDisclosure {
     pub result: InlineFields,
 }
 
-/// The receipt disclosure policy. A tool not listed is fully committed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct RootPolicyDisclosure {
-    pub default: DisclosureDefault,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tools: Option<BTreeMap<String, ToolDisclosure>>,
+validated_struct! {
+    /// The receipt disclosure policy. A tool not listed is fully committed.
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    pub struct RootPolicyDisclosure {
+        pub default: DisclosureDefault,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pub tools: Option<BTreeMap<String, ToolDisclosure>>,
+    }
 }
-
-validated_serde!(RootPolicyDisclosure);
 
 impl RootPolicyDisclosure {
     pub fn validate(&self) -> Result<(), RootAuthorityShapeError> {
@@ -324,25 +322,24 @@ impl RootPolicyDisclosure {
     }
 }
 
-/// `chio.root-policy.v1`, signed by the provider's policy key.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(remote = "Self", deny_unknown_fields)]
-pub struct RootPolicy {
-    pub schema: String,
-    pub policy_id: Identifier,
-    #[serde(deserialize_with = "canonical_public_key")]
-    pub policy_key: PublicKey,
-    #[serde(deserialize_with = "canonical_public_keys")]
-    pub exchange_keys: Vec<PublicKey>,
-    pub rules: Vec<RootPolicyRule>,
-    pub disclosure: RootPolicyDisclosure,
-    pub valid_from: u64,
-    pub valid_until: u64,
-    #[serde(deserialize_with = "canonical_signature")]
-    pub signature: Signature,
+validated_struct! {
+    /// `chio.root-policy.v1`, signed by the provider's policy key.
+    #[derive(Debug, Clone, Serialize)]
+    pub struct RootPolicy {
+        pub schema: String,
+        pub policy_id: Identifier,
+        #[serde(deserialize_with = "canonical_public_key")]
+        pub policy_key: PublicKey,
+        #[serde(deserialize_with = "canonical_public_keys")]
+        pub exchange_keys: Vec<PublicKey>,
+        pub rules: Vec<RootPolicyRule>,
+        pub disclosure: RootPolicyDisclosure,
+        pub valid_from: u64,
+        pub valid_until: u64,
+        #[serde(deserialize_with = "canonical_signature")]
+        pub signature: Signature,
+    }
 }
-
-validated_serde!(RootPolicy);
 
 /// Every policy member except `signature`.
 #[derive(Serialize)]
