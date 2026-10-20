@@ -79,6 +79,132 @@ impl Drop for EngineDouble {
     }
 }
 
+#[test]
+fn cancellation_before_create_preserves_cleanup_without_starting(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let fixture = EngineDouble::new(serde_json::json!({}))?;
+    let (state, path) = fixture.host()?;
+    let host = super::super::super::state::Host::open(&state, true)?;
+    let plan: super::super::plan::Plan = serde_json::from_slice(&std::fs::read(path)?)?;
+    let mut journal = Journal::open(&host, &plan)?;
+    let worker = journal.workers[0].clone();
+    let attempt = journal.start(&worker)?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        let lease = journal.reserve_container(&worker.process, attempt, engine().await?.id)?;
+        let writer = journal.container_writer()?;
+        let (_cancel, cancelled) = tokio::sync::watch::channel(true);
+        let control = AttemptControl {
+            authority: std::sync::Arc::new(LaunchAuthority {
+                key: host.authority.kernel_keypair(),
+                clock: host.kernel.authority_clock(),
+                runtime: host.runtime.clone(),
+            }),
+            cancellation: Some(cancelled),
+        };
+        let (result, cleanup) = run(
+            writer,
+            lease,
+            worker,
+            state.join("worker.sock"),
+            b"{}\n".to_vec(),
+            attempt,
+            control,
+        )
+        .await;
+        let outcome = result?;
+        assert_eq!(
+            (outcome.success, outcome.reason.as_str()),
+            (false, "process_cancelled")
+        );
+        assert_eq!(journal.containers()?.len(), 1);
+        assert!(!fixture.root.path().join("starts").exists());
+        cleanup.run().await?;
+        assert!(journal.containers()?.is_empty());
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })
+}
+
+#[test]
+fn cancellation_after_attachment_keeps_custody_until_removal_is_confirmed(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for cleanup_failure in [false, true] {
+        let fixture = EngineDouble::new(serde_json::json!({
+            "worker_status": "running", "start_sleep": 30, "cleanup_failure": cleanup_failure
+        }))?;
+        let (state, path) = fixture.host()?;
+        let host = super::super::super::state::Host::open(&state, true)?;
+        let plan: super::super::plan::Plan = serde_json::from_slice(&std::fs::read(path)?)?;
+        let mut journal = Journal::open(&host, &plan)?;
+        let worker = journal.workers[0].clone();
+        let attempt = journal.start(&worker)?;
+        let socket = state.join("worker.sock");
+        let _listener = std::os::unix::net::UnixListener::bind(&socket)?;
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()?;
+        runtime.block_on(async {
+            let lease = journal.reserve_container(&worker.process, attempt, engine().await?.id)?;
+            let writer = journal.container_writer()?;
+            let (cancel, cancelled) = tokio::sync::watch::channel(false);
+            let control = AttemptControl {
+                authority: std::sync::Arc::new(LaunchAuthority {
+                    key: host.authority.kernel_keypair(),
+                    clock: host.kernel.authority_clock(),
+                    runtime: host.runtime.clone(),
+                }),
+                cancellation: Some(cancelled),
+            };
+            let signal = async {
+                tokio::time::timeout(Duration::from_secs(10), async {
+                    while !fixture.root.path().join("bootstrapped").exists() {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                })
+                .await?;
+                cancel.send(true)?;
+                Ok::<_, Box<dyn std::error::Error>>(())
+            };
+            let ((result, cleanup), signalled) = tokio::join!(
+                run(
+                    writer,
+                    lease,
+                    worker,
+                    socket,
+                    b"{}\n".to_vec(),
+                    attempt,
+                    control
+                ),
+                signal
+            );
+            signalled?;
+            assert_eq!(
+                std::fs::read_to_string(fixture.root.path().join("starts"))?,
+                "1"
+            );
+            if cleanup_failure {
+                let failure = result.err().ok_or("unconfirmed removal accepted")?;
+                assert_eq!(failure.to_string(), "process host: local Docker control client exited (exit_1); preserve state and engine for recovery");
+                assert_eq!(journal.containers()?.len(), 1);
+                fixture.scenario(serde_json::json!({}))?;
+            } else {
+                let outcome = result?;
+                assert_eq!(
+                    (outcome.success, outcome.reason.as_str()),
+                    (false, "process_cancelled")
+                );
+                assert!(journal.containers()?.is_empty());
+            }
+            cleanup.run().await?;
+            assert!(journal.containers()?.is_empty());
+            Ok::<_, Box<dyn std::error::Error>>(())
+        })?;
+    }
+    Ok(())
+}
+
 fn attachment_error_after_request(lease: &Lease) -> Result<Spawned, CliError> {
     use std::io::Write;
     // Only external request delivery is substituted. The fixture starts its
@@ -789,10 +915,7 @@ fn confirmed_launch_is_signed_before_the_bootstrap_is_released(
     assert_eq!(records.len(), 1);
     let record = &records[0];
     assert_eq!(record.state, CageEnforcementState::FullyEnforced);
-    assert_eq!(
-        (record.process_id.as_str(), record.attempt),
-        ("root", 1)
-    );
+    assert_eq!((record.process_id.as_str(), record.attempt), ("root", 1));
     assert_eq!(record.container_id, "a".repeat(64));
     assert_eq!(record.image_id, format!("sha256:{}", "1".repeat(64)));
     assert_eq!(record.engine_identity, "test-engine");

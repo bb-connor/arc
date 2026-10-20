@@ -10,6 +10,71 @@ use super::*;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+#[tokio::test]
+async fn scoped_cancellation_withholds_bootstrap_and_retains_reaper_usage() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let marker = directory.path().join("bootstrap-read");
+    let mut command = Command::new("/bin/sh");
+    command
+        .args(["-c", "read line && touch \"$0\"; sleep 30"])
+        .arg(&marker);
+    let spawned = spawn_command(command, None)?;
+    let descriptor = worker_descriptor(&spawned)?;
+    let (cancel, cancelled) = tokio::sync::watch::channel(true);
+    let outcome = wait_bounded(
+        spawned,
+        b"bootstrap\n".to_vec(),
+        None,
+        Duration::from_secs(10),
+        None,
+        None,
+        Some(cancelled),
+    )
+    .await?;
+    assert_eq!(
+        (outcome.success, outcome.reason.as_str()),
+        (false, "runner_interrupted")
+    );
+    assert!(!marker.exists());
+    assert!(reaped(&descriptor)?);
+    drop(cancel);
+    Ok(())
+}
+
+#[tokio::test]
+async fn observed_success_precedes_scoped_cancellation() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let marker = directory.path().join("exit");
+    let spawned = spawn_command(awaiting(&marker), None)?;
+    let observation = spawned.observation();
+    let (cancel, cancelled) = tokio::sync::watch::channel(false);
+    let mut waiting = Box::pin(wait_bounded(
+        spawned,
+        Vec::new(),
+        None,
+        Duration::from_secs(10),
+        None,
+        None,
+        Some(cancelled),
+    ));
+    tokio::select! {
+        biased;
+        _ = &mut waiting => return Err("worker ended before release".into()),
+        () = std::future::ready(()) => {}
+    }
+    std::fs::write(marker, b"")?;
+    let expected = published(&observation).await?;
+    assert!(expected.success);
+    cancel.send(true)?;
+    let outcome = waiting.await?;
+    assert_eq!((outcome.success, outcome.reason.as_str()), (true, "exit_0"));
+    assert_eq!(
+        (outcome.usage.peak_resident_bytes, outcome.usage.cpu_ms),
+        (expected.usage.peak_resident_bytes, expected.usage.cpu_ms)
+    );
+    Ok(())
+}
+
 fn task_present(tid: libc::pid_t) -> bool {
     Path::new(&format!("/proc/self/task/{tid}")).exists()
 }
