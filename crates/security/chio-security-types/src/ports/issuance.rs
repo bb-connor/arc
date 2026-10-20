@@ -94,23 +94,23 @@ pub struct IssuanceFreezePendingRelease {
     pub contribution: IssuanceFreezeContribution,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(
-    rename_all = "snake_case",
-    tag = "status",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum IssuanceFreezeOperationStatus {
-    NotExecuted,
-    ReleasePending {
-        contribution: Box<IssuanceFreezeContribution>,
-    },
-    Completed {
-        result: EffectResult,
-    },
+crate::lossless_serde! {
+    #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+    #[serde(
+        rename_all = "snake_case",
+        tag = "status",
+        deny_unknown_fields
+    )]
+    pub enum IssuanceFreezeOperationStatus {
+        NotExecuted,
+        ReleasePending {
+            contribution: Box<IssuanceFreezeContribution>,
+        },
+        Completed {
+            result: EffectResult,
+        },
+    }
 }
-crate::lossless_serde!(IssuanceFreezeOperationStatus);
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]

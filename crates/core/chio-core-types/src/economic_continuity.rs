@@ -731,18 +731,18 @@ impl EconomicRequestReplayV1 {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(
-    tag = "mode",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum EconomicActionAuthorizationV1 {
-    Direct,
-    NOfM { frost: EconomicFrostBindingV1 },
+chio_security_types::lossless_serde! {
+    #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+    #[serde(
+        tag = "mode",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum EconomicActionAuthorizationV1 {
+        Direct,
+        NOfM { frost: EconomicFrostBindingV1 },
+    }
 }
-chio_security_types::lossless_serde!(EconomicActionAuthorizationV1);
 
 impl EconomicActionAuthorizationV1 {
     fn validate(&self, action_digest: &str) -> Result<(), EconomicContinuityError> {

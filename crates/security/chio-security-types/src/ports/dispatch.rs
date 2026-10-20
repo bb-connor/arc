@@ -17,22 +17,22 @@ pub struct ResponseDispatchKey {
     pub dispatch_id: RecordId,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(
-    tag = "approval_mode",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum ResponseDispatchApproval {
-    Automatic,
-    Governed {
-        admission_operation_id: RecordId,
-        admission_operation_version: u64,
-        approval_set_hash: Digest32,
-    },
+crate::lossless_serde! {
+    #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+    #[serde(
+        tag = "approval_mode",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum ResponseDispatchApproval {
+        Automatic,
+        Governed {
+            admission_operation_id: RecordId,
+            admission_operation_version: u64,
+            approval_set_hash: Digest32,
+        },
+    }
 }
-crate::lossless_serde!(ResponseDispatchApproval);
 
 /// First immutable automatic preparation for one tenant-scoped action.
 #[derive(Clone, Debug, Eq, PartialEq)]
