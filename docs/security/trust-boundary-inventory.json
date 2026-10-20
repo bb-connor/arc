@@ -24208,6 +24208,27 @@
     ],
     "crates/products/chio-cli/src/cli/dispatch/proof/fixture_runtime_check.rs": [
       "verify_committed_runtime_fixture::shared-reader::crates/trust/chio-attest-buyer/src/api.rs::verify_proof_package_json"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store.rs": [
+      "decode_blob::original-json-reader::UntrustedJsonText"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store/projection.rs": [
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob",
+      "verify::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs": [
+      "idp_key_snapshot::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "provider_identity::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "read_retained::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store.rs::decode_blob",
+      "root_policy::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained",
+      "verify_retained_table::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::read_retained"
+    ],
+    "crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs": [
+      "initialize_root_exchange_schema::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_root_exchange_invariants",
+      "initialize_root_exchange_schema::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/schema.rs::verify_root_exchange_invariants",
+      "verify_root_exchange_invariants::shared-reader::crates/platform/chio-store-sqlite/src/root_exchange_store/reads.rs::verify_retained_table"
     ]
   },
   "retired_direct_readers": {

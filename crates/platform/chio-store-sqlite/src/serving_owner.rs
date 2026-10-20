@@ -61,6 +61,7 @@ pub(crate) const SERVING_NAMESPACES: &[&str] = &[
     "channel_release_publisher",
     "work_delegation",
     "work_graph",
+    "root_exchange",
     "tool_outcome",
     "finding_market",
     "finding_purchase",
@@ -919,6 +920,14 @@ impl SqliteAuthorityStore {
     }
 
     #[must_use]
+    pub fn root_exchange_store(&self) -> crate::root_exchange_store::SqliteRootExchangeStore {
+        crate::root_exchange_store::SqliteRootExchangeStore::open_alongside(
+            self.connection.clone(),
+            self.owner.clone(),
+        )
+    }
+
+    #[must_use]
     pub fn work_graph_store(&self) -> crate::work_graph_store::SqliteWorkGraphStore {
         crate::work_graph_store::SqliteWorkGraphStore::open_alongside(
             self.connection.clone(),
@@ -956,6 +965,7 @@ fn initialize_serving_components(
     crate::channel_release_publisher_store::initialize_channel_release_publisher_schema(schema)?;
     crate::delegation_store::initialize_work_delegation_schema(schema)?;
     crate::work_graph_store::initialize_work_graph_schema(schema)?;
+    crate::root_exchange_store::initialize_root_exchange_schema(schema)?;
     crate::tool_outcome_store::initialize_tool_outcome_schema(schema)
         .map_err(SqliteServingOwnerError::ToolOutcomeSchema)?;
     crate::finding_market_store::initialize_finding_market_schema(schema)
@@ -1662,6 +1672,7 @@ fn verify_authority_store_invariants(
     )?;
     crate::delegation_store::verify_work_delegation_invariants(connection)?;
     crate::work_graph_store::verify_work_graph_invariants(connection)?;
+    crate::root_exchange_store::verify_root_exchange_invariants(connection)?;
     Ok(())
 }
 
