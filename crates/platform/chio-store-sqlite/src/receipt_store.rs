@@ -146,7 +146,9 @@ INSERT OR IGNORE INTO chio_receipt_sink_generation (singleton, store_generation)
 VALUES (1, '0');
 "#;
 
-fn ensure_receipt_rollback_generation(connection: &Connection) -> Result<u64, ReceiptStoreError> {
+fn initialize_receipt_rollback_generation(
+    connection: &Connection,
+) -> Result<u64, ReceiptStoreError> {
     connection.execute_batch(RECEIPT_ROLLBACK_GENERATION_SCHEMA)?;
     load_receipt_rollback_generation(connection)
 }
@@ -3217,6 +3219,8 @@ mod append;
 #[path = "receipt_store/bootstrap.rs"]
 mod bootstrap;
 use append::{append_chio_receipt_tx, append_chio_receipt_tx_with_insert_status};
+pub use bootstrap::initialize_receipt_approval_database;
+pub(crate) use bootstrap::validate_receipt_catalog;
 mod chaos_test_hooks;
 #[path = "receipt_store/query_snapshot_access.rs"]
 mod query_snapshot_access;

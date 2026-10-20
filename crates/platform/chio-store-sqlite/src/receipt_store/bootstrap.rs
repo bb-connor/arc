@@ -6,6 +6,8 @@ mod federated;
 mod listing;
 #[path = "bootstrap/open.rs"]
 mod open;
+pub use open::initialize_receipt_approval_database;
+pub(crate) use open::validate_receipt_catalog;
 #[path = "bootstrap/qualification.rs"]
 mod qualification;
 

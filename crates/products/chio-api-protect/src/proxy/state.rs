@@ -415,12 +415,10 @@ impl ProtectProxy {
 
         let policy_hash = spec_content.policy_hash(self.config.allow_anonymous_reads)?;
 
-        // Open the durable receipt store first so it owns the shared sidecar
-        // file's provenance anchor; the approval store then co-locates onto that
-        // file. Opening receipt-first fails closed on a path mistargeted at a
-        // foreign approval database: it carries no receipt anchor, so the receipt
-        // store refuses it here instead of adopting it and commingling receipt
-        // tables into another store's file.
+        if let Some(path) = durable_receipt_db {
+            chio_store_sqlite::initialize_receipt_approval_database(path)
+                .map_err(|error| ProtectError::ReceiptStore(error.to_string()))?;
+        }
         let durable_receipt_store: Option<Arc<chio_store_sqlite::SqliteReceiptStore>> =
             match durable_receipt_db {
                 Some(path) => Some(Arc::new(
