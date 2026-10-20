@@ -1,0 +1,1471 @@
+//! Pure checkpoint and evidence verification.
+//!
+//! Signed checkpoint statements commit a batch of receipts to a Merkle root
+//! and the whole checkpoint chain to a chain root. Everything here derives,
+//! checks or builds those records from caller-supplied data: no store, no
+//! clock and no I/O. Issuance time is a parameter.
+//!
+//! Statement schema: "chio.checkpoint_statement.v1"
+
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::format;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
+use core::fmt;
+
+use chio_core_types::canonical::canonical_json_bytes;
+use chio_core_types::hashing::sha256_hex;
+use chio_core_types::hashing::Hash;
+use chio_core_types::merkle::{leaf_hash, verify_consistency_proof, MerkleTree};
+use chio_core_types::receipt::checkpoint::{
+    is_supported_checkpoint_schema, CheckpointConsistencyProof, CheckpointEquivocation,
+    CheckpointEquivocationKind, CheckpointPublication, CheckpointPublicationIdentityKind,
+    CheckpointPublicationTrustAnchorBinding, CheckpointTransparencySummary, CheckpointWitness,
+    KernelCheckpoint, KernelCheckpointBody, ReceiptInclusionProof,
+    CHECKPOINT_CONSISTENCY_PROOF_SCHEMA, CHECKPOINT_EQUIVOCATION_SCHEMA,
+    CHECKPOINT_PUBLICATION_SCHEMA, CHECKPOINT_WITNESS_SCHEMA,
+};
+use serde::Serialize;
+
+mod builders;
+mod claims;
+mod consistency;
+
+pub use builders::{
+    build_checkpoint_with_chain_frontier_at, build_checkpoint_with_previous_at,
+    CheckpointSigningContext,
+};
+pub use claims::build_evidence_transparency_claims;
+pub use consistency::CheckpointConsistencyAnchor;
+use consistency::{chain_leaf_is_committed, consistency_prefix_is_anchored};
+
+/// Error type for checkpoint operations.
+#[derive(Debug)]
+pub enum CheckpointError {
+    Clock(chio_security_types::clock::ClockError),
+    Merkle(chio_core_types::Error),
+    Serialization(String),
+    Invalid(String),
+    InvalidSignature,
+    Continuity(String),
+}
+
+impl fmt::Display for CheckpointError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Clock(error) => fmt::Display::fmt(error, formatter),
+            Self::Merkle(error) => write!(formatter, "merkle error: {error}"),
+            Self::Serialization(reason) => write!(formatter, "serialization error: {reason}"),
+            Self::Invalid(reason) => write!(formatter, "invalid checkpoint: {reason}"),
+            Self::InvalidSignature => {
+                formatter.write_str("checkpoint signature verification failed")
+            }
+            Self::Continuity(reason) => write!(formatter, "checkpoint continuity error: {reason}"),
+        }
+    }
+}
+
+impl core::error::Error for CheckpointError {}
+
+impl From<chio_security_types::clock::ClockError> for CheckpointError {
+    fn from(error: chio_security_types::clock::ClockError) -> Self {
+        Self::Clock(error)
+    }
+}
+
+impl From<chio_core_types::Error> for CheckpointError {
+    fn from(error: chio_core_types::Error) -> Self {
+        Self::Merkle(error)
+    }
+}
+
+#[cfg(test)]
+mod test_counters {
+    extern crate std;
+
+    std::thread_local! {
+        pub(super) static CHECKPOINT_SIGNATURE_VERIFICATION_COUNT: std::cell::Cell<usize> =
+            const { std::cell::Cell::new(0) };
+        pub(super) static CHECKPOINT_EQUIVOCATION_INSPECTION_COUNT: std::cell::Cell<usize> =
+            const { std::cell::Cell::new(0) };
+    }
+}
+
+#[cfg(test)]
+fn checkpoint_signature_verification_count_for_test() -> usize {
+    test_counters::CHECKPOINT_SIGNATURE_VERIFICATION_COUNT.with(core::cell::Cell::get)
+}
+
+#[cfg(test)]
+fn checkpoint_equivocation_inspection_count_for_test() -> usize {
+    test_counters::CHECKPOINT_EQUIVOCATION_INSPECTION_COUNT.with(core::cell::Cell::get)
+}
+
+#[must_use]
+pub fn checkpoint_log_id(checkpoint: &KernelCheckpoint) -> String {
+    let log_key_bytes: Vec<u8> = match checkpoint.body.kernel_key.ed25519_bytes() {
+        Ok(bytes) => bytes.to_vec(),
+        Err(_) => checkpoint.body.kernel_key.to_hex().into_bytes(),
+    };
+    format!("local-log-{}", sha256_hex(&log_key_bytes))
+}
+
+#[must_use]
+pub fn checkpoint_log_tree_size(body: &KernelCheckpointBody) -> u64 {
+    body.batch_end_seq
+}
+
+fn checkpoint_batch_entry_count(body: &KernelCheckpointBody) -> Result<u64, CheckpointError> {
+    body.batch_end_seq
+        .checked_sub(body.batch_start_seq)
+        .and_then(|count| count.checked_add(1))
+        .ok_or_else(|| {
+            CheckpointError::Invalid(format!(
+                "invalid checkpoint entry range {}-{}",
+                body.batch_start_seq, body.batch_end_seq
+            ))
+        })
+}
+
+/// Return the canonical SHA-256 digest for a checkpoint body.
+pub fn checkpoint_body_sha256(body: &KernelCheckpointBody) -> Result<String, CheckpointError> {
+    let body_bytes =
+        canonical_json_bytes(body).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+    Ok(sha256_hex(&body_bytes))
+}
+
+/// Canonical leaf content for the checkpoint-chain commitment.
+///
+/// Deliberately excludes `issued_at`, the kernel key, and the signature so
+/// that two honest builders checkpointing the same batch produce the same
+/// leaf even when their wall clocks differ.
+#[derive(Serialize)]
+struct CheckpointChainLeaf {
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    merkle_root: Hash,
+}
+
+/// RFC 6962 leaf hash of one checkpoint's chain-commitment leaf.
+pub fn checkpoint_chain_leaf_hash_from_parts(
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    merkle_root: Hash,
+) -> Result<Hash, CheckpointError> {
+    let leaf = CheckpointChainLeaf {
+        checkpoint_seq,
+        batch_start_seq,
+        batch_end_seq,
+        merkle_root,
+    };
+    let leaf_bytes =
+        canonical_json_bytes(&leaf).map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+    Ok(leaf_hash(&leaf_bytes))
+}
+
+/// RFC 6962 leaf hash of a checkpoint body's chain-commitment leaf.
+pub fn checkpoint_chain_leaf_hash(body: &KernelCheckpointBody) -> Result<Hash, CheckpointError> {
+    checkpoint_chain_leaf_hash_from_parts(
+        body.checkpoint_seq,
+        body.batch_start_seq,
+        body.batch_end_seq,
+        body.merkle_root,
+    )
+}
+
+/// Append-only frontier of the checkpoint-chain Merkle tree.
+///
+/// Holds one root per perfect subtree covering the leaves so far, largest
+/// first, which is enough to compute the RFC 6962 tree head and to extend it.
+/// Appending is amortized O(1) hashes and the root costs O(log n), so a
+/// long-lived writer never rehashes the whole chain to issue one checkpoint.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CheckpointChainFrontier {
+    /// `(subtree root, leaf span)`, spans strictly decreasing powers of two.
+    subtrees: Vec<(Hash, u64)>,
+}
+
+impl CheckpointChainFrontier {
+    /// Frontier over no leaves.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Rebuild from every chain leaf in order. O(n); used once when a writer
+    /// seeds or resyncs its head, never on the per-checkpoint path.
+    #[must_use]
+    pub fn from_leaves(chain_leaf_hashes: &[Hash]) -> Self {
+        let mut frontier = Self::empty();
+        for leaf in chain_leaf_hashes {
+            frontier.append(*leaf);
+        }
+        frontier
+    }
+
+    /// Number of chain leaves covered.
+    #[must_use]
+    pub fn leaf_count(&self) -> u64 {
+        self.subtrees.iter().map(|(_, span)| *span).sum()
+    }
+
+    /// Extend by one chain leaf, merging equal-span neighbours so the spans
+    /// stay strictly decreasing powers of two.
+    pub fn append(&mut self, chain_leaf_hash: Hash) {
+        self.subtrees.push((chain_leaf_hash, 1));
+        while let [.., (left, left_span), (right, right_span)] = self.subtrees.as_slice() {
+            let (left, left_span, right, right_span) = (*left, *left_span, *right, *right_span);
+            if left_span != right_span {
+                break;
+            }
+            self.subtrees.truncate(self.subtrees.len() - 2);
+            self.subtrees.push((
+                chio_core_types::merkle::node_hash(&left, &right),
+                left_span * 2,
+            ));
+        }
+    }
+
+    /// Number of perfect subtrees retained; equals the population count of
+    /// the leaf count.
+    #[cfg(test)]
+    #[must_use]
+    pub fn subtree_count_for_test(&self) -> usize {
+        self.subtrees.len()
+    }
+
+    /// RFC 6962 tree head over the covered leaves, or `None` when empty.
+    ///
+    /// Folds right-associatively, which is the same shape the recursive
+    /// definition produces for a tree whose right edge is incomplete.
+    #[must_use]
+    pub fn root(&self) -> Option<Hash> {
+        let (&(last, _), prefix) = self.subtrees.split_last()?;
+        Some(prefix.iter().rev().fold(last, |acc, (subtree, _)| {
+            chio_core_types::merkle::node_hash(subtree, &acc)
+        }))
+    }
+}
+
+/// Chain-commitment root over an ordered, gap-free run of chain leaves
+/// starting at checkpoint_seq 1.
+pub fn checkpoint_chain_root(chain_leaf_hashes: &[Hash]) -> Result<Hash, CheckpointError> {
+    Ok(MerkleTree::from_hashes(chain_leaf_hashes.to_vec())?.root())
+}
+
+/// Build a deterministic publication record from a signed checkpoint.
+pub fn build_checkpoint_publication(
+    checkpoint: &KernelCheckpoint,
+) -> Result<CheckpointPublication, CheckpointError> {
+    validate_checkpoint(checkpoint)?;
+    Ok(CheckpointPublication {
+        log_id: checkpoint_log_id(checkpoint),
+        schema: CHECKPOINT_PUBLICATION_SCHEMA.to_string(),
+        checkpoint_seq: checkpoint.body.checkpoint_seq,
+        checkpoint_sha256: checkpoint_body_sha256(&checkpoint.body)?,
+        merkle_root: checkpoint.body.merkle_root,
+        published_at: checkpoint.body.issued_at,
+        kernel_key: checkpoint.body.kernel_key.clone(),
+        log_tree_size: checkpoint_log_tree_size(&checkpoint.body),
+        entry_start_seq: checkpoint.body.batch_start_seq,
+        entry_end_seq: checkpoint.body.batch_end_seq,
+        previous_checkpoint_sha256: checkpoint.body.previous_checkpoint_sha256.clone(),
+        trust_anchor_binding: None,
+    })
+}
+
+/// Attach a validated trust-anchor binding to an already-derived publication.
+pub fn bind_checkpoint_publication_trust_anchor(
+    publication: CheckpointPublication,
+    trust_anchor_binding: CheckpointPublicationTrustAnchorBinding,
+) -> Result<CheckpointPublication, CheckpointError> {
+    trust_anchor_binding
+        .validate()
+        .map_err(|error| CheckpointError::Invalid(error.to_string()))?;
+    bind_checkpoint_publication_trust_anchor_after_validation(publication, trust_anchor_binding)
+}
+
+fn bind_checkpoint_publication_trust_anchor_after_validation(
+    mut publication: CheckpointPublication,
+    trust_anchor_binding: CheckpointPublicationTrustAnchorBinding,
+) -> Result<CheckpointPublication, CheckpointError> {
+    if trust_anchor_binding.publication_identity.kind == CheckpointPublicationIdentityKind::LocalLog
+        && trust_anchor_binding.publication_identity.identity != publication.log_id
+    {
+        return Err(CheckpointError::Invalid(format!(
+            "checkpoint publication local_log identity {} does not match log_id {}",
+            trust_anchor_binding.publication_identity.identity, publication.log_id
+        )));
+    }
+    publication.trust_anchor_binding = Some(trust_anchor_binding);
+    Ok(publication)
+}
+
+/// Build a deterministic publication record that is explicitly bound to
+/// declared trust-anchor verifier material.
+pub fn build_trust_anchored_checkpoint_publication(
+    checkpoint: &KernelCheckpoint,
+    trust_anchor_binding: CheckpointPublicationTrustAnchorBinding,
+) -> Result<CheckpointPublication, CheckpointError> {
+    trust_anchor_binding
+        .validate()
+        .map_err(|error| CheckpointError::Invalid(error.to_string()))?;
+    let publication = build_checkpoint_publication(checkpoint)?;
+    bind_checkpoint_publication_trust_anchor_after_validation(publication, trust_anchor_binding)
+}
+
+/// Build a deterministic witness record when `witness_checkpoint` cites `checkpoint`.
+pub fn build_checkpoint_witness(
+    checkpoint: &KernelCheckpoint,
+    witness_checkpoint: &KernelCheckpoint,
+) -> Result<CheckpointWitness, CheckpointError> {
+    validate_checkpoint(checkpoint)?;
+    validate_checkpoint(witness_checkpoint)?;
+
+    let checkpoint_sha256 = checkpoint_body_sha256(&checkpoint.body)?;
+    let witness_checkpoint_sha256 = checkpoint_body_sha256(&witness_checkpoint.body)?;
+    let Some(previous_checkpoint_sha256) = witness_checkpoint
+        .body
+        .previous_checkpoint_sha256
+        .as_deref()
+    else {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} does not cite a predecessor digest",
+            witness_checkpoint.body.checkpoint_seq
+        )));
+    };
+    if previous_checkpoint_sha256 != checkpoint_sha256 {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} does not witness checkpoint {}",
+            witness_checkpoint.body.checkpoint_seq, checkpoint.body.checkpoint_seq
+        )));
+    }
+
+    Ok(CheckpointWitness {
+        log_id: checkpoint_log_id(checkpoint),
+        schema: CHECKPOINT_WITNESS_SCHEMA.to_string(),
+        checkpoint_seq: checkpoint.body.checkpoint_seq,
+        checkpoint_sha256,
+        witness_checkpoint_seq: witness_checkpoint.body.checkpoint_seq,
+        witness_checkpoint_sha256,
+        witnessed_at: witness_checkpoint.body.issued_at,
+    })
+}
+
+fn chain_tree_size(checkpoint: &KernelCheckpoint) -> Result<usize, CheckpointError> {
+    usize::try_from(checkpoint.body.checkpoint_seq).map_err(|_| {
+        CheckpointError::Invalid(format!(
+            "checkpoint_seq {} exceeds the addressable chain size",
+            checkpoint.body.checkpoint_seq
+        ))
+    })
+}
+
+/// Ensure the two pair endpoints appear at their own positions in the
+/// supplied chain leaves, then hand back the parsed sizes.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "Both nonzero tree sizes are checked against the supplied leaf count before indexing."
+)]
+fn validate_chain_leaves_for_pair(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+    chain_leaf_hashes: &[Hash],
+) -> Result<(usize, usize), CheckpointError> {
+    let from_size = chain_tree_size(previous)?;
+    let to_size = chain_tree_size(current)?;
+    // Callers reach here through `validate_checkpoint_predecessor`, which
+    // forces `from_size + 1 == to_size`; re-check locally so a future direct
+    // caller gets an error rather than an out-of-bounds index below.
+    if from_size == 0 || from_size >= to_size {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} does not extend checkpoint {} in chain order",
+            current.body.checkpoint_seq, previous.body.checkpoint_seq
+        )));
+    }
+    if chain_leaf_hashes.len() < to_size {
+        return Err(CheckpointError::Continuity(format!(
+            "chain leaf count {} does not reach checkpoint {} chain size {}",
+            chain_leaf_hashes.len(),
+            current.body.checkpoint_seq,
+            to_size
+        )));
+    }
+    if chain_leaf_hashes[from_size - 1] != checkpoint_chain_leaf_hash(&previous.body)? {
+        return Err(CheckpointError::Continuity(format!(
+            "chain leaf {} does not match the predecessor checkpoint body",
+            previous.body.checkpoint_seq
+        )));
+    }
+    if chain_leaf_hashes[to_size - 1] != checkpoint_chain_leaf_hash(&current.body)? {
+        return Err(CheckpointError::Continuity(format!(
+            "chain leaf {} does not match the checkpoint body",
+            current.body.checkpoint_seq
+        )));
+    }
+    Ok((from_size, to_size))
+}
+
+fn require_chain_root(checkpoint: &KernelCheckpoint) -> Result<Hash, CheckpointError> {
+    checkpoint.body.chain_root.ok_or_else(|| {
+        CheckpointError::Continuity(format!(
+            "checkpoint {} carries no chain commitment; consistency is unverifiable",
+            checkpoint.body.checkpoint_seq
+        ))
+    })
+}
+
+fn validate_checkpoint_chain_commitments(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+    chain_leaf_hashes: &[Hash],
+    chain_tree: &MerkleTree,
+) -> Result<(usize, usize), CheckpointError> {
+    let (from_size, to_size) =
+        validate_chain_leaves_for_pair(previous, current, chain_leaf_hashes)?;
+    if Some(chain_tree.prefix_root(from_size)?) != previous.body.chain_root {
+        return Err(CheckpointError::Continuity(format!(
+            "predecessor {} chain_root does not match the retained checkpoint chain",
+            previous.body.checkpoint_seq
+        )));
+    }
+    if Some(chain_tree.prefix_root(to_size)?) != current.body.chain_root {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} chain_root does not extend the retained checkpoint chain",
+            current.body.checkpoint_seq
+        )));
+    }
+    Ok((from_size, to_size))
+}
+
+fn build_checkpoint_consistency_proof_from_tree(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+    chain_leaf_hashes: &[Hash],
+    chain_tree: &MerkleTree,
+) -> Result<CheckpointConsistencyProof, CheckpointError> {
+    validate_checkpoint_predecessor(previous, current)?;
+    let previous = ValidatedCheckpoint::after_validation(previous)?;
+    let current = ValidatedCheckpoint::after_validation(current)?;
+    build_checkpoint_consistency_proof_from_validated(
+        &previous,
+        &current,
+        chain_leaf_hashes,
+        chain_tree,
+    )
+}
+
+fn build_checkpoint_consistency_proof_from_validated(
+    previous: &ValidatedCheckpoint<'_>,
+    current: &ValidatedCheckpoint<'_>,
+    chain_leaf_hashes: &[Hash],
+    chain_tree: &MerkleTree,
+) -> Result<CheckpointConsistencyProof, CheckpointError> {
+    validate_checkpoint_predecessor_link(
+        previous.checkpoint,
+        &previous.checkpoint_sha256,
+        current.checkpoint,
+    )?;
+    if previous.log_id != current.log_id {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} derives log_id {} but predecessor {} derives {}",
+            current.checkpoint.body.checkpoint_seq,
+            current.log_id,
+            previous.checkpoint.body.checkpoint_seq,
+            previous.log_id
+        )));
+    }
+
+    let from_chain_root = require_chain_root(previous.checkpoint)?;
+    let to_chain_root = require_chain_root(current.checkpoint)?;
+    let (from_size, to_size) = validate_checkpoint_chain_commitments(
+        previous.checkpoint,
+        current.checkpoint,
+        chain_leaf_hashes,
+        chain_tree,
+    )?;
+    let chain_proof_hashes = chain_tree.consistency_proof_between(from_size, to_size)?;
+    let from_leaf_inclusion = chain_tree.inclusion_proof_at_size(from_size - 1, from_size)?;
+    let to_leaf_inclusion = chain_tree.inclusion_proof_at_size(to_size - 1, to_size)?;
+
+    Ok(CheckpointConsistencyProof {
+        schema: CHECKPOINT_CONSISTENCY_PROOF_SCHEMA.to_string(),
+        log_id: current.log_id.clone(),
+        from_checkpoint_seq: previous.checkpoint.body.checkpoint_seq,
+        to_checkpoint_seq: current.checkpoint.body.checkpoint_seq,
+        from_checkpoint_sha256: previous.checkpoint_sha256.clone(),
+        to_checkpoint_sha256: current.checkpoint_sha256.clone(),
+        from_log_tree_size: previous.log_tree_size,
+        to_log_tree_size: current.log_tree_size,
+        appended_entry_start_seq: current.checkpoint.body.batch_start_seq,
+        appended_entry_end_seq: current.checkpoint.body.batch_end_seq,
+        from_chain_root,
+        to_chain_root,
+        chain_proof_hashes,
+        from_leaf_inclusion,
+        to_leaf_inclusion,
+    })
+}
+
+/// Build a Merkle consistency proof showing that `current`'s chain commitment
+/// is an append-only extension of `previous`'s.
+///
+/// `chain_leaf_hashes` must contain the chain leaf of every checkpoint from
+/// sequence 1 through `current`, in order (see
+/// [`checkpoint_chain_leaf_hash`]). Both checkpoints must carry a signed
+/// `chain_root` and both roots must match the supplied leaves; the proof
+/// fails to build rather than committing to unverified data.
+pub fn build_checkpoint_consistency_proof(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+    chain_leaf_hashes: &[Hash],
+) -> Result<CheckpointConsistencyProof, CheckpointError> {
+    let to_size = chain_tree_size(current)?;
+    if chain_leaf_hashes.len() != to_size {
+        return Err(CheckpointError::Continuity(format!(
+            "chain leaf count {} does not match checkpoint {} chain size {}",
+            chain_leaf_hashes.len(),
+            current.body.checkpoint_seq,
+            to_size
+        )));
+    }
+    let tree = MerkleTree::from_hashes(chain_leaf_hashes.to_vec())?;
+    build_checkpoint_consistency_proof_from_tree(previous, current, chain_leaf_hashes, &tree)
+}
+
+/// Verify a genesis-anchored consistency proof against two signed checkpoints.
+///
+/// The earlier endpoint must be checkpoint 1; a pair that starts later carries
+/// a prefix this input set cannot judge, so it is an error here. Mid-chain
+/// pairs go through [`verify_checkpoint_consistency_proof_with_anchor`].
+pub fn verify_checkpoint_consistency_proof(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+    proof: &CheckpointConsistencyProof,
+) -> Result<bool, CheckpointError> {
+    verify_checkpoint_consistency_proof_with_anchor(
+        previous,
+        current,
+        proof,
+        CheckpointConsistencyAnchor::Genesis,
+    )
+}
+
+/// Verify a consistency proof against two signed checkpoints and an anchor for
+/// the prefix below the earlier endpoint.
+///
+/// The Merkle path in the proof is checked against the `chain_root`
+/// commitments inside the two signed bodies, so a verifier needs nothing
+/// beyond the two checkpoints, the proof, and the anchor. Structural
+/// mismatches (wrong pair, missing chain commitments, unsupported schema, an
+/// unanchored mid-chain pair) are errors; a well-formed proof that does not
+/// verify returns `Ok(false)`.
+pub fn verify_checkpoint_consistency_proof_with_anchor(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+    proof: &CheckpointConsistencyProof,
+    anchor: CheckpointConsistencyAnchor<'_>,
+) -> Result<bool, CheckpointError> {
+    validate_checkpoint_predecessor(previous, current)?;
+    let previous_log_id = checkpoint_log_id(previous);
+    let current_log_id = checkpoint_log_id(current);
+    if previous_log_id != current_log_id {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} derives log_id {} but predecessor {} derives {}",
+            current.body.checkpoint_seq,
+            current_log_id,
+            previous.body.checkpoint_seq,
+            previous_log_id
+        )));
+    }
+    let metadata_matches = proof.log_id == current_log_id
+        && proof.from_checkpoint_seq == previous.body.checkpoint_seq
+        && proof.to_checkpoint_seq == current.body.checkpoint_seq
+        && proof.from_checkpoint_sha256 == checkpoint_body_sha256(&previous.body)?
+        && proof.to_checkpoint_sha256 == checkpoint_body_sha256(&current.body)?
+        && proof.from_log_tree_size == checkpoint_log_tree_size(&previous.body)
+        && proof.to_log_tree_size == checkpoint_log_tree_size(&current.body)
+        && proof.appended_entry_start_seq == current.body.batch_start_seq
+        && proof.appended_entry_end_seq == current.body.batch_end_seq;
+    if !metadata_matches {
+        return Ok(false);
+    }
+
+    if proof.schema != CHECKPOINT_CONSISTENCY_PROOF_SCHEMA {
+        return Err(CheckpointError::Invalid(format!(
+            "unsupported consistency proof schema {}",
+            proof.schema
+        )));
+    }
+    let from_chain_root = require_chain_root(previous)?;
+    let to_chain_root = require_chain_root(current)?;
+    if proof.from_chain_root != from_chain_root || proof.to_chain_root != to_chain_root {
+        return Ok(false);
+    }
+
+    // Both committed chains must end in their own checkpoint's leaf. Binding
+    // only the later endpoint would leave a pair starting after checkpoint 1
+    // open: a key holder could commit an arbitrary tree as the earlier root,
+    // extend it with the later real leaf, and produce paths that verify while
+    // the earlier root never contained the earlier body.
+    let from_size = chain_tree_size(previous)?;
+    let to_size = chain_tree_size(current)?;
+    if !chain_leaf_is_committed(
+        &proof.from_leaf_inclusion,
+        from_size,
+        checkpoint_chain_leaf_hash(&previous.body)?,
+        &from_chain_root,
+    ) || !chain_leaf_is_committed(
+        &proof.to_leaf_inclusion,
+        to_size,
+        checkpoint_chain_leaf_hash(&current.body)?,
+        &to_chain_root,
+    ) {
+        return Ok(false);
+    }
+
+    if !consistency_prefix_is_anchored(previous, from_size, &from_chain_root, anchor)? {
+        return Ok(false);
+    }
+
+    Ok(verify_consistency_proof(
+        from_size,
+        to_size,
+        &from_chain_root,
+        &to_chain_root,
+        &proof.chain_proof_hashes,
+    ))
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "Keep the existing explicit boundary parameters together; changing the owning API is separate from enforcing unsafe and panic rules."
+)]
+fn ordered_equivocation(
+    kind: CheckpointEquivocationKind,
+    log_id: Option<String>,
+    log_tree_size: Option<u64>,
+    first_seq: u64,
+    first_sha256: String,
+    second_seq: u64,
+    second_sha256: String,
+    previous_checkpoint_sha256: Option<String>,
+) -> CheckpointEquivocation {
+    if (first_seq, first_sha256.as_str()) <= (second_seq, second_sha256.as_str()) {
+        CheckpointEquivocation {
+            schema: CHECKPOINT_EQUIVOCATION_SCHEMA.to_string(),
+            kind,
+            log_id,
+            log_tree_size,
+            first_checkpoint_seq: first_seq,
+            second_checkpoint_seq: second_seq,
+            first_checkpoint_sha256: first_sha256,
+            second_checkpoint_sha256: second_sha256,
+            previous_checkpoint_sha256,
+        }
+    } else {
+        CheckpointEquivocation {
+            schema: CHECKPOINT_EQUIVOCATION_SCHEMA.to_string(),
+            kind,
+            log_id,
+            log_tree_size,
+            first_checkpoint_seq: second_seq,
+            second_checkpoint_seq: first_seq,
+            first_checkpoint_sha256: second_sha256,
+            second_checkpoint_sha256: first_sha256,
+            previous_checkpoint_sha256,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ValidatedCheckpoint<'a> {
+    checkpoint: &'a KernelCheckpoint,
+    checkpoint_sha256: String,
+    log_id: String,
+    log_tree_size: u64,
+}
+
+impl<'a> ValidatedCheckpoint<'a> {
+    fn validate(checkpoint: &'a KernelCheckpoint) -> Result<Self, CheckpointError> {
+        validate_checkpoint(checkpoint)?;
+        Self::after_validation(checkpoint)
+    }
+
+    fn after_validation(checkpoint: &'a KernelCheckpoint) -> Result<Self, CheckpointError> {
+        Ok(Self {
+            checkpoint,
+            checkpoint_sha256: checkpoint_body_sha256(&checkpoint.body)?,
+            log_id: checkpoint_log_id(checkpoint),
+            log_tree_size: checkpoint_log_tree_size(&checkpoint.body),
+        })
+    }
+}
+
+fn detect_checkpoint_equivocation_from_validated(
+    first: &ValidatedCheckpoint<'_>,
+    second: &ValidatedCheckpoint<'_>,
+) -> Option<CheckpointEquivocation> {
+    #[cfg(test)]
+    test_counters::CHECKPOINT_EQUIVOCATION_INSPECTION_COUNT.with(|count| {
+        count.set(count.get().saturating_add(1));
+    });
+    if first.checkpoint_sha256 == second.checkpoint_sha256 {
+        return None;
+    }
+
+    if first.checkpoint.body.checkpoint_seq == second.checkpoint.body.checkpoint_seq {
+        return Some(ordered_equivocation(
+            CheckpointEquivocationKind::ConflictingCheckpointSeq,
+            (first.log_id == second.log_id).then(|| first.log_id.clone()),
+            (first.log_tree_size == second.log_tree_size).then_some(first.log_tree_size),
+            first.checkpoint.body.checkpoint_seq,
+            first.checkpoint_sha256.clone(),
+            second.checkpoint.body.checkpoint_seq,
+            second.checkpoint_sha256.clone(),
+            first
+                .checkpoint
+                .body
+                .previous_checkpoint_sha256
+                .clone()
+                .or_else(|| second.checkpoint.body.previous_checkpoint_sha256.clone()),
+        ));
+    }
+
+    if first.log_id == second.log_id && first.log_tree_size == second.log_tree_size {
+        return Some(ordered_equivocation(
+            CheckpointEquivocationKind::ConflictingLogTreeSize,
+            Some(first.log_id.clone()),
+            Some(first.log_tree_size),
+            first.checkpoint.body.checkpoint_seq,
+            first.checkpoint_sha256.clone(),
+            second.checkpoint.body.checkpoint_seq,
+            second.checkpoint_sha256.clone(),
+            first
+                .checkpoint
+                .body
+                .previous_checkpoint_sha256
+                .clone()
+                .or_else(|| second.checkpoint.body.previous_checkpoint_sha256.clone()),
+        ));
+    }
+
+    if first.checkpoint.body.previous_checkpoint_sha256.is_some()
+        && first.checkpoint.body.previous_checkpoint_sha256
+            == second.checkpoint.body.previous_checkpoint_sha256
+    {
+        return Some(ordered_equivocation(
+            CheckpointEquivocationKind::ConflictingPredecessorWitness,
+            (first.log_id == second.log_id).then(|| first.log_id.clone()),
+            None,
+            first.checkpoint.body.checkpoint_seq,
+            first.checkpoint_sha256.clone(),
+            second.checkpoint.body.checkpoint_seq,
+            second.checkpoint_sha256.clone(),
+            first.checkpoint.body.previous_checkpoint_sha256.clone(),
+        ));
+    }
+
+    None
+}
+
+/// Detect whether two checkpoints conflict under Chio transparency semantics.
+pub fn detect_checkpoint_equivocation(
+    first: &KernelCheckpoint,
+    second: &KernelCheckpoint,
+) -> Result<Option<CheckpointEquivocation>, CheckpointError> {
+    validate_checkpoint(first)?;
+    validate_checkpoint(second)?;
+    let first = ValidatedCheckpoint::after_validation(first)?;
+    let second = ValidatedCheckpoint::after_validation(second)?;
+    Ok(detect_checkpoint_equivocation_from_validated(
+        &first, &second,
+    ))
+}
+
+/// Render a checkpoint conflict as a stable, human-readable description.
+#[must_use]
+pub fn describe_checkpoint_equivocation(equivocation: &CheckpointEquivocation) -> String {
+    match equivocation.kind {
+        CheckpointEquivocationKind::ConflictingCheckpointSeq => format!(
+            "checkpoint_seq {} has conflicting digests {} and {}",
+            equivocation.first_checkpoint_seq,
+            equivocation.first_checkpoint_sha256,
+            equivocation.second_checkpoint_sha256
+        ),
+        CheckpointEquivocationKind::ConflictingLogTreeSize => format!(
+            "log {} has conflicting checkpoints at cumulative tree size {}: {} ({}) vs {} ({})",
+            equivocation.log_id.as_deref().unwrap_or("<unknown>"),
+            equivocation.log_tree_size.unwrap_or_default(),
+            equivocation.first_checkpoint_seq,
+            equivocation.first_checkpoint_sha256,
+            equivocation.second_checkpoint_seq,
+            equivocation.second_checkpoint_sha256
+        ),
+        CheckpointEquivocationKind::ConflictingPredecessorWitness => format!(
+            "predecessor digest {} is witnessed by conflicting checkpoints {} ({}) and {} ({})",
+            equivocation
+                .previous_checkpoint_sha256
+                .as_deref()
+                .unwrap_or("<missing>"),
+            equivocation.first_checkpoint_seq,
+            equivocation.first_checkpoint_sha256,
+            equivocation.second_checkpoint_seq,
+            equivocation.second_checkpoint_sha256
+        ),
+    }
+}
+
+fn checkpoint_publication_from_validated(
+    checkpoint: &ValidatedCheckpoint<'_>,
+) -> CheckpointPublication {
+    CheckpointPublication {
+        log_id: checkpoint.log_id.clone(),
+        schema: CHECKPOINT_PUBLICATION_SCHEMA.to_string(),
+        checkpoint_seq: checkpoint.checkpoint.body.checkpoint_seq,
+        checkpoint_sha256: checkpoint.checkpoint_sha256.clone(),
+        merkle_root: checkpoint.checkpoint.body.merkle_root,
+        published_at: checkpoint.checkpoint.body.issued_at,
+        kernel_key: checkpoint.checkpoint.body.kernel_key.clone(),
+        log_tree_size: checkpoint.log_tree_size,
+        entry_start_seq: checkpoint.checkpoint.body.batch_start_seq,
+        entry_end_seq: checkpoint.checkpoint.body.batch_end_seq,
+        previous_checkpoint_sha256: checkpoint
+            .checkpoint
+            .body
+            .previous_checkpoint_sha256
+            .clone(),
+        trust_anchor_binding: None,
+    }
+}
+
+fn checkpoint_witness_from_validated(
+    checkpoint: &ValidatedCheckpoint<'_>,
+    witness_checkpoint: &ValidatedCheckpoint<'_>,
+) -> CheckpointWitness {
+    CheckpointWitness {
+        log_id: checkpoint.log_id.clone(),
+        schema: CHECKPOINT_WITNESS_SCHEMA.to_string(),
+        checkpoint_seq: checkpoint.checkpoint.body.checkpoint_seq,
+        checkpoint_sha256: checkpoint.checkpoint_sha256.clone(),
+        witness_checkpoint_seq: witness_checkpoint.checkpoint.body.checkpoint_seq,
+        witness_checkpoint_sha256: witness_checkpoint.checkpoint_sha256.clone(),
+        witnessed_at: witness_checkpoint.checkpoint.body.issued_at,
+    }
+}
+
+#[derive(Default)]
+struct EquivocationKeyBucket {
+    first_digest_by_position: BTreeMap<usize, String>,
+    last_position_by_digest: BTreeMap<String, usize>,
+}
+
+fn index_equivocation_key<K: Ord>(
+    index: &mut BTreeMap<K, EquivocationKeyBucket>,
+    key: K,
+    checkpoint_sha256: &str,
+    position: usize,
+    candidate_pairs: &mut BTreeSet<(String, String)>,
+) {
+    let bucket = index.entry(key).or_default();
+    match bucket
+        .last_position_by_digest
+        .get(checkpoint_sha256)
+        .copied()
+    {
+        None => {
+            candidate_pairs.extend(
+                bucket
+                    .last_position_by_digest
+                    .keys()
+                    .map(|digest| (digest.clone(), checkpoint_sha256.to_string())),
+            );
+            bucket
+                .first_digest_by_position
+                .insert(position, checkpoint_sha256.to_string());
+        }
+        Some(previous_position) => {
+            candidate_pairs.extend(
+                bucket
+                    .first_digest_by_position
+                    .range((
+                        core::ops::Bound::Excluded(previous_position),
+                        core::ops::Bound::Excluded(position),
+                    ))
+                    .map(|(_, digest)| (digest.clone(), checkpoint_sha256.to_string())),
+            );
+        }
+    }
+    bucket
+        .last_position_by_digest
+        .insert(checkpoint_sha256.to_string(), position);
+}
+
+struct DerivedCheckpointTransparency<'a> {
+    summary: CheckpointTransparencySummary,
+    checkpoints: Vec<ValidatedCheckpoint<'a>>,
+}
+
+#[allow(
+    clippy::indexing_slicing,
+    reason = "All positions are created by enumerating this immutable checkpoint slice in this function."
+)]
+fn derive_checkpoint_transparency(
+    checkpoints: &[KernelCheckpoint],
+) -> Result<DerivedCheckpointTransparency<'_>, CheckpointError> {
+    let checkpoints = checkpoints
+        .iter()
+        .map(ValidatedCheckpoint::validate)
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut publications = checkpoints
+        .iter()
+        .map(checkpoint_publication_from_validated)
+        .collect::<Vec<_>>();
+    publications.sort_by_key(|publication| publication.checkpoint_seq);
+
+    // A clean prefix has no candidate pairs. Work grows with the number of
+    // indexed key collisions and emitted conflicts rather than every possible
+    // pair of checkpoints.
+    let mut by_checkpoint_seq = BTreeMap::<u64, EquivocationKeyBucket>::new();
+    let mut by_log_tree_size = BTreeMap::<(String, u64), EquivocationKeyBucket>::new();
+    let mut by_predecessor_digest = BTreeMap::<String, EquivocationKeyBucket>::new();
+    let mut candidate_pairs = BTreeSet::<(String, String)>::new();
+    for (position, checkpoint) in checkpoints.iter().enumerate() {
+        index_equivocation_key(
+            &mut by_checkpoint_seq,
+            checkpoint.checkpoint.body.checkpoint_seq,
+            &checkpoint.checkpoint_sha256,
+            position,
+            &mut candidate_pairs,
+        );
+        index_equivocation_key(
+            &mut by_log_tree_size,
+            (checkpoint.log_id.clone(), checkpoint.log_tree_size),
+            &checkpoint.checkpoint_sha256,
+            position,
+            &mut candidate_pairs,
+        );
+        if let Some(previous_checkpoint_sha256) = checkpoint
+            .checkpoint
+            .body
+            .previous_checkpoint_sha256
+            .clone()
+        {
+            index_equivocation_key(
+                &mut by_predecessor_digest,
+                previous_checkpoint_sha256,
+                &checkpoint.checkpoint_sha256,
+                position,
+                &mut candidate_pairs,
+            );
+        }
+    }
+
+    let by_digest = checkpoints
+        .iter()
+        .enumerate()
+        .map(|(position, checkpoint)| (checkpoint.checkpoint_sha256.clone(), position))
+        .collect::<BTreeMap<_, _>>();
+    let mut equivocations = candidate_pairs
+        .into_iter()
+        .map(|(first_digest, second_digest)| {
+            let first = by_digest.get(&first_digest).copied().ok_or_else(|| {
+                CheckpointError::Invalid(
+                    "equivocation index references a missing first checkpoint digest".to_string(),
+                )
+            })?;
+            let second = by_digest.get(&second_digest).copied().ok_or_else(|| {
+                CheckpointError::Invalid(
+                    "equivocation index references a missing second checkpoint digest".to_string(),
+                )
+            })?;
+            Ok(detect_checkpoint_equivocation_from_validated(
+                &checkpoints[first],
+                &checkpoints[second],
+            ))
+        })
+        .collect::<Result<Vec<_>, CheckpointError>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    equivocations.sort();
+    equivocations.dedup();
+    let equivocated_digests = equivocations
+        .iter()
+        .flat_map(|equivocation| {
+            [
+                equivocation.first_checkpoint_sha256.clone(),
+                equivocation.second_checkpoint_sha256.clone(),
+            ]
+        })
+        .collect::<BTreeSet<_>>();
+
+    // The signed chain commitment is global across checkpoint signing-key
+    // rotation. Derive its leaves from the contiguous, unique sequence run
+    // beginning at 1, then restrict proof endpoints to a common log identity.
+    // This preserves proofs between checkpoints signed by the post-rotation
+    // key without incorrectly requiring that key to have issued sequence 1.
+    let mut by_seq = BTreeMap::<u64, Vec<usize>>::new();
+    for (position, checkpoint) in checkpoints.iter().enumerate() {
+        by_seq
+            .entry(checkpoint.checkpoint.body.checkpoint_seq)
+            .or_default()
+            .push(position);
+    }
+    let mut chain_leaf_hashes = Vec::new();
+    let mut next_seq = 1u64;
+    while let Some([single]) = by_seq.get(&next_seq).map(Vec::as_slice) {
+        chain_leaf_hashes.push(checkpoint_chain_leaf_hash(
+            &checkpoints[*single].checkpoint.body,
+        )?);
+        let Some(following) = next_seq.checked_add(1) else {
+            break;
+        };
+        next_seq = following;
+    }
+    let chain_tree = (!chain_leaf_hashes.is_empty())
+        .then(|| MerkleTree::from_hashes(chain_leaf_hashes.clone()))
+        .transpose()?;
+
+    let mut witnesses = Vec::new();
+    let mut consistency_proofs = Vec::new();
+    for checkpoint in &checkpoints {
+        let Some(previous_checkpoint_sha256) = checkpoint
+            .checkpoint
+            .body
+            .previous_checkpoint_sha256
+            .as_deref()
+        else {
+            continue;
+        };
+        if let Some(previous_position) = by_digest.get(previous_checkpoint_sha256) {
+            let previous = &checkpoints[*previous_position];
+            if let Err(error) = validate_checkpoint_predecessor_link(
+                previous.checkpoint,
+                &previous.checkpoint_sha256,
+                checkpoint.checkpoint,
+            ) {
+                if equivocated_digests.contains(&checkpoint.checkpoint_sha256) {
+                    continue;
+                }
+                return Err(error);
+            }
+            witnesses.push(checkpoint_witness_from_validated(previous, checkpoint));
+            let to_size = chain_tree_size(checkpoint.checkpoint)?;
+            if let Some(tree) = chain_tree.as_ref() {
+                if chain_leaf_hashes.len() >= to_size {
+                    // The checkpoint-chain commitment is global. Verify both
+                    // signed roots against the retained prefix even when a
+                    // signing-key rotation changes the derived log identity.
+                    validate_checkpoint_chain_commitments(
+                        previous.checkpoint,
+                        checkpoint.checkpoint,
+                        &chain_leaf_hashes,
+                        tree,
+                    )?;
+                    if previous.log_id == checkpoint.log_id
+                        && previous.checkpoint.body.chain_root.is_some()
+                        && checkpoint.checkpoint.body.chain_root.is_some()
+                    {
+                        consistency_proofs.push(build_checkpoint_consistency_proof_from_validated(
+                            previous,
+                            checkpoint,
+                            &chain_leaf_hashes,
+                            tree,
+                        )?);
+                    }
+                }
+            }
+        }
+    }
+    witnesses.sort_by_key(|witness| (witness.witness_checkpoint_seq, witness.checkpoint_seq));
+    consistency_proofs.sort_by_key(|proof| (proof.to_checkpoint_seq, proof.from_checkpoint_seq));
+
+    Ok(DerivedCheckpointTransparency {
+        summary: CheckpointTransparencySummary {
+            publications,
+            witnesses,
+            consistency_proofs,
+            equivocations,
+        },
+        checkpoints,
+    })
+}
+
+/// Derive publication, witness, and equivocation records from a checkpoint set.
+pub fn build_checkpoint_transparency(
+    checkpoints: &[KernelCheckpoint],
+) -> Result<CheckpointTransparencySummary, CheckpointError> {
+    Ok(derive_checkpoint_transparency(checkpoints)?.summary)
+}
+
+/// Validate that a checkpoint set is transparency-safe, fork-free, and
+/// connected to checkpoint 1.
+///
+/// A caller that wants to trust a later boundary without the full prefix must
+/// use a separate API that accepts an explicitly pinned boundary. This
+/// verifier has no such input, so an unresolved predecessor fails closed.
+#[allow(
+    clippy::indexing_slicing,
+    reason = "The digest index stores positions from enumerating the same unchanged checkpoint vector."
+)]
+pub fn validate_checkpoint_transparency(
+    checkpoints: &[KernelCheckpoint],
+) -> Result<CheckpointTransparencySummary, CheckpointError> {
+    let mut checkpoint_seqs = BTreeSet::new();
+    for checkpoint in checkpoints {
+        if !checkpoint_seqs.insert(checkpoint.body.checkpoint_seq) {
+            return Err(CheckpointError::Continuity(format!(
+                "duplicate checkpoint sequence {}",
+                checkpoint.body.checkpoint_seq
+            )));
+        }
+    }
+
+    let derived = derive_checkpoint_transparency(checkpoints)?;
+    let transparency = derived.summary;
+    if let Some(equivocation) = transparency.equivocations.first() {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint equivocation detected: {}",
+            describe_checkpoint_equivocation(equivocation)
+        )));
+    }
+
+    let by_digest = derived
+        .checkpoints
+        .iter()
+        .enumerate()
+        .map(|(position, checkpoint)| (checkpoint.checkpoint_sha256.as_str(), position))
+        .collect::<BTreeMap<_, _>>();
+    for checkpoint in &derived.checkpoints {
+        let Some(previous_checkpoint_sha256) = checkpoint
+            .checkpoint
+            .body
+            .previous_checkpoint_sha256
+            .as_deref()
+        else {
+            if checkpoint.checkpoint.body.checkpoint_seq != 1 {
+                return Err(CheckpointError::Continuity(format!(
+                    "checkpoint {} is not connected to checkpoint 1",
+                    checkpoint.checkpoint.body.checkpoint_seq
+                )));
+            }
+            if checkpoint.checkpoint.body.batch_start_seq != 1 {
+                return Err(CheckpointError::Continuity(format!(
+                    "checkpoint 1 must start at receipt 1, got {}",
+                    checkpoint.checkpoint.body.batch_start_seq
+                )));
+            }
+            continue;
+        };
+        let previous = by_digest.get(previous_checkpoint_sha256).ok_or_else(|| {
+            CheckpointError::Continuity(format!(
+                "checkpoint {} has unresolved predecessor {}",
+                checkpoint.checkpoint.body.checkpoint_seq, previous_checkpoint_sha256
+            ))
+        })?;
+        let previous = &derived.checkpoints[*previous];
+        validate_checkpoint_predecessor_link(
+            previous.checkpoint,
+            &previous.checkpoint_sha256,
+            checkpoint.checkpoint,
+        )?;
+    }
+
+    Ok(transparency)
+}
+
+/// Verify that supplied transparency records match the signed checkpoint set.
+///
+/// Valid trust-anchor bindings are preserved in the returned summary so callers
+/// can safely project publication state without collapsing back to raw
+/// checkpoint-only records.
+pub fn verify_checkpoint_transparency_records(
+    checkpoints: &[KernelCheckpoint],
+    supplied: &CheckpointTransparencySummary,
+) -> Result<CheckpointTransparencySummary, CheckpointError> {
+    let derived = validate_checkpoint_transparency(checkpoints)?;
+    let derived_publications = derived
+        .publications
+        .iter()
+        .map(|publication| (publication.checkpoint_seq, publication))
+        .collect::<BTreeMap<_, _>>();
+
+    if supplied.publications.len() != derived.publications.len() {
+        return Err(CheckpointError::Continuity(
+            "checkpoint publication records do not match the signed checkpoint set".to_string(),
+        ));
+    }
+
+    let mut normalized_publications = Vec::with_capacity(supplied.publications.len());
+    let mut matched_checkpoint_seqs = BTreeSet::new();
+    for publication in &supplied.publications {
+        if !matched_checkpoint_seqs.insert(publication.checkpoint_seq) {
+            return Err(CheckpointError::Continuity(format!(
+                "duplicate checkpoint publication record for checkpoint {}",
+                publication.checkpoint_seq
+            )));
+        }
+        let Some(derived_publication) = derived_publications
+            .get(&publication.checkpoint_seq)
+            .copied()
+        else {
+            return Err(CheckpointError::Continuity(
+                "checkpoint publication records do not match the signed checkpoint set".to_string(),
+            ));
+        };
+        let expected = match publication.trust_anchor_binding.clone() {
+            Some(binding) => {
+                bind_checkpoint_publication_trust_anchor((*derived_publication).clone(), binding)?
+            }
+            None => (*derived_publication).clone(),
+        };
+        if publication != &expected {
+            return Err(CheckpointError::Continuity(
+                "checkpoint publication records do not match the signed checkpoint set".to_string(),
+            ));
+        }
+        normalized_publications.push(expected);
+    }
+    if matched_checkpoint_seqs.len() != derived_publications.len() {
+        return Err(CheckpointError::Continuity(
+            "checkpoint publication records do not cover the signed checkpoint set".to_string(),
+        ));
+    }
+
+    if supplied.witnesses != derived.witnesses {
+        return Err(CheckpointError::Continuity(
+            "checkpoint witness records do not match the signed checkpoint set".to_string(),
+        ));
+    }
+    if supplied.consistency_proofs != derived.consistency_proofs {
+        return Err(CheckpointError::Continuity(
+            "checkpoint consistency proof records do not match the signed checkpoint set"
+                .to_string(),
+        ));
+    }
+    if supplied.equivocations != derived.equivocations {
+        return Err(CheckpointError::Continuity(
+            "checkpoint equivocation records do not match the signed checkpoint set".to_string(),
+        ));
+    }
+
+    Ok(CheckpointTransparencySummary {
+        publications: normalized_publications,
+        witnesses: supplied.witnesses.clone(),
+        consistency_proofs: supplied.consistency_proofs.clone(),
+        equivocations: supplied.equivocations.clone(),
+    })
+}
+
+/// Verify that `current` explicitly extends `previous`.
+pub fn verify_checkpoint_continuity(
+    previous: &KernelCheckpoint,
+    current: &KernelCheckpoint,
+) -> Result<bool, CheckpointError> {
+    match validate_checkpoint_predecessor(previous, current) {
+        Ok(()) => Ok(true),
+        Err(CheckpointError::Continuity(_)) => Ok(false),
+        Err(error) => Err(error),
+    }
+}
+
+/// Build an inclusion proof for a leaf in an already-built MerkleTree.
+pub fn build_inclusion_proof(
+    tree: &MerkleTree,
+    leaf_index: usize,
+    checkpoint_seq: u64,
+    receipt_seq: u64,
+) -> Result<ReceiptInclusionProof, CheckpointError> {
+    let proof = tree.inclusion_proof(leaf_index)?;
+    Ok(ReceiptInclusionProof {
+        checkpoint_seq,
+        receipt_seq,
+        leaf_index,
+        merkle_root: tree.root(),
+        proof,
+    })
+}
+
+/// Verify the signature on a KernelCheckpoint.
+///
+/// Returns `Ok(true)` if the signature is valid.
+pub fn verify_checkpoint_signature(checkpoint: &KernelCheckpoint) -> Result<bool, CheckpointError> {
+    #[cfg(test)]
+    test_counters::CHECKPOINT_SIGNATURE_VERIFICATION_COUNT.with(|count| {
+        count.set(count.get().saturating_add(1));
+    });
+    let body_bytes = canonical_json_bytes(&checkpoint.body)
+        .map_err(|e| CheckpointError::Serialization(e.to_string()))?;
+    Ok(checkpoint
+        .body
+        .kernel_key
+        .verify_strict(&body_bytes, &checkpoint.signature))
+}
+
+/// Validate the integrity of a single checkpoint statement.
+pub fn validate_checkpoint(checkpoint: &KernelCheckpoint) -> Result<(), CheckpointError> {
+    if !is_supported_checkpoint_schema(&checkpoint.body.schema) {
+        return Err(CheckpointError::Invalid(format!(
+            "unsupported checkpoint schema {}",
+            checkpoint.body.schema
+        )));
+    }
+    if checkpoint.body.checkpoint_seq == 0 {
+        return Err(CheckpointError::Invalid(
+            "checkpoint_seq must be greater than zero".to_string(),
+        ));
+    }
+    if checkpoint.body.batch_start_seq == 0 {
+        return Err(CheckpointError::Invalid(
+            "batch_start_seq must be greater than zero".to_string(),
+        ));
+    }
+    if checkpoint.body.batch_end_seq < checkpoint.body.batch_start_seq {
+        return Err(CheckpointError::Invalid(format!(
+            "batch_end_seq {} is less than batch_start_seq {}",
+            checkpoint.body.batch_end_seq, checkpoint.body.batch_start_seq
+        )));
+    }
+    if checkpoint.body.tree_size == 0 {
+        return Err(CheckpointError::Invalid(
+            "tree_size must be greater than zero".to_string(),
+        ));
+    }
+    if checkpoint.body.issued_at == 0 {
+        return Err(CheckpointError::Invalid(
+            "issued_at must be greater than zero".to_string(),
+        ));
+    }
+    if checkpoint
+        .body
+        .previous_checkpoint_sha256
+        .as_deref()
+        .is_some_and(|digest| !is_lowercase_sha256(digest))
+    {
+        return Err(CheckpointError::Invalid(
+            "previous_checkpoint_sha256 must be 64 lowercase hex characters".to_string(),
+        ));
+    }
+    let expected_tree_size = checkpoint_batch_entry_count(&checkpoint.body)?;
+    if u64::try_from(checkpoint.body.tree_size).ok() != Some(expected_tree_size) {
+        return Err(CheckpointError::Invalid(format!(
+            "tree_size {} does not match covered entry count {} for range {}-{}",
+            checkpoint.body.tree_size,
+            expected_tree_size,
+            checkpoint.body.batch_start_seq,
+            checkpoint.body.batch_end_seq
+        )));
+    }
+    if checkpoint.body.checkpoint_seq == 1 {
+        let Some(chain_root) = checkpoint.body.chain_root else {
+            return Err(CheckpointError::Invalid(
+                "checkpoint 1 must carry chain_root".to_string(),
+            ));
+        };
+        if chain_root != checkpoint_chain_root(&[checkpoint_chain_leaf_hash(&checkpoint.body)?])? {
+            return Err(CheckpointError::Invalid(
+                "chain_root of the first checkpoint does not commit its own chain leaf".to_string(),
+            ));
+        }
+    }
+    if !verify_checkpoint_signature(checkpoint)? {
+        return Err(CheckpointError::InvalidSignature);
+    }
+    Ok(())
+}
+
+fn is_lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn validate_checkpoint_successor_position(
+    predecessor: &KernelCheckpoint,
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+) -> Result<(), CheckpointError> {
+    let expected_checkpoint_seq =
+        predecessor
+            .body
+            .checkpoint_seq
+            .checked_add(1)
+            .ok_or_else(|| {
+                CheckpointError::Continuity("predecessor checkpoint_seq overflowed u64".to_string())
+            })?;
+    if checkpoint_seq != expected_checkpoint_seq {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint_seq {} does not immediately follow predecessor {}",
+            checkpoint_seq, predecessor.body.checkpoint_seq
+        )));
+    }
+
+    let expected_batch_start = predecessor
+        .body
+        .batch_end_seq
+        .checked_add(1)
+        .ok_or_else(|| {
+            CheckpointError::Continuity("predecessor batch_end_seq overflowed u64".to_string())
+        })?;
+    if batch_start_seq != expected_batch_start {
+        return Err(CheckpointError::Continuity(format!(
+            "batch_start_seq {} does not immediately follow predecessor batch_end_seq {}",
+            batch_start_seq, predecessor.body.batch_end_seq
+        )));
+    }
+
+    Ok(())
+}
+
+/// Validate that `checkpoint` cleanly extends `predecessor`.
+pub fn validate_checkpoint_predecessor(
+    predecessor: &KernelCheckpoint,
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), CheckpointError> {
+    validate_checkpoint(predecessor)?;
+    validate_checkpoint(checkpoint)?;
+    let predecessor_sha256 = checkpoint_body_sha256(&predecessor.body)?;
+    validate_checkpoint_predecessor_link(predecessor, &predecessor_sha256, checkpoint)
+}
+
+fn validate_checkpoint_predecessor_link(
+    predecessor: &KernelCheckpoint,
+    predecessor_sha256: &str,
+    checkpoint: &KernelCheckpoint,
+) -> Result<(), CheckpointError> {
+    validate_checkpoint_successor_position(
+        predecessor,
+        checkpoint.body.checkpoint_seq,
+        checkpoint.body.batch_start_seq,
+    )?;
+
+    let Some(previous_checkpoint_sha256) = checkpoint.body.previous_checkpoint_sha256.as_deref()
+    else {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} is missing predecessor digest",
+            checkpoint.body.checkpoint_seq
+        )));
+    };
+    if previous_checkpoint_sha256 != predecessor_sha256 {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} does not match predecessor digest {}",
+            checkpoint.body.checkpoint_seq, predecessor_sha256
+        )));
+    }
+    if predecessor.body.chain_root.is_none() || checkpoint.body.chain_root.is_none() {
+        return Err(CheckpointError::Continuity(format!(
+            "checkpoint {} does not extend a chain commitment from its predecessor",
+            checkpoint.body.checkpoint_seq
+        )));
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+#[path = "evidence_verify/tests.rs"]
+mod tests;

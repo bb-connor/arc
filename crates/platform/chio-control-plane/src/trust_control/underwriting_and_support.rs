@@ -1546,11 +1546,12 @@ mod underwriting_and_support_tests {
             pending_settlement_receipts: 0,
             failed_settlement_receipts: 0,
             direct_evidence_export_supported: true,
-            child_receipt_scope: chio_kernel::EvidenceChildReceiptScope::OmittedNoJoinPath,
+            child_receipt_scope:
+                chio_core::receipt::evidence::EvidenceChildReceiptScope::OmittedNoJoinPath,
             proofs_complete: true,
-            export_query: chio_kernel::EvidenceExportQuery {
+            export_query: chio_core::receipt::evidence::EvidenceExportQuery {
                 agent_subject: Some("subject-other".to_string()),
-                ..chio_kernel::EvidenceExportQuery::default()
+                ..chio_core::receipt::evidence::EvidenceExportQuery::default()
             },
             export_scope_note: None,
         };

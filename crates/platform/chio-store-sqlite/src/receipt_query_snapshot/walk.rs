@@ -8,10 +8,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use chio_core::receipt::body::ChioReceipt;
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_core::receipt::lineage::ChildRequestReceipt;
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
 use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
 use chio_kernel::ReceiptStoreError;
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 use rusqlite::{params, Connection, ErrorCode, OptionalExtension};
 
 use super::db::{
@@ -951,13 +952,16 @@ pub(super) fn authenticate_checkpoints(
         let checkpoint = parse_persisted_checkpoint_row(row.clone()).map_err(integrity)?;
         match next_previous.as_ref() {
             Some(predecessor) => {
-                chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
-                    .map_err(|error| integrity(checkpoint_error_to_receipt_store(error)))?
+                chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
+                    predecessor,
+                    &checkpoint,
+                )
+                .map_err(|error| integrity(checkpoint_error_to_receipt_store(error)))?
             }
             None => validate_checkpoint_base(&checkpoint).map_err(integrity)?,
         }
         next_chain.append(
-            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body)
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint.body)
                 .map_err(|error| integrity(checkpoint_error_to_receipt_store(error)))?,
         );
         if let Some(chain_root) = checkpoint.body.chain_root {

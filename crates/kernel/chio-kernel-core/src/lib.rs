@@ -84,6 +84,7 @@ pub mod budget_split;
 pub mod capability_verify;
 pub mod clock;
 pub mod evaluate;
+pub mod evidence_verify;
 #[allow(dead_code)]
 pub(crate) mod formal_aeneas;
 pub mod formal_core;

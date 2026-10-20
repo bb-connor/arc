@@ -10,6 +10,7 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::Keypair;
+use chio_core::receipt::evidence::{CapabilitySnapshot, CapabilitySnapshotProvenance};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     metadata::ReceiptAttributionMetadata,
@@ -22,8 +23,8 @@ use chio_credentials::{
     SignedPortableNegativeEvent, SignedPortableReputationSummary,
 };
 use chio_kernel::{
-    BudgetStore, CapabilityAuthority, CapabilitySnapshot, CapabilitySnapshotProvenance,
-    FederatedEvidenceShareImport, LocalCapabilityAuthority, ReceiptStore, StoredToolReceipt,
+    BudgetStore, CapabilityAuthority, FederatedEvidenceShareImport, LocalCapabilityAuthority,
+    ReceiptStore, StoredToolReceipt,
 };
 use chio_store_sqlite::{SqliteBudgetStore, SqliteCapabilityAuthority, SqliteReceiptStore};
 use chio_test_support::loopback::{reserve_listen_addr, skip_when_loopback_bind_denied};

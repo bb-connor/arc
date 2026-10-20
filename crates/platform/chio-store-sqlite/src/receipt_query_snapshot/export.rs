@@ -5,11 +5,11 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use chio_core::canonical::canonical_json_bytes;
-use chio_kernel::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
-use chio_kernel::evidence_export::{
-    EvidenceExportBundle, EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata,
-    EvidenceToolReceiptRecord,
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
+use chio_core::receipt::evidence::{
+    EvidenceExportBundle, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
 };
+use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportReceiptQuery};
 use chio_kernel::{ReceiptQuerySnapshotError, ReceiptSnapshotWatermark, ReceiptStoreError};
 use sha2::{Digest, Sha256};
 

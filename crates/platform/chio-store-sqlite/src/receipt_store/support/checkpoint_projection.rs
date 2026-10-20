@@ -1132,11 +1132,15 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
     for row in rows {
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
         if let Some(predecessor) = parsed_checkpoints.last() {
-            chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
-                .map_err(checkpoint_error_to_receipt_store)?;
-        }
-        let publication = chio_kernel::checkpoint::build_checkpoint_publication(&checkpoint)
+            chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
+                predecessor,
+                &checkpoint,
+            )
             .map_err(checkpoint_error_to_receipt_store)?;
+        }
+        let publication =
+            chio_kernel_core::evidence_verify::build_checkpoint_publication(&checkpoint)
+                .map_err(checkpoint_error_to_receipt_store)?;
 
         expected_heads.push(CheckpointTreeHeadProjectionRow {
             checkpoint_seq: row.checkpoint_seq,

@@ -1,7 +1,8 @@
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
 use chio_core::web3::anchors::{
     verify_anchor_inclusion_proof, AnchorInclusionProof, CHIO_ANCHOR_INCLUSION_PROOF_SCHEMA,
 };
-use chio_kernel::checkpoint::{describe_checkpoint_equivocation, CheckpointTransparencySummary};
+use chio_kernel_core::evidence_verify::describe_checkpoint_equivocation;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::{

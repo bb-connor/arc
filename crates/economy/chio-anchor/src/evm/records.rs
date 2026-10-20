@@ -1,5 +1,5 @@
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_core::web3::anchors::Web3ChainAnchorRecord;
-use chio_kernel::checkpoint::KernelCheckpoint;
 
 use super::types::{EvmAnchorTarget, EvmPublicationReceipt};
 

@@ -152,7 +152,9 @@ async fn evidence_startup_ignores_oversized_legacy_receipts(
     assert_eq!(receipts.total_count, 1);
     assert_eq!(receipts.receipts[0].receipt.kernel_key, key.public_key());
     let error = reopened
-        .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())
+        .build_evidence_export_bundle(
+            &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
+        )
         .test_unwrap_err();
     assert!(error.to_string().contains("legacy mutable receipt history"));
     Ok(())
@@ -258,8 +260,9 @@ async fn receipt_retention_runs_from_the_actual_proxy_serving_lifetime(
     })
     .await??;
     assert!(archive.is_file());
-    let bundle =
-        store.build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
+    let bundle = store.build_evidence_export_bundle(
+        &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
+    )?;
     assert_eq!(bundle.tool_receipts.len(), 1);
     assert_eq!(bundle.inclusion_proofs.len(), 1);
     task.abort();

@@ -1,7 +1,8 @@
 //! Membership of the original call receipt in its owning host's signed log.
 
 use chio_core::{crypto::canonical_json_bytes, receipt::body::ChioReceipt, PublicKey};
-use chio_kernel::checkpoint::{validate_checkpoint, KernelCheckpoint, ReceiptInclusionProof};
+use chio_kernel_core::evidence_verify::validate_checkpoint;
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use serde::{Deserialize, Serialize};
 
 use super::state::error;
@@ -51,7 +52,7 @@ pub(super) fn export(
     receipt: &ChioReceipt,
     observed_at: u64,
 ) -> Result<Evidence, CliError> {
-    use chio_kernel::evidence_export::EvidenceExportQuery;
+    use chio_core::receipt::evidence::EvidenceExportQuery;
 
     let bundle = host
         .receipts

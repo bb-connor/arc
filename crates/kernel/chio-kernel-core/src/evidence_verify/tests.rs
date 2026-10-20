@@ -1,12 +1,88 @@
-//! Unit tests for Merkle-committed receipt batch checkpointing.
-//!
-//! Split from `checkpoint.rs` to keep that module inside the production file
-//! size limit enforced by `scripts/check-rust-file-hygiene.py`.
+//! Unit tests for checkpoint issuance, verification and transparency.
+
+extern crate std;
+
+use alloc::boxed::Box;
+use alloc::vec;
+
+use chio_core_types::crypto::{Keypair, PublicKey, Signature};
+use chio_core_types::receipt::checkpoint::{
+    CHECKPOINT_CONSISTENCY_PROOF_SCHEMA, CHECKPOINT_SCHEMA,
+};
+use chio_security_types::clock::UnixMillis;
 
 use super::*;
 
+/// Fixed issuance time for every checkpoint these tests build.
+const ISSUED_AT_SECS: u64 = 1_792_234_800;
+
+fn signing(keypair: &Keypair) -> CheckpointSigningContext<'_> {
+    CheckpointSigningContext {
+        keypair,
+        issued_at: UnixMillis::new(ISSUED_AT_SECS * 1000),
+    }
+}
+
+pub(super) fn build_checkpoint(
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    receipt_canonical_bytes_batch: &[Vec<u8>],
+    keypair: &Keypair,
+) -> Result<KernelCheckpoint, CheckpointError> {
+    build_checkpoint_with_previous(
+        checkpoint_seq,
+        batch_start_seq,
+        batch_end_seq,
+        receipt_canonical_bytes_batch,
+        keypair,
+        None,
+        &[],
+    )
+}
+
+pub(super) fn build_checkpoint_with_previous(
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    receipt_canonical_bytes_batch: &[Vec<u8>],
+    keypair: &Keypair,
+    previous_checkpoint: Option<&KernelCheckpoint>,
+    prior_chain_leaf_hashes: &[Hash],
+) -> Result<KernelCheckpoint, CheckpointError> {
+    build_checkpoint_with_previous_at(
+        checkpoint_seq,
+        batch_start_seq,
+        batch_end_seq,
+        receipt_canonical_bytes_batch,
+        signing(keypair),
+        previous_checkpoint,
+        prior_chain_leaf_hashes,
+    )
+}
+
+fn build_checkpoint_with_chain_frontier(
+    checkpoint_seq: u64,
+    batch_start_seq: u64,
+    batch_end_seq: u64,
+    receipt_canonical_bytes_batch: &[Vec<u8>],
+    keypair: &Keypair,
+    previous_checkpoint: Option<&KernelCheckpoint>,
+    prior_chain: &CheckpointChainFrontier,
+) -> Result<KernelCheckpoint, CheckpointError> {
+    build_checkpoint_with_chain_frontier_at(
+        checkpoint_seq,
+        batch_start_seq,
+        batch_end_seq,
+        receipt_canonical_bytes_batch,
+        signing(keypair),
+        previous_checkpoint,
+        prior_chain,
+    )
+}
+
 #[test]
-fn checkpoint_rejects_identity_key_forgery() -> Result<(), Box<dyn std::error::Error>> {
+fn checkpoint_rejects_identity_key_forgery() -> Result<(), Box<dyn core::error::Error>> {
     let mut checkpoint = build_checkpoint(1, 1, 1, &[b"receipt".to_vec()], &Keypair::generate())?;
     checkpoint.body.kernel_key =
         PublicKey::from_hex("0100000000000000000000000000000000000000000000000000000000000000")?;
@@ -95,7 +171,7 @@ fn build_checkpoint_single_receipt_merkle_root_equals_leaf_hash() {
     // Degenerate case: a single-receipt batch must produce a Merkle root
     // equal to the leaf hash of that receipt's canonical bytes (per RFC 6962:
     // LeafHash(bytes) = SHA256(0x00 || bytes)).
-    use chio_core::merkle::leaf_hash;
+    use chio_core_types::merkle::leaf_hash;
 
     let kp = Keypair::generate();
     let leaf_bytes = b"single-receipt-canonical-bytes";
@@ -564,12 +640,12 @@ fn build_trust_anchored_checkpoint_publication_records_binding() {
     let publication = build_trust_anchored_checkpoint_publication(
         &checkpoint,
         CheckpointPublicationTrustAnchorBinding {
-            publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
-                chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::TransparencyService,
+            publication_identity: chio_core_types::receipt::checkpoint::CheckpointPublicationIdentity::new(
+                chio_core_types::receipt::checkpoint::CheckpointPublicationIdentityKind::TransparencyService,
                 "transparency.example/checkpoints/1",
             ),
-            trust_anchor_identity: chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
-                chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::Did,
+            trust_anchor_identity: chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
+                chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::Did,
                 "did:chio:operator-root",
             ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
@@ -643,12 +719,12 @@ fn build_trust_anchored_checkpoint_publication_rejects_invalid_binding() {
     let error = build_trust_anchored_checkpoint_publication(
         &checkpoint,
         CheckpointPublicationTrustAnchorBinding {
-            publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
-                chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::TransparencyService,
+            publication_identity: chio_core_types::receipt::checkpoint::CheckpointPublicationIdentity::new(
+                chio_core_types::receipt::checkpoint::CheckpointPublicationIdentityKind::TransparencyService,
                 "",
             ),
-            trust_anchor_identity: chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
-                chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::Did,
+            trust_anchor_identity: chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
+                chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::Did,
                 "did:chio:operator-root",
             ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
@@ -671,13 +747,13 @@ fn trust_anchor_binding_validation_precedes_checkpoint_validation() {
         &checkpoint,
         CheckpointPublicationTrustAnchorBinding {
             publication_identity:
-                chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
-                    chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::TransparencyService,
+                chio_core_types::receipt::checkpoint::CheckpointPublicationIdentity::new(
+                    chio_core_types::receipt::checkpoint::CheckpointPublicationIdentityKind::TransparencyService,
                     "",
                 ),
             trust_anchor_identity:
-                chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
-                    chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::Did,
+                chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
+                    chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::Did,
                     "did:chio:operator-root",
                 ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),
@@ -698,13 +774,13 @@ fn build_trust_anchored_checkpoint_publication_rejects_mismatched_local_log_iden
         &checkpoint,
         CheckpointPublicationTrustAnchorBinding {
             publication_identity:
-                chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
-                    chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
+                chio_core_types::receipt::checkpoint::CheckpointPublicationIdentity::new(
+                    chio_core_types::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
                     "local-log-not-the-real-one",
                 ),
             trust_anchor_identity:
-                chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
-                    chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::OperatorRoot,
+                chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
+                    chio_core_types::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::OperatorRoot,
                     "chio-operator-root",
                 ),
             trust_anchor_ref: "chio_checkpoint_witness_chain".to_string(),

@@ -1,8 +1,6 @@
 use chio_core::capability::token::CapabilityToken;
-pub use chio_kernel::capability_lineage::{
-    CapabilityLineageError, CapabilitySnapshot, CapabilitySnapshotProvenance,
-    StoredCapabilitySnapshot,
-};
+pub use chio_core::receipt::evidence::{CapabilitySnapshot, CapabilitySnapshotProvenance};
+pub use chio_kernel::capability_lineage::{CapabilityLineageError, StoredCapabilitySnapshot};
 use rusqlite::types::Type;
 use rusqlite::{params, OptionalExtension, Row};
 
@@ -104,7 +102,9 @@ pub(crate) fn signed_capability_from_row(
 pub(crate) fn validate_snapshot_for_transport(
     snapshot: &CapabilitySnapshot,
 ) -> Result<(), chio_kernel::ReceiptStoreError> {
-    snapshot.validate()
+    snapshot
+        .validate()
+        .map_err(chio_kernel::ReceiptStoreError::from)
 }
 
 pub(crate) fn ensure_snapshots_compatible(

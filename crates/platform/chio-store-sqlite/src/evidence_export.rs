@@ -2,18 +2,21 @@ use std::collections::BTreeMap;
 
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding;
-use chio_kernel::capability_lineage::CapabilitySnapshot;
-use chio_kernel::checkpoint::{
-    bind_checkpoint_publication_trust_anchor, build_inclusion_proof,
-    validate_checkpoint_transparency, CheckpointPublication, CheckpointTransparencySummary,
-    KernelCheckpoint, ReceiptInclusionProof,
+use chio_core::receipt::checkpoint::{
+    CheckpointPublication, CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof,
 };
-use chio_kernel::evidence_export::{
+use chio_core::receipt::evidence::CapabilitySnapshot;
+use chio_core::receipt::evidence::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportBundle,
-    EvidenceExportError, EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
+    EvidenceExportQuery, EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
     EvidenceUncheckpointedReceipt,
 };
+use chio_kernel::evidence_export::{EvidenceExportError, EvidenceExportReceiptQuery};
 use chio_kernel::ReceiptStoreError;
+use chio_kernel_core::evidence_verify::{
+    bind_checkpoint_publication_trust_anchor, build_inclusion_proof,
+    validate_checkpoint_transparency,
+};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::receipt_store::retained_read::RetainedSnapshot;
@@ -67,9 +70,9 @@ impl SqliteReceiptStore {
             let (inclusion_proofs, uncheckpointed_receipts) =
                 self.collect_inclusion_proofs_for_export(snapshot, &tool_receipts, &checkpoints)?;
             let tenant = match &query.read_boundary {
-                Some(chio_kernel::ReceiptReadBoundary::TenantScoped { tenant }) => {
-                    Some(tenant.as_str())
-                }
+                Some(chio_core::receipt::evidence::ReceiptReadBoundary::TenantScoped {
+                    tenant,
+                }) => Some(tenant.as_str()),
                 _ => None,
             };
             let oldest: Option<i64> = snapshot.live.query_row(
@@ -331,7 +334,7 @@ impl SqliteReceiptStore {
                 snapshot.live,
                 &record.receipt.capability_id,
             )? {
-                snapshot.validate()?;
+                snapshot.validate().map_err(ReceiptStoreError::from)?;
                 snapshots
                     .entry(snapshot.capability_id.clone())
                     .or_insert(snapshot);
@@ -536,9 +539,10 @@ pub(crate) mod tests {
         lineage::ChildRequestReceipt, lineage::ChildRequestReceiptBody,
     };
     use chio_core::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
-    use chio_kernel::checkpoint::validate_checkpoint_transparency;
-    use chio_kernel::checkpoint::{build_checkpoint_with_previous, checkpoint_chain_leaf_hash};
+    use chio_kernel::checkpoint::build_checkpoint_with_previous;
     use chio_kernel::{build_checkpoint, ReceiptStore};
+    use chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash;
+    use chio_kernel_core::evidence_verify::validate_checkpoint_transparency;
 
     use super::*;
 

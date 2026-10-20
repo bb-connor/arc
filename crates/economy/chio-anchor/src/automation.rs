@@ -177,11 +177,11 @@ pub fn assess_anchor_automation_execution(
 #[cfg(test)]
 mod tests {
     use chio_core::crypto::Keypair;
+    use chio_core::receipt::checkpoint::KernelCheckpoint;
     use chio_core::web3::identity::{
         SignedWeb3IdentityBinding, Web3IdentityBindingCertificate, Web3KeyBindingPurpose,
         CHIO_KEY_BINDING_CERTIFICATE_SCHEMA,
     };
-    use chio_kernel::checkpoint::KernelCheckpoint;
 
     use crate::{
         assess_anchor_automation_execution, build_anchor_publication_job,

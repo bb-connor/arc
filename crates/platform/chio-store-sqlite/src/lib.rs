@@ -118,8 +118,8 @@ pub mod tool_outcome_store;
 pub mod work_graph_store;
 
 pub use chio_core::crypto::SharedCanonicalBytes;
+pub use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 pub use chio_core::{CanonicalBytes, CanonicalJsonWitness};
-pub use chio_kernel::{EvidenceChildReceiptScope, EvidenceExportQuery};
 
 /// Default SQLite reader pool size.
 ///

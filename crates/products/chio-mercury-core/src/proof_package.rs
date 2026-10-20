@@ -1,21 +1,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use chio_core::receipt::checkpoint::is_supported_checkpoint_schema;
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_core::receipt::evidence::{
+    EvidenceExportBundle, EvidenceExportQuery, EvidenceTransparencyClaims,
+};
 use chio_core::receipt::{
     body::ChioReceipt,
     decision::Decision,
     kinds::{ReceiptKind, TrustLevel},
 };
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_kernel::checkpoint::{
+use chio_kernel_core::evidence_verify::build_evidence_transparency_claims;
+use chio_kernel_core::evidence_verify::verify_checkpoint_signature;
+use chio_kernel_core::evidence_verify::{
     validate_checkpoint_transparency, verify_checkpoint_transparency_records,
-    CheckpointTransparencySummary,
-};
-use chio_kernel::evidence_export::{
-    build_evidence_transparency_claims, EvidenceExportBundle, EvidenceExportQuery,
-    EvidenceTransparencyClaims,
-};
-use chio_kernel::{
-    is_supported_checkpoint_schema, verify_checkpoint_signature, ReceiptReadBoundary,
 };
 use serde::{Deserialize, Serialize};
 

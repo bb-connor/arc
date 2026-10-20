@@ -20,8 +20,9 @@ canonical complete bundle/transparency/federation-policy digest. Every consumed
 package file must appear exactly once in the signed manifest. Unsigned legacy
 packages require re-export from a trusted source.
 
-`evidence verify` and `evidence import` require independently obtained
-`--trusted-kernel-pubkey` values (repeat for explicitly trusted rotation keys).
+`evidence verify` and `evidence import` require `--trust <file>`, a
+verifier-owned `chio.verifier-trust.v1` file whose `kernel_keys` list the
+independently obtained kernel keys (list every explicitly trusted rotation key).
 The package signer and every tool receipt, child receipt and checkpoint signer
 must belong to that set. Each tool proof also binds its receipt signer to its
 checkpoint signer. Signatures use strict verification. File reads are bounded to
@@ -29,25 +30,24 @@ checkpoint signer. Signatures use strict verification. File reads are bounded to
 symlink components and non-regular files.
 
 ```sh
-chio evidence verify --input ./evidence-package \
-  --trusted-kernel-pubkey "$CHIO_KERNEL_PUBKEY"
+chio evidence verify --input ./evidence-package --trust ./verifier-trust.json
 chio --receipt-db imported.sqlite3 evidence import --input ./evidence-package \
-  --trusted-kernel-pubkey "$CHIO_KERNEL_PUBKEY"
+  --trust ./verifier-trust.json
 ```
 
 Import also requires the existing signed bilateral federation policy attachment.
-An optional `--trusted-anchor-file` contains a complete independently obtained
-`CheckpointPublicationTrustAnchorBinding`. Every publication must match its
+The trust file's optional `checkpoint_trust_anchor` holds a complete
+independently obtained `CheckpointPublicationTrustAnchorBinding`. Every publication must match its
 identity, anchor identity/reference, certificate reference and profile version;
 the binding is covered by the signed payload. Without this input, a package's own
 anchor assertion remains `transparency_preview`. This is configured external
-trust, not online PKI or transparency discovery. Obtain keys and anchor files
+trust, not online PKI or transparency discovery. Obtain keys and anchor bindings
 through an independent trusted channel, never from the package being verified.
 
 Authenticated remote export collects raw records; the CLI signs locally with
 explicit custody and never sends the private seed. Remote import uses the same
 verifier before forwarding or storage. Its authenticated service administrator
-supplies the independent verification policy in the request; the service does
+supplies the independent trust file in the request; the service does
 not derive trust from embedded package keys. A receiver-owned persistent trust
 roster is a separate deployment policy.
 

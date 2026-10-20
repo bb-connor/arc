@@ -234,7 +234,7 @@ async fn export_lane_refuses_a_second_export_without_borrowing_read_capacity() -
         .header(AUTHORIZATION, "Bearer snapshot-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::admin_all(),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::admin_all(),
             "requireProofs": false,
         }))?))?;
     let response = super::super::build_router(state.clone())
