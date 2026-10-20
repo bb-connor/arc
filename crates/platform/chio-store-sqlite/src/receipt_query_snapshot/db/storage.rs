@@ -1,6 +1,6 @@
 //! Platform storage for a process-owned authenticated projection.
 #[cfg(target_os = "linux")]
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use chio_kernel::ReceiptStoreError;
 use rusqlite::Connection;
@@ -8,8 +8,8 @@ use rusqlite::Connection;
 use super::SnapshotDbError;
 #[cfg(target_os = "linux")]
 use crate::receipt_query_snapshot_backing::{
-    reclaim_abandoned as reclaim_backing, SnapshotBackingError, SnapshotCustodyRefusal,
-    SnapshotFileBacking, SnapshotLocationRefusal,
+    reclaim_abandoned as reclaim_backing, SnapshotBackingError, SnapshotFileBacking,
+    SnapshotLocationRefusal,
 };
 use crate::receipt_store::SqliteReceiptStore;
 
@@ -27,8 +27,8 @@ impl Storage {
     pub(super) fn create(store: &SqliteReceiptStore) -> Result<Self, SnapshotDbError> {
         #[cfg(target_os = "linux")]
         {
-            let directory = data_directory(store)?;
-            match SnapshotFileBacking::create(directory.as_deref()) {
+            let database = database_file(store)?;
+            match SnapshotFileBacking::create(database.as_deref()) {
                 Ok(backing) => Ok(Self::File(backing)),
                 Err(error @ SnapshotBackingError::Unusable(SnapshotLocationRefusal::Contended)) => {
                     Err(SnapshotDbError::Contended(error.to_string()))
@@ -73,8 +73,8 @@ impl Storage {
 pub(super) fn reclaim_abandoned(store: &SqliteReceiptStore) {
     #[cfg(target_os = "linux")]
     {
-        let outcome = data_directory(store)
-            .and_then(|directory| reclaim_backing(directory.as_deref()).map_err(backing_error));
+        let outcome = database_file(store)
+            .and_then(|database| reclaim_backing(database.as_deref()).map_err(backing_error));
         if let Err(error) = outcome {
             tracing::warn!(%error, "receipt query snapshot reclamation did not run");
         }
@@ -83,12 +83,12 @@ pub(super) fn reclaim_abandoned(store: &SqliteReceiptStore) {
     let _ = store;
 }
 
-/// The directory of `store`'s main database file, as SQLite resolved it
-/// (absolute and without links). The name is read as bytes, so a non-UTF-8
-/// name keeps its directory; only an empty name, which SQLite reports for a
-/// database backed by no file, yields `None`.
+/// `store`'s main database file, as SQLite resolved it (absolute and without
+/// links). The name is read as bytes, so a non-UTF-8 name is kept; only an
+/// empty name, which SQLite reports for a database backed by no file, yields
+/// `None`.
 #[cfg(target_os = "linux")]
-fn data_directory(store: &SqliteReceiptStore) -> Result<Option<PathBuf>, ReceiptStoreError> {
+fn database_file(store: &SqliteReceiptStore) -> Result<Option<PathBuf>, ReceiptStoreError> {
     use std::os::unix::ffi::OsStrExt;
     let connection = store.connection()?;
     let file: Vec<u8> = connection.query_row(
@@ -110,14 +110,7 @@ fn data_directory(store: &SqliteReceiptStore) -> Result<Option<PathBuf>, Receipt
     if file.is_empty() {
         return Ok(None);
     }
-    Path::new(std::ffi::OsStr::from_bytes(&file))
-        .parent()
-        .map(|directory| Some(directory.to_path_buf()))
-        .ok_or_else(|| {
-            backing_error(SnapshotBackingError::Refused(
-                SnapshotCustodyRefusal::MissingParent,
-            ))
-        })
+    Ok(Some(PathBuf::from(std::ffi::OsStr::from_bytes(&file))))
 }
 
 #[cfg(target_os = "linux")]

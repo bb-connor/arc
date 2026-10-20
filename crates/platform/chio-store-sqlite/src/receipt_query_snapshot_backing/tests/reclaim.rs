@@ -8,7 +8,6 @@ use std::sync::mpsc;
 use rustix::fs::{flock, FlockOperation};
 
 use super::super::directory::pause;
-use super::super::reclaim::PARENT_NAME;
 use super::super::reclaim_abandoned;
 use super::*;
 
@@ -18,7 +17,7 @@ const ATTEMPT_SELECTOR: &str =
 const ATTEMPT_COMPLETED: &str = "chio_snapshot_provisioning_attempt_completed";
 
 pub(super) fn snapshot_parent(base: &Path) -> PathBuf {
-    base.join(PARENT_NAME)
+    snapshot_parent_of(&database(base))
 }
 
 /// A snapshot directory with a database file and no owner, as a killed
@@ -266,7 +265,7 @@ fn a_directory_published_before_its_lock_is_never_reclaimed() -> TestResult {
         SnapshotLocationRefusal::Contended,
     )?;
     require_unusable(
-        reclaim_abandoned(Some(root.path())),
+        reclaim_abandoned(Some(&database(root.path()))),
         SnapshotLocationRefusal::Contended,
     )?;
     assert!(fs::symlink_metadata(&published)?.is_dir());
@@ -276,7 +275,7 @@ fn a_directory_published_before_its_lock_is_never_reclaimed() -> TestResult {
         .map_err(|_| "the provisioner did not finish within the hang bound")??;
     provisioner.join().map_err(|_| "the provisioner panicked")?;
     assert_eq!(backing.custody.directory.path, published);
-    let report = reclaim_abandoned(Some(root.path()))?;
+    let report = reclaim_abandoned(Some(&database(root.path())))?;
     assert_eq!((report.reclaimed, report.live), (0, 1), "{report:?}");
     backing.checked_connection()?;
     backing.close()?;
@@ -295,11 +294,11 @@ fn parent_lock_contention_is_an_operational_refusal() -> TestResult {
         SnapshotLocationRefusal::Contended,
     )?;
     require_unusable(
-        SnapshotFileBacking::create(Some(root.path())),
+        SnapshotFileBacking::create(Some(&database(root.path()))),
         SnapshotLocationRefusal::Contended,
     )?;
     require_unusable(
-        reclaim_abandoned(Some(root.path())),
+        reclaim_abandoned(Some(&database(root.path()))),
         SnapshotLocationRefusal::Contended,
     )?;
     assert_eq!(custody_entries(root.path())?, before);

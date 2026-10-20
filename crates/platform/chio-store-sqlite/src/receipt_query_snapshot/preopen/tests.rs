@@ -1,4 +1,4 @@
-//! The data directory derived before the receipt database opens must be the
+//! The database file derived before the receipt database opens must be the
 //! one SQLite reports once it has opened it, and a database SQLite backs by no
 //! file must have none.
 use std::ffi::OsStr;
@@ -8,12 +8,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use super::super::{ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots};
-use super::{data_directory, reclaim_abandoned_snapshots, Location};
+use super::{database_location, reclaim_abandoned_snapshots, Location};
+use crate::receipt_query_snapshot_backing::snapshot_parent_of;
 use crate::receipt_store::SqliteReceiptStore;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const PARENT_NAME: &str = "chio-receipt-snapshots";
 const RELATIVE_PROBE: &str = "receipt_query_snapshot::preopen::tests::relative_names_probe";
 const RELATIVE_PROBE_ENV: &str = "CHIO_SNAPSHOT_RELATIVE_NAMES_PROBE";
 const RELATIVE_RESOLVED: &str = "chio_snapshot_relative_names_resolved";
@@ -45,20 +45,20 @@ fn sqlite_file(configured: &Path) -> Result<Vec<u8>, Box<dyn std::error::Error>>
 }
 
 /// Derive first, as the hook does before the store opens; then let SQLite
-/// open the same name and compare directories.
+/// open the same name, compare files and return the reported directory.
 fn assert_equivalent(configured: &Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let derived = data_directory(configured);
+    let derived = database_location(configured);
     let file = sqlite_file(configured)?;
-    let reported = Path::new(OsStr::from_bytes(&file))
-        .parent()
-        .ok_or("SQLite reported no file")?
-        .to_path_buf();
+    let reported = Path::new(OsStr::from_bytes(&file));
     assert_eq!(
         derived,
-        Location::Directory(reported.clone()),
+        Location::File(reported.to_path_buf()),
         "{configured:?}"
     );
-    Ok(reported)
+    Ok(reported
+        .parent()
+        .ok_or("SQLite reported no file")?
+        .to_path_buf())
 }
 
 /// `%`-encode every byte a URI filename cannot carry literally.
@@ -196,7 +196,7 @@ fn relative_names_probe() -> TestResult {
         );
         assert_eq!(listing(&working)?, before, "{configured:?} created a file");
         assert_eq!(
-            data_directory(Path::new(configured)),
+            database_location(Path::new(configured)),
             Location::NoFile,
             "{configured:?}"
         );
@@ -212,7 +212,7 @@ fn relative_names_probe() -> TestResult {
             "{configured}"
         );
         assert_eq!(
-            data_directory(Path::new(configured)),
+            database_location(Path::new(configured)),
             Location::Unsupported,
             "{configured}"
         );
@@ -288,7 +288,7 @@ fn forms_that_are_not_resolved_exactly_are_refused() -> TestResult {
     refused.push(root.path().to_path_buf());
     for configured in refused {
         assert_eq!(
-            data_directory(&configured),
+            database_location(&configured),
             Location::Unsupported,
             "{configured:?}"
         );
@@ -300,7 +300,10 @@ fn forms_that_are_not_resolved_exactly_are_refused() -> TestResult {
 fn a_missing_data_directory_is_absent_and_never_created() -> TestResult {
     let root = private_root()?;
     let missing = root.path().join("not-yet");
-    assert_eq!(data_directory(&missing.join("live.db")), Location::Absent);
+    assert_eq!(
+        database_location(&missing.join("live.db")),
+        Location::Absent
+    );
     reclaim_abandoned_snapshots(&missing.join("live.db"));
     assert!(!missing.exists());
     Ok(())
@@ -323,7 +326,7 @@ fn reclamation_runs_only_where_the_path_resolves_and_never_opens_the_database() 
     let root = private_root()?;
     let data = root.path().join("data");
     private_directory(&data)?;
-    let parent = data.join(PARENT_NAME);
+    let parent = snapshot_parent_of(&data.join("live.db"));
     private_directory(&parent)?;
     let abandoned = abandoned_directory(&parent)?;
     let encoded = uri_path(&data);
@@ -376,9 +379,9 @@ fn ready_service(configured: &Path) -> Result<ReceiptQuerySnapshots, Box<dyn std
     }
 }
 
-/// Snapshot databases in the snapshot parent of `directory`.
-fn snapshot_databases(directory: &Path) -> std::io::Result<Vec<PathBuf>> {
-    let entries = match std::fs::read_dir(directory.join(PARENT_NAME)) {
+/// Snapshot databases in the snapshot parent of the database file `database`.
+fn snapshot_databases(database: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let entries = match std::fs::read_dir(snapshot_parent_of(database)) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(error) => return Err(error),
@@ -399,7 +402,7 @@ fn a_store_under_a_non_utf8_directory_keeps_its_snapshot_there() -> TestResult {
     let directory = root.path().join(OsStr::from_bytes(b"receipts-\xfe\xff"));
     private_directory(&directory)?;
     let service = ready_service(&directory.join("live.db"))?;
-    let databases = snapshot_databases(&directory)?;
+    let databases = snapshot_databases(&directory.join("live.db"))?;
     service.shutdown();
     assert_eq!(
         databases.len(),
@@ -432,7 +435,7 @@ fn the_walker_provisions_where_the_hook_reclaims() -> TestResult {
         non_utf8.join("live.db"),
     ] {
         // Derived before the store opens, as the hook runs.
-        let Location::Directory(expected) = data_directory(&configured) else {
+        let Location::File(expected) = database_location(&configured) else {
             return Err(format!("{configured:?} did not resolve").into());
         };
         let service = ready_service(&configured)?;

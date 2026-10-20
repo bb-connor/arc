@@ -31,10 +31,10 @@ use std::path::PathBuf;
 pub fn reclaim_abandoned_snapshots(receipt_db_path: &Path) {
     #[cfg(target_os = "linux")]
     {
-        match data_directory(receipt_db_path) {
-            Location::Directory(directory) => {
+        match database_location(receipt_db_path) {
+            Location::File(database) => {
                 if let Err(error) =
-                    crate::receipt_query_snapshot_backing::reclaim_abandoned(Some(&directory))
+                    crate::receipt_query_snapshot_backing::reclaim_abandoned(Some(&database))
                 {
                     tracing::warn!(
                         %error,
@@ -57,8 +57,9 @@ pub fn reclaim_abandoned_snapshots(receipt_db_path: &Path) {
 #[cfg(target_os = "linux")]
 #[derive(Debug, PartialEq, Eq)]
 enum Location {
-    /// The directory of the database file, as SQLite resolves it.
-    Directory(PathBuf),
+    /// The database file as SQLite resolves it: its directory resolved
+    /// through every link, and its name there.
+    File(PathBuf),
     /// Neither the database nor its directory exists yet.
     Absent,
     /// SQLite backs the database by no file: it is held in memory, or it is
@@ -68,11 +69,11 @@ enum Location {
     Unsupported,
 }
 
-/// The directory SQLite will report for the database at `configured`: the
+/// The file SQLite will report for the database at `configured`: the
 /// database file resolved through every link when it exists, otherwise its
-/// existing parent resolved. Nothing is created.
+/// name in its existing parent resolved. Nothing is created.
 #[cfg(target_os = "linux")]
-fn data_directory(configured: &Path) -> Location {
+fn database_location(configured: &Path) -> Location {
     let file = match database_file(configured) {
         Ok(Some(file)) => file,
         Ok(None) => return Location::NoFile,
@@ -80,11 +81,7 @@ fn data_directory(configured: &Path) -> Location {
     };
     match std::fs::canonicalize(&file) {
         Ok(resolved) if resolved.is_dir() => Location::Unsupported,
-        Ok(resolved) => resolved
-            .parent()
-            .map_or(Location::Unsupported, |directory| {
-                Location::Directory(directory.to_path_buf())
-            }),
+        Ok(resolved) => Location::File(resolved),
         // A dangling link: SQLite would create its target, which this does
         // not resolve.
         Err(error)
@@ -94,12 +91,15 @@ fn data_directory(configured: &Path) -> Location {
             Location::Unsupported
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            let Some(name) = file.file_name() else {
+                return Location::Unsupported;
+            };
             let parent = file
                 .parent()
                 .filter(|parent| !parent.as_os_str().is_empty())
                 .unwrap_or(Path::new("."));
             match std::fs::canonicalize(parent) {
-                Ok(directory) if directory.is_dir() => Location::Directory(directory),
+                Ok(directory) if directory.is_dir() => Location::File(directory.join(name)),
                 Ok(_) => Location::Unsupported,
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => Location::Absent,
                 Err(_) => Location::Unsupported,

@@ -16,10 +16,9 @@ use super::super::service::{ReceiptQuerySnapshotState, ReceiptQuerySnapshots};
 use super::super::walk::{WalkError, WalkLimits};
 use super::service::{config, ready, wait_for};
 use super::support::{context, limits, target, Fixture};
+use crate::receipt_query_snapshot_backing::snapshot_parent_of;
 use crate::receipt_store::test_hooks::FAIL_SEED_PATH_MARKER;
 use crate::receipt_store::SqliteReceiptStore;
-
-const PARENT_NAME: &str = "chio-receipt-snapshots";
 
 const KILLED_OWNER_BASE: &str = "CHIO_SNAPSHOT_KILLED_OWNER_BASE";
 const KILLED_OWNER_SELECTOR: &str =
@@ -220,7 +219,7 @@ const CONTENDED: &str =
 #[test]
 fn parent_lock_contention_is_a_busy_outcome() {
     let fixture = Fixture::new(0);
-    let parent = data_directory(&fixture).join(PARENT_NAME);
+    let parent = snapshot_parent_of(&fixture.live);
     private_directory(&parent);
     let holder = hold_lock(&parent);
     let error = match SnapshotDb::open_private(&fixture.store, 1 << 24) {
@@ -246,7 +245,7 @@ fn stepped_store() -> (tempfile::TempDir, Arc<SteppedClock>, SqliteReceiptStore)
     let store =
         SqliteReceiptStore::open_with_clock(directory.path().join("live.db"), clock.clone())
             .unwrap();
-    private_directory(&directory.path().join(PARENT_NAME));
+    private_directory(&snapshot_parent_of(&directory.path().join("live.db")));
     (directory, clock, store)
 }
 
@@ -262,7 +261,7 @@ fn a_build_waits_out_parent_lock_contention_until_cancelled() {
     };
     let ctx = context(&store, &cancel, walk_limits);
     let contended = target(&ctx);
-    let holder = hold_lock(&directory.path().join(PARENT_NAME));
+    let holder = hold_lock(&snapshot_parent_of(&directory.path().join("live.db")));
     let outcome = std::thread::scope(|scope| {
         let builder =
             scope.spawn(|| build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {}).map(|_| ()));
@@ -325,7 +324,7 @@ fn build_released_by_the_clock(script: [(u64, u64); 3]) -> Result<usize, WalkErr
     let store =
         SqliteReceiptStore::open_with_clock(directory.path().join("live.db"), clock.clone())
             .unwrap();
-    let parent = directory.path().join(PARENT_NAME);
+    let parent = snapshot_parent_of(&directory.path().join("live.db"));
     private_directory(&parent);
     *clock.holder.lock().unwrap() = Some(hold_lock(&parent));
     let cancel = Arc::new(AtomicBool::new(false));
@@ -414,7 +413,7 @@ fn a_parent_lock_held_past_the_busy_timeout_is_unavailable() {
     };
     let ctx = context(&store, &cancel, walk_limits);
     let contended = target(&ctx);
-    let _holder = hold_lock(&directory.path().join(PARENT_NAME));
+    let _holder = hold_lock(&snapshot_parent_of(&directory.path().join("live.db")));
     let step_ms = u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap();
     let outcome = std::thread::scope(|scope| {
         let builder =
@@ -450,7 +449,7 @@ fn the_data_directory_is_where_sqlite_resolved_the_store() {
     });
     let databases = snapshot_databases(&real);
     assert_eq!(databases.len(), 1, "{databases:?}");
-    assert!(databases[0].starts_with(real.join(PARENT_NAME)));
+    assert!(databases[0].starts_with(snapshot_parent_of(&real.join("live.db"))));
     assert!(std::fs::symlink_metadata(&link)
         .unwrap()
         .file_type()
@@ -478,7 +477,7 @@ fn reclamation_continues_on_the_store_clock_while_the_writer_never_seeds() {
         .permissions(std::fs::Permissions::from_mode(0o700))
         .tempdir()
         .unwrap();
-    let parent = directory.path().join(PARENT_NAME);
+    let parent = snapshot_parent_of(&directory.path().join("live.db"));
     private_directory(&parent);
     let created: Vec<PathBuf> = (0..40).map(|_| abandoned_directory(&parent)).collect();
     // The first 17 snapshot directories the kernel lists are live: one

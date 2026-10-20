@@ -3,9 +3,8 @@ use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
 use super::super::reclaim_abandoned_snapshots;
+use crate::receipt_query_snapshot_backing::snapshot_parent_of;
 use crate::receipt_store::SqliteReceiptStore;
-
-const PARENT_NAME: &str = "chio-receipt-snapshots";
 
 fn private_directory(path: &Path) {
     std::fs::DirBuilder::new().mode(0o700).create(path).unwrap();
@@ -35,7 +34,7 @@ fn closed_store_with_abandoned_snapshots() -> (tempfile::TempDir, PathBuf, Vec<P
     let live = root.path().join("live.db");
     // Dropping the store joins its writer and closes every connection.
     drop(SqliteReceiptStore::open(&live).unwrap());
-    let parent = root.path().join(PARENT_NAME);
+    let parent = snapshot_parent_of(&live);
     private_directory(&parent);
     let abandoned = (0..3).map(|_| abandoned_directory(&parent)).collect();
     (root, live, abandoned)

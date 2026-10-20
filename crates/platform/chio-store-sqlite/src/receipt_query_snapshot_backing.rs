@@ -8,9 +8,12 @@
 //!
 //! Snapshot directories live in one versioned private parent (0700, owned by
 //! the effective user) inside the receipt store's data directory, or under
-//! `/tmp` when the store has no data directory. Each directory holds a
-//! lifetime lock, so provisioning can reclaim the directories of owners that
-//! died without unwinding (see `reclaim`).
+//! `/tmp` when the store has no data directory. The parent in a data directory
+//! is named for the effective user and the database file name, so databases
+//! and users sharing that directory use distinct parents; the name is as
+//! predictable as the database file name. Each directory holds a lifetime
+//! lock, so provisioning can reclaim the directories of owners that died
+//! without unwinding (see `reclaim`).
 //!
 //! The data directory may be group-writable. Its group writers can rename or
 //! remove the data directory or the private parent, which denies service just
@@ -101,6 +104,10 @@ pub(crate) enum SnapshotBackingError {
     Descriptor(#[from] SqliteFileIdentityInspectionError),
 }
 
+/// The database file name whose snapshot parent `create_in` provisions in.
+#[cfg(test)]
+const TEST_DATABASE: &str = "live.db";
+
 pub(crate) struct SnapshotFileBacking {
     // Drop must close SQLite before custody's held file descriptor, because
     // closing another descriptor of this inode can release SQLite's POSIX locks.
@@ -109,18 +116,24 @@ pub(crate) struct SnapshotFileBacking {
 }
 
 impl SnapshotFileBacking {
-    /// Provision in the receipt store's data directory, or under Linux `/tmp`
-    /// when the store has none, without consulting or changing SQLite's
-    /// process-global temporary-directory settings.
-    pub(crate) fn create(data_directory: Option<&Path>) -> Result<Self, SnapshotBackingError> {
-        let (base, parent_name) = held_base(data_directory)?;
+    /// Provision in the data directory of the receipt store's main database
+    /// file `database`, or under Linux `/tmp` when the store has none, without
+    /// consulting or changing SQLite's process-global temporary-directory
+    /// settings.
+    pub(crate) fn create(database: Option<&Path>) -> Result<Self, SnapshotBackingError> {
+        let (base, parent_name) = held_base(database)?;
         Self::provision(base, &parent_name)
     }
 
-    /// Provision under `parent` with the strict ancestor rule.
+    /// Provision under `parent` with the strict ancestor rule, in the
+    /// snapshot parent of the database file `TEST_DATABASE` there.
     #[cfg(test)]
     fn create_in(parent: &Path) -> Result<Self, SnapshotBackingError> {
-        Self::provision(open_parents(parent)?, reclaim::PARENT_NAME)
+        let parent_name = reclaim::database_parent_name(
+            rustix::process::geteuid().as_raw(),
+            std::ffi::OsStr::new(TEST_DATABASE),
+        );
+        Self::provision(open_parents(parent)?, &parent_name)
     }
 
     fn provision(
@@ -213,9 +226,9 @@ impl SnapshotFileBacking {
 /// `create` would provision, without provisioning or creating anything there
 /// beyond the reclaim cursor.
 pub(crate) fn reclaim_abandoned(
-    data_directory: Option<&Path>,
+    database: Option<&Path>,
 ) -> Result<ReclaimReport, SnapshotBackingError> {
-    let (base, parent_name) = held_base(data_directory)?;
+    let (base, parent_name) = held_base(database)?;
     let held = base.last().ok_or(SnapshotBackingError::Refused(
         SnapshotCustodyRefusal::MissingParent,
     ))?;
@@ -227,16 +240,24 @@ pub(crate) fn reclaim_abandoned(
     Ok(persisted.report)
 }
 
-/// The held base and the name of its snapshot parent. The `/tmp` parent is
-/// per user, because `/tmp` is shared.
+/// The held base and the name of its snapshot parent: the directory of the
+/// main database file `database` with a parent for this user and that file,
+/// or `/tmp` with a parent for this user.
 fn held_base(
-    data_directory: Option<&Path>,
+    database: Option<&Path>,
 ) -> Result<(Vec<DirectoryCustody>, String), SnapshotBackingError> {
-    match data_directory {
-        Some(directory) => Ok((
-            open_data_directory(directory)?,
-            reclaim::PARENT_NAME.to_string(),
-        )),
+    match database {
+        Some(database) => {
+            let (Some(directory), Some(name)) = (database.parent(), database.file_name()) else {
+                return Err(SnapshotBackingError::Refused(
+                    SnapshotCustodyRefusal::MissingParent,
+                ));
+            };
+            Ok((
+                open_data_directory(directory)?,
+                reclaim::database_parent_name(rustix::process::geteuid().as_raw(), name),
+            ))
+        }
         None => Ok((
             open_parents(Path::new("/tmp"))?,
             format!(
@@ -246,6 +267,18 @@ fn held_base(
             ),
         )),
     }
+}
+
+/// The snapshot parent that this user's snapshots of the main database file
+/// `database` use.
+#[cfg(test)]
+pub(crate) fn snapshot_parent_of(database: &Path) -> std::path::PathBuf {
+    let directory = database.parent().unwrap_or(Path::new("/"));
+    let name = database.file_name().unwrap_or_default();
+    directory.join(reclaim::database_parent_name(
+        rustix::process::geteuid().as_raw(),
+        name,
+    ))
 }
 
 impl Drop for SnapshotFileBacking {

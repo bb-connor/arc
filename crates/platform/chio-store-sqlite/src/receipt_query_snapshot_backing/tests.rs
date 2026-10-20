@@ -4,6 +4,12 @@ use std::os::unix::fs::{symlink, DirBuilderExt, MetadataExt, OpenOptionsExt, Per
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+/// The database file whose snapshot parent `create_in` provisions in under
+/// `base`.
+fn database(base: &Path) -> std::path::PathBuf {
+    base.join(TEST_DATABASE)
+}
+
 #[path = "tests/cursor.rs"]
 mod cursor;
 #[path = "tests/location.rs"]
@@ -143,7 +149,7 @@ fn private_tempdir() -> std::io::Result<tempfile::TempDir> {
 /// Entries of `base` other than its snapshot parent, plus the snapshot
 /// directories inside that parent. Empty once every custody is released.
 fn custody_entries(base: &Path) -> std::io::Result<Vec<std::path::PathBuf>> {
-    let parent = base.join(super::reclaim::PARENT_NAME);
+    let parent = reclaim::snapshot_parent(base);
     let mut entries = Vec::new();
     for entry in fs::read_dir(base)? {
         let path = entry?.path();
