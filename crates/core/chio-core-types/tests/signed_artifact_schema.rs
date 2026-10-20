@@ -287,6 +287,24 @@ fn fiscal_signed_artifact_schemas_are_registered() {
 }
 
 #[test]
+fn root_authority_signed_artifact_schemas_are_registered() {
+    for (schema, artifact_kind) in [
+        ("chio.root-policy.v1", "root_policy"),
+        ("chio.idp-key-snapshot.v1", "idp_key_snapshot"),
+    ] {
+        assert!(chio_core_types::is_supported_signed_artifact_schema(schema));
+        assert!(chio_core_types::built_in_signed_artifact_registry()
+            .iter()
+            .any(|entry| entry.schema == schema
+                && entry.artifact_kind == artifact_kind
+                && entry.introduced_by == "root-authority-v1"));
+    }
+    assert!(!chio_core_types::is_supported_signed_artifact_schema(
+        "chio.root-policy.v2"
+    ));
+}
+
+#[test]
 fn fiscal_genesis_policy_remains_outside_the_signed_artifact_registry() {
     let schema = "chio.fiscal.genesis-policy.v1";
     assert!(!chio_core_types::is_supported_signed_artifact_schema(
