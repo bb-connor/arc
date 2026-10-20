@@ -118,8 +118,12 @@ fn pending_cancellation_refuses_active_and_completed_attempts_without_mutation()
             .cancel_pending(&worker)
             .err()
             .ok_or("nonpending cancellation accepted")?;
+        let CliError::Chio(failure) = failure else {
+            return Err("pending cancellation returned an unregistered error".into());
+        };
+        assert_eq!(failure.code().as_str(), "urn:chio:error:cli:other");
         assert_eq!(
-            failure.to_string(),
+            failure.message(),
             "process host: cancellation does not match pending worker state"
         );
         assert_eq!(serde_json::to_value(journal.snapshots()?)?, before);
