@@ -1,0 +1,84 @@
+{
+ "sqlite": "3.51.0 2025-06-12 13:14:41 f0ca7bba1c5e232e5d279fad6338121ab55af0c8c68c84cdfb18ba5114dcaapl (64-bit)",
+ "all_as_expected": true,
+ "results": [
+  {
+   "case": "present_json",
+   "expected_accept": true,
+   "accepted": true,
+   "error": null
+  },
+  {
+   "case": "erased_null",
+   "expected_accept": true,
+   "accepted": true,
+   "error": null
+  },
+  {
+   "case": "present_null",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(value) = 'text' AND json_valid(value)) OR (state = 'erased' AND value IS NULL) (19)"
+  },
+  {
+   "case": "present_invalid_json",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(value) = 'text' AND json_valid(value)) OR (state = 'erased' AND value IS NULL) (19)"
+  },
+  {
+   "case": "present_blob",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(value) = 'text' AND json_valid(value)) OR (state = 'erased' AND value IS NULL) (19)"
+  },
+  {
+   "case": "erased_with_value",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: (state = 'present' AND typeof(value) = 'text' AND json_valid(value)) OR (state = 'erased' AND value IS NULL) (19)"
+  },
+  {
+   "case": "salt_ref_not_metadata",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(CAST(salt_ref AS BLOB)) BETWEEN 10 AND 64 AND salt_ref GLOB 'metadata.[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "salt_ref_embedded_nul",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(CAST(salt_ref AS BLOB)) BETWEEN 10 AND 64 AND salt_ref GLOB 'metadata.[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  },
+  {
+   "case": "receipt_id_embedded_nul",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(CAST(receipt_id AS BLOB)) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*' (19)"
+  },
+  {
+   "case": "state_lost",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 11: CHECK constraint failed: typeof(state) = 'text' AND instr(state, char(0)) = 0 AND state IN ('present', 'erased') (19)"
+  },
+  {
+   "case": "update_erase_clearing_value",
+   "expected_accept": true,
+   "accepted": true,
+   "error": null
+  },
+  {
+   "case": "update_erase_leaving_value",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 12: CHECK constraint failed: (state = 'present' AND typeof(value) = 'text' AND json_valid(value)) OR (state = 'erased' AND value IS NULL) (19)"
+  },
+  {
+   "case": "update_salt_ref_nul",
+   "expected_accept": false,
+   "accepted": false,
+   "error": "Runtime error near line 12: CHECK constraint failed: typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(CAST(salt_ref AS BLOB)) BETWEEN 10 AND 64 AND salt_ref GLOB 'metadata.[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.' (19)"
+  }
+ ]
+}
