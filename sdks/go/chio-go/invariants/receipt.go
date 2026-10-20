@@ -1,5 +1,10 @@
 package invariants
 
+import (
+	"sort"
+	"strconv"
+)
+
 type ReceiptVerification struct {
 	Decision           string `json:"decision"`
 	Authorized         bool   `json:"authorized"`
@@ -13,6 +18,96 @@ type ReceiptVerification struct {
 	SignerTrusted      bool   `json:"signer_trusted"`
 	SignatureValid     bool   `json:"signature_valid"`
 	TrustLevel         string `json:"trust_level"`
+}
+
+var (
+	receiptMembers = memberSet(
+		"action", "actor_chain", "algorithm", "bbs_projection_version", "bbs_signature",
+		"boundary_class", "capability_id", "content_hash", "decision", "evidence", "id",
+		"kernel_key", "metadata", "observation_outcome", "policy_hash", "receipt_kind",
+		"redaction_mode", "signature", "tenant_id", "timestamp", "tool_name", "tool_origin",
+		"tool_server", "trust_level",
+	)
+	receiptActionMembers   = memberSet("parameters", "parameter_hash")
+	receiptActorMembers    = memberSet("actor_id", "actor_kind")
+	receiptEvidenceMembers = memberSet("guard_name", "verdict", "details")
+	receiptBBSMembers      = memberSet(
+		"schema", "projection_version", "algorithm", "ciphersuite", "issuer_fingerprint",
+		"issuer_public_key_hex", "message_count", "signature_hex",
+	)
+	receiptDecisionMembers = map[string]map[string]struct{}{
+		"allow":      memberSet("verdict"),
+		"deny":       memberSet("verdict", "reason", "guard"),
+		"cancelled":  memberSet("verdict", "reason"),
+		"incomplete": memberSet("verdict", "reason"),
+	}
+)
+
+func memberSet(names ...string) map[string]struct{} {
+	set := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		set[name] = struct{}{}
+	}
+	return set
+}
+
+func requireMembers(value any, allowed map[string]struct{}, path string) error {
+	object, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	keys := make([]string, 0, len(object))
+	for key := range object {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if _, ok := allowed[key]; !ok {
+			return newInvariantError("receipt", "unknown receipt member: "+path+"/"+key)
+		}
+	}
+	return nil
+}
+
+// requireClosedReceipt refuses any member the signed receipt shape does not define.
+func requireClosedReceipt(receipt map[string]any) error {
+	if err := requireMembers(receipt, receiptMembers, ""); err != nil {
+		return err
+	}
+	if err := requireMembers(receipt["action"], receiptActionMembers, "/action"); err != nil {
+		return err
+	}
+	if err := requireMembers(receipt["bbs_signature"], receiptBBSMembers, "/bbs_signature"); err != nil {
+		return err
+	}
+	if decision, ok := receipt["decision"].(map[string]any); ok {
+		verdict, _ := decision["verdict"].(string)
+		allowed, known := receiptDecisionMembers[verdict]
+		if !known {
+			allowed = memberSet("verdict")
+		}
+		if err := requireMembers(decision, allowed, "/decision"); err != nil {
+			return err
+		}
+	}
+	for _, list := range []struct {
+		name    string
+		allowed map[string]struct{}
+	}{
+		{"actor_chain", receiptActorMembers},
+		{"evidence", receiptEvidenceMembers},
+	} {
+		entries, ok := receipt[list.name].([]any)
+		if !ok {
+			continue
+		}
+		for index, entry := range entries {
+			if err := requireMembers(entry, list.allowed, "/"+list.name+"/"+strconv.Itoa(index)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func ParseReceiptJSON(input string) (map[string]any, error) {
@@ -61,6 +156,9 @@ func VerifyReceiptWithTrustedSigners(
 	receipt map[string]any,
 	trustedSigners []string,
 ) (ReceiptVerification, error) {
+	if err := requireClosedReceipt(receipt); err != nil {
+		return ReceiptVerification{}, err
+	}
 	body, err := ReceiptSigningBodyCanonicalJSON(receipt)
 	if err != nil {
 		return ReceiptVerification{}, err

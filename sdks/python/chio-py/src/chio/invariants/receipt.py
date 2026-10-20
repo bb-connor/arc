@@ -29,6 +29,77 @@ def _safe_verify_receipt_signature(
         return False
 
 
+_RECEIPT_MEMBERS = frozenset({
+    "action",
+    "actor_chain",
+    "algorithm",
+    "bbs_projection_version",
+    "bbs_signature",
+    "boundary_class",
+    "capability_id",
+    "content_hash",
+    "decision",
+    "evidence",
+    "id",
+    "kernel_key",
+    "metadata",
+    "observation_outcome",
+    "policy_hash",
+    "receipt_kind",
+    "redaction_mode",
+    "signature",
+    "tenant_id",
+    "timestamp",
+    "tool_name",
+    "tool_origin",
+    "tool_server",
+    "trust_level",
+})
+_ACTION_MEMBERS = frozenset({"parameters", "parameter_hash"})
+_ACTOR_MEMBERS = frozenset({"actor_id", "actor_kind"})
+_EVIDENCE_MEMBERS = frozenset({"guard_name", "verdict", "details"})
+_BBS_SIGNATURE_MEMBERS = frozenset({
+    "schema",
+    "projection_version",
+    "algorithm",
+    "ciphersuite",
+    "issuer_fingerprint",
+    "issuer_public_key_hex",
+    "message_count",
+    "signature_hex",
+})
+_DECISION_MEMBERS = {
+    "allow": frozenset({"verdict"}),
+    "deny": frozenset({"verdict", "reason", "guard"}),
+    "cancelled": frozenset({"verdict", "reason"}),
+    "incomplete": frozenset({"verdict", "reason"}),
+}
+
+
+def _require_members(value: Any, allowed: frozenset[str], path: str) -> None:
+    if not isinstance(value, dict):
+        return
+    for key in sorted(value):
+        if key not in allowed:
+            raise ChioInvariantError("json", f"unknown receipt member: {path}/{key}")
+
+
+def _require_closed_receipt(receipt: dict[str, Any]) -> None:
+    """Refuse any member the signed receipt shape does not define."""
+    _require_members(receipt, _RECEIPT_MEMBERS, "")
+    _require_members(receipt.get("action"), _ACTION_MEMBERS, "/action")
+    _require_members(receipt.get("bbs_signature"), _BBS_SIGNATURE_MEMBERS, "/bbs_signature")
+    decision = receipt.get("decision")
+    if isinstance(decision, dict):
+        allowed = _DECISION_MEMBERS.get(decision.get("verdict"), frozenset({"verdict"}))
+        _require_members(decision, allowed, "/decision")
+    for name, allowed in (("actor_chain", _ACTOR_MEMBERS), ("evidence", _EVIDENCE_MEMBERS)):
+        entries = receipt.get(name)
+        if isinstance(entries, list):
+            for index, entry in enumerate(entries):
+                _require_members(entry, allowed, f"/{name}/{index}")
+
+
 def parse_receipt_json(input_text: str) -> dict[str, Any]:
     """Decode signed receipt text. A repeated object key at any depth raises
     ``ChioInvariantError`` with code ``json`` before any field is read."""
@@ -145,6 +216,7 @@ def verify_receipt(
     receipt: dict[str, Any],
     trusted_signers: list[str] | None = None,
 ) -> dict[str, Any]:
+    _require_closed_receipt(receipt)
     decision_value = receipt.get("decision")
     decision = (
         decision_value.get("verdict", "none")

@@ -77,6 +77,92 @@ export interface ReceiptVerification {
   ok: boolean;
 }
 
+const RECEIPT_MEMBERS = new Set([
+  "action",
+  "actor_chain",
+  "algorithm",
+  "bbs_projection_version",
+  "bbs_signature",
+  "boundary_class",
+  "capability_id",
+  "content_hash",
+  "decision",
+  "evidence",
+  "id",
+  "kernel_key",
+  "metadata",
+  "observation_outcome",
+  "policy_hash",
+  "receipt_kind",
+  "redaction_mode",
+  "signature",
+  "tenant_id",
+  "timestamp",
+  "tool_name",
+  "tool_origin",
+  "tool_server",
+  "trust_level",
+]);
+const ACTION_MEMBERS = new Set(["parameters", "parameter_hash"]);
+const ACTOR_MEMBERS = new Set(["actor_id", "actor_kind"]);
+const EVIDENCE_MEMBERS = new Set(["guard_name", "verdict", "details"]);
+const BBS_SIGNATURE_MEMBERS = new Set([
+  "schema",
+  "projection_version",
+  "algorithm",
+  "ciphersuite",
+  "issuer_fingerprint",
+  "issuer_public_key_hex",
+  "message_count",
+  "signature_hex",
+]);
+const DECISION_MEMBERS: Record<string, Set<string>> = {
+  allow: new Set(["verdict"]),
+  deny: new Set(["verdict", "reason", "guard"]),
+  cancelled: new Set(["verdict", "reason"]),
+  incomplete: new Set(["verdict", "reason"]),
+};
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireMembers(value: unknown, allowed: Set<string>, path: string): void {
+  if (!isObject(value)) {
+    return;
+  }
+  for (const key of Object.keys(value).sort()) {
+    if (!allowed.has(key)) {
+      throw new ChioInvariantError("json", `unknown receipt member: ${path}/${key}`);
+    }
+  }
+}
+
+/** Refuse any member the signed receipt shape does not define. */
+function requireClosedReceipt(receipt: ChioReceipt): void {
+  const value: unknown = receipt;
+  if (!isObject(value)) {
+    return;
+  }
+  requireMembers(value, RECEIPT_MEMBERS, "");
+  requireMembers(value.action, ACTION_MEMBERS, "/action");
+  requireMembers(value.bbs_signature, BBS_SIGNATURE_MEMBERS, "/bbs_signature");
+  const decision = value.decision;
+  if (isObject(decision)) {
+    const verdict = typeof decision.verdict === "string" ? decision.verdict : "";
+    requireMembers(decision, DECISION_MEMBERS[verdict] ?? new Set(["verdict"]), "/decision");
+  }
+  for (const [name, allowed] of [
+    ["actor_chain", ACTOR_MEMBERS],
+    ["evidence", EVIDENCE_MEMBERS],
+  ] as const) {
+    const entries = value[name];
+    if (Array.isArray(entries)) {
+      entries.forEach((entry, index) => requireMembers(entry, allowed, `/${name}/${index}`));
+    }
+  }
+}
+
 /** Signed receipt text; a repeated object key at any depth throws a `json` ChioInvariantError. */
 export function parseReceiptJson(input: string): ChioReceipt {
   return parseJsonTextUniqueKeys(input);
@@ -203,6 +289,7 @@ function semanticallySignable(receipt: ChioReceipt, decision: ReceiptDecisionKin
 }
 
 export function verifyReceipt(receipt: ChioReceipt, trustedSigners: string[] = []): ReceiptVerification {
+  requireClosedReceipt(receipt);
   const signingBodyCanonicalJson = receiptSigningBodyCanonicalJson(receipt);
   const parameterCanonicalJson = canonicalizeJson(receipt.action.parameters);
   const decision = receipt.decision?.verdict ?? "none";
