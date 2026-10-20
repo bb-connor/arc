@@ -34,8 +34,8 @@ use chio_credit::{CreditEvaluatorHook, LocalCreditAccount};
 use chio_guard_registry::GuardPrice;
 use chio_reputation::ReputationTier;
 use chio_settle::{
-    SettlementHook, SettlementHookError, SettlementObservation, SettlementOutcome,
-    SettlementSkipReason,
+    ObservedSettlement, SettlementHook, SettlementHookError, SettlementObservation,
+    SettlementOutcome,
 };
 use serde::{Deserialize, Serialize};
 
@@ -64,9 +64,6 @@ impl SettlementHook for CountingSettlementHook {
         observation: &SettlementObservation,
         _idempotency_key: &chio_settle::SettlementIdempotencyKey,
     ) -> Result<SettlementOutcome, SettlementHookError> {
-        if observation.amount.units == 0 {
-            return Ok(SettlementOutcome::skipped(SettlementSkipReason::ZeroCharge));
-        }
         self.accepted.fetch_add(1, Ordering::SeqCst);
         Ok(SettlementOutcome::accepted(format!(
             "ts-{}",
@@ -209,9 +206,14 @@ fn install_priced_guard_run_call_one_iou_one_settlement() {
         receipt.tool_server.clone(),
         receipt.tool_name.clone(),
         receipt.capability_id.clone(),
-        chio_credit::capability::scope::MonetaryAmount {
-            currency: envelope.body.currency.clone(),
-            units: envelope.body.amount_units,
+        ObservedSettlement::Charge {
+            amount: chio_credit::capability::scope::MonetaryAmount {
+                currency: envelope.body.currency.clone(),
+                units: envelope.body.amount_units,
+            },
+            status: SettlementStatus::Pending,
+            payment_reference: None,
+            hold_id: None,
         },
         receipt.content_hash.clone(),
         receipt.policy_hash.clone(),

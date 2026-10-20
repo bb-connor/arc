@@ -17,7 +17,9 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use chio_core::{capability::scope::MonetaryAmount, hashing::sha256};
+use chio_core::{
+    capability::scope::MonetaryAmount, hashing::sha256, receipt::economics::SettlementStatus,
+};
 
 use crate::SettlementError;
 
@@ -65,11 +67,41 @@ where
     )
 }
 
+/// Settlement truth the signed receipt records for an observed invocation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", tag = "kind", deny_unknown_fields)]
+pub enum ObservedSettlement {
+    /// An allowed invocation that charged a strictly positive amount.
+    Charge {
+        /// Charged amount from `financial.cost_charged` and `financial.currency`.
+        amount: MonetaryAmount,
+        /// `financial.settlement_status` stamped at signing.
+        status: SettlementStatus,
+        /// `financial.payment_reference` returned by the payment rail.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        payment_reference: Option<String>,
+        /// `budget_authority.hold_id` of the budget hold that backed the charge.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hold_id: Option<String>,
+    },
+    /// A denied invocation whose payment authorization outcome is ambiguous.
+    /// The budget hold and any rail authorization stay retained until
+    /// admission recovery resolves the payment journal.
+    RetainedPayment {
+        /// Payment operation the kernel attempted. Under durable admission
+        /// this is the admission operation id that keys the payment journal.
+        operation_id: String,
+        /// `budget_authority.hold_id` of the retained hold.
+        hold_id: String,
+        /// `budget_authority.authorize.exposure_units` held for the attempt.
+        exposure_units: u64,
+    },
+}
+
 /// Observation handed to a [`SettlementHook`] by the kernel observer
 /// slot once a receipt has been signed and persisted. The structure is
 /// deliberately storage-agnostic: it carries the finalized-receipt
-/// identity plus the financial coordinates required to route the
-/// settlement through `chio-settle/ops.rs`.
+/// identity plus the settlement truth the receipt records.
 ///
 /// The kernel sets [`finalized_at`] to the receipt timestamp so a hook
 /// implementation can sort by `(finalized_at, receipt_id)` to guarantee
@@ -94,10 +126,9 @@ pub struct SettlementObservation {
     pub tool_name: String,
     /// Capability id matched at evaluation time.
     pub capability_id: String,
-    /// Settlement amount derived from the manifest pricing context. The
-    /// kernel skips the hook entirely for zero-priced receipts; the
-    /// amount on this struct is therefore always strictly positive.
-    pub amount: MonetaryAmount,
+    /// Settlement truth recorded by the receipt. The kernel skips the hook
+    /// for zero-priced, non-economic and ordinary denied receipts.
+    pub settlement: ObservedSettlement,
     /// Receipt content hash, carried verbatim so a downstream auditor
     /// can confirm the settlement references the same bytes the kernel
     /// signed.
@@ -125,7 +156,7 @@ impl SettlementObservation {
         tool_server: impl Into<String>,
         tool_name: impl Into<String>,
         capability_id: impl Into<String>,
-        amount: MonetaryAmount,
+        settlement: ObservedSettlement,
         content_hash: impl Into<String>,
         policy_hash: impl Into<String>,
     ) -> Self {
@@ -137,7 +168,7 @@ impl SettlementObservation {
             tool_server: tool_server.into(),
             tool_name: tool_name.into(),
             capability_id: capability_id.into(),
-            amount,
+            settlement,
             content_hash: content_hash.into(),
             policy_hash: policy_hash.into(),
         }
@@ -539,7 +570,9 @@ impl SettlementHookError {
 ///
 /// - Treat `observe` as observer-only relative to receipt bytes:
 ///   the receipt is already signed and persisted before this method
-///   runs, and a hook MUST NOT mutate the receipt store.
+///   runs, and a hook MUST NOT mutate receipt rows or receipt bytes.
+///   Sidecar settlement records (reconciliations, closures) are written
+///   through the serving writer.
 /// - Process observations in `(finalized_at, receipt_id)` order when
 ///   batching is necessary (see [`SettlementObservation::ordering_key`]).
 /// - Be safe to call concurrently from a tokio runtime; the kernel
@@ -572,10 +605,15 @@ mod tests {
         result.unwrap_or_else(|error| panic!("{context}: {error:?}"))
     }
 
-    fn sample_amount() -> MonetaryAmount {
-        MonetaryAmount {
-            currency: "USD".to_string(),
-            units: 100,
+    fn sample_charge() -> ObservedSettlement {
+        ObservedSettlement::Charge {
+            amount: MonetaryAmount {
+                currency: "USD".to_string(),
+                units: 100,
+            },
+            status: SettlementStatus::Settled,
+            payment_reference: None,
+            hold_id: None,
         }
     }
 
@@ -612,6 +650,47 @@ mod tests {
     }
 
     #[test]
+    fn observed_settlement_round_trips_with_a_closed_shape() {
+        let retained = ObservedSettlement::RetainedPayment {
+            operation_id: "op-1".to_string(),
+            hold_id: "hold-1".to_string(),
+            exposure_units: 100,
+        };
+        let encoded = serde_json::to_value(&retained).unwrap_or_else(|error| {
+            panic!("retained settlement must serialize: {error}");
+        });
+        assert_eq!(
+            encoded,
+            serde_json::json!({
+                "kind": "retained_payment",
+                "operation_id": "op-1",
+                "hold_id": "hold-1",
+                "exposure_units": 100,
+            })
+        );
+        let decoded = require_ok(
+            serde_json::from_value::<ObservedSettlement>(encoded),
+            "retained settlement decodes",
+        );
+        assert_eq!(decoded, retained);
+
+        let charge = serialize(&sample_charge());
+        assert_eq!(
+            charge,
+            r#"{"kind":"charge","amount":{"units":100,"currency":"USD"},"status":"settled"}"#
+        );
+
+        let unknown = serde_json::from_value::<ObservedSettlement>(serde_json::json!({
+            "kind": "retained_payment",
+            "operation_id": "op-1",
+            "hold_id": "hold-1",
+            "exposure_units": 100,
+            "rail": "x402",
+        }));
+        assert!(unknown.is_err());
+    }
+
+    #[test]
     fn ordering_key_sorts_by_finalized_at_then_receipt_id() {
         let a = SettlementObservation::new(
             "rcpt-b",
@@ -619,7 +698,7 @@ mod tests {
             "srv",
             "tool",
             "cap",
-            sample_amount(),
+            sample_charge(),
             "ch",
             "ph",
         );
@@ -629,7 +708,7 @@ mod tests {
             "srv",
             "tool",
             "cap",
-            sample_amount(),
+            sample_charge(),
             "ch",
             "ph",
         );
@@ -639,7 +718,7 @@ mod tests {
             "srv",
             "tool",
             "cap",
-            sample_amount(),
+            sample_charge(),
             "ch",
             "ph",
         );
@@ -711,9 +790,6 @@ mod tests {
                 observation: &SettlementObservation,
                 _idempotency_key: &SettlementIdempotencyKey,
             ) -> Result<SettlementOutcome, SettlementHookError> {
-                if observation.amount.units == 0 {
-                    return Ok(SettlementOutcome::skipped(SettlementSkipReason::ZeroCharge));
-                }
                 Ok(SettlementOutcome::accepted(format!(
                     "ts-{}",
                     observation.receipt_id
@@ -727,7 +803,7 @@ mod tests {
             "srv",
             "tool",
             "cap",
-            sample_amount(),
+            sample_charge(),
             "ch",
             "ph",
         );
