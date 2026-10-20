@@ -1296,7 +1296,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 
 - Generator version: `3`
 - Regenerate: `cargo xtask gen proof-coverage`
-- Input digest: `09cd9f1e08d3707ac0ed221009ce6e1b5ff9b11380bd2f904f1e3d0dbacb596f`
+- Input digest: `e7d458d0889a6d13748c59f308e12b2b5af67fb3f1d707f07b88aeca72559e5d`
 - Git commit: `@GIT_COMMIT@` (resolved in coverage.json and Proof Room packages)
 - Row identity: file rows use package-relative Rust paths; crate-only artifacts use `package::*`.
 
@@ -1465,7 +1465,7 @@ These drift-checked manual mirrors and contract twins are review navigation only
 - `crates/kernel/chio-kernel/src/kernel/dispatch.rs`: `82f0f623f9d0f2f26512860f0f4392b1341e429f160ef19fc7f35fcdb620daac`
 - `crates/kernel/chio-kernel/src/kernel/kernel_drop_guard.rs`: `a3a2b6c5e7aece9cda236f3eac78525058b80c9e03f230bdbfc2b5cf7a493d7c`
 - `crates/kernel/chio-kernel/src/kernel/ledger_audit.rs`: `defcb8e3b9de79e211b55fc1309609847d18e13d7df357a02a8a6f5a87aeb137`
-- `crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs`: `7077aa6eff4befa4436b8eb8b8ef3c99279f05b246d937da7c66f92923cf8ffa`
+- `crates/kernel/chio-kernel/src/kernel/responses/allow_responses.rs`: `5f162b9f2abae251b4b93286bfa65258f99fe7c9749b16febc9944d416ed7021`
 - `crates/kernel/chio-kernel/src/kernel/responses/finalization.rs`: `44e7dc20b5447a46a9251beba90401cef5dbcf722bba404bd8a9c85ce988ea8a`
 - `crates/kernel/chio-kernel/src/kernel/responses/receipt_persistence.rs`: `2da4a442d0c384fd070eed0d22056a47154210959f6d8c2374ab6dc598b2e91a`
 - `crates/kernel/chio-kernel/src/kernel/tests/budget.rs`: `4a47a40dc3563acbd82f698c5bcdec032c6a712a7f965721a7dd9936c254d518`
