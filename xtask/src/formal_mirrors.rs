@@ -249,6 +249,7 @@ fn compute_from_source(entry: &MirrorEntry, source: &str) -> Result<ComputedMirr
 }
 
 fn normalize_symbol(file: &syn::File, symbol: &str) -> Result<String, String> {
+    let items = source_items(file)?;
     let mut matches = Vec::new();
     if let Some((type_path, method_name)) = symbol.rsplit_once("::") {
         let Some(type_name) = type_path.rsplit("::").next() else {
@@ -257,7 +258,7 @@ fn normalize_symbol(file: &syn::File, symbol: &str) -> Result<String, String> {
         if type_name.is_empty() || method_name.is_empty() {
             return Err(format!("invalid method symbol: {symbol}"));
         }
-        for item in &file.items {
+        for item in &items {
             let Item::Impl(item_impl) = item else {
                 continue;
             };
@@ -275,7 +276,7 @@ fn normalize_symbol(file: &syn::File, symbol: &str) -> Result<String, String> {
             }
         }
     } else {
-        for item in &file.items {
+        for item in &items {
             if matches!(item_name(item), Some(name) if name == symbol) {
                 matches.push(item.to_token_stream());
             }
@@ -292,6 +293,29 @@ fn normalize_symbol(file: &syn::File, symbol: &str) -> Result<String, String> {
         }
         count => Err(format!("ambiguous symbol: {symbol} ({count} matches)")),
     }
+}
+
+/// Top-level items, including the item a `lossless_serde!` invocation defines.
+fn source_items(file: &syn::File) -> Result<Vec<Item>, String> {
+    let mut items = Vec::with_capacity(file.items.len());
+    for item in &file.items {
+        if let Item::Macro(item_macro) = item {
+            if item_macro
+                .mac
+                .path
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == "lossless_serde")
+            {
+                let inner: syn::File = syn::parse2(item_macro.mac.tokens.clone())
+                    .map_err(|error| format!("lossless_serde! parse failed: {error}"))?;
+                items.extend(inner.items);
+                continue;
+            }
+        }
+        items.push(item.clone());
+    }
+    Ok(items)
 }
 
 fn impl_type_name(ty: &Type) -> Option<&syn::Ident> {
@@ -685,6 +709,14 @@ mod tests {
             Err(error) => error,
         };
         assert!(error.contains("ambiguous symbol: Token::valid"));
+    }
+
+    #[test]
+    fn lossless_serde_item_resolves_like_a_top_level_item() {
+        let wrapped =
+            "chio_security_types::lossless_serde! { #[derive(Serialize)] pub enum Mode { Direct } }";
+        let plain = "#[derive(Serialize)] pub enum Mode { Direct }";
+        assert_eq!(hash_symbol(wrapped, "Mode"), hash_symbol(plain, "Mode"));
     }
 
     #[test]
