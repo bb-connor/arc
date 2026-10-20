@@ -116,7 +116,7 @@ expected_counts = {
     "durable flow state": 41,
     "native flow custody": 131,
     "native dispatch participant snapshots": 3,
-    "native dispatch ledger callbacks": 3,
+    "native dispatch ledger callbacks": 6,
     "native dispatch attachment contracts": 4,
     "native flow observation contracts": 3,
     "original security authority selection": 22,
