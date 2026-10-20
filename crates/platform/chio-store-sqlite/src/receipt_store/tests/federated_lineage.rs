@@ -6,7 +6,7 @@ use chio_core::capability::{
     token::{CapabilityToken, CapabilityTokenBody},
 };
 use chio_core::crypto::{sha256_hex, Keypair};
-use chio_kernel::CapabilitySnapshotProvenance;
+use chio_core::receipt::evidence::CapabilitySnapshotProvenance;
 
 fn signed_token(id: &str, subject: &Keypair, issuer: &Keypair) -> CapabilityToken {
     CapabilityToken::sign(

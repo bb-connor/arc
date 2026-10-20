@@ -222,7 +222,9 @@ mod tests {
             .flush_receipt_writes_with_timeout(Duration::from_secs(5))
             .test_unwrap();
         let bundle = store
-            .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())
+            .build_evidence_export_bundle(
+                &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
+            )
             .test_unwrap();
         assert_eq!(bundle.tool_receipts.len(), 1);
         assert_eq!(bundle.inclusion_proofs.len(), 1);

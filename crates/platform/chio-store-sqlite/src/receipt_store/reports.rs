@@ -1,9 +1,10 @@
 use super::*;
 
 use chio_core::capability::governance::GovernedProvenanceEvidenceClass;
-use chio_kernel::evidence_export::EvidenceLineageReferences;
+use chio_core::receipt::evidence::EvidenceLineageReferences;
+use chio_core::receipt::evidence::ReceiptReadBoundary;
 use chio_kernel::operator_report::GovernedTransactionDiagnostics;
-use chio_kernel::receipt_query::{ReceiptReadBoundary, ReceiptReadContext};
+use chio_kernel::receipt_query::ReceiptReadContext;
 
 // Report generation for `SqliteReceiptStore`. The shared governed-transaction
 // projection helpers live here; each report family lives in its own submodule

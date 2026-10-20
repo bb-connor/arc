@@ -42,7 +42,7 @@ impl ReceiptStore for CrashReceiptStore {
 
     fn load_latest_checkpoint(
         &self,
-    ) -> Result<Option<chio_kernel::KernelCheckpoint>, ReceiptStoreError> {
+    ) -> Result<Option<chio_core::receipt::checkpoint::KernelCheckpoint>, ReceiptStoreError> {
         self.inner.load_latest_checkpoint()
     }
 

@@ -243,7 +243,7 @@ Each lane is a ladder of rungs. Each rung (and Lane REC as a whole) states one r
 - A's passport revocation never reaches B. Federated issue reads B's own local status.
 - At proxied routes a federated capability is a bearer token, because holder possession is not checked.
 - The door ignores revocations made after it started.
-- `evidence verify` gains `--trusted-kernel-pubkey` and `--trusted-anchor-file` with #1160. That verifier already checks every receipt and checkpoint signer against keys the verifier supplies independently, so a partner's keys can be pinned by hand. What is missing is partner-card ingestion and discovery: nothing reads a partner's published card or key history into the verifier.
+- `evidence verify --trust <file>` checks every receipt and checkpoint signer against the keys a verifier-owned `chio.verifier-trust.v1` file pins, so a partner's keys can be pinned by hand. What is missing is partner-card ingestion and discovery: nothing reads a partner's published card or key history into the verifier.
 - The issuance inbox design has no way to return the issued capability to the holder.
 - As written in #1177's NORTH-STAR-FLOWS, the HOST-M1 flow fails on #1160 in two places:
   - B rejects an A-signed delegation ceiling: federated issue requires the policy signer to be a key B's own capability authority trusts (the IETF draft's Delegated Issuance step 7 states the same rule);
@@ -256,7 +256,7 @@ Each lane is a ladder of rungs. Each rung (and Lane REC as a whole) states one r
   - B's authority owns the delegation ceiling.
   - The challenge is consumed once across challenge submit and federated issue.
   - Door receipts are exportable, and the verifier checks the embedded `HttpReceipt`.
-  - `evidence verify` ingests a partner card into #1160's existing pinned-key verifier (`--trusted-kernel-pubkey`, `--trusted-anchor-file`), in place of hand-pinned keys.
+  - `evidence verify` ingests a partner card into the pinned-key verifier's `chio.verifier-trust.v1` trust file, in place of hand-pinned keys.
   - OS key custody built on #1160's `signing_custody`: `credential:` or systemd-creds on headless hosts, Keychain or Secret Service on desktops. Plaintext seed files are labelled development-only.
   - Service packaging: systemd units, a LaunchAgent, and a container image.
   - The desktop review moments (Waybar or QML, menu bar, notifier) are optional follow-ons, not gates.

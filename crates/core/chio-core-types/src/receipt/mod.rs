@@ -10,6 +10,7 @@ pub mod commitment;
 pub mod crypto_floor;
 pub mod decision;
 pub mod economics;
+pub mod evidence;
 pub mod governance;
 pub mod kinds;
 pub mod lineage;

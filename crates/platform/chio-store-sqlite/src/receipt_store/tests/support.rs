@@ -18,6 +18,7 @@ pub(super) use chio_core::crypto::Keypair;
 #[cfg(feature = "pq")]
 pub(super) use chio_core::crypto::{Ed25519Backend, HybridBackend, MlDsa65Backend, SigningBackend};
 pub(super) use chio_core::merkle::MerkleTree;
+pub(super) use chio_core::receipt::evidence::EvidenceExportQuery;
 pub(super) use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     economics::EconomicAmountBoundsReceiptMetadata, economics::EconomicAuthorizationMode,
@@ -39,13 +40,13 @@ pub(super) use chio_core::session::{
     OperationKind, OperationTerminalState, RequestId, RequestLineageMode, RequestLineageRecord,
     SessionAnchorReference, SessionId,
 };
-pub(super) use chio_kernel::checkpoint::build_checkpoint_publication;
 pub(super) use chio_kernel::{
-    build_checkpoint, build_checkpoint_with_previous, build_inclusion_proof, AnalyticsTimeBucket,
-    BehavioralFeedQuery, EvidenceExportQuery, MeteredBillingEvidenceRecord,
-    MeteredBillingReconciliationState, OperatorReportQuery, ReceiptAnalyticsQuery,
-    SettlementReconciliationState,
+    build_checkpoint, build_checkpoint_with_previous, AnalyticsTimeBucket, BehavioralFeedQuery,
+    MeteredBillingEvidenceRecord, MeteredBillingReconciliationState, OperatorReportQuery,
+    ReceiptAnalyticsQuery, SettlementReconciliationState,
 };
+pub(super) use chio_kernel_core::evidence_verify::build_checkpoint_publication;
+pub(super) use chio_kernel_core::evidence_verify::build_inclusion_proof;
 
 pub(super) use super::super::*;
 

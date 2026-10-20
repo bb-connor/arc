@@ -11,6 +11,7 @@ use chio_core::merkle::MerkleTree;
 use chio_core::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 use chio_core::receipt::authoritative_spend::BudgetAuthorityReceiptRef;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_core::receipt::kinds::TrustLevel;
 use chio_core::receipt::lineage::SignedExportEnvelope;
@@ -40,9 +41,9 @@ use chio_finding_verifier::{
     FindingNonceResolver, FindingVerifierTrustRoots, ResolvedReceiptEvidence,
     SignedFindingBondStoreSnapshot, FINDING_BOND_STORE_SNAPSHOT_SCHEMA_V1,
 };
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_transparency, build_inclusion_proof, checkpoint_log_id,
-    KernelCheckpoint, ReceiptInclusionProof,
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::{
+    build_checkpoint_transparency, build_inclusion_proof, checkpoint_log_id,
 };
 use chio_open_market::fee_schedule::{
     build_open_market_fee_schedule_artifact, OpenMarketBondClass, OpenMarketBondRequirement,
@@ -476,9 +477,9 @@ impl FindingVerifiedFixDraft {
         chio_finding_verifier::verify_checkpoint_membership(
             &resolved,
             std::slice::from_ref(&self.evidence_checkpoint),
-            &chio_kernel::checkpoint::build_checkpoint_transparency(std::slice::from_ref(
-                &self.evidence_checkpoint,
-            ))
+            &chio_kernel_core::evidence_verify::build_checkpoint_transparency(
+                std::slice::from_ref(&self.evidence_checkpoint),
+            )
             .map_err(string_error)?,
             &self.verifier_profile.body,
             &self.finding.evidence_checkpoint_ref,

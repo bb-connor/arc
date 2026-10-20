@@ -22,6 +22,9 @@ use chio_core_types::capability::trust_policy::AttestationTrustPolicy;
 use chio_core_types::crypto::{sha256_hex, Keypair, PublicKey};
 use chio_core_types::receipt::authoritative_spend::is_authoritative_spend_receipt;
 use chio_core_types::receipt::body::{chio_receipt_id, ChioReceipt};
+use chio_core_types::receipt::checkpoint::{
+    CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof,
+};
 use chio_core_types::receipt::lineage::SignedExportEnvelope;
 use chio_core_types::receipt::metadata::{
     DeliveryResult, FindingDelivery, FindingMediaTypeCheck, FINDING_DELIVERY_METADATA_KEY,
@@ -38,9 +41,6 @@ use chio_finding::{
     SignedFindingBondBacking, SignedFindingChallengeVerifierProfile, SignedFindingMarketTerms,
     SignedFindingVerifierReport, FINDING_PREDICATE_ENGINE_CHIO_REPLAY_V1,
     FINDING_VERIFIER_REPORT_SCHEMA_V1,
-};
-use chio_kernel::checkpoint::{
-    CheckpointTransparencySummary, KernelCheckpoint, ReceiptInclusionProof,
 };
 
 use crate::checkpoints::{

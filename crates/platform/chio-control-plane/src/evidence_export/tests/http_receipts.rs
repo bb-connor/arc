@@ -46,10 +46,12 @@ fn http_package(receipt: ChioReceipt) -> tempfile::TempDir {
     let mut bundle = sample_bundle();
     bundle.query = EvidenceExportQuery::admin_all();
     bundle.child_receipt_scope = EvidenceChildReceiptScope::FullQueryWindow;
-    bundle.uncheckpointed_receipts = vec![chio_kernel::EvidenceUncheckpointedReceipt {
-        seq: 1,
-        receipt_id: receipt.id.clone(),
-    }];
+    bundle.uncheckpointed_receipts = vec![
+        chio_core::receipt::evidence::EvidenceUncheckpointedReceipt {
+            seq: 1,
+            receipt_id: receipt.id.clone(),
+        },
+    ];
     bundle.tool_receipts = vec![EvidenceToolReceiptRecord { seq: 1, receipt }];
     bundle.checkpoints.clear();
     bundle.inclusion_proofs.clear();
@@ -65,16 +67,14 @@ fn http_package(receipt: ChioReceipt) -> tempfile::TempDir {
     directory
 }
 
-fn assert_http_rejection(
-    receipt: ChioReceipt,
-    expected_message: &str,
-    policy: &EvidenceVerificationPolicy,
-) {
+fn assert_http_rejection(receipt: ChioReceipt, expected_message: &str, trust: &VerifierTrust) {
     let directory = http_package(receipt);
-    let error = load_verified_evidence_package_summary(directory.path(), policy).test_unwrap_err();
-    assert_registry_error(&error, "urn:chio:error:attest:provenance-missing", "attest");
+    let error = load_verified_evidence_package(directory.path(), trust).test_unwrap_err();
     match error {
-        CliError::Chio(error) => assert_eq!(error.message(), expected_message),
+        CliError::Chio(error) => {
+            assert_eq!(error.domain().as_str(), "attest");
+            assert_eq!(error.message(), expected_message);
+        }
         other => panic!("expected attestation refusal, received {other:?}"),
     }
 }
@@ -90,10 +90,13 @@ fn package_accepts_authenticated_http_allow_and_deny() {
             .to_chio_receipt_with_keypair(&package_keypair())
             .test_unwrap();
         let directory = http_package(projected.clone());
-        let verified = load_verified_evidence_package_summary(directory.path(), &package_policy())
-            .test_unwrap();
-        assert_eq!(verified.bundle.tool_receipts.len(), 1);
-        assert_eq!(verified.bundle.tool_receipts[0].receipt.id, projected.id);
+        let verified =
+            load_verified_evidence_package(directory.path(), &package_trust()).test_unwrap();
+        assert_eq!(verified.package.bundle.tool_receipts.len(), 1);
+        assert_eq!(
+            verified.package.bundle.tool_receipts[0].receipt.id,
+            projected.id
+        );
     }
 }
 
@@ -110,7 +113,7 @@ fn package_rejects_tampered_embedded_http_receipt() {
         "HTTP receipt projection verification failed: {}",
         receipt.id
     );
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 fn resign_embedded_http(mut body: ChioReceiptBody, http: HttpReceipt) -> ChioReceipt {
@@ -145,7 +148,7 @@ fn package_rejects_forged_embedded_http_signature_with_valid_id() {
         "HTTP receipt projection verification failed: {}",
         receipt.id
     );
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 #[test]
@@ -162,7 +165,7 @@ fn package_rejects_http_receipt_without_embedded_evidence() {
         .remove("chio_http_receipt_v1");
     let receipt = ChioReceipt::sign(body, &package_keypair()).test_unwrap();
     let expected = format!("HTTP receipt evidence missing: {}", receipt.id);
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 #[test]
@@ -177,7 +180,7 @@ fn package_rejects_null_embedded_http_evidence() {
         "HTTP receipt evidence decoding failed: {}: invalid type: null, expected struct HttpReceipt",
         receipt.id
     );
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 #[test]
@@ -194,7 +197,7 @@ fn package_rejects_http_projection_under_another_server() {
         "HTTP receipt projection verification failed: {}",
         receipt.id
     );
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 #[test]
@@ -212,7 +215,7 @@ fn package_rejects_unknown_embedded_http_fields() {
         "HTTP receipt projection verification failed: {}",
         receipt.id
     );
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 #[test]
@@ -232,10 +235,10 @@ fn package_preserves_signed_http_metadata() {
             .to_chio_receipt_with_keypair(&package_keypair())
             .test_unwrap();
         let directory = http_package(projected);
-        let verified = load_verified_evidence_package_summary(directory.path(), &package_policy())
-            .test_unwrap();
+        let verified =
+            load_verified_evidence_package(directory.path(), &package_trust()).test_unwrap();
         assert_eq!(
-            verified.bundle.tool_receipts[0]
+            verified.package.bundle.tool_receipts[0]
                 .receipt
                 .metadata
                 .as_ref()
@@ -259,11 +262,7 @@ fn package_rejects_distinct_trusted_http_and_outer_signers() {
     body.id = http.id;
     body.kernel_key = package_keypair().public_key();
     let receipt = ChioReceipt::sign(body, &package_keypair()).test_unwrap();
-    let policy = EvidenceVerificationPolicy::new(
-        vec![package_keypair().public_key(), foreign.public_key()],
-        None,
-    )
-    .test_unwrap();
+    let policy = kernel_trust(vec![package_keypair().public_key(), foreign.public_key()]);
     let expected = format!(
         "HTTP receipt projection verification failed: {}",
         receipt.id
@@ -285,7 +284,7 @@ fn package_rejects_outer_allow_for_http_deny() {
         "HTTP receipt projection verification failed: {}",
         receipt.id
     );
-    assert_http_rejection(receipt, &expected, &package_policy());
+    assert_http_rejection(receipt, &expected, &package_trust());
 }
 
 #[test]
@@ -304,9 +303,8 @@ fn package_preserves_non_authorizing_http_observation() {
         .to_chio_receipt_with_keypair(&package_keypair())
         .test_unwrap();
     let directory = http_package(projected);
-    let verified =
-        load_verified_evidence_package_summary(directory.path(), &package_policy()).test_unwrap();
-    let receipt = &verified.bundle.tool_receipts[0].receipt;
+    let verified = load_verified_evidence_package(directory.path(), &package_trust()).test_unwrap();
+    let receipt = &verified.package.bundle.tool_receipts[0].receipt;
     assert_eq!(receipt.decision, None);
     assert_eq!(receipt.trust_level, TrustLevel::Advisory);
     assert_eq!(receipt.boundary_class, BoundaryClass::AdvisoryOnly);

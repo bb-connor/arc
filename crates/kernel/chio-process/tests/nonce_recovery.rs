@@ -210,7 +210,7 @@ async fn strict_nonce_subprocess() -> Result {
     let receipts = chio_store_sqlite::SqliteReceiptStore::open(directory.join("receipts.db"))?;
     receipts.create_next_receipt_checkpoint(1024, &support::issuer())?;
     let bundle = receipts.build_evidence_export_bundle(
-        &chio_kernel::evidence_export::EvidenceExportQuery::admin_all(),
+        &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
     )?;
     let retained = bundle
         .tool_receipts
@@ -227,7 +227,7 @@ async fn strict_nonce_subprocess() -> Result {
         .iter()
         .find(|checkpoint| checkpoint.body.checkpoint_seq == proof.checkpoint_seq)
         .ok_or("unknown refusal has no checkpoint")?;
-    chio_kernel::checkpoint::validate_checkpoint(checkpoint)?;
+    chio_kernel_core::evidence_verify::validate_checkpoint(checkpoint)?;
     assert!(proof.verify(
         &chio_core_types::crypto::canonical_json_bytes(&response.receipt)?,
         &checkpoint.body.merkle_root

@@ -1,26 +1,9 @@
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+
 use crate::receipt_store::StoredToolReceipt;
 
 /// Maximum number of receipts returnable in a single query page.
 pub const MAX_QUERY_LIMIT: usize = 200;
-
-/// Explicit receipt read boundary for query, export, and report surfaces.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case", tag = "kind")]
-pub enum ReceiptReadBoundary {
-    /// Caller has explicit administrative access to all receipt rows.
-    AdminAll,
-    /// Caller is scoped to a single authenticated tenant.
-    TenantScoped { tenant: String },
-}
-
-impl ReceiptReadBoundary {
-    #[must_use]
-    pub fn tenant_scoped(tenant: impl Into<String>) -> Self {
-        Self::TenantScoped {
-            tenant: tenant.into(),
-        }
-    }
-}
 
 /// Provenance for a resolved read boundary.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]

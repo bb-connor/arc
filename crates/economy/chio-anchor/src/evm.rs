@@ -55,9 +55,9 @@ mod tests {
     use alloy_primitives::keccak256;
     use alloy_sol_types::SolCall;
     use chio_core::crypto::PublicKey;
+    use chio_core::receipt::checkpoint::KernelCheckpoint;
     use chio_core::web3::anchors::AnchorInclusionProof;
     use chio_core::web3::identity::{SignedWeb3IdentityBinding, Web3KeyBindingPurpose};
-    use chio_kernel::checkpoint::KernelCheckpoint;
     use chio_web3_bindings::IChioRootRegistry;
     use serde_json::{json, Value};
 

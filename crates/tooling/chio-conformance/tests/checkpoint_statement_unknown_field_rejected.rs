@@ -13,8 +13,9 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
+use chio_core::receipt::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
 use chio_core::Keypair;
-use chio_kernel::checkpoint::{build_checkpoint, KernelCheckpoint, KernelCheckpointBody};
+use chio_kernel::checkpoint::build_checkpoint;
 
 #[test]
 fn checkpoint_statement_with_smuggled_field_is_rejected_at_parse() {

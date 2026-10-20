@@ -24,10 +24,8 @@ use chio_credentials::{
 use chio_credentials::{synthesize_trust_tier, TrustTier};
 use chio_did::DidChio;
 use chio_errors::_generated::error_codes::TRANSACTION_RECEIPT_UNCHECKPOINTED;
-use chio_kernel::{
-    behavioral_anomaly_score, compliance_score, ComplianceReport, ComplianceScoreConfig,
-    ComplianceScoreInputs, EmaBaselineState, EvidenceChildReceiptScope, EvidenceExportQuery,
-};
+use chio_kernel::{ComplianceReport, ComplianceScoreConfig, ComplianceScoreInputs, EmaBaselineState, behavioral_anomaly_score, compliance_score};
+use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use chio_reputation::{compute_local_scorecard, ReputationConfig};
 use chio_store_sqlite::SqliteReceiptStore;
 use url::Url;
@@ -502,7 +500,7 @@ fn build_attestation_evidence(
         since,
         until,
         tenant: None,
-        read_boundary: Some(chio_kernel::ReceiptReadBoundary::AdminAll),
+        read_boundary: Some(chio_core::receipt::evidence::ReceiptReadBoundary::AdminAll),
     })?;
 
     if bundle.tool_receipts.is_empty() {
