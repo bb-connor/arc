@@ -34,6 +34,7 @@ use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::{Keypair, PublicKey};
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_core::receipt::kinds::TrustLevel;
 use chio_core::receipt::lineage::{ReceiptLineageRelationKind, SignedExportEnvelope};
@@ -69,10 +70,7 @@ use chio_finding::{
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
 use chio_http_serve::{apply_server_hygiene, ServeHygieneConfig};
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_inclusion_proof, checkpoint_log_id, KernelCheckpoint,
-    ReceiptInclusionProof,
-};
+use chio_kernel::checkpoint::build_checkpoint;
 use chio_kernel::finding_purchase::{
     FINDING_PURCHASE_CONTEXT_KEY, FINDING_STATUS_PROOF_CONTEXT_KEY,
 };
@@ -84,6 +82,7 @@ use chio_kernel::{
     ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
+use chio_kernel_core::evidence_verify::{build_inclusion_proof, checkpoint_log_id};
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, ReservationReceipt, SignedAcceptedBid,
     SignedAskResponse, SignedBidRequest, SignedReservationReceipt, VerifiedReservationReceipt,

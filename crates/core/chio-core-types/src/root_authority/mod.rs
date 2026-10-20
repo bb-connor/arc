@@ -16,6 +16,7 @@ pub mod idp_key_snapshot;
 pub mod jwk;
 pub mod provider_identity;
 pub mod root_policy;
+pub mod verifier_trust;
 pub mod wire;
 
 pub use claims::{
@@ -40,6 +41,10 @@ pub use root_policy::{
     DisclosureDefault, InlineFields, LoadedRootPolicy, RootPolicy, RootPolicyDisclosure,
     RootPolicyDisclosureFields, RootPolicyFields, RootPolicyLoadError, RootPolicyMatch,
     RootPolicyRule, RootPolicyRuleFields, ToolDisclosure, CHIO_ROOT_POLICY_SCHEMA,
+};
+pub use verifier_trust::{
+    ReportColumn, VerifierTrust, VerifierTrustError, CHIO_VERIFIER_TRUST_SCHEMA,
+    MAX_VERIFIER_TRUST_BYTES,
 };
 pub use wire::{HttpsUrl, Identifier, SaltRef, Sha256Digest, Text, Uri};
 

@@ -230,7 +230,8 @@ fn frontier_rebuild_rejects_merkle_root_mirror_divergence() {
     ReceiptStore::store_checkpoint(&store, &checkpoint).test_unwrap();
 
     let signed_leaf =
-        chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body).test_unwrap();
+        chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint.body)
+            .test_unwrap();
     assert_eq!(
         load_checkpoint_chain_leaf_hashes(&store.connection().test_unwrap()).test_unwrap(),
         vec![signed_leaf],
@@ -382,7 +383,10 @@ fn store_checkpoint_accepts_contiguous_predecessor() {
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &kp,
         Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
     ReceiptStore::store_checkpoint(&store, &second).test_unwrap();
@@ -433,7 +437,10 @@ fn store_checkpoint_projects_tree_heads_and_predecessor_witnesses() {
         &canonical_receipt_bytes(&store, seqs[2], seqs[3]),
         &checkpoint_kp,
         Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
     store.store_checkpoint(&second).test_unwrap();
@@ -535,7 +542,10 @@ fn record_checkpoint_publication_trust_anchor_binding_is_idempotent_and_visible_
         &canonical_receipt_bytes(&store, second_seq, second_seq),
         &checkpoint_kp,
         Some(&first),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&first.body).test_unwrap()],
+        &[
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&first.body)
+                .test_unwrap(),
+        ],
     )
     .test_unwrap();
 

@@ -24,6 +24,10 @@ use chio_core::credit::{
 use chio_core::crypto::Keypair;
 use chio_core::hashing::sha256_hex;
 use chio_core::merkle::MerkleTree;
+use chio_core::receipt::evidence::{
+    EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
+    EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
+};
 use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     lineage::SignedExportEnvelope,
@@ -36,11 +40,8 @@ use chio_core::web3::identity::{
 };
 use chio_core::web3::settlement::Web3SettlementLifecycleState;
 use chio_core::web3::trust_profile::Web3SettlementPath;
-use chio_kernel::checkpoint::{build_checkpoint, build_inclusion_proof};
-use chio_kernel::evidence_export::{
-    EvidenceChildReceiptScope, EvidenceExportBundle, EvidenceExportQuery,
-    EvidenceRetentionMetadata, EvidenceToolReceiptRecord,
-};
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::build_inclusion_proof;
 use chio_link::config::{
     build_default_egress_contract, OracleBackendKind, PairConfig, PriceOracleConfig,
 };

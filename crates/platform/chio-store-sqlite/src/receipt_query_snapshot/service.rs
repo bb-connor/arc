@@ -6,12 +6,13 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use chio_core::receipt::body::ChioReceipt;
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_kernel::receipt_query::{
     ReceiptQuery, ReceiptQueryResult, ReceiptQuerySnapshotError, ReceiptReadContext,
     ReceiptSnapshotWatermark,
 };
 use chio_kernel::ReceiptStoreError;
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 
 use super::db::{SnapshotBatch, SnapshotDb, SnapshotDbError};
 use super::extend::extend_cycle;

@@ -640,6 +640,11 @@ files = ["crates/core/chio-core-types/src/signed_artifact.rs"]
 first_seen = "51e46336b1"
 
 [[schema]]
+value = "chio.bundle-verify-report.v1"
+files = ["crates/tooling/chio-bundle-verify/src/report.rs"]
+first_seen = "07284e64cb"
+
+[[schema]]
 value = "chio.cage-migration-posture.v1"
 files = ["crates/security/chio-security-types/src/migration.rs"]
 first_seen = "6ea79bb5da"
@@ -906,27 +911,27 @@ first_seen = "51e46336b1"
 
 [[schema]]
 value = "chio.checkpoint_consistency_proof.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.checkpoint_equivocation.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.checkpoint_publication.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.checkpoint_statement.v1"
-files = ["crates/economy/chio-web3/src/anchors.rs", "crates/kernel/chio-kernel/src/checkpoint.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs", "crates/economy/chio-web3/src/anchors.rs", "crates/platform/chio-transaction-passport/src/minimal.rs"]
 first_seen = "041db5c226"
 
 [[schema]]
 value = "chio.checkpoint_witness.v1"
-files = ["crates/kernel/chio-kernel/src/checkpoint.rs"]
+files = ["crates/core/chio-core-types/src/receipt/checkpoint.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -1536,22 +1541,22 @@ first_seen = "2d6c8ed146"
 
 [[schema]]
 value = "chio.evidence_export_commitment.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export/envelope.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "0a455ac2c0"
 
 [[schema]]
 value = "chio.evidence_export_disclosure_notice.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "0acd05adbf"
 
 [[schema]]
 value = "chio.evidence_export_manifest.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.evidence_transparency_claims.v1"
-files = ["crates/kernel/chio-kernel/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -1626,7 +1631,7 @@ first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.federated-evidence-share.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -1646,7 +1651,7 @@ first_seen = "11e573d2d7"
 
 [[schema]]
 value = "chio.federation-policy.v1"
-files = ["crates/platform/chio-control-plane/src/evidence_export.rs"]
+files = ["crates/core/chio-core-types/src/receipt/evidence.rs"]
 first_seen = "11e573d2d7"
 
 [[schema]]
@@ -5665,6 +5670,11 @@ files = ["crates/tooling/chio-conformance/verdict_matrix/drivers/lambda/src/lib.
 first_seen = "4221ec5d89"
 
 [[schema]]
+value = "chio.verifier-trust.v1"
+files = ["crates/core/chio-core-types/src/root_authority/verifier_trust.rs"]
+first_seen = "61607d31ad"
+
+[[schema]]
 value = "chio.wall.authorization_context.v1"
 files = ["crates/products/chio-wall-core/src/control_path.rs"]
 first_seen = "11e573d2d7"
@@ -5908,6 +5918,11 @@ first_seen = "e057afb02a"
 value = "chio_finding_market_spend_period_ceiling_v1"
 files = ["crates/platform/chio-finding-market-store-postgres/src/spend.rs"]
 first_seen = "f9b04c8f9d"
+
+[[schema]]
+value = "chio_http_receipt_v1"
+files = ["crates/tooling/chio-bundle-verify/src/verify.rs"]
+first_seen = "28d826e3e6"
 
 [[schema]]
 value = "chio_link_runtime_v1"

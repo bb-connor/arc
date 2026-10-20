@@ -33,9 +33,9 @@ mod retention {
 
     use chio_kernel::build_checkpoint;
     use chio_kernel::build_checkpoint_with_previous;
-    use chio_kernel::build_inclusion_proof;
-    use chio_kernel::verify_checkpoint_signature;
     use chio_kernel::{ReceiptStore, RetentionConfig};
+    use chio_kernel_core::evidence_verify::build_inclusion_proof;
+    use chio_kernel_core::evidence_verify::verify_checkpoint_signature;
     use chio_store_sqlite::SqliteReceiptStore;
 
     fn unique_db_path(prefix: &str) -> std::path::PathBuf {
@@ -166,8 +166,8 @@ mod retention {
         start_seq: u64,
         end_seq: u64,
         keypair: &Keypair,
-        previous: Option<&chio_kernel::checkpoint::KernelCheckpoint>,
-    ) -> chio_kernel::checkpoint::KernelCheckpoint {
+        previous: Option<&chio_core::receipt::checkpoint::KernelCheckpoint>,
+    ) -> chio_core::receipt::checkpoint::KernelCheckpoint {
         let canonical = store
             .receipts_canonical_bytes_range(start_seq, end_seq)
             .unwrap();
@@ -181,7 +181,10 @@ mod retention {
                 &bytes,
                 keypair,
                 Some(previous),
-                &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&previous.body).unwrap()],
+                &[
+                    chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&previous.body)
+                        .unwrap(),
+                ],
             )
             .unwrap(),
         };

@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/export/bundle-verify-report.schema.json",
+  "title": "Chio Bundle Verify Report",
+  "description": "`chio.bundle-verify-report.v1`: the unsigned per-receipt column report an offline bundle verifier prints. Every class is computed from the bundle and the verifier-owned trust file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "envelope_signer",
+    "manifest_sha256",
+    "required_columns",
+    "receipts",
+    "exit_class"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "chio.bundle-verify-report.v1"
+    },
+    "envelope_signer": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+      "description": "The kernel key that signed the export envelope, in `PublicKey::to_hex` form."
+    },
+    "manifest_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "required_columns": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 5,
+      "items": {
+        "$ref": "#/$defs/Column"
+      }
+    },
+    "receipts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ReceiptReport"
+      }
+    },
+    "exit_class": {
+      "type": "integer",
+      "enum": [
+        0,
+        10
+      ]
+    }
+  },
+  "$defs": {
+    "Column": {
+      "type": "string",
+      "enum": [
+        "identity_root",
+        "delegation_chain",
+        "decision",
+        "content",
+        "settlement"
+      ]
+    },
+    "EvidenceClass": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "observed",
+        "asserted",
+        "unverifiable",
+        "rejected"
+      ]
+    },
+    "ColumnResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class"
+      ],
+      "properties": {
+        "class": {
+          "$ref": "#/$defs/EvidenceClass"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "ReceiptReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receipt_id",
+        "seq",
+        "columns"
+      ],
+      "properties": {
+        "receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "columns": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity_root",
+            "delegation_chain",
+            "decision",
+            "content",
+            "settlement"
+          ],
+          "properties": {
+            "identity_root": {
+              "$ref": "#/$defs/ColumnResult"
+            },
+            "delegation_chain": {
+              "$ref": "#/$defs/ColumnResult"
+            },
+            "decision": {
+              "$ref": "#/$defs/ColumnResult"
+            },
+            "content": {
+              "$ref": "#/$defs/ColumnResult"
+            },
+            "settlement": {
+              "$ref": "#/$defs/ColumnResult"
+            }
+          }
+        }
+      }
+    }
+  }
+}

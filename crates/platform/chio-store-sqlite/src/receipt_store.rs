@@ -12,6 +12,11 @@ use chacha20poly1305::aead::rand_core::{OsRng, RngCore};
 use chio_core::canonical::{canonical_json_bytes, CanonicalBytes};
 use chio_core::capability::{scope::ChioScope, token::CapabilityToken};
 use chio_core::crypto::{sha256_hex, Keypair, Signature};
+use chio_core::receipt::checkpoint::{KernelCheckpoint, KernelCheckpointBody};
+use chio_core::receipt::evidence::ReceiptReadBoundary;
+use chio_core::receipt::evidence::{
+    CapabilitySnapshot, EvidenceChildReceiptScope, EvidenceExportQuery,
+};
 use chio_core::receipt::security::ActiveDefenseReceiptBody;
 use chio_core::receipt::{
     body::ChioReceipt, crypto_floor::ReceiptCryptoFloor, decision::Decision,
@@ -22,7 +27,6 @@ use chio_core::receipt::{
 use chio_core::session::{
     OperationTerminalState, RequestLineageMode, RequestLineageRecord, SessionAnchorReference,
 };
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint, KernelCheckpointBody};
 use chio_kernel::cost_attribution::{
     CostAttributionChainHop, CostAttributionQuery, CostAttributionReceiptRow,
     CostAttributionReport, CostAttributionSummary, LeafCostAttributionRow, RootCostAttributionRow,
@@ -59,28 +63,28 @@ use chio_kernel::receipt_analytics::{
     ReceiptAnalyticsResponse, TimeAnalyticsRow, ToolAnalyticsRow, MAX_ANALYTICS_GROUP_LIMIT,
 };
 use chio_kernel::receipt_query::{
-    ReceiptQuery, ReceiptQueryResult, ReceiptReadBoundary, ReceiptReadContext, MAX_QUERY_LIMIT,
+    ReceiptQuery, ReceiptQueryResult, ReceiptReadContext, MAX_QUERY_LIMIT,
 };
 use chio_kernel::receipt_store::{ReceiptLineageStatementLink, ReceiptLineageVerification};
 use chio_kernel::{
-    AtomicReceiptProjection, AuthorizationReceiptConsumption, CapabilitySnapshot,
-    CreditBondDisposition, CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport,
-    CreditBondListSummary, CreditBondRow, CreditFacilityDisposition, CreditFacilityLifecycleState,
+    AtomicReceiptProjection, AuthorizationReceiptConsumption, CreditBondDisposition,
+    CreditBondLifecycleState, CreditBondListQuery, CreditBondListReport, CreditBondListSummary,
+    CreditBondRow, CreditFacilityDisposition, CreditFacilityLifecycleState,
     CreditFacilityListQuery, CreditFacilityListReport, CreditFacilityListSummary,
     CreditFacilityRow, CreditLossLifecycleEventKind, CreditLossLifecycleListQuery,
     CreditLossLifecycleListReport, CreditLossLifecycleListSummary, CreditLossLifecycleRow,
-    EvidenceChildReceiptScope, EvidenceExportQuery, ExposureLedgerQuery,
-    FederatedEvidenceShareImport, FederatedEvidenceShareSummary, IndexedSecurityEvidenceStore,
-    LiabilityAutoBindDisposition, LiabilityClaimPayoutReconciliationState,
-    LiabilityClaimResponseDisposition, LiabilityClaimSettlementReconciliationState,
-    LiabilityClaimWorkflowQuery, LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow,
-    LiabilityClaimWorkflowSummary, LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport,
-    LiabilityMarketWorkflowRow, LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState,
-    LiabilityProviderListQuery, LiabilityProviderListReport, LiabilityProviderListSummary,
-    LiabilityProviderResolutionQuery, LiabilityProviderResolutionReport, LiabilityProviderRow,
-    LiabilityQuoteDisposition, PendingSettlementObservation, ReceiptCheckpointCreateReport,
-    ReceiptCheckpointRange, ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore,
-    ReceiptStoreError, ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
+    ExposureLedgerQuery, FederatedEvidenceShareImport, FederatedEvidenceShareSummary,
+    IndexedSecurityEvidenceStore, LiabilityAutoBindDisposition,
+    LiabilityClaimPayoutReconciliationState, LiabilityClaimResponseDisposition,
+    LiabilityClaimSettlementReconciliationState, LiabilityClaimWorkflowQuery,
+    LiabilityClaimWorkflowReport, LiabilityClaimWorkflowRow, LiabilityClaimWorkflowSummary,
+    LiabilityMarketWorkflowQuery, LiabilityMarketWorkflowReport, LiabilityMarketWorkflowRow,
+    LiabilityMarketWorkflowSummary, LiabilityProviderLifecycleState, LiabilityProviderListQuery,
+    LiabilityProviderListReport, LiabilityProviderListSummary, LiabilityProviderResolutionQuery,
+    LiabilityProviderResolutionReport, LiabilityProviderRow, LiabilityQuoteDisposition,
+    PendingSettlementObservation, ReceiptCheckpointCreateReport, ReceiptCheckpointRange,
+    ReceiptCheckpointStatusReport, ReceiptFlushReport, ReceiptStore, ReceiptStoreError,
+    ReceiptStoreHealthReport, ReceiptWalCheckpointReport, ReceiptWriterCounters,
     RetainedReceiptCommitment, RetentionConfig, SignedCreditBond, SignedCreditFacility,
     SignedCreditLossLifecycle, SignedLiabilityAutoBindDecision, SignedLiabilityBoundCoverage,
     SignedLiabilityClaimAdjudication, SignedLiabilityClaimDispute, SignedLiabilityClaimPackage,
@@ -98,6 +102,7 @@ use chio_kernel::{
     LIABILITY_CLAIM_WORKFLOW_REPORT_SCHEMA, LIABILITY_MARKET_WORKFLOW_REPORT_SCHEMA,
     LIABILITY_PROVIDER_LIST_REPORT_SCHEMA, LIABILITY_PROVIDER_RESOLUTION_REPORT_SCHEMA,
 };
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 use chio_security_types::ports::OpaqueReceiptRef;
 use chio_supervisor::{
     HealthFlag, HealthLevel, SupervisedOutcome, SupervisedThread, SupervisorConfig,
@@ -2236,19 +2241,20 @@ fn maybe_build_checkpoint(
             .ok_or_else(|| ReceiptStoreError::Conflict("checkpoint_seq overflow".to_string()))?;
         // O(b) Merkle build over the batch, plus O(log n) over the chain
         // frontier; the predecessor digest comes from the cached head.
-        let checkpoint = chio_kernel::checkpoint::build_checkpoint_with_chain_frontier_at(
-            checkpoint_seq,
-            start_seq,
-            end_seq,
-            &receipt_bytes,
-            chio_kernel::checkpoint::CheckpointSigningContext {
-                keypair: &signer.keypair,
-                issued_at: clock.unix_millis()?,
-            },
-            head.latest_checkpoint.as_ref(),
-            &chain_frontier,
-        )
-        .map_err(checkpoint_error_to_receipt_store)?;
+        let checkpoint =
+            chio_kernel_core::evidence_verify::build_checkpoint_with_chain_frontier_at(
+                checkpoint_seq,
+                start_seq,
+                end_seq,
+                &receipt_bytes,
+                chio_kernel_core::evidence_verify::CheckpointSigningContext {
+                    keypair: &signer.keypair,
+                    issued_at: clock.unix_millis()?,
+                },
+                head.latest_checkpoint.as_ref(),
+                &chain_frontier,
+            )
+            .map_err(checkpoint_error_to_receipt_store)?;
         #[cfg(test)]
         if test_hooks::panic_during_checkpoint_build(signer.max_batch) {
             panic!("injected test panic during background checkpoint build");
@@ -2666,13 +2672,13 @@ fn verify_head_against_latest_checkpoint(
                 ));
             };
             // Body-only deserialize: parse_persisted_checkpoint_row would run
-            // chio_kernel::checkpoint::validate_checkpoint and re-verify the
+            // chio_kernel_core::evidence_verify::validate_checkpoint and re-verify the
             // signature, putting one Ed25519 verify back on every append. The
             // cached head was signature-checked at seed time.
             let persisted_body: KernelCheckpointBody = serde_json::from_str(&row.statement_json)?;
-            let persisted_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&persisted_body)
+            let persisted_digest = chio_kernel_core::evidence_verify::checkpoint_body_sha256(&persisted_body)
                 .map_err(checkpoint_error_to_receipt_store)?;
-            let cached_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&cached.body)
+            let cached_digest = chio_kernel_core::evidence_verify::checkpoint_body_sha256(&cached.body)
                 .map_err(checkpoint_error_to_receipt_store)?;
             if persisted_digest != cached_digest {
                 return Err(ReceiptStoreError::Conflict(
@@ -2758,8 +2764,11 @@ fn catch_up_verified_head_to(
         let checkpoint = parse_persisted_checkpoint_row(row.clone())?;
         match head.latest_checkpoint.as_ref() {
             Some(predecessor) => {
-                chio_kernel::checkpoint::validate_checkpoint_predecessor(predecessor, &checkpoint)
-                    .map_err(checkpoint_error_to_receipt_store)?;
+                chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
+                    predecessor,
+                    &checkpoint,
+                )
+                .map_err(checkpoint_error_to_receipt_store)?;
             }
             None => validate_checkpoint_base(&checkpoint)?,
         }

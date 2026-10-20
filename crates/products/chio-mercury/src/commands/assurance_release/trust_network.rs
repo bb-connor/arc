@@ -80,7 +80,7 @@ pub(in crate::commands) fn export_trust_network(
             let binding = chio_core::receipt::checkpoint::CheckpointPublicationTrustAnchorBinding {
                 publication_identity: chio_core::receipt::checkpoint::CheckpointPublicationIdentity::new(
                     chio_core::receipt::checkpoint::CheckpointPublicationIdentityKind::LocalLog,
-                    chio_kernel::checkpoint::checkpoint_log_id(checkpoint),
+                    chio_kernel_core::evidence_verify::checkpoint_log_id(checkpoint),
                 ),
                 trust_anchor_identity: chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentity::new(
                     chio_core::receipt::checkpoint::CheckpointTrustAnchorIdentityKind::ChainRoot,
@@ -91,7 +91,7 @@ pub(in crate::commands) fn export_trust_network(
                 publication_profile_version: "chio.mercury.trust_network.append_only.v1"
                     .to_string(),
             };
-            chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
+            chio_kernel_core::evidence_verify::build_trust_anchored_checkpoint_publication(
                 checkpoint,
                 binding,
             )
@@ -100,7 +100,7 @@ pub(in crate::commands) fn export_trust_network(
         .collect::<Result<Vec<_>, CliError>>()?;
     let mut checkpoint_transparency = match shared_proof_package.checkpoint_transparency.clone() {
         Some(summary) => summary,
-        None => chio_kernel::checkpoint::validate_checkpoint_transparency(
+        None => chio_kernel_core::evidence_verify::validate_checkpoint_transparency(
             &shared_proof_package.chio_bundle.checkpoints,
         )
         .map_err(|error| CliError::Other(error.to_string()))?,
@@ -116,7 +116,7 @@ pub(in crate::commands) fn export_trust_network(
         .publication_profile
         .freshness_window_secs = Some(86_400);
     shared_proof_package.publication_claim_boundary = Some(
-        chio_kernel::evidence_export::build_evidence_transparency_claims(
+        chio_kernel_core::evidence_verify::build_evidence_transparency_claims(
             &shared_proof_package.chio_bundle,
             &checkpoint_transparency,
             Some(&trust_anchor_ref),

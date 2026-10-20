@@ -14,7 +14,7 @@ use chio_core::{canonical_json_bytes, sha256_hex};
 use chio_finding::{
     FindingFacetKind, FindingFacetOutcome, FindingPurchaseContext, PURCHASE_CONTEXT_SCHEMA,
 };
-use chio_kernel::checkpoint::{build_checkpoint, build_inclusion_proof};
+use chio_kernel::checkpoint::build_checkpoint;
 use chio_kernel::finding_purchase::{
     FINDING_PURCHASE_CONTEXT_KEY, FINDING_STATUS_PROOF_CONTEXT_KEY,
 };
@@ -23,6 +23,7 @@ use chio_kernel::{
     ToolCallRequest, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES, DPOP_SCHEMA,
 };
+use chio_kernel_core::evidence_verify::build_inclusion_proof;
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, SignedAcceptedBid, SignedAskResponse,
     SignedBidRequest, SignedReservationReceipt, VerifiedReservationReceipt, BID_REQUEST_SCHEMA,

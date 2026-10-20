@@ -41,8 +41,8 @@ These records describe the fixture exercise.
 
 ## Guarantees
 
-- `build_proof_package` loads evidence through
-  `load_verified_evidence_package_summary` with an explicit verification policy.
+- `build_proof_package` verifies evidence through `chio-bundle-verify` with a
+  trust file pinning the supplied kernel keys.
 - `cmd_mercury_verify` calls the core package's `verify` method. This method
   checks receipt signatures and package bindings without selecting an external
   trusted kernel-key set. Authority-sensitive consumers should use the core

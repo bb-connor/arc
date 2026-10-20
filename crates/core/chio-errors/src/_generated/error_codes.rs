@@ -3032,6 +3032,126 @@ pub const ATTEST_SIGNED_JSON_NONCANONICAL: ErrorCodeSpec = ErrorCodeSpec {
     ],
 };
 
+pub const ATTEST_BUNDLE_ENVELOPE_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-envelope-invalid",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "The evidence bundle export envelope is missing, malformed, wrongly signed, or does not commit to its manifest and payload.",
+    help: "Re-export the bundle from the provider and verify it against the kernel key pinned in the trust file.",
+    string_code: "CHIO-ATTEST-BUNDLE-ENVELOPE-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_FILE_HASH_MISMATCH: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-file-hash-mismatch",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "An evidence bundle file is missing, unsafe to read, or differs from its manifest digest or length, or the inventory is not exact.",
+    help: "Obtain an unmodified copy of the bundle; do not edit files after export.",
+    string_code: "CHIO-ATTEST-BUNDLE-FILE-HASH-MISMATCH",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_SIGNATURE_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-signature-invalid",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "A receipt, checkpoint or policy signature in the evidence bundle does not verify under a pinned key.",
+    help: "Check that the trust file pins the provider kernel keys and that the bundle was not altered.",
+    string_code: "CHIO-ATTEST-BUNDLE-SIGNATURE-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_EVIDENCE_INCONSISTENT: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-evidence-inconsistent",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "Signed parts of the evidence bundle contradict each other: counts, scope, checkpoint chain, inclusion proofs, transparency claims or disclosure notice.",
+    help: "Treat the bundle as tampered or mis-exported and request a fresh export.",
+    string_code: "CHIO-ATTEST-BUNDLE-EVIDENCE-INCONSISTENT",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_SCHEMA_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-schema-invalid",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "An evidence bundle file does not decode under its strict schema.",
+    help:
+        "Re-export the bundle with a matching Chio version; unknown or dropped members are refused.",
+    string_code: "CHIO-ATTEST-BUNDLE-SCHEMA-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_TRUST_INVALID: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-trust-invalid",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "The verifier trust file fails to load under chio.verifier-trust.v1.",
+    help: "Fix the trust file: schema const, key bounds, unique keys, no weak keys, no key in two roles.",
+    string_code: "CHIO-ATTEST-BUNDLE-TRUST-INVALID",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_TRUST_MISSING: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-trust-missing",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "The evidence bundle needs a key role the verifier trust file leaves empty.",
+    help: "Pin the keys for the role the bundle needs in the trust file.",
+    string_code: "CHIO-ATTEST-BUNDLE-TRUST-MISSING",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_FEATURE_UNSUPPORTED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-feature-unsupported",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary:
+        "The evidence bundle or the trust file needs a feature this verifier does not support.",
+    help:
+        "Use a verifier that supports the feature, or remove it from the trust file requirements.",
+    string_code: "CHIO-ATTEST-BUNDLE-FEATURE-UNSUPPORTED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
+pub const ATTEST_BUNDLE_REQUIRED_COLUMN_UNVERIFIED: ErrorCodeSpec = ErrorCodeSpec {
+    urn: "urn:chio:error:attest:bundle-required-column-unverified",
+    domain: Domain::Attest,
+    severity: Severity::Error,
+    summary: "A report column the trust file requires is not verified for some receipt.",
+    help: "Inspect the report to see which column and receipt fell short of verified.",
+    string_code: "CHIO-ATTEST-BUNDLE-REQUIRED-COLUMN-UNVERIFIED",
+    jsonrpc_code: None,
+    since: "0.1.0",
+    stability: "stable",
+    consumed_by: &["chio-bundle-verify", "chio-cli", "chio-control-plane"],
+};
+
 pub const KERNEL_RECEIPT_READ_CONTEXT_MISSING: ErrorCodeSpec = ErrorCodeSpec {
     urn: "urn:chio:error:kernel:receipt-read-context-missing",
     domain: Domain::Kernel,
@@ -4113,6 +4233,15 @@ pub static ERROR_CODES: &[ErrorCodeSpec] = &[
     ATTEST_SIGNED_JSON_INVALID_SHAPE,
     ATTEST_SIGNED_JSON_CANONICALIZATION,
     ATTEST_SIGNED_JSON_NONCANONICAL,
+    ATTEST_BUNDLE_ENVELOPE_INVALID,
+    ATTEST_BUNDLE_FILE_HASH_MISMATCH,
+    ATTEST_BUNDLE_SIGNATURE_INVALID,
+    ATTEST_BUNDLE_EVIDENCE_INCONSISTENT,
+    ATTEST_BUNDLE_SCHEMA_INVALID,
+    ATTEST_BUNDLE_TRUST_INVALID,
+    ATTEST_BUNDLE_TRUST_MISSING,
+    ATTEST_BUNDLE_FEATURE_UNSUPPORTED,
+    ATTEST_BUNDLE_REQUIRED_COLUMN_UNVERIFIED,
     KERNEL_RECEIPT_READ_CONTEXT_MISSING,
     KERNEL_RECEIPT_READ_TENANT_INVALID,
     KERNEL_RECEIPT_READ_SCOPE_MISMATCH,

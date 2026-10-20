@@ -339,9 +339,9 @@ async fn ap23_signed_approval_survives_restart_and_dispatches_exact_call_once() 
         .ok_or("shared receipt sink")?
         .lock()
         .await;
-    let bundle = store
-        .core
-        .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())?;
+    let bundle = store.core.build_evidence_export_bundle(
+        &chio_core_types::receipt::evidence::EvidenceExportQuery::admin_all(),
+    )?;
     assert!(
         bundle
             .tool_receipts

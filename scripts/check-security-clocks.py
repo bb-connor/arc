@@ -45,6 +45,7 @@ FIXED_ROOTS = (
     "crates/protocol/chio-a2a-edge/",
     "crates/protocol/chio-acp-edge/",
     "crates/protocol/chio-acp-proxy/",
+    "crates/tooling/chio-bundle-verify/",
     "sdks/lambda/chio-lambda-extension/",
 )
 ADAPTER = "crates/security/chio-security-types/src/clock/system.rs"

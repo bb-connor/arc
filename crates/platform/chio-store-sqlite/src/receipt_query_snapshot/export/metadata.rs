@@ -4,16 +4,15 @@
 //! bounded, decoded or validated.
 use std::collections::{BTreeMap, BTreeSet};
 
-use chio_core::receipt::lineage::ChildRequestReceipt;
-use chio_kernel::capability_lineage::CapabilitySnapshot;
-use chio_kernel::checkpoint::{
-    validate_checkpoint_transparency, CheckpointTransparencySummary, KernelCheckpoint,
-};
-use chio_kernel::evidence_export::{
+use chio_core::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
+use chio_core::receipt::evidence::CapabilitySnapshot;
+use chio_core::receipt::evidence::{
     EvidenceChildReceiptRecord, EvidenceChildReceiptScope, EvidenceExportQuery,
     EvidenceToolReceiptRecord,
 };
+use chio_core::receipt::lineage::ChildRequestReceipt;
 use chio_kernel::{ReceiptQuerySnapshotError, ReceiptStoreError};
+use chio_kernel_core::evidence_verify::validate_checkpoint_transparency;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{checkpoint_digest, invalid, Lease};
@@ -433,7 +432,9 @@ pub(super) fn lineage(
                         crate::capability_lineage::snapshot_columns_from_row,
                     )
                     .map_err(|error| metadata_row_error(error, INVALID_LINEAGE_METADATA))?;
-                snapshot.validate().map_err(lineage_validation_error)?;
+                snapshot
+                    .validate()
+                    .map_err(|error| lineage_validation_error(ReceiptStoreError::from(error)))?;
                 Ok(Some(snapshot))
             })?;
             let Some(snapshot) = snapshot else {

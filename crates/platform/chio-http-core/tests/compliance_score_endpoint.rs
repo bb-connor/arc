@@ -8,13 +8,13 @@
 
 use std::sync::Arc;
 
+use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use chio_core_types::crypto::Keypair;
 use chio_http_core::{
     handle_compliance_score, ComplianceScoreError, ComplianceScoreRequest, ComplianceScoreWindow,
     ComplianceSource, ComplianceSourceResult,
 };
 use chio_kernel::compliance_score::ComplianceScoreInputs;
-use chio_kernel::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
 use chio_kernel::operator_report::ComplianceReport;
 use chio_kernel::{ChioKernel, KernelConfig};
 

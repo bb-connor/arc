@@ -31,8 +31,8 @@ invocation. There is no long-running Mercury admission service in this crate.
 
 ## Data and control flow
 
-`build_proof_package` constructs an `EvidenceVerificationPolicy` from supplied
-kernel keys, loads a verified export summary, validates bundle manifests, and
+`build_proof_package` builds a `chio.verifier-trust.v1` trust from the supplied
+kernel keys, verifies the export through `chio-bundle-verify`, validates bundle manifests, and
 calls `MercuryProofPackage::build`. The export command invokes `verify` before
 writing the resulting JSON. Current builds produce proof-package v2.
 

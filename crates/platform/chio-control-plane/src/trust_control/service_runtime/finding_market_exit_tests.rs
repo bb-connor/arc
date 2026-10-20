@@ -15,6 +15,7 @@ use chio_core::capability::scope::MonetaryAmount;
 use chio_core::crypto::Keypair;
 use chio_core::merkle::MerkleTree;
 use chio_core::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core::receipt::checkpoint::KernelCheckpoint;
 use chio_core::receipt::decision::{Decision, ToolCallAction};
 use chio_core::receipt::kinds::TrustLevel;
 use chio_core::receipt::lineage::SignedExportEnvelope;
@@ -41,9 +42,8 @@ use chio_finding::{
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
 use chio_http_serve::{apply_server_hygiene, ServeHygieneConfig};
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_inclusion_proof, checkpoint_log_id, KernelCheckpoint,
-};
+use chio_kernel::checkpoint::build_checkpoint;
+use chio_kernel_core::evidence_verify::{build_inclusion_proof, checkpoint_log_id};
 use chio_open_market::bidding::{
     BidMintContext, BidRequest, RequestedScope, SignedBidRequest, BID_REQUEST_SCHEMA,
 };

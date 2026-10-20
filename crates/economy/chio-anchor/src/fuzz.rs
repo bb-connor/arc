@@ -1,6 +1,6 @@
 //! libFuzzer entry-point module for `chio-anchor`. Gated behind `fuzz` feature.
 
-use chio_kernel::checkpoint::CheckpointTransparencySummary;
+use chio_core::receipt::checkpoint::CheckpointTransparencySummary;
 
 use crate::{verify_checkpoint_publication_records, verify_proof_bundle, AnchorProofBundle};
 

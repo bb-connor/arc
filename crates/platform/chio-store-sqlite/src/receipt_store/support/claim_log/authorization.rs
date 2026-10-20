@@ -550,7 +550,7 @@ pub(crate) fn validate_chio_oauth_authorization_row(
 
 pub(crate) fn chain_is_complete(
     capability_id: &str,
-    chain: &[chio_kernel::CapabilitySnapshot],
+    chain: &[chio_core::receipt::evidence::CapabilitySnapshot],
 ) -> bool {
     if chain.is_empty() {
         return false;

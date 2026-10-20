@@ -878,7 +878,7 @@ impl ReceiptStore for SqliteReceiptStore {
     fn get_capability_snapshot(
         &self,
         capability_id: &str,
-    ) -> Result<Option<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+    ) -> Result<Option<chio_core::receipt::evidence::CapabilitySnapshot>, ReceiptStoreError> {
         // Admission resolves only exact signed-token projections. Synthetic
         // federation anchors, legacy rows, and imported evidence remain
         // available through explicit lineage/reporting APIs but are not roots
@@ -892,14 +892,15 @@ impl ReceiptStore for SqliteReceiptStore {
                 chio_kernel::CapabilityLineageError::Json(error) => ReceiptStoreError::Json(error),
             })?;
         Ok(snapshot.filter(|snapshot| {
-            snapshot.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+            snapshot.provenance
+                == chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken
         }))
     }
 
     fn get_capability_delegation_chain(
         &self,
         capability_id: &str,
-    ) -> Result<Vec<chio_kernel::CapabilitySnapshot>, ReceiptStoreError> {
+    ) -> Result<Vec<chio_core::receipt::evidence::CapabilitySnapshot>, ReceiptStoreError> {
         let chain =
             SqliteReceiptStore::get_delegation_chain(self, capability_id).map_err(|error| {
                 match error {
@@ -914,13 +915,15 @@ impl ReceiptStore for SqliteReceiptStore {
             })?;
         let complete_signed_chain = chain.is_empty()
             || (chain.first().is_some_and(|root| {
-                root.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                root.provenance
+                    == chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken
                     && root.parent_capability_id.is_none()
                     && root.delegation_depth == 0
             }) && chain.array_windows::<2>().all(|pair| {
                 let parent = &pair[0];
                 let child = &pair[1];
-                child.provenance == chio_kernel::CapabilitySnapshotProvenance::SignedToken
+                child.provenance
+                    == chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken
                     && child.parent_capability_id.as_deref() == Some(parent.capability_id.as_str())
                     && parent
                         .delegation_depth
@@ -1268,11 +1271,12 @@ impl SqliteReceiptStore {
                     checkpoint_seq
                 ))
             })?;
-        let publication = chio_kernel::checkpoint::build_trust_anchored_checkpoint_publication(
-            &checkpoint,
-            binding.clone(),
-        )
-        .map_err(checkpoint_error_to_receipt_store)?;
+        let publication =
+            chio_kernel_core::evidence_verify::build_trust_anchored_checkpoint_publication(
+                &checkpoint,
+                binding.clone(),
+            )
+            .map_err(checkpoint_error_to_receipt_store)?;
         let normalized_binding = publication.trust_anchor_binding.ok_or_else(|| {
             ReceiptStoreError::Conflict(format!(
                 "checkpoint {} trust-anchor binding was not preserved during validation",
