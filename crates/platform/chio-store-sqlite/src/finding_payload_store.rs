@@ -24,33 +24,12 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
-fn verify_schema(connection: &rusqlite::Connection) -> Result<(), FindingPayloadStoreError> {
-    if crate::schema_catalog::matches_canonical_schema(
-        connection,
-        FINDING_PAYLOAD_SCHEMA,
-        FINDING_PAYLOAD_SCHEMA_TABLES,
-    )? {
-        Ok(())
-    } else {
-        Err(FindingPayloadStoreError::Unavailable(
-            "finding payload schema differs from the canonical definition".to_owned(),
-        ))
-    }
-}
-
 use crate::encrypted_blob::{
     decrypt_blob_with_aad, try_encrypt_blob_with_aad, BlobStoreError, EncryptedBlob, TenantId,
     TenantKey,
 };
 
 const FINDING_PAYLOAD_SCHEMA_KEY: &str = "finding_payload";
-const FINDING_PAYLOAD_SCHEMA_VERSION: i32 = 1;
-const FINDING_PAYLOAD_SCHEMA_ANCHORS: &[&str] = &[
-    "chio_finding_operator_bundles",
-    "chio_finding_payloads",
-    "chio_finding_operator_payments",
-];
-const FINDING_PAYLOAD_SCHEMA_TABLES: &[&str] = &["chio_finding_payloads"];
 pub(crate) const FINDING_PAYLOAD_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_payloads (
     finding_id TEXT PRIMARY KEY,
@@ -182,31 +161,16 @@ impl SqliteFindingPayloadStore {
     }
 
     fn initialize_schema(&self) -> Result<(), FindingPayloadStoreError> {
-        let mut conn = self.pool.get()?;
-        let state = crate::check_current_schema(
-            &conn,
+        let mut connection = self
+            .pool
+            .get()
+            .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
+        crate::finding_operator_database::initialize_component(
+            &mut connection,
             FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SCHEMA_VERSION,
-            FINDING_PAYLOAD_SCHEMA_ANCHORS,
+            FINDING_PAYLOAD_SCHEMA,
         )
-        .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
-        )?;
-        if state == crate::SchemaState::Current {
-            return verify_schema(&conn);
-        }
-        let transaction = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        transaction.execute_batch(FINDING_PAYLOAD_SCHEMA)?;
-        crate::stamp_schema_version(
-            &transaction,
-            FINDING_PAYLOAD_SCHEMA_KEY,
-            FINDING_PAYLOAD_SCHEMA_VERSION,
-        )
-        .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))?;
-        verify_schema(&transaction)?;
-        transaction.commit()?;
-        Ok(())
+        .map_err(|error| FindingPayloadStoreError::Unavailable(error.to_string()))
     }
 
     /// Seal a Finding payload. Exact retries are idempotent while any changed
@@ -419,7 +383,12 @@ mod tests {
         let path = dir.path().join("operator.db");
         drop(SqliteFindingPayloadStore::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
-        crate::stamp_schema_version(&conn, FINDING_PAYLOAD_SCHEMA_KEY, 0).unwrap();
+        conn.execute_batch(
+            "PRAGMA ignore_check_constraints = ON;
+            UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'finding_payload';
+            PRAGMA ignore_check_constraints = OFF;",
+        )
+        .unwrap();
         drop(conn);
         assert_eq!(
             SqliteFindingPayloadStore::open(&path)
@@ -448,8 +417,7 @@ mod tests {
                 .err()
                 .unwrap()
                 .to_string(),
-            "finding payload store is unavailable: finding payload schema differs from the \
-             canonical definition"
+            "finding payload store is unavailable: schema catalog differs from its canonical definition"
         );
     }
 

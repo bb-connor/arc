@@ -96,6 +96,8 @@ fn production_purchase_executor(
         unix_timestamp_now().unwrap_or_else(|error| panic!("trusted fixture clock: {error}")),
     )?;
     let bundle_json = bundle.to_canonical_json()?;
+    chio_store_sqlite::initialize_finding_operator_database(&operator_db_path)
+        .map_err(std::io::Error::other)?;
     SqliteFindingOperatorBundleStore::open(&operator_db_path)?
         .put(&deployment.web.finding_id, &bundle_json)?;
     SqliteFindingPayloadStore::open(&operator_db_path)?.put(

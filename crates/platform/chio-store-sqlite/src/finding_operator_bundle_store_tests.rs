@@ -720,7 +720,9 @@ fn bundle_schema_other_than_current_is_refused() {
     let path = dir.path().join("operator.db");
     drop(SqliteFindingOperatorBundleStore::open(&path).unwrap());
     let conn = rusqlite::Connection::open(&path).unwrap();
-    crate::stamp_schema_version(&conn, SCHEMA_KEY, 0).unwrap();
+    conn.execute_batch("PRAGMA ignore_check_constraints = ON;
+            UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'finding_operator_bundle';
+            PRAGMA ignore_check_constraints = OFF;").unwrap();
     drop(conn);
     assert_eq!(
         SqliteFindingOperatorBundleStore::open(&path)
@@ -753,7 +755,6 @@ fn current_stamp_over_a_retired_bundle_table_shape_is_refused() {
             .err()
             .unwrap()
             .to_string(),
-        "finding operator bundle store is unavailable: finding operator bundle schema differs \
-         from the canonical definition"
+        "finding operator bundle store is unavailable: schema catalog differs from its canonical definition"
     );
 }

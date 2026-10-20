@@ -1,55 +1,49 @@
-//! Exact schema comparison for stores that own a single schema.
-
 use rusqlite::Connection;
+
+use crate::schema_version::SchemaVersionError;
 
 type CatalogEntry = (String, String, String, Option<String>);
 
-/// Whether `tables`, with every index and trigger defined on them, carry exactly
-/// the definitions `canonical_ddl` creates in an empty database.
-///
-/// Objects on other tables are ignored, so stores that share one database file
-/// each verify only their own tables.
-pub(crate) fn matches_canonical_schema(
+pub(crate) fn validate(
     connection: &Connection,
     canonical_ddl: &str,
-    tables: &[&str],
-) -> rusqlite::Result<bool> {
+) -> Result<(), SchemaVersionError> {
     let canonical = Connection::open_in_memory()?;
     canonical.execute_batch(canonical_ddl)?;
-    Ok(schema_catalog(connection, tables)? == schema_catalog(&canonical, tables)?)
+    if catalog(connection)? != catalog(&canonical)? {
+        return Err(SchemaVersionError::CatalogMismatch);
+    }
+    Ok(())
 }
 
-fn schema_catalog(connection: &Connection, tables: &[&str]) -> rusqlite::Result<Vec<CatalogEntry>> {
-    let mut statement = connection.prepare(
-        "SELECT type, name, tbl_name, sql FROM sqlite_schema \
-         WHERE tbl_name = ?1 ORDER BY type, name",
-    )?;
-    let mut entries = Vec::new();
-    for table in tables {
-        let rows = statement.query_map([table], |row| {
+fn catalog(connection: &Connection) -> rusqlite::Result<Vec<CatalogEntry>> {
+    let mut statement = connection
+        .prepare("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name")?;
+    let entries = statement
+        .query_map([], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-        })?;
-        for row in rows {
-            entries.push(row?);
-        }
-    }
-    Ok(entries)
+        })?
+        .collect();
+    entries
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    const DDL: &str =
-        "CREATE TABLE IF NOT EXISTS owned (id TEXT PRIMARY KEY, value INTEGER NOT NULL);
-         CREATE INDEX IF NOT EXISTS owned_by_value ON owned(value);";
+    const DDL: &str = "CREATE TABLE owned (id TEXT PRIMARY KEY, value INTEGER NOT NULL);
+         CREATE INDEX owned_by_value ON owned(value);";
 
     #[test]
-    fn canonical_schema_matches_and_ignores_other_tables() -> rusqlite::Result<()> {
+    fn complete_catalog_matches_and_refuses_undeclared_objects() -> rusqlite::Result<()> {
         let connection = Connection::open_in_memory()?;
         connection.execute_batch(DDL)?;
+        assert!(validate(&connection, DDL).is_ok());
         connection.execute_batch("CREATE TABLE sibling (id INTEGER);")?;
-        assert!(matches_canonical_schema(&connection, DDL, &["owned"])?);
+        assert!(matches!(
+            validate(&connection, DDL),
+            Err(SchemaVersionError::CatalogMismatch)
+        ));
         Ok(())
     }
 
@@ -65,7 +59,10 @@ mod tests {
         ] {
             let connection = Connection::open_in_memory()?;
             connection.execute_batch(altered)?;
-            assert!(!matches_canonical_schema(&connection, DDL, &["owned"])?);
+            assert!(matches!(
+                validate(&connection, DDL),
+                Err(SchemaVersionError::CatalogMismatch)
+            ));
         }
         Ok(())
     }

@@ -248,6 +248,7 @@ impl FindingOperatorPurchaseExecutor {
                 return Err("buyer credentials must have distinct ids, tokens, and keys".to_owned());
             }
         }
+        chio_store_sqlite::initialize_finding_operator_database(&storage.operator_db_path)?;
         let bundle_store = SqliteFindingOperatorBundleStore::open(&storage.operator_db_path)
             .map_err(|error| error.to_string())?;
         let payload_store = Arc::new(
