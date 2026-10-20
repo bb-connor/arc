@@ -170,6 +170,7 @@ fn protocol_error_registry_includes_launch_transaction_failures() {
         "transaction_signature_invalid",
         "transaction_verifier_feature_unsupported",
         "transaction_negative_case_mismatch",
+        "transaction_verifier_context_invalid",
     ]);
     let actual = registry
         .codes

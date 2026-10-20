@@ -210,6 +210,7 @@ export function verifyReceipt(receipt: ChioReceipt, trustedSigners: string[] = [
   const semanticAuthorized =
     semantics.receipt_kind === "mediated_decision" &&
     semantics.boundary_class === "prevent" &&
+    receipt.trust_level === "mediated" &&
     receipt.observation_outcome == null &&
     decision === "allow";
   const signerTrusted =

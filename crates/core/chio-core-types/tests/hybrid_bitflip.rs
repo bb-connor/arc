@@ -14,7 +14,7 @@ fn hybrid_fixture() -> Result<(PublicKey, Signature), Box<dyn Error>> {
     let classical = Box::new(Ed25519Backend::new(Keypair::from_seed(&[3u8; 32])));
     let pq = MlDsa65Backend::from_seed(&[7u8; 32]);
     let backend = HybridBackend::new(classical, pq)?;
-    let public_key = backend.public_key();
+    let public_key = backend.public_key()?;
     let signature = backend.sign_bytes(MESSAGE)?;
     assert!(public_key.verify(MESSAGE, &signature));
     Ok((public_key, signature))

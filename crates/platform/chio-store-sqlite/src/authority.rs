@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::sync::Mutex;
 
 use crate::budget_store::{
     budget_snapshot_anchor_chain_digest, BudgetSnapshotAnchorCommitment,
@@ -37,7 +36,6 @@ pub struct SqliteCapabilityAuthority {
     clock: crate::store_clock::StoreClock,
     replication_clock_policy: AuthorityEnvelopeClockPolicy,
     custody: custody::AuthorityCustody,
-    cached_public_key: Mutex<PublicKey>,
 }
 
 /// Authority-store schema revision. Any other stamped revision is refused.
@@ -143,7 +141,6 @@ impl SqliteCapabilityAuthority {
             clock,
             replication_clock_policy,
             custody,
-            cached_public_key: Mutex::new(status.public_key),
         })
     }
 
@@ -156,7 +153,6 @@ impl SqliteCapabilityAuthority {
         let mut status = Self::read_status_from_connection(&transaction)?;
         status.trusted_public_keys = lifecycle::live_public_keys(&snapshot, now.as_secs())?;
         transaction.commit()?;
-        self.update_cached_public_key(status.public_key.clone());
         Ok(status)
     }
 
@@ -623,32 +619,7 @@ impl SqliteCapabilityAuthority {
             )));
         }
         transaction.commit()?;
-        self.update_cached_public_key(status.public_key);
         Ok(keypair)
-    }
-
-    fn update_cached_public_key(&self, public_key: PublicKey) {
-        match self.cached_public_key.lock() {
-            Ok(mut guard) => *guard = public_key,
-            Err(poisoned) => {
-                tracing::error!(
-                    "cached_public_key mutex is poisoned - recovering possibly-stale key material"
-                );
-                *poisoned.into_inner() = public_key;
-            }
-        }
-    }
-
-    fn cached_public_key(&self) -> PublicKey {
-        match self.cached_public_key.lock() {
-            Ok(guard) => guard.clone(),
-            Err(poisoned) => {
-                tracing::error!(
-                    "cached_public_key mutex is poisoned - reading possibly-stale key material"
-                );
-                poisoned.into_inner().clone()
-            }
-        }
     }
 
     fn read_trusted_public_keys(
@@ -758,10 +729,10 @@ impl SqliteCapabilityAuthority {
 }
 
 impl CapabilityAuthority for SqliteCapabilityAuthority {
-    fn authority_public_key(&self) -> PublicKey {
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
         self.status()
             .map(|status| status.public_key)
-            .unwrap_or_else(|_| self.cached_public_key())
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
@@ -874,7 +845,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(capability.subject, subject);
-        assert_eq!(capability.issuer, authority.authority_public_key());
+        assert_eq!(capability.issuer, authority.authority_public_key().unwrap());
         assert!(capability.id.starts_with("cap-"));
         assert!(capability.verify_signature().unwrap());
     }

@@ -1,7 +1,7 @@
 //! Shared boot-selected authority for proposals and ordinary receipts.
 
 use super::*;
-use chio_core::crypto::{SigningAlgorithm, SigningBackend, SigningOutcome};
+use chio_core::crypto::{SigningBackend, SigningOutcome};
 
 #[cfg(test)]
 #[path = "signing_authority/forwarding_tests.rs"]
@@ -22,17 +22,22 @@ impl KernelSigningAuthority {
     }
 }
 
+/// The identity `backend` signs receipts with now. An unreadable identity
+/// refuses signing.
+pub(crate) fn signing_identity(
+    backend: &dyn SigningBackend,
+) -> Result<chio_core::PublicKey, KernelError> {
+    backend
+        .public_key()
+        .map_err(|error| KernelError::ReceiptSigningFailed(error.to_string()))
+}
+
 impl ChioKernel {
     pub(super) fn freeze_receipt_signing_identity(
         &self,
     ) -> Result<crate::tool_outcome::FrozenReceiptSigningIdentityV1, KernelError> {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let key = self.signing_authority.backend.public_key();
-            if key.algorithm() != self.signing_authority.backend.algorithm() {
-                return Err(KernelError::ReceiptSigningFailed(
-                    "receipt signing identity changed during selection".into(),
-                ));
-            }
+            let key = self.receipt_signing_public_key()?;
             crate::tool_outcome::FrozenReceiptSigningIdentityV1::new(
                 key,
                 self.receipt_signing_crypto_floor(),
@@ -127,8 +132,8 @@ impl ChioKernel {
 
     /// Current ordinary receipt signer. This is distinct from the classical
     /// capability authority returned by [`Self::public_key`].
-    pub fn receipt_signing_public_key(&self) -> chio_core::PublicKey {
-        self.signing_authority.backend.public_key()
+    pub fn receipt_signing_public_key(&self) -> Result<chio_core::PublicKey, KernelError> {
+        signing_identity(self.signing_authority.backend.as_ref())
     }
 
     pub(super) fn receipt_signing_crypto_floor(
@@ -144,16 +149,8 @@ impl ChioKernel {
 struct SharedSigningBackend(Arc<dyn SigningBackend>);
 
 impl SigningBackend for SharedSigningBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.0.algorithm()
-    }
-
-    fn public_key(&self) -> chio_core::PublicKey {
+    fn public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
         self.0.public_key()
-    }
-
-    fn current_public_key(&self) -> Result<chio_core::PublicKey, chio_core::Error> {
-        self.0.current_public_key()
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {

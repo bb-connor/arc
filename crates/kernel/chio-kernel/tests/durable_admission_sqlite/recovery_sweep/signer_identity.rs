@@ -20,7 +20,7 @@ pub(super) fn signing_kernel(
     invocations: &Arc<AtomicU64>,
 ) -> TestResult<ChioKernel> {
     let mut kernel = serving.kernel(signer.clone(), clock)?;
-    assert_eq!(kernel.receipt_signing_public_key(), signer.public_key());
+    assert_eq!(kernel.receipt_signing_public_key()?, signer.public_key());
     kernel.set_payment_adapter(Box::new(ReversiblePaymentAdapter {
         calls: Some(calls.clone()),
     }));
@@ -176,11 +176,11 @@ fn sqlite_replaced_signer_defers_its_operation_and_recovers_the_next() -> TestRe
     let serving = Serving::open(&database, &locks, &clock)?;
     let kernel = signing_kernel(&serving, &clock, &healthy.signer, &calls, &invocations)?;
     assert_eq!(
-        serde_json::to_value(kernel.receipt_signing_public_key())?,
+        serde_json::to_value(kernel.receipt_signing_public_key()?)?,
         retained_signer(&serving, &healthy.operation)?
     );
     assert_ne!(
-        serde_json::to_value(kernel.receipt_signing_public_key())?,
+        serde_json::to_value(kernel.receipt_signing_public_key()?)?,
         retained_signer(&serving, &replaced.operation)?
     );
     let page = serving

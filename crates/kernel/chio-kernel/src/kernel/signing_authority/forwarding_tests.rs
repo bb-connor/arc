@@ -1,30 +1,26 @@
 use super::*;
+use chio_core::crypto::SigningAlgorithm;
 use chio_core::{CanonicalBytes, CanonicalJsonWitness, Ed25519Backend, PublicKey, Signature};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 struct BackendSpy {
     inner: Ed25519Backend,
-    calls: [AtomicU64; 6],
+    calls: [AtomicU64; 5],
 }
 
 impl SigningBackend for BackendSpy {
-    fn algorithm(&self) -> SigningAlgorithm {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         self.calls[0].fetch_add(1, Ordering::SeqCst);
-        self.inner.algorithm()
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.calls[1].fetch_add(1, Ordering::SeqCst);
         self.inner.public_key()
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature, chio_core::Error> {
-        self.calls[2].fetch_add(1, Ordering::SeqCst);
+        self.calls[1].fetch_add(1, Ordering::SeqCst);
         self.inner.sign_bytes(message)
     }
 
     fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome, chio_core::Error> {
-        self.calls[3].fetch_add(1, Ordering::SeqCst);
+        self.calls[2].fetch_add(1, Ordering::SeqCst);
         self.inner.sign_bytes_with_identity(message)
     }
 
@@ -33,7 +29,7 @@ impl SigningBackend for BackendSpy {
         key: &PublicKey,
         message: &[u8],
     ) -> Result<SigningOutcome, chio_core::Error> {
-        self.calls[4].fetch_add(1, Ordering::SeqCst);
+        self.calls[3].fetch_add(1, Ordering::SeqCst);
         self.inner.sign_bytes_for_identity(key, message)
     }
 
@@ -41,7 +37,7 @@ impl SigningBackend for BackendSpy {
         &self,
         canonical: &CanonicalBytes<CanonicalJsonWitness>,
     ) -> Result<Signature, chio_core::Error> {
-        self.calls[5].fetch_add(1, Ordering::SeqCst);
+        self.calls[4].fetch_add(1, Ordering::SeqCst);
         self.inner.sign_canonical_bytes(canonical)
     }
 }
@@ -54,7 +50,7 @@ fn shared_backend_forwards_an_unreadable_current_key() {
         )),
     ));
     assert!(matches!(
-        shared.current_public_key(),
+        shared.public_key(),
         Err(chio_core::Error::InvalidPublicKey(message)) if message == "selector unavailable"
     ));
 }
@@ -66,8 +62,8 @@ fn shared_backend_forwards_every_atomic_signing_entrypoint() -> Result<(), chio_
         calls: std::array::from_fn(|_| AtomicU64::new(0)),
     });
     let shared = SharedSigningBackend(spy.clone());
-    assert_eq!(shared.algorithm(), SigningAlgorithm::Ed25519);
-    let public_key = shared.public_key();
+    let public_key = shared.public_key()?;
+    assert_eq!(public_key.algorithm(), SigningAlgorithm::Ed25519);
     assert!(public_key.verify(b"message", &shared.sign_bytes(b"message")?));
     assert_eq!(
         shared.sign_bytes_with_identity(b"message")?.public_key,

@@ -868,6 +868,130 @@
         "trust_level": "mediated"
       },
       "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"4e04ec88bc4255bd23d289de76ded240f94ec716f789aae30db24804fec78cad\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"chio_receipt_signing_nonce\":\"rcpt-bindings-null-observation\",\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"mediated\"}"
+    },
+    {
+      "description": "A mediated allow with verified trust has a valid id but is not signable and is not authorization.",
+      "expected": {
+        "authorized": false,
+        "boundary_class": "prevent",
+        "decision": "allow",
+        "ok": false,
+        "parameter_hash_valid": true,
+        "receipt_id_valid": true,
+        "receipt_kind": "mediated_decision",
+        "result": "Allowed",
+        "signature_valid": false,
+        "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "signer_trusted": false,
+        "trust_level": "verified"
+      },
+      "id": "mediated_decision_with_verified_trust_level",
+      "receipt": {
+        "action": {
+          "parameter_hash": "035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929",
+          "parameters": {
+            "mode": "read",
+            "path": "/workspace/docs/roadmap.md"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "verdict": "allow"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "30243bf33b378bf13f097455b12b5fc89f00183fe5886d16a02cb59f3eb1d885",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "rcpt-bindings-verified-trust",
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "policy_hash": "policy-bindings-v1",
+        "receipt_kind": "mediated_decision",
+        "redaction_mode": "none",
+        "signature": "5e9198edf12cec72dba07e47be387404b0126ef38e2db6852ab6820a6187d4e93880dcf60930f2b558ced587af6b36ab556d979e63e4753b1bc913d42f1c950d",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "verified"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"30243bf33b378bf13f097455b12b5fc89f00183fe5886d16a02cb59f3eb1d885\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"chio_receipt_signing_nonce\":\"rcpt-bindings-verified-trust\",\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"verified\"}"
+    },
+    {
+      "description": "A mediated allow with advisory trust has a valid id but is not signable and is not authorization.",
+      "expected": {
+        "authorized": false,
+        "boundary_class": "prevent",
+        "decision": "allow",
+        "ok": false,
+        "parameter_hash_valid": true,
+        "receipt_id_valid": true,
+        "receipt_kind": "mediated_decision",
+        "result": "Allowed",
+        "signature_valid": false,
+        "signer_key_hex": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "signer_trusted": false,
+        "trust_level": "advisory"
+      },
+      "id": "mediated_decision_with_advisory_trust_level",
+      "receipt": {
+        "action": {
+          "parameter_hash": "035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929",
+          "parameters": {
+            "mode": "read",
+            "path": "/workspace/docs/roadmap.md"
+          }
+        },
+        "boundary_class": "prevent",
+        "capability_id": "cap-bindings-001",
+        "content_hash": "4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93",
+        "decision": {
+          "verdict": "allow"
+        },
+        "evidence": [
+          {
+            "details": "path allowed",
+            "guard_name": "ForbiddenPathGuard",
+            "verdict": true
+          },
+          {
+            "details": "no secrets detected",
+            "guard_name": "SecretLeakGuard",
+            "verdict": true
+          }
+        ],
+        "id": "0c60de6aae29a9525fd6ca1054f56a2c0ad7afaee011a574d91a990227d7d0de",
+        "kernel_key": "ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c",
+        "metadata": {
+          "chio_receipt_signing_nonce": "rcpt-bindings-advisory-trust",
+          "surface": "bindings-vectors",
+          "version": 1
+        },
+        "policy_hash": "policy-bindings-v1",
+        "receipt_kind": "mediated_decision",
+        "redaction_mode": "none",
+        "signature": "7b13c9cf61084bbb2e7c412851af6a3256185f9aad5ac7d9b03295a4014fcf96305e03e32f62bd19f7a1905a7bc7bea62413d85e21aa2b479fc00ddb5de2c10e",
+        "timestamp": 1710000200,
+        "tool_name": "file_read",
+        "tool_origin": "caller_executed",
+        "tool_server": "srv-files",
+        "trust_level": "advisory"
+      },
+      "receipt_body_canonical_json": "{\"action\":{\"parameter_hash\":\"035350b0e6a021a4c924a149111944945e94d12f6d8a5e24e4461e7009ebf929\",\"parameters\":{\"mode\":\"read\",\"path\":\"/workspace/docs/roadmap.md\"}},\"boundary_class\":\"prevent\",\"capability_id\":\"cap-bindings-001\",\"content_hash\":\"4062edaf750fb8074e7e83e0c9028c94e32468a8b6f1614774328ef045150f93\",\"decision\":{\"verdict\":\"allow\"},\"evidence\":[{\"details\":\"path allowed\",\"guard_name\":\"ForbiddenPathGuard\",\"verdict\":true},{\"details\":\"no secrets detected\",\"guard_name\":\"SecretLeakGuard\",\"verdict\":true}],\"id\":\"0c60de6aae29a9525fd6ca1054f56a2c0ad7afaee011a574d91a990227d7d0de\",\"kernel_key\":\"ea4a6c63e29c520abef5507b132ec5f9954776aebebe7b92421eea691446d22c\",\"metadata\":{\"chio_receipt_signing_nonce\":\"rcpt-bindings-advisory-trust\",\"surface\":\"bindings-vectors\",\"version\":1},\"policy_hash\":\"policy-bindings-v1\",\"receipt_kind\":\"mediated_decision\",\"redaction_mode\":\"none\",\"timestamp\":1710000200,\"tool_name\":\"file_read\",\"tool_origin\":\"caller_executed\",\"tool_server\":\"srv-files\",\"trust_level\":\"advisory\"}"
     }
   ],
   "generated_by": "chio-binding-helpers",

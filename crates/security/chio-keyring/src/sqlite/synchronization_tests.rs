@@ -71,8 +71,8 @@ fn synchronization_page_and_head_share_a_snapshot_during_concurrent_append() {
     let policy = KeyLogPolicy::new(KeyLogPolicyConfig {
         log_id: LogId::new("log.snapshot").test_unwrap(),
         authority_id: AuthorityId::new("authority.snapshot").test_unwrap(),
-        bootstrap_key: bootstrap.public_key(),
-        operator_key: operator.public_key(),
+        bootstrap_key: bootstrap.public_key().test_unwrap(),
+        operator_key: operator.public_key().test_unwrap(),
         witness_roster_id: WitnessRosterId::new("roster.snapshot").test_unwrap(),
         witness_keys: witnesses
             .iter()
@@ -80,7 +80,7 @@ fn synchronization_page_and_head_share_a_snapshot_during_concurrent_append() {
             .map(|(index, witness)| {
                 (
                     WitnessId::new(format!("witness.{index}")).test_unwrap(),
-                    witness.public_key(),
+                    witness.public_key().test_unwrap(),
                 )
             })
             .collect(),
@@ -106,9 +106,13 @@ fn synchronization_page_and_head_share_a_snapshot_during_concurrent_append() {
         event_id: EventId::new("event.genesis").test_unwrap(),
         previous_event_hash: None,
         authority_id: policy.authority_id().clone(),
-        key_id: derive_key_id(active.algorithm(), &active.public_key()).test_unwrap(),
-        algorithm: active.algorithm(),
-        public_key: active.public_key(),
+        key_id: derive_key_id(
+            active.public_key().test_unwrap().algorithm(),
+            &active.public_key().test_unwrap(),
+        )
+        .test_unwrap(),
+        algorithm: active.public_key().test_unwrap().algorithm(),
+        public_key: active.public_key().test_unwrap(),
         operation: KeyLogOperation::Genesis,
         effective_at: 1_000,
         verify_until: None,
@@ -138,8 +142,12 @@ fn synchronization_page_and_head_share_a_snapshot_during_concurrent_append() {
     rotation_body.sequence = 1;
     rotation_body.event_id = EventId::new("event.rotation").test_unwrap();
     rotation_body.previous_event_hash = Some(genesis.envelope_hash().test_unwrap());
-    rotation_body.key_id = derive_key_id(next.algorithm(), &next.public_key()).test_unwrap();
-    rotation_body.public_key = next.public_key();
+    rotation_body.key_id = derive_key_id(
+        next.public_key().test_unwrap().algorithm(),
+        &next.public_key().test_unwrap(),
+    )
+    .test_unwrap();
+    rotation_body.public_key = next.public_key().test_unwrap();
     rotation_body.operation = KeyLogOperation::Rotate {
         previous_key_id: genesis.body.key_id,
         witness_roster_id: WitnessRosterId::new("roster.snapshot").test_unwrap(),

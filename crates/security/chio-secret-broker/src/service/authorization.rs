@@ -268,7 +268,10 @@ impl BrokerService {
         let capability_sha256 = capability_digest(&request.capability)?;
         let proof_sha256 = proof_digest(&request.proof)?;
         let canonical_request_sha256 = broker_execute_request_registration_digest(request)?;
-        let receipt_signer = self.receipt_signer.public_key();
+        let receipt_signer = self
+            .receipt_signer
+            .public_key()
+            .map_err(|error| BrokerError::AuthorityUnavailable(error.to_string()))?;
         let trust = crate::audit::BrokerAuditTrustConfiguration {
             trusted_capability_issuer: &self.trusted_issuer,
             broker_audience: &self.config.audience,

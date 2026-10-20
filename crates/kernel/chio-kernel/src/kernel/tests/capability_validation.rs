@@ -566,8 +566,8 @@ struct FixedIssuanceAuthority {
 }
 
 impl CapabilityAuthority for FixedIssuanceAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.current_issuer.clone()
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
+        Ok(self.current_issuer.clone())
     }
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {

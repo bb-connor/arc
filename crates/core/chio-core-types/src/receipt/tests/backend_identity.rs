@@ -13,10 +13,7 @@ struct IdentityBackend {
 }
 
 impl SigningBackend for IdentityBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        self.inner.algorithm()
-    }
-    fn public_key(&self) -> PublicKey {
+    fn public_key(&self) -> crate::Result<PublicKey> {
         self.inner.public_key()
     }
     fn sign_bytes(&self, _: &[u8]) -> Result<Signature> {
@@ -31,11 +28,11 @@ impl SigningBackend for IdentityBackend {
     }
     fn sign_bytes_for_identity(&self, key: &PublicKey, message: &[u8]) -> Result<SigningOutcome> {
         self.calls.fetch_add(1, Ordering::SeqCst);
-        assert_eq!(key, &self.inner.public_key());
+        assert_eq!(key, &self.inner.public_key().unwrap());
         let mut outcome = self.inner.sign_bytes_for_identity(key, message)?;
         match self.fault {
             0 => {}
-            1 => outcome.public_key = self.other.public_key(),
+            1 => outcome.public_key = self.other.public_key()?,
             2 => outcome.algorithm = SigningAlgorithm::P256,
             3 => outcome.signature = self.other.sign_bytes(message)?,
             _ => return Err(Error::InvalidSignature("unknown test fault".into())),

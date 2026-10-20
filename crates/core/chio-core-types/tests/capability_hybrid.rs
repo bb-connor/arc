@@ -60,7 +60,7 @@ fn hybrid_token() -> CapabilityToken {
     let pq = MlDsa65Backend::from_seed(&fixture_pq_seed());
     let classical = chio_core_types::crypto::Ed25519Backend::new(kp);
     let backend = HybridBackend::new(Box::new(classical), pq).unwrap();
-    let body = make_body(&backend.public_key());
+    let body = make_body(&backend.public_key().unwrap());
     CapabilityToken::sign_with_backend(body, &backend).unwrap()
 }
 

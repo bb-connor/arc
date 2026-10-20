@@ -122,6 +122,7 @@ libc = "0.2"
 loom = { workspace = true }
 
 [target.'cfg(not(loom))'.dev-dependencies]
+chio-kernel = { workspace = true, features = ["admission-test-support"] }
 chio-store-sqlite = { workspace = true }
 chio-test-support = { workspace = true }
 criterion = { workspace = true }

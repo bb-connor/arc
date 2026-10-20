@@ -454,7 +454,7 @@ fn handshake_accepts_hybrid_signing_backend() {
     let exchange_b = KernelTrustExchange::new_with_backend("kernel.org-b", Box::new(hybrid_b))
         .with_conformance_tier(ConformanceTier::Silver);
     let exchange_a = KernelTrustExchange::new("kernel.org-a", kp_a)
-        .with_trusted_peer("kernel.org-b", exchange_b.local_public_key());
+        .with_trusted_peer("kernel.org-b", exchange_b.local_public_key().unwrap());
 
     let envelope_b = exchange_b
         .local_envelope("kernel.org-a", "nonce-hybrid", now)

@@ -99,6 +99,9 @@ fn validate_authority_pins(
     Ok(())
 }
 
+const AUTHORITY_CACHE_UNAVAILABLE: &str = "remote capability authority cache is unavailable";
+const NO_CURRENT_AUTHORITY_KEY: &str = "remote capability authority has no current key";
+
 impl RemoteCapabilityAuthority {
     pub fn refresh_status(&self) -> Result<(), CliError> {
         let _refresh_guard = self.lock_refresh();
@@ -126,20 +129,23 @@ impl RemoteCapabilityAuthority {
         if let Some(pinned_current) = self.pinned_current.as_ref() {
             validate_authority_pins(&cache, pinned_current, &self.pinned_trusted)?;
         }
-        let mut guard = match self.cache.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        let mut guard = self
+            .cache
+            .lock()
+            .map_err(|_| CliError::cli_other_error(AUTHORITY_CACHE_UNAVAILABLE))?;
         cache.ensure_not_older_than(&guard)?;
         *guard = cache;
         Ok(())
     }
 
     fn refresh_status_if_stale(&self) -> Result<(), CliError> {
-        let should_refresh = match self.cache.lock() {
-            Ok(guard) => guard.refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
-            Err(poisoned) => poisoned.into_inner().refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
-        };
+        let should_refresh = self
+            .cache
+            .lock()
+            .map_err(|_| CliError::cli_other_error(AUTHORITY_CACHE_UNAVAILABLE))?
+            .refreshed_at
+            .elapsed()
+            >= AUTHORITY_CACHE_TTL;
         if should_refresh {
             self.refresh_status()?;
         }
@@ -155,18 +161,16 @@ impl RemoteCapabilityAuthority {
     }
 
     fn issuance_key_snapshot(&self) -> Result<(PublicKey, bool), chio_kernel::KernelError> {
-        let (current, stale) = match self.cache.lock() {
-            Ok(guard) => (
+        let (current, stale) = {
+            let guard = self.cache.lock().map_err(|_| {
+                chio_kernel::KernelError::CapabilityIssuanceFailed(
+                    AUTHORITY_CACHE_UNAVAILABLE.to_string(),
+                )
+            })?;
+            (
                 guard.current.clone(),
                 guard.refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
-            ),
-            Err(poisoned) => {
-                let guard = poisoned.into_inner();
-                (
-                    guard.current.clone(),
-                    guard.refreshed_at.elapsed() >= AUTHORITY_CACHE_TTL,
-                )
-            }
+            )
         };
         current.map(|current| (current, stale)).ok_or_else(|| {
             chio_kernel::KernelError::CapabilityIssuanceFailed(
@@ -237,39 +241,21 @@ impl RemoteCapabilityAuthority {
     }
 }
 
-impl RemoteCapabilityAuthority {
-    /// Fail-closed substitute for a missing current authority key.
-    ///
-    /// `AuthorityKeyCache::from_status` rejects any status without a current
-    /// key, so a primed cache always carries one. If that invariant is ever
-    /// violated we must NOT abort the process and must NOT return a key an
-    /// attacker could control. We return a freshly
-    /// generated ephemeral public key whose private half is discarded
-    /// immediately: it can never validate a real capability, so callers that
-    /// fold this value into a trust set gain no usable issuer. The effect is a
-    /// denial (zero trust granted) rather than a panic.
-    fn deny_sentinel_public_key() -> PublicKey {
-        tracing::error!(
-            "remote capability authority cache missing current key; \
-             returning a non-trusting sentinel so admission fails closed"
-        );
-        Keypair::generate().public_key()
-    }
-}
-
 impl CapabilityAuthority for RemoteCapabilityAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        let _ = self.refresh_status_if_stale();
-        match self.cache.lock() {
-            Ok(guard) => match &guard.current {
-                Some(public_key) => public_key.clone(),
-                None => Self::deny_sentinel_public_key(),
-            },
-            Err(poisoned) => match &poisoned.into_inner().current {
-                Some(public_key) => public_key.clone(),
-                None => Self::deny_sentinel_public_key(),
-            },
-        }
+    /// A failed refresh, an unavailable cache or a missing current key
+    /// refuses issuance.
+    fn authority_public_key(&self) -> Result<PublicKey, chio_kernel::KernelError> {
+        self.refresh_status_if_stale().map_err(|error| {
+            chio_kernel::KernelError::CapabilityIssuanceFailed(error.to_string())
+        })?;
+        let cache = self.cache.lock().map_err(|_| {
+            chio_kernel::KernelError::CapabilityIssuanceFailed(
+                AUTHORITY_CACHE_UNAVAILABLE.to_string(),
+            )
+        })?;
+        cache.current.clone().ok_or_else(|| {
+            chio_kernel::KernelError::CapabilityIssuanceFailed(NO_CURRENT_AUTHORITY_KEY.to_string())
+        })
     }
 
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
@@ -563,6 +549,67 @@ mod tests {
         Ok(())
     }
 
+    fn authority_key_refusal(remote: &RemoteCapabilityAuthority) -> Option<String> {
+        match remote.authority_public_key() {
+            Err(chio_kernel::KernelError::CapabilityIssuanceFailed(message)) => Some(message),
+            _ => None,
+        }
+    }
+
+    #[test]
+    fn authority_public_key_refuses_a_failed_refresh() -> Result<(), Box<dyn std::error::Error>> {
+        let mut remote = remote_with_trusted_key(Keypair::generate().public_key())?;
+        remote
+            .cache
+            .get_mut()
+            .map_err(|_| "cache poisoned")?
+            .refreshed_at = Instant::now() - AUTHORITY_CACHE_TTL;
+        let expected = match remote.refresh_status() {
+            Err(error) => error.to_string(),
+            Ok(()) => return Err("refresh against an unreachable service succeeded".into()),
+        };
+        assert_eq!(authority_key_refusal(&remote), Some(expected));
+        Ok(())
+    }
+
+    #[test]
+    fn authority_public_key_refuses_a_poisoned_cache() -> Result<(), Box<dyn std::error::Error>> {
+        let remote = remote_with_trusted_key(Keypair::generate().public_key())?;
+        let poisoned = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    let _guard = remote.cache.lock();
+                    panic!("poison the authority cache");
+                })
+                .join()
+        });
+        assert!(matches!(
+            poisoned,
+            Err(payload) if payload.downcast_ref::<&str>() == Some(&"poison the authority cache")
+        ));
+        assert_eq!(
+            authority_key_refusal(&remote),
+            Some(CliError::cli_other_error(AUTHORITY_CACHE_UNAVAILABLE).to_string())
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn authority_public_key_refuses_a_missing_current_key() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let mut remote = remote_with_trusted_key(Keypair::generate().public_key())?;
+        remote
+            .cache
+            .get_mut()
+            .map_err(|_| "cache poisoned")?
+            .current = None;
+        assert_eq!(
+            authority_key_refusal(&remote),
+            Some(NO_CURRENT_AUTHORITY_KEY.to_string())
+        );
+        Ok(())
+    }
+
     fn remote_with_trusted_key(
         public_key: PublicKey,
     ) -> Result<RemoteCapabilityAuthority, CliError> {
@@ -588,7 +635,7 @@ mod tests {
     {
         let authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&authority)?;
-        let remote = remote_with_trusted_key(authority.authority_public_key())?;
+        let remote = remote_with_trusted_key(authority.authority_public_key()?)?;
 
         remote.verify_issuance_response(
             &issued.capability,
@@ -605,7 +652,7 @@ mod tests {
         let trusted_authority = LocalCapabilityAuthority::new(Keypair::generate());
         let untrusted_authority = LocalCapabilityAuthority::new(Keypair::generate());
         let issued = issue_test_capability(&untrusted_authority)?;
-        let current = trusted_authority.authority_public_key();
+        let current = trusted_authority.authority_public_key()?;
 
         let result = chio_kernel::validate_issued_capability_response(
             &issued.capability,
@@ -635,7 +682,7 @@ mod tests {
             &issued.subject,
             &issued.scope,
             issued.ttl_seconds,
-            &authority.authority_public_key(),
+            &authority.authority_public_key()?,
             chio_security_types::clock::UnixMillis::new(chio_test_support::clock::unix_millis()),
         );
 
@@ -651,8 +698,8 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let previous = LocalCapabilityAuthority::new(Keypair::generate());
         let rotated = LocalCapabilityAuthority::new(Keypair::generate());
-        let previous_key = previous.authority_public_key();
-        let rotated_key = rotated.authority_public_key();
+        let previous_key = previous.authority_public_key()?;
+        let rotated_key = rotated.authority_public_key()?;
         let remote = remote_with_trusted_key(previous_key.clone())?;
         let issued = issue_test_capability(&previous)?;
         let refreshed = AuthorityKeyCache {
@@ -685,8 +732,8 @@ mod tests {
     ) -> Result<(), Box<dyn std::error::Error>> {
         let previous = LocalCapabilityAuthority::new(Keypair::generate());
         let rotated = LocalCapabilityAuthority::new(Keypair::generate());
-        let previous_key = previous.authority_public_key();
-        let rotated_key = rotated.authority_public_key();
+        let previous_key = previous.authority_public_key()?;
+        let rotated_key = rotated.authority_public_key()?;
         let remote = remote_with_trusted_key(previous_key.clone())?;
         let issued = issue_test_capability(&rotated)?;
         let refreshed = AuthorityKeyCache {
@@ -723,7 +770,7 @@ mod tests {
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
                 current: None,
-                trusted: vec![authority.authority_public_key()],
+                trusted: vec![authority.authority_public_key()?],
                 generation: Some(1),
                 rotated_at: Some(1),
                 issuer_state: None,
@@ -746,7 +793,7 @@ mod tests {
             Err(chio_kernel::KernelError::CapabilityIssuanceFailed(_))
         ));
 
-        let current_key = authority.authority_public_key();
+        let current_key = authority.authority_public_key()?;
         let remote = remote_with_trusted_key(current_key.clone())?;
         let result = remote.install_verified_status_cache(
             &issued.capability,
@@ -780,7 +827,7 @@ mod tests {
             issued.scope.clone(),
             issued.ttl_seconds,
         )?;
-        let remote = remote_with_trusted_key(authority.authority_public_key())?;
+        let remote = remote_with_trusted_key(authority.authority_public_key()?)?;
 
         let result = remote.verify_issuance_response(
             &substituted,
@@ -805,8 +852,8 @@ mod tests {
             clock: chio_test_support::clock::clock(),
             client: build_client("http://127.0.0.1:1", "test-token")?,
             cache: Mutex::new(AuthorityKeyCache {
-                current: Some(authority.authority_public_key()),
-                trusted: vec![authority.authority_public_key()],
+                current: Some(authority.authority_public_key()?),
+                trusted: vec![authority.authority_public_key()?],
                 generation: Some(1),
                 rotated_at: Some(1),
                 issuer_state: None,

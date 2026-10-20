@@ -56,16 +56,8 @@ impl MigrationGuardedSigningBackend {
 }
 
 impl SigningBackend for MigrationGuardedSigningBackend {
-    fn algorithm(&self) -> chio_core::SigningAlgorithm {
-        self.inner.algorithm()
-    }
-
-    fn public_key(&self) -> chio_core::PublicKey {
+    fn public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
         self.inner.public_key()
-    }
-
-    fn current_public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
-        self.inner.current_public_key()
     }
 
     fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<chio_core::Signature> {
@@ -417,7 +409,9 @@ impl KeyringRuntimeComposition {
             let sequence = previous.body.sequence.checked_add(1).ok_or_else(|| {
                 CliError::cli_other_error("key-log sequence overflow".to_string())
             })?;
-            let new_public_key = new_backend.public_key();
+            let new_public_key = new_backend
+                .public_key()
+                .map_err(|error| CliError::cli_other_error(error.to_string()))?;
             let body = chio_keyring::KeyLogEventBody {
                 schema: chio_keyring::KEY_LOG_EVENT_SCHEMA.to_string(),
                 log_id: policy.log_id().clone(),
@@ -432,9 +426,9 @@ impl KeyringRuntimeComposition {
                         .map_err(|error| CliError::cli_other_error(error.to_string()))?,
                 ),
                 authority_id: policy.authority_id().clone(),
-                key_id: chio_keyring::derive_key_id(new_backend.algorithm(), &new_public_key)
+                key_id: chio_keyring::derive_key_id(new_public_key.algorithm(), &new_public_key)
                     .map_err(|error| CliError::cli_other_error(error.to_string()))?,
-                algorithm: new_backend.algorithm(),
+                algorithm: new_public_key.algorithm(),
                 public_key: new_public_key,
                 operation: chio_keyring::KeyLogOperation::Rotate {
                     previous_key_id: state
@@ -878,10 +872,13 @@ pub fn load_keyring_runtime_composition_with_clock(
     let artifact_time_inner: Arc<dyn SigningBackend> = Arc::new(load_private_seed_backend(
         &config.artifact_time_seed_file_path,
     )?);
+    let artifact_time_key = artifact_time_inner
+        .public_key()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let artifact_time_anchor_id = artifact_time
         .iter()
         .find_map(|(anchor_id, public_key)| {
-            (public_key == &artifact_time_inner.public_key()).then(|| anchor_id.clone())
+            (public_key == &artifact_time_key).then(|| anchor_id.clone())
         })
         .ok_or_else(|| {
             CliError::cli_other_error(
@@ -1102,8 +1099,11 @@ fn key_enterprise_receipt_to_chio_receipt(
     };
     use chio_core::receipt::metadata::ActorRef;
 
+    let operator_key = operator_backend
+        .public_key()
+        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     enterprise_receipt
-        .verify_operator(&operator_backend.public_key())
+        .verify_operator(&operator_key)
         .map_err(|error| CliError::cli_other_error(error.to_string()))?;
     let canonical = enterprise_receipt
         .canonical_bytes()
@@ -1139,7 +1139,7 @@ fn key_enterprise_receipt_to_chio_receipt(
         })),
         trust_level: TrustLevel::Verified,
         tenant_id: None,
-        kernel_key: operator_backend.public_key(),
+        kernel_key: operator_key,
         bbs_projection_version: None,
     };
     ChioReceipt::sign_with_backend(body, operator_backend)
@@ -1753,20 +1753,11 @@ pub(crate) mod tests {
     use super::*;
     use chio_test_support::prelude::*;
 
-    /// A rotating backend whose current selector is unreadable while its
-    /// compatibility identity still names an earlier key.
+    /// A rotating backend whose current selector cannot be read.
     pub(crate) struct UnreadableSelectorBackend(pub(crate) chio_core::crypto::Ed25519Backend);
 
     impl SigningBackend for UnreadableSelectorBackend {
-        fn algorithm(&self) -> chio_core::SigningAlgorithm {
-            self.0.algorithm()
-        }
-
-        fn public_key(&self) -> chio_core::PublicKey {
-            self.0.public_key()
-        }
-
-        fn current_public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
+        fn public_key(&self) -> chio_core::error::Result<chio_core::PublicKey> {
             Err(chio_core::Error::InvalidPublicKey(
                 "selector unavailable".to_string(),
             ))
@@ -1822,7 +1813,7 @@ pub(crate) mod tests {
             migration_binding: KeyLogMigrationBinding(binding),
         };
         assert!(matches!(
-            guarded.current_public_key(),
+            guarded.public_key(),
             Err(chio_core::Error::InvalidPublicKey(message)) if message == "selector unavailable"
         ));
     }

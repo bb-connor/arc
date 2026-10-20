@@ -264,7 +264,12 @@ impl WatermarkIssuer {
             .ok_or(WatermarkIssueError::UntrustedKey)?;
         trusted.validate()?;
         if trusted.status != WatermarkKeyStatus::Active
-            || trusted.public_key != self.dependencies.signer.public_key()
+            || trusted.public_key
+                != self
+                    .dependencies
+                    .signer
+                    .public_key()
+                    .map_err(|_| WatermarkIssueError::DependencyUnavailable)?
             || now < trusted.not_before_unix_ms
             || now >= trusted.signing_cutoff_unix_ms
             || context.issued_at_unix_ms < trusted.not_before_unix_ms

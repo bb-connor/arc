@@ -31,7 +31,7 @@ or claim that the budget database commits atomically with the receipt database.
 | Finding | Status | Code |
 | --- | --- | --- |
 | F70 | Implemented | Journal store `chio-store-sqlite/src/budget_store/payment_journal.rs` and composite schema `budget_store/composite_schema/payment/schema.sql`; kernel types `chio-kernel/src/payment/journal.rs`; `QualifiedAdmissionProjectionStore::load_payment_journal` and `advance_payment_journal`; idempotency contract and `settlement_state` on `PaymentAdapter` (`chio-kernel/src/payment.rs`). |
-| F71 | Resolved by RFC-0003 recovery and the reserved-hold reaper (see F71 below) | `reconcile_durable_admission_startup` (`kernel/admission_coordinator/recovery.rs`), `reconcile_recoverable_admissions_batch` (`recovery/batch.rs`), `reap_expired_reserved_budget_holds` (`kernel/reconciliation.rs`); periodic tick in `chio-api-protect/src/proxy/state/admission_maintenance.rs`. |
+| F71 | Partially implemented: recovery and the reserved-hold reaper run periodically only in `chio api protect` (see F71 below) | `reconcile_durable_admission_startup` (`kernel/admission_coordinator/recovery.rs`), `reconcile_recoverable_admissions_batch` (`recovery/batch.rs`), `reap_expired_reserved_budget_holds` (`kernel/reconciliation.rs`); periodic tick in `chio-api-protect/src/proxy/state/admission_maintenance.rs`. |
 | F68 | Implemented; active only while a settlement observer runtime is installed | Attempt-zero row seeded in the receipt append (`kernel/responses/receipt_persistence.rs`), inline claim and CAS completion (`settlement_routing.rs`), `settle_attempts` and `settle_dead_letters` in `chio-store-sqlite`, `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`. |
 | F69 | Open | No production `SettlementHook` exists and no production binary installs the settlement observer runtime. Nothing calls `SettlementOutcomeStore::claim_due`, so a `Retryable` row is never re-run after the inline attempt. |
 | F72 | Implemented | `BudgetDenyReason::CurrencyMismatch` (`chio-metering/src/budget_hierarchy.rs`), tests in `chio-metering/tests/budget_hierarchy.rs`. |
@@ -680,6 +680,10 @@ the evidence for them:
 - `chio api protect` runs the recovery batch and the reserved-hold reaper on its
   admission maintenance tick. `serve-http` and the control plane reconcile at
   startup only; their periodic tick lands with their payment adapter wiring.
+
+F71 closes only when every host that holds budget runs the recovery batch and the
+reserved-hold reaper on a periodic maintenance tick. Startup reconciliation alone
+does not meet that boundary.
 
 A hold that recovery cannot resolve (`Settling`, moved-funds `Settled`,
 `ReconcileFailed`, unproved `DispatchCommitted`, `OutcomeUnknownAfterDispatch`, or

@@ -1169,7 +1169,7 @@ impl ChioKernel {
         // fallback must stay free, while a paid fallback may not inherit the
         // ephemeral escape from another candidate. Reserve-for-caller mediation
         // returns before this point and does not dispatch on this kernel.
-        if !self.unsafe_ephemeral_financial_dispatch
+        if !self.ephemeral_financial_dispatch_allowed()
             && durable_admission
                 .as_ref()
                 .is_none_or(|admission| !admission.requires_payment())

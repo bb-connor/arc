@@ -7,8 +7,6 @@ fn no_charge_mustprepay_dispatch(nested: bool, unsafe_financial_dispatch: bool) 
     grant.max_invocations = Some(1);
     let (mut kernel, mut request, store, invocations) =
         durable_admission_fixture_with_grants("no-charge-mustprepay-dispatch", vec![grant]);
-    // The general fixture explicitly enables development-only financial dispatch.
-    // Restore the production default, then opt in only for the compatibility case.
     kernel.unsafe_ephemeral_financial_dispatch = false;
     if unsafe_financial_dispatch {
         kernel.enable_unsafe_ephemeral_financial_dispatch_for_development();

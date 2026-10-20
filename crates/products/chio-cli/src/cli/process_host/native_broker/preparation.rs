@@ -206,7 +206,7 @@ impl Route {
         let capability = issue_capability(
             BrokerCapabilityBody {
                 schema: BROKER_CAPABILITY_SCHEMA.into(),
-                issuer: self.signer.public_key(),
+                issuer: self.signer.public_key()?,
                 capability_id: format!("prepared-{binding}"),
                 parent_capability_id: parent.id.clone(),
                 subject: parent.subject.clone(),

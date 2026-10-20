@@ -116,7 +116,10 @@ fn signing_envelope_is_byte_identical_across_signers() {
 #[test]
 fn signature_verifies_against_backend_public_key() {
     let backend = ed25519_backend(13);
-    let public = backend.public_key();
+    let public = match backend.public_key() {
+        Ok(key) => key,
+        Err(e) => panic!("backend public key must read: {e}"),
+    };
     let backend_arc: Arc<dyn SigningBackend> = Arc::new(backend);
     let svc = IssuerService::with_signer(AUDIENCE, backend_arc);
     let req = fixture_request(AUDIENCE, "n3");
@@ -142,7 +145,10 @@ fn signature_verifies_against_backend_public_key() {
 #[test]
 fn tampering_with_audience_breaks_signature() {
     let backend = ed25519_backend(17);
-    let public = backend.public_key();
+    let public = match backend.public_key() {
+        Ok(key) => key,
+        Err(e) => panic!("backend public key must read: {e}"),
+    };
     let backend_arc: Arc<dyn SigningBackend> = Arc::new(backend);
     let svc = IssuerService::with_signer(AUDIENCE, backend_arc);
     let req = fixture_request(AUDIENCE, "n4");
@@ -171,7 +177,10 @@ fn tampering_with_audience_breaks_signature() {
 #[test]
 fn tampering_with_scope_set_breaks_signature() {
     let backend = ed25519_backend(19);
-    let public = backend.public_key();
+    let public = match backend.public_key() {
+        Ok(key) => key,
+        Err(e) => panic!("backend public key must read: {e}"),
+    };
     let backend_arc: Arc<dyn SigningBackend> = Arc::new(backend);
     let svc = IssuerService::with_signer(AUDIENCE, backend_arc);
     let req = fixture_request(AUDIENCE, "n5");
@@ -220,7 +229,10 @@ mod hybrid {
             Ok(h) => h,
             Err(e) => panic!("HybridBackend ctor must succeed: {e}"),
         };
-        let public = hybrid.public_key();
+        let public = match hybrid.public_key() {
+            Ok(key) => key,
+            Err(e) => panic!("backend public key must read: {e}"),
+        };
         let backend_arc: Arc<dyn SigningBackend> = Arc::new(hybrid);
         let svc = IssuerService::with_signer(AUDIENCE, backend_arc);
         let req = fixture_request(AUDIENCE, "n-hybrid");

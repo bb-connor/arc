@@ -35,6 +35,61 @@ fn durable_admission_runtime_defaults_closed_and_off_requires_explicit_unsafe_ep
 }
 
 #[test]
+fn financial_dispatch_without_durable_admission_is_refused(
+) -> Result<(), Box<dyn std::error::Error>> {
+    use crate::admission_operation::DurableAdmissionMode;
+
+    for nested in [false, true] {
+        let mut kernel =
+            ChioKernel::new_with_clock(make_monetary_config(), chio_test_support::clock::clock());
+        kernel.configure_durable_admission(DurableAdmissionMode::Off, true)?;
+        let invocations = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        kernel.register_tool_server(Box::new(CountingMonetaryServer {
+            id: "ephemeral-cost-srv".to_string(),
+            invocations: invocations.clone(),
+        }));
+        let agent = make_keypair();
+        let grant = make_monetary_grant("ephemeral-cost-srv", "compute", 100, 1000, "USD");
+        let capability = make_capability(&kernel, &agent, make_scope(vec![grant]), 300);
+        let request = make_request(
+            "ephemeral-financial-dispatch",
+            &capability,
+            "compute",
+            "ephemeral-cost-srv",
+        );
+        let response = if nested {
+            let session = kernel.open_session("ephemeral-financial-parent".into(), Vec::new())?;
+            kernel.activate_session(&session)?;
+            let parent = make_operation_context(
+                &session,
+                "ephemeral-financial-parent-request",
+                "ephemeral-financial-parent",
+            );
+            kernel.begin_session_request(&parent, OperationKind::ToolCall, true)?;
+            kernel.evaluate_tool_call_with_nested_flow_client(
+                &parent,
+                &request,
+                &mut NoopNestedFlowClient,
+                None,
+            )?
+        } else {
+            kernel.evaluate_tool_call_blocking(&request)?
+        };
+        assert_eq!(response.verdict, Verdict::Deny, "{response:?}");
+        assert_eq!(
+            response.reason.as_deref(),
+            Some("financial tool dispatch requires durable admission coverage")
+        );
+        assert_eq!(
+            invocations.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "nested={nested}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn side_effecting_mode_exempts_only_explicitly_read_only_tools() {
     struct ReadOnlyServer;
 

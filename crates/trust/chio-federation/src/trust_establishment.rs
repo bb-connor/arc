@@ -397,7 +397,9 @@ impl PeerHandshakeEnvelope {
             .map_err(|e| PeerHandshakeError::SigningFailed(e.to_string()))?;
         Ok(Self {
             challenge,
-            declared_public_key: local_backend.public_key(),
+            declared_public_key: local_backend
+                .public_key()
+                .map_err(|e| PeerHandshakeError::SigningFailed(e.to_string()))?,
             signature,
         })
     }
@@ -673,7 +675,7 @@ impl KernelTrustExchange {
         &self.local_kernel_id
     }
 
-    pub fn local_public_key(&self) -> PublicKey {
+    pub fn local_public_key(&self) -> Result<PublicKey, chio_core_types::Error> {
         self.local_signing_backend.public_key()
     }
 
