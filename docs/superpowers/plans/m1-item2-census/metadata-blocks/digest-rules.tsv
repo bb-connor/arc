@@ -1,0 +1,44 @@
+# kind	path_re	line_re	preimage	holds_committed	decision
+field	receipt/body\.rs$	content_hash	tool result bytes	yes	replaced by the content commitment (main plan Task 2)
+field	receipt/decision\.rs$	parameter_hash	call arguments	yes	replaced by the parameter commitment (main plan Task 2)
+field	receipt/body\.rs$	policy_hash	operator policy document	no	kept; cage sets it to the profile commitment value (A1 cage table); SCIM keys it (A1 SCIM table)
+field	receipt/economics\.rs$	(open_digest|reservation_digest)	signed channel open and reservation artifacts	no	kept (CommittedSafe, channel readers)
+field	receipt/economics\.rs$	(quote_hash|tariff_hash|meter_profile_hash)	provider quote, tariff and meter profile	no	kept (CommittedSafe, metered billing readers)
+field	receipt/economics\.rs$	economic_intent_digest	governed intent binding hash (holds purpose and context)	yes	committed: carries the intent-hash commitment value (A1 governed intent hash)
+field	receipt/economics\.rs$	payee_binding_digest	seller and settlement destination (both kept)	no	kept (participant_evidence.rs, receivable_iou.rs)
+field	receipt/economics\.rs$	(pre_action_authority_digest|credit_authority_digest)	approver-signed approval token; signed credit authority	no (keyed by signature)	kept
+field	receipt/governance\.rs$	approval_artifact_digest	approver-signed approval token	no (keyed by signature)	kept
+field	receipt/governance\.rs$	evidence_sha256	runtime attestation or provider usage evidence	no	kept (finding-verifier, metered readers)
+field	receipt/governance\.rs$	intent_hash	governed intent binding hash (holds purpose and context)	yes	committed: metadata.governed_transaction.intent_hash (A1)
+field	receipt/lineage\.rs$	outcome_hash	nested child request outcome payload (receipt_building.rs:13)	yes	committed: becomes a salted outcome commitment in F (A1 other receipt types); store readers compare commitment values
+field	receipt/lineage\.rs$	policy_hash	operator policy document	no	kept
+field	receipt/metadata\.rs$	(expected_digest|observed_digest|digest_check)	delivery contract: grant-fixed digest, keyed observed commitment, closed result	no	as planned (OQ12 split; observed is keyed); digest_check is a closed code
+field	receipt/metadata\.rs$	(status_epoch_artifact_sha256|proof_sha256|root_hash)	signed public finding-status feed epoch and proof	no	kept (public feed artifacts)
+field	receipt/metadata\.rs$	(accepted_bid_envelope_sha256|venue_admission_envelope_sha256)	signed bid and venue envelopes	no (keyed by signature)	kept
+field	receipt/security_parts/	.	active-defense and security projection fields	per field	Task 5 security projections; kept only under kept_digests_are_keyed_or_entropy_backed
+intent	chio-core-types/src/receipt/	.	governed intent binding hash	yes	receipt metadata: one commitment (A1)
+intent	chio-core-types/src/capability/governance\.rs$	.	governed intent binding hash	yes	authorization protocol artifact (caller, approvers, kernels hold the intent): raw kept; never embedded in a receipt or export
+intent	chio-core-types/src/session/lineage\.rs$	.	governed intent binding hash	yes	lineage record: carries the commitment value
+intent	chio-credit/src/	.	governed intent binding hash	yes	outbound credit artifact: carries the commitment value
+intent	chio-kernel/src/kernel/mod\.rs$	economic_intent_digest	governed intent binding hash	yes	payee binding feeding receipts and credit atoms: carries the commitment value
+intent	chio-kernel/src/payment/types\.rs$	.	governed intent binding hash	yes	outbound to payment adapters: carries the commitment value
+intent	chio-kernel/src/operator_report/	.	governed intent binding hash	yes	operator report: carries the commitment value
+intent	chio-kernel/src/receipt_support/receipt_metadata\.rs$	.	governed intent binding hash	yes	receipt metadata writer: commitment value
+intent	chio-security-types/src/response\.rs$	.	governed intent binding hash of an active-response intent	yes	signed security response receipt body (dispatch binding): the Task 5 security projection carries the intent-hash commitment value; executors compare the raw hash only in private dispatch state
+intent	(chio-kernel/src/(admission_operation|governed_approval_replay|approval/|threshold_approval/|security_admission_operation/|response_simulation_report|kernel/(active_response|governed_validation|validation/))|chio-kernel/src/admission_operation\.part|chio-store-sqlite/|chio-security-types/|chio-control-plane/src/security/)	.	governed intent binding hash	yes	deployment-internal row, approval protocol or active-response dispatch (private under disclosure authority): raw kept; receipts carry it only through the Task 5 projections
+intent	chio-response-model/src/state/projection\.rs$	Digest32::new\(\[	fixed literal	no	fixed-value literal in a helper, not a carrier
+copy	kernel/reconciliation\.rs$	realized_cost\.breakdown	tool-reported cost breakdown	yes	moves to committed reported_cost_breakdown (A1 financial)
+copy	validation/tool_output\.rs$	cost\.breakdown	tool-reported cost breakdown	yes	moves to committed reported_cost_breakdown (A1 financial)
+copy	responses/finalization\.rs$	escalations	post-invocation hook text	yes	committed post_invocation.escalations
+copy	receipt_metadata\.rs$	funding_source_ref: commerce\.shared_payment_token_id	shared payment token	yes	committed funding_source_ref
+copy	receipt_metadata\.rs$	or_else\(\|\| Some\(commerce\.shared_payment_token_id	shared payment token	yes	fallback deleted; rail.contract_or_account_ref is payment_reference or None
+copy	receipt_metadata\.rs$	shared_payment_token_id: commerce\.shared_payment_token_id	shared payment token	yes	committed payment_token
+copy	receipt_metadata\.rs$	\.call_chain	caller call chain	yes	committed call_chain members
+copy	receipt_metadata\.rs$	purpose: intent\.purpose	caller purpose	yes	committed purpose
+copy	config_and_public\.rs$	^(provider_record_id|principal|subject_key): identity\.|^\.provider_record_id|find_by_identity|^provider\.provider_id, identity\.subject_key|^record\.user_id$	SCIM identity	yes	SCIM lifecycle store record and lookup (operator-private), not a receipt field
+copy	config_and_public\.rs$	^\"(providerId|userId|userName|subjectKey)\": record	SCIM identity	yes	action parameters and content: parameter and content commitments (main plan)
+copy	config_and_public\.rs$	^record\.provider_id, record\.enterprise_identity\.subject_key	SCIM identity	yes	policy_hash: keyed (A1 SCIM table)
+copy	config_and_public\.rs$	sha256_hex\(format!\(\"\{\}:\{\}:\{now\}\"	SCIM identity	yes	receipt id drawn from the Rng seam (A1 SCIM table)
+copy	config_and_public\.rs$	capability_id: format!\(\"scim-user	SCIM identity	yes	capability_id keyed (A1 SCIM table)
+copy	config_and_public\.rs$	^subject_key: record\.enterprise_identity	enterprise principal	yes	attribution.subject_key: OQ-A1-2 (default keyed)
+copy	config_and_public\.rs$	^(\"(providerRecordId|principal|subjectKey|userId|userName)\": record|\.entitlements)	SCIM identity	yes	scimLifecycle members committed (A1)
