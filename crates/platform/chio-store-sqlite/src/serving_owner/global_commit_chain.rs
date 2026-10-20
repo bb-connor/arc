@@ -4,15 +4,6 @@ use rusqlite::types::ValueRef;
 use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
 use serde::Serialize;
 
-use super::finding_market_snapshot_versions::{
-    finding_market_snapshot_digest_v10, finding_market_snapshot_digest_v11,
-    finding_market_snapshot_digest_v12, finding_market_snapshot_digest_v13,
-    finding_market_snapshot_digest_v2, finding_market_snapshot_digest_v3,
-    finding_market_snapshot_digest_v4, finding_market_snapshot_digest_v5,
-    finding_market_snapshot_digest_v6, finding_market_snapshot_digest_v7,
-    finding_market_snapshot_digest_v8, finding_market_snapshot_digest_v9,
-    FindingMarketSnapshotShape,
-};
 use super::{read_u64, sqlite_u64, SqliteServingOwnerError};
 use crate::admission_operation_store as admission_store;
 
@@ -1189,32 +1180,6 @@ fn baseline_projection_digest(connection: &Connection) -> Result<String, SqliteS
     baseline_projection_digest_for_tables(connection, table_names(connection, false)?)
 }
 
-fn finding_challenge_snapshot_digest_v1(
-    connection: &Connection,
-) -> Result<String, SqliteServingOwnerError> {
-    let tables = [
-        "challenges",
-        "dispute_locks",
-        "liability_heads",
-        "governance_case_index",
-        "claim_snapshots",
-        "effect_intents",
-        "listing_sales_blocks",
-    ];
-    let mut snapshots = Vec::with_capacity(tables.len());
-    for table in tables {
-        snapshots.push(if table == "liability_heads" {
-            table_snapshot_without_column(connection, table, "seller_hex")?
-        } else {
-            table_snapshot(connection, table, None)?
-        });
-    }
-    digest(&AuthoritySnapshot {
-        format: "chio.sqlite-finding-challenge-snapshot.v1",
-        tables: snapshots,
-    })
-}
-
 fn finding_status_snapshot_digest(
     connection: &Connection,
 ) -> Result<String, SqliteServingOwnerError> {
@@ -1237,195 +1202,39 @@ fn finding_status_snapshot_digest(
     })
 }
 
-/// Current rollback-protected cognition-market snapshot. Purchase claims
-/// and every durable relation used to admit them share the challenge
-/// projection, so restoring a database from before a settled purchase
-/// cannot silently shrink a later sealed distribution.
 fn finding_market_snapshot_digest(
     connection: &Connection,
 ) -> Result<String, SqliteServingOwnerError> {
-    finding_market_snapshot_digest_version(connection, FindingMarketSnapshotShape::CURRENT)
-}
-
-pub(super) fn finding_market_snapshot_digest_version(
-    connection: &Connection,
-    shape: FindingMarketSnapshotShape,
-) -> Result<String, SqliteServingOwnerError> {
-    let mut challenge_tables = vec![
+    let tables = [
         "challenges",
+        "dispute_lock_reservations",
         "dispute_locks",
         "liability_heads",
         "governance_case_index",
         "claim_snapshots",
         "effect_intents",
         "listing_sales_blocks",
-    ];
-    if shape.include_root_bindings {
-        challenge_tables.push("effect_root_bindings");
-    }
-    if shape.include_outcomes {
-        challenge_tables.push("finding_challenge_outcomes");
-    }
-    if shape.include_finalizing_authorizations {
-        challenge_tables.push("finding_finalizing_authorizations");
-    }
-    if shape.include_finalizing_authorization_refreshes {
-        challenge_tables.push("finding_finalizing_authorization_refreshes");
-    }
-    if shape.include_seller_impairment_reconciliations {
-        challenge_tables.push("finding_seller_impairment_reconciliations");
-    }
-    if shape.include_challenge_submissions {
-        challenge_tables.push("finding_challenge_submissions");
-    }
-    let mut snapshots = Vec::with_capacity(if shape.include_lock_reservations {
-        19
-    } else {
-        18
-    });
-    for table in challenge_tables {
-        snapshots.push(
-            if table == "liability_heads" && !shape.include_liability_seller {
-                table_snapshot_without_column(connection, table, "seller_hex")?
-            } else {
-                table_snapshot(connection, table, None)?
-            },
-        );
-        if shape.include_lock_reservations && table == "challenges" {
-            snapshots.push(table_snapshot(
-                connection,
-                "dispute_lock_reservations",
-                None,
-            )?);
-        }
-    }
-    snapshots.push(table_snapshot(connection, "purchase_records", None)?);
-    if shape.include_capture_intents {
-        snapshots.push(table_snapshot(
-            connection,
-            "purchase_capture_intents",
-            None,
-        )?);
-    }
-    if shape.include_failed_deliveries {
-        snapshots.push(table_snapshot(connection, "failed_delivery_records", None)?);
-    }
-    for table in [
+        "effect_root_bindings",
+        "finding_challenge_outcomes",
+        "finding_finalizing_authorizations",
+        "finding_finalizing_authorization_refreshes",
+        "finding_seller_impairment_reconciliations",
+        "finding_challenge_submissions",
+        "purchase_records",
+        "purchase_capture_intents",
+        "failed_delivery_records",
         "purchase_reservations",
         "purchase_payout_bindings",
         "seller_exposure_encumbrances",
         "pending_purchase_slots",
-    ] {
-        snapshots.push(table_snapshot_where(
-            connection,
-            table,
-            if shape.include_terminal_reservations {
-                "1 = 1"
-            } else if shape.include_failed_deliveries {
-                r#"
-                reservation_id IN (
-                    SELECT reservation_id FROM purchase_records
-                    UNION
-                    SELECT reservation_id FROM failed_delivery_records
-                    UNION
-                    SELECT reservation_id FROM purchase_reservations
-                    WHERE state IN ('open', 'slot_reserved')
-                )
-                "#
-            } else if shape.include_inflight_purchases {
-                r#"
-                reservation_id IN (
-                    SELECT reservation_id FROM purchase_records
-                    UNION
-                    SELECT reservation_id FROM purchase_reservations
-                    WHERE state IN ('open', 'slot_reserved')
-                )
-                "#
-            } else {
-                "reservation_id IN (SELECT reservation_id FROM purchase_records)"
-            },
-        )?);
-    }
-    snapshots.push(table_snapshot_where(
-        connection,
         "payout_destinations",
-        if shape.include_finalizing_authorizations {
-            // The current public admission API can create a buyer slot
-            // before any purchase binding exists. Every such actionable row
-            // affects collision and capacity decisions and must therefore be
-            // committed even while it is unattached.
-            "1 = 1"
-        } else if shape.include_failed_deliveries {
-            r#"
-            slot_index = 0 OR EXISTS (
-                SELECT 1
-                FROM purchase_payout_bindings AS bindings
-                JOIN seller_exposure_encumbrances AS encumbrances
-                  ON encumbrances.reservation_id = bindings.reservation_id
-                WHERE bindings.reservation_id IN (
-                    SELECT reservation_id FROM purchase_records
-                    UNION
-                    SELECT reservation_id FROM failed_delivery_records
-                    UNION
-                    SELECT reservation_id FROM purchase_reservations
-                    WHERE state IN ('open', 'slot_reserved')
-                )
-                  AND encumbrances.allocation_id = payout_destinations.allocation_id
-                  AND bindings.destination = payout_destinations.destination
-            )
-            "#
-        } else if shape.include_inflight_purchases {
-            r#"
-            slot_index = 0 OR EXISTS (
-                SELECT 1
-                FROM purchase_payout_bindings AS bindings
-                JOIN seller_exposure_encumbrances AS encumbrances
-                  ON encumbrances.reservation_id = bindings.reservation_id
-                WHERE bindings.reservation_id IN (
-                    SELECT reservation_id FROM purchase_records
-                    UNION
-                    SELECT reservation_id FROM purchase_reservations
-                    WHERE state IN ('open', 'slot_reserved')
-                )
-                  AND encumbrances.allocation_id = payout_destinations.allocation_id
-                  AND bindings.destination = payout_destinations.destination
-            )
-            "#
-        } else {
-            r#"
-            slot_index = 0 OR EXISTS (
-                SELECT 1
-                FROM purchase_records AS records
-                JOIN purchase_payout_bindings AS bindings
-                  ON bindings.reservation_id = records.reservation_id
-                JOIN seller_exposure_encumbrances AS encumbrances
-                  ON encumbrances.reservation_id = records.reservation_id
-                WHERE encumbrances.allocation_id = payout_destinations.allocation_id
-                  AND bindings.destination = payout_destinations.destination
-            )
-            "#
-        },
-    )?);
+    ];
+    let mut snapshots = Vec::with_capacity(tables.len());
+    for table in tables {
+        snapshots.push(table_snapshot(connection, table, None)?);
+    }
     digest(&AuthoritySnapshot {
-        format: if shape.include_terminal_reservations {
-            "chio.sqlite-finding-market-snapshot.v12"
-        } else if shape.include_failed_deliveries {
-            "chio.sqlite-finding-market-snapshot.v9"
-        } else if shape.include_capture_intents {
-            "chio.sqlite-finding-market-snapshot.v8"
-        } else if shape.include_outcomes {
-            "chio.sqlite-finding-market-snapshot.v7"
-        } else if shape.include_root_bindings {
-            "chio.sqlite-finding-market-snapshot.v6"
-        } else if shape.include_inflight_purchases {
-            "chio.sqlite-finding-market-snapshot.v5"
-        } else if shape.include_liability_seller {
-            "chio.sqlite-finding-market-snapshot.v4"
-        } else if shape.include_lock_reservations {
-            "chio.sqlite-finding-market-snapshot.v3"
-        } else {
-            "chio.sqlite-finding-market-snapshot.v2"
-        },
+        format: "chio.sqlite-finding-market-snapshot.v1",
         tables: snapshots,
     })
 }
@@ -1954,122 +1763,19 @@ pub(super) fn verify_finding_challenge_projection_coverage(
         |row| row.get::<_, bool>(0),
     )?;
     match rows.last() {
-        Some((_, _, snapshot_digest, _, _)) => {
-            let current_market = finding_market_snapshot_digest(connection)?;
-            let current_market_v13 = finding_market_snapshot_digest_v13(connection)?;
-            let current_market_v12 = finding_market_snapshot_digest_v12(connection)?;
-            let current_market_v11 = finding_market_snapshot_digest_v11(connection)?;
-            let current_market_v10 = finding_market_snapshot_digest_v10(connection)?;
-            let current_market_v9 = finding_market_snapshot_digest_v9(connection)?;
-            let current_market_v8 = finding_market_snapshot_digest_v8(connection)?;
-            let current_market_v7 = finding_market_snapshot_digest_v7(connection)?;
-            let current_market_v6 = finding_market_snapshot_digest_v6(connection)?;
-            let current_market_v5 = finding_market_snapshot_digest_v5(connection)?;
-            let current_market_v4 = finding_market_snapshot_digest_v4(connection)?;
-            let current_market_v3 = finding_market_snapshot_digest_v3(connection)?;
-            let current_market_v2 = finding_market_snapshot_digest_v2(connection)?;
-            let current_legacy = finding_challenge_snapshot_digest_v1(connection)?;
-            let has_uncommitted_purchase_state = connection.query_row(
-                r#"
-                SELECT EXISTS(
-                    SELECT 1 FROM purchase_reservations
-                    WHERE state IN ('open', 'slot_reserved')
-                      AND reservation_id NOT IN (
-                          SELECT reservation_id FROM purchase_records
-                      )
-                )
-                "#,
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v6_root_binding = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM effect_root_bindings)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v7_outcome = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM finding_challenge_outcomes)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v8_capture_intent = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM purchase_capture_intents)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v9_failed_delivery = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM failed_delivery_records)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v10_finalizing_authorization = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM finding_finalizing_authorizations)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v10_actionable_payout_slot = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM payout_destinations WHERE slot_index > 0)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v11_finalizing_authorization_refresh = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM finding_finalizing_authorization_refreshes)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v12_terminal_reservation = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM purchase_reservations WHERE state IN ('released', 'expired'))",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v13_seller_impairment_reconciliation = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM finding_seller_impairment_reconciliations)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let has_v14_challenge_submission = connection.query_row(
-                "SELECT EXISTS(SELECT 1 FROM finding_challenge_submissions)",
-                [],
-                |row| row.get::<_, bool>(0),
-            )?;
-            let uncovered_before_v10 = current_market_v9 != *snapshot_digest
-                && (has_v9_failed_delivery
-                    || (current_market_v8 != *snapshot_digest
-                        && (has_v8_capture_intent
-                            || (current_market_v7 != *snapshot_digest
-                                && (has_uncommitted_purchase_state
-                                    || has_v7_outcome
-                                    || (current_market_v6 != *snapshot_digest
-                                        && (has_v6_root_binding
-                                            || (current_market_v4 != *snapshot_digest
-                                                && current_market_v5 != *snapshot_digest
-                                                && current_market_v3 != *snapshot_digest
-                                                && current_market_v2 != *snapshot_digest
-                                                && current_legacy != *snapshot_digest))))))));
-            let uncovered_before_v11 = current_market_v10 != *snapshot_digest
-                && (has_v10_finalizing_authorization
-                    || has_v10_actionable_payout_slot
-                    || uncovered_before_v10);
-            let uncovered_before_v12 = current_market_v11 != *snapshot_digest
-                && (has_v11_finalizing_authorization_refresh || uncovered_before_v11);
-            let uncovered_before_v13 = current_market_v12 != *snapshot_digest
-                && (has_v12_terminal_reservation || uncovered_before_v12);
-            let uncovered_before_v14 = current_market_v13 != *snapshot_digest
-                && (has_v13_seller_impairment_reconciliation || uncovered_before_v13);
-            if current_market != *snapshot_digest
-                && (has_v14_challenge_submission || uncovered_before_v14)
-            {
-                return Err(invalid(
-                    "finding challenge projection does not cover current state",
-                ));
-            }
+        Some((_, _, snapshot_digest, _, _))
+            if finding_market_snapshot_digest(connection)? != *snapshot_digest =>
+        {
+            return Err(invalid(
+                "finding challenge projection does not cover current state",
+            ));
         }
         None if has_state => {
             return Err(invalid(
                 "finding challenge state has no authenticated projection",
             ));
         }
-        None => {}
+        Some(_) | None => {}
     }
     Ok(())
 }
@@ -2371,91 +2077,6 @@ fn table_snapshot(
     })
 }
 
-/// Snapshot the retained columns in canonical column and row order.
-fn table_snapshot_without_column(
-    connection: &Connection,
-    table: &str,
-    excluded: &str,
-) -> Result<TableSnapshot, SqliteServingOwnerError> {
-    let table_identifier = quote_identifier(table);
-    let probe = connection.prepare(&format!("SELECT * FROM {table_identifier} LIMIT 0"))?;
-    let columns = probe
-        .column_names()
-        .into_iter()
-        .filter(|column| *column != excluded)
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    drop(probe);
-    if columns.is_empty() {
-        return Err(invalid(format!(
-            "projection table `{table}` has no retained columns"
-        )));
-    }
-    let order = columns
-        .iter()
-        .map(|column| quote_identifier(column))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let mut statement = connection.prepare(&format!(
-        "SELECT {order} FROM {table_identifier} ORDER BY {order}"
-    ))?;
-    let mut rows = statement.query([])?;
-    let mut row_digests = Vec::new();
-    while let Some(row) = rows.next()? {
-        let mut values = Vec::with_capacity(columns.len());
-        for index in 0..columns.len() {
-            values.push(snapshot_value(row.get_ref(index)?));
-        }
-        row_digests.push(digest(&values)?);
-    }
-    Ok(TableSnapshot {
-        name: table.to_owned(),
-        columns,
-        row_digests,
-    })
-}
-
-/// Snapshot one table under a fixed internal predicate. Callers supply
-/// only static predicates defined beside a projection, never external
-/// input; table identifiers are still quoted and rows retain the same
-/// canonical full-column ordering as an unfiltered snapshot.
-fn table_snapshot_where(
-    connection: &Connection,
-    table: &str,
-    predicate: &'static str,
-) -> Result<TableSnapshot, SqliteServingOwnerError> {
-    let table_identifier = quote_identifier(table);
-    let probe = connection.prepare(&format!("SELECT * FROM {table_identifier} LIMIT 0"))?;
-    let columns = probe
-        .column_names()
-        .into_iter()
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-    drop(probe);
-    let order = columns
-        .iter()
-        .map(|column| quote_identifier(column))
-        .collect::<Vec<_>>()
-        .join(", ");
-    let mut statement = connection.prepare(&format!(
-        "SELECT * FROM {table_identifier} WHERE {predicate} ORDER BY {order}"
-    ))?;
-    let mut rows = statement.query([])?;
-    let mut row_digests = Vec::new();
-    while let Some(row) = rows.next()? {
-        let mut values = Vec::with_capacity(columns.len());
-        for index in 0..columns.len() {
-            values.push(snapshot_value(row.get_ref(index)?));
-        }
-        row_digests.push(digest(&values)?);
-    }
-    Ok(TableSnapshot {
-        name: table.to_string(),
-        columns,
-        row_digests,
-    })
-}
-
 fn snapshot_value(value: ValueRef<'_>) -> SnapshotValue {
     match value {
         ValueRef::Null => SnapshotValue::Null,
@@ -2544,6 +2165,10 @@ fn is_digest(value: &str) -> bool {
 fn invalid(detail: impl Into<String>) -> SqliteServingOwnerError {
     SqliteServingOwnerError::Invalid(detail.into())
 }
+
+#[cfg(all(test, unix))]
+#[path = "global_commit_chain/market_snapshot_tests.rs"]
+mod market_snapshot_tests;
 
 #[cfg(test)]
 mod tests;
