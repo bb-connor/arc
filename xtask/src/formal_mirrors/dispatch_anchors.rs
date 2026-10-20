@@ -1510,8 +1510,13 @@ const NATIVE_DISPATCH_LEDGER_SOURCES: &[RequiredSource] = &[
         symbols: &["digest", "expected", "verify"],
     },
     RequiredSource {
-        path: "crates/platform/chio-store-sqlite/src/admission_operation_store.rs",
-        symbols: &["ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION"],
+        path: "crates/platform/chio-store-sqlite/src/schema_version/creation.rs",
+        symbols: &[
+            "METADATA_SCHEMA",
+            "SchemaTransaction::from_transaction",
+            "SchemaTransaction::stamp",
+            "SchemaTransaction::commit",
+        ],
     },
     RequiredSource {
         path: "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs",

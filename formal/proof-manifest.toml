@@ -2043,12 +2043,12 @@ rust_symbols = [
   "preflight_tool_outcome_schema",
   "verify_tool_outcome_schema_catalog",
 ]
-normalized_sha256 = "4f616652ef229d5df25deb21d216cb59368263eedf14322f5f6b45aa9b003cf1"
+normalized_sha256 = "8bc1b819bdcd6dac9df4465ad9bc69c12b434e80249c4ec614093f934beeed62"
 symbol_sha256 = [
   { symbol = "SqliteToolOutcomeStore::require_security_release_checkpoint_support", sha256 = "cbf49359b0aa14f5549fe6e1fb787b9fe1565ca27319ef120cb0baa20f9c75df" },
   { symbol = "SqliteToolOutcomeStore::record_security_release", sha256 = "d95908fa37f96e5c10dbda7d8b7f396ddc99420e3ad86c08a1a394610a909a65" },
   { symbol = "SqliteToolOutcomeStore::lookup_security_release", sha256 = "3315ac8508a69f3aa77e42d00c478dcc98b734e98d5a5265e1d076fa8517da1e" },
-  { symbol = "initialize_tool_outcome_schema", sha256 = "32b31634f0efcd3ad09f988865ceddbb2e529e69ee410db3970efc9f0eb18e67" },
+  { symbol = "initialize_tool_outcome_schema", sha256 = "f2a273f2b94d51b75ef53542c7c9cf873274f9e6b2ff5bd74296673d19cfc877" },
   { symbol = "verify_tool_outcome_invariants", sha256 = "45fbfb7999b00c1486881ff4cc71ee87eef6b9ce6a81128b45dcef7659b751d3" },
   { symbol = "verify_tool_outcome_data_invariants", sha256 = "5c71f770b78fcacc10df25ff3ad452f3a07424b073ccc409ae3894215a9dbeb2" },
   { symbol = "preflight_tool_outcome_schema", sha256 = "94aca80e6d260543451bc057d416c34fc11d43ae2c57f8fa202847ad3fd2d874" },
@@ -3311,9 +3311,9 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store/schema.rs"
 rust_symbols = ["initialize_admission_operation_schema","verify_admission_operation_invariants","verify_admission_operation_schema","admission_operation_schema_catalog"]
-normalized_sha256 = "faf99498350ea0805c29ad017b784980d70c6bb9836816b6ed525b25597db169"
+normalized_sha256 = "290345bebbd5f22a4c83d9229cf3b12d94239bfcf256b471f964bd99365dca82"
 symbol_sha256 = [
-  { symbol = "initialize_admission_operation_schema", sha256 = "be897df34155017039d2fada7d28460ce6066a45f80ae52ecf5e601b7dbf890c" },
+  { symbol = "initialize_admission_operation_schema", sha256 = "ebd2cb5a37b5f7db5413af942a400d657699644f83a857aed134b53bcad5188f" },
   { symbol = "verify_admission_operation_invariants", sha256 = "86c004ee3c7f6a900f895ab3573f31644434a1e3d34c9ed2d9adf321a2b381b1" },
   { symbol = "verify_admission_operation_schema", sha256 = "de79fa606f610563a0562aed2211835a119a6aa2884d339b24ab66b70cbeab86" },
   { symbol = "admission_operation_schema_catalog", sha256 = "4a8cba51f37d8fc12954a905486130a1e772b734099c64a6ee56cd23a8f239fb" },
@@ -3337,10 +3337,9 @@ model_file = "formal/apalache/PostAdmissionDropGuard.tla"
 model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/admission_operation_store.rs"
-rust_symbols = ["ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION","SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch"]
-normalized_sha256 = "61eeb78fb075bed6e485ba085df72765340a75b9e6131fb806263674ffd623b3"
+rust_symbols = ["SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch"]
+normalized_sha256 = "2f22ffa01115d599355e6ab22bf9715c081955097fa508c5eca6fa6567b4b0a2"
 symbol_sha256 = [
-  { symbol = "ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION", sha256 = "5e1a4cb44621deeb868936ff34547fd86266aceeca20d8caca4dcbd907c1b16d" },
   { symbol = "SqliteAdmissionOperationStore::capture_native_invocation_and_commit_dispatch", sha256 = "deaac50e9990fa4ae3b07274654b432549acbfd8ce86cd2b0a6cd1b4a6fea160" },
 ]
 
@@ -3350,11 +3349,11 @@ model_kind = "tla"
 relationship = "abstraction_anchor"
 rust_source = "crates/platform/chio-store-sqlite/src/serving_owner/global_commit_chain.rs"
 rust_symbols = ["GLOBAL_COMMIT_SCHEMA", "budget_event_reference_digest", "initialize_global_commit_schema", "verify_global_commit_schema", "global_schema_catalog"]
-normalized_sha256 = "9ad14b5388d7cee7264464a59a4ad8054a51dd03d4cdd0b114b4902d09b4eb0f"
+normalized_sha256 = "d68a7ac65b1aa206aed43f37809ed50de790662554b89f7248f6ca29fc3bc4e8"
 symbol_sha256 = [
   { symbol = "GLOBAL_COMMIT_SCHEMA", sha256 = "52f621e259a4d7fc28720fe2ab5e5ed5004327552c70bccc547f26de84a801c2" },
   { symbol = "budget_event_reference_digest", sha256 = "4b3a4210201b80e3b8f384bc041d173aa01edf63d81cc1ccfb229a8ea1340ee0" },
-  { symbol = "initialize_global_commit_schema", sha256 = "1b480c05cff14ef62bbe5036fd2462733feb25d8c17a0d294e37847c07a233f6" },
+  { symbol = "initialize_global_commit_schema", sha256 = "5e0cce2bf396594842d64bfb8ee1a779da770437d6101608a78938ac11a69009" },
   { symbol = "verify_global_commit_schema", sha256 = "dd784cb75e3694132fad9a212c16e1cfbc80b7ec066d66987d359177eb04c693" },
   { symbol = "global_schema_catalog", sha256 = "b06324e2a0df260fd47ba78acda3c338f9a0cd33e1dc5cec534dad0c20d6e055" },
 ]
@@ -4802,4 +4801,18 @@ normalized_sha256 = "a720655aa0432af5d23f86b1abd87ca6bca919e783eba9e87821c54d02a
 symbol_sha256 = [
   { symbol = "CALLER_RETURN_CONTEXT_SCHEMA", sha256 = "26dd5e7b0a1a285f0c598312d0cb636468c7ce9ebfa371610574474850d0d1f8" },
   { symbol = "AdmissionCallerDispatchContextV1::native_release_custody", sha256 = "574d43579cc163c8d2184341e7efe63e0367aeca3c85e6e8b297bc9a3197bea7" },
+]
+
+[[mirror]]
+model_file = "formal/apalache/PostAdmissionDropGuard.tla"
+model_kind = "tla"
+relationship = "abstraction_anchor"
+rust_source = "crates/platform/chio-store-sqlite/src/schema_version/creation.rs"
+rust_symbols = ["METADATA_SCHEMA", "SchemaTransaction::from_transaction", "SchemaTransaction::stamp", "SchemaTransaction::commit"]
+normalized_sha256 = "e0f01d4e05d88ea9cea547e5e36785b004a8a3025e8718c7f0a2eee4f24e8e02"
+symbol_sha256 = [
+  { symbol = "METADATA_SCHEMA", sha256 = "3bdb8a7ac89e6220725fb385d3a00f37ca1b57fe5081d9d02f0e55bd6954944b" },
+  { symbol = "SchemaTransaction::from_transaction", sha256 = "bcc0293a30569bf92da2450f9acf085a704f26b380ee1cb035c242ef8e79828e" },
+  { symbol = "SchemaTransaction::stamp", sha256 = "0e5e504a706d04ade0d13a790ea40cbdcd7351358a2eaaa8e13668cb0311a63c" },
+  { symbol = "SchemaTransaction::commit", sha256 = "1a1772926f351aa47b59305cac928945775f1953ebadad438fb97aa43911fe7e" },
 ]

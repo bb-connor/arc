@@ -344,7 +344,9 @@ fn retained_prefix_rejects_corruption_and_unknown_schema() -> TestResult {
         drop(store);
         let connection = Connection::open(&archive)?;
         connection.execute_batch("DROP TRIGGER IF EXISTS kernel_checkpoints_reject_update;")?;
+        connection.execute_batch("PRAGMA ignore_check_constraints = ON")?;
         connection.execute_batch(corruption)?;
+        connection.execute_batch("PRAGMA ignore_check_constraints = OFF")?;
         drop(connection);
         let store = SqliteReceiptStore::open(&live)?;
         assert!(store.append_chio_receipt(&sample_receipt_with_id("must-refuse")).is_err());

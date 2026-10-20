@@ -825,7 +825,7 @@ mod tests {
             path: None,
             capacity: 4,
             clock: StableReplayClock::new(
-                Arc::new(SystemClock),
+                chio_test_support::clock::clock(),
                 MAX_GOVERNED_APPROVAL_CLOCK_SKEW_I64,
             )?,
         };
