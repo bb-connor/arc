@@ -132,3 +132,15 @@ fn decode_signed_keeps_native_numeric_domain() -> TestResult {
     assert_eq!(String::from_utf8(canonical_json_bytes(&decoded)?)?, receipt);
     Ok(())
 }
+
+#[test]
+fn records_without_value_members_refuse_raw_duplicate_fields() {
+    assert!(serde_json::from_str::<GuardEvidence>(
+        r#"{"guard_name":"g","verdict":true,"verdict":false}"#
+    )
+    .is_err());
+    assert!(serde_json::from_str::<Decision>(
+        r#"{"verdict":"deny","reason":"a","reason":"b","guard":"g"}"#
+    )
+    .is_err());
+}

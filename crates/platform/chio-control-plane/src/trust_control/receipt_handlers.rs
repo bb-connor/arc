@@ -428,7 +428,7 @@ struct AuthenticatedEvidenceExportResponse {
 pub(crate) async fn handle_evidence_import(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
-    Json(request): Json<evidence_export::RemoteEvidenceImportRequest>,
+    SignedJson(request): SignedJson<evidence_export::RemoteEvidenceImportRequest>,
 ) -> Response {
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
