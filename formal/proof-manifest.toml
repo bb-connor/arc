@@ -460,10 +460,10 @@ model_kind = "lean"
 relationship = "transliteration"
 rust_source = "crates/core/chio-core-types/src/capability/scope.rs"
 rust_symbols = ["Operation", "Constraint", "ToolGrant", "ChioScope"]
-normalized_sha256 = "c8d3bfa667d08623e7c49f16c15ff583edc33c25f33959a94696efd0fd625191"
+normalized_sha256 = "7d7cddf9284be430c64da407ed9517a1549202b2a48643063ce28fc30430eb1d"
 symbol_sha256 = [
   { symbol = "Operation", sha256 = "fe28608332bd4700fd795bbac8be595534762cfccd30ba2b8987949326a883dd" },
-  { symbol = "Constraint", sha256 = "7cce0a89703723dcd101d44e50b2b239fa45cdad745fc5f5089925e07fc92f3a" },
+  { symbol = "Constraint", sha256 = "adf4c77cc6ba516513544134e92bc27fa2af369ce1ed7f1608a18bdb3e3488bb" },
   { symbol = "ToolGrant", sha256 = "ae91c5163222f26106e96bc4dbd73bc4871bcfab054d789d4c88cb8b2f68e4fa" },
   { symbol = "ChioScope", sha256 = "9346d69e5c39d63cffa8dc526b7acfd1d6f472f0098a356366237dd299b7497a" },
 ]
