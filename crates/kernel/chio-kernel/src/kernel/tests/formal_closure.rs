@@ -30,6 +30,10 @@ impl Guard for FormalClosureGuardError {
         "formal-closure-error"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         Err(KernelError::GuardDenied(
             "formal closure guard error".to_string(),

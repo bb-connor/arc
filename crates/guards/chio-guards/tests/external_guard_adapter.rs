@@ -17,7 +17,7 @@ use chio_guards::external::{
     AsyncGuardAdapter, CircuitBreakerConfig, CircuitOpenVerdict, ExternalGuard, ExternalGuardError,
     GuardCallContext, RateLimitedVerdict, RetryConfig,
 };
-use chio_kernel::Verdict;
+use chio_kernel::{GuardEvidenceDeclaration, Verdict};
 
 /// Configurable mock `ExternalGuard` used by every test in this file.
 struct MockGuard {
@@ -45,6 +45,10 @@ impl MockGuard {
 impl ExternalGuard for MockGuard {
     fn name(&self) -> &str {
         self.name
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {

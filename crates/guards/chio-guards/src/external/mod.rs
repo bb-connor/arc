@@ -28,13 +28,16 @@
 //! use chio_guards::external::{
 //!     AsyncGuardAdapter, ExternalGuard, ExternalGuardError, GuardCallContext,
 //! };
-//! use chio_kernel::Verdict;
+//! use chio_kernel::{GuardEvidenceDeclaration, Verdict};
 //!
 //! struct HelloGuard;
 //!
 //! #[async_trait]
 //! impl ExternalGuard for HelloGuard {
 //!     fn name(&self) -> &str { "hello" }
+//!     fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+//!         GuardEvidenceDeclaration::SAFE
+//!     }
 //!     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String> {
 //!         Some(ctx.tool_name.clone())
 //!     }
@@ -60,7 +63,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chio_kernel::Verdict;
+use chio_kernel::{GuardEvidenceDeclaration, Verdict};
 use thiserror::Error;
 
 pub use cache::{Clock, TokioClock, TtlCache};
@@ -131,6 +134,10 @@ impl ExternalGuardError {
 pub trait ExternalGuard: Send + Sync {
     /// Human-readable guard name (e.g. `"bedrock-guardrail"`).
     fn name(&self) -> &str;
+
+    /// Whether the `details` of evidence derived from this guard may appear in
+    /// a committed receipt.
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
 
     /// Return a cache key for this request, or `None` to skip caching.
     fn cache_key(&self, ctx: &GuardCallContext) -> Option<String>;
@@ -333,6 +340,11 @@ impl<E: ExternalGuard + ?Sized> AsyncGuardAdapter<E> {
     /// Name of the wrapped guard.
     pub fn name(&self) -> &str {
         self.inner.name()
+    }
+
+    #[must_use]
+    pub fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        self.inner.evidence_declaration()
     }
 
     /// Effective configuration.

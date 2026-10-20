@@ -14,8 +14,9 @@ use chio_decoy::{
     WatermarkObservationContext, WatermarkScanError, WatermarkScanVerdict, WatermarkVerifier,
 };
 use chio_kernel::{
-    Guard, GuardContext, GuardDecision, KernelError, PostInvocationContext,
-    PostInvocationInspection, PostInvocationVerdict, SecurityInvocationContextV1, ToolCallRequest,
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError,
+    PostInvocationContext, PostInvocationInspection, PostInvocationVerdict,
+    SecurityInvocationContextV1, ToolCallRequest,
 };
 use chio_security_types::ports::{
     CanonicalBody, Digest32, EventAppend, EventId, OpaqueReceiptRef, PortError, PortErrorKind,
@@ -294,6 +295,10 @@ impl TripwireGuard {
 impl Guard for TripwireGuard {
     fn name(&self) -> &str {
         PRE_INVOCATION_GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, guard_context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

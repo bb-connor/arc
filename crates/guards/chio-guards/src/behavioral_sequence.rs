@@ -16,7 +16,7 @@ use std::sync::Arc;
 use chio_http_session::SessionJournal;
 #[cfg(test)]
 use chio_kernel::Verdict;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 // ---------------------------------------------------------------------------
 // SequencePolicy
@@ -58,6 +58,10 @@ impl BehavioralSequenceGuard {
 impl Guard for BehavioralSequenceGuard {
     fn name(&self) -> &str {
         "behavioral-sequence"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

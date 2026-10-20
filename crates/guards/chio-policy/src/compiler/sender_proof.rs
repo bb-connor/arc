@@ -1,10 +1,13 @@
 //! Policy-owned proof requirement, including capabilities minted by other issuers.
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 pub(super) struct SenderProofGuard;
 impl Guard for SenderProofGuard {
     fn name(&self) -> &str {
         "sender-proof"
+    }
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
     fn evaluate(&self, ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         // The kernel verifies proof and replay custody before running guards. Requiring

@@ -79,6 +79,10 @@ impl Guard for NestedReservationMutationGuard {
         "nested-reservation-mutation"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         Ok(GuardDecision::allow())
     }

@@ -137,6 +137,9 @@ impl Guard for AllowGuard {
     fn name(&self) -> &str {
         "allow-all"
     }
+    fn evidence_declaration(&self) -> chio_kernel_core::GuardEvidenceDeclaration {
+        chio_kernel_core::GuardEvidenceDeclaration::SAFE
+    }
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<Verdict, KernelCoreError> {
         Ok(Verdict::Allow)
     }
@@ -148,6 +151,9 @@ impl Guard for DenyGuard {
     fn name(&self) -> &str {
         "deny-all"
     }
+    fn evidence_declaration(&self) -> chio_kernel_core::GuardEvidenceDeclaration {
+        chio_kernel_core::GuardEvidenceDeclaration::SAFE
+    }
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<Verdict, KernelCoreError> {
         Ok(Verdict::Deny)
     }
@@ -158,6 +164,9 @@ struct ErrorGuard;
 impl Guard for ErrorGuard {
     fn name(&self) -> &str {
         "error-all"
+    }
+    fn evidence_declaration(&self) -> chio_kernel_core::GuardEvidenceDeclaration {
+        chio_kernel_core::GuardEvidenceDeclaration::SAFE
     }
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<Verdict, KernelCoreError> {
         Err(KernelCoreError::ConstraintError {

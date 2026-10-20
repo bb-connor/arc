@@ -6,7 +6,10 @@
 //! pipeline allow the request.
 
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, ToolServerOutput, Verdict};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, ToolServerOutput,
+    Verdict,
+};
 
 /// A pipeline of guards evaluated in registration order.
 ///
@@ -58,6 +61,10 @@ impl Default for GuardPipeline {
 impl Guard for GuardPipeline {
     fn name(&self) -> &str {
         "guard-pipeline"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
@@ -174,6 +181,9 @@ mod tests {
         fn name(&self) -> &str {
             "allow-all"
         }
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow())
         }
@@ -184,6 +194,9 @@ mod tests {
         fn name(&self) -> &str {
             "deny-all"
         }
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::deny(Vec::new()))
         }
@@ -193,6 +206,9 @@ mod tests {
     impl Guard for ErrorGuard {
         fn name(&self) -> &str {
             "error-guard"
+        }
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
         }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Err(KernelError::Internal("boom".to_string()))
@@ -206,6 +222,10 @@ mod tests {
     impl Guard for RequiredRevalidationGuard {
         fn name(&self) -> &str {
             "required-revalidation"
+        }
+
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
         }
 
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
@@ -230,6 +250,10 @@ mod tests {
     impl Guard for OutputValidationGuard {
         fn name(&self) -> &str {
             "output-validation"
+        }
+
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
         }
 
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
