@@ -183,7 +183,7 @@ fn retained_lookup_queries_the_archive_connection_that_was_authenticated(
             let writer = rusqlite::Connection::open(&archive)?;
             writer.busy_timeout(std::time::Duration::ZERO)?;
             let error = writer
-                .execute("DELETE FROM chio_tool_receipts", [])
+                .execute("DELETE FROM chio_receipt_sink_identity", [])
                 .err()
                 .ok_or_else(|| {
                     ReceiptStoreError::Conflict(
@@ -377,11 +377,14 @@ fn retention_then_append_and_reopen_succeeds() -> Result<(), Box<dyn std::error:
 
     // The archived and live receipt-id sets partition the history with no
     // overlap: the four aged ids are gone from live, present in the archive.
-    // The archive is a minimal evidence bundle (no live-only tables), so it is
-    // consumed with open() (which rebuilds the checkpoint projections from the
-    // co-archived kernel_checkpoints), not open_existing().
-    let archive_store = SqliteReceiptStore::open(&archive)?;
-    assert_eq!(archive_store.tool_receipt_count()?, 4);
+    let archived = rusqlite::Connection::open_with_flags(
+        &archive,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let count: i64 = archived.query_row("SELECT COUNT(*) FROM chio_tool_receipts", [], |row| {
+        row.get(0)
+    })?;
+    assert_eq!(count, 4);
 
     let _ = std::fs::remove_file(&path);
     let _ = std::fs::remove_file(&archive);
@@ -579,8 +582,10 @@ fn settlement_and_metered_rows_are_archived_not_cascaded() -> Result<(), Box<dyn
         |row| row.get(0),
     )?;
     assert_eq!(live_consumptions, 0, "consumption row absent from live");
-    let archive_store = SqliteReceiptStore::open_existing(&archive)?;
-    let arch = archive_store.reader_connection_for_test()?;
+    let arch = rusqlite::Connection::open_with_flags(
+        &archive,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
     let arch_settlement: i64 = arch.query_row(
         "SELECT COUNT(*) FROM settlement_reconciliations",
         [],
@@ -681,8 +686,10 @@ fn rotation_refreshes_stale_reconciliation_archive_rows() -> Result<(), Box<dyn 
     );
 
     // The archive now holds the current live reconciliation state.
-    let archive_store = SqliteReceiptStore::open_existing(&archive)?;
-    let arch = archive_store.reader_connection_for_test()?;
+    let arch = rusqlite::Connection::open_with_flags(
+        &archive,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
     let settled_state: String = arch.query_row(
         "SELECT reconciliation_state FROM settlement_reconciliations WHERE receipt_id = ?1",
         rusqlite::params![receipt_id],
@@ -1839,15 +1846,9 @@ fn co_archival_rejects_divergent_attribution_columns() -> Result<(), Box<dyn std
             "INSERT INTO chio_tool_receipts \
              (seq, receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, \
               tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json, tenant_id) \
-             SELECT seq, receipt_id, timestamp, capability_id, subject_key, issuer_key, grant_index, \
+             SELECT seq, receipt_id, timestamp, capability_id, 'tampered-attribution-' || COALESCE(subject_key, ''), issuer_key, grant_index, \
               tool_server, tool_name, decision_kind, policy_hash, content_hash, raw_json, tenant_id \
              FROM live.chio_tool_receipts WHERE seq = 1;",
-        )?;
-        // Tamper ONLY the attribution: a value guaranteed to differ from the live
-        // subject_key whether that was NULL or a real key.
-        seed.execute(
-            "UPDATE chio_tool_receipts SET subject_key = 'tampered-attribution-' || COALESCE(subject_key, '') WHERE seq = 1",
-            [],
         )?;
         seed.execute_batch("DETACH DATABASE live;")?;
     }
@@ -3203,10 +3204,11 @@ fn watermark_trust_rejects_tampered_archive_contents() -> Result<(), Box<dyn std
     // receipt that was checkpointed.
     {
         let tampered = rusqlite::Connection::open(&archive)?;
-        let changed = tampered.execute(
+        let changed = super::support::tamper_archive_row(
+            &tampered,
+            "claim_receipt_log_entries_reject_update",
             "UPDATE claim_receipt_log_entries SET raw_json = '{\"tampered\":true}' \
              WHERE entry_seq = 1",
-            [],
         )?;
         assert_eq!(changed, 1, "exactly one archived row tampered");
     }
@@ -3995,8 +3997,10 @@ fn governed_receipt_lineage_is_co_archived() -> Result<(), Box<dyn std::error::E
 
     // The archive holds a faithful copy, so the archived receipt keeps its
     // provenance when the archive is opened standalone.
-    let archive_store = SqliteReceiptStore::open_existing(&archive)?;
-    let arch = archive_store.reader_connection_for_test()?;
+    let arch = rusqlite::Connection::open_with_flags(
+        &archive,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
     let (arch_lineage, arch_chain, arch_parent): (i64, Option<String>, Option<String>) = arch
         .query_row(
             "SELECT COUNT(*), MAX(chain_id), MAX(parent_receipt_id) \

@@ -813,7 +813,7 @@ fn provision_refuses_populated_standalone_budget_state() {
     assert!(
         error
             .to_string()
-            .contains("baseline refuses nonempty safety table `budget_mutation_events`"),
+            .contains("schema namespace admission_operation is missing"),
         "unexpected provisioning error: {error}"
     );
     let _ = fs::remove_dir_all(path);

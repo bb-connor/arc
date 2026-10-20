@@ -100,9 +100,10 @@ fn archive_preserves_exact_attempted_projection() -> Result<(), Box<dyn std::err
     let before = projections(&*store.connection()?)?;
     assert_eq!(store.archive_receipts_before(2, archive_path)?, 3);
     drop(store);
-    let archived = SqliteReceiptStore::open_existing(&archive)?;
-    assert_eq!(projections(&*archived.connection()?)?, before);
-    archived.audit_receipt_cost_projection()?;
+    let archived =
+        Connection::open_with_flags(&archive, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    assert_eq!(projections(&archived)?, before);
+    crate::receipt_store::support::audit_receipt_cost_projection(&archived)?;
     drop(archived);
     let mut connection = Connection::open_in_memory()?;
     connection.execute("ATTACH DATABASE ?1 AS archive", [archive_path])?;
@@ -115,13 +116,11 @@ fn archive_preserves_exact_attempted_projection() -> Result<(), Box<dyn std::err
     );
     connection.execute_batch("DETACH DATABASE archive")?;
     drop(connection);
-    let archived = SqliteReceiptStore::open_existing(&archive)?;
-    assert_eq!(projections(&*archived.connection()?)?, before);
-    assert_eq!(
-        schema_version(&*archived.connection()?)?,
-        RECEIPT_STORE_SCHEMA_VERSION
-    );
-    archived.audit_receipt_cost_projection()?;
+    let archived =
+        Connection::open_with_flags(&archive, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    assert_eq!(projections(&archived)?, before);
+    assert_eq!(schema_version(&archived)?, RECEIPT_STORE_SCHEMA_VERSION);
+    crate::receipt_store::support::audit_receipt_cost_projection(&archived)?;
     drop(archived);
     fs::remove_file(path)?;
     fs::remove_file(archive)?;

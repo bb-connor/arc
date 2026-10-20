@@ -35,13 +35,13 @@ supplies the capability identity, grant index, and limit after authorization.
 
 | Entry point | Scope and caller duties |
 | --- | --- |
-| `SqliteReceiptStore::open` | Creates parents and runs receipt migrations; default pools have eight readers and one writer connection. Protect the database and its sidecars. |
-| `SqliteReceiptStore::open_existing` | Requires existing current receipt schema; opens read/write and can configure pragmas and integrity guards. |
+| `SqliteReceiptStore::open` | Creates parents and initializes an empty database or validates the current receipt catalog; default pools have eight readers and one writer connection. Protect the database and its sidecars. |
+| `SqliteReceiptStore::open_existing` | Requires the complete current receipt catalog; opens read/write and configures connection pragmas without repairing schema or projections. |
 | `SqliteBudgetStore::open` | Opens standalone budget state on one mutex-protected connection. A provisioned serving-authority file requires its joint owner. |
-| `SqliteApprovalStore::open_colocated_with_receipt_store` | Adopts a receipt-anchored file; open the receipt store first. Approval operations retain their own transaction boundaries. |
+| `SqliteApprovalStore::open_colocated_with_receipt_store` | Opens a declared receipt/approval database created by `initialize_receipt_approval_database`. Approval operations retain their own transaction boundaries. |
 | `SqliteAuthorityStore::provision` / `open_serving` | Provisions and opens joint authority state with file identity, an exclusive serving lock, epochs, and a rollback anchor. Requires Unix and a secure lock root. |
 | `SqliteCapabilityAuthority::open` | Establishes Linux file custody before storing the plaintext signing seed. Requires a private owned parent and private single-link database/sidecars. |
-| `SqliteSecurityStateStore::open` | Rejects empty, memory, URI, query, and fragment paths; Unix opens bind an unaliased main-file identity before migrations. Isolation-epoch evidence defaults to refusal. |
+| `SqliteSecurityStateStore::open` | Rejects empty, memory, URI, query, and fragment paths; Unix opens bind an unaliased main-file identity before schema creation or validation. Isolation-epoch evidence defaults to refusal. |
 
 `SqliteAuthorityStore::admission_operation_store` returns the joint
 `SqliteAdmissionOperationStore`. The separate
@@ -66,9 +66,11 @@ qualified durable sink identity.
 
 ## Guarantees
 
-- `check_schema_version` rejects foreign application IDs, mismatched store
-  anchors, and newer keyed schema revisions. Each participating constructor
-  selects its own anchor tables; receipt/approval co-location is explicit.
+- `inspect_schema` reads application identity and exact declared v1 namespaces.
+  `SchemaTransaction` creates metadata, identity and namespace stamps atomically
+  from an empty catalog. Constructors validate their complete catalogs on reopen;
+  missing namespaces and non-v1 revisions refuse without repair. Composite
+  creators declare receipt/approval, seller, security/blob and serving layouts.
 - Receipt connection initialization verifies WAL, FULL synchronization,
   foreign keys, and a busy timeout of at least five seconds on every pooled
   connection. `wait_for_writer_ready` waits for the writer's verified seed.
@@ -78,7 +80,7 @@ qualified durable sink identity.
 - Internal `SecurityStateWriteTransaction` and `ScopedMutation` compose
   selected flow and declassification mutations inside one owned transaction;
   failed mutations drop that owner and roll back its uncommitted work.
-  Public legacy methods such as `FlowStateStore::join` commit independently.
+  Public methods such as `FlowStateStore::join` commit independently.
 - Joint admission writes check the serving owner and rollback anchor inside
   their transaction, then synchronize the external anchor after commit.
   Uncertain commit outcomes require recovery through the serving owner.

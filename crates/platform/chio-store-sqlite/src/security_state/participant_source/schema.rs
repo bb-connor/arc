@@ -170,11 +170,11 @@ fn verify_schema_version(connection: &Connection) -> Result<()> {
             "source security schema version is not canonical",
         ));
     }
-    match crate::check_current_schema(connection, "security_state", 1, &["security_transitions"])? {
-        crate::SchemaState::Current => Ok(()),
-        crate::SchemaState::Unstamped => Err(crate::SchemaVersionError::StaleSchema {
-            found: 0,
-            current: 1,
+    match crate::schema_version::read_store_schema_version(connection, "security_state")? {
+        Some(1) => Ok(()),
+        Some(found) => Err(crate::SchemaVersionError::StaleSchema { found, current: 1 }.into()),
+        None => Err(crate::SchemaVersionError::MissingSchema {
+            store_key: "security_state".into(),
         }
         .into()),
     }

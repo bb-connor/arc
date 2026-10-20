@@ -1,8 +1,6 @@
 use std::path::Path;
 
-use chio_store_sqlite::{
-    stamp_schema_version, BlobStoreError, SqliteEncryptedBlobStore, SqliteMemoryProvenanceStore,
-};
+use chio_store_sqlite::{BlobStoreError, SqliteEncryptedBlobStore, SqliteMemoryProvenanceStore};
 use rusqlite::Connection;
 
 const STALE_SCHEMA: &str =
@@ -10,7 +8,12 @@ const STALE_SCHEMA: &str =
 
 fn restamp(path: &Path, store_key: &str) -> Result<(), Box<dyn std::error::Error>> {
     let connection = Connection::open(path)?;
-    stamp_schema_version(&connection, store_key, 0)?;
+    connection.execute_batch("PRAGMA ignore_check_constraints = ON;")?;
+    connection.execute(
+        "UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = ?1",
+        [store_key],
+    )?;
+    connection.execute_batch("PRAGMA ignore_check_constraints = OFF;")?;
     Ok(())
 }
 

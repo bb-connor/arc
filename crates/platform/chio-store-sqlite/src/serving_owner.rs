@@ -425,7 +425,7 @@ impl SqliteAuthorityStore {
         verify_path_available_for_new_identity(&lock_root, &canonical_database_path)?;
         let state = crate::schema_version::inspect_schema(&connection, SERVING_NAMESPACES)
             .map_err(|error| SqliteServingOwnerError::Invalid(error.to_string()))?;
-        if state != crate::SchemaState::Unstamped {
+        if state != crate::SchemaState::Empty {
             return Err(SqliteServingOwnerError::PartialProvision(
                 canonical_database_path.display().to_string(),
             ));

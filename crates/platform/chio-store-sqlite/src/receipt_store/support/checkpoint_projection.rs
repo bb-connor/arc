@@ -843,33 +843,6 @@ pub(crate) fn load_checkpoint_tree_head_projection_row(
         .transpose()
 }
 
-fn insert_checkpoint_tree_head_projection_row(
-    connection: &Connection,
-    row: &CheckpointTreeHeadProjectionRow,
-) -> Result<(), ReceiptStoreError> {
-    connection.execute(
-        r#"
-        INSERT INTO checkpoint_tree_heads (
-            checkpoint_seq, batch_start_seq, batch_end_seq, tree_size, merkle_root,
-            issued_at, kernel_key, previous_checkpoint_sha256, statement_json, signature
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-        "#,
-        params![
-            sqlite_i64(row.checkpoint_seq, "checkpoint_seq")?,
-            sqlite_i64(row.batch_start_seq, "batch_start_seq")?,
-            sqlite_i64(row.batch_end_seq, "batch_end_seq")?,
-            sqlite_i64(row.tree_size, "tree_size")?,
-            row.merkle_root.as_str(),
-            sqlite_i64(row.issued_at, "issued_at")?,
-            row.kernel_key.as_str(),
-            row.previous_checkpoint_sha256.as_deref(),
-            row.statement_json.as_str(),
-            row.signature.as_str(),
-        ],
-    )?;
-    Ok(())
-}
-
 pub(crate) fn load_checkpoint_tree_head_projection_ids(
     connection: &Connection,
 ) -> Result<BTreeSet<u64>, ReceiptStoreError> {
@@ -935,28 +908,6 @@ pub(crate) fn load_checkpoint_predecessor_witness_projection_row(
             },
         )
         .transpose()
-}
-
-fn insert_checkpoint_predecessor_witness_projection_row(
-    connection: &Connection,
-    row: &CheckpointPredecessorWitnessProjectionRow,
-) -> Result<(), ReceiptStoreError> {
-    connection.execute(
-        r#"
-        INSERT INTO checkpoint_predecessor_witnesses (
-            predecessor_checkpoint_seq, witness_checkpoint_seq,
-            previous_checkpoint_sha256, witnessed_at, witness_statement_json
-        ) VALUES (?1, ?2, ?3, ?4, ?5)
-        "#,
-        params![
-            sqlite_i64(row.predecessor_checkpoint_seq, "predecessor_checkpoint_seq")?,
-            sqlite_i64(row.witness_checkpoint_seq, "witness_checkpoint_seq")?,
-            row.previous_checkpoint_sha256.as_str(),
-            sqlite_i64(row.witnessed_at, "witnessed_at")?,
-            row.witness_statement_json.as_str(),
-        ],
-    )?;
-    Ok(())
 }
 
 pub(crate) fn load_checkpoint_predecessor_witness_projection_ids(
@@ -1046,32 +997,6 @@ pub(crate) fn load_checkpoint_publication_metadata_projection_row(
         .transpose()
 }
 
-fn insert_checkpoint_publication_metadata_projection_row(
-    connection: &Connection,
-    row: &CheckpointPublicationMetadataProjectionRow,
-) -> Result<(), ReceiptStoreError> {
-    connection.execute(
-        r#"
-        INSERT INTO checkpoint_publication_metadata (
-            checkpoint_seq, publication_schema, merkle_root, published_at, kernel_key,
-            log_tree_size, entry_start_seq, entry_end_seq, previous_checkpoint_sha256
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-        "#,
-        params![
-            sqlite_i64(row.checkpoint_seq, "checkpoint_seq")?,
-            row.publication_schema.as_str(),
-            row.merkle_root.as_str(),
-            sqlite_i64(row.published_at, "published_at")?,
-            row.kernel_key.as_str(),
-            sqlite_i64(row.log_tree_size, "log_tree_size")?,
-            sqlite_i64(row.entry_start_seq, "entry_start_seq")?,
-            sqlite_i64(row.entry_end_seq, "entry_end_seq")?,
-            row.previous_checkpoint_sha256.as_deref(),
-        ],
-    )?;
-    Ok(())
-}
-
 pub(crate) fn load_checkpoint_publication_metadata_projection_ids(
     connection: &Connection,
 ) -> Result<BTreeSet<u64>, ReceiptStoreError> {
@@ -1087,6 +1012,16 @@ pub(crate) fn load_checkpoint_publication_metadata_projection_ids(
         )
     })
     .collect::<Result<BTreeSet<_>, _>>()
+}
+
+pub(crate) fn create_archive_transparency_projection_guards(
+    connection: &Connection,
+) -> Result<(), ReceiptStoreError> {
+    connection.execute_batch(
+        &TRANSPARENCY_PROJECTION_GUARDS_SQL
+            .replace("CREATE TRIGGER IF NOT EXISTS ", "CREATE TRIGGER archive."),
+    )?;
+    Ok(())
 }
 
 pub(crate) fn ensure_transparency_projection_guards(
@@ -1120,8 +1055,8 @@ pub(crate) fn drop_transparency_projection_guards(
     Ok(())
 }
 
-pub(crate) fn backfill_checkpoint_transparency_projections(
-    connection: &rusqlite::Transaction<'_>,
+pub(crate) fn validate_checkpoint_transparency_projections(
+    connection: &Connection,
 ) -> Result<(), ReceiptStoreError> {
     let rows = load_all_persisted_checkpoint_rows(connection)?;
     let mut parsed_checkpoints = Vec::with_capacity(rows.len());
@@ -1191,7 +1126,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
                     row.checkpoint_seq
                 )))
             }
-            None => insert_checkpoint_tree_head_projection_row(connection, row)?,
+            None => return Err(ReceiptStoreError::Conflict(format!("checkpoint tree head projection for checkpoint {} is missing", row.checkpoint_seq))),
         }
     }
 
@@ -1232,7 +1167,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
                     row.witness_checkpoint_seq
                 )))
             }
-            None => insert_checkpoint_predecessor_witness_projection_row(connection, row)?,
+            None => return Err(ReceiptStoreError::Conflict(format!("checkpoint predecessor witness projection for checkpoint {} is missing", row.witness_checkpoint_seq))),
         }
     }
 
@@ -1270,7 +1205,7 @@ pub(crate) fn backfill_checkpoint_transparency_projections(
                     row.checkpoint_seq
                 )))
             }
-            None => insert_checkpoint_publication_metadata_projection_row(connection, row)?,
+            None => return Err(ReceiptStoreError::Conflict(format!("checkpoint publication metadata projection for checkpoint {} is missing", row.checkpoint_seq))),
         }
     }
 

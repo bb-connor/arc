@@ -293,14 +293,34 @@ fn checkpoint_archive_reopens_with_exact_typed_predecessors() -> TestResult {
     evidence_retention::create_archive_schema(&mut connection)?;
     evidence_retention::create_archive_schema(&mut connection)?;
     connection.execute_batch("DETACH DATABASE archive")?;
-    // Writable open materializes the archive's documented empty projection shells.
-    let archived = SqliteReceiptStore::open(&archive)?;
+    let archived =
+        Connection::open_with_flags(&archive, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    assert_eq!(signed_checkpoint_rows(&archived)?, original);
+    let mut predecessor = None;
+    for row in load_all_persisted_checkpoint_rows(&archived)? {
+        let checkpoint = parse_persisted_checkpoint_row(row)?;
+        validate_checkpoint_against_claim_log(&archived, &checkpoint)?;
+        if let Some(previous) = predecessor.as_ref() {
+            chio_kernel::checkpoint::validate_checkpoint_predecessor(previous, &checkpoint)?;
+        }
+        predecessor = Some(checkpoint);
+    }
     drop(archived);
-    let archived = SqliteReceiptStore::open_existing(&archive)?;
-    assert_eq!(signed_checkpoint_rows(&*archived.connection()?)?, original);
-    verify_checkpoint_chain_integrity(&*archived.connection()?)?;
     let mut connection = Connection::open(&archive)?;
+    connection.execute(
+        "ATTACH DATABASE ?1 AS live",
+        [path.to_str().ok_or("live path")?],
+    )?;
     let tx = connection.transaction()?;
+    for table in [
+        "checkpoint_tree_heads",
+        "checkpoint_predecessor_witnesses",
+        "checkpoint_publication_metadata",
+    ] {
+        tx.execute_batch(&format!(
+            "INSERT INTO main.{table} SELECT * FROM live.{table}"
+        ))?;
+    }
     assert_checkpoint_column_constraints(&tx)?;
     tx.rollback()?;
     Ok(())
