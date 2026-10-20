@@ -804,6 +804,7 @@ fn open_existing_checkpoint_status_does_not_repair_missing_projection() {
             "#,
         )
         .test_unwrap();
+    ensure_transparency_projection_guards(&connection).test_unwrap();
     drop(connection);
     drop(store);
 
@@ -832,6 +833,20 @@ fn open_existing_checkpoint_status_does_not_repair_missing_projection() {
         "open_existing/status must not repair checkpoint projection rows"
     );
 
+    drop(reopened);
+    assert!(matches!(SqliteReceiptStore::open(&path),
+        Err(ReceiptStoreError::Conflict(message))
+            if message == "checkpoint publication metadata projection for checkpoint 1 is missing"));
+    let connection = Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .test_unwrap();
+    let remaining: i64 = connection
+        .query_row(
+            "SELECT COUNT(*) FROM checkpoint_publication_metadata WHERE checkpoint_seq = 1",
+            [],
+            |row| row.get(0),
+        )
+        .test_unwrap();
+    assert_eq!(remaining, 0);
     let _ = fs::remove_file(path);
 }
 

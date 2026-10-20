@@ -43,29 +43,33 @@ custody. `security_state` contains flow, declassification, response, scheduler,
 and source-retirement logic. Encrypted blobs, provenance, settlement, finding
 markets, FROST state, and fiscal state have dedicated modules.
 
-## Construction and migrations
+## Creation and reopen
 
-`check_schema_version` inspects `PRAGMA application_id` and store-specific
-anchor tables. An empty or recognized legacy database with application ID zero
-is stamped as Chio and reported as revision zero. A stamped populated file
-must still carry an accepted anchor. Revisions live in
-`chio_store_schema_versions`, keyed by store, so co-located stores have
-independent revisions. The helper validates provenance and returns a revision;
-the constructor owns migration and the later `stamp_schema_version` call.
+`inspect_schema` reads application identity, catalog emptiness and canonical
+metadata for an explicit namespace set. Each namespace must record version 1.
+`SchemaTransaction` begins an immediate transaction and rechecks that state.
+Fresh creation inserts metadata, application identity, component schemas and
+namespace stamps in that transaction. Commit requires every declared stamp.
+A populated unstamped database cannot be adopted. Reopen validates the complete
+catalog and required seed rows without adding namespaces or repairing objects.
 
-Receipt creation performs schema work in an immediate transaction and stamps
-the revision before commit. Its `open_existing` path requires the current
-schema and uses read/write flags without creation. It still configures
-connection pragmas and transparency guards. Approval co-location explicitly
-accepts the receipt anchor; ordinary approval opens use their own anchor set.
-These checks apply to the constructors that invoke them. Security-state
-migrations and joint serving-owner initialization have their own gates.
+Top-level creators declare receipt/approval, seller bundle/payload/payment,
+security-state/blob and joint serving-owner compositions. Individual readers
+validate the declared composition; opening a standalone file cannot promote it
+into a composite. Serving creation includes the owner identity and initial
+global baseline in the same transaction as its 17 component namespaces.
+
+Fresh receipt creation retains an exclusive SQLite lock while preparing
+incremental auto-vacuum on the empty file, then creates its declared schemas
+transactionally. `open_existing` requires the complete current catalog and
+opens without file creation. Missing transparency guards or generation rows
+refuse. Connection pragmas follow schema validation on existing databases.
 
 `SqliteSecurityStateStore::open` accepts a plain filesystem path. On Unix it
-opens and binds an unaliased main file before migration, initializes encrypted
-blob tables, and retains the identity for later connection checks. Its default
-isolation-epoch verifier denies new evidence; callers can supply an explicit
-verifier through `open_with_isolation_epoch_verifier`.
+binds an unaliased main file before creating the security and encrypted-blob
+namespaces together, and retains that identity for later connection checks.
+Its default isolation-epoch verifier denies new evidence; callers can supply an
+explicit verifier through `open_with_isolation_epoch_verifier`.
 
 ## Data and control flow
 

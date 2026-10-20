@@ -1597,3 +1597,22 @@ pub(super) fn tamper_canonical_bytes_of_uncheckpointed_receipt(
 #[path = "support/evidence.rs"]
 mod evidence;
 pub(super) use evidence::*;
+
+pub(super) fn tamper_archive_row(
+    connection: &rusqlite::Connection,
+    guard: &str,
+    mutation: &str,
+) -> rusqlite::Result<usize> {
+    let tx =
+        rusqlite::Transaction::new_unchecked(connection, rusqlite::TransactionBehavior::Immediate)?;
+    let definition: String = tx.query_row(
+        "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = ?1",
+        [guard],
+        |row| row.get(0),
+    )?;
+    tx.execute_batch(&format!("DROP TRIGGER {guard}"))?;
+    let changed = tx.execute(mutation, [])?;
+    tx.execute_batch(&definition)?;
+    tx.commit()?;
+    Ok(changed)
+}

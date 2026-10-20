@@ -17,15 +17,45 @@ pub(crate) fn validate_against(
     connection: &Connection,
     canonical: &Connection,
 ) -> Result<(), SchemaVersionError> {
-    if catalog(connection)? != catalog(canonical)? {
+    validate_catalog_pair(connection, canonical, "sqlite_schema")
+}
+
+pub(crate) fn validate_archive_against(
+    connection: &Connection,
+    canonical: &Connection,
+) -> Result<(), SchemaVersionError> {
+    validate_catalog_pair(connection, canonical, "archive.sqlite_schema")
+}
+
+fn validate_catalog_pair(
+    connection: &Connection,
+    canonical: &Connection,
+    schema: &str,
+) -> Result<(), SchemaVersionError> {
+    if catalog_size(connection, schema)? != catalog_size(canonical, schema)?
+        || catalog(connection, schema)? != catalog(canonical, schema)?
+    {
         return Err(SchemaVersionError::CatalogMismatch);
     }
     Ok(())
 }
 
-fn catalog(connection: &Connection) -> rusqlite::Result<Vec<CatalogEntry>> {
-    let mut statement = connection
-        .prepare("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name")?;
+fn catalog_size(connection: &Connection, schema: &str) -> rusqlite::Result<(i64, i64)> {
+    connection.query_row(
+        &format!(
+            "SELECT COUNT(*), COALESCE(SUM(length(type) + length(name)
+         + length(tbl_name) + COALESCE(length(sql), 0)), 0)
+         FROM {schema}"
+        ),
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    )
+}
+
+fn catalog(connection: &Connection, schema: &str) -> rusqlite::Result<Vec<CatalogEntry>> {
+    let mut statement = connection.prepare(&format!(
+        "SELECT type, name, tbl_name, sql FROM {schema} ORDER BY type, name"
+    ))?;
     let entries = statement
         .query_map([], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))

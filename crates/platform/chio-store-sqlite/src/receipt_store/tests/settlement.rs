@@ -71,31 +71,11 @@ fn open_existing_does_not_install_missing_settlement_schema(
     })?;
     drop(store);
 
-    let reopened = SqliteReceiptStore::open_existing(&path)?;
-    assert_eq!(
-        ReceiptStore::atomic_receipt_projection(&reopened),
-        chio_kernel::AtomicReceiptProjection::Unsupported
-    );
-    assert!(!ReceiptStore::supports_atomic_receipt_projection_with_timeout(&reopened));
-    assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
-    let unsupported_receipt = sample_receipt_with_id("rcpt-settlement-unsupported");
-    let unsupported = ReceiptStore::append_chio_receipt_with_pending_observation_and_timeout(
-        &reopened,
-        &unsupported_receipt,
-        &chio_kernel::PendingSettlementObservation {
-            next_visible_at_ms: 1,
-        },
-        std::time::Duration::from_secs(2),
-    );
-    assert!(matches!(
-        unsupported,
-        Err(ReceiptStoreError::Unsupported(message))
-            if message == "atomic settlement observation projection"
-    ));
-    assert!(reopened
-        .load_chio_receipt(&unsupported_receipt.id)?
-        .is_none());
-    let connection = reopened.connection()?;
+    assert!(matches!(SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Conflict(message))
+            if message == "schema catalog differs from its canonical definition"));
+    let connection =
+        Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let attempts_table: Option<String> = connection
         .query_row(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'settle_attempts'",
@@ -106,7 +86,6 @@ fn open_existing_does_not_install_missing_settlement_schema(
     assert_eq!(attempts_table, None);
 
     drop(connection);
-    drop(reopened);
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -122,13 +101,11 @@ fn open_existing_does_not_reinstall_missing_settlement_guard(
     })?;
     drop(store);
 
-    let reopened = SqliteReceiptStore::open_existing(&path)?;
-    assert_eq!(
-        ReceiptStore::atomic_receipt_projection(&reopened),
-        chio_kernel::AtomicReceiptProjection::Unsupported
-    );
-    assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
-    let connection = reopened.connection()?;
+    assert!(matches!(SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Conflict(message))
+            if message == "schema catalog differs from its canonical definition"));
+    let connection =
+        Connection::open_with_flags(&path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     let guard: Option<String> = connection
         .query_row(
             "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_settle_attempts_reject_terminal_insert'",
@@ -139,7 +116,6 @@ fn open_existing_does_not_reinstall_missing_settlement_guard(
     assert_eq!(guard, None);
 
     drop(connection);
-    drop(reopened);
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -159,14 +135,9 @@ fn open_existing_rejects_same_named_noop_settlement_guard() -> Result<(), Box<dy
     })?;
     drop(store);
 
-    let reopened = SqliteReceiptStore::open_existing(&path)?;
-    assert_eq!(
-        ReceiptStore::atomic_receipt_projection(&reopened),
-        chio_kernel::AtomicReceiptProjection::Unsupported
-    );
-    assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
-
-    drop(reopened);
+    assert!(matches!(SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Conflict(message))
+            if message == "schema catalog differs from its canonical definition"));
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -191,14 +162,9 @@ fn open_existing_rejects_unconstrained_settlement_table() -> Result<(), Box<dyn 
     })?;
     drop(store);
 
-    let reopened = SqliteReceiptStore::open_existing(&path)?;
-    assert_eq!(
-        ReceiptStore::atomic_receipt_projection(&reopened),
-        chio_kernel::AtomicReceiptProjection::Unsupported
-    );
-    assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
-
-    drop(reopened);
+    assert!(matches!(SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Conflict(message))
+            if message == "schema catalog differs from its canonical definition"));
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -218,14 +184,9 @@ fn open_existing_rejects_extra_settlement_trigger() -> Result<(), Box<dyn std::e
     })?;
     drop(store);
 
-    let reopened = SqliteReceiptStore::open_existing(&path)?;
-    assert_eq!(
-        ReceiptStore::atomic_receipt_projection(&reopened),
-        chio_kernel::AtomicReceiptProjection::Unsupported
-    );
-    assert_eq!(ReceiptStore::settlement_store_binding(&reopened), None);
-
-    drop(reopened);
+    assert!(matches!(SqliteReceiptStore::open_existing(&path),
+        Err(ReceiptStoreError::Conflict(message))
+            if message == "schema catalog differs from its canonical definition"));
     let _ = fs::remove_file(path);
     Ok(())
 }
@@ -617,14 +578,7 @@ fn receipt_retention_refuses_store_without_settlement_projection(
         connection.execute_batch("DROP TABLE settle_attempts")?;
         Ok(())
     })?;
-    drop(store);
-
-    let reopened = SqliteReceiptStore::open_existing(&path)?;
-    assert_eq!(
-        ReceiptStore::atomic_receipt_projection(&reopened),
-        chio_kernel::AtomicReceiptProjection::Unsupported
-    );
-    let error = reopened
+    let error = store
         .archive_receipts_before(2, archive_path.to_str().ok_or("invalid archive path")?)
         .err()
         .ok_or("rotation without the settle_attempts projection must fail closed")?;
@@ -637,10 +591,10 @@ fn receipt_retention_refuses_store_without_settlement_projection(
         ),
         "unexpected rotation error: {error:?}"
     );
-    assert!(reopened.load_chio_receipt(&receipt.id)?.is_some());
-    assert_eq!(reopened.latest_committed_entry_seq()?, 1);
+    assert!(store.load_chio_receipt(&receipt.id)?.is_some());
+    assert_eq!(store.latest_committed_entry_seq()?, 1);
 
-    drop(reopened);
+    drop(store);
     let _ = fs::remove_file(path);
     let _ = fs::remove_file(archive_path);
     Ok(())

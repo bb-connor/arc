@@ -147,33 +147,8 @@ pub(crate) fn verify_archive_receipt_cost_projection(
         "archive.sqlite_schema",
         "PRAGMA archive.table_info(chio_tool_receipts)",
         "SELECT sql FROM archive.sqlite_schema WHERE type = 'table' AND name = 'chio_tool_receipts'",
-        archive_receipt_update_guard(connection)?.is_some(),
+        true,
     )
-}
-
-/// Archives may be uninspected (no receipt guards) or inspected (both exact
-/// guards). A partial or substituted set is neither state and fails closed.
-fn archive_receipt_update_guard(
-    connection: &Connection,
-) -> Result<Option<String>, ReceiptStoreError> {
-    let actual = receipt_cost_schema_catalog(connection, "archive.sqlite_schema")?
-        .into_iter()
-        .filter(|object| object.object_type == "trigger")
-        .collect::<Vec<_>>();
-    if actual.is_empty() {
-        return Ok(None);
-    }
-    let reference = Connection::open_in_memory()?;
-    reference.execute_batch(RECEIPT_COST_REFERENCE_SCHEMA)?;
-    ensure_transparency_projection_guards(&reference)?;
-    let expected = receipt_cost_schema_catalog(&reference, "sqlite_schema")?;
-    if actual != expected {
-        return Err(receipt_cost_schema_error());
-    }
-    Ok(actual
-        .into_iter()
-        .find(|object| object.name == "chio_tool_receipts_reject_update")
-        .map(|object| object.sql))
 }
 
 fn verify_receipt_cost_projection_schema(

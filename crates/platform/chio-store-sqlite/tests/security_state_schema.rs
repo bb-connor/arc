@@ -33,7 +33,9 @@ fn stamped_zero_is_refused_without_catalog_mutation() -> TestResult {
         "DROP TRIGGER security_response_effect_finality_immutable;
          DROP TRIGGER security_response_effect_finality_delete_rejected;
          DROP TABLE security_response_effect_finality;
-         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';",
+         PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';
+         PRAGMA ignore_check_constraints = OFF;",
     )?;
     let before = catalog(&connection)?;
     let error = SqliteSecurityStateStore::open(&path)
@@ -62,7 +64,9 @@ fn source_with_zero_stamp_is_refused_without_catalog_mutation() -> TestResult {
         "DROP TRIGGER security_response_effect_finality_immutable;
          DROP TRIGGER security_response_effect_finality_delete_rejected;
          DROP TABLE security_response_effect_finality;
-         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';",
+         PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';
+         PRAGMA ignore_check_constraints = OFF;",
     )?;
     let before = catalog(&connection)?;
     let error = SqliteSecurityParticipantSource::open(&path)
@@ -90,7 +94,7 @@ fn missing_security_stamp_is_refused_without_catalog_mutation() -> TestResult {
     let error = SqliteSecurityStateStore::open(&path)
         .err()
         .ok_or("security namespace without a stamp was accepted")?;
-    stale_schema(&error);
+    assert_eq!(error, PortError::integrity_failure());
     assert_eq!(catalog(&connection)?, before);
     assert_eq!(
         connection.query_row(
@@ -106,7 +110,7 @@ fn missing_security_stamp_is_refused_without_catalog_mutation() -> TestResult {
 #[test]
 fn current_stamp_with_noncanonical_key_is_refused_without_mutation() -> TestResult {
     for damage in [
-        "INSERT INTO chio_store_schema_versions (store_key, version) VALUES ('SECURITY_STATE', 2);",
+        "PRAGMA ignore_check_constraints = ON; INSERT INTO chio_store_schema_versions (store_key, version) VALUES ('SECURITY_STATE', 2); PRAGMA ignore_check_constraints = OFF;",
         "ALTER TABLE chio_store_schema_versions RENAME TO saved_stamps;
          CREATE TABLE chio_store_schema_versions (
              store_key TEXT COLLATE NOCASE NOT NULL PRIMARY KEY,

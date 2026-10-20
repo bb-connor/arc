@@ -27,8 +27,6 @@ pub(super) fn schema_version_error(error: crate::SchemaVersionError) -> PortErro
             error,
         ),
         crate::SchemaVersionError::ForeignDatabase { .. }
-        | crate::SchemaVersionError::MismatchedStore { .. }
-        | crate::SchemaVersionError::FutureSchema { .. }
         | crate::SchemaVersionError::InvalidCreationPlan
         | crate::SchemaVersionError::MissingSchema { .. }
         | crate::SchemaVersionError::CreationNotAllowed

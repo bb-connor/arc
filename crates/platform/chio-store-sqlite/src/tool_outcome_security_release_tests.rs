@@ -13,7 +13,14 @@ fn assert_refusal_without_writes(
         connection.pragma_query_value(None, "schema_version", |row| row.get(0))?;
     let changes = connection.total_changes();
     assert_eq!(
-        preflight_tool_outcome_schema(connection, allow_empty),
+        preflight_tool_outcome_schema(connection, allow_empty).and_then(|()| {
+            crate::test_schema::apply(
+                connection,
+                &[TOOL_OUTCOME_SCHEMA_KEY],
+                initialize_tool_outcome_schema,
+                |error| invariant(error.to_string()),
+            )
+        }),
         Err(expected)
     );
     assert_eq!(tool_outcome_schema_catalog(connection)?, catalog);
@@ -216,19 +223,38 @@ fn tool_outcome_store_refuses_unstamped_namespace_beside_admission_store() -> Te
 #[test]
 fn tool_outcome_store_initializes_beside_admission_store() -> TestResult {
     let mut connection = Connection::open_in_memory()?;
-    connection.pragma_update(None, "application_id", crate::CHIO_SQLITE_APPLICATION_ID)?;
-    connection.execute_batch("CREATE TABLE admission_operations (operation_id TEXT)")?;
-    crate::test_schema::write_version(&connection, "admission_operation", 1)?;
     crate::test_schema::apply(
         &mut connection,
-        &[TOOL_OUTCOME_SCHEMA_KEY],
-        initialize_tool_outcome_schema,
+        &["admission_operation", TOOL_OUTCOME_SCHEMA_KEY],
+        |schema| {
+            if schema.is_fresh() {
+                schema
+                    .connection()
+                    .execute_batch("CREATE TABLE admission_operations (operation_id TEXT)")
+                    .map_err(|error| invariant(error.to_string()))?;
+                schema
+                    .stamp("admission_operation")
+                    .map_err(|error| invariant(error.to_string()))?;
+            }
+            initialize_tool_outcome_schema(schema)
+        },
         |error| invariant(error.to_string()),
     )?;
     crate::test_schema::apply(
         &mut connection,
-        &[TOOL_OUTCOME_SCHEMA_KEY],
-        initialize_tool_outcome_schema,
+        &["admission_operation", TOOL_OUTCOME_SCHEMA_KEY],
+        |schema| {
+            if schema.is_fresh() {
+                schema
+                    .connection()
+                    .execute_batch("CREATE TABLE admission_operations (operation_id TEXT)")
+                    .map_err(|error| invariant(error.to_string()))?;
+                schema
+                    .stamp("admission_operation")
+                    .map_err(|error| invariant(error.to_string()))?;
+            }
+            initialize_tool_outcome_schema(schema)
+        },
         |error| invariant(error.to_string()),
     )?;
     assert_eq!(
@@ -352,8 +378,6 @@ fn outcome_view_without_application_identity_is_refused_before_writes() -> TestR
 #[test]
 fn provisioned_outcome_initializer_refuses_namespace_deleted_after_preflight() -> TestResult {
     let mut connection = Connection::open_in_memory()?;
-    connection.pragma_update(None, "application_id", crate::CHIO_SQLITE_APPLICATION_ID)?;
-    connection.execute_batch("CREATE TABLE admission_operations (operation_id TEXT)")?;
     crate::test_schema::apply(
         &mut connection,
         &[TOOL_OUTCOME_SCHEMA_KEY],

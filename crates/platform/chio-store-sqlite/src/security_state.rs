@@ -15,7 +15,6 @@ mod native_mutation;
 mod participant_source;
 mod scoped_sql;
 mod transaction;
-use crate::encrypted_blob::SqliteEncryptedBlobStore;
 use crate::store_connection::{StoreConnection, StoreGuard};
 use chio_core::canonical::canonical_json_bytes;
 use chio_core::hashing::sha256;
@@ -272,7 +271,6 @@ impl SqliteSecurityStateStore {
             .busy_timeout(Duration::from_secs(5))
             .map_err(sqlite_error)?;
         open_schema(&connection)?;
-        SqliteEncryptedBlobStore::open(path).map_err(|_| PortError::unavailable())?;
         Ok(Self {
             connection: StoreConnection::transaction_only("security_state", connection),
             isolation_epoch_verifier,
@@ -847,6 +845,7 @@ use scheduler::{
 
 mod schema;
 use schema::open_schema;
+pub(crate) use schema::{validate_security_blob_catalog, SECURITY_BLOB_NAMESPACES};
 
 mod session_throttle;
 use session_throttle::load_session_throttle_snapshot;

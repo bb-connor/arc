@@ -47,7 +47,9 @@ fn zero_revision_is_refused_without_finality_backfill() -> TestResult {
         "DROP TRIGGER security_response_effect_finality_immutable;
          DROP TRIGGER security_response_effect_finality_delete_rejected;
          DROP TABLE security_response_effect_finality;
-         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';",
+         PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';
+         PRAGMA ignore_check_constraints = OFF;",
     )
 }
 
@@ -137,7 +139,11 @@ fn schema_refusal_preserves_delete_journal_mode() -> TestResult {
     let path = directory.path().join("security.db");
     drop(SqliteSecurityStateStore::open(&path)?);
     let connection = Connection::open(&path)?;
-    connection.execute_batch("PRAGMA journal_mode = DELETE; UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';")?;
+    connection.execute_batch(
+        "PRAGMA journal_mode = DELETE; PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';
+         PRAGMA ignore_check_constraints = OFF;",
+    )?;
     let before: String = connection.pragma_query_value(None, "journal_mode", |row| row.get(0))?;
     assert_eq!(before, "delete");
     drop(connection);

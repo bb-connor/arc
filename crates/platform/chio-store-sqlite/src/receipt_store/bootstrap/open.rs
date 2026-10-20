@@ -628,6 +628,8 @@ impl SqliteReceiptStore {
                 .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?;
         }
         validate_receipt_catalog(schema.connection(), namespaces.len() == 2)?;
+        super::support::validate_claim_receipt_log_entries_in_transaction(schema.connection())?;
+        super::support::validate_checkpoint_transparency_projections(schema.connection())?;
         crate::capability_lineage::reject_unsigned_projection_lineage(schema.connection(), "main")?;
         verify_receipt_cost_projection(schema.connection())?;
         let internal_sink_id = load_receipt_sink_identity(schema.connection())?;
@@ -792,14 +794,14 @@ fn begin_receipt_creation<'a>(
 ) -> Result<crate::schema_version::SchemaTransaction<'a>, ReceiptStoreError> {
     if crate::schema_version::inspect_schema(connection, namespaces)
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
-        == crate::SchemaState::Unstamped
+        == crate::SchemaState::Empty
     {
         connection.pragma_update(None, "locking_mode", "EXCLUSIVE")?;
         let lock =
             connection.transaction_with_behavior(rusqlite::TransactionBehavior::Exclusive)?;
         let fresh = crate::schema_version::inspect_schema(&lock, namespaces)
             .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
-            == crate::SchemaState::Unstamped;
+            == crate::SchemaState::Empty;
         lock.commit()?;
         if fresh {
             connection.execute_batch("PRAGMA auto_vacuum = INCREMENTAL; VACUUM;")?;
@@ -815,7 +817,7 @@ fn begin_receipt_creation<'a>(
         connection.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
     if crate::schema_version::inspect_schema(&transaction, namespaces)
         .map_err(|error| ReceiptStoreError::Conflict(error.to_string()))?
-        == crate::SchemaState::Unstamped
+        == crate::SchemaState::Empty
     {
         if let Some(limit) = max_page_count {
             transaction.pragma_update(None, "max_page_count", limit)?;
@@ -1722,9 +1724,8 @@ fn create_receipt_schema(transaction: &rusqlite::Transaction<'_>) -> Result<(), 
     super::support::ensure_receipt_retention_watermark_table(transaction)?;
     super::support::ensure_receipt_retention_tombstones(transaction)?;
     super::support::drop_transparency_projection_guards(transaction)?;
-    super::support::backfill_provenance_lineage_tables(transaction)?;
     super::support::validate_claim_receipt_log_entries_in_transaction(transaction)?;
-    super::support::backfill_checkpoint_transparency_projections(transaction)?;
+    super::support::validate_checkpoint_transparency_projections(transaction)?;
     super::support::ensure_transparency_projection_guards(transaction)?;
     verify_receipt_cost_projection(transaction)?;
     initialize_receipt_rollback_generation(transaction)?;

@@ -4,7 +4,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 use super::{SchemaState, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID};
 
-const METADATA_SCHEMA: &str = "CREATE TABLE chio_store_schema_versions (
+pub(crate) const METADATA_SCHEMA: &str = "CREATE TABLE chio_store_schema_versions (
     store_key TEXT NOT NULL PRIMARY KEY,
     version INTEGER NOT NULL CHECK (version = 1)
 ) STRICT";
@@ -44,7 +44,7 @@ fn inspect_declared(
         |row| row.get(0),
     )?;
     if app_id == 0 && empty {
-        return Ok(SchemaState::Unstamped);
+        return Ok(SchemaState::Empty);
     }
     if app_id != CHIO_SQLITE_APPLICATION_ID {
         return Err(SchemaVersionError::ForeignDatabase {
@@ -71,7 +71,7 @@ impl<'connection> SchemaTransaction<'connection> {
         namespaces: &[&str],
     ) -> Result<Self, SchemaVersionError> {
         let declared = namespace_set(namespaces)?;
-        let fresh = inspect_declared(&transaction, &declared)? == SchemaState::Unstamped;
+        let fresh = inspect_declared(&transaction, &declared)? == SchemaState::Empty;
         if fresh {
             transaction.execute_batch(METADATA_SCHEMA)?;
             transaction.pragma_update(None, "application_id", CHIO_SQLITE_APPLICATION_ID)?;
@@ -143,7 +143,7 @@ fn validate_metadata(connection: &Connection) -> Result<(), SchemaVersionError> 
     }
     let mut statement = connection.prepare(
         "SELECT type, name FROM sqlite_schema
-         WHERE tbl_name = 'chio_store_schema_versions' ORDER BY type, name",
+         WHERE tbl_name = 'chio_store_schema_versions' ORDER BY type, name LIMIT 3",
     )?;
     let objects = statement
         .query_map([], |row| {
@@ -188,12 +188,12 @@ fn validate_namespaces(
             }
         }
     }
-    let mut statement = connection
-        .prepare("SELECT store_key FROM chio_store_schema_versions ORDER BY store_key")?;
-    let actual = statement
-        .query_map([], |row| row.get::<_, String>(0))?
-        .collect::<Result<BTreeSet<_>, _>>()?;
-    if &actual != namespaces {
+    let actual: i64 = connection.query_row(
+        "SELECT COUNT(*) FROM chio_store_schema_versions",
+        [],
+        |row| row.get(0),
+    )?;
+    if usize::try_from(actual).ok() != Some(namespaces.len()) {
         return Err(SchemaVersionError::UnexpectedNamespaces);
     }
     Ok(())
@@ -209,7 +209,7 @@ mod tests {
         connection.pragma_update(None, "query_only", true)?;
         assert_eq!(
             inspect_schema(&connection, &["receipt"])?,
-            SchemaState::Unstamped
+            SchemaState::Empty
         );
         connection.pragma_update(None, "query_only", false)?;
         let creation = SchemaTransaction::begin(&mut connection, &["receipt"])?;
