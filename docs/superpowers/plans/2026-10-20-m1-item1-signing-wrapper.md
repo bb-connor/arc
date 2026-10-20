@@ -34,6 +34,15 @@ The G19 algorithm rule (spec 2.5):
 
 Further constraints:
 
+- Owner decisions (2026-10-20, lead approval on #1703):
+  - G19 scope: every unsigned signature `algorithm` member is deleted, in every crate. Only key-record attributes (`KeyLogEventBody.algorithm`, `KeyRecord.algorithm`) stay; they describe a registered key and never select a verifier.
+  - Registration: a payload id is registered only when a non-test path signs that payload through the wrapper. Export payload ids that no non-test path signs are deferred and listed in Task 6.
+  - Raw-site ids: `chio.finding.operator-purchase-job.v1`, `chio.wasm-module.v1` and `chio.tee-capture-frame.v1`.
+  - The revocation epoch root signs under `chio.trust.passport-revocation-root.v1`, registered by #1607. `chio.epoch-root.v1` does not exist.
+  - Receipt `deny_unknown_fields` lands through the lead's fwdcompat receipt change, before this PR.
+  - Runtime-attestation evidence ids live in a closed vendor list in `chio-appraisal`; an id outside it fails closed.
+  - Fixtures: fwdcompat's receipt fixture regeneration lands first. This PR regenerates every signed fixture once, on top of it, with one generator command (`cargo xtask gen signed-fixtures`). No signed fixture is edited by hand.
+  - Order: #1674, #1601, #1607, fwdcompat receipts, the K-stack (#1675, #1682 and Root-2's other open kernel PRs), then this PR. M1 item 3 lands independently.
 - Preconditions (D16, D17): #1674 (the `SigningBackend` collapse) is merged. The D17 coordination below is acknowledged by the lead and Root-2 on `ws2:~/lanes/claude-pr1160-evidence/lead2/sync.md` before the PR opens. #1489 is merged (2026-10-19T03:03Z); `chio.dpop_proof.v2` is already absent from `spec/schemas/registry.json`.
 - One PR, squash-merged. Commits follow the groups in "Commit Grouping". Intermediate commits need not build; the PR tip is verified.
 - Algorithms (spec 7.0): Ed25519 signs the 88 wrapper bytes. ML-DSA-65 signs the 88 wrapper bytes with an empty FIPS 204 context. P-256 is ECDSA with SHA-256 over the wrapper, P-384 ECDSA with SHA-384. Hybrid signs the same 88 bytes with both halves. Signature encodings are unchanged.
@@ -83,6 +92,7 @@ Further constraints:
 | 52 schema files carrying a signature `algorithm` member | 5 | member deleted (G19) |
 | `scripts/gen-signing-wrapper-vectors.py`, `tests/bindings/vectors/signing/wrapper/v1.json`, `tests/bindings/vectors/signing/wrapper/pq-v1.json` (new), `tests/bindings/vectors/signing/v1.json`, `tests/bindings/vectors/MANIFEST.sha256` | 9, 10 | vectors |
 | `scripts/check-signing-exemptions.py` (new), `scripts/check-domain-separation.py`, `.github/workflows/ci.yml` (one line, pushed by the lead from the Mac) | 8 | exempt-site gate; signature-domain constants out of the domain gate's scope |
+| `xtask/src/cli.rs` and a new `xtask/src/signed_fixtures.rs` | 11 | `cargo xtask gen signed-fixtures [--check]`, the one regeneration command |
 | every signed fixture in Task 11 | 11 | regenerated |
 | `spec/PROTOCOL.md` (4.1, new 4.5), `docs/superpowers/specs/relying-party-wedge/protocol/protocol-4.5-signing-wrapper.md` (deleted on move), `docs/superpowers/specs/relying-party-wedge/in-place-schemas/{capability/token,receipt/record}.schema.json`, `spec/ietf/generated/appendix-b.md` and the draft renderings | 12 | contract text |
 | `docs/formal/COVERAGE.md`, `formal/rust-verification/kani-public-harnesses.toml`, `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs` | 13 | formal touchpoints |
@@ -245,7 +255,7 @@ Deleted: `sign_canonical_with_backend`, `sign_canonical_with_backend_for_identit
 **Files:** every struct with a signature-descriptor `algorithm` member (74 Rust fields at the census base) and every caller; `crates/core/chio-core-types/src/crypto.rs` (`is_default_algorithm`, `is_default_optional_algorithm` deleted); `src/receipt/crypto_floor.rs`.
 
 Classification rule for the census rows:
-- Delete: an `algorithm` member that describes the signature of the envelope carrying it, signed or unsigned. Covers `CapabilityToken`, `ChioReceipt`, `ReceiptLineageStatement`, `GovernedApprovalToken`, `ThresholdApprovalProposal`, `AggregateBudgetRoot*`, `CumulativeApprovalRoot*`, the recovery disclosure grant wire, `chio-credit` `IouEnvelope`, `SignedReceivableIou`, and (pending owner question Q1) the required members on `SessionComplianceCertificate`, `SignedProvenance`, `KeyringArtifactSignature`, `KeyringSigningResult`, `RequestProof`, the secret-broker envelopes, the control-plane active-response authority envelopes, the keyring checkpoint, time-anchor and readiness proofs, and `chio-revocation-oracle` `RootSignature.algorithm: String`.
+- Delete: an `algorithm` member that describes the signature of the envelope carrying it, signed or unsigned. Covers `CapabilityToken`, `ChioReceipt`, `ReceiptLineageStatement`, `GovernedApprovalToken`, `ThresholdApprovalProposal`, `AggregateBudgetRoot*`, `CumulativeApprovalRoot*`, the recovery disclosure grant wire, `chio-credit` `IouEnvelope`, `SignedReceivableIou`, and the required members on `SessionComplianceCertificate`, `SignedProvenance`, `KeyringArtifactSignature`, `KeyringSigningResult`, `RequestProof`, the secret-broker envelopes, the control-plane active-response authority envelopes, the keyring checkpoint, time-anchor and readiness proofs, and `chio-revocation-oracle` `RootSignature.algorithm: String`.
 - Keep: members that describe another object, not the signature over this one: `KeyLogEventBody.algorithm` and `KeyRecord.algorithm` (registered key attributes, checked equal to the typed key's algorithm, never used to choose a verifier) and the BBS `algorithm: "bbs"` constant inside `bbsReceiptSignature`.
 
 **Interfaces:**
@@ -253,7 +263,7 @@ Classification rule for the census rows:
 - `ChioReceipt::verify_signature_with_floor(&self, pinned: &PublicKey, floor)`.
 
 - [ ] **Step 1: Failing tests** in `signing_wrapper_negatives.rs`: `capability_with_algorithm_member_fails_decoding` and `receipt_with_algorithm_member_fails_decoding` (both with `"algorithm":"ed25519"` added and with `"algorithm":"p256"` altered, over a body whose wrapper signature is valid); `verifier_choice_ignores_algorithm_member` (P-256 pinned key, artifact JSON with `"algorithm":"ed25519"` and an Ed25519 signature: decoding fails; with the member removed, verification fails with `SignatureAlgorithmMismatch`).
-- [ ] **Step 2: Delete the members and helpers; fix callers.** `ChioReceipt` gains `#[serde(deny_unknown_fields)]` unless the fwdcompat receipt change has landed it (owner question Q5); `CapabilityToken` already denies unknown fields.
+- [ ] **Step 2: Delete the members and helpers; fix callers.** `ChioReceipt` carries `#[serde(deny_unknown_fields)]` from the fwdcompat receipt change, which is merged before this PR rebases; `CapabilityToken` already denies unknown fields.
 - [ ] **Step 3: Schemas.** Delete the signature `algorithm` property from the 52 census schema files that the rule above deletes, and from the staged `docs/superpowers/specs/relying-party-wedge/in-place-schemas/capability/token.schema.json` and `receipt/record.schema.json` (top-level member only; the BBS constant stays). Regenerate code (Task 6 Step 5).
 - [ ] **Step 4: SDK types.** TS `receipt.ts` (`Omit<ChioReceipt, "algorithm" | "signature">` becomes `Omit<ChioReceipt, "signature">`), Python and Go receipt and capability models drop the member (Task 9).
 - [ ] **Step 5: Run** `cs cargo test -p chio-core-types --no-fail-fast` and `--features fips,pq`. Expected: PASS.
@@ -286,11 +296,12 @@ Classification rule for the census rows:
 **Interfaces:**
 - `type SignedArtifactSchemaSpec = (&'static str, &'static str, &'static str);` (schema, artifact kind, introducedBy). The `Option` and the test's `internal_only_schemas` exemption are deleted: every entry is registered.
 - `pub const KNOWN_SIGNED_ARTIFACT_SCHEMAS: &[&str]` (unchanged name) holds exactly the wrapper ids. `pub fn registered_wrapper_schema(schema_id: &str) -> bool` is what `SigningWrapper::new` and `verify_wrapped*` call.
-- The four runtime-attestation evidence ids (`chio.runtime-attestation.azure-maa.jwt.v1`, `aws-nitro-attestation.v1`, `google-confidential-vm.jwt.v1`, `enterprise-verifier.json.v1`) are vendor or JWS formats, not wrapper ids. They leave `KNOWN_SIGNED_ARTIFACT_SCHEMAS` and move to a closed list beside their validator in `chio-appraisal` (owner question Q6).
+- The four runtime-attestation evidence ids (`chio.runtime-attestation.azure-maa.jwt.v1`, `aws-nitro-attestation.v1`, `google-confidential-vm.jwt.v1`, `enterprise-verifier.json.v1`) are vendor or JWS formats, not wrapper ids. They leave `KNOWN_SIGNED_ARTIFACT_SCHEMAS` and move to `pub const RUNTIME_ATTESTATION_EVIDENCE_FORMATS: &[&str]` in `chio-appraisal`. The appraisal validator accepts an evidence format only when it is in that closed list and returns a typed error for any other id.
 - Ids registered here, each with `introducedBy: "signing-wrapper-v1"`, a `schemaFile` that validates the live serialization, and a `KNOWN_SIGNED_ARTIFACT_SCHEMAS` entry:
   - The 63 ids of spec 2.5 G11 and G16. Four of them (`chio.root-policy.v1`, `chio.idp-key-snapshot.v1`, `chio.revocation-request.v1`, `chio.settlement-closure.v1`) were registered by M0 PR 4, so 59 rows are added: `chio.delegation-link.v1`, `chio.governed-upstream-call-chain-proof.v1`, `chio.call_chain_continuation.v1`, `chio.governed-approval-token.v1`, `chio.child-request-receipt.v1`, `chio.session_anchor.v1`, `chio.credit.iou-envelope.v1`, `chio.channel.signature.v1`, `chio.signed-admission-terminal-projection.v1`, `chio.authority-lifecycle.v1`, `chio.authority-snapshot.v1`, `chio.session-compliance-certificate.v1`, `chio.execution_nonce.v1`, `chio.active-response-submission.v1`, `chio.active-response-artifact-authority-attestation.v1`, `chio.process.container-launch.v1`, `chio.swarm.delegation-witness-hop-signature.v1`, `chio.certify.check.v1`, `chio.federation-policy.v1`, `chio.active-response-policy-authority-request.v1`, `chio.active-response-policy-authority-response.v1`, `chio.budget-snapshot-anchor-commitment.v1`, `chio.enterprise-migration-transition.v1`, `chio.work-subdivision.v1`, `chio.work-offer.v1`, `chio.work-selection.v1`, `chio.work-dispatch-permit.v1`, `chio.workflow-receipt.v1`, `chio.federated-delegation-policy.v1`, `chio.process.swarm-profile.v1`, `chio.ag-ui-receipt.v1`, `chio.mcp.operator-approval.v1`, `chio.mcp.session-credential.v1`, `chio.mcp.session-credential-call.v1`, `chio.provenance-stamp.v1`, `chio.signed-watermark-envelope.v1`, `chio.key-log.witness-statement.v1`, `chio.trace-observation.v1`, `chio.reputation-credential.v1`, `chio.cross-issuer-migration.v1`, `chio.public-issuer-discovery.v1`, `chio.public-verifier-discovery.v1`, `chio.public-discovery-transparency.v1`, `chio.financial-agent-passport-presentation-response.v1`, `chio.agent-passport-presentation-response.v1`, `chio.passport-verifier-policy.v1`, `chio.passkey-capability.v1`, `chio.frost.dkg-package.v1`, `chio.tee-bless-audit.v1`, `chio.runtime.tool-server-ack-signature.v1`, `chio.checkpoint_statement.v1`, `chio.evidence_export_commitment.v1`, `chio.operation_execution_nonce.v1`, `chio.stop-operator-config.v1`, `chio.stop-operator-config-approval.v1`, `chio.signer-readiness-probe.v1`, `chio.finding-pool.store-identity-proof.v1`, `chio.compliance.certificate.v1`, `chio.federation-kernel-handshake.v1`. (`chio.fincred.*.v1` in the staged table is the five registered family ids.)
-  - The raw-site ids from Task 8 that are not yet registered (at the census base: `chio.finding.operator-purchase-job.v1`, `chio.wasm-module.v1`, `chio.epoch-root.v1`, `chio.tee-capture-frame.v1`).
-  - Every `SignedExportPayload::SCHEMA_ID` not already registered. At the census base 165 payload types sign through `SignedExportEnvelope`; 146 carry a `schema` member, 15 carry none and get `chio.<kebab type name without Signed and Body suffixes>.v1` (`AssignmentAcknowledgementBodyV1` becomes `chio.assignment-acknowledgement.v1`), and up to 137 of their ids are unregistered (heuristic upper bound; the compiler-driven list in Step 1 is exact).
+  - The raw-site ids from Task 8 that are not yet registered (`chio.finding.operator-purchase-job.v1`, `chio.wasm-module.v1`, `chio.tee-capture-frame.v1`). `chio.trust.passport-revocation-root.v1` is registered by #1607.
+  - Every `SignedExportPayload::SCHEMA_ID` that a non-test path signs through the wrapper and that is not already registered. At the census base 165 payload types appear in `SignedExportEnvelope<T>`; 117 are signed by a non-test path. Of those, 20 ids are registered and about 70 are not: 57 existing `schema` member values, 13 payloads without a `schema` member that take `chio.<kebab type name without Body and V1 suffixes>.v1` (`AssignmentAcknowledgementBodyV1` becomes `chio.assignment-acknowledgement.v1`; the nine `Outcome*BodyV1` payloads, the three `Assignment*BodyV1` payloads and `FindingStatusOperatorAuthorization`), and up to 5 whose id the census could not resolve (`CapitalExecutionInstructionArtifact`, `ComptrollerSurfaceReport`, `LiabilityClaimPayoutInstructionArtifact`, `LiabilityClaimSettlementInstructionArtifact`, `RuntimeAdmissionReport`). `chio.registry.namespace.v0` registers as `chio.registry.namespace.v1` (v1 only). The compiler-driven list in Step 1 is exact.
+- Deferred, not registered in this PR: the export payloads that no non-test path signs. At the census base: `AutonomousComparisonReport`, `AutonomousDriftReport`, `AutonomousExecutionDecisionArtifact`, `AutonomousPricingAuthorityEnvelopeArtifact`, `AutonomousPricingDecisionArtifact`, `AutonomousPricingInputArtifact`, `AutonomousRollbackPlanArtifact`, `CapitalPoolOptimizationArtifact`, `CapitalPoolSimulationReport`, `CrossIssuerLifecycleResult`, `EntryActivationDecision`, `EvidenceSourceCheckpointV1`, `FederatedReputationClearingArtifact`, `FederationActivationExchangeArtifact`, `FederationQualificationMatrix`, `FederationQuorumReport`, `FinancialCrossIssuerMigration`, `FinancialCrossIssuerTrustPack`, `FinancialPassportPresentationChallenge`, `FinancialPassportSourceManifest`, `FinancialSourceCheckpointBodyV1`, `FinancialSourceCompletenessAttestationBodyV1`, `FindingAuditEpoch`, `FindingAuditRoundAuthorization`, `FindingCurrentListingAssertion`, `FindingKeyRevocation`, `FindingPoolDebitAuthorization`, `HostedAggregateCheckpointBody`, `HostedArchiveManifestBody`, `HostedAuthorityTransitionBody`, `HostedGcReceiptBody`, `HostedJournalCheckpointBody`, `HostedLegalHoldBody`, `HostedPrincipalLifecycleBody`, `HostedPrincipalReplicationEventBody`, `HostedQuotaAlertBody`, `HostedRestoreVerificationBody`, `IdentityInteropQualificationMatrix`, `IssuerLifecycleCheckpoint`, `IssuerLifecycleGenerationPin`, `LifecycleCheckpointPin`, `ParametricContestV1`, `ParametricPayoutIntentV1`, `PublicIdentityProfileArtifact`, `PublicWalletDirectoryEntryArtifact`, `PublicWalletRoutingManifestArtifact`, `Web3SettlementDispatchArtifact`, `Web3SettlementExecutionReceiptArtifact`. `SignedExportEnvelope::sign` and `verify_signature` refuse a deferred payload with `UnregisteredSchemaId`. A test that signs a deferred payload asserts that refusal. A deferred payload is registered in the PR that adds its first non-test signer.
 - `chio.broker-authority-rpc.v1` and `chio.active-response-policy-authority.v1` are not registered; Task 7 replaces them (G6).
 - SDK copy: `cargo xtask codegen --lang <ts|python|go>` also writes `sdks/typescript/chio-ts/src/invariants/_generated/signed_artifact_schemas.ts`, `sdks/python/chio-py/src/chio/invariants/_generated_signed_artifact_schemas.py` and `sdks/go/chio-go/invariants/signed_artifact_schemas_gen.go` from `chio_core_types::KNOWN_SIGNED_ARTIFACT_SCHEMAS`; `--check` fails on drift.
 
@@ -341,11 +352,11 @@ Resolution table (re-anchored to current lines in Task 1):
 | `chio-control-plane/src/fiscal_runtime_readiness.rs` (`FiscalRuntimeReadinessBuilder::sign`, body in `chio-fiscal/src/lifecycle/readiness.rs`) | `chio.fiscal.consumer-readiness.v1` (registered) |
 | `chio-control-plane/src/security/adapters/native_evidence.rs` readiness probe | `chio.signer-readiness-probe.v1` over `{"probe":"native_security_receipt","schema":"chio.signer-readiness-probe.v1"}` |
 | `chio-control-plane/src/security/response_simulation.rs` readiness probe | `chio.signer-readiness-probe.v1` over `{"probe":"response_simulation","schema":"chio.signer-readiness-probe.v1"}` |
-| `chio-control-plane/src/trust_control/finding_operator_purchase.rs` (`buyer_signature` over `ask_digest`) | `chio.finding.operator-purchase-job.v1` over the canonical ask body that `ask_digest` hashes (Q3) |
+| `chio-control-plane/src/trust_control/finding_operator_purchase.rs` (`buyer_signature` over `ask_digest`) | `chio.finding.operator-purchase-job.v1` over the canonical ask body that `ask_digest` hashes |
 | `chio-store-sqlite/src/finding_pool_ledger/qualification.rs` (`challenge`) | `chio.finding-pool.store-identity-proof.v1` over a canonical `{"challenge": <hex>, "schema": ...}` object |
 | `chio-store-sqlite/src/fiscal_store.rs` (`FiscalProposalAdmissionBuilder::sign`) | `chio.fiscal.proposal-admission.v1` (registered) |
 | `chio-cli/src/cli/dispatch/proof/collect.rs`, `proof/export.rs` (`signed_payload`) | exempt, `ExemptFormat::DssePae` |
-| `chio-cli/src/guards/sign.rs` and the verifier in `chio-wasm-guards/src/manifest.rs` | `chio.wasm-module.v1` over `{"module_hash","module_name","signer_public_key","version"}`; the newline-joined `chio-wasm-guard-v1` message and `SIGNED_MODULE_DOMAIN` are deleted (Q3) |
+| `chio-cli/src/guards/sign.rs` and the verifier in `chio-wasm-guards/src/manifest.rs` | `chio.wasm-module.v1` over `{"module_hash","module_name","signer_public_key","version"}`; the newline-joined `chio-wasm-guard-v1` message and `SIGNED_MODULE_DOMAIN` are deleted |
 | `chio-acp-proxy/src/compliance.rs` | `chio.compliance.certificate.v1` |
 | `chio-mcp-remote/src/remote_mcp/oauth/helpers.rs` (local AS) | exempt, `ExemptFormat::JwsSigningInput` |
 | `chio-binding-helpers/src/signing.rs` UTF-8 signer | deleted (Task 9) |
@@ -355,8 +366,8 @@ Resolution table (re-anchored to current lines in Task 1):
 | `chio-federation-authority/src/frost_ceremony/sealing.rs` | `chio.frost.dkg-round2-sealed.v1` (registered) |
 | `chio-federation/src/bilateral.rs`, `bilateral_dsse/sign.rs` (5 sites), `bilateral_dsse/typestate_handlers.rs`, `chio-federation-transport-iroh/src/lanes/bilateral.rs` | exempt, `ExemptFormat::DssePae` |
 | `chio-federation/src/trust_establishment.rs` | `chio.federation-kernel-handshake.v1` |
-| `chio-revocation-oracle/src/signer.rs` (`SignedEpochRoot`) | `chio.epoch-root.v1` over the canonical `EpochRoot`; `DOMAIN_SEPARATION_CONTEXT` and `RootSignature.algorithm` deleted (Q4, coop2c) |
-| `chio-tee/src/capture.rs` (`sign_frame`) | `chio.tee-capture-frame.v1` over the frame signing payload; the `ed25519:<base64>` encoding is unchanged (Q3) |
+| `chio-revocation-oracle/src/signer.rs` (`SignedEpochRoot`) | `chio.trust.passport-revocation-root.v1` (registered by #1607) over the canonical `EpochRoot`; `DOMAIN_SEPARATION_CONTEXT` and `RootSignature.algorithm` deleted |
+| `chio-tee/src/capture.rs` (`sign_frame`) | `chio.tee-capture-frame.v1` over the frame signing payload; the `ed25519:<base64>` encoding is unchanged |
 
 **Interfaces:**
 - `scripts/check-signing-exemptions.py`: lists every non-test call of `SigningMessage::exempt`, `Keypair::sign_exempt` and `verify_exempt` under `crates/` and fails unless the set of `(file, ExemptFormat)` pairs equals its embedded allowlist, which is the exempt rows above. No baseline file; the allowlist lives in the script.
@@ -422,7 +433,7 @@ Resolution table (re-anchored to current lines in Task 1):
 
 ### Task 11: Fixture regeneration (commit 10)
 
-Every signed fixture changes bytes. Each file is rewritten only by its generator; nothing signed is edited by hand. The PR body lists every changed fixture path with its generator command.
+Every signed fixture changes bytes. fwdcompat's receipt fixture regeneration is merged first; this task regenerates once on top of it. One command rewrites every set: `cargo xtask gen signed-fixtures` runs the generators in the table below in order and repeats until a pass changes nothing; `--check` runs one pass and fails without writing when any fixture would change. No signed fixture is edited by hand. The PR body lists every changed fixture path and the generator that wrote it.
 
 | Fixture set (count at the census base) | Generator |
 |---|---|
@@ -441,8 +452,8 @@ Every signed fixture changes bytes. Each file is rewritten only by its generator
 | `spec/ietf/generated/appendix-b.md` and the draft renderings | `python3 spec/ietf/tools/render_vectors.py` and `python3 spec/ietf/tools/test_render_vectors.py` |
 
 - [ ] **Step 1:** After Tasks 2 to 10, run the full test suites (Verification) and collect every golden-signature failure. Each maps to one row above.
-- [ ] **Step 2:** Regenerate. Then run the lane-local review aid `ws2:~/lanes/claude-pr1160-evidence/m1i1/diff-signed-fixtures.py origin/main HEAD` (not committed): for every changed JSON or NDJSON fixture it parses before and after and fails when they differ outside signature members, signature-derived ids and digests, the `algorithm` members removed by Task 4 and the G6 `schema` values. Expected: no other differences. Its output goes in the PR body.
-- [ ] **Step 3:** `cs cargo xtask freeze-vectors --check`, `cargo run -p chio-cli --bin chio -- proof fixture regenerate --check`, `cs cargo xtask eval-receipt-regen --check`. Expected: PASS.
+- [ ] **Step 2:** Add the `gen signed-fixtures` subcommand to `xtask/src/cli.rs` (one function calling each generator in the table), run `cs cargo xtask gen signed-fixtures`, then run the lane-local review aid `ws2:~/lanes/claude-pr1160-evidence/m1i1/diff-signed-fixtures.py origin/main HEAD` (not committed): for every changed JSON or NDJSON fixture it parses before and after and fails when they differ outside signature members, signature-derived ids and digests, the `algorithm` members removed by Task 4 and the G6 `schema` values. Expected: no other differences. Its output goes in the PR body.
+- [ ] **Step 3:** `cs cargo xtask gen signed-fixtures --check` and `cs cargo xtask freeze-vectors --check`. Expected: PASS.
 
 ---
 
@@ -470,7 +481,7 @@ Signed artifacts whose bytes change:
 1. Capabilities (`chio.capability.v1`) and delegation links (`chio.delegation-link.v1`): every capability signature, every issued token, every capability fixture; the top-level `algorithm` member disappears from the JSON.
 2. Receipts (`chio.receipt.v1`), child receipts and lineage statements: every receipt signature and every receipt fixture; `algorithm` disappears. Receipt ids do not change (the id is a hash of the body, not of the signature).
 3. Chio DPoP proofs (`chio.dpop_proof.v1`, #1489 landed): kernel signer and verifier (`chio-kernel/src/dpop.rs`), TS `signDpopProof`, C++ `sign_dpop_proof`; fixtures `tests/bindings/fixtures/dpop-authority-v1.json`, `chio-kernel/src/dpop/authority/tests.rs`, `chio-kernel/src/admission_operation/dpop_claim/tests.rs`, `sdks/cpp/chio-cpp/tests/sdk_tests.cpp`.
-4. Revocation roots (coop2c, #1607 open): `chio-revocation-oracle` `SignedEpochRoot` moves to `chio.epoch-root.v1` (or the id the owner picks, Q4), drops its `chio-revocation-oracle:v1:epoch-root` prefix and `RootSignature.algorithm`; #1607's `sign_passport_revocation_root`, its partner mirror verification and `spec/vectors/passport-revocation/v1/{root.positive,root.unknown-field.negative}.json` change with it.
+4. Revocation roots (coop2c, #1607 open): `chio-revocation-oracle` `SignedEpochRoot` signs under `chio.trust.passport-revocation-root.v1`, drops its `chio-revocation-oracle:v1:epoch-root` prefix and `RootSignature.algorithm`; #1607's `sign_passport_revocation_root`, its partner mirror verification and `spec/vectors/passport-revocation/v1/{root.positive,root.unknown-field.negative}.json` change with it.
 5. Kernel artifacts touched by the K-stack: the kernel checkpoint, stop operator config and approvals, caller dispatch authorization and delivery report, execution nonces (both), admission terminal projection, active-response submission proof and artifact attestation, session compliance certificate, authority lifecycle and snapshot, terminal outcome commitment. Open K-stack PRs that touch the same files: #1675 (active-response proof and dispatch, `execution_validation.inc`, `tests/security_receipts.rs`), #1682 (`receipt_store.rs`, `receipt_namespace.rs`), #1678 and #1701 (no signing sites; textual conflicts only).
 6. Security artifacts: every key-log, keyring, secret-broker, decoy watermark, cage and security-event signature; `chio.broker-authority-rpc.v1` and `chio.active-response-policy-authority.v1` member values are replaced (G6).
 7. Every other row of the inventory wrapper table and the raw-site table (economy, trust, protocol, products, tooling), and every `SignedExportEnvelope<T>` payload.
@@ -478,12 +489,12 @@ Signed artifacts whose bytes change:
 
 Fixtures whose bytes change: every set in Task 11. Shared with in-flight work:
 - `tests/bindings/vectors/receipt/v1.json` and `tests/bindings/vectors/MANIFEST.sha256`: also changed by #1601 (trust level). #1601 lands first; this PR regenerates after it.
-- `fixtures/proof-room/**` (3027 signed files) and receipt fixtures generally: also touched by the fwdcompat RECEIPT-UNKNOWN-FIELDS change (receipt `deny_unknown_fields`, commerce schema tag off receipt bytes, about 389 fixtures). fwdcompat lands first; this PR regenerates after it and takes its `deny_unknown_fields` (Q5).
+- `fixtures/proof-room/**` (3027 signed files) and receipt fixtures generally: also touched by the fwdcompat RECEIPT-UNKNOWN-FIELDS change (receipt `deny_unknown_fields`, commerce schema tag off receipt bytes, about 389 fixtures). fwdcompat lands first, including its receipt fixture regeneration and receipt `deny_unknown_fields`; this PR regenerates once on top of it.
 - `spec/vectors/passport-revocation/v1/*`, `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, `spec/wire-schemas.lock`: also changed by #1607. #1607 lands first.
 - `tests/bindings/fixtures/dpop-authority-v1.json`: owned by the DPoP lane; #1489 is merged, so no conflict, bytes only.
-- The anchored-root lane (M1 item 3, `anchorroot`) adds `root_anchor` to the capability signing body. It rebases onto this PR; its fixtures are generated once on the wrapper.
+- M1 item 3 (`anchorroot`) adds `root_anchor` to the capability signing body and lands independently of this PR. Whichever of the two merges second rebases and regenerates capability fixtures through `cargo xtask gen signed-fixtures`.
 
-Merge order: #1674, then #1601, #1607, fwdcompat receipts and the K-stack PRs listed above in Root-2's order, then this PR, then M1 item 2 and item 3.
+Merge order: #1674, #1601, #1607, fwdcompat receipts, the K-stack (#1675, #1682 and Root-2's other open kernel PRs in Root-2's order), then this PR. M1 item 3 lands independently. M1 item 2 follows this PR.
 
 ## Verification
 
@@ -535,7 +546,7 @@ Spec 13.2 sizes item 1 at L, 23-32 engineer-days. Estimate from the census:
 | Wrapper types, trait, free functions, verifier, deletions, crypto floor (Tasks 2, 3) | 2-3 |
 | `algorithm` members: 74 fields, 52 schemas, SDK types, negatives (Task 4) | 2-3 |
 | Core-types artifacts and `ToolManifest` deletion (Task 5) | 1-2 |
-| Registration: 59 table ids, 4 raw-site ids, an estimated 90 to 140 export payload ids with schemas and four-language codegen (Task 6) | 6-9 |
+| Registration: 59 table ids, 3 raw-site ids and about 70 signed export payload ids with schemas and four-language codegen; 48 export payloads deferred (Task 6) | 4-6 |
 | Wrapper-table call sites in about 60 crates, about 450 signing and verifying call sites, G5 and G6 (Task 7) | 5-7 |
 | Raw sites and the exemption gate (Task 8) | 2-3 |
 | Binding helper, FFI, C++, Python, TS, Go, webhook, bedrock, DPoP signers (Task 9) | 3-4 |
@@ -543,18 +554,13 @@ Spec 13.2 sizes item 1 at L, 23-32 engineer-days. Estimate from the census:
 | Fixture regeneration, about 3200 signed files (Task 11) | 2-4 |
 | PROTOCOL, docs, formal touchpoints (Tasks 12, 13) | 1-2 |
 | Integration, native-cage runs, review rounds | 3-4 |
-| Total | 28-43 |
+| Total | 26-40 |
 
-The estimate exceeds the 13.2 range (23-32) at both ends. The driver is the registration of `SignedExportEnvelope` payload ids: 165 payload types sign through the envelope and up to 137 of their ids are unregistered, each needing a schema file and four-language codegen. 13.2 assumed the 63 G16 ids. The remaining parts fit the 13.2 assumptions. Q2 asks the owner to accept the larger size; M1 total moves from 104-148 to about 109-159.
+Item 1 is L, 26-40 engineer-days, with a planning figure of 28 when the census holds at the real base. The range sits 3 to 8 days above spec 13.2 (23-32). The remaining excess over 13.2 is the registration of about 70 signed export payload ids, which 13.2 did not count; deferring the 48 unsigned payloads removes the rest. The M1 total is 107-156 engineer-days (13.2's 104-148 with item 1 at 26-40); the earlier 109-159 figure no longer holds.
 
-## Open Questions (owner decisions)
+## Decisions
 
-- **Q1. G19 scope.** G19 names the optional `algorithm` members in `chio-core-types` and `chio-credit`; spec 7.0 says "every other envelope that carries one". The census finds required signature-descriptor `algorithm` members in chio-keyring, chio-secret-broker, chio-control-plane, chio-kernel (`SessionComplianceCertificate`), chio-tool-call-fabric (`SignedProvenance`) and chio-revocation-oracle. Default in this plan: delete all of them; keep only key-record attributes (`KeyLogEventBody.algorithm`, `KeyRecord.algorithm`) and the BBS constant.
-- **Q2. Export payload registration and size.** G11 requires a registry row with a schema for every `SignedExportEnvelope<T>` payload id. That is up to 137 schemas beyond the 63 G16 ids and moves the item to 28-43 days. Default: register all in this PR.
-- **Q3. Naming-rule ids.** Confirm `chio.finding.operator-purchase-job.v1` (buyer signature over the ask body), `chio.wasm-module.v1` (guard module statement, replacing `chio-wasm-guard-v1`), `chio.tee-capture-frame.v1` (TEE capture frame) and the use of the registered `chio.fiscal.consumer-readiness.v1`, `chio.fiscal.proposal-admission.v1`, `chio.lineage.signed-subgraph.v1` and `chio.frost.dkg-round2-sealed.v1`.
-- **Q4. Revocation-root id.** The naming rule gives `chio.epoch-root.v1` for `chio-revocation-oracle` `SignedEpochRoot`. #1607 introduces `chio.trust.passport-revocation-root.v1` for the document that carries it. Pick one wrapper id for the signed root (default `chio.epoch-root.v1`, the oracle is not passport-specific).
-- **Q5. Receipt strict decoding.** `ChioReceipt` has no `deny_unknown_fields` on `main`, so G19's "fails strict decoding" for receipts needs it. Default: fwdcompat RECEIPT-UNKNOWN-FIELDS lands it first; if it has not merged when this PR is ready, this PR adds only the top-level `deny_unknown_fields` and fwdcompat rebases.
-- **Q6. Runtime-attestation evidence ids.** Four vendor or JWS evidence formats sit in `KNOWN_SIGNED_ARTIFACT_SCHEMAS` as internal-only entries. Default: they leave the wrapper list for a closed list beside their validator in `chio-appraisal`.
+The owner decisions of 2026-10-20 are recorded under Global Constraints and applied in Tasks 4, 6, 8 and 11 and in D17 Coordination. No open question remains for this item.
 
 ## Spec coverage
 
