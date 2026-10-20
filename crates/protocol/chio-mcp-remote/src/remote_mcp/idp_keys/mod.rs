@@ -8,7 +8,8 @@
 //! every fetch for one source is spaced by at least
 //! [`RefreshPolicy::min_fetch_interval_secs`]. A key set older than
 //! [`RefreshPolicy::scheduled_refresh_secs`] is refetched before use and
-//! denies while it cannot be. Every change to the key set is signed by the
+//! denies while it cannot be. After a refresh fails or is cancelled, no
+//! key resolves until a later refresh succeeds and is recorded. Every change to the key set is signed by the
 //! exchange key as a `chio.idp-key-snapshot.v1` and recorded before the set
 //! is used. Time is the caller's `now`; nothing here reads a clock.
 //! [`IdpKeySources`] is the root exchange's

@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use chio_core::crypto::{Ed25519Backend, Keypair, PublicKey};
+use chio_core::crypto::{Ed25519Backend, Keypair, PublicKey, Signature, SigningBackend};
 use chio_core::root_authority::{
     EnterpriseProviderIdentity, EnterpriseProviderIdentityFields, HttpsUrl, Identifier,
     IdpKeySnapshot, IdpKeySnapshotSignatureError, InlineJwks, Jwk, JwsAlgorithm, KeySnapshotSource,
@@ -26,6 +26,7 @@ const T0: u64 = 1_792_230_000;
 struct StubFetcher {
     responses: Mutex<VecDeque<Result<Vec<u8>, JwksFetchError>>>,
     calls: AtomicUsize,
+    hang: AtomicBool,
 }
 
 impl StubFetcher {
@@ -43,6 +44,9 @@ impl JwksFetcher for StubFetcher {
     async fn fetch(&self, url: &HttpsUrl) -> Result<Vec<u8>, JwksFetchError> {
         assert_eq!(url.as_str(), JWKS_URL);
         self.calls.fetch_add(1, Ordering::SeqCst);
+        if self.hang.load(Ordering::SeqCst) {
+            std::future::pending::<()>().await;
+        }
         self.responses
             .lock()
             .unwrap()
@@ -861,5 +865,157 @@ fn document_drops_keys_without_usable_verification_material() {
     assert_eq!(
         admit_jwks_document(&jwks(&[p521])),
         Err(JwksDocumentError::NoUsableKeys),
+    );
+}
+
+/// Signs as the exchange key, or with another key while `fail` is set, which
+/// the identity check refuses.
+struct SwitchableBackend {
+    exchange: Ed25519Backend,
+    other: Ed25519Backend,
+    fail: AtomicBool,
+}
+
+impl SigningBackend for SwitchableBackend {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        self.exchange.public_key()
+    }
+
+    fn sign_bytes(&self, message: &[u8]) -> chio_core::error::Result<Signature> {
+        if self.fail.load(Ordering::SeqCst) {
+            self.other.sign_bytes(message)
+        } else {
+            self.exchange.sign_bytes(message)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum RefreshFailure {
+    Http,
+    Document,
+    Sign,
+    Sink,
+}
+
+/// k1 is installed at T0; at T0 + 60 an unknown `kid` refresh fails along
+/// `path` (the sign and sink paths fetch a set that withdraws k1). Until a
+/// refresh succeeds and is recorded, known k1 is refused; at T0 + 120 the
+/// recorded refresh installs {k2}.
+async fn failed_refresh_refuses_known_keys_until_recovery(path: RefreshFailure) {
+    let backend = Arc::new(SwitchableBackend {
+        exchange: Ed25519Backend::new(exchange_keypair()),
+        other: Ed25519Backend::new(Keypair::from_seed(&[43; 32])),
+        fail: AtomicBool::new(false),
+    });
+    let harness = harness_signed_by(
+        &identity(Some(JWKS_URL), None),
+        ExchangeSigner {
+            backend: backend.clone(),
+            key: exchange_key(),
+        },
+    )
+    .unwrap();
+    harness.fetcher.push(Ok(jwks(&[rsa_key("k1", 2048)])));
+    harness.resolve(JwsAlgorithm::RS256, "k1").await.unwrap();
+
+    harness.set_now(T0 + 60);
+    let expected = match path {
+        RefreshFailure::Http => {
+            harness.fetcher.push(Err(JwksFetchError::Status(503)));
+            KeyResolutionError::Fetch(JwksFetchError::Status(503))
+        }
+        RefreshFailure::Document => {
+            harness.fetcher.push(Ok(b"not json".to_vec()));
+            KeyResolutionError::Document(JwksDocumentError::Malformed)
+        }
+        RefreshFailure::Sign => {
+            harness.fetcher.push(Ok(jwks(&[rsa_key("k2", 2048)])));
+            backend.fail.store(true, Ordering::SeqCst);
+            KeyResolutionError::SnapshotNotSigned(SnapshotNotSigned)
+        }
+        RefreshFailure::Sink => {
+            harness.fetcher.push(Ok(jwks(&[rsa_key("k2", 2048)])));
+            harness.sink.refuse.store(true, Ordering::SeqCst);
+            KeyResolutionError::SnapshotNotRecorded(SnapshotNotRecorded)
+        }
+    };
+    assert_eq!(
+        harness.resolve(JwsAlgorithm::RS256, "k2").await,
+        Err(expected),
+        "{path:?}"
+    );
+
+    for now in [T0 + 61, T0 + 119] {
+        harness.set_now(now);
+        assert_eq!(
+            harness.resolve(JwsAlgorithm::RS256, "k1").await,
+            Err(KeyResolutionError::KeySetUnavailable),
+            "{path:?}"
+        );
+        assert_eq!(
+            harness.refresh_if_due().await,
+            Err(KeyResolutionError::KeySetUnavailable),
+            "{path:?}"
+        );
+    }
+    assert_eq!(harness.fetcher.calls(), 2, "{path:?}");
+    assert_eq!(harness.sink.snapshots().len(), 1, "{path:?}");
+
+    backend.fail.store(false, Ordering::SeqCst);
+    harness.sink.refuse.store(false, Ordering::SeqCst);
+    harness.fetcher.push(Ok(jwks(&[rsa_key("k2", 2048)])));
+    harness.set_now(T0 + 120);
+    let resolved = harness.resolve(JwsAlgorithm::RS256, "k2").await.unwrap();
+    assert_eq!(resolved.snapshot.observed_at, T0 + 120, "{path:?}");
+    assert_eq!(
+        harness.resolve(JwsAlgorithm::RS256, "k1").await,
+        Err(KeyResolutionError::UnknownKid),
+        "{path:?}"
+    );
+    assert_eq!(harness.fetcher.calls(), 3, "{path:?}");
+    assert_eq!(harness.sink.snapshots().len(), 2, "{path:?}");
+    assert_eq!(harness.sink.kids(1), ["k2"], "{path:?}");
+}
+
+#[tokio::test]
+async fn failed_http_refresh_refuses_known_keys_until_recovery() {
+    failed_refresh_refuses_known_keys_until_recovery(RefreshFailure::Http).await;
+}
+
+#[tokio::test]
+async fn failed_document_refresh_refuses_known_keys_until_recovery() {
+    failed_refresh_refuses_known_keys_until_recovery(RefreshFailure::Document).await;
+}
+
+#[tokio::test]
+async fn failed_signing_refresh_refuses_known_keys_until_recovery() {
+    failed_refresh_refuses_known_keys_until_recovery(RefreshFailure::Sign).await;
+}
+
+#[tokio::test]
+async fn failed_recording_refresh_refuses_known_keys_until_recovery() {
+    failed_refresh_refuses_known_keys_until_recovery(RefreshFailure::Sink).await;
+}
+
+#[tokio::test]
+async fn cancelled_refresh_refuses_known_keys() {
+    let harness = fetched_harness();
+    harness.fetcher.push(Ok(jwks(&[rsa_key("k1", 2048)])));
+    harness.resolve(JwsAlgorithm::RS256, "k1").await.unwrap();
+    harness.set_now(T0 + 60);
+    harness.fetcher.hang.store(true, Ordering::SeqCst);
+    let cancelled = tokio::select! {
+        biased;
+        _ = harness.resolve(JwsAlgorithm::RS256, "k2") => false,
+        () = std::future::ready(()) => true,
+    };
+    assert!(cancelled);
+    assert_eq!(harness.fetcher.calls(), 2);
+    harness.fetcher.hang.store(false, Ordering::SeqCst);
+    harness.set_now(T0 + 61);
+    assert_eq!(
+        harness.resolve(JwsAlgorithm::RS256, "k1").await,
+        Err(KeyResolutionError::KeySetUnavailable),
     );
 }
