@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior};
 
-use super::{SchemaVersionError, CHIO_SQLITE_APPLICATION_ID};
+use super::{SchemaState, SchemaVersionError, CHIO_SQLITE_APPLICATION_ID};
 
 const METADATA_SCHEMA: &str = "CREATE TABLE chio_store_schema_versions (
     store_key TEXT NOT NULL PRIMARY KEY,
@@ -15,38 +15,59 @@ pub struct SchemaTransaction<'connection> {
     fresh: bool,
 }
 
+pub fn inspect_schema(
+    connection: &Connection,
+    namespaces: &[&str],
+) -> Result<SchemaState, SchemaVersionError> {
+    inspect_declared(connection, &namespace_set(namespaces)?)
+}
+
+fn namespace_set(namespaces: &[&str]) -> Result<BTreeSet<String>, SchemaVersionError> {
+    let declared: BTreeSet<String> = namespaces.iter().map(|key| (*key).to_owned()).collect();
+    if declared.is_empty()
+        || declared.len() != namespaces.len()
+        || declared.iter().any(|key| key.is_empty())
+    {
+        return Err(SchemaVersionError::InvalidCreationPlan);
+    }
+    Ok(declared)
+}
+
+fn inspect_declared(
+    connection: &Connection,
+    namespaces: &BTreeSet<String>,
+) -> Result<SchemaState, SchemaVersionError> {
+    let app_id: i32 = connection.query_row("PRAGMA application_id", [], |row| row.get(0))?;
+    let empty: bool = connection.query_row(
+        "SELECT NOT EXISTS(SELECT 1 FROM sqlite_schema)",
+        [],
+        |row| row.get(0),
+    )?;
+    if app_id == 0 && empty {
+        return Ok(SchemaState::Unstamped);
+    }
+    if app_id != CHIO_SQLITE_APPLICATION_ID {
+        return Err(SchemaVersionError::ForeignDatabase {
+            found: app_id,
+            expected: CHIO_SQLITE_APPLICATION_ID,
+        });
+    }
+    validate_metadata(connection)?;
+    validate_namespaces(connection, namespaces)?;
+    Ok(SchemaState::Current)
+}
+
 impl<'connection> SchemaTransaction<'connection> {
     pub fn begin(
         connection: &'connection mut Connection,
         namespaces: &[&str],
     ) -> Result<Self, SchemaVersionError> {
-        let declared: BTreeSet<String> = namespaces.iter().map(|key| (*key).to_owned()).collect();
-        if declared.is_empty()
-            || declared.len() != namespaces.len()
-            || declared.iter().any(|key| key.is_empty())
-        {
-            return Err(SchemaVersionError::InvalidCreationPlan);
-        }
+        let declared = namespace_set(namespaces)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let app_id: i32 = transaction.query_row("PRAGMA application_id", [], |row| row.get(0))?;
-        let empty: bool = transaction.query_row(
-            "SELECT NOT EXISTS(SELECT 1 FROM sqlite_schema)",
-            [],
-            |row| row.get(0),
-        )?;
-        let fresh = app_id == 0 && empty;
+        let fresh = inspect_declared(&transaction, &declared)? == SchemaState::Unstamped;
         if fresh {
             transaction.execute_batch(METADATA_SCHEMA)?;
             transaction.pragma_update(None, "application_id", CHIO_SQLITE_APPLICATION_ID)?;
-        } else {
-            if app_id != CHIO_SQLITE_APPLICATION_ID {
-                return Err(SchemaVersionError::ForeignDatabase {
-                    found: app_id,
-                    expected: CHIO_SQLITE_APPLICATION_ID,
-                });
-            }
-            validate_metadata(&transaction)?;
-            validate_namespaces(&transaction, &declared)?;
         }
         Ok(Self {
             transaction,
@@ -186,6 +207,30 @@ fn validate_namespaces(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn inspection_works_on_query_only_connections() -> Result<(), Box<dyn std::error::Error>> {
+        let mut connection = Connection::open_in_memory()?;
+        connection.pragma_update(None, "query_only", true)?;
+        assert_eq!(
+            inspect_schema(&connection, &["receipt"])?,
+            SchemaState::Unstamped
+        );
+        connection.pragma_update(None, "query_only", false)?;
+        let creation = SchemaTransaction::begin(&mut connection, &["receipt"])?;
+        creation.stamp("receipt")?;
+        creation.commit()?;
+        connection.pragma_update(None, "query_only", true)?;
+        assert_eq!(
+            inspect_schema(&connection, &["receipt"])?,
+            SchemaState::Current
+        );
+        assert!(matches!(
+            inspect_schema(&connection, &["receipt", "approval"]),
+            Err(SchemaVersionError::MissingSchema { store_key }) if store_key == "approval"
+        ));
+        Ok(())
+    }
 
     #[test]
     fn fresh_creation_commits_declared_v1_namespaces() -> Result<(), Box<dyn std::error::Error>> {
