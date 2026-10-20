@@ -142,6 +142,7 @@ fn cancellation_after_attachment_keeps_custody_until_removal_is_confirmed(
         let attempt = journal.start(&worker)?;
         let socket = state.join("worker.sock");
         let _listener = std::os::unix::net::UnixListener::bind(&socket)?;
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600))?;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;

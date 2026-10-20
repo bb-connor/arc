@@ -20,6 +20,7 @@ async fn scoped_cancellation_withholds_bootstrap_and_retains_reaper_usage() -> T
         .arg(&marker);
     let spawned = spawn_command(command, None)?;
     let descriptor = worker_descriptor(&spawned)?;
+    let observation = spawned.observation();
     let (cancel, cancelled) = tokio::sync::watch::channel(true);
     let outcome = wait_bounded(
         spawned,
@@ -37,7 +38,36 @@ async fn scoped_cancellation_withholds_bootstrap_and_retains_reaper_usage() -> T
     );
     assert!(!marker.exists());
     assert!(reaped(&descriptor)?);
+    let recorded = published(&observation).await?;
+    assert_eq!(
+        (outcome.usage.peak_resident_bytes, outcome.usage.cpu_ms),
+        (recorded.usage.peak_resident_bytes, recorded.usage.cpu_ms)
+    );
     drop(cancel);
+    Ok(())
+}
+
+#[tokio::test]
+async fn lost_scoped_cancellation_owner_stops_and_reaps_worker() -> TestResult {
+    let spawned = spawn_command(sleeper(), None)?;
+    let descriptor = worker_descriptor(&spawned)?;
+    let (cancel, cancelled) = tokio::sync::watch::channel(false);
+    drop(cancel);
+    let outcome = wait_bounded(
+        spawned,
+        Vec::new(),
+        None,
+        Duration::from_secs(10),
+        None,
+        None,
+        Some(cancelled),
+    )
+    .await?;
+    assert_eq!(
+        (outcome.success, outcome.reason.as_str()),
+        (false, "runner_interrupted")
+    );
+    assert!(reaped(&descriptor)?);
     Ok(())
 }
 
