@@ -260,32 +260,32 @@ pub enum DetectorHealthKind {
     TruncatedScan,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(
-    tag = "kind",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum DetectorWatermarkEvidence {
-    Unknown,
-    Committed { unix_ms: u64 },
-    Contradictory { claimed_unix_ms: String },
+crate::lossless_serde! {
+    #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+    #[serde(
+        tag = "kind",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum DetectorWatermarkEvidence {
+        Unknown,
+        Committed { unix_ms: u64 },
+        Contradictory { claimed_unix_ms: String },
+    }
 }
-crate::lossless_serde!(DetectorWatermarkEvidence);
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(
-    tag = "kind",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum DetectorGroupBindingEvidence {
-    Unresolved,
-    Resolved { group_key_hash: Digest32 },
+crate::lossless_serde! {
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+    #[serde(
+        tag = "kind",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum DetectorGroupBindingEvidence {
+        Unresolved,
+        Resolved { group_key_hash: Digest32 },
+    }
 }
-crate::lossless_serde!(DetectorGroupBindingEvidence);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]

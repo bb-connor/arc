@@ -31,30 +31,49 @@ pub mod __private {
     pub use serde_json::value::Serializer as ValueSerializer;
 }
 
-/// Implements serde for a type derived with `#[serde(remote = "Self")]`,
-/// decoding through [`lossless`].
+/// Defines an enum whose `Deserialize` decodes through [`lossless`].
+///
+/// The enum derives `Serialize` from its own attributes. Decoding runs a
+/// derived remote mirror that is private to the expansion, so the strict
+/// trait implementation is the only public decoder.
 #[macro_export]
 macro_rules! lossless_serde {
-    ($ty:ident) => {
-        impl $crate::strict_serde::__private::Serialize for $ty {
-            fn serialize<S: $crate::strict_serde::__private::Serializer>(
-                &self,
-                serializer: S,
-            ) -> ::core::result::Result<S::Ok, S::Error> {
-                $ty::serialize(self, serializer)
-            }
-        }
+    (
+        $(#[doc = $doc:literal])*
+        #[derive($($derive:path),* $(,)?)]
+        $(#[$meta:meta])*
+        $vis:vis enum $name:ident { $($body:tt)* }
+    ) => {
+        $(#[doc = $doc])*
+        #[derive($($derive),*)]
+        $(#[$meta])*
+        $vis enum $name { $($body)* }
 
-        impl<'de> $crate::strict_serde::__private::Deserialize<'de> for $ty {
-            fn deserialize<D: $crate::strict_serde::__private::Deserializer<'de>>(
-                deserializer: D,
-            ) -> ::core::result::Result<Self, D::Error> {
-                $crate::strict_serde::lossless(
-                    deserializer,
-                    |value| $ty::deserialize(value),
-                    |typed| $ty::serialize(typed, $crate::strict_serde::__private::ValueSerializer),
-                )
+        const _: () = {
+            type LosslessTarget = $name;
+
+            #[allow(dead_code)]
+            #[derive($crate::strict_serde::__private::Deserialize)]
+            $(#[$meta])*
+            #[serde(remote = "LosslessTarget")]
+            enum LosslessRaw { $($body)* }
+
+            impl<'de> $crate::strict_serde::__private::Deserialize<'de> for $name {
+                fn deserialize<D: $crate::strict_serde::__private::Deserializer<'de>>(
+                    deserializer: D,
+                ) -> ::core::result::Result<Self, D::Error> {
+                    $crate::strict_serde::lossless(
+                        deserializer,
+                        |value| LosslessRaw::deserialize(value),
+                        |typed| {
+                            $crate::strict_serde::__private::Serialize::serialize(
+                                typed,
+                                $crate::strict_serde::__private::ValueSerializer,
+                            )
+                        },
+                    )
+                }
             }
-        }
+        };
     };
 }
