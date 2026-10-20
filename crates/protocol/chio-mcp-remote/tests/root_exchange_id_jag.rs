@@ -245,6 +245,7 @@ impl ExchangeEntropy for CountingEntropy {
 struct StubKeys {
     keys: Vec<Jwk>,
     failure: Option<RootExchangeError>,
+    any_kid: bool,
     calls: AtomicUsize,
 }
 
@@ -256,6 +257,7 @@ impl StubKeys {
                 .map(|key| serde_json::from_value(key.clone()).unwrap())
                 .collect(),
             failure: None,
+            any_kid: false,
             calls: AtomicUsize::new(0),
         }
     }
@@ -278,7 +280,7 @@ impl IdpKeyLookup for StubKeys {
         }
         self.keys
             .iter()
-            .find(|key| key.kid.as_str() == kid)
+            .find(|key| self.any_kid || key.kid.as_str() == kid)
             .map(|jwk| IdpKey {
                 jwk: jwk.clone(),
                 snapshot_digest: SNAPSHOT_DIGEST,
@@ -1004,4 +1006,93 @@ async fn committed_claims_carry_openings() {
         commitment.commit,
         Sha256Digest::from_hash(sha256(&preimage))
     );
+}
+
+#[tokio::test]
+async fn every_key_location_header_and_hmac_alg_is_refused() {
+    for member in ["x5u", "jwk", "x5c"] {
+        let header = edit(id_jag_header(), |header| {
+            header.insert(member.into(), json!("https://attacker.example/key"));
+        });
+        assert_eq!(
+            refusal(header, id_jag_claims()).await,
+            RootExchangeError::ForbiddenHeaderMember(member)
+        );
+    }
+    for alg in ["HS384", "HS512"] {
+        let header = edit(id_jag_header(), |header| {
+            header.insert("alg".into(), json!(alg));
+        });
+        assert_eq!(
+            refusal(header, id_jag_claims()).await,
+            RootExchangeError::AlgorithmNotAdmitted
+        );
+    }
+}
+
+#[tokio::test]
+async fn key_that_does_not_admit_the_token_alg_is_refused() {
+    let mut harness = Harness::new();
+    harness.keys = StubKeys::serving(&[edit(client_jwk(), |key| {
+        key.insert("kid".into(), json!(IDP_KID));
+    })]);
+    assert_eq!(
+        harness
+            .run(id_jag_header(), id_jag_claims())
+            .await
+            .unwrap_err(),
+        RootExchangeError::KeyAlgorithmMismatch
+    );
+}
+
+#[tokio::test]
+async fn client_assertion_nbf_sub_and_skew_rules_are_enforced() {
+    let not_yet_valid = client_assertion(&edit(client_assertion_claims(), |claims| {
+        claims.insert("nbf".into(), json!(NOW + 6));
+    }));
+    assert_eq!(
+        client_refusal(jwt_bearer_body(&id_jag(), &not_yet_valid)).await,
+        RootExchangeError::ClientAssertionInvalid("not yet valid")
+    );
+    let without_sub = client_assertion(&edit(client_assertion_claims(), |claims| {
+        claims.remove("sub");
+    }));
+    assert_eq!(
+        client_refusal(jwt_bearer_body(&id_jag(), &without_sub)).await,
+        RootExchangeError::ClientAssertionInvalid("claim missing")
+    );
+    let mut wide_skew = Harness::new();
+    wide_skew.exchange.client_assertion_skew_secs = 600;
+    let future = client_assertion(&edit(client_assertion_claims(), |claims| {
+        claims.insert("iat".into(), json!(NOW + 61));
+        claims.insert("exp".into(), json!(NOW + 100));
+    }));
+    assert_eq!(
+        wide_skew
+            .run_body(&jwt_bearer_body(&id_jag(), &future), None, NOW)
+            .await
+            .unwrap_err(),
+        RootExchangeError::ClientAssertionInvalid("issued in the future")
+    );
+}
+
+#[tokio::test]
+async fn late_refusal_does_not_spend_the_id_jag() {
+    let mut harness = Harness::new();
+    harness.keys.any_kid = true;
+    let oversized_kid = edit(id_jag_header(), |header| {
+        header.insert("kid".into(), json!("k".repeat(129)));
+    });
+    let id_jag = compact(&oversized_kid, &id_jag_claims(), idp_sign);
+    let assertion = client_assertion(&client_assertion_claims());
+    assert_eq!(
+        harness
+            .run_body(&jwt_bearer_body(&id_jag, &assertion), None, NOW)
+            .await
+            .unwrap_err(),
+        RootExchangeError::ClaimInvalid("kid")
+    );
+    let bound = harness.replay.bound.lock().unwrap();
+    assert!(bound.keys().all(|key| key.id != "id-jag-1"));
+    assert_eq!(bound.len(), 1);
 }

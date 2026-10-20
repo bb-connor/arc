@@ -4,13 +4,17 @@ use std::collections::BTreeMap;
 
 use chio_core::root_authority::Jwk;
 
-use super::claims::{audience_is, required_seconds, required_string, string};
+use super::claims::{audience_is, required_seconds, required_string, seconds};
 use super::error::RootExchangeError;
 use super::jws::{CompactJws, VerifyingKey};
 use super::replay::{ExchangeReplayStore, ReplayBinding, ReplayKey, ReplayNamespace};
 
 pub const CLIENT_ASSERTION_TYPE_JWT_BEARER: &str =
     "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
+
+/// Largest clock skew admitted on a client assertion; a larger configured
+/// skew is reduced to this.
+pub const MAX_CLIENT_ASSERTION_SKEW_SECS: u64 = 60;
 
 /// Longest admitted client assertion, `exp - iat`.
 pub const MAX_CLIENT_ASSERTION_LIFETIME_SECS: u64 = 60;
@@ -102,7 +106,8 @@ pub fn authenticate_client(
         _ => RootExchangeError::ClientAssertionInvalid("claim malformed"),
     };
     let issuer = required_string(&jws.claims, "iss").map_err(claim)?;
-    if string(&jws.claims, "sub").map_err(claim)? != Some(issuer) {
+    let subject = required_string(&jws.claims, "sub").map_err(claim)?;
+    if subject != issuer {
         return Err(RootExchangeError::ClientAssertionInvalid(
             "sub differs from iss",
         ));
@@ -138,7 +143,9 @@ pub fn authenticate_client(
             "lifetime exceeds 60 seconds",
         ));
     }
-    let skew = context.max_clock_skew_secs;
+    let skew = context
+        .max_clock_skew_secs
+        .min(MAX_CLIENT_ASSERTION_SKEW_SECS);
     if context.now >= exp.saturating_add(skew) {
         return Err(RootExchangeError::ClientAssertionInvalid("expired"));
     }
@@ -146,6 +153,12 @@ pub fn authenticate_client(
         return Err(RootExchangeError::ClientAssertionInvalid(
             "issued in the future",
         ));
+    }
+    if seconds(&jws.claims, "nbf")
+        .map_err(claim)?
+        .is_some_and(|nbf| nbf > context.now.saturating_add(skew))
+    {
+        return Err(RootExchangeError::ClientAssertionInvalid("not yet valid"));
     }
     let jti = required_string(&jws.claims, "jti").map_err(claim)?;
     let key = ReplayKey {
