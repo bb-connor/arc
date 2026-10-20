@@ -84,7 +84,7 @@ async fn handle_admin_health(State(state): State<RemoteAppState>, request: Reque
     let enterprise_provider_summary = match state
         .enterprise_provider_registry
         .as_ref()
-        .map(EnterpriseProviderRegistryFile::load)
+        .map(EnterpriseProviderRegistryFile::load_for_health)
     {
         Some(Ok(registry)) => json!({
             "configured": true,
