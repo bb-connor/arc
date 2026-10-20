@@ -203,7 +203,7 @@ def file_sites(path, code, binding_items, contracts, json_decoders):
         arguments_start = code.find("(", start)
         arguments_end = contracts.closing(code, arguments_start)
         arguments = code[arguments_start:arguments_end]
-        names = {"Json": "json", "Form": "form"}
+        names = {"Json": "json", "Form": "form", "SignedJson": "signed-json"}
         for alias, target in bindings.items():
             if target.startswith("axum::") and target.split("::")[-1] in {"Json", "Form"}:
                 names[alias] = target.split("::")[-1].lower()

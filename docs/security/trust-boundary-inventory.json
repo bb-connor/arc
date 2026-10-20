@@ -1277,6 +1277,7 @@
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire",
     "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire",
+    "crates/observability/chio-siem/src/manager.rs::poll_once::new",
     "crates/platform/chio-commerce-order/src/input.rs::decode::from_wire",
     "crates/platform/chio-control-plane/src/attestation/model.rs::verify_and_appraise::from_wire",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire",
@@ -1351,6 +1352,7 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::require_authorized_voluntary_source::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::strict_intent_ingress::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/frost.rs::decode_response::from_wire",
+    "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::from_request::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::validate_document::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::validate_signed::from_wire",
     "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs::from_policy_file::from_wire",
@@ -1557,6 +1559,8 @@
     "crates/protocol/chio-provider-conformance/src/bin/record/bedrock.rs::bedrock_converse::from_wire",
     "crates/protocol/chio-tool-call-fabric/src/types.rs::validate::from_wire",
     "crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json::new",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str::new",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str::new",
     "crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload::new",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire",
@@ -6953,9 +6957,6 @@
     "crates/observability/chio-siem/src/exporters/splunk.rs": [
       "classify_hec_response::from_str"
     ],
-    "crates/observability/chio-siem/src/manager.rs": [
-      "poll_once::from_str"
-    ],
     "crates/platform/chio-agent-web-interop/src/evidence.rs": [
       "as_str::custom_deserialize",
       "parse_artifact::from_value"
@@ -7418,8 +7419,6 @@
       "evaluate_json_str::from_str",
       "evaluate_json_str::from_value",
       "evaluate_json_str::from_value",
-      "sign_receipt_json_str::from_str",
-      "sign_receipt_relaying_trusted_body_json_str::from_str",
       "verify_capability_json_str::from_str",
       "verify_capability_with_context_json_str::from_str",
       "verify_capability_with_context_json_str::from_value",
@@ -9194,10 +9193,6 @@
       ]
     },
     "crates/observability/chio-siem/src/exporters/splunk.rs": {
-      "kind": "raw-input-baseline",
-      "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
-    },
-    "crates/observability/chio-siem/src/manager.rs": {
       "kind": "raw-input-baseline",
       "contract": "Untrusted raw decoding outside the reviewed signed-owner set. Pinned for change detection; caller authentication and signed-input migration remain separate review work."
     },
@@ -18069,6 +18064,7 @@
     "crates/kernel/chio-runtime-core/src/treaty.rs::treaty_scope_from_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/validation/proof.rs::parse_runtime_json::from_wire#1::decode_signed",
     "crates/kernel/chio-runtime-core/src/work/decode.rs::decode::from_wire#1::decode_document",
+    "crates/observability/chio-siem/src/manager.rs::poll_once::new#1::decode_signed",
     "crates/platform/chio-commerce-order/src/input.rs::decode::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/model.rs::verify_and_appraise#4::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/attestation/verification.rs::decode_jwt_parts::from_wire#1::decode_signed",
@@ -18143,6 +18139,7 @@
     "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::require_authorized_voluntary_source::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/finding_status_handlers.rs::strict_intent_ingress::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/frost.rs::decode_response::from_wire#1::decode_signed",
+    "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::from_request::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::validate_document::from_wire#1::decode_document",
     "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::validate_signed::from_wire#1::decode_signed",
     "crates/platform/chio-control-plane/src/trust_control/service_types/config.rs::from_policy_file::from_wire#1::decode_signed",
@@ -18349,6 +18346,8 @@
     "crates/protocol/chio-provider-conformance/src/bin/record/bedrock.rs::bedrock_converse::from_wire#1::bounds_only",
     "crates/protocol/chio-tool-call-fabric/src/types.rs::validate::from_wire#1::decode_document",
     "crates/sdk/chio-binding-helpers/src/receipt.rs::parse_receipt_json::new#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_json_str::new#1::decode_signed",
+    "crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::sign_receipt_relaying_trusted_body_json_str::new#1::decode_signed",
     "crates/sdk/chio-eval-receipt/src/verify.rs::verify_chio_receipt_payload::new#1::decode_signed",
     "crates/security/chio-active-response-authority/src/config.rs::load_runtime_config::from_wire#1::decode_canonical",
     "crates/security/chio-active-response-authority/src/store.rs::decode_canonical::from_wire#1::decode_canonical",
@@ -19766,6 +19765,7 @@
       "handle_share::request-json::FrostCoordinatorShareRequest"
     ],
     "crates/platform/chio-control-plane/src/trust_control/json_ingress.rs": [
+      "from_request::original-json-reader::UntrustedJsonText",
       "validate::shared-reader::crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::validate_document",
       "validate::shared-reader::crates/platform/chio-control-plane/src/trust_control/json_ingress.rs::validate_signed",
       "validate_document::original-json-reader::UntrustedJsonText",
@@ -19787,8 +19787,8 @@
       "handle_verify_passport_challenge::request-json::VerifyPassportChallengeRequest"
     ],
     "crates/platform/chio-control-plane/src/trust_control/receipt_handlers.rs": [
-      "handle_append_child_receipt::request-json::ChildRequestReceipt",
-      "handle_append_tool_receipt::request-json::ChioReceipt",
+      "handle_append_child_receipt::request-signed-json::ChildRequestReceipt",
+      "handle_append_tool_receipt::request-signed-json::ChioReceipt",
       "handle_comptroller_surface_report::shared-reader::crates/platform/chio-control-plane/src/trust_control/reports.rs::build_comptroller_surface_report",
       "handle_evidence_export::request-json::evidence_export::RemoteEvidenceExportRequest",
       "handle_evidence_import::request-json::evidence_export::RemoteEvidenceImportRequest",
@@ -22920,6 +22920,8 @@
       "chio_kernel_verify_capability_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_json_str",
       "chio_kernel_verify_capability_with_context_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_capability_with_context_json_str",
       "chio_kernel_verify_passport_json::shared-reader::crates/sdk/chio-cpp-kernel-ffi/src/lib.rs::verify_passport_json_str",
+      "sign_receipt_json_str::original-json-reader::UntrustedJsonText",
+      "sign_receipt_relaying_trusted_body_json_str::original-json-reader::UntrustedJsonText",
       "verify_passport_json_str::shared-reader::crates/kernel/chio-kernel-core/src/passport_verify.rs::verify_passport"
     ],
     "crates/sdk/chio-eval-receipt/py/src/lib.rs": [
@@ -23865,6 +23867,9 @@
       "load_owned::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::load_record",
       "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload",
       "planning_tenant::shared-reader::crates/platform/chio-store-sqlite/src/admission_operation_store/recovery_records/record.rs::decode_protected_payload"
+    ],
+    "crates/observability/chio-siem/src/manager.rs": [
+      "poll_once::original-json-reader::UntrustedJsonText"
     ]
   },
   "retired_direct_readers": {

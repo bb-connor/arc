@@ -10,6 +10,9 @@ mod authentication;
 #[path = "ingress_tests/media_types.rs"]
 mod media_types;
 
+#[path = "ingress_tests/signed_json.rs"]
+mod signed_json;
+
 #[path = "ingress_tests/wallet_credentials.rs"]
 mod wallet_credentials;
 

@@ -437,7 +437,3 @@ pub(super) async fn validate(request: Request, next: Next) -> Response {
     next.run(Request::from_parts(parts, Body::from(bytes)))
         .await
 }
-
-#[cfg(test)]
-#[path = "json_ingress_tests.rs"]
-mod tests;
