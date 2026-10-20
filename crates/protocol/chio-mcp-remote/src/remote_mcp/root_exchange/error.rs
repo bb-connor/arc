@@ -1,0 +1,160 @@
+//! Typed refusals of the root exchange.
+
+use chio_core::capability::anchor::AnchorKind;
+use chio_core::root_authority::HolderClass;
+
+/// The OAuth error a refusal answers with at the token endpoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OAuthErrorCode {
+    InvalidRequest,
+    InvalidClient,
+    InvalidGrant,
+    InvalidScope,
+    UnsupportedGrantType,
+    TemporarilyUnavailable,
+    ServerError,
+}
+
+impl OAuthErrorCode {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::InvalidRequest => "invalid_request",
+            Self::InvalidClient => "invalid_client",
+            Self::InvalidGrant => "invalid_grant",
+            Self::InvalidScope => "invalid_scope",
+            Self::UnsupportedGrantType => "unsupported_grant_type",
+            Self::TemporarilyUnavailable => "temporarily_unavailable",
+            Self::ServerError => "server_error",
+        }
+    }
+}
+
+/// Why a token request yields no anchored root.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RootExchangeError {
+    #[error("token request is malformed: {0}")]
+    MalformedRequest(&'static str),
+    #[error("unsupported grant_type")]
+    UnsupportedGrantType,
+    #[error("unsupported subject_token_type")]
+    UnsupportedSubjectTokenType,
+    #[error("unsupported requested_token_type")]
+    UnsupportedRequestedTokenType,
+
+    #[error("client authentication is missing")]
+    ClientAssertionMissing,
+    #[error("client_assertion_type is not jwt-bearer")]
+    ClientAssertionTypeUnsupported,
+    #[error("client is not a registered confidential client")]
+    ClientNotConfidential,
+    #[error("client assertion is invalid: {0}")]
+    ClientAssertionInvalid(&'static str),
+    #[error("client assertion signature is invalid")]
+    ClientAssertionSignatureInvalid,
+    #[error("client assertion jti was already used")]
+    ClientAssertionReplay,
+
+    #[error("assertion is not a well-formed compact JWS: {0}")]
+    MalformedJws(&'static str),
+    #[error("JWS header member `{0}` is not allowed")]
+    ForbiddenHeaderMember(&'static str),
+    #[error("JWS alg is not admitted")]
+    AlgorithmNotAdmitted,
+    #[error("JWS kid is missing")]
+    KidMissing,
+    #[error("assertion typ is not the ID-JAG media type")]
+    TypMismatch,
+    #[error("kid is not in the provider key set")]
+    UnknownKid,
+    #[error("signing key does not admit the token alg")]
+    KeyAlgorithmMismatch,
+    #[error("assertion signature is invalid")]
+    SignatureInvalid,
+
+    #[error("identity-provider key is unusable")]
+    IdpKeyUnusable,
+    #[error("identity-provider keys are unavailable: {0}")]
+    KeysUnavailable(String),
+
+    #[error("provider record `{0}` is missing")]
+    ProviderRecordMissing(String),
+    #[error("provider record `{0}` is disabled")]
+    ProviderRecordDisabled(String),
+    #[error("provider record `{record}` is invalid: {reason}")]
+    ProviderRecordInvalid { record: String, reason: String },
+    #[error("provider record `{0}` identity differs from the root policy rule")]
+    ProviderIdentityMismatch(String),
+
+    #[error("assertion claim `{0}` is missing")]
+    ClaimMissing(&'static str),
+    #[error("assertion claim `{0}` is invalid")]
+    ClaimInvalid(&'static str),
+    #[error("assertion issuer is not the provider record issuer")]
+    IssuerMismatch,
+    #[error("assertion audience is not the local authorization server")]
+    AudienceMismatch,
+    #[error("assertion client_id differs from the authenticated client")]
+    ClientIdMismatch,
+    #[error("assertion resource is not the protected resource")]
+    ResourceMismatch,
+    #[error("assertion has expired")]
+    AssertionExpired,
+    #[error("assertion is issued in the future")]
+    AssertionIssuedInFuture,
+    #[error("assertion is not yet valid")]
+    AssertionNotYetValid,
+    #[error("assertion lifetime {lifetime}s exceeds {max}s")]
+    AssertionLifetimeTooLong { lifetime: u64, max: u64 },
+    #[error("assertion jti was already exchanged")]
+    AssertionReplay,
+
+    #[error("root policy is out of force")]
+    PolicyOutOfForce,
+    #[error("{matched} root policy rules match; exactly one is required")]
+    RuleMatchCount { matched: usize },
+    #[error("scope value is absent from the rule projection")]
+    ScopeNotProjected,
+    #[error("effective root scope is empty")]
+    EmptyEffectiveScope,
+    #[error("holder class {} is not allowed by the rule", .0.as_str())]
+    HolderClassNotAllowed(HolderClass),
+    #[error("edge_session root would carry a proof-required grant")]
+    ProofRequiredGrantForEdgeSession,
+    #[error("recorded claim `{0}` is absent from the assertion")]
+    RecordedClaimMissing(&'static str),
+    #[error("root would expire at or before now")]
+    RootLifetimeEmpty,
+    #[error("anchor kind {} is not exchanged here", .0.as_str())]
+    KindNotExchanged(AnchorKind),
+
+    #[error("replay store is unavailable: {0}")]
+    ReplayStoreUnavailable(String),
+    #[error("canonicalization failed: {0}")]
+    Canonicalization(String),
+}
+
+impl RootExchangeError {
+    /// The OAuth error code the token endpoint answers with.
+    #[must_use]
+    pub fn oauth_error(&self) -> OAuthErrorCode {
+        match self {
+            Self::MalformedRequest(_)
+            | Self::UnsupportedSubjectTokenType
+            | Self::UnsupportedRequestedTokenType => OAuthErrorCode::InvalidRequest,
+            Self::UnsupportedGrantType => OAuthErrorCode::UnsupportedGrantType,
+            Self::ClientAssertionMissing
+            | Self::ClientAssertionTypeUnsupported
+            | Self::ClientNotConfidential
+            | Self::ClientAssertionInvalid(_)
+            | Self::ClientAssertionSignatureInvalid
+            | Self::ClientAssertionReplay => OAuthErrorCode::InvalidClient,
+            Self::ScopeNotProjected | Self::EmptyEffectiveScope => OAuthErrorCode::InvalidScope,
+            Self::KeysUnavailable(_) | Self::ReplayStoreUnavailable(_) => {
+                OAuthErrorCode::TemporarilyUnavailable
+            }
+            Self::Canonicalization(_) => OAuthErrorCode::ServerError,
+            _ => OAuthErrorCode::InvalidGrant,
+        }
+    }
+}
