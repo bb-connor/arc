@@ -32,7 +32,18 @@ macro_rules! validated_type {
                 fields.validate()?;
                 Ok(Self(fields))
             }
+        }
 
+        impl<'de> serde::Deserialize<'de> for $name {
+            fn deserialize<D: serde::Deserializer<'de>>(
+                deserializer: D,
+            ) -> core::result::Result<Self, D::Error> {
+                let fields = <$fields as serde::Deserialize>::deserialize(deserializer)?;
+                Self::new(fields).map_err(serde::de::Error::custom)
+            }
+        }
+
+        impl $name {
             /// The validated fields, for building a changed value through `new`.
             #[must_use]
             pub fn into_fields(self) -> $fields {
@@ -45,15 +56,6 @@ macro_rules! validated_type {
 
             fn deref(&self) -> &$fields {
                 &self.0
-            }
-        }
-
-        impl<'de> serde::Deserialize<'de> for $name {
-            fn deserialize<D: serde::Deserializer<'de>>(
-                deserializer: D,
-            ) -> core::result::Result<Self, D::Error> {
-                let fields = <$fields as serde::Deserialize>::deserialize(deserializer)?;
-                Self::new(fields).map_err(serde::de::Error::custom)
             }
         }
     };

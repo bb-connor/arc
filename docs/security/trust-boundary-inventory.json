@@ -7711,7 +7711,7 @@
       "serialize::custom_deserialize"
     ],
     "crates/core/chio-core-types/src/root_authority/wire.rs": [
-      "deref::custom_deserialize",
+      "new::custom_deserialize",
       "serialize::custom_deserialize",
       "serialize::custom_deserialize",
       "serialize::custom_deserialize",
