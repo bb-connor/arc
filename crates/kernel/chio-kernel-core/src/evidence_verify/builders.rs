@@ -1,66 +1,13 @@
 //! Checkpoint issuance with explicit service-owned time.
 use super::*;
+use chio_core_types::crypto::Keypair;
+use chio_core_types::receipt::checkpoint::CHECKPOINT_SCHEMA;
 
 /// Explicit signer and issuance time for a checkpoint authority owner.
 /// The caller obtains the reading from its fallible, fenced service clock.
 pub struct CheckpointSigningContext<'a> {
     pub keypair: &'a Keypair,
     pub issued_at: chio_security_types::clock::UnixMillis,
-}
-
-/// Build a signed kernel checkpoint from a batch of canonical receipt bytes.
-///
-/// `receipt_canonical_bytes_batch` must not be empty. The first checkpoint of
-/// a chain (`checkpoint_seq == 1`) commits a single-leaf chain; a detached
-/// checkpoint at a later sequence is issued without a chain commitment.
-pub fn build_checkpoint(
-    checkpoint_seq: u64,
-    batch_start_seq: u64,
-    batch_end_seq: u64,
-    receipt_canonical_bytes_batch: &[Vec<u8>],
-    keypair: &Keypair,
-) -> Result<KernelCheckpoint, CheckpointError> {
-    build_checkpoint_with_previous(
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        receipt_canonical_bytes_batch,
-        keypair,
-        None,
-        &[],
-    )
-}
-
-/// Build a signed kernel checkpoint that explicitly links to the previous
-/// checkpoint when provided.
-///
-/// `prior_chain_leaf_hashes` must hold the chain leaf of every prior
-/// checkpoint in sequence order (see [`checkpoint_chain_leaf_hash`]); the new
-/// body then carries a `chain_root` extending them, and the leaves are
-/// cross-checked against the predecessor's own commitment when it has one. An
-/// empty slice is valid only with no previous checkpoint.
-pub fn build_checkpoint_with_previous(
-    checkpoint_seq: u64,
-    batch_start_seq: u64,
-    batch_end_seq: u64,
-    receipt_canonical_bytes_batch: &[Vec<u8>],
-    keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
-    prior_chain_leaf_hashes: &[Hash],
-) -> Result<KernelCheckpoint, CheckpointError> {
-    use chio_security_types::clock::{Clock, SystemClock};
-    build_checkpoint_with_previous_at(
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        receipt_canonical_bytes_batch,
-        CheckpointSigningContext {
-            keypair,
-            issued_at: SystemClock.unix_millis()?,
-        },
-        previous_checkpoint,
-        prior_chain_leaf_hashes,
-    )
 }
 
 /// Build with the issuance time supplied by the owning service.
@@ -81,37 +28,6 @@ pub fn build_checkpoint_with_previous_at(
         signing,
         previous_checkpoint,
         &CheckpointChainFrontier::from_leaves(prior_chain_leaf_hashes),
-    )
-}
-
-/// Build a signed kernel checkpoint from the chain frontier rather than from
-/// every prior leaf.
-///
-/// This is the hot path: a long-lived writer keeps the frontier and extends
-/// it, so issuing a checkpoint costs O(log n) hashes instead of rehashing the
-/// whole chain. The predecessor's signed `chain_root` is still checked, at the
-/// same O(log n) cost, so the integrity guarantee is unchanged.
-pub fn build_checkpoint_with_chain_frontier(
-    checkpoint_seq: u64,
-    batch_start_seq: u64,
-    batch_end_seq: u64,
-    receipt_canonical_bytes_batch: &[Vec<u8>],
-    keypair: &Keypair,
-    previous_checkpoint: Option<&KernelCheckpoint>,
-    prior_chain: &CheckpointChainFrontier,
-) -> Result<KernelCheckpoint, CheckpointError> {
-    use chio_security_types::clock::{Clock, SystemClock};
-    build_checkpoint_with_chain_frontier_at(
-        checkpoint_seq,
-        batch_start_seq,
-        batch_end_seq,
-        receipt_canonical_bytes_batch,
-        CheckpointSigningContext {
-            keypair,
-            issued_at: SystemClock.unix_millis()?,
-        },
-        previous_checkpoint,
-        prior_chain,
     )
 }
 

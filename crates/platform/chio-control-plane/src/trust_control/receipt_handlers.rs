@@ -433,9 +433,7 @@ pub(crate) async fn handle_evidence_import(
     if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
         return response;
     }
-    if let Err(error) =
-        evidence_export::validate_import_package_data(&request.package, &request.verification)
-    {
+    if let Err(error) = evidence_export::verify_import_package(&request.package, &request.trust) {
         return plain_http_error(StatusCode::BAD_REQUEST, &error.to_string());
     }
     match forward_post_to_leader(&state, EVIDENCE_IMPORT_PATH, &request).await {

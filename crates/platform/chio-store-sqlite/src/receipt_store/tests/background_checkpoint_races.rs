@@ -92,9 +92,7 @@ fn rejected_checkpoint_commits_restored_guards_but_not_candidate(
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
         Some(&checkpoint_one),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
-            &checkpoint_one.body,
-        )?],
+        &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
 
     let connection = store.connection()?;
@@ -327,9 +325,7 @@ fn panicked_savepoint_write_rolls_back_candidate_and_resumes_payload(
         &canonical_receipt_bytes(&store, 3, 4),
         &keypair,
         Some(&checkpoint_one),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
-            &checkpoint_one.body,
-        )?],
+        &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
 
     let mut connection = store.connection()?;
@@ -528,8 +524,8 @@ fn cache_miss_uses_locked_replacement_frontier_when_no_build_is_due(
     let stale_frontier = rebuild_checkpoint_frontier(&mut connection, None)?;
     let checkpoint_b = build_checkpoint(1, 1, 2, &canonical_receipt_bytes(&store, 1, 2), &keypair)?;
     assert_ne!(
-        chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_a.body)?,
-        chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_b.body)?,
+        chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_a.body)?,
+        chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_b.body)?,
         "the replacement must change a chain-leaf-bound field"
     );
     replace_base_checkpoint(&connection, &checkpoint_b)?;
@@ -558,7 +554,7 @@ fn cache_miss_uses_locked_replacement_frontier_when_no_build_is_due(
         "the stale A frontier must not overwrite the caught-up B frontier"
     );
     let expected_frontier = CheckpointChainFrontier::from_leaves(&[
-        chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_b.body)?,
+        chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_b.body)?,
     ]);
     assert_eq!(adopted_frontier.root(), expected_frontier.root());
     assert!(
@@ -590,9 +586,8 @@ fn cache_hit_adopts_valid_different_batch_winner_frontier() -> Result<(), Box<dy
     let checkpoint_one = store
         .load_checkpoint_by_seq(1)?
         .ok_or("checkpoint 1 missing")?;
-    let chain_leaves = [chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
-        &checkpoint_one.body,
-    )?];
+    let chain_leaves =
+        [chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?];
     let prior_frontier = CheckpointChainFrontier::from_leaves(&chain_leaves);
     let loser = build_checkpoint_with_previous(
         2,
@@ -663,9 +658,8 @@ fn cache_miss_adopts_valid_different_batch_winner_frontier(
     let checkpoint_one = store
         .load_checkpoint_by_seq(1)?
         .ok_or("checkpoint 1 missing")?;
-    let chain_leaves = [chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
-        &checkpoint_one.body,
-    )?];
+    let chain_leaves =
+        [chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?];
     let loser = build_checkpoint_with_previous(
         2,
         3,
@@ -749,9 +743,8 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
     let checkpoint_one = store
         .load_checkpoint_by_seq(1)?
         .ok_or("checkpoint 1 missing")?;
-    let chain_leaves = [chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
-        &checkpoint_one.body,
-    )?];
+    let chain_leaves =
+        [chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?];
     let loser = build_checkpoint_with_previous(
         2,
         3,
@@ -841,8 +834,8 @@ fn archived_peer_checkpoint_winner_is_authenticated_before_adoption(
     let mut forged = winner.clone();
     forged.body.kernel_key = attacker.public_key();
     forged.signature = attacker.sign(&canonical_json_bytes(&forged.body)?);
-    chio_kernel::checkpoint::validate_checkpoint(&forged)?;
-    chio_kernel::checkpoint::validate_checkpoint_predecessor(&checkpoint_one, &forged)?;
+    chio_kernel_core::evidence_verify::validate_checkpoint(&forged)?;
+    chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(&checkpoint_one, &forged)?;
     assert_eq!(forged.body.batch_start_seq, winner.body.batch_start_seq);
     assert_eq!(forged.body.batch_end_seq, winner.body.batch_end_seq);
     assert_eq!(forged.body.merkle_root, winner.body.merkle_root);

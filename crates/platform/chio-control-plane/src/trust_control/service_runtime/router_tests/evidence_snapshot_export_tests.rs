@@ -7,6 +7,7 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::crypto::Keypair;
 use chio_core::receipt::body::ChioReceipt;
+use chio_kernel::EvidenceExportReceiptQuery;
 use chio_store_sqlite::receipt_query_snapshot::{
     ReceiptQuerySnapshotConfig, ReceiptQuerySnapshotState, ReceiptQuerySnapshots,
 };
@@ -74,7 +75,7 @@ async fn export(
         .header(AUTHORIZATION, "Bearer tenant-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a"),
             "requireProofs": false,
         }))?))?;
     let response = super::super::build_router(state).oneshot(request).await?;
@@ -147,7 +148,7 @@ async fn tenant_export_does_not_reauthenticate_unselected_tenant_payloads() -> T
     )?);
     wait_until_ready(Arc::clone(&snapshots)).await?;
     let baseline = store.build_evidence_export_bundle(
-        &chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a"),
+        &chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a"),
     )?;
     assert_eq!(baseline.tool_receipts.len(), 1);
     assert_eq!(baseline.inclusion_proofs.len(), 1);
@@ -223,7 +224,7 @@ async fn oversized_tenant_export_returns_422_without_bundle_or_snapshot_invalida
     assert_eq!(
         snapshots
             .query_receipts(
-                &chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a")
+                &chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a")
                     .as_receipt_query(None)
             )?
             .total_count,
@@ -351,7 +352,7 @@ async fn assert_typed_refusal_keeps_other_tenants(
         .header(AUTHORIZATION, "Bearer tenant-b-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-b"),
             "requireProofs": false,
         }))?))?;
     let response = super::super::build_router(state).oneshot(request).await?;
@@ -472,7 +473,7 @@ async fn captured_attribution_tamper_invalidates_before_export_refusal() -> Test
     )?);
     wait_until_ready(Arc::clone(&snapshots)).await?;
     let mut by_subject =
-        chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-a")
+        chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-a")
             .as_receipt_query(None);
     by_subject.agent_subject = Some(subject);
     assert_eq!(snapshots.query_receipts(&by_subject)?.total_count, 1);
@@ -574,7 +575,7 @@ async fn tenant_b_export_status(
         .header(AUTHORIZATION, "Bearer tenant-b-secret")
         .header("content-type", "application/json")
         .body(Body::from(serde_json::to_vec(&json!({
-            "query": chio_kernel::evidence_export::EvidenceExportQuery::tenant_scoped("tenant-b"),
+            "query": chio_core::receipt::evidence::EvidenceExportQuery::tenant_scoped("tenant-b"),
             "requireProofs": false,
         }))?))?;
     Ok(super::super::build_router(state)

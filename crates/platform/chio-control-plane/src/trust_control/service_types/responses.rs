@@ -113,7 +113,7 @@ pub(crate) struct CombinedDelegationChainEntry {
     parent_capability_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     federated_parent_capability_id: Option<String>,
-    provenance: chio_kernel::CapabilitySnapshotProvenance,
+    provenance: chio_core::receipt::evidence::CapabilitySnapshotProvenance,
     #[serde(skip_serializing_if = "Option::is_none")]
     signed_capability: Option<chio_core::capability::token::CapabilityToken>,
     snapshot_delegation_depth: u64,
@@ -184,7 +184,7 @@ mod combined_delegation_chain_tests {
             delegation_depth: snapshot_depth,
             parent_capability_id: snapshot_parent.map(ToString::to_string),
             federated_parent_capability_id: federated_parent.map(ToString::to_string),
-            provenance: chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor,
+            provenance: chio_core::receipt::evidence::CapabilitySnapshotProvenance::SyntheticAnchor,
             signed_capability: None,
         }
     }

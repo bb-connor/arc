@@ -390,7 +390,7 @@ pub(crate) fn build_capability_snapshot(
         delegation_depth,
         parent_capability_id,
         federated_parent_capability_id: None,
-        provenance: chio_kernel::CapabilitySnapshotProvenance::SignedToken,
+        provenance: chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken,
         signed_capability: Some(token.clone()),
     })
 }
@@ -427,7 +427,7 @@ pub(crate) fn build_federated_delegation_anchor_snapshot(
         parent_capability_id: None,
         federated_parent_capability_id: parent_capability
             .map(|snapshot| snapshot.capability_id.clone()),
-        provenance: chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor,
+        provenance: chio_core::receipt::evidence::CapabilitySnapshotProvenance::SyntheticAnchor,
         signed_capability: None,
     })
 }
@@ -884,7 +884,7 @@ mod capability_snapshot_tests {
         assert_eq!(persisted.signature.to_hex(), token.signature.to_hex());
         assert_eq!(
             snapshot.provenance,
-            chio_kernel::CapabilitySnapshotProvenance::SignedToken
+            chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken
         );
         assert!(snapshot.federated_parent_capability_id.is_none());
         Ok(())
@@ -940,7 +940,7 @@ mod capability_snapshot_tests {
         );
         assert_eq!(
             anchor.provenance,
-            chio_kernel::CapabilitySnapshotProvenance::SyntheticAnchor
+            chio_core::receipt::evidence::CapabilitySnapshotProvenance::SyntheticAnchor
         );
         anchor.validate()?;
         Ok(())

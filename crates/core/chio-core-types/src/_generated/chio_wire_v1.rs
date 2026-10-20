@@ -26912,6 +26912,804 @@ pub mod error_tool_server_error {
         }
     }
 }
+pub mod export_bundle_verify_report {
+    /// Error types.
+    pub mod error {
+        /// Error from a `TryFrom` or `FromStr` implementation.
+        pub struct ConversionError(::std::borrow::Cow<'static, str>);
+        impl ::std::error::Error for ConversionError {}
+        impl ::std::fmt::Display for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Display::fmt(&self.0, f)
+            }
+        }
+        impl ::std::fmt::Debug for ConversionError {
+            fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> Result<(), ::std::fmt::Error> {
+                ::std::fmt::Debug::fmt(&self.0, f)
+            }
+        }
+        impl From<&'static str> for ConversionError {
+            fn from(value: &'static str) -> Self {
+                Self(value.into())
+            }
+        }
+        impl From<String> for ConversionError {
+            fn from(value: String) -> Self {
+                Self(value.into())
+            }
+        }
+    }
+    ///`chio.bundle-verify-report.v1`: the unsigned per-receipt column report an offline bundle verifier prints. Every class is computed from the bundle and the verifier-owned trust file.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/export/bundle-verify-report.schema.json",
+    ///  "title": "Chio Bundle Verify Report",
+    ///  "description": "`chio.bundle-verify-report.v1`: the unsigned per-receipt column report an offline bundle verifier prints. Every class is computed from the bundle and the verifier-owned trust file.",
+    ///  "type": "object",
+    ///  "required": [
+    ///    "envelope_signer",
+    ///    "exit_class",
+    ///    "manifest_sha256",
+    ///    "receipts",
+    ///    "required_columns",
+    ///    "schema"
+    ///  ],
+    ///  "properties": {
+    ///    "envelope_signer": {
+    ///      "description": "The kernel key that signed the export envelope, in `PublicKey::to_hex` form.",
+    ///      "type": "string",
+    ///      "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///    },
+    ///    "exit_class": {
+    ///      "type": "integer",
+    ///      "enum": [
+    ///        0,
+    ///        10
+    ///      ]
+    ///    },
+    ///    "manifest_sha256": {
+    ///      "type": "string",
+    ///      "pattern": "^[0-9a-f]{64}$"
+    ///    },
+    ///    "receipts": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/ReceiptReport"
+    ///      }
+    ///    },
+    ///    "required_columns": {
+    ///      "type": "array",
+    ///      "items": {
+    ///        "$ref": "#/$defs/Column"
+    ///      },
+    ///      "maxItems": 5,
+    ///      "uniqueItems": true
+    ///    },
+    ///    "schema": {
+    ///      "type": "string",
+    ///      "const": "chio.bundle-verify-report.v1"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ChioBundleVerifyReport {
+        ///The kernel key that signed the export envelope, in `PublicKey::to_hex` form.
+        pub envelope_signer: ChioBundleVerifyReportEnvelopeSigner,
+        pub exit_class: ChioBundleVerifyReportExitClass,
+        pub manifest_sha256: ChioBundleVerifyReportManifestSha256,
+        pub receipts: ::std::vec::Vec<ReceiptReport>,
+        pub required_columns: Vec<Column>,
+        pub schema: ::std::string::String,
+    }
+    impl ::std::convert::From<&ChioBundleVerifyReport> for ChioBundleVerifyReport {
+        fn from(value: &ChioBundleVerifyReport) -> Self {
+            value.clone()
+        }
+    }
+    ///The kernel key that signed the export envelope, in `PublicKey::to_hex` form.
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "description": "The kernel key that signed the export envelope, in `PublicKey::to_hex` form.",
+    ///  "type": "string",
+    ///  "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioBundleVerifyReportEnvelopeSigner(::std::string::String);
+    impl ::std::ops::Deref for ChioBundleVerifyReportEnvelopeSigner {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioBundleVerifyReportEnvelopeSigner> for ::std::string::String {
+        fn from(value: ChioBundleVerifyReportEnvelopeSigner) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioBundleVerifyReportEnvelopeSigner>
+        for ChioBundleVerifyReportEnvelopeSigner
+    {
+        fn from(value: &ChioBundleVerifyReportEnvelopeSigner) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioBundleVerifyReportEnvelopeSigner {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> = ::std::sync::LazyLock::new(
+                || {
+                    ::regress::Regex::new(
+                        "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$",
+                    )
+                    .unwrap()
+                },
+            );
+            if PATTERN.find(value).is_none() {
+                return Err(
+                    "doesn't match pattern \"^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$\""
+                        .into(),
+                );
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioBundleVerifyReportEnvelopeSigner {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioBundleVerifyReportEnvelopeSigner {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioBundleVerifyReportEnvelopeSigner {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioBundleVerifyReportEnvelopeSigner {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`ChioBundleVerifyReportExitClass`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "integer",
+    ///  "enum": [
+    ///    0,
+    ///    10
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug)]
+    #[serde(transparent)]
+    pub struct ChioBundleVerifyReportExitClass(i64);
+    impl ::std::ops::Deref for ChioBundleVerifyReportExitClass {
+        type Target = i64;
+        fn deref(&self) -> &i64 {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioBundleVerifyReportExitClass> for i64 {
+        fn from(value: ChioBundleVerifyReportExitClass) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioBundleVerifyReportExitClass> for ChioBundleVerifyReportExitClass {
+        fn from(value: &ChioBundleVerifyReportExitClass) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::convert::TryFrom<i64> for ChioBundleVerifyReportExitClass {
+        type Error = self::error::ConversionError;
+        fn try_from(value: i64) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if ![0_i64, 10_i64].contains(&value) {
+                Err("invalid value".into())
+            } else {
+                Ok(Self(value))
+            }
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioBundleVerifyReportExitClass {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            Self::try_from(<i64>::deserialize(deserializer)?)
+                .map_err(|e| <D::Error as ::serde::de::Error>::custom(e.to_string()))
+        }
+    }
+    ///`ChioBundleVerifyReportManifestSha256`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "pattern": "^[0-9a-f]{64}$"
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ChioBundleVerifyReportManifestSha256(::std::string::String);
+    impl ::std::ops::Deref for ChioBundleVerifyReportManifestSha256 {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ChioBundleVerifyReportManifestSha256> for ::std::string::String {
+        fn from(value: ChioBundleVerifyReportManifestSha256) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ChioBundleVerifyReportManifestSha256>
+        for ChioBundleVerifyReportManifestSha256
+    {
+        fn from(value: &ChioBundleVerifyReportManifestSha256) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ChioBundleVerifyReportManifestSha256 {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+                ::std::sync::LazyLock::new(|| ::regress::Regex::new("^[0-9a-f]{64}$").unwrap());
+            if PATTERN.find(value).is_none() {
+                return Err("doesn't match pattern \"^[0-9a-f]{64}$\"".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ChioBundleVerifyReportManifestSha256 {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ChioBundleVerifyReportManifestSha256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ChioBundleVerifyReportManifestSha256 {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ChioBundleVerifyReportManifestSha256 {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`Column`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "identity_root",
+    ///    "delegation_chain",
+    ///    "decision",
+    ///    "content",
+    ///    "settlement"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum Column {
+        #[serde(rename = "identity_root")]
+        IdentityRoot,
+        #[serde(rename = "delegation_chain")]
+        DelegationChain,
+        #[serde(rename = "decision")]
+        Decision,
+        #[serde(rename = "content")]
+        Content,
+        #[serde(rename = "settlement")]
+        Settlement,
+    }
+    impl ::std::convert::From<&Self> for Column {
+        fn from(value: &Column) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for Column {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::IdentityRoot => f.write_str("identity_root"),
+                Self::DelegationChain => f.write_str("delegation_chain"),
+                Self::Decision => f.write_str("decision"),
+                Self::Content => f.write_str("content"),
+                Self::Settlement => f.write_str("settlement"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for Column {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "identity_root" => Ok(Self::IdentityRoot),
+                "delegation_chain" => Ok(Self::DelegationChain),
+                "decision" => Ok(Self::Decision),
+                "content" => Ok(Self::Content),
+                "settlement" => Ok(Self::Settlement),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for Column {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for Column {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for Column {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ColumnResult`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "class"
+    ///  ],
+    ///  "properties": {
+    ///    "class": {
+    ///      "$ref": "#/$defs/EvidenceClass"
+    ///    },
+    ///    "reason": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ColumnResult {
+        pub class: EvidenceClass,
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub reason: ::std::option::Option<ColumnResultReason>,
+    }
+    impl ::std::convert::From<&ColumnResult> for ColumnResult {
+        fn from(value: &ColumnResult) -> Self {
+            value.clone()
+        }
+    }
+    ///`ColumnResultReason`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ColumnResultReason(::std::string::String);
+    impl ::std::ops::Deref for ColumnResultReason {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ColumnResultReason> for ::std::string::String {
+        fn from(value: ColumnResultReason) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ColumnResultReason> for ColumnResultReason {
+        fn from(value: &ColumnResultReason) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ColumnResultReason {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ColumnResultReason {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ColumnResultReason {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ColumnResultReason {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ColumnResultReason {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`EvidenceClass`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "verified",
+    ///    "observed",
+    ///    "asserted",
+    ///    "unverifiable",
+    ///    "rejected"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum EvidenceClass {
+        #[serde(rename = "verified")]
+        Verified,
+        #[serde(rename = "observed")]
+        Observed,
+        #[serde(rename = "asserted")]
+        Asserted,
+        #[serde(rename = "unverifiable")]
+        Unverifiable,
+        #[serde(rename = "rejected")]
+        Rejected,
+    }
+    impl ::std::convert::From<&Self> for EvidenceClass {
+        fn from(value: &EvidenceClass) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for EvidenceClass {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::Verified => f.write_str("verified"),
+                Self::Observed => f.write_str("observed"),
+                Self::Asserted => f.write_str("asserted"),
+                Self::Unverifiable => f.write_str("unverifiable"),
+                Self::Rejected => f.write_str("rejected"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for EvidenceClass {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "verified" => Ok(Self::Verified),
+                "observed" => Ok(Self::Observed),
+                "asserted" => Ok(Self::Asserted),
+                "unverifiable" => Ok(Self::Unverifiable),
+                "rejected" => Ok(Self::Rejected),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for EvidenceClass {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for EvidenceClass {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for EvidenceClass {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`ReceiptReport`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "columns",
+    ///    "receipt_id",
+    ///    "seq"
+    ///  ],
+    ///  "properties": {
+    ///    "columns": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "content",
+    ///        "decision",
+    ///        "delegation_chain",
+    ///        "identity_root",
+    ///        "settlement"
+    ///      ],
+    ///      "properties": {
+    ///        "content": {
+    ///          "$ref": "#/$defs/ColumnResult"
+    ///        },
+    ///        "decision": {
+    ///          "$ref": "#/$defs/ColumnResult"
+    ///        },
+    ///        "delegation_chain": {
+    ///          "$ref": "#/$defs/ColumnResult"
+    ///        },
+    ///        "identity_root": {
+    ///          "$ref": "#/$defs/ColumnResult"
+    ///        },
+    ///        "settlement": {
+    ///          "$ref": "#/$defs/ColumnResult"
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "receipt_id": {
+    ///      "type": "string",
+    ///      "minLength": 1
+    ///    },
+    ///    "seq": {
+    ///      "type": "integer",
+    ///      "minimum": 0.0
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ReceiptReport {
+        pub columns: ReceiptReportColumns,
+        pub receipt_id: ReceiptReportReceiptId,
+        pub seq: u64,
+    }
+    impl ::std::convert::From<&ReceiptReport> for ReceiptReport {
+        fn from(value: &ReceiptReport) -> Self {
+            value.clone()
+        }
+    }
+    ///`ReceiptReportColumns`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "content",
+    ///    "decision",
+    ///    "delegation_chain",
+    ///    "identity_root",
+    ///    "settlement"
+    ///  ],
+    ///  "properties": {
+    ///    "content": {
+    ///      "$ref": "#/$defs/ColumnResult"
+    ///    },
+    ///    "decision": {
+    ///      "$ref": "#/$defs/ColumnResult"
+    ///    },
+    ///    "delegation_chain": {
+    ///      "$ref": "#/$defs/ColumnResult"
+    ///    },
+    ///    "identity_root": {
+    ///      "$ref": "#/$defs/ColumnResult"
+    ///    },
+    ///    "settlement": {
+    ///      "$ref": "#/$defs/ColumnResult"
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct ReceiptReportColumns {
+        pub content: ColumnResult,
+        pub decision: ColumnResult,
+        pub delegation_chain: ColumnResult,
+        pub identity_root: ColumnResult,
+        pub settlement: ColumnResult,
+    }
+    impl ::std::convert::From<&ReceiptReportColumns> for ReceiptReportColumns {
+        fn from(value: &ReceiptReportColumns) -> Self {
+            value.clone()
+        }
+    }
+    ///`ReceiptReportReceiptId`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct ReceiptReportReceiptId(::std::string::String);
+    impl ::std::ops::Deref for ReceiptReportReceiptId {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<ReceiptReportReceiptId> for ::std::string::String {
+        fn from(value: ReceiptReportReceiptId) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&ReceiptReportReceiptId> for ReceiptReportReceiptId {
+        fn from(value: &ReceiptReportReceiptId) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for ReceiptReportReceiptId {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for ReceiptReportReceiptId {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for ReceiptReportReceiptId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for ReceiptReportReceiptId {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for ReceiptReportReceiptId {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+}
 pub mod federation_bilateral_signature_slice_envelope {
     /// Error types.
     pub mod error {
@@ -149269,6 +150067,800 @@ pub mod root_authority_verifier_trust {
             value.parse()
         }
     }
+    ///`CheckpointTrustAnchorBinding`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "publicationIdentity",
+    ///    "publicationProfileVersion",
+    ///    "signerCertRef",
+    ///    "trustAnchorIdentity",
+    ///    "trustAnchorRef"
+    ///  ],
+    ///  "properties": {
+    ///    "publicationIdentity": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "identity",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "identity": {
+    ///          "type": "string",
+    ///          "maxLength": 2048,
+    ///          "minLength": 1
+    ///        },
+    ///        "kind": {
+    ///          "type": "string",
+    ///          "enum": [
+    ///            "local_log",
+    ///            "transparency_service",
+    ///            "immutable_record",
+    ///            "chain_anchor"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "publicationProfileVersion": {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "minLength": 1
+    ///    },
+    ///    "signerCertRef": {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "minLength": 1
+    ///    },
+    ///    "trustAnchorIdentity": {
+    ///      "type": "object",
+    ///      "required": [
+    ///        "identity",
+    ///        "kind"
+    ///      ],
+    ///      "properties": {
+    ///        "identity": {
+    ///          "type": "string",
+    ///          "maxLength": 2048,
+    ///          "minLength": 1
+    ///        },
+    ///        "kind": {
+    ///          "type": "string",
+    ///          "enum": [
+    ///            "operator_root",
+    ///            "did",
+    ///            "x509_root",
+    ///            "transparency_root",
+    ///            "chain_root"
+    ///          ]
+    ///        }
+    ///      },
+    ///      "additionalProperties": false
+    ///    },
+    ///    "trustAnchorRef": {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "minLength": 1
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CheckpointTrustAnchorBinding {
+        #[serde(rename = "publicationIdentity")]
+        pub publication_identity: CheckpointTrustAnchorBindingPublicationIdentity,
+        #[serde(rename = "publicationProfileVersion")]
+        pub publication_profile_version: CheckpointTrustAnchorBindingPublicationProfileVersion,
+        #[serde(rename = "signerCertRef")]
+        pub signer_cert_ref: CheckpointTrustAnchorBindingSignerCertRef,
+        #[serde(rename = "trustAnchorIdentity")]
+        pub trust_anchor_identity: CheckpointTrustAnchorBindingTrustAnchorIdentity,
+        #[serde(rename = "trustAnchorRef")]
+        pub trust_anchor_ref: CheckpointTrustAnchorBindingTrustAnchorRef,
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBinding> for CheckpointTrustAnchorBinding {
+        fn from(value: &CheckpointTrustAnchorBinding) -> Self {
+            value.clone()
+        }
+    }
+    ///`CheckpointTrustAnchorBindingPublicationIdentity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "identity",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "identity": {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "minLength": 1
+    ///    },
+    ///    "kind": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "local_log",
+    ///        "transparency_service",
+    ///        "immutable_record",
+    ///        "chain_anchor"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CheckpointTrustAnchorBindingPublicationIdentity {
+        pub identity: CheckpointTrustAnchorBindingPublicationIdentityIdentity,
+        pub kind: CheckpointTrustAnchorBindingPublicationIdentityKind,
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingPublicationIdentity>
+        for CheckpointTrustAnchorBindingPublicationIdentity
+    {
+        fn from(value: &CheckpointTrustAnchorBindingPublicationIdentity) -> Self {
+            value.clone()
+        }
+    }
+    ///`CheckpointTrustAnchorBindingPublicationIdentityIdentity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CheckpointTrustAnchorBindingPublicationIdentityIdentity(::std::string::String);
+    impl ::std::ops::Deref for CheckpointTrustAnchorBindingPublicationIdentityIdentity {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CheckpointTrustAnchorBindingPublicationIdentityIdentity>
+        for ::std::string::String
+    {
+        fn from(value: CheckpointTrustAnchorBindingPublicationIdentityIdentity) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingPublicationIdentityIdentity>
+        for CheckpointTrustAnchorBindingPublicationIdentityIdentity
+    {
+        fn from(value: &CheckpointTrustAnchorBindingPublicationIdentityIdentity) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingPublicationIdentityIdentity {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingPublicationIdentityIdentity {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for CheckpointTrustAnchorBindingPublicationIdentityIdentity
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for CheckpointTrustAnchorBindingPublicationIdentityIdentity
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CheckpointTrustAnchorBindingPublicationIdentityIdentity {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CheckpointTrustAnchorBindingPublicationIdentityKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "local_log",
+    ///    "transparency_service",
+    ///    "immutable_record",
+    ///    "chain_anchor"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum CheckpointTrustAnchorBindingPublicationIdentityKind {
+        #[serde(rename = "local_log")]
+        LocalLog,
+        #[serde(rename = "transparency_service")]
+        TransparencyService,
+        #[serde(rename = "immutable_record")]
+        ImmutableRecord,
+        #[serde(rename = "chain_anchor")]
+        ChainAnchor,
+    }
+    impl ::std::convert::From<&Self> for CheckpointTrustAnchorBindingPublicationIdentityKind {
+        fn from(value: &CheckpointTrustAnchorBindingPublicationIdentityKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for CheckpointTrustAnchorBindingPublicationIdentityKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::LocalLog => f.write_str("local_log"),
+                Self::TransparencyService => f.write_str("transparency_service"),
+                Self::ImmutableRecord => f.write_str("immutable_record"),
+                Self::ChainAnchor => f.write_str("chain_anchor"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingPublicationIdentityKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "local_log" => Ok(Self::LocalLog),
+                "transparency_service" => Ok(Self::TransparencyService),
+                "immutable_record" => Ok(Self::ImmutableRecord),
+                "chain_anchor" => Ok(Self::ChainAnchor),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingPublicationIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for CheckpointTrustAnchorBindingPublicationIdentityKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for CheckpointTrustAnchorBindingPublicationIdentityKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`CheckpointTrustAnchorBindingPublicationProfileVersion`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CheckpointTrustAnchorBindingPublicationProfileVersion(::std::string::String);
+    impl ::std::ops::Deref for CheckpointTrustAnchorBindingPublicationProfileVersion {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CheckpointTrustAnchorBindingPublicationProfileVersion>
+        for ::std::string::String
+    {
+        fn from(value: CheckpointTrustAnchorBindingPublicationProfileVersion) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingPublicationProfileVersion>
+        for CheckpointTrustAnchorBindingPublicationProfileVersion
+    {
+        fn from(value: &CheckpointTrustAnchorBindingPublicationProfileVersion) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingPublicationProfileVersion {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingPublicationProfileVersion {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for CheckpointTrustAnchorBindingPublicationProfileVersion
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for CheckpointTrustAnchorBindingPublicationProfileVersion
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CheckpointTrustAnchorBindingPublicationProfileVersion {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CheckpointTrustAnchorBindingSignerCertRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CheckpointTrustAnchorBindingSignerCertRef(::std::string::String);
+    impl ::std::ops::Deref for CheckpointTrustAnchorBindingSignerCertRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CheckpointTrustAnchorBindingSignerCertRef> for ::std::string::String {
+        fn from(value: CheckpointTrustAnchorBindingSignerCertRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingSignerCertRef>
+        for CheckpointTrustAnchorBindingSignerCertRef
+    {
+        fn from(value: &CheckpointTrustAnchorBindingSignerCertRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingSignerCertRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingSignerCertRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String> for CheckpointTrustAnchorBindingSignerCertRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CheckpointTrustAnchorBindingSignerCertRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CheckpointTrustAnchorBindingSignerCertRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CheckpointTrustAnchorBindingTrustAnchorIdentity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "object",
+    ///  "required": [
+    ///    "identity",
+    ///    "kind"
+    ///  ],
+    ///  "properties": {
+    ///    "identity": {
+    ///      "type": "string",
+    ///      "maxLength": 2048,
+    ///      "minLength": 1
+    ///    },
+    ///    "kind": {
+    ///      "type": "string",
+    ///      "enum": [
+    ///        "operator_root",
+    ///        "did",
+    ///        "x509_root",
+    ///        "transparency_root",
+    ///        "chain_root"
+    ///      ]
+    ///    }
+    ///  },
+    ///  "additionalProperties": false
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Deserialize, ::serde::Serialize, Clone, Debug)]
+    #[serde(deny_unknown_fields)]
+    pub struct CheckpointTrustAnchorBindingTrustAnchorIdentity {
+        pub identity: CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity,
+        pub kind: CheckpointTrustAnchorBindingTrustAnchorIdentityKind,
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingTrustAnchorIdentity>
+        for CheckpointTrustAnchorBindingTrustAnchorIdentity
+    {
+        fn from(value: &CheckpointTrustAnchorBindingTrustAnchorIdentity) -> Self {
+            value.clone()
+        }
+    }
+    ///`CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity(::std::string::String);
+    impl ::std::ops::Deref for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity>
+        for ::std::string::String
+    {
+        fn from(value: CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity>
+        for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity
+    {
+        fn from(value: &CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CheckpointTrustAnchorBindingTrustAnchorIdentityIdentity {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
+    ///`CheckpointTrustAnchorBindingTrustAnchorIdentityKind`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "enum": [
+    ///    "operator_root",
+    ///    "did",
+    ///    "x509_root",
+    ///    "transparency_root",
+    ///    "chain_root"
+    ///  ]
+    ///}
+    /// ```
+    /// </details>
+    #[derive(
+        ::serde::Deserialize,
+        ::serde::Serialize,
+        Clone,
+        Copy,
+        Debug,
+        Eq,
+        Hash,
+        Ord,
+        PartialEq,
+        PartialOrd,
+    )]
+    pub enum CheckpointTrustAnchorBindingTrustAnchorIdentityKind {
+        #[serde(rename = "operator_root")]
+        OperatorRoot,
+        #[serde(rename = "did")]
+        Did,
+        #[serde(rename = "x509_root")]
+        X509Root,
+        #[serde(rename = "transparency_root")]
+        TransparencyRoot,
+        #[serde(rename = "chain_root")]
+        ChainRoot,
+    }
+    impl ::std::convert::From<&Self> for CheckpointTrustAnchorBindingTrustAnchorIdentityKind {
+        fn from(value: &CheckpointTrustAnchorBindingTrustAnchorIdentityKind) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::fmt::Display for CheckpointTrustAnchorBindingTrustAnchorIdentityKind {
+        fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+            match *self {
+                Self::OperatorRoot => f.write_str("operator_root"),
+                Self::Did => f.write_str("did"),
+                Self::X509Root => f.write_str("x509_root"),
+                Self::TransparencyRoot => f.write_str("transparency_root"),
+                Self::ChainRoot => f.write_str("chain_root"),
+            }
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingTrustAnchorIdentityKind {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            match value {
+                "operator_root" => Ok(Self::OperatorRoot),
+                "did" => Ok(Self::Did),
+                "x509_root" => Ok(Self::X509Root),
+                "transparency_root" => Ok(Self::TransparencyRoot),
+                "chain_root" => Ok(Self::ChainRoot),
+                _ => Err("invalid value".into()),
+            }
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingTrustAnchorIdentityKind {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for CheckpointTrustAnchorBindingTrustAnchorIdentityKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String>
+        for CheckpointTrustAnchorBindingTrustAnchorIdentityKind
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    ///`CheckpointTrustAnchorBindingTrustAnchorRef`
+    ///
+    /// <details><summary>JSON schema</summary>
+    ///
+    /// ```json
+    ///{
+    ///  "type": "string",
+    ///  "maxLength": 2048,
+    ///  "minLength": 1
+    ///}
+    /// ```
+    /// </details>
+    #[derive(::serde::Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    #[serde(transparent)]
+    pub struct CheckpointTrustAnchorBindingTrustAnchorRef(::std::string::String);
+    impl ::std::ops::Deref for CheckpointTrustAnchorBindingTrustAnchorRef {
+        type Target = ::std::string::String;
+        fn deref(&self) -> &::std::string::String {
+            &self.0
+        }
+    }
+    impl ::std::convert::From<CheckpointTrustAnchorBindingTrustAnchorRef> for ::std::string::String {
+        fn from(value: CheckpointTrustAnchorBindingTrustAnchorRef) -> Self {
+            value.0
+        }
+    }
+    impl ::std::convert::From<&CheckpointTrustAnchorBindingTrustAnchorRef>
+        for CheckpointTrustAnchorBindingTrustAnchorRef
+    {
+        fn from(value: &CheckpointTrustAnchorBindingTrustAnchorRef) -> Self {
+            value.clone()
+        }
+    }
+    impl ::std::str::FromStr for CheckpointTrustAnchorBindingTrustAnchorRef {
+        type Err = self::error::ConversionError;
+        fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            if value.chars().count() > 2048usize {
+                return Err("longer than 2048 characters".into());
+            }
+            if value.chars().count() < 1usize {
+                return Err("shorter than 1 characters".into());
+            }
+            Ok(Self(value.to_string()))
+        }
+    }
+    impl ::std::convert::TryFrom<&str> for CheckpointTrustAnchorBindingTrustAnchorRef {
+        type Error = self::error::ConversionError;
+        fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<&::std::string::String>
+        for CheckpointTrustAnchorBindingTrustAnchorRef
+    {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: &::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl ::std::convert::TryFrom<::std::string::String> for CheckpointTrustAnchorBindingTrustAnchorRef {
+        type Error = self::error::ConversionError;
+        fn try_from(
+            value: ::std::string::String,
+        ) -> ::std::result::Result<Self, self::error::ConversionError> {
+            value.parse()
+        }
+    }
+    impl<'de> ::serde::Deserialize<'de> for CheckpointTrustAnchorBindingTrustAnchorRef {
+        fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+        where
+            D: ::serde::Deserializer<'de>,
+        {
+            ::std::string::String::deserialize(deserializer)?
+                .parse()
+                .map_err(|e: self::error::ConversionError| {
+                    <D::Error as ::serde::de::Error>::custom(e.to_string())
+                })
+        }
+    }
     ///`chio.verifier-trust.v1`: a local, unsigned file the verifying party writes and controls. It pins the keys a verifier accepts and the report columns that must be `verified`.
     ///
     /// <details><summary>JSON schema</summary>
@@ -149296,7 +150888,12 @@ pub mod root_authority_verifier_trust {
     ///      "maxItems": 64,
     ///      "uniqueItems": true
     ///    },
+    ///    "checkpoint_trust_anchor": {
+    ///      "description": "The checkpoint publication binding the verifier accepts as a trust anchor. Absent: publication claims stay transparency previews.",
+    ///      "$ref": "#/$defs/CheckpointTrustAnchorBinding"
+    ///    },
     ///    "exchange_keys": {
+    ///      "description": "Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.",
     ///      "type": "array",
     ///      "items": {
     ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
@@ -149304,7 +150901,7 @@ pub mod root_authority_verifier_trust {
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
     ///      "maxItems": 64,
-    ///      "minItems": 1,
+    ///      "minItems": 0,
     ///      "uniqueItems": true
     ///    },
     ///    "idp_keys": {
@@ -149446,6 +151043,7 @@ pub mod root_authority_verifier_trust {
     ///      "uniqueItems": true
     ///    },
     ///    "root_policy_keys": {
+    ///      "description": "Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.",
     ///      "type": "array",
     ///      "items": {
     ///        "description": "Self-describing public key encoding (`PublicKey::to_hex`): bare Ed25519 hex, `p256:`, `p384:` or `hybrid:`.",
@@ -149453,7 +151051,7 @@ pub mod root_authority_verifier_trust {
     ///        "pattern": "^([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}|hybrid:([0-9a-f]{64}|p256:[0-9a-f]{130}|p384:[0-9a-f]{194}):[0-9a-f]{3904}:(ed25519|p256|p384)\\+mldsa65)$"
     ///      },
     ///      "maxItems": 64,
-    ///      "minItems": 1,
+    ///      "minItems": 0,
     ///      "uniqueItems": true
     ///    },
     ///    "schema": {
@@ -149470,6 +151068,10 @@ pub mod root_authority_verifier_trust {
     pub struct ChioVerifierTrust {
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub checkpoint_keys: ::std::option::Option<Vec<ChioVerifierTrustCheckpointKeysItem>>,
+        ///The checkpoint publication binding the verifier accepts as a trust anchor. Absent: publication claims stay transparency previews.
+        #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
+        pub checkpoint_trust_anchor: ::std::option::Option<CheckpointTrustAnchorBinding>,
+        ///Keys that may sign anchored roots. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.
         pub exchange_keys: Vec<ChioVerifierTrustExchangeKeysItem>,
         ///Issuer to the identity-provider keys the verifier pins itself.
         #[serde(
@@ -149490,6 +151092,7 @@ pub mod root_authority_verifier_trust {
             ::std::collections::HashMap<ChioVerifierTrustPepKeysKey, ChioVerifierTrustPepKeysValue>,
         #[serde(default, skip_serializing_if = "::std::option::Option::is_none")]
         pub required_columns: ::std::option::Option<Vec<ChioVerifierTrustRequiredColumnsItem>>,
+        ///Keys that may sign root policies. Empty when the verifier accepts no anchored root; a bundle with an anchored root then refuses as missing trust.
         pub root_policy_keys: Vec<ChioVerifierTrustRootPolicyKeysItem>,
         pub schema: ::std::string::String,
     }

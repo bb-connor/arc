@@ -1,7 +1,6 @@
 use super::receipt_scopes::{
     current_governed_call_chain_receipt_evidence, current_governed_runtime_attestation_record,
 };
-use crate::evidence_export::EvidenceLineageReferences;
 use crate::kernel::VerifiedGovernedPayeeBinding;
 use crate::operator_report::GovernedTransactionDiagnostics;
 use crate::*;
@@ -10,6 +9,7 @@ use chio_core::capability::governance::{
     GovernedCallChainContext, GovernedCallChainEvidenceSource, GovernedCallChainProvenance,
     GovernedProvenanceEvidenceClass,
 };
+use chio_core::receipt::evidence::EvidenceLineageReferences;
 
 fn governed_call_chain_provenance(
     context: GovernedCallChainContext,

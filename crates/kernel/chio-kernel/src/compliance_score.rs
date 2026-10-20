@@ -389,7 +389,7 @@ pub fn compliance_factor_breakdown(
 )]
 mod tests {
     use super::*;
-    use crate::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
+    use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 
     fn perfect_report() -> ComplianceReport {
         ComplianceReport {

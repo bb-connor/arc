@@ -37,15 +37,15 @@ use chio_finding::{
 };
 use chio_kernel::finding_denial::FindingDenial;
 
+use chio_core::receipt::checkpoint::{KernelCheckpoint, ReceiptInclusionProof};
 use chio_kernel::admission_operation::{
     AdmissionOperationState, AdmissionOperationStore, AdmissionReceiptMetadataV1,
     AdmissionTerminalReplay, ADMISSION_RECEIPT_METADATA_KEY,
 };
-use chio_kernel::checkpoint::{
-    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint, verify_checkpoint_signature,
-    KernelCheckpoint, ReceiptInclusionProof,
-};
 use chio_kernel::tool_outcome::{ResolvedToolOutcomeV1, SettlementDispositionV1, ToolOutcomeStore};
+use chio_kernel_core::evidence_verify::{
+    checkpoint_body_sha256, checkpoint_log_id, validate_checkpoint, verify_checkpoint_signature,
+};
 use chio_open_market::bidding::{
     ReservationReceipt, SignedAskResponse, SignedBidRequest, SignedReservationReceipt,
     ASK_RESPONSE_SCHEMA, RESERVATION_RECEIPT_SCHEMA,

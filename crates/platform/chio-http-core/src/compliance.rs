@@ -155,7 +155,7 @@ pub fn handle_compliance_score(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use chio_kernel::evidence_export::{EvidenceChildReceiptScope, EvidenceExportQuery};
+    use chio_core::receipt::evidence::{EvidenceChildReceiptScope, EvidenceExportQuery};
 
     fn clean_report() -> ComplianceReport {
         ComplianceReport {

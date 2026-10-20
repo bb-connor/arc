@@ -20,6 +20,7 @@ use chio_core_types::crypto::Keypair;
 use chio_core_types::message::{ExecutionNonce, NonceBinding, SignedExecutionNonce};
 use chio_core_types::receipt::authoritative_spend::BudgetAuthorityReceiptRef;
 use chio_core_types::receipt::body::{ChioReceipt, ChioReceiptBody};
+use chio_core_types::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_core_types::receipt::decision::{Decision, ToolCallAction};
 use chio_core_types::receipt::governance::{
     GovernedTransactionReceiptMetadata, RuntimeAssuranceReceiptMetadata,
@@ -58,10 +59,10 @@ use chio_finding_verifier::{
     SignedFindingBondStoreSnapshot, FINDING_BOND_STORE_SNAPSHOT_SCHEMA_V1,
 };
 use chio_fiscal::fee_schedule::SignedOpenMarketFeeSchedule;
-use chio_kernel::checkpoint::{
-    build_checkpoint, build_checkpoint_transparency, build_checkpoint_with_previous,
-    build_inclusion_proof, checkpoint_chain_leaf_hash, checkpoint_log_id,
-    CheckpointTransparencySummary, KernelCheckpoint,
+use chio_kernel::checkpoint::{build_checkpoint, build_checkpoint_with_previous};
+use chio_kernel_core::evidence_verify::{
+    build_checkpoint_transparency, build_inclusion_proof, checkpoint_chain_leaf_hash,
+    checkpoint_log_id,
 };
 use chio_revocation_oracle::{
     finding_status_empty_leaf_hash, FindingStatusSparseMap, FINDING_STATUS_BRANCH_DOMAIN,

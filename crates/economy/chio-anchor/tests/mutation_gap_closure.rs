@@ -8,7 +8,8 @@ use chio_anchor::{
     AnchorIndexerStatus, AnchorLaneHealthStatus, AnchorLaneKind, AnchorOperationKind,
 };
 use chio_core::crypto::Keypair;
-use chio_kernel::checkpoint::{build_checkpoint, KernelCheckpoint};
+use chio_core::receipt::checkpoint::KernelCheckpoint;
+use chio_kernel::checkpoint::build_checkpoint;
 
 fn test_ok<T, E>(result: Result<T, E>, context: &str) -> T
 where
