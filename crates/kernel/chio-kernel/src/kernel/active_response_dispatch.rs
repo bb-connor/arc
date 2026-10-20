@@ -156,7 +156,9 @@ pub fn prepare_response_dispatch(
         authorization_capability_hash: request.authorization_capability_hash,
         governed_intent_hash: request.governed_intent_hash,
         policy_decision_hash: request.policy_decision_hash,
-        admission_artifact_fingerprint: request.admission_artifact_fingerprint,
+        admission_artifact_fingerprint: request
+            .admission_artifact_fingerprint
+            .ok_or(DispatchRejection::UnboundArtifactPreparation)?,
         executor_authority_id: request.executor_authority_id,
         executor_authority_generation: request.executor_authority_generation,
         approval: request.approval,
@@ -172,7 +174,7 @@ struct DispatchPreparation {
     authorization_capability_hash: Digest32,
     governed_intent_hash: Digest32,
     policy_decision_hash: Digest32,
-    admission_artifact_fingerprint: Option<Digest32>,
+    admission_artifact_fingerprint: Digest32,
     executor_authority_id: RecordId,
     executor_authority_generation: u64,
     approval: ResponseDispatchApproval,
@@ -198,15 +200,10 @@ fn prepare_dispatch(
         initial_lease,
         commit_mode,
     } = request;
-    if commit_mode == ResponseDispatchCommitMode::Fresh && admission_artifact_fingerprint.is_none()
-    {
+    if admission_artifact_fingerprint.is_zero() {
         return Err(DispatchRejection::UnboundArtifactPreparation.into());
     }
-    let dispatch_schema = if admission_artifact_fingerprint.is_some() {
-        RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
-    } else {
-        1
-    };
+    let dispatch_schema = RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION;
     let mut snapshot = initial_response_snapshot(plan)?;
     let plan = &snapshot.plan;
     if authorization_capability_hash != plan.operator_capability.capability_digest {

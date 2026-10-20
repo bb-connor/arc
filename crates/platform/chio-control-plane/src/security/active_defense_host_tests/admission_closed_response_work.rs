@@ -158,25 +158,23 @@ impl AttestedFindingResponseCoordinator for ExecutingResponseCoordinator {
         _: AttestedFindingAdmissionArtifacts,
     ) -> PortResult<PreparedAttestedFindingResponse> {
         let response_plan = plan.response_plan();
-        let dispatch_id = chio_kernel::derive_active_response_dispatch_id(
-            response_plan,
-            &self.identity,
-            &hex::encode(
-                response_plan
-                    .operator_capability
-                    .capability_digest
-                    .as_bytes(),
-            ),
-            &hex::encode(GOVERNED_INTENT_HASH),
-            &hex::encode(POLICY_DECISION_HASH),
-            response_plan.created_at_unix_ms,
-            &chio_kernel::ActiveResponseExecutionApproval::Automatic,
-        )
-        .map_err(|_| PortError::integrity_failure())?;
         let artifact_fingerprint = Digest32::new([0x73; 32]);
-        let dispatch_id = chio_kernel::bind_active_response_dispatch_id_to_artifact(
-            &dispatch_id,
-            &artifact_fingerprint,
+        let dispatch_id = chio_kernel::derive_active_response_dispatch_id(
+            chio_kernel::ActiveResponseDispatchIdInput {
+                response_plan,
+                executor_authority: &self.identity,
+                authorization_capability_hash: &hex::encode(
+                    response_plan
+                        .operator_capability
+                        .capability_digest
+                        .as_bytes(),
+                ),
+                governed_intent_hash: &hex::encode(GOVERNED_INTENT_HASH),
+                policy_decision_hash: &hex::encode(POLICY_DECISION_HASH),
+                authorized_at_unix_ms: response_plan.created_at_unix_ms,
+                approval: &chio_kernel::ActiveResponseExecutionApproval::Automatic,
+                admission_artifact_fingerprint: &artifact_fingerprint,
+            },
         )
         .map_err(|_| PortError::integrity_failure())?;
         // Match execute_automatic_for_test's canonical descriptor before the
@@ -194,7 +192,7 @@ impl AttestedFindingResponseCoordinator for ExecutingResponseCoordinator {
             authorization_capability_hash: response_plan.operator_capability.capability_digest,
             governed_intent_hash: Digest32::new(GOVERNED_INTENT_HASH),
             policy_decision_hash: Digest32::new(POLICY_DECISION_HASH),
-            admission_artifact_fingerprint: Some(artifact_fingerprint),
+            admission_artifact_fingerprint: artifact_fingerprint,
             approval: chio_security_types::ports::ResponseDispatchApproval::Automatic,
         };
         let claimed = chio_kernel::ActiveResponseExecutorAuthority::claim_automatic_preparation(

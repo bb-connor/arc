@@ -467,7 +467,7 @@ impl Harness {
             authorization_capability_hash: prepared.authorization_capability_hash().into(),
             governed_intent_hash: sha256_hex(format!("{request_id}-intent").as_bytes()),
             policy_decision_hash: sha256_hex(format!("{request_id}-decision").as_bytes()),
-            admission_artifact_fingerprint: None,
+            admission_artifact_fingerprint: chio_security_types::ports::Digest32::new([91; 32]),
             approval_set_hash: approval_set.approval_set_hash().into(),
         };
         self.kernel

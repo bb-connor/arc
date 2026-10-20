@@ -503,7 +503,7 @@ fn valid_prepared_dispatch_binding(plan: &ResponsePlan) -> PreparedActiveRespons
         authorization_capability_hash: plan.operator_capability.capability_digest,
         governed_intent_hash: Digest32::new([41; 32]),
         policy_decision_hash: Digest32::new([42; 32]),
-        admission_artifact_fingerprint: Some(Digest32::new([96_u8; 32])),
+        admission_artifact_fingerprint: Digest32::new([96_u8; 32]),
         approval: ResponseDispatchApproval::Automatic,
     }
 }
@@ -710,23 +710,18 @@ fn fresh_live_admission_refuses_simulated_plans() {
 fn prepared_dispatch_binding_requires_exact_artifact_schema_pairing() {
     let plan = valid_response_plan();
     let valid = valid_prepared_dispatch_binding(&plan);
-    let mut absent = valid.clone();
-    absent.admission_artifact_fingerprint = None;
-    assert_eq!(
-        absent.validate_for_plan(&plan),
-        Err(chio_security_types::ports::PreparedActiveResponseDispatchBindingError)
-    );
-    let mut legacy = absent;
-    legacy.schema_version = 1;
-    assert_eq!(legacy.validate_for_plan(&plan), Ok(()));
-    let mut legacy_bound = valid.clone();
-    legacy_bound.schema_version = 1;
-    assert_eq!(
-        legacy_bound.validate_for_plan(&plan),
-        Err(chio_security_types::ports::PreparedActiveResponseDispatchBindingError)
-    );
+    assert_eq!(valid.schema_version, 1);
+    assert_eq!(valid.validate_for_plan(&plan), Ok(()));
+    for schema in [0, 2, u8::MAX] {
+        let mut invalid = valid.clone();
+        invalid.schema_version = schema;
+        assert_eq!(
+            invalid.validate_for_plan(&plan),
+            Err(chio_security_types::ports::PreparedActiveResponseDispatchBindingError)
+        );
+    }
     let mut zero = valid;
-    zero.admission_artifact_fingerprint = Some(Digest32::new([0; 32]));
+    zero.admission_artifact_fingerprint = Digest32::new([0; 32]);
     assert_eq!(
         zero.validate_for_plan(&plan),
         Err(chio_security_types::ports::PreparedActiveResponseDispatchBindingError)

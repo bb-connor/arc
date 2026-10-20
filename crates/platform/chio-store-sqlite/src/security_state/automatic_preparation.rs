@@ -205,7 +205,7 @@ fn load_preparation(
         || decoded.tenant_id != binding.tenant_id
         || decoded.action_id != binding.action_id
         || decoded.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
-        || decoded.admission_artifact_fingerprint.is_none()
+        || decoded.admission_artifact_fingerprint.is_zero()
     {
         return Err(PortError::integrity_failure());
     }
@@ -238,7 +238,7 @@ pub(super) fn claim_automatic_preparation(
         .validate_for_plan(&request.response_plan)
         .map_err(|_| PortError::invalid_data())?;
     if binding.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
-        || binding.admission_artifact_fingerprint.is_none()
+        || binding.admission_artifact_fingerprint.is_zero()
         || !matches!(binding.approval, ResponseDispatchApproval::Automatic)
     {
         return Err(PortError::invalid_data());
@@ -309,7 +309,7 @@ pub(super) fn require_exact_automatic_preparation(
 ) -> PortResult<()> {
     validate_automatic_preparation_schema(connection)?;
     if binding.schema_version != PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION
-        || binding.admission_artifact_fingerprint.is_none()
+        || binding.admission_artifact_fingerprint.is_zero()
     {
         return Err(PortError::invalid_data());
     }

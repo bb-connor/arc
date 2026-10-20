@@ -25,6 +25,7 @@ fn committed_admission_without_dispatch_survives_cold_recovery() {
             executor_authority: fixture.runtime.executor.identity(),
             governed_intent_hash: "77".repeat(32),
             policy_decision_hash: "88".repeat(32),
+            admission_artifact_fingerprint: chio_security_types::ports::Digest32::new([99; 32]),
             // The committed authorization must precede the store's trusted
             // clock. The executor clock deliberately models later recovery.
             authorized_at_unix_ms: plan.created_at_unix_ms,

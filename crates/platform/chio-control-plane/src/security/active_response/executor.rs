@@ -3,13 +3,12 @@ use super::tests;
 #[cfg(test)]
 use super::PREPARED_ACTIVE_RESPONSE_DISPATCH_BINDING_SCHEMA_VERSION;
 use super::{
-    bind_active_response_dispatch_id_to_artifact, committed_readback, decode_lower_hex_digest,
-    decode_response_record, derive_active_response_dispatch_id, digest_is_zero,
-    has_durable_execution_proof, readiness, recovery_id, valid_prefixed_digest_id,
-    validate_lease_duration, ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence,
-    ActiveResponseExecutionApproval, ActiveResponseExecutionEvidence,
-    ActiveResponseExecutionEvidenceParts, ActiveResponseExecutionOrigin,
-    ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
+    committed_readback, decode_lower_hex_digest, decode_response_record,
+    derive_active_response_dispatch_id, digest_is_zero, has_durable_execution_proof, readiness,
+    recovery_id, valid_prefixed_digest_id, validate_lease_duration,
+    ActiveResponseCommittedDispatch, ActiveResponseEffectEvidence, ActiveResponseExecutionApproval,
+    ActiveResponseExecutionEvidence, ActiveResponseExecutionEvidenceParts,
+    ActiveResponseExecutionOrigin, ActiveResponseExecutionOutcome, ActiveResponseExecutionRequest,
     ActiveResponseExecutorAuthority, ActiveResponseExecutorAuthorityIdentity,
     ActiveResponseExecutorError, ActiveResponseFailedEffectEvidence, ActiveResponseFailureEvidence,
     ActiveResponseReceiptProofSource, ActiveResponseRequestSource, Arc,
@@ -94,25 +93,22 @@ impl<
         let policy_decision_hash = hex::encode(policy_decision_hash.as_bytes());
         let artifact_fingerprint = Digest32::new([0x73; 32]);
         let approval = ActiveResponseExecutionApproval::Automatic;
-        let dispatch_id = derive_active_response_dispatch_id(
-            &response_plan,
-            &self.identity,
-            &authorization_capability_hash,
-            &governed_intent_hash,
-            &policy_decision_hash,
-            authorized_at_unix_ms,
-            &approval,
-        )
-        .map_err(|error| {
-            ActiveResponseExecutorError::RejectedBeforeCommit(format!(
-                "automatic test dispatch identifier is invalid: {error}"
-            ))
-        })?;
         let dispatch_id =
-            bind_active_response_dispatch_id_to_artifact(&dispatch_id, &artifact_fingerprint)
-                .map_err(|error| {
-                    ActiveResponseExecutorError::RejectedBeforeCommit(error.to_string())
-                })?;
+            derive_active_response_dispatch_id(chio_kernel::ActiveResponseDispatchIdInput {
+                response_plan: &response_plan,
+                executor_authority: &self.identity,
+                authorization_capability_hash: &authorization_capability_hash,
+                governed_intent_hash: &governed_intent_hash,
+                policy_decision_hash: &policy_decision_hash,
+                authorized_at_unix_ms,
+                approval: &approval,
+                admission_artifact_fingerprint: &artifact_fingerprint,
+            })
+            .map_err(|error| {
+                ActiveResponseExecutorError::RejectedBeforeCommit(format!(
+                    "automatic test dispatch identifier is invalid: {error}"
+                ))
+            })?;
         let request = RawActiveResponseExecutionRequest {
             dispatch_id,
             request_id: response_plan.action_id.as_str().to_string(),
@@ -155,7 +151,7 @@ impl<
                         "fixture policy digest".to_owned(),
                     )
                 })?,
-            admission_artifact_fingerprint: Some(artifact_fingerprint),
+            admission_artifact_fingerprint: artifact_fingerprint,
             approval: ResponseDispatchApproval::Automatic,
         };
         self.claim_automatic_preparation(&request.response_plan, &binding)?;
@@ -289,28 +285,24 @@ impl<
                 "dispatch-committed resume requires governed approval",
             ));
         }
-        let expected_dispatch_id = derive_active_response_dispatch_id(
-            &raw.response_plan,
-            &raw.executor_authority,
-            &raw.authorization_capability_hash,
-            &raw.governed_intent_hash,
-            &raw.policy_decision_hash,
-            raw.authorized_at_unix_ms,
-            &raw.approval,
-        )
-        .map_err(|_| reject("active-response dispatch identifier derivation failed"))?;
-        let expected_dispatch_id = match raw.admission_artifact_fingerprint {
-            Some(fingerprint) => {
-                bind_active_response_dispatch_id_to_artifact(&expected_dispatch_id, &fingerprint)
-                    .map_err(|_| reject("bound dispatch identifier derivation failed"))?
-            }
-            None if raw.origin != ActiveResponseExecutionOrigin::Fresh => expected_dispatch_id,
-            None => {
-                return Err(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
-                    chio_security_types::DispatchRejection::UnboundArtifactPreparation,
-                ))
-            }
-        };
+        let admission_artifact_fingerprint = raw
+            .admission_artifact_fingerprint
+            .filter(|fingerprint| !fingerprint.is_zero())
+            .ok_or(ActiveResponseExecutorError::DispatchRejectedBeforeCommit(
+                chio_security_types::DispatchRejection::UnboundArtifactPreparation,
+            ))?;
+        let expected_dispatch_id =
+            derive_active_response_dispatch_id(chio_kernel::ActiveResponseDispatchIdInput {
+                response_plan: &raw.response_plan,
+                executor_authority: &raw.executor_authority,
+                authorization_capability_hash: &raw.authorization_capability_hash,
+                governed_intent_hash: &raw.governed_intent_hash,
+                policy_decision_hash: &raw.policy_decision_hash,
+                authorized_at_unix_ms: raw.authorized_at_unix_ms,
+                approval: &raw.approval,
+                admission_artifact_fingerprint: &admission_artifact_fingerprint,
+            })
+            .map_err(|_| reject("active-response dispatch identifier derivation failed"))?;
         if expected_dispatch_id != raw.dispatch_id {
             return Err(reject(
                 "active-response dispatch identifier is not canonical for the request",
@@ -431,11 +423,7 @@ impl<
                 ))
             })?;
         let exact = body.schema_version
-            == if request.raw.admission_artifact_fingerprint.is_some() {
-                chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
-            } else {
-                1
-            }
+            == chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
             && body.key.tenant_id == request.raw.response_plan.tenant_id
             && body.key.dispatch_id == request.raw.dispatch_id
             && body.action_id == request.raw.response_plan.action_id
@@ -443,7 +431,8 @@ impl<
             && body.authorization_capability_hash == request.authorization_capability_hash
             && body.governed_intent_hash == request.governed_intent_hash
             && body.policy_decision_hash == request.policy_decision_hash
-            && body.admission_artifact_fingerprint == request.raw.admission_artifact_fingerprint
+            && Some(body.admission_artifact_fingerprint)
+                == request.raw.admission_artifact_fingerprint
             && body.executor_authority_id.as_str() == self.identity.authority_id()
             && body.executor_authority_generation == self.identity.generation()
             && body.approval == request.approval
@@ -804,23 +793,20 @@ impl<
                 "automatic active-response dispatch fence authority binding is invalid",
             ));
         }
-        let expected_dispatch_id = derive_active_response_dispatch_id(
-            response_plan,
-            &self.identity,
-            &hex::encode(binding.authorization_capability_hash.as_bytes()),
-            &hex::encode(binding.governed_intent_hash.as_bytes()),
-            &hex::encode(binding.policy_decision_hash.as_bytes()),
-            binding.authorized_at_unix_ms,
-            &ActiveResponseExecutionApproval::Automatic,
-        )
-        .map_err(|_| reject("automatic active-response dispatch fence id derivation failed"))?;
-        let expected_dispatch_id = match binding.admission_artifact_fingerprint {
-            Some(fingerprint) => {
-                bind_active_response_dispatch_id_to_artifact(&expected_dispatch_id, &fingerprint)
-                    .map_err(|_| reject("bound fence identifier derivation failed"))?
-            }
-            None => expected_dispatch_id,
-        };
+        let expected_dispatch_id =
+            derive_active_response_dispatch_id(chio_kernel::ActiveResponseDispatchIdInput {
+                response_plan,
+                executor_authority: &self.identity,
+                authorization_capability_hash: &hex::encode(
+                    binding.authorization_capability_hash.as_bytes(),
+                ),
+                governed_intent_hash: &hex::encode(binding.governed_intent_hash.as_bytes()),
+                policy_decision_hash: &hex::encode(binding.policy_decision_hash.as_bytes()),
+                authorized_at_unix_ms: binding.authorized_at_unix_ms,
+                approval: &ActiveResponseExecutionApproval::Automatic,
+                admission_artifact_fingerprint: &binding.admission_artifact_fingerprint,
+            })
+            .map_err(|_| reject("automatic active-response dispatch fence id derivation failed"))?;
         if expected_dispatch_id != binding.dispatch_id {
             return Err(reject(
                 "automatic active-response dispatch fence id is not canonical for the binding",

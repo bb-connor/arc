@@ -31,11 +31,7 @@ pub(super) fn active_response_execution_dispatch_binding(
         },
     };
     let binding = ResponseExecutionDispatchBinding {
-        schema_version: if request.admission_artifact_fingerprint().is_some() {
-            chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION
-        } else {
-            1
-        },
+        schema_version: chio_security_types::ports::RESPONSE_DISPATCH_AUTHORIZATION_SCHEMA_VERSION,
         tenant_id: request.response_plan().tenant_id.clone(),
         dispatch_id: request.dispatch_id().clone(),
         action_id: request.response_plan().action_id.clone(),

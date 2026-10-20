@@ -1,5 +1,5 @@
 use chio_core::{canonical_json_bytes, sha256_hex};
-use chio_security_types::ResponsePlan;
+use chio_security_types::{ports::Digest32, ResponsePlan};
 use serde::Serialize;
 
 use crate::security_admission_operation::{
@@ -24,8 +24,7 @@ pub(super) struct ActiveResponseOperationAnchor {
     pub(super) authorization_capability_hash: String,
     pub(super) governed_intent_hash: String,
     pub(super) policy_decision_hash: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub(super) admission_artifact_fingerprint: Option<chio_security_types::ports::Digest32>,
+    pub(super) admission_artifact_fingerprint: Digest32,
     pub(super) approval_set_hash: String,
 }
 
@@ -42,7 +41,8 @@ impl ActiveResponseOperationAnchor {
     }
 
     pub(super) fn is_valid(&self) -> bool {
-        self.executor_authority_generation != 0
+        !self.admission_artifact_fingerprint.is_zero()
+            && self.executor_authority_generation != 0
             && self.authorized_at_unix_ms != 0
             && [
                 self.plan_hash.as_str(),
@@ -83,15 +83,35 @@ pub(super) fn active_response_dispatch_operation_version(
     })
 }
 
+pub(super) struct ActiveResponseOperationAnchorInput<'a> {
+    pub(super) response_plan: &'a ResponsePlan,
+    pub(super) executor_authority: &'a ActiveResponseExecutorAuthorityIdentity,
+    pub(super) authorized_at_unix_ms: u64,
+    pub(super) authorization_capability_hash: &'a str,
+    pub(super) governed_intent_hash: &'a str,
+    pub(super) policy_decision_hash: &'a str,
+    pub(super) approval_set_hash: &'a str,
+    pub(super) admission_artifact_fingerprint: Digest32,
+}
+
 pub(super) fn build_active_response_operation_anchor(
-    response_plan: &ResponsePlan,
-    executor_authority: &ActiveResponseExecutorAuthorityIdentity,
-    authorized_at_unix_ms: u64,
-    authorization_capability_hash: &str,
-    governed_intent_hash: &str,
-    policy_decision_hash: &str,
-    approval_set_hash: &str,
+    input: ActiveResponseOperationAnchorInput<'_>,
 ) -> Result<ActiveResponseOperationAnchor, KernelError> {
+    let ActiveResponseOperationAnchorInput {
+        response_plan,
+        executor_authority,
+        authorized_at_unix_ms,
+        authorization_capability_hash,
+        governed_intent_hash,
+        policy_decision_hash,
+        approval_set_hash,
+        admission_artifact_fingerprint,
+    } = input;
+    if admission_artifact_fingerprint.is_zero() {
+        return Err(active_response_denied(
+            "admission artifact fingerprint is zero",
+        ));
+    }
     if authorized_at_unix_ms < response_plan.created_at_unix_ms
         || authorized_at_unix_ms >= response_plan.expires_at_unix_ms
     {
@@ -107,40 +127,33 @@ pub(super) fn build_active_response_operation_anchor(
         authorization_capability_hash: authorization_capability_hash.to_string(),
         governed_intent_hash: governed_intent_hash.to_string(),
         policy_decision_hash: policy_decision_hash.to_string(),
-        admission_artifact_fingerprint: None,
+        admission_artifact_fingerprint,
         approval_set_hash: approval_set_hash.to_string(),
     })
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ActiveResponseOperationSeed<'a> {
+    pub(super) plan_hash: &'a str,
+    pub(super) executor_authority_id: &'a str,
+    pub(super) executor_authority_generation: u64,
+    pub(super) authorization_capability_hash: &'a str,
+    pub(super) governed_intent_hash: &'a str,
+    pub(super) approval_set_hash: &'a str,
+    pub(super) admission_artifact_fingerprint: &'a Digest32,
+}
+
 pub(super) fn derive_active_response_operation_request_binding_hash(
-    plan_hash: &str,
-    executor_authority_id: &str,
-    executor_authority_generation: u64,
-    authorization_capability_hash: &str,
-    governed_intent_hash: &str,
-    approval_set_hash: &str,
+    seed: ActiveResponseOperationSeed<'_>,
     policy_hash: &str,
 ) -> Result<String, KernelError> {
-    #[derive(Serialize)]
-    #[serde(rename_all = "camelCase")]
-    struct OperationSeed<'a> {
-        plan_hash: &'a str,
-        executor_authority_id: &'a str,
-        executor_authority_generation: u64,
-        authorization_capability_hash: &'a str,
-        governed_intent_hash: &'a str,
-        approval_set_hash: &'a str,
+    if seed.admission_artifact_fingerprint.is_zero() {
+        return Err(active_response_denied(
+            "admission artifact fingerprint is zero",
+        ));
     }
-
-    let canonical = canonical_json_bytes(&OperationSeed {
-        plan_hash,
-        executor_authority_id,
-        executor_authority_generation,
-        authorization_capability_hash,
-        governed_intent_hash,
-        approval_set_hash,
-    })
-    .map_err(|error| {
+    let canonical = canonical_json_bytes(&seed).map_err(|error| {
         active_response_denied(format!(
             "active-response operation seed canonicalization failed: {error}"
         ))
@@ -153,9 +166,9 @@ pub(super) fn derive_active_response_operation_request_binding_hash(
     AdmissionRequestBindingInput::new(AdmissionRequestBindingParts {
         action_hash,
         policy_hash: policy_hash.to_string(),
-        governed_intent_hash: Some(governed_intent_hash.to_string()),
+        governed_intent_hash: Some(seed.governed_intent_hash.to_string()),
         threshold_proposal_hash: None,
-        verified_approval_set_hash: Some(approval_set_hash.to_string()),
+        verified_approval_set_hash: Some(seed.approval_set_hash.to_string()),
         approval_token_digests: Vec::new(),
         budget_hold_reference: None,
         supplemental_authorization_reference: None,
@@ -166,21 +179,43 @@ pub(super) fn derive_active_response_operation_request_binding_hash(
     .map_err(|error| active_response_denied(format!("request binding failed: {error}")))
 }
 
-pub(super) fn bind_active_response_operation_request_hash_to_artifact(
-    legacy_hash: &str,
-    fingerprint: Option<chio_security_types::ports::Digest32>,
-) -> Result<String, KernelError> {
-    let Some(fingerprint) = fingerprint else {
-        return Ok(legacy_hash.to_string());
-    };
-    if fingerprint.is_zero() {
-        return Err(active_response_denied(
-            "admission artifact fingerprint is zero",
-        ));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn operation_request_binding_commits_required_artifact() -> Result<(), KernelError> {
+        let plan_hash = "01".repeat(32);
+        let authority_id = "02".repeat(32);
+        let capability_hash = "03".repeat(32);
+        let intent_hash = "04".repeat(32);
+        let approval_hash = "05".repeat(32);
+        let policy_hash = "06".repeat(32);
+        let derive = |fingerprint: &Digest32| {
+            derive_active_response_operation_request_binding_hash(
+                ActiveResponseOperationSeed {
+                    plan_hash: &plan_hash,
+                    executor_authority_id: &authority_id,
+                    executor_authority_generation: 7,
+                    authorization_capability_hash: &capability_hash,
+                    governed_intent_hash: &intent_hash,
+                    approval_set_hash: &approval_hash,
+                    admission_artifact_fingerprint: fingerprint,
+                },
+                &policy_hash,
+            )
+        };
+        let original = derive(&Digest32::new([7; 32]))?;
+        assert_eq!(
+            original,
+            "213a70839831e6fc86fa9c23e10165fbd24424b49c70528bf4fb6f6ff1d4558e"
+        );
+        assert_ne!(original, derive(&Digest32::new([8; 32]))?);
+        let invalid = derive(&Digest32::new([0; 32]));
+        assert!(
+            matches!(invalid, Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "active-response admission denied: admission artifact fingerprint is zero")
+        );
+        Ok(())
     }
-    let canonical = canonical_json_bytes(&(legacy_hash, fingerprint))
-        .map_err(|error| active_response_denied(error.to_string()))?;
-    let mut bytes = b"chio.active-response-artifact-operation.v2\0".to_vec();
-    bytes.extend_from_slice(&canonical);
-    Ok(sha256_hex(&bytes))
 }
