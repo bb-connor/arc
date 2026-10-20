@@ -3,9 +3,6 @@ use rusqlite::Connection;
 
 use super::{invalid, Error};
 
-// Match the current legacy store's exact catalog, not merely its column names.
-// Historical ALTER-created variants require separate qualification. Sealing
-// must refuse them, not rewrite a live replay namespace to make it qualify.
 const MARKER_SCHEMA: &str = r#"
 CREATE TABLE chio_governed_approval_replay_entries (
                 subject_id              TEXT NOT NULL,
@@ -124,25 +121,14 @@ pub(super) fn verify(connection: &Connection, sealed: bool) -> Result<(), Error>
     Ok(())
 }
 
-/// Migration inspection must never adopt, stamp or repair an unstamped source.
-/// The shared legacy startup helper may write application_id, so it is not
-/// suitable for preview, exact verification or migration-only reopening.
 pub(super) fn verify_metadata(connection: &Connection) -> Result<(), Error> {
-    let app_id: i32 = connection.pragma_query_value(None, "application_id", |row| row.get(0))?;
-    if app_id != crate::CHIO_SQLITE_APPLICATION_ID {
-        return Err(invalid("source application identity is not canonical"));
-    }
-    let matches: bool = connection.query_row(
-        "SELECT COUNT(*) = 1 AND COALESCE(MIN(typeof(version) = 'integer' AND version = ?2), 0)
-         FROM chio_store_schema_versions WHERE store_key = ?1",
-        rusqlite::params![
-            super::super::GOVERNED_APPROVAL_STORE_SCHEMA_KEY,
-            super::super::GOVERNED_APPROVAL_STORE_SUPPORTED_SCHEMA_VERSION
-        ],
-        |row| row.get(0),
-    )?;
-    if !matches {
-        return Err(invalid("source schema version is not canonical"));
+    let state = crate::schema_version::inspect_schema(
+        connection,
+        &[super::super::GOVERNED_APPROVAL_STORE_SCHEMA_KEY],
+    )
+    .map_err(|error| invalid(error.to_string()))?;
+    if state != crate::SchemaState::Current {
+        return Err(invalid("source schema version is missing"));
     }
     Ok(())
 }
