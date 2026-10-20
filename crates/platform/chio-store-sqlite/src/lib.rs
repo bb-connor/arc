@@ -45,6 +45,8 @@ extern crate self as chio_store_sqlite;
 
 #[cfg(test)]
 mod test_authority;
+#[cfg(test)]
+mod test_schema;
 
 use std::path::{Path, PathBuf};
 

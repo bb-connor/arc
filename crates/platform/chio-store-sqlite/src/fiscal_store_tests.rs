@@ -557,11 +557,21 @@ fn store_fixture() -> TestResult<StoreFixture> {
 #[test]
 fn obsolete_fiscal_schema_is_refused_without_rewriting() -> TestResult {
     let mut connection = rusqlite::Connection::open_in_memory()?;
-    initialize_fiscal_schema(&mut connection)?;
-    crate::stamp_schema_version(&connection, "fiscal", 0)?;
-    let error = initialize_fiscal_schema(&mut connection)
-        .err()
-        .ok_or("an obsolete fiscal schema opened")?;
+    crate::test_schema::apply(
+        &mut connection,
+        &[FISCAL_STORE_SCHEMA_KEY],
+        initialize_fiscal_schema,
+        |error| invariant(error.to_string()),
+    )?;
+    crate::test_schema::write_version(&connection, "fiscal", 0)?;
+    let error = crate::test_schema::apply(
+        &mut connection,
+        &[FISCAL_STORE_SCHEMA_KEY],
+        initialize_fiscal_schema,
+        |error| invariant(error.to_string()),
+    )
+    .err()
+    .ok_or("an obsolete fiscal schema opened")?;
     assert!(
         error.to_string().contains(
             "database schema version 0 is not the current schema version 1; refusing to open"
@@ -580,13 +590,23 @@ fn obsolete_fiscal_schema_is_refused_without_rewriting() -> TestResult {
 #[test]
 fn fiscal_schema_without_the_fee_schedule_binding_table_is_refused() -> TestResult {
     let mut connection = rusqlite::Connection::open_in_memory()?;
-    initialize_fiscal_schema(&mut connection)?;
+    crate::test_schema::apply(
+        &mut connection,
+        &[FISCAL_STORE_SCHEMA_KEY],
+        initialize_fiscal_schema,
+        |error| invariant(error.to_string()),
+    )?;
     connection.execute_batch(
         "ALTER TABLE fiscal_fee_schedule_bindings RENAME TO fiscal_legacy_fee_schedule_bindings",
     )?;
-    let error = initialize_fiscal_schema(&mut connection)
-        .err()
-        .ok_or("a fiscal schema without its binding table opened")?;
+    let error = crate::test_schema::apply(
+        &mut connection,
+        &[FISCAL_STORE_SCHEMA_KEY],
+        initialize_fiscal_schema,
+        |error| invariant(error.to_string()),
+    )
+    .err()
+    .ok_or("a fiscal schema without its binding table opened")?;
     assert!(
         error
             .to_string()

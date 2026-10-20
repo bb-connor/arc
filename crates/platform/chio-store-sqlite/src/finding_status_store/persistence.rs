@@ -64,9 +64,7 @@ fn validate_intent_commit_liveness(
             "intent authority valid_until must follow valid_from",
         ));
     }
-    if input.issued_at < liveness.valid_from
-        || input.inclusion_deadline >= liveness.valid_until
-    {
+    if input.issued_at < liveness.valid_from || input.inclusion_deadline >= liveness.valid_until {
         return Err(FindingStatusStoreError::Conflict(
             "retraction intent is not covered through its inclusion deadline".to_owned(),
         ));
@@ -356,9 +354,7 @@ fn persist_epoch_tx(
         if epoch.operator_key_epoch == floor.operator_key_epoch
             && epoch.operator_key != floor.operator_key
         {
-            return Err(invariant(
-                "operator key changed without key-epoch rotation",
-            ));
+            return Err(invariant("operator key changed without key-epoch rotation"));
         }
         if epoch.operator_key_epoch == floor.operator_key_epoch
             && epoch.operator_authorization_sha256 != floor.operator_authorization_sha256
@@ -1957,32 +1953,20 @@ fn sqlite_error(error: rusqlite::Error) -> FindingStatusStoreError {
 }
 
 pub(crate) fn initialize_finding_status_schema(
-    connection: &mut Connection,
-) -> Result<(), FindingStatusStoreError> {
-    let state = crate::check_current_schema(
-        connection,
-        FINDING_STATUS_SCHEMA_KEY,
-        FINDING_STATUS_SCHEMA_VERSION,
-        FINDING_STATUS_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if state == crate::SchemaState::Current {
-        return verify_finding_status_invariants(connection);
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), FindingStatusStoreError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction
+            .execute_batch(FINDING_STATUS_SCHEMA)
+            .map_err(sqlite_error)?;
+
+        schema
+            .stamp(FINDING_STATUS_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(FINDING_STATUS_SCHEMA)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        FINDING_STATUS_SCHEMA_KEY,
-        FINDING_STATUS_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    verify_finding_status_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_finding_status_invariants(transaction)
 }
 
 pub(crate) fn verify_finding_status_invariants(

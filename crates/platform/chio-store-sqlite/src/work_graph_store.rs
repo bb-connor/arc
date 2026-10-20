@@ -21,8 +21,6 @@ use crate::serving_owner::{SqliteServingOwner, SqliteServingOwnerError};
 use crate::store_connection::{StoreConnection, StoreGuard};
 
 const SCHEMA_KEY: &str = "work_graph";
-const SCHEMA_VERSION: i32 = 1;
-const SCHEMA_ANCHORS: &[&str] = &["work_graph_heads", "chio_serving_owner"];
 const SCHEMA: &str = include_str!("work_graph_store.sql");
 const MAX_BUNDLE_BYTES: usize = 64 * 1024 * 1024;
 
@@ -444,33 +442,18 @@ fn owner_invalid(detail: impl Into<String>) -> SqliteServingOwnerError {
 }
 
 pub(crate) fn initialize_work_graph_schema(
-    connection: &mut Connection,
+    schema: &crate::schema_version::SchemaTransaction<'_>,
 ) -> std::result::Result<(), SqliteServingOwnerError> {
-    let state = crate::check_current_schema(connection, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
-        .map_err(|error| owner_invalid(error.to_string()))?;
-    if state == crate::SchemaState::Current {
-        return verify_work_graph_invariants(connection);
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction.execute_batch(SCHEMA)?;
+
+        schema
+            .stamp(SCHEMA_KEY)
+            .map_err(|error| owner_invalid(error.to_string()))?;
     }
-    let present: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'work_graph_heads')",
-        [],
-        |row| row.get(0),
-    )?;
-    if present {
-        return Err(owner_invalid(
-            "graph issuer store was provisioned without a schema stamp",
-        ));
-    }
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(SCHEMA)?;
-    crate::stamp_schema_version(&transaction, SCHEMA_KEY, SCHEMA_VERSION)
-        .map_err(|error| owner_invalid(error.to_string()))?;
-    verify_work_graph_invariants(&transaction)?;
-    transaction.commit().map_err(|error| {
-        SqliteServingOwnerError::OutcomeUnknown(format!(
-            "sqlite graph issuer schema commit outcome is unknown: {error}"
-        ))
-    })
+    verify_work_graph_invariants(transaction)
 }
 
 /// The schema matches its canonical definition, every head is the latest

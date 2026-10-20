@@ -138,64 +138,6 @@ fn authority_snapshot_includes_payment_projection() -> Result<(), Box<dyn std::e
             "payment_release_evidence",
         ]
     );
-    assert_ne!(
-        baseline_projection_digest(&connection)?,
-        pre_payment_baseline_projection_digest(&connection)?
-    );
-    Ok(())
-}
-
-#[test]
-fn pre_payment_compatibility_requires_empty_payment_projection(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let connection = projection_fixture()?;
-    assert!(payment_projection_is_empty(&connection)?);
-
-    connection.execute(
-        "INSERT INTO payment_journal (operation_id) VALUES ('operation-1')",
-        [],
-    )?;
-
-    assert!(!payment_projection_is_empty(&connection)?);
-    Ok(())
-}
-
-#[test]
-fn pre_channel_compatibility_requires_every_channel_table_to_be_empty(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let connection = projection_fixture()?;
-    assert!(projection_is_empty(&connection, "channel_")?);
-
-    connection.execute(
-        "INSERT INTO channel_prepared_admission_plans (operation_id) VALUES ('operation-1')",
-        [],
-    )?;
-
-    assert!(!projection_is_empty(&connection, "channel_")?);
-    Ok(())
-}
-
-#[test]
-fn pre_factor_assignment_compatibility_requires_empty_projection(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let connection = Connection::open_in_memory()?;
-    connection.execute(
-        "CREATE TABLE factor_assignment_authority_sets (generation INTEGER PRIMARY KEY)",
-        [],
-    )?;
-
-    assert!(factor_assignment_projection_is_empty(&connection)?);
-    assert_ne!(
-        baseline_projection_digest(&connection)?,
-        pre_factor_assignment_baseline_projection_digest(&connection)?
-    );
-
-    connection.execute(
-        "INSERT INTO factor_assignment_authority_sets (generation) VALUES (1)",
-        [],
-    )?;
-
-    assert!(!factor_assignment_projection_is_empty(&connection)?);
     Ok(())
 }
 
@@ -301,5 +243,36 @@ fn channel_release_projection_references_are_exact_and_unknown_kinds_stay_closed
         "#,
     )?;
     assert!(verify_channel_release_projection_coverage(&connection).is_err());
+    Ok(())
+}
+
+#[test]
+fn baseline_requires_the_complete_declared_projection_even_when_empty(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let connection = Connection::open_in_memory()?;
+    connection.execute_batch(
+        "CREATE TABLE factor_assignment_authority_sets (generation INTEGER PRIMARY KEY);
+         CREATE TABLE authority_global_commits (
+             commit_sequence INTEGER, projection_kind TEXT, projection_reference_digest TEXT
+         );",
+    )?;
+    let incomplete = baseline_projection_digest_for_tables(&connection, Vec::new())?;
+    connection.execute(
+        "INSERT INTO authority_global_commits VALUES(1, 'baseline', ?1)",
+        [&incomplete],
+    )?;
+    assert!(matches!(
+        verify_live_baseline_projection(&connection),
+        Err(SqliteServingOwnerError::Invalid(message))
+            if message == "global authority baseline does not match its live projection"
+    ));
+    assert_eq!(
+        connection.query_row(
+            "SELECT projection_reference_digest FROM authority_global_commits",
+            [],
+            |row| row.get::<_, String>(0),
+        )?,
+        incomplete
+    );
     Ok(())
 }

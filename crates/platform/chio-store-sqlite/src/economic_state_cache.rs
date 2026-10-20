@@ -35,9 +35,6 @@ use persistence::*;
 pub(crate) use persistence::{append_stage_commit, load_stage_tx, update_stage};
 
 const ECONOMIC_STATE_CACHE_SCHEMA_KEY: &str = "economic_state_cache";
-pub(crate) const ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS: &[&str] =
-    &["economic_state_stages", "capability_grant_budgets"];
 const MAX_REASON_BYTES: usize = 4 * 1024;
 const MAX_VIEW_BYTES: usize = 4 * MAX_ECONOMIC_BATCH_BYTES;
 const MAX_DESCRIPTOR_BYTES: usize = 4 * MAX_ECONOMIC_BATCH_BYTES;
@@ -1678,31 +1675,20 @@ pub(crate) fn finalize_stage_in_transaction(
 }
 
 pub(crate) fn initialize_economic_state_cache_schema(
-    connection: &mut Connection,
-) -> Result<(), EconomicStateCacheError> {
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    let state = crate::check_current_schema(
-        &transaction,
-        ECONOMIC_STATE_CACHE_SCHEMA_KEY,
-        ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
-        ECONOMIC_STATE_CACHE_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if state == crate::SchemaState::Unstamped {
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), EconomicStateCacheError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
         transaction
             .execute_batch(ECONOMIC_STATE_CACHE_SCHEMA)
             .map_err(sqlite_error)?;
-        crate::stamp_schema_version(
-            &transaction,
-            ECONOMIC_STATE_CACHE_SCHEMA_KEY,
-            ECONOMIC_STATE_CACHE_SUPPORTED_SCHEMA_VERSION,
-        )
-        .map_err(|error| invariant(error.to_string()))?;
+
+        schema
+            .stamp(ECONOMIC_STATE_CACHE_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    verify_cache_sql_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_cache_sql_invariants(transaction)
 }
 
 fn qualify_operation_binding(

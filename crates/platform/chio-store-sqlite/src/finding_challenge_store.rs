@@ -106,13 +106,6 @@ use submission_retention::{
 };
 
 const FINDING_CHALLENGE_SCHEMA_KEY: &str = "finding_challenge";
-pub(crate) const FINDING_CHALLENGE_SCHEMA_VERSION: i32 = 1;
-const FINDING_CHALLENGE_SCHEMA_ANCHORS: &[&str] = &[
-    "challenges",
-    "finding_challenge_projection_commits",
-    "admission_operations",
-    "chio_serving_owner",
-];
 const FINDING_CHALLENGE_SCHEMA: &str = include_str!("finding_challenge_store.sql");
 
 /// Upper bound on every opaque identifier this store persists. An

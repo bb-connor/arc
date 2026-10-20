@@ -174,7 +174,7 @@ fn a_legacy_global_projection_constraint_is_rejected_rather_than_migrated() {
     // Only the canonical schema is accepted; a non-canonical catalog is refused
     // instead of being adapted in place.
     assert!(matches!(
-        super::global_commit_chain::initialize_global_commit_schema(&connection),
+        super::global_commit_chain::verify_global_commit_schema(&connection),
         Err(SqliteServingOwnerError::Invalid(_))
     ));
     drop(connection);
@@ -464,9 +464,9 @@ fn baseline_verification_rejects_live_projection_tampering() {
         .expect("tamper connection")
         .execute(
             r#"
-            UPDATE chio_authority_migrations
-            SET completed_index = 2
-            WHERE migration_key = 'revocation-admission-authority-v1'
+            UPDATE budget_replication_meta
+            SET next_seq = 1
+            WHERE singleton = 1
             "#,
             [],
         )
@@ -1541,7 +1541,7 @@ fn offline_provision_is_fenced_idempotent_and_refuses_noncurrent_budget() {
     assert_eq!(admission_projection(&database), before);
 
     let connection = Connection::open(&database).expect("schema connection");
-    crate::stamp_schema_version(&connection, "budget", 3).expect("noncurrent budget stamp");
+    crate::test_schema::write_version(&connection, "budget", 3).expect("noncurrent budget stamp");
     let error = SqliteAuthorityStore::provision(&database, &lock_root)
         .expect_err("noncurrent budget schema must be refused");
     assert!(matches!(

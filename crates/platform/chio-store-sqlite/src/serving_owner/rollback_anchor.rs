@@ -1438,7 +1438,8 @@ mod tests {
                 [&replacement],
             )
             .expect("replace active lease");
-        super::super::initialize_serving_lease_schema(&connection)
+        connection
+            .execute_batch(super::super::lease_history::SERVING_LEASE_SCHEMA)
             .expect("restore exact lease schema");
         super::super::verify_authority_store_invariants(&connection)
             .expect("alternate lease satisfies database invariants");

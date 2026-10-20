@@ -35,38 +35,20 @@ pub(crate) fn admission_operation_schema_sql() -> Result<String, AdmissionOperat
 }
 
 pub(crate) fn initialize_admission_operation_schema(
-    connection: &mut Connection,
-) -> Result<(), AdmissionOperationStoreError> {
-    crate::security_state::deny_native_mutations(connection).map_err(sqlite_error)?;
-    let state = crate::check_current_schema(
-        connection,
-        ADMISSION_OPERATION_SCHEMA_KEY,
-        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
-        ADMISSION_OPERATION_SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if state == crate::SchemaState::Current {
-        return verify_admission_operation_invariants(connection);
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), AdmissionOperationStoreError> {
+    let transaction = schema.connection();
+    crate::security_state::deny_native_mutations(transaction).map_err(sqlite_error)?;
+    if schema.is_fresh() {
+        transaction
+            .execute_batch(&admission_operation_schema_sql()?)
+            .map_err(sqlite_error)?;
+
+        schema
+            .stamp(ADMISSION_OPERATION_SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    if table_exists(connection, "admission_operations")? {
-        return Err(invariant(
-            "admission storage is provisioned without a schema stamp",
-        ));
-    }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction
-        .execute_batch(&admission_operation_schema_sql()?)
-        .map_err(sqlite_error)?;
-    crate::stamp_schema_version(
-        &transaction,
-        ADMISSION_OPERATION_SCHEMA_KEY,
-        ADMISSION_OPERATION_SUPPORTED_SCHEMA_VERSION,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    verify_admission_operation_invariants(&transaction)?;
-    transaction.commit().map_err(sqlite_error)
+    verify_admission_operation_invariants(transaction)
 }
 
 fn table_exists(

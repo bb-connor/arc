@@ -45,9 +45,6 @@ pub(crate) use terminal::{
 };
 
 const CHANNEL_LIFECYCLE_SCHEMA_KEY: &str = "channel_lifecycle";
-pub(crate) const CHANNEL_LIFECYCLE_SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const CHANNEL_LIFECYCLE_SCHEMA_ANCHORS: &[&str] =
-    &["channel_lifecycle_records", "admission_operations"];
 const CHANNEL_LIFECYCLE_SCHEMA: &str = include_str!("channel_lifecycle_store.sql");
 const MAX_CHANNEL_ARTIFACT_BYTES: usize = 1024 * 1024;
 const MAX_CHANNEL_PREPARED_PLAN_BYTES: usize = 4 * 1024 * 1024;

@@ -3799,12 +3799,12 @@ fn finding_challenge_schema_other_than_current_is_refused() {
         drop(crate::test_authority::open_serving(&database, &lock_root).expect("open authority"));
         {
             let raw = rusqlite::Connection::open(&database).expect("open raw connection");
-            crate::stamp_schema_version(&raw, FINDING_CHALLENGE_SCHEMA_KEY, version)
+            crate::test_schema::write_version(&raw, FINDING_CHALLENGE_SCHEMA_KEY, version)
                 .expect("stage schema version");
         }
         let mut raw = rusqlite::Connection::open(&database).expect("open raw connection");
         assert!(matches!(
-            initialize_finding_challenge_schema(&mut raw),
+            crate::test_schema::apply(&mut raw, crate::serving_owner::SERVING_NAMESPACES, initialize_finding_challenge_schema, |error| FindingChallengeStoreError::Invariant(error.to_string())),
             Err(FindingChallengeStoreError::Invariant(message)) if message == expected
         ));
     }

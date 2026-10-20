@@ -12,8 +12,6 @@ use crate::serving_owner::SqliteServingOwner;
 use crate::store_connection::{StoreConnection, StoreGuard};
 
 const SCHEMA_KEY: &str = "finding_recovery";
-const SUPPORTED_SCHEMA_VERSION: i32 = 1;
-const SCHEMA_ANCHORS: &[&str] = &["finding_recovery_issuances", "purchase_records"];
 const SCHEMA: &str = include_str!("finding_recovery_store.sql");
 const MAX_IDENTIFIER_BYTES: usize = 512;
 
@@ -416,25 +414,18 @@ fn validate_issuance(
 }
 
 pub(crate) fn initialize_finding_recovery_schema(
-    connection: &mut Connection,
-) -> Result<(), FindingRecoveryStoreError> {
-    let on_disk = crate::check_schema_version(
-        connection,
-        SCHEMA_KEY,
-        SUPPORTED_SCHEMA_VERSION,
-        SCHEMA_ANCHORS,
-    )
-    .map_err(|error| invariant(error.to_string()))?;
-    if on_disk == SUPPORTED_SCHEMA_VERSION {
-        return Ok(());
+    schema: &crate::schema_version::SchemaTransaction<'_>,
+) -> std::result::Result<(), FindingRecoveryStoreError> {
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction.execute_batch(SCHEMA).map_err(sqlite_error)?;
+
+        schema
+            .stamp(SCHEMA_KEY)
+            .map_err(|error| invariant(error.to_string()))?;
     }
-    let transaction = connection
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(sqlite_error)?;
-    transaction.execute_batch(SCHEMA).map_err(sqlite_error)?;
-    crate::stamp_schema_version(&transaction, SCHEMA_KEY, SUPPORTED_SCHEMA_VERSION)
-        .map_err(|error| invariant(error.to_string()))?;
-    transaction.commit().map_err(sqlite_error)
+    Ok(())
 }
 
 fn require_identifier(value: &str, field: &str) -> Result<(), FindingRecoveryStoreError> {

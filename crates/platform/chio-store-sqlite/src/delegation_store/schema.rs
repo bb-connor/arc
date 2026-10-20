@@ -6,8 +6,6 @@ use rand_core::{OsRng, RngCore};
 use super::*;
 
 const SCHEMA_KEY: &str = "work_delegation";
-const SCHEMA_VERSION: i32 = 1;
-const SCHEMA_ANCHORS: &[&str] = &["work_delegation_slots", "chio_serving_owner"];
 const SCHEMA: &str = include_str!("../delegation_store.sql");
 
 pub(crate) const PROJECTION: &str = "work_delegation";
@@ -16,39 +14,23 @@ pub(super) const PROJECTION_KEY: &str = "allocator";
 type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 pub(crate) fn initialize_work_delegation_schema(
-    connection: &mut Connection,
+    schema: &crate::schema_version::SchemaTransaction<'_>,
 ) -> std::result::Result<(), SqliteServingOwnerError> {
-    let state = crate::check_current_schema(connection, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
-        .map_err(|error| owner_invalid(error.to_string()))?;
-    if state == crate::SchemaState::Current {
-        return verify_work_delegation_invariants(connection);
+    let transaction = schema.connection();
+
+    if schema.is_fresh() {
+        transaction.execute_batch(SCHEMA)?;
+        let mut bytes = [0_u8; 32];
+        OsRng.fill_bytes(&mut bytes);
+        transaction.execute(
+            "INSERT INTO work_delegation_namespace (singleton, namespace) VALUES (1, ?1)",
+            [hex::encode(bytes)],
+        )?;
+        schema
+            .stamp(SCHEMA_KEY)
+            .map_err(|error| owner_invalid(error.to_string()))?;
     }
-    let present: bool = connection.query_row(
-        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'work_delegation_slots')",
-        [],
-        |row| row.get(0),
-    )?;
-    if present {
-        return Err(owner_invalid(
-            "delegation store was provisioned without a schema stamp",
-        ));
-    }
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(SCHEMA)?;
-    let mut bytes = [0_u8; 32];
-    OsRng.fill_bytes(&mut bytes);
-    transaction.execute(
-        "INSERT INTO work_delegation_namespace (singleton, namespace) VALUES (1, ?1)",
-        [hex::encode(bytes)],
-    )?;
-    crate::stamp_schema_version(&transaction, SCHEMA_KEY, SCHEMA_VERSION)
-        .map_err(|error| owner_invalid(error.to_string()))?;
-    verify_work_delegation_invariants(&transaction)?;
-    transaction.commit().map_err(|error| {
-        SqliteServingOwnerError::OutcomeUnknown(format!(
-            "sqlite delegation schema commit outcome is unknown: {error}"
-        ))
-    })
+    verify_work_delegation_invariants(transaction)
 }
 
 /// The schema matches its canonical definition, the namespace exists, and
