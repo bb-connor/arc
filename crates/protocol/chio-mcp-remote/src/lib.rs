@@ -6,6 +6,8 @@ use rate_limit::{rate_limit_mcp_request, McpRateLimiter};
 mod clock;
 use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, UnixMillis};
 pub use clock::RemoteClock;
+#[path = "remote_mcp/idp_keys/mod.rs"]
+pub mod idp_keys;
 mod oauth_error;
 pub use oauth_error::{OAuthError, OAuthRejection};
 #[path = "remote_mcp/enterprise_provider_registry.rs"]
