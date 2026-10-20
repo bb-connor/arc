@@ -283,7 +283,8 @@ impl RootExchange {
     ///
     /// `sender_key` is the `cnf.chioSenderKey` the client proved; without it
     /// the root is held by the edge session. Nothing is persisted except the
-    /// spent client-assertion and ID-JAG replay keys.
+    /// spent client-assertion and ID-JAG replay keys; the ID-JAG key is bound
+    /// only after every other check and conversion has succeeded.
     pub async fn exchange_id_jag(
         &self,
         grant: &IdJagGrant,
@@ -375,15 +376,6 @@ impl RootExchange {
             issuer: verified.issuer.clone(),
             id: verified.jti.clone(),
         };
-        match services
-            .replay
-            .bind(&replay_key, verified.exp.saturating_add(skew), now)
-            .map_err(RootExchangeError::ReplayStoreUnavailable)?
-        {
-            ReplayBinding::Bound => {}
-            ReplayBinding::AlreadyBound => return Err(RootExchangeError::AssertionReplay),
-        }
-
         let subject = match sender_key {
             Some(key) => key.clone(),
             None => Keypair::from_seed(&random::<32>(services.entropy)).public_key(),
@@ -458,6 +450,14 @@ impl RootExchange {
             delegation_chain: Vec::new(),
             aggregate_invocation_budget: None,
         };
+        match services
+            .replay
+            .bind(&replay_key, verified.exp.saturating_add(skew), now)
+            .map_err(RootExchangeError::ReplayStoreUnavailable)?
+        {
+            ReplayBinding::Bound => {}
+            ReplayBinding::AlreadyBound => return Err(RootExchangeError::AssertionReplay),
+        }
         Ok(PreparedAnchoredRoot {
             body,
             anchor,
