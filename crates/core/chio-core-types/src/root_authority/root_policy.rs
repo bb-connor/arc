@@ -378,11 +378,7 @@ impl RootPolicyFields {
         check_schema(&self.schema, CHIO_ROOT_POLICY_SCHEMA)?;
         check_items("exchange_keys", self.exchange_keys.len(), 1, 16)?;
         check_unique("exchange_keys", &self.exchange_keys)?;
-        check_items("rules", self.rules.len(), 1, 64)?;
-        for rule in &self.rules {
-            rule.validate()?;
-        }
-        self.disclosure.validate()
+        check_items("rules", self.rules.len(), 1, 64)
     }
 }
 

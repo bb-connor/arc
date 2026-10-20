@@ -188,8 +188,7 @@ validated_type!(
 
 impl DelegationContextFields {
     pub fn validate(&self) -> core::result::Result<(), RootAuthorityShapeError> {
-        check_schema(&self.schema, CHIO_DELEGATION_CONTEXT_SCHEMA)?;
-        self.anchor.validate()
+        check_schema(&self.schema, CHIO_DELEGATION_CONTEXT_SCHEMA)
     }
 }
 

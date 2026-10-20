@@ -143,8 +143,6 @@ impl IdpKeySnapshot {
         &self,
         pinned_exchange_key: &PublicKey,
     ) -> core::result::Result<(), IdpKeySnapshotSignatureError> {
-        self.validate()
-            .map_err(IdpKeySnapshotSignatureError::Shape)?;
         if &self.exchange_key != pinned_exchange_key {
             return Err(IdpKeySnapshotSignatureError::ExchangeKeyNotPinned);
         }
@@ -162,8 +160,6 @@ impl IdpKeySnapshot {
 /// Why a key snapshot signature is refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum IdpKeySnapshotSignatureError {
-    /// The snapshot breaks a `chio.idp-key-snapshot.v1` rule.
-    Shape(RootAuthorityShapeError),
     /// `exchange_key` is not the pinned exchange key.
     ExchangeKeyNotPinned,
     /// The signature does not verify under the pinned exchange key.
@@ -174,7 +170,6 @@ pub enum IdpKeySnapshotSignatureError {
 impl core::fmt::Display for IdpKeySnapshotSignatureError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Shape(error) => write!(formatter, "key snapshot is malformed: {error}"),
             Self::ExchangeKeyNotPinned => {
                 formatter.write_str("key snapshot exchange_key is not the pinned exchange key")
             }
