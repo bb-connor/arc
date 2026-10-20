@@ -10,11 +10,14 @@ use crate::crypto::{PublicKey, Signature};
 use super::jwk::Jwk;
 use super::wire::{
     canonical_public_key, canonical_signature, check_items, check_schema, validated_struct,
-    HttpsUrl, Uri,
+    HttpsUrl, Sha256Digest, Uri,
 };
 use super::RootAuthorityShapeError;
 
 pub const CHIO_IDP_KEY_SNAPSHOT_SCHEMA: &str = "chio.idp-key-snapshot.v1";
+
+/// Domain prefix of a key snapshot digest.
+pub const IDP_KEY_SNAPSHOT_DIGEST_DOMAIN: &[u8] = b"chio.idp-key-snapshot.v1\0";
 
 const REGISTRY_SOURCE_PREFIX: &str = "registry:";
 
@@ -115,6 +118,16 @@ impl IdpKeySnapshot {
             observed_at: self.observed_at,
             exchange_key: &self.exchange_key,
         }
+    }
+
+    /// `SHA-256("chio.idp-key-snapshot.v1\0" || canonical_json(snapshot))`, signature
+    /// included; the `key_snapshot_digest` a delegation context names.
+    pub fn digest(&self) -> crate::error::Result<Sha256Digest> {
+        let canonical = crate::canonical::canonical_json_bytes(self)?;
+        Ok(Sha256Digest::of_domain(
+            IDP_KEY_SNAPSHOT_DIGEST_DOMAIN,
+            &canonical,
+        ))
     }
 
     /// Verify `signature` over the signing body under `pinned_exchange_key`,

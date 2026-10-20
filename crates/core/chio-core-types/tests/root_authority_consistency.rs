@@ -748,3 +748,17 @@ fn key_snapshot_signed_by_a_key_that_is_not_pinned_is_refused() {
         Err(IdpKeySnapshotSignatureError::InvalidSignature)
     );
 }
+
+#[test]
+fn key_snapshot_digest_is_domain_separated_and_covers_the_signature() {
+    let pinned = exchange_keypair().public_key();
+    let snapshot = snapshot_signed_by(&pinned, &exchange_keypair());
+    let mut preimage = b"chio.idp-key-snapshot.v1\0".to_vec();
+    preimage.extend_from_slice(&canonical_json_bytes(&snapshot).unwrap());
+    assert_eq!(
+        snapshot.digest().unwrap(),
+        Sha256Digest::from_hash(sha256(&preimage))
+    );
+    let resigned = snapshot_signed_by(&pinned, &other_keypair());
+    assert_ne!(resigned.digest().unwrap(), snapshot.digest().unwrap());
+}
