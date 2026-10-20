@@ -52,7 +52,7 @@ invariants.
 | --- | --- | --- | --- | --- | --- |
 | [RFC-0001](./RFC-0001-hot-path-deadlines.md) | Hot-path deadlines and watchdogs | F01, F07 (with RFC-0006), F14 (with RFC-0011) | ADR-0006, ADR-0013 | RFC-0002 | ready |
 | [RFC-0002](./RFC-0002-unconditional-post-admission-unwind.md) | Unconditional post-admission unwind | F02, F08 | ADR-0003, ADR-0006 | none | ready |
-| [RFC-0003](./RFC-0003-dispatch-intent-journal.md) | Durable dispatch-intent journal | F04, F31, F70 (with RFC-0013) | ADR-0008, ADR-0013 | RFC-0006 | ready |
+| [RFC-0003](./RFC-0003-dispatch-intent-journal.md) | Durable dispatch-intent journal | F04, F31, F70 and F71 (with RFC-0013) | ADR-0008, ADR-0013 | RFC-0006 | ready |
 | [RFC-0004](./RFC-0004-bounded-memory-enomem-analog.md) | Bounded-memory architecture and the ENOMEM analog | F03, F06, F10, F12, F21, F25, F38, F39, F63 (with RFC-0010) | none | none | ready |
 | [RFC-0005](./RFC-0005-durable-by-default-wiring.md) | Durable-by-default store wiring and schema versioning | F19, F26, F60, F62, F64, F65 | ADR-0004, ADR-0013 | none | ready |
 | [RFC-0006](./RFC-0006-storage-hot-path.md) | Storage hot path: incremental verification, background checkpoints, single writer | F07, F22, F28, F29 | ADR-0008, ADR-0013 | none | ready |
@@ -62,7 +62,7 @@ invariants.
 | [RFC-0010](./RFC-0010-graceful-shutdown-server-hygiene.md) | Graceful shutdown, drain, and server hygiene | F11, F61, F63 (with RFC-0004) | none | RFC-0001 | minor-gaps |
 | [RFC-0011](./RFC-0011-control-plane-replication-soundness.md) | Control-plane replication soundness | F14, F15, F16, F20 | ADR-0006 | none | ready |
 | [RFC-0012](./RFC-0012-federation-transport-hardening.md) | Federation transport hardening | F33, F34, F35, F36, F37 | ADR-0014 | RFC-0001, RFC-0003 | ready |
-| [RFC-0013](./RFC-0013-money-path-durability.md) | Money-path durability | F68, F69, F70, F71, F72, F73, F74 | ADR-0006, ADR-0015 | RFC-0003 | ready |
+| [RFC-0013](./RFC-0013-money-path-durability.md) | Money-path durability (per-finding status in the RFC) | F68, F69, F70, F71, F72, F73, F74 | ADR-0006, ADR-0015 | RFC-0003 | ready |
 | [PLAN-load-chaos](./PLAN-load-soak-chaos-program.md) | Load, soak, and chaos program | F49, F50, F51, F53, F54, F55, F56 (F52 with PLAN-formal-methods) | none | RFC-0004, RFC-0006 | minor-gaps |
 | [PLAN-formal-methods](./PLAN-formal-methods-program.md) | Formal-methods program | F41, F42, F43, F44, F45, F46, F47, F48, F52 | none | RFC-0002, RFC-0003, RFC-0011 | ready |
 
@@ -204,7 +204,7 @@ them as continuous programs rather than a trailing phase is recommended.
 ## 5. Coverage matrix
 
 76 finding ids are owned by this series. Every id has exactly one primary
-owner; five are shared with a named supporting document. No finding in the
+owner; six are shared with a named supporting document. No finding in the
 required set is unowned.
 
 | Finding | Primary owner | Also touched by |
@@ -272,7 +272,7 @@ required set is unowned.
 | F68 | RFC-0013 | |
 | F69 | RFC-0013 | |
 | F70 | RFC-0013 (payment journal, idempotency contract) | RFC-0003 (dispatch-intent groundwork) |
-| F71 | RFC-0013 | |
+| F71 | RFC-0013 (hold resolution contract) | RFC-0003 (recovery batch and reserved-hold reaper) |
 | F72 | RFC-0013 | |
 | F73 | RFC-0013 | |
 | F74 | RFC-0013 | |
