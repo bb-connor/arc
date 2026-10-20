@@ -7,12 +7,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use chio_core_types::canonical_json_bytes;
-use chio_store_sqlite::{
-    check_current_schema, stamp_schema_version, SchemaState, SchemaVersionError,
-};
-use rusqlite::{
-    params, Connection, OpenFlags, OptionalExtension, Transaction, TransactionBehavior,
-};
+use chio_store_sqlite::schema_version::SchemaTransaction;
+use chio_store_sqlite::SchemaVersionError;
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension, Transaction};
 
 use crate::budget::ExecutionQuota;
 use crate::store::{
@@ -55,7 +52,7 @@ impl SqliteAttemptStore {
             connection: Mutex::new(connection),
             durable_file: Some(durable_file),
         };
-        store.migrate()?;
+        store.initialize_schema()?;
         store.validate_durable_binding(path)?;
         Ok(store)
     }
@@ -67,7 +64,7 @@ impl SqliteAttemptStore {
             connection: Mutex::new(connection),
             durable_file: None,
         };
-        store.migrate()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
@@ -104,40 +101,32 @@ impl SqliteAttemptStore {
             .validate_path_binding(path)
     }
 
-    fn migrate(&self) -> Result<()> {
+    fn initialize_schema(&self) -> Result<()> {
         let mut connection = self.connection()?;
         connection
-            .execute_batch(
-                r#"
-                PRAGMA journal_mode = WAL;
-                PRAGMA synchronous = FULL;
-                PRAGMA busy_timeout = 5000;
-                PRAGMA foreign_keys = ON;
-                "#,
-            )
+            .busy_timeout(std::time::Duration::from_secs(5))
             .map_err(storage)?;
-        let transaction = connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
+        connection
+            .pragma_update(None, "foreign_keys", true)
             .map_err(storage)?;
-        let state = check_current_schema(
-            &transaction,
-            BROKER_ATTEMPT_SCHEMA_KEY,
-            BROKER_ATTEMPT_SCHEMA_VERSION,
-            BROKER_ATTEMPT_SCHEMA_ANCHORS,
-        )
-        .map_err(schema_error)?;
-        if state == SchemaState::Unstamped {
-            transaction
+        let schema = SchemaTransaction::begin(&mut connection, &[BROKER_ATTEMPT_SCHEMA_KEY])
+            .map_err(schema_error)?;
+        if schema.is_fresh() {
+            schema
+                .connection()
                 .execute_batch(BROKER_ATTEMPT_SCHEMA)
                 .map_err(storage)?;
-            stamp_schema_version(
-                &transaction,
-                BROKER_ATTEMPT_SCHEMA_KEY,
-                BROKER_ATTEMPT_SCHEMA_VERSION,
-            )
-            .map_err(schema_error)?;
+            schema
+                .stamp(BROKER_ATTEMPT_SCHEMA_KEY)
+                .map_err(schema_error)?;
         }
-        transaction.commit().map_err(storage)
+        schema
+            .validate_catalog(BROKER_ATTEMPT_SCHEMA)
+            .map_err(schema_error)?;
+        schema.commit().map_err(schema_error)?;
+        connection
+            .execute_batch("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;")
+            .map_err(storage)
     }
 }
 
@@ -154,8 +143,6 @@ impl ProductionSqliteAttemptStore {
 }
 
 const BROKER_ATTEMPT_SCHEMA_KEY: &str = "broker_attempts";
-const BROKER_ATTEMPT_SCHEMA_VERSION: i32 = 1;
-const BROKER_ATTEMPT_SCHEMA_ANCHORS: &[&str] = &["broker_attempts", "broker_nonces"];
 const BROKER_ATTEMPT_SCHEMA: &str = r#"
 CREATE TABLE broker_attempts (
     attempt_id TEXT PRIMARY KEY,
@@ -1253,14 +1240,14 @@ mod tests {
     use super::*;
     use crate::store::derive_attempt_ids;
 
-    fn migrate_seeded(seed: &str) -> Result<SqliteAttemptStore> {
+    fn initialize_seeded(seed: &str) -> Result<SqliteAttemptStore> {
         let connection = Connection::open_in_memory().map_err(storage)?;
         connection.execute_batch(seed).map_err(storage)?;
         let store = SqliteAttemptStore {
             connection: Mutex::new(connection),
             durable_file: None,
         };
-        store.migrate()?;
+        store.initialize_schema()?;
         Ok(store)
     }
 
@@ -1272,10 +1259,81 @@ mod tests {
         }
     }
 
+    fn canonical_store_fixture() -> Result<SqliteAttemptStore> {
+        let mut connection = Connection::open_in_memory().map_err(storage)?;
+        let schema = chio_store_sqlite::schema_version::SchemaTransaction::begin(
+            &mut connection,
+            &[BROKER_ATTEMPT_SCHEMA_KEY],
+        )
+        .map_err(schema_error)?;
+        schema
+            .connection()
+            .execute_batch(BROKER_ATTEMPT_SCHEMA)
+            .map_err(storage)?;
+        schema
+            .stamp(BROKER_ATTEMPT_SCHEMA_KEY)
+            .map_err(schema_error)?;
+        schema.commit().map_err(schema_error)?;
+        Ok(SqliteAttemptStore {
+            connection: Mutex::new(connection),
+            durable_file: None,
+        })
+    }
+
+    #[test]
+    fn schema_reopen_refuses_a_deleted_stamp_without_repair() -> Result<()> {
+        let store = canonical_store_fixture()?;
+        store
+            .connection()?
+            .execute("DELETE FROM chio_store_schema_versions", [])
+            .map_err(storage)?;
+        assert!(matches!(
+            store.initialize_schema(),
+            Err(BrokerError::Storage(message))
+                if message == "broker attempt store schema: schema namespace broker_attempts is missing"
+        ));
+        let stamps: i64 = store
+            .connection()?
+            .query_row(
+                "SELECT COUNT(*) FROM chio_store_schema_versions",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(storage)?;
+        assert_eq!(stamps, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn schema_reopen_refuses_a_missing_index_without_repair() -> Result<()> {
+        let store = canonical_store_fixture()?;
+        store
+            .connection()?
+            .execute_batch("DROP INDEX idx_broker_attempts_recovery;")
+            .map_err(storage)?;
+        assert!(matches!(
+            store.initialize_schema(),
+            Err(BrokerError::Storage(message))
+                if message == "broker attempt store schema: schema catalog differs from its canonical definition"
+        ));
+        let present: bool = store
+            .connection()?
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_broker_attempts_recovery')",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(storage)?;
+        assert!(!present);
+        Ok(())
+    }
+
     #[test]
     fn attempt_store_reopens_its_current_schema() {
         let store = SqliteAttemptStore::open_in_memory().test_expect("fresh attempt store");
-        store.migrate().test_expect("current schema reopens");
+        store
+            .initialize_schema()
+            .test_expect("current schema reopens");
         let version: i32 = store
             .connection()
             .test_expect("connection")
@@ -1285,29 +1343,31 @@ mod tests {
                 |row| row.get(0),
             )
             .test_expect("schema stamp");
-        assert_eq!(version, BROKER_ATTEMPT_SCHEMA_VERSION);
+        assert_eq!(version, 1);
     }
 
     #[test]
-    fn attempt_store_refuses_a_stale_schema_stamp() {
-        assert_storage_refusal(
-            migrate_seeded(
-                "PRAGMA application_id = 1128810831;
-                 CREATE TABLE broker_attempts (attempt_id TEXT PRIMARY KEY);
-                 CREATE TABLE chio_store_schema_versions (
-                     store_key TEXT PRIMARY KEY,
-                     version INTEGER NOT NULL
-                 );
-                 INSERT INTO chio_store_schema_versions VALUES ('broker_attempts', 0);",
-            ),
-            "broker attempt store schema: database schema version 0 is not the current schema version 1; refusing to open",
-        );
+    fn attempt_store_refuses_a_stale_schema_stamp() -> Result<()> {
+        let store = canonical_store_fixture()?;
+        store
+            .connection()?
+            .execute_batch(
+                "PRAGMA ignore_check_constraints = ON;
+             UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'broker_attempts';
+             PRAGMA ignore_check_constraints = OFF;",
+            )
+            .map_err(storage)?;
+        assert!(matches!(
+            store.initialize_schema(),
+            Err(BrokerError::Storage(message)) if message == "broker attempt store schema: database schema version 0 is not the current schema version 1; refusing to open"
+        ));
+        Ok(())
     }
 
     #[test]
     fn attempt_store_refuses_an_unstamped_populated_database() {
         assert_storage_refusal(
-            migrate_seeded(
+            initialize_seeded(
                 "CREATE TABLE broker_attempts (attempt_id TEXT PRIMARY KEY, state TEXT NOT NULL);",
             ),
             "broker attempt store schema: database application_id 0x0 is not a Chio store (expected 0x4348494f)",
