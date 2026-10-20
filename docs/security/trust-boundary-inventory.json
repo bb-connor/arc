@@ -7707,6 +7707,16 @@
     "crates/core/chio-core-types/src/recovery/disclosure_grant.rs": [
       "present::custom_deserialize"
     ],
+    "crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs": [
+      "serialize::custom_deserialize"
+    ],
+    "crates/core/chio-core-types/src/root_authority/wire.rs": [
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize",
+      "serialize::custom_deserialize"
+    ],
     "crates/security/chio-security-types/src/recovery/bounds.rs": [
       "as_slice::custom_deserialize",
       "checked_add::custom_deserialize",
@@ -12814,6 +12824,39 @@
             "serde::Deserializer"
           ],
           "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/root_authority/idp_key_snapshot.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom field deserialization of root-authority wire values after an outer original-byte reader. Each value is checked against its schema encoding; no authority token is constructed.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true
+        }
+      ]
+    },
+    "crates/core/chio-core-types/src/root_authority/wire.rs": {
+      "kind": "typed-field-deserializer",
+      "contract": "Custom field deserialization of root-authority wire values after an outer original-byte reader. Each value is checked against its schema encoding; no authority token is constructed.",
+      "readers": [
+        {
+          "reader": "deserialize",
+          "decoders": [
+            "custom_deserialize"
+          ],
+          "apis": [
+            "serde::Deserializer"
+          ],
+          "checked": true,
+          "instances": 5
         }
       ]
     },
