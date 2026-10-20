@@ -127,7 +127,7 @@ PROTOCOL 5.6 (merged) is normative for wire behaviour.
 | B | `refactor(mcp-remote): exchange entropy from the core Rng seam and token request follow-ups` | #1726 (P-a), #1709 | no | 1-1.5 |
 | C | `feat(mcp-remote): verify the kept anchor kinds into one exchange` | #1709, #1713, B | no | 6-8 |
 | D | `feat(mcp-remote): seed-file and trust-control exchange signers` | item 1, F15 decision | yes (item 1 wrapper) | 2-3 |
-| E | `feat(mcp-remote): mount the root exchange in serve-http and delete the bypass paths` | A, C, D, item 3 part 2 (`root_anchor` in the signed body), item 5 PR 3 hook point | yes | 11-15 |
+| E | `feat(mcp-remote): mount the root exchange in serve-http and delete the bypass paths` (one PR, or a stacked series merged in one MERGING window, L2) | A, C, D, item 3 part 2 (`root_anchor` in the signed body), item 5 PR 3 hook point | yes | 11-15 |
 
 PRs A, B and C sign nothing and may land before item 1. PR D waits for item 1, because the exchange signer signs through `sign_wrapped`, and for the F15 owner decision. PR E waits for item 3 part 2: a root is only issuable with `root_anchor` inside the signed capability body, and item 3 part 2 also returns the anchored-root resolver that admission calls. PR E is the only PR that mounts anything, and it carries every section 2.4 deletion, so `main` never has two issuance paths.
 
@@ -410,15 +410,18 @@ CREATE TABLE tenant_index_meta (
   10. scenarios.
 - [ ] **Step 3 (Task E-final):** The Review Focus 5 grep returns no matches. The light checks pass. The integrator runs the full `chio-mcp-remote`, `chio-store-sqlite`, `chio-control-plane` and native-cage `chio-cli` and `chio-conformance` suites and the hosted-edge qualification lane (item 7 owns the live Okta and Entra runs). COVERAGE is regenerated last.
 
+## Lead decisions
+
+- **L1 (was O4), lead decision 2026-10-20.** `POST /admin/roots` with its own signed request schema, `chio.operator-root-request.v1` (Decision 6). `/admin/authority` is not extended: an operator root request and an authority rotation are different trust objects.
+- **L2 (was O5), lead decision 2026-10-20.** PR E is one PR, so `main` never has two issuance paths. If it grows past reviewable size, it splits by caller group inside a stacked series whose members merge together in one MERGING window. A separately landed half is not allowed.
+
 ## Open decisions
 
 | # | Owner | Question | Default in this plan |
 |---|---|---|---|
-| O1 | owner | F15: lifecycle state for keyring and seed-file trust services, or refuse them as remote exchange signers in v1 | PR D implements whichever is chosen; it does not open until the decision is recorded |
-| O2 | owner | Decision 1: refuse remote durable admission under a root policy | refuse; item 5's 409 path is deleted |
+| O1 | owner (Connor) | F15: lifecycle state for keyring and seed-file trust services, or refuse them as remote exchange signers in v1 | PR D implements whichever is chosen; it does not open until the decision is recorded |
+| O2 | owner (Connor) | Decision 1: refuse remote durable admission under a root policy | refuse; item 5's 409 path is deleted |
 | O3 | Root-2 | Receipt tenant tag as a side table (PR A) or a receipt-table column (Root-2 lane) | side table `receipt_tenant_tags` |
-| O4 | lead | Decision 6: `POST /admin/roots` with a new signed request schema, versus extending `/admin/authority` | new route and schema |
-| O5 | lead | Whether PR E splits the caller migration (examples, deploy, docs) into a follow-up PR | no split: one PR, so no dual path exists on `main` |
 
 ## Spec traceability
 
