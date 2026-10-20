@@ -1,0 +1,56 @@
+# block	path_regex	line_regex	needs_plaintext	note
+financial	terminal/financial_receipt\.rs		yes: cost_breakdown	kernel recomputes the payment breakdown and opens the cost_breakdown commitment over it (at signing or from its own store); other fields are kept plaintext
+financial	(authoritative_spend|local_account|receivable_iou|channel/state|channel_terminal|participant_evidence|remote_projection|refusal|admission_coordinator/terminal|effect_obligation/preparation|settlement_observer|receipt_support/receipt_metadata|chio-siem/src/(event|sink_projection)|claim_log/(metadata|schema)|finding-challenge/src/standing|finding-verifier/src/cost)\.rs	\.get|financial_metadata|\["financial"\]	no	reads only the kept accounting fields (grant_index, cost_charged, currency, budget_remaining, budget_total, delegation_depth, root_budget_holder, payment_reference, settlement_status, oracle_evidence, attempted_cost)
+financial	body\.rs	typed_metadata	no	typed accessor; the struct type changes cost_breakdown to a commitment
+financial	.	.	writer	writer: sets cost_breakdown to MetadataCommitment over the breakdown and stores the plaintext beside the receipt
+governed_transaction	claim_log/metadata\.rs		yes: purpose, call_chain, shared_payment_token_id	operator claim log reads the plaintext from the store's erasable metadata-value rows written in the append transaction; an erased value is reported as erased
+governed_transaction	(receivable_iou|participant_evidence|finding-verifier/src/verify|kernel/mod|native_suite|call_evidence/export)\.rs		no	reads approval, economic_authorization (with funding_source_ref committed), runtime_assurance, server_id, tool_name, intent ids, which stay plaintext
+governed_transaction	receipt_support/receipt_metadata\.rs		writer	writer and kernel post-processing (get_mut): commits purpose, call_chain, commerce.shared_payment_token_id and economic_authorization.funding_source_ref
+governed_transaction	body\.rs	typed_metadata	no	typed accessor
+governed_transaction	.	.	writer	writer
+governed_transaction_diagnostics	reports\.rs		yes: call_chain	operator report reads the plaintext from the store's erasable metadata-value rows
+governed_transaction_diagnostics	.	.	writer	writer: the whole block becomes one MetadataCommitment
+receipt_context	chio-acp-proxy/src/kernel_signer\.rs	get\("receipt_context"\)	no	reads request_id (kept); authorization_resource is checked by opening its commitment over the proxy's own authorization request record (kernel_signer.rs:342)
+receipt_context	(projection/authorization|receipt_identity|allow_responses|call_evidence|run_evidence/custody|process_response_verify|chio-cross-protocol/src/execution|completed_result|chio-trace-validate/src/(capture|observation))\.rs		no	reads request_id, request_namespace_digest, evaluation_id or session_id, which stay plaintext
+receipt_context	.	.	writer	writer: kernel form unchanged; the ACP form commits authorization_resource
+stream	(compacted_replay|tool_outcome/receipt_signing)\.rs		no	presence check only
+stream	chio-kernel/src/kernel/responses/finalization\.rs	get\("stream"\)	no	reads the post-invocation hook envelope, not receipt metadata
+stream	process_response_verify\.rs		yes: chunk hashes	verifier recomputes chunk digests from its own output and opens the content commitment (the stream block keeps only chunk_count)
+stream	verdict_matrix/src/driver\.rs		no	conformance driver; asserts chunk_count and opens the content commitment
+stream	(chio-cohere-tools-adapter|chio-provider-conformance|chio-hermes|ai-sdk-process|probe_host_boundary|chio-langgraph|chio-streaming|chio-mini-swe|model-journal|tools\.ts|index\.d\.ts|chio-process/src/worker|native_broker/payload|chio-a2a-adapter|chio-acp-edge|chio-mcp-edge|chio-go-http|process_response_verify)	.	unrelated	provider request or tool-output stream flag, not the receipt metadata block
+stream	.	.	writer	writer: drops chunk_hashes (spec 7.6 forbids per-chunk digests in signed fields); keeps chunk_count
+memory_provenance	.	.	writer	writer: store and key become MetadataCommitments; no reader of the receipt block exists
+post_invocation	(chio-arena/src/runtime|verdict_matrix/src/driver)\.rs		yes: escalations	in-process reader; reads the escalation text from the SignedReceipt openings and plaintext held at signing, not from the signed block
+post_invocation	(chio-guards/src/lib|chio-security-kernel/src/tripwire)\.rs	.	unrelated	guard pipeline stage name, not the receipt block
+post_invocation	.	.	writer	writer: escalation text becomes a MetadataCommitment; escalation count and guard names stay plaintext
+session_report	.	.	writer	writer: operation_sha256 becomes operation_commitment; no reader of the receipt block exists
+chio_receipt_signing_nonce	(evm/prepare|chio-web3/src/settlement|admission_coordinator/terminal|compacted_replay)\.rs		no	reads the nonce to bind receipt identity; after the ACP producer stops embedding a content hash the nonce is random and Safe
+chio_receipt_signing_nonce	.	.	writer	writer: kernel form is random; the ACP producer form is changed to the kernel form
+protocol_admission	.	.	writer	writer: free-text last_error becomes a MetadataCommitment beside a closed last_error_code; no reader of the receipt block exists
+finding_pool_mutation	finding_pool_ledger\.rs		yes: mutation parameters	ledger rebuilds the expected mutation and opens the receipt's parameter commitment with the opening from the same store (census kind E/P-ii)
+finding_pool_mutation	.	.	writer	writer: the block is removed; it duplicated the action parameters, which the parameter commitment covers
+otel	chio-otel-receipt-exporter/src/sink\.rs		writer	writer: span attribute values become MetadataCommitments; trace and span ids stay plaintext
+otel	.	.	unrelated	cargo feature name or doctor check, not the receipt block
+active_defense_backfill_v1	.	.	no	migration reader verifies the active_defense projection carried in the backfill block
+scimLifecycle	config_and_public\.rs		writer	writer: SCIM user attributes become MetadataCommitments; the SCIM operation and Chio ids stay plaintext
+scimLifecycle	health\.rs	.	unrelated	health summary, not receipt metadata
+mercury	receipt_metadata\.rs	get\("mercury"\)	yes: workflow fields	proof package verifier rebuilds the canonical mercury block from the proof package and opens it with the carried opening (kind E)
+mercury	receipt_metadata\.rs	.	writer	writer: the mercury block becomes one MetadataCommitment carried with its opening in the proof package
+mercury	.	.	unrelated	server id or binary name, not the receipt block
+authorizationContext	.	.	writer	writer: MetadataCommitment; no reader of the receipt block exists
+guardOutcome	.	.	writer	writer: MetadataCommitment; no reader of the receipt block exists
+deniedAccessRecord	.	.	writer	writer: MetadataCommitment; no reader of the receipt block exists
+acp	chio-acp-proxy/src/kernel_signer\.rs		writer	writer: sessionId, toolCallId and status stay plaintext (Chio ids); content-bearing fields become MetadataCommitments
+acp	(session_certificate_read|chio-acp-proxy/src/compliance)\.rs	.	no	reads sessionId, which stays plaintext
+acp	.	.	unrelated	payment adapter name, protocol enum or OTel system name, not the receipt block
+batch_witness	explain\.rs	get\("batch_witness"\)	no	reads the witness reference string, which stays plaintext (registered Safe after its audit in P-d part 2)
+batch_witness	.	.	writer	writer of the explain report, not receipt metadata
+chio_http_receipt_v1	.	.	n/a	deleted with HttpReceipt in F (Task 12)
+delivery_contract	.	.	n/a	covered by the plan's delivery_contract split (r5, OQ12)
+cage_receipt	.	.	unrelated	generated SDK type field name
+active_defense_evidence_id	.	.	n/a	covered by the plan's keyed evidence ids (r5)
+protocol_refusal	(session_certificate_read|chio-acp-proxy/src/compliance)\.rs	.	no	reads session_id, which stays plaintext
+protocol_refusal	.	.	writer	writer: request_digest.sha256 (over the wire bytes), method_sha256 and target_sha256 become MetadataCommitments; session_id and the refusal code stay plaintext
+admission_operation	(admission_operation/projection|admission_operation/remote_projection|admission_coordinator/refusal|admission_coordinator/terminal|terminal/compacted_replay|payload_compaction/eligibility)\.rs	.	no	kernel and store readers compare the block with the operation row; request_binding_hash is a MetadataCommitment they open with the store or SignedReceipt opening over the row's binding hash (kind A); operation_id and projected_state stay plaintext
+admission_operation	(chio-process/src/lib|call_evidence|nonce_evidence|completed_result|finding_purchase_coordinator|chio-mini-swe)	.	no	reads operation_id and projected_state, which stay plaintext
+admission_operation	.	.	writer	writer: request_binding_hash becomes a MetadataCommitment (metadata.admission_operation.request_binding)

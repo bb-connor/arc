@@ -96,7 +96,7 @@ Producers without a root policy (spec 7.4):
 Further constraints:
 
 - M1 scope (spec 13.1 cut 1): every receipt is fully committed. `parameters_inline` and `result_inline` exist in the types, the schema and the verifiers, and the signer refuses to set them. Inline disclosure lands in M2.
-- Merge order (precondition): #1674, #1601 (merged), #1607, #1723 (`852c60127f`), #1715 and #1706 (both rebased onto #1723), #1716, #1705, #1710, #1708, the Root-2 K-stack in Root-2's order (T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, KERN-TRACE-LOCK-FSYNC), #1722 (subtree cancellation, draft at `188a6af6ff`), item 6 part 6a, item 1, and the store schema-adoption cleanup (no PR or implementation yet; it is the last serial store item and an explicit unresolved predecessor, never a guessed PR number); then P-a to P-d in that order, P-e (any time before F) and P-f (before P-c, which uses its credentials and listener); then F. P-c also waits for #1722 and the schema-adoption cleanup, because it adds a store table. #1710 is an explicit predecessor of F (Root-2 condition 7), not "whichever lands second". Item 3's capability change (`root_anchor` in the capability body) follows F. Root-2's order is not an approval of any candidate head.
+- Merge order (precondition): #1674, #1601 (merged), #1607, #1723 (`852c60127f`), #1715 and #1706 (both rebased onto #1723), #1716, #1705, #1710, #1708, the Root-2 K-stack in Root-2's order (T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, KERN-TRACE-LOCK-FSYNC), #1722 (subtree cancellation, draft at `188a6af6ff`), item 6 part 6a, item 1, and the store schema-adoption cleanup (no PR or implementation yet; it is the last serial store item and an explicit unresolved predecessor, never a guessed PR number); then P-a to P-d in that order (P-d as part 1, #1727, and part 2, the stacked projections PR after P-a, P-b and #1706), P-e (any time before F) and P-f (before P-c, which uses its credentials and listener); then F. F stays stopped until Amendment A1 (value-carrying metadata blocks) merges. P-c also waits for #1722 and the schema-adoption cleanup, because it adds a store table. #1710 is an explicit predecessor of F (Root-2 condition 7), not "whichever lands second". Item 3's capability change (`root_anchor` in the capability body) follows F. Root-2's order is not an approval of any candidate head.
 - Preconditions (D17): the "D17 Coordination" list is acknowledged by the lead and Root-2 on `ws2:~/lanes/claude-pr1160-evidence/lead2/sync.md` before F opens. Each Root-held file in that list has Root-2's ACK before the lane edits it.
 - Precursors are byte-neutral: each one's tip passes the full changed-crate suites and `cs cargo xtask gen signed-fixtures --check` with no fixture change.
 - F is one PR, squash-merged. Commits follow "Commit Grouping" for F: the inventory's five groups in order, and inside them each producer's salt-source wiring in its own commit. Intermediate commits need not build. Each group's last commit passes `cs cargo check -p <crate>` for the crates that group finishes.
@@ -1265,6 +1265,182 @@ Pre-existing reds on `main` are reported with `main`'s result at the same base.
 
 The staged `receipt_disclosure` category stays staged. Every scenario in it starts `serve_http_edge` with a `root_policy`, a `tenant_index_key` and the `rust-mcp-serve-http` driver, none of which exist before items 4 and 7, and 007 to 010 are export scenarios that item 6 implements. F lands the kernel-level behavior and tests behind 001 to 006 and registers `urn:chio:error:attest:receipt-tenant-id-with-authority`. The category moves with the driver (open question 4).
 
+## Amendment A1: value-carrying metadata fields, guard error text and the cage projection
+
+Status: proposed amendment to the merged plan, written against Root-2's decisions for #1727 (`root2/decision-1727-metadata-split-and-projections.md`) and the lead's #1727 review. **F stays stopped until this amendment merges.** No F commit that switches on metadata refusal (Task 8) or signs a block below in a new form lands before it.
+
+### Rules (Root-2 decision 2)
+
+- **Salted commitment is the default** for every field that carries a caller or tool value, or an unsalted digest whose preimage is low-entropy or contains such a value.
+- A field stays **plaintext only in a minimal typed projection**, and only when a **named downstream reader** needs it in plaintext; the registry records it `CommittedSafe` with that reader and a Safe reason. No blanket block-level Safe classification.
+- **No silent drop and no fallback.** A removed field is either committed or replaced by a named projection field; a reader that needs a value it can no longer read refuses with a named error. Unregistered keys stay refused (P-d).
+- **Entropy failure denies:** a salt draw failure refuses signing (Task 2 `RngError`), for metadata salts as for parameter and content salts.
+- **Raw evidence and openings stay private under disclosure authority.** Salts live in `receipt_openings`; operator-readable plaintext lives in `receipt_metadata_values`; both are read only by the operator's own store and by callers with the `receipt-openings:read` credential scope (Task 4). Neither is published beside a public commitment, except a salt-only opening in a carrier that already holds the complete preimage (OQ9 wording).
+
+### Mechanism
+
+- **No whole-block commitments.** Every block is split by field; each committed field has its own salt and `salt_ref`. The rows below follow the lead's #1727 review addendum (b) and were checked against the census.
+- `MetadataCommitment { alg: CommitmentAlg, value: Sha256Digest, salt_ref: SaltRef }` (the receipt commitment shape), `salt_ref` `metadata.<block>.<field>` (#1706 grammar; a camelCase key uses its snake_case form, e.g. `metadata.wall_guard_outcome.reason`; every `salt_ref` below is at most 64 bytes), domain `chio.receipt.metadata.v1\0 || utf8(salt_ref) || 0x00`, so a metadata opening cannot stand in for a parameter, content or other metadata opening. Preimage: the canonical JSON of the field value. The salt is drawn with the receipt's other salts and refused when equal to any of them.
+- The salt goes to `receipt_openings` and the plaintext value to the new erasable `receipt_metadata_values` table, both in the receipt's append transaction (Task 4), replicated with the receipt and erased together (one transaction, tombstones on the openings stream).
+- Openings: an operator store reader opens with its own rows; a remote reader uses `POST /v1/internal/receipts/openings/read` with `receipt-openings:read`; an in-process reader uses `SignedReceipt.openings` at signing; an external verifier opens only with a carried opening under OQ9.
+- Refusal vocabulary: `OpeningUnavailable { Erased | Unknown }`, `MetadataCommitmentMismatch { salt_ref }`, `ReceiptMetadataUnavailable { block, field }` (a reader whose plaintext was erased reports it as erased and refuses any decision that needs it).
+
+`receipt_metadata_values` DDL, probed with `/usr/bin/sqlite3` 3.51.0 (13 of 13 cases as expected; `docs/superpowers/plans/m1-item2-census/metadata-blocks/values-ddl.sql`, `values_probe.py`, `values-probe-result.json`, sha256 `c4a6295c49fdb9401b833bd7c2347a8add05f15e64993d16d6c7bef98428785f`):
+
+```sql
+CREATE TABLE receipt_metadata_values (
+  receipt_id TEXT NOT NULL CHECK (typeof(receipt_id) = 'text' AND instr(receipt_id, char(0)) = 0 AND length(CAST(receipt_id AS BLOB)) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  salt_ref TEXT NOT NULL CHECK (typeof(salt_ref) = 'text' AND instr(salt_ref, char(0)) = 0 AND length(CAST(salt_ref AS BLOB)) BETWEEN 10 AND 64 AND salt_ref GLOB 'metadata.[a-z]*' AND salt_ref NOT GLOB '*[^a-z0-9_.]*' AND salt_ref NOT GLOB '*..*' AND salt_ref NOT GLOB '*.'),
+  state TEXT NOT NULL CHECK (typeof(state) = 'text' AND instr(state, char(0)) = 0 AND state IN ('present', 'erased')),
+  value TEXT,
+  state_at INTEGER NOT NULL CHECK (typeof(state_at) = 'integer' AND state_at >= 0),
+  CHECK ((state = 'present' AND typeof(value) = 'text' AND json_valid(value)) OR (state = 'erased' AND value IS NULL)),
+  PRIMARY KEY (receipt_id, salt_ref)
+) WITHOUT ROWID;
+```
+
+### Census
+
+`docs/superpowers/plans/m1-item2-census/metadata-blocks/metadata_blocks.py` lists, at `bc5579aaf4`, every non-test line under `crates` and `sdks` naming one of 26 blocks by literal, by a constant whose value is the key, or by a typed accessor (`financial_metadata()`, `governed_transaction_metadata()`, `delivery_contract()`), with its role (writer, reader, constant, other). Every reader and writer line matches a rule in `rules.tsv`. It fails closed: exit 2 on a git failure, exit 1 on a non-commit revision, an empty block or an unclassified reader or writer; `--self-check` requires a nonexistent revision and an empty rule set to exit nonzero (both do). Output `blocks-bc5579aaf4.tsv`: 314 lines, 26 blocks, 0 unclassified. Lines whose literal is unrelated (a provider `stream` flag, the `otel` cargo feature, the `acp` payment adapter) are classified `unrelated` by rule. Field-level readers reached after a typed decode are named in the table from a direct grep of the field. The settlement readers of #1705 (head `afe49dcd0e`) and #1710 (head `cbd953833f`) are listed at those heads.
+
+### Per-field table
+
+Columns: the field; its producer; every reader and whether it needs plaintext; the retained projection (plaintext, with the named reader and Safe reason) or the commitment; the opening path; the refusal when the value or opening is missing or wrong. "Store" means the operator's own `receipt_openings` and `receipt_metadata_values` rows.
+
+**`financial`** (writers: kernel responses, validation and evaluation, 31 census lines incl. `terminal.rs:1422`, `reconciliation.rs:398-403`, `tool_output.rs:521,577`, `finding_verified_fix.rs:1342`, `iou_store.rs:397`)
+
+| Field | Readers (plaintext need) | Projection or commitment | Opening | Refusal |
+|---|---|---|---|---|
+| `cost_charged`, `currency` | settlement: `settlement_observer.rs:113,258-300` (#1705, #1710), `settlement_ledger.rs:46-100` (#1710), `reconciliation.rs:352-370` (#1710); credit `local_account.rs:165`, `receivable_iou.rs:775`; `channel/state.rs:359`, `channel_terminal.rs:579`, `participant_evidence.rs:577`, `remote_projection.rs:896`; claim log `claim_log/metadata.rs:156,175`, `schema.rs:74`; SIEM `event.rs:96`, `sink_projection.rs:127`; finding `standing.rs:191`, `cost.rs:87,132`; `authoritative_spend.rs:39` (all need plaintext) | **Settlement projection**, `CommittedSafe`: the kernel-computed charge settlement must reconcile against the payment rail; not a tool value | none | unchanged reader errors (`settlement_observer.rs:267-300`) |
+| `settlement_status`, `payment_reference`, `payment_authorization_ambiguous` | `settlement_observer.rs:305-337,820-848` (#1705, #1710), `settlement_ledger.rs:46-100` (#1710) | **Settlement projection**, `CommittedSafe`: settlement state and the payment rail's reference, read by settlement and the ledger transcript | none | unchanged |
+| `grant_index`, `budget_remaining`, `budget_total`, `delegation_depth`, `root_budget_holder`, `attempted_cost`, `oracle_evidence` | credit, channel, projection, claim log and finding readers above (budget and grant accounting) | **Accounting projection**, `CommittedSafe` per field with its readers: kernel-computed budget, grant and conversion state | none | unchanged |
+| `cost_breakdown`, split. Today `tool_output.rs:521-527` merges the tool-reported `cost.breakdown` with the kernel `payment_breakdown` and the cross-currency note | kernel recovery check `terminal/financial_receipt.rs:18,118` compares it with the recomputed payment breakdown | `cost_breakdown` keeps only the kernel `payment_breakdown` and cross-currency note: **Projection**, `CommittedSafe` with that reader. The tool-reported breakdown moves to `reported_cost_breakdown`, a **commitment** `metadata.financial.reported_cost_breakdown` | the recovery check compares kernel-derived values only and needs no opening; the operator opens the reported part from its values row | recovery mismatch refuses as today; erased reported part shows `erased` |
+
+The settlement readers move from `metadata.get("financial")` field picks to the typed `FinancialSettlementProjection { cost_charged, currency, settlement_status, payment_reference, payment_authorization_ambiguous }` read through `financial_metadata()`; they never read `cost_breakdown` or `reported_cost_breakdown`. `budget_authority` (`hold_id`, `authorize.exposure_units`, read at `settlement_observer.rs:98,138,869-870`) is already `CommittedSafe`; its kept fields are named in the registry reason. #1705 and #1710 rebase onto the projection type in F (D17).
+
+**`governed_transaction`** (writers: `receipt_metadata.rs:473,534,586,600`, `validation.rs:1726,1785`; conformance `native_suite.rs:465`)
+
+| Field | Readers | Projection or commitment | Opening | Refusal |
+|---|---|---|---|---|
+| `purpose` | store claim log `claim_log/metadata.rs:186-225`, `claim_log/authorization.rs:307` copies it into authorization details | **Commitment** `metadata.governed_transaction.purpose` (caller text) | the claim log builds authorization details from the operator's `receipt_metadata_values` row, written in the same append transaction | erased: the authorization-details row records `ReceiptMetadataUnavailable { purpose }`; no fallback to a signed field |
+| `commerce.shared_payment_token_id` | `claim_log/metadata.rs:220`, `claim_log/authorization.rs:307` (copies it and requires it non-empty) | **Commitment** `metadata.governed_transaction.payment_token` | as above; the non-empty check runs on the values row | missing or erased value refuses the authorization-details projection with `ReceiptMetadataUnavailable { payment_token }`, as an empty token refuses today |
+| `economic_authorization.funding_source_ref` (set from the token at `receipt_metadata.rs:402,423`) | `participant_evidence.rs:569-577` (needs the ref only for equality with the token) | **Commitment** `metadata.governed_transaction.funding_source_ref` | participant evidence opens with the store over the token from its own row | `MetadataCommitmentMismatch` |
+| `call_chain.session_anchor_id`, `call_chain.receipt_lineage_statement_id` and the kernel-minted chain anchor hash | `kernel/mod.rs:869-877` (parent session anchor for continuation tokens, `governed_validation.rs:966-990`), `support/lineage.rs:951` | **Projection**, `CommittedSafe`: kernel-minted anchor id and hash, read by the parent-anchor lookup | none | unchanged |
+| `call_chain` caller-asserted members (asserted parent request and receipt ids, asserted actor and hop data, `evidence_class == Asserted` entries) | `claim_log/metadata.rs:281`, `claim_log/authorization.rs:223,410`, `receipt_store/reports.rs:81-203`, underwriting `policy_support.rs:641` | **Commitment** `metadata.governed_transaction.call_chain_asserted` | store values row; underwriting reads it through the store | erased: reports show `erased`; an underwriting rule that needs it refuses with `ReceiptMetadataUnavailable` |
+| `intent_id`, `intent_hash` (the governed-transaction anchor id and hash), `server_id`, `tool_name`, `max_amount`, `approval`, `runtime_assurance`, `autonomy`, `metered_billing`, `commerce.seller`, `commerce.settlement_destination_ref`, other `economic_authorization` members | core `body.rs:603`, `receivable_iou.rs:868-877`, `participant_evidence.rs:520,569`, `finding-verifier/verify.rs:1657`, `call_evidence/export.rs:117`, `native_suite.rs:1157` | **Projection**, `CommittedSafe` per field with these readers: kernel-derived intent anchor, approval, assurance, seller and authorization state | none | unchanged |
+
+**`governed_transaction_diagnostics`** (writer `receipt_metadata.rs:68-85,609`; readers `receipt_store/reports.rs:65`, `operator_report/authorization_context.rs:322,407`, `behavioral_analysis.rs:102`): `asserted_call_chain` (the caller-asserted chain) becomes the **commitment** `metadata.governed_transaction_diagnostics.asserted_call_chain`, read by the operator reports from the values row (erased shows `erased`); `lineage_references.session_anchor_id` and `.receipt_lineage_statement_id` are kernel-minted and stay in the **projection** with those report readers. The top-level `lineageReferences` fallback in `kernel/mod.rs:869-877` is deleted in the reserved-key PR, so no reader takes lineage from caller metadata.
+
+**`receipt_context`** (kernel writers `return_context.rs:78`, `post_effect.rs:228`, `preparation.rs:149`, `receipt_persistence.rs:177`, `receipt_identity.rs:80`; ACP writers `kernel_signer.rs:532`, `kernel_checker.rs:264`)
+
+| Field | Readers | Projection or commitment | Opening | Refusal |
+|---|---|---|---|---|
+| `request_id`, `request_namespace_digest`, `evaluation_id`, `session_id` | 13 readers: `projection/authorization.rs:62`, `receipt_identity.rs:70`, `allow_responses.rs:890`, `call_evidence.rs:301,389`, `run_evidence/custody.rs:93`, `process_response_verify.rs:212`, `chio-cross-protocol/execution.rs:242`, `completed_result.rs:140`, `chio-trace-validate` `capture.rs:602`, `observation.rs:269`, `acp-proxy/kernel_signer.rs:282` | **Projection**, `CommittedSafe`: Chio-minted ids and a kernel namespace digest that bind receipts to requests | none | unchanged |
+| ACP `authorization_resource` | `acp-proxy/kernel_signer.rs:342` compares it | **Commitment** `metadata.receipt_context.authorization_resource` (from the tool call) | proxy opens over the resource in its own authorization request record | `MetadataCommitmentMismatch` refuses the session update |
+
+**`stream`** (writers `finalization.rs:272-282`, `receipt_content.rs:53`)
+
+| Field | Readers | Projection or commitment | Opening | Refusal |
+|---|---|---|---|---|
+| `chunks_received`, `total_bytes` | `compacted_replay.rs:220`, `tool_outcome/receipt_signing.rs:107` (presence), CLI `process_response_verify.rs:353-360`, conformance `driver.rs:1094-1111` | **Projection**, `CommittedSafe`: kernel-counted stream size, compared by the CLI with its own chunks | none | unchanged |
+| `chunk_hashes` | CLI `process_response_verify.rs:310,331,353-360` | **Dropped from signed metadata** (spec 7.6: per-chunk digests are not written to any signed field). The content commitment already commits the stream preimage | the CLI recomputes the content commitment from its own chunks and opens it with the caller-copy opening (Task 7) | `OpeningUnavailable` or `ContentCommitmentMismatch` fails verification |
+
+**`memory_provenance`** (writers `allow_responses.rs:352,1016`; no receipt reader, the store's `memory_provenance` constant is a schema key). Decision under no-silent-drop: the producer stays, and every value-carrying member is committed: `store`, `key` (from the arguments), `hash`, `prev_hash` and `chain_digest` (digests over memory content) become **commitments** `metadata.memory_provenance.<member>`, opened by the operator from its values rows when auditing a memory read. `status`, the closed `reason` code and the Chio-minted `entry_id`, `capability_id`, `receipt_id` and `written_at` stay plaintext as the kernel's record of the verification (OQ-A1-1).
+
+**`post_invocation`** (writer `finalization.rs:351`): `sanitized` stays in the **projection** (readers `chio-arena/runtime.rs:285` and conformance `verdict_matrix/driver.rs:941` read only it); `escalations` (hook text) becomes the **commitment** `metadata.post_invocation.escalations`, opened by the operator from its values row. No reader needs it, so no reader changes.
+
+**`session_report`** (writer `session_ops/reports.rs:105-140`; no receipt reader). Decision under no-silent-drop: the producer stays. `operation_sha256` and `context_sha256` (unsalted digests over the operation and the caller context) become **commitments** `metadata.session_report.operation` and `.context`. `agent_id`, `session_anchor_id`, `auth_epoch`, `request_id`, `capability_sha256` (over a signed capability) and `execution_outcome` stay plaintext as Chio-minted session state (OQ-A1-1). The receipt `content_hash` over the event is replaced by the content commitment like every other receipt.
+
+**`chio_receipt_signing_nonce`** (writers `signing.rs:106,137`; ACP producer): readers `terminal.rs:747,764`, `compacted_replay.rs:241`, `chio-settle/evm/prepare.rs:504`, `chio-web3/settlement.rs:19,685` require `nonce == governed_receipt_id`, so committing it would break them. **Projection**, `CommittedSafe` with those readers. **Producer fix:** the ACP proxy (`acp-proxy/kernel_signer.rs`) today embeds an unsalted content hash in `body.id`; it mints the id from the `Rng` seam like the kernel, with no content hash. A nonce that fails the kernel-form shape check refuses signing.
+
+**`protocol_admission`** (writer `admission_terminal_receipt.rs:833`): free-text `last_error` becomes a **commitment**; a closed `last_error_code` stays in the projection; no reader.
+
+**`protocol_refusal`** (writer `session_ops/protocol_refusal.rs:266`; readers `session_certificate_read.rs:410-411`, `acp-proxy/compliance.rs:352,358` read `session_id`): `request_digest.sha256` (over the original wire bytes), `method_sha256` and `target_sha256` become **commitments**; `session_id` and the refusal code stay in the projection. Registered `Unsafe` by P-d until F.
+
+**`admission_operation`** (writers `refusal.rs:245`, `admission_terminal_receipt.rs:834`, `terminal.rs:760,1450`): `request_binding_hash` (over the immutable request hash and the unsalted parameter hash) becomes the **commitment** `metadata.admission_operation.request_binding`. Kernel and store readers (`projection.rs:1266`, `remote_projection.rs:1083`, `refusal.rs:454`, `terminal.rs:732`, `compacted_replay.rs:170`, `payload_compaction/eligibility.rs:155`, `finding_purchase_coordinator.rs:1251`) compare with the operation row and open with the store or `SignedReceipt.openings` over the row's binding hash; `MetadataCommitmentMismatch` refuses. `operation_id`, `projected_state` and the other Chio state stay in the projection for the external readers (`chio-process/lib.rs:636`, `call_evidence.rs:284`, `nonce_evidence.rs:25,53,120`, `completed_result.rs:77,139`, `chio-mini-swe` `model.py:117`, `repository_proof.py:98,154`). Registered `Unsafe` by P-d until F.
+
+**`finding_pool_mutation`** (writer `receipt_persistence.rs:61,68`; reader `finding_pool_ledger.rs:1570,1577`): the block duplicates the action parameters. It is replaced by the parameter commitment (no new metadata field): the ledger rebuilds the expected mutation and opens the parameter commitment with the store opening (census kind E/P-ii); `OpeningUnavailable` refuses the ledger mutation.
+
+**`otel`** (writer `chio-otel-receipt-exporter/sink.rs:368,373`; no receipt reader): each span attribute value becomes its own **commitment** `metadata.otel.attr_<n>` (n is the attribute's position in the sorted attribute names); the trace and span ids stay plaintext so the operator's trace backend can join the receipt (OQ-A1-1).
+
+**`scimLifecycle`** (writer `config_and_public.rs:1562`; no receipt reader): each SCIM user attribute becomes its own **commitment** `metadata.scim_lifecycle.<attribute>`; the closed operation kind and the Chio-minted ids stay plaintext (OQ-A1-1).
+
+**`mercury`** (writers `chio-mercury-core/receipt_metadata.rs:283,294`; readers `receipt_metadata.rs:311` and the proof package `proof_package.rs:205-256,376-407,547-548,1020-1032`):
+
+| Fields | Readers | Projection or commitment | Opening | Refusal |
+|---|---|---|---|---|
+| `schema`, `decision_context.decision_type`, `chronology.stage`, `chronology.ingested_at`, `chronology.source_timestamp`, `sensitivity.classification`, `sensitivity.contains_customer_data`, `sensitivity.contains_market_data`, `disclosure.policy`, `disclosure.verifier_equivalent`, `disclosure.reviewed_export_approved`, `approval_state.state` | proof package `:547-548,1020-1032` | **Projection**, `CommittedSafe`: closed codes, flags and times the package checks | none | unchanged |
+| `business_ids.workflow_id`, `.account_id`, `.desk_id`, `.strategy_id` | proof package `:205-256,376-407` (equality across records) | **Commitment** per field `metadata.mercury.<field>` | the proof package carries each value with a salt-only opening (OQ9 carrier: the package holds the preimage); the verifier opens before comparing | `OpeningUnavailable` or `MetadataCommitmentMismatch` refuses the package |
+| every other member: remaining `business_ids`, `chronology.event_id`, `.idempotency_key`, `.causal_parent_event_ids`, `decision_context.workflow_version`, `.policy_reference`, `.model_id`, all `provenance` members, `sensitivity.retention_class`, `disclosure.redaction_profile`, `.audience`, `approval_state.approver_subjects`, `.approval_ticket_id`, `bundle_refs` | proof package `:1020-1032` (event id) and the package display | **Commitment** per field | as above | as above |
+
+**`authorizationContext`, `guardOutcome`, `deniedAccessRecord`** (writer `chio-wall/commands.rs:401-408`, structs in `chio-wall-core/control_path.rs`; no receipt reader). Split by field: `schema`, `buyer_motion`, `control_surface`, `source_domain`, `requested_domain`, `decision` and `fail_closed` (closed codes) stay plaintext as the wall's signed record (OQ-A1-1); `request_id`, `workflow_id`, `actor_label`, `tool_name`, `policy_reference`, `guard_name`, `pipeline_name`, `matched_policy`, `evaluated_tool`, `allowed_tools`, `reason`, `escalation_owner`, `support_owner` and `note` each become a **commitment** `metadata.wall_<block>.<field>`. The wall's `content_hash` over the metadata is replaced by the content commitment.
+
+**`acp`** (writer `acp-proxy/kernel_signer.rs:511`): `sessionId`, `toolCallId` and `status` stay in the projection (readers `session_certificate_read.rs:408`, `acp-proxy/compliance.rs:350`, Chio ids); `authorizationResource` and any content-bearing member become **commitments**.
+
+**`active_defense_backfill_v1`** (reader `active_defense_migration.rs:22,1068`): carries the `active_defense` projection (Task 5), never the body; the reader verifies the projection.
+
+**`batch_witness`** (reader `explain.rs:66,776`): the witness reference stays in the projection if P-d part 2's audit shows it is a Chio checkpoint reference; otherwise it is committed.
+
+**`chio_http_receipt_v1`, `delivery_contract`, `active_defense_evidence_id`**: already planned (deleted with `HttpReceipt`, Task 12; split, OQ12; keyed, r5).
+
+### Cage projection (Root-2 decision 3)
+
+Every alias of an argument-derived digest is committed, in every location, and the receipt's top-level `policy_hash` follows the projection, so no raw digest survives under another key. The projection binds to the raw cage evidence through one commitment over the whole raw body.
+
+| Field (all locations) | Producer | Readers | Projection or commitment | Opening | Refusal |
+|---|---|---|---|---|---|
+| `plan_digest` in `bindings` and `enforcement_record.fully_enforced.prepared` | `chio-cage/src/launch/linux.rs:216,258-260,1035`, `receipt.rs` (`prepare_cage_receipt`) | cage verifier (`verify_signed_cage_receipt`), launch checks `linux.rs:364-366,676-677,1093-1095` (in-process, raw plan) | **Commitment** `metadata.cage_receipt.plan_digest` (preimage covers `target_argv`, environment, descriptor paths); one commitment, referenced from both locations | in-process launch checks use the raw plan; an authorized verifier opens with the cage host's evidence store | `MetadataCommitmentMismatch` |
+| `fd_table_digest` in `bindings` and `fully_enforced.prepared` | as above | as above | **Commitment** `metadata.cage_receipt.fd_table_digest` | as above | as above |
+| `profile_digest` in `bindings` and `fully_enforced.prepared`, and the receipt's top-level `policy_hash` | as above | cage verifier (`profile_digest == policy_hash`), `cage_policy/evidence.rs` | **Commitment** `metadata.cage_receipt.profile_digest` over the raw profile digest; `policy_hash` is set to that commitment's value, so the verifier's equality still holds and neither confirms a guess | authorized verifier opens with the evidence store | mismatch between `policy_hash` and the commitment refuses |
+| `admitted_policy_digest` | `prepare_cage_receipt` | cage verifier | **Commitment** when equal to the profile digest (the same commitment value is referenced); otherwise its own commitment | as above | as above |
+| `raw_evidence` | cage host | authorized verifier | **Commitment** `metadata.cage_receipt.raw` over the canonical raw `CageReceiptBody`: the verifiable binding to the authoritative raw evidence | an authorized verifier with disclosure authority opens it, then recomputes every field commitment above from the opened raw body | any mismatch refuses |
+| `manifest_digest`, `helper_binding_digest`, `target_binding_digest`, `target_identity` | as above | cage verifier and `cage_policy/evidence.rs` (tool and binary identity) | **Projection**, `CommittedSafe`: digests and file identity of operator-installed binaries and the signed manifest, not caller values | none | unchanged |
+| `seccomp_filter_digest`, `trace_session_digest`, `applied_execution_identity`, landlock and seccomp status and versions | as above | cage verifier (enforcement checks) | **Projection**, `CommittedSafe` if P-d part 2's audit confirms the seccomp filter carries no caller value; else committed | none | unchanged |
+| `exit.exit_code`, `exit.signal` | cage executor | `generic_semantics` in the cage verifier and `cage_policy/evidence.rs` derive the decision and terminal state from them | **Projection**, `CommittedSafe` with that reader: the wrapped process status decides the signed decision | none | unchanged |
+| `exit.process_id`, `fully_enforced.prepared.process_id`, `exec_transition.process_id` | as above | none | **Commitment** (no reader; no silent drop) | authorized verifier | none |
+| `attempt_id`, `stage`, `state`, timestamps | as above | cage verifier, `cage_policy/evidence.rs` (TN-B rule), `delivery_preparation.rs:37` (state) | **Projection**, `CommittedSafe`: Chio-minted attempt and enforcement state | none | unchanged |
+
+### Guard error text and deny reasons (lead #1727 review P1-2)
+
+A guard `Err(e)` becomes `GuardDenied("guard \"{name}\" error (fail-closed): {e}")` (`kernel/dispatch.rs:416-455`, also `dispatch/runtime_admission.rs:156`), which is the signed `Decision::Deny.reason`. Example: `HttpProjectionGuard`, declared SAFE, returns `projected.capability.invalid_reason` and serde errors over `ctx.request.arguments` (`chio-http-core/src/authority.rs:249-274`). `evidence_declaration` covers only `GuardEvidence.details`.
+
+- **Signed reason.** `Decision::Deny.reason` and `Decision::Cancelled.reason` become a closed template: `guard "<guard name>" <GuardFailureCode>` for guard errors and `<RefusalCode>` for kernel refusals; the guard name is Chio-defined. No `e` text enters a signed field.
+- **Detail.** The error text is a **commitment** `metadata.guard_error.detail` with the plaintext in `receipt_metadata_values` for the operator; an operator reader that needs it reads the values table.
+- **SAFE classification rule.** `EvidenceDisclosure::Safe` now requires that the guard's `details`, its deny reason and its `Err` text are all free of argument- or result-derived text. P-d part 2 reclassifies `HttpProjectionGuard` and any other guard whose `Err` interpolates request data to `UNSAFE` and changes guard deny reasons to `&'static str` or a closed enum where they are SAFE (lead #1727 review P3-4).
+- **Tests.** `deny_reason_carries_no_argument_text` (marker property: markers in arguments through every guard `Err` path, including `HttpProjectionGuard` and runtime admission hooks, never appear in `Decision::Deny.reason` or `Cancelled.reason`); `guard_error_detail_committed`; `safe_guard_err_text_is_static`.
+
+### Registry follow-ups (lead #1727 review P1-1)
+
+- `protocol_refusal` and `admission_operation` are registered `Unsafe` in P-d until F applies the rows above.
+- `lineageReferences`: the top-level fallback (`kernel/mod.rs:869-877`) is deleted in the reserved-key PR; F adds no reader of it.
+- The store claim log (`claim_log/metadata.rs:186-225`, `claim_log/authorization.rs:307`) builds authorization details from values rows written in the receipt's append transaction, never from signed plaintext; a test pins that an erased `purpose` or `payment_token` refuses that projection and never yields an empty token.
+- `kept_digests_are_keyed_or_entropy_backed` extends to every `CommittedSafe` registry entry, not only the security projections. P-d part 2 audits the next candidates member by member: `caller_delivery`, `chio_runtime`, `finding_purchase_replay_snapshot`, `finding_recovery_replay_snapshot`, `threshold_approval`.
+
+### Split of P-d
+
+- **Reserved-key fix** (Root-2 decision 1): a separate small PR on current main that only expands the caller-metadata reserved list (12 to 29 names) with exact-refusal tests; it lands independently and does not wait for this amendment.
+- **P-d part 1** (#1727): guard declarations and the registry, with the classifications above registered `Unsafe` until F.
+- **P-d part 2** (stacked, after P-a, P-b and #1706): `MetadataCommitment`; the `active_defense`, `response_simulation`, `security_event`, `stream`, `acp`, `financial` and `cage_receipt` projections; registry rows flipped to their decided forms with named readers; the guard SAFE rule change; the census script and output; the tests that need no F wiring. The plan's merge order and size table now name P-d part 2 explicitly.
+
+### Open question
+
+- **OQ-A1-1.** Blocks with no receipt reader (`memory_provenance`, `session_report`, the wall blocks, `otel`, `scimLifecycle`) keep closed codes and Chio-minted ids plaintext and commit every caller- or content-derived member. Default: as written. The alternative, committing those ids as well, costs nothing in readers and is the choice if Root-2 reads decision 2 as "plaintext only with a reader" without exception.
+
+### Tasks
+
+- **P-c:** `receipt_metadata_values` with the 13 probe cases as named Rust tests; included in erasure, replication and snapshot import.
+- **P-d part 2:** as above.
+- **F:** writers emit commitments and values rows in the append transaction; readers move to projections, values rows or openings as the tables say; #1705 and #1710 settlement readers move to `FinancialSettlementProjection`; the deny reason template; Task 8's refusal switches on only after every row here has its decided form.
+- **F acceptance** (Root-2): exact refusals for `Unsafe`, unknown and caller-origin keys; unchanged behavior of every valid reader in the tables; wrong and missing opening failures for every committed field with a reader; field-level disclosure tests (marker values in every committed field and in deny reasons never appear in signed fields, OCSF or logs); producer-regenerated signed fixtures on the integrated base. All shapes stay v1; no legacy decoder or compatibility path.
+
+### Size
+
++6 to +8 engineer-days: P-d part 2 +3-4 (commitment type, four more projections, registry flips, SAFE rule), P-c +1 (values table), F +2-3 (writers, readers, settlement projection, deny template, tests). Item 2 becomes **L, 60-84 engineer-days, planning figure 71**; the M1 total becomes 146-209.
+
+## Size
+
++6 to +8 engineer-days: P-d part 2 +3-4 (commitment type, four more projections, registry flips, SAFE rule), P-c +1 (values table), F +2-3 (writers, readers, settlement projection, deny template, tests). Item 2 becomes **L, 60-84 engineer-days, planning figure 71**; the M1 total becomes 146-209.
+
 ## Size
 
 Spec 13.2 sizes item 2 at L, 26-37 engineer-days. Estimate from the census:
@@ -1289,9 +1465,10 @@ Spec 13.2 sizes item 2 at L, 26-37 engineer-days. Estimate from the census:
 | F fixture regeneration (Task 18) | 2-3 |
 | PROTOCOL, docs, formal (Tasks 19, 20) | 1-2 |
 | Integration, native-cage runs on five PRs, review rounds | 3-4 |
-| Total | 57-82 |
+| Amendment A1: metadata commitments, four more projections, values table, settlement projection, deny-reason template, writers and readers | 6-8 |
+| Total | 63-90 |
 
-The parts sum to 57-82. Shared setup across the seven PRs and agent assistance on the mechanical guard, construction-site and census edits bring the plan to **L, 54-76 engineer-days, planning figure 63**. That is the larger of the lead's r4-delta estimate (51-72) and this plan's own sum after the r3 and r4 items: r4's 47-65, the lead's r3 items (3-5 days), P-f (3-5 days, replacing the 1 day earlier counted for the internal read), the tenant reader census, tenant source and key set (1-2 days), and P-e moved onto `decode_signed` (1 day less than the `StrictValue` version). That is 28 to 39 days above spec 13.2 (26-37). The M1 total is 140-201 engineer-days: 13.2's 104-148, plus 3-8 for item 1 (26-40), 5-6 for item 6's merged plan, and 28-39 for item 2.
+The parts sum to 63-90, including Amendment A1. With A1 the plan is **L, 60-84 engineer-days, planning figure 71** (54-76 before A1). The M1 total is 146-209 engineer-days: 13.2's 104-148, plus 3-8 for item 1, 5-6 for item 6, and 34-47 for item 2.
 
 ## Open Questions
 
