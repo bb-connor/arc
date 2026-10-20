@@ -408,9 +408,7 @@ pub(super) fn build_snapshot(
     quota_bytes: u64,
     on_progress: &mut dyn FnMut(u64, u64),
 ) -> Result<(SnapshotDb, PassResult), WalkError> {
-    let mut db = retry_busy(ctx, || {
-        Ok(SnapshotDb::open_private(ctx.store, quota_bytes)?)
-    })?;
+    let mut db = provision(ctx, quota_bytes)?;
     let mut pass = Pass::new(PassMode::Build, target);
     loop {
         let progress = retry_busy(ctx, || pass.step(ctx, &mut db))?;
@@ -418,6 +416,33 @@ pub(super) fn build_snapshot(
         on_progress(done, total);
         if let PassProgress::Done(result) = progress {
             return Ok((db, *result));
+        }
+    }
+}
+
+/// Provision the private snapshot. Contention for the snapshot location is
+/// retried like a busy step until the walker busy timeout has passed on the
+/// store clock; a location still contended then is unavailable.
+fn provision(ctx: &WalkContext<'_>, quota_bytes: u64) -> Result<SnapshotDb, WalkError> {
+    let now_ms = || {
+        ctx.store
+            .query_snapshot_unix_ms()
+            .map_err(|error| WalkError::Unavailable(error.to_string()))
+    };
+    let budget_ms = u64::try_from(ctx.limits.busy_timeout.as_millis()).unwrap_or(u64::MAX);
+    let deadline_ms = now_ms()?.saturating_add(budget_ms);
+    let mut delay = std::time::Duration::from_millis(10);
+    loop {
+        match SnapshotDb::open_private(ctx.store, quota_bytes).map_err(WalkError::from) {
+            Err(WalkError::Busy(reason)) => {
+                ctx.check_cancel()?;
+                if now_ms()? >= deadline_ms {
+                    return Err(WalkError::Unavailable(reason));
+                }
+                std::thread::sleep(delay);
+                delay = (delay * 2).min(std::time::Duration::from_secs(1));
+            }
+            other => return other,
         }
     }
 }

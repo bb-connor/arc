@@ -13,7 +13,7 @@ use rustix::fs::{flock, FlockOperation};
 use super::super::db::{SnapshotDb, SnapshotDbError};
 use super::super::pass::build_snapshot;
 use super::super::service::{ReceiptQuerySnapshotState, ReceiptQuerySnapshots};
-use super::super::walk::WalkError;
+use super::super::walk::{WalkError, WalkLimits};
 use super::service::{config, ready, wait_for};
 use super::support::{context, limits, target, Fixture};
 use crate::receipt_store::test_hooks::FAIL_SEED_PATH_MARKER;
@@ -236,15 +236,33 @@ fn parent_lock_contention_is_a_busy_outcome() {
     assert!(SnapshotDb::open_private(&fixture.store, 1 << 24).is_ok());
 }
 
+/// A store in a private directory whose clock moves only when stepped.
+fn stepped_store() -> (tempfile::TempDir, Arc<SteppedClock>, SqliteReceiptStore) {
+    let directory = tempfile::Builder::new()
+        .permissions(std::fs::Permissions::from_mode(0o700))
+        .tempdir()
+        .unwrap();
+    let clock = Arc::new(SteppedClock(AtomicU64::new(1_760_000_000_000)));
+    let store =
+        SqliteReceiptStore::open_with_clock(directory.path().join("live.db"), clock.clone())
+            .unwrap();
+    private_directory(&directory.path().join(PARENT_NAME));
+    (directory, clock, store)
+}
+
+const BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+
 #[test]
 fn a_build_waits_out_parent_lock_contention_until_cancelled() {
-    let fixture = Fixture::new(0);
-    let parent = data_directory(&fixture).join(PARENT_NAME);
-    private_directory(&parent);
+    let (directory, _clock, store) = stepped_store();
     let cancel = Arc::new(AtomicBool::new(false));
-    let ctx = context(&fixture.store, &cancel, limits());
+    let walk_limits = WalkLimits {
+        busy_timeout: BUSY_TIMEOUT,
+        ..limits()
+    };
+    let ctx = context(&store, &cancel, walk_limits);
     let contended = target(&ctx);
-    let holder = hold_lock(&parent);
+    let holder = hold_lock(&directory.path().join(PARENT_NAME));
     let outcome = std::thread::scope(|scope| {
         let builder =
             scope.spawn(|| build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {}).map(|_| ()));
@@ -252,15 +270,41 @@ fn a_build_waits_out_parent_lock_contention_until_cancelled() {
         builder.join().unwrap()
     });
     assert_eq!(outcome, Err(WalkError::Cancelled));
-    assert_eq!(
-        snapshot_databases(data_directory(&fixture)),
-        Vec::<PathBuf>::new()
-    );
+    assert_eq!(snapshot_databases(directory.path()), Vec::<PathBuf>::new());
     flock(&holder, FlockOperation::Unlock).unwrap();
     cancel.store(false, Ordering::SeqCst);
     let (db, _) = build_snapshot(&ctx, target(&ctx), 1 << 24, &mut |_, _| {}).unwrap();
-    assert_eq!(snapshot_databases(data_directory(&fixture)).len(), 1);
+    assert_eq!(snapshot_databases(directory.path()).len(), 1);
     drop(db);
+}
+
+#[test]
+fn a_parent_lock_held_past_the_busy_timeout_is_unavailable() {
+    let (directory, clock, store) = stepped_store();
+    let cancel = Arc::new(AtomicBool::new(false));
+    let walk_limits = WalkLimits {
+        busy_timeout: BUSY_TIMEOUT,
+        ..limits()
+    };
+    let ctx = context(&store, &cancel, walk_limits);
+    let contended = target(&ctx);
+    let _holder = hold_lock(&directory.path().join(PARENT_NAME));
+    let step_ms = u64::try_from(BUSY_TIMEOUT.as_millis()).unwrap();
+    let outcome = std::thread::scope(|scope| {
+        let builder =
+            scope.spawn(|| build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {}).map(|_| ()));
+        // Past the diagnostic bound the build is cancelled, so a build
+        // without a deadline ends as Cancelled.
+        let bound = Instant::now() + Duration::from_secs(60);
+        while !builder.is_finished() && Instant::now() < bound {
+            clock.0.fetch_add(step_ms, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        cancel.store(true, Ordering::SeqCst);
+        builder.join().unwrap()
+    });
+    assert_eq!(outcome, Err(WalkError::Unavailable(CONTENDED.into())));
+    assert_eq!(snapshot_databases(directory.path()), Vec::<PathBuf>::new());
 }
 
 #[test]
