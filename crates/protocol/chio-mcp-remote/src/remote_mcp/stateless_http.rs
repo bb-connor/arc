@@ -53,9 +53,7 @@ pub(super) async fn handle_post(
 
     let session = match state.factory.spawn_session(auth_context) {
         Ok(session) => session,
-        Err(error) => {
-            return plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-        }
+        Err(error) => return spawn_session_error(error),
     };
     let response = dispatch(&session, message, &request_id).await;
     session.worker_serving_closed.send_replace(true);
