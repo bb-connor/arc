@@ -646,3 +646,60 @@ async fn admission_host_retry_pending_payment_completes_without_new_request() ->
     assert_eq!(fixture.trace.financial_effects.load(Ordering::SeqCst), 1);
     Ok(())
 }
+
+#[tokio::test]
+async fn admission_host_settlement_drain_failure_fails_the_tick() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let database = directory.path().join("receipts.db");
+    let receipts = Arc::new(chio_store_sqlite::SqliteReceiptStore::open(&database)?);
+    let outcomes = chio_store_sqlite::SqliteSettlementOutcomeStore::open_alongside(&receipts)?;
+    let clock = chio_test_support::clock::clock();
+    let mut kernel = build_mediation_kernel(
+        &Keypair::from_seed(&[29; 32]),
+        super::super::MediationBudget::Configured(Arc::new(
+            chio_kernel::InMemoryBudgetStore::with_clock(clock.clone()),
+        )),
+        super::super::mediated::MediationPolicy {
+            dpop_replay_authority: None,
+            issuers: &[],
+            hash: None,
+            receipt_store: Some(receipts.clone() as Arc<dyn chio_kernel::ReceiptStore>),
+        },
+        Vec::new(),
+        None,
+        clock,
+    )?;
+    kernel.install_settlement_ledger(Arc::new(outcomes), Default::default())?;
+    rusqlite::Connection::open(&database)?.execute_batch("DROP TABLE settle_attempts")?;
+    let controller = Arc::new(ShutdownController::manual());
+    let mut owner = AdmissionMaintenance::spawn(
+        Arc::new(Mutex::new(kernel)),
+        false,
+        controller.clone(),
+        Duration::from_millis(10),
+    )?;
+    let control = owner.control();
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while !controller.is_shutdown() && std::time::Instant::now() < deadline {
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    owner.stop_and_join(Duration::from_secs(1)).await;
+
+    let health = control.health();
+    assert_eq!(
+        health.lifecycle,
+        crate::proxy::state::admission_maintenance::MaintenanceLifecycle::Failed
+    );
+    assert_eq!(health.ticks_completed, 0);
+    assert_eq!(health.settlement_drained, 0);
+    assert_eq!(
+        health.last_error_code.as_deref(),
+        Some("CHIO-KERNEL-SETTLEMENT-DRAIN")
+    );
+    let failure = control.failure().ok_or("drain failure was not retained")?;
+    assert!(
+        matches!(failure.as_ref(), KernelError::SettlementDrain(_)),
+        "{failure:?}"
+    );
+    Ok(())
+}

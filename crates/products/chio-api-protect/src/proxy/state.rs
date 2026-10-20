@@ -404,6 +404,13 @@ impl ProtectProxy {
             .as_deref()
             .filter(|path| !chio_store_sqlite::is_in_memory_sqlite_path(path));
 
+        if self.payment_adapter.is_some() && durable_receipt_db.is_none() {
+            return Err(ProtectError::Config(
+                "a payment adapter requires a durable receipt store for its settlement ledger"
+                    .into(),
+            ));
+        }
+
         if durable_receipt_db.is_none() && !self.config.allow_ephemeral_receipts {
             return Err(ProtectError::Config(
                 "refusing to start without a durable receipt store: set receipt_db to a durable \

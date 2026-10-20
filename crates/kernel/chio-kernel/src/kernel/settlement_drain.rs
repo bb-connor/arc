@@ -1,7 +1,18 @@
 use chio_settle::{SettlementAttemptClaim, SettlementHookError, SettlementIdempotencyKey};
 
+use crate::settlement_routing::SettlementCompletion;
+
 use super::settlement_observer::SettlementObserverStatus;
 use super::{ChioKernel, KernelError};
+
+/// Claimed settlement attempts one drain pass resolved.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SettlementDrainReport {
+    /// Claims whose outcome was committed.
+    pub completed: usize,
+    /// Claims another worker reclaimed after this pass's lease lapsed.
+    pub lost_leases: usize,
+}
 
 impl ChioKernel {
     /// Claim up to `limit` due settlement attempts and run each through the
@@ -10,25 +21,36 @@ impl ChioKernel {
     /// Each claimed row is rebuilt from its stored receipt and completed
     /// through the claimed-outcome CAS, so a `Retryable` attempt is re-run
     /// once its retry deadline passes and dead-letters when the retry policy
-    /// is exhausted. Returns the number of rows claimed; a kernel without a
-    /// settlement runtime claims nothing.
-    pub fn drain_settlement_attempts(&self, limit: usize) -> Result<usize, KernelError> {
+    /// is exhausted. A claim or completion persistence failure returns
+    /// `SettlementDrain` and leaves the remaining claimed rows leased until
+    /// their lease lapses. A kernel without a settlement runtime claims nothing.
+    pub fn drain_settlement_attempts(
+        &self,
+        limit: usize,
+    ) -> Result<SettlementDrainReport, KernelError> {
         let Some(runtime) = self.settlement_observer.as_ref() else {
-            return Ok(0);
+            return Ok(SettlementDrainReport::default());
         };
         let claim_now_ms = self.read_authority_time()?.get();
-        let claims = runtime.claim_due(claim_now_ms, limit).map_err(|error| {
-            KernelError::Internal(format!("settlement drain claim failed: {error}"))
-        })?;
+        let claims = runtime
+            .claim_due(claim_now_ms, limit)
+            .map_err(KernelError::SettlementDrain)?;
+        let mut report = SettlementDrainReport::default();
         for claim in &claims {
             let status = self.drained_settlement_status(claim);
-            runtime.record_claimed_status(
-                claim,
-                &status,
-                self.read_authority_time()?.get().max(claim_now_ms),
-            );
+            let completion = runtime
+                .complete_claim(
+                    claim,
+                    &status,
+                    self.read_authority_time()?.get().max(claim_now_ms),
+                )
+                .map_err(KernelError::SettlementDrain)?;
+            match completion {
+                SettlementCompletion::Recorded(_) => report.completed += 1,
+                SettlementCompletion::LostLease => report.lost_leases += 1,
+            }
         }
-        Ok(claims.len())
+        Ok(report)
     }
 
     fn drained_settlement_status(

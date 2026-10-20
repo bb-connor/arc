@@ -65,17 +65,22 @@ from `supports_settlement_reconciliation`; otherwise the install fails with
 `UnsupportedSettlementLedger`. The hook records one `reconciled`
 `settlement_reconciliations` row for each charge whose receipt records
 `settled`, dead-letters a charge whose receipt records any other status, and
-keeps a retained payment retryable. It never mutates receipt rows or bytes.
+keeps a retained payment retryable until the retry policy dead-letters it. The
+reconciliation row records the signed receipt's historical settlement status; it
+does not establish rail finality. The hook never mutates receipt rows or bytes.
 
 The host drains due attempts from its maintenance tick:
 
 ```rust
-let claimed = kernel.drain_settlement_attempts(limit)?;
+let report = kernel.drain_settlement_attempts(limit)?;
 ```
 
 The drain claims due `settle_attempts` rows, rebuilds each observation from the
 stored receipt, and completes it through the claimed-outcome CAS, so a
-`Retryable` attempt re-runs once its retry deadline passes. A receipt committed
+`Retryable` attempt re-runs once its retry deadline passes. A claim or
+completion persistence failure returns `KernelError::SettlementDrain` and leaves
+the claimed rows leased until their lease lapses; a row another worker reclaimed
+after this lease lapsed counts as a lost lease, not a failure. A receipt committed
 through durable admission is seeded without an inline claim, so the drain is
 the first hook invocation for it. `chio api protect`
 installs the ledger whenever a payment adapter is configured and drains on its

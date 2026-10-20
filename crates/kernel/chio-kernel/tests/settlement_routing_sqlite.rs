@@ -600,7 +600,7 @@ fn settlement_ledger_records_one_reconciliation_for_a_settled_durable_receipt(
     let payment_reference = financial
         .payment_reference
         .ok_or("settled receipt carries no payment reference")?;
-    assert_eq!(kernel.drain_settlement_attempts(16)?, 1);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 1);
     assert_eq!(pending_attempts(&fixture.outcomes)?, 0);
     assert!(!ReceiptStore::record_settlement_reconciliation(
         fixture.receipts.as_ref(),
@@ -616,7 +616,7 @@ fn settlement_ledger_records_one_reconciliation_for_a_settled_durable_receipt(
         chio_core::canonical::canonical_json_bytes(&stored)?,
         chio_core::canonical::canonical_json_bytes(&receipt)?
     );
-    assert_eq!(kernel.drain_settlement_attempts(16)?, 0);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 0);
     Ok(())
 }
 
@@ -656,15 +656,57 @@ fn settlement_drain_reruns_a_retryable_attempt_once_it_is_due() -> Result<(), Bo
 
     execute(&kernel, &capability, "drain-retry")?;
     assert_eq!(hook.calls.load(Ordering::SeqCst), 0);
-    assert_eq!(kernel.drain_settlement_attempts(16)?, 1);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 1);
     assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(kernel.drain_settlement_attempts(16)?, 0);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 0);
     assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
 
     let _due = chio_test_support::clock::scope_unix_secs(LEDGER_FIXTURE_UNIX_SECS + 5);
-    assert_eq!(kernel.drain_settlement_attempts(16)?, 1);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 1);
     assert_eq!(hook.calls.load(Ordering::SeqCst), 2);
     assert_eq!(pending_attempts(&fixture.outcomes)?, 0);
-    assert_eq!(kernel.drain_settlement_attempts(16)?, 0);
+    assert_eq!(kernel.drain_settlement_attempts(16)?.completed, 0);
+    Ok(())
+}
+
+#[test]
+fn settlement_drain_fails_on_a_completion_write_and_keeps_the_row_for_reclaim(
+) -> Result<(), Box<dyn Error>> {
+    let _clock = chio_test_support::clock::scope_unix_secs(LEDGER_FIXTURE_UNIX_SECS);
+    let fixture = sqlite_fixture()?;
+    let failing = CrashOutcomeStore::new(Arc::clone(&fixture.outcomes), CrashMode::AfterHook);
+    let hook = Arc::new(AcceptingHook::default());
+    let outcome_handle: Arc<dyn SettlementOutcomeStore> = failing.clone();
+    let hook_handle: Arc<dyn SettlementHook> = hook.clone();
+    let (kernel, capability) = kernel(
+        &fixture.receipts,
+        outcome_handle,
+        hook_handle,
+        &fixture.authority,
+    )?;
+    let receipt = execute(&kernel, &capability, "drain-completion-failure")?;
+
+    let drained = kernel.drain_settlement_attempts(16);
+
+    assert!(
+        matches!(
+            &drained,
+            Err(KernelError::SettlementDrain(SettlementRouteError::Backend { detail }))
+                if detail == "simulated crash after hook"
+        ),
+        "{drained:?}"
+    );
+    assert_eq!(hook.calls.load(Ordering::SeqCst), 1);
+    let fixture_now_ms = LEDGER_FIXTURE_UNIX_SECS * 1_000;
+    assert!(fixture
+        .outcomes
+        .claim_due("reclaim", fixture_now_ms, 1_000, 16)?
+        .is_empty());
+    let reclaimed = fixture
+        .outcomes
+        .claim_due("reclaim", fixture_now_ms + 30_000, 1_000, 16)?;
+    assert_eq!(reclaimed.len(), 1);
+    assert_eq!(reclaimed[0].receipt_id, receipt.id);
+    assert_eq!(reclaimed[0].attempts, 0);
     Ok(())
 }

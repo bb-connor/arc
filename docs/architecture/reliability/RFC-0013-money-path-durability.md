@@ -32,7 +32,7 @@ or claim that the budget database commits atomically with the receipt database.
 | F70 | Implemented | Journal store `chio-store-sqlite/src/budget_store/payment_journal.rs` and composite schema `budget_store/composite_schema/payment/schema.sql`; kernel types `chio-kernel/src/payment/journal.rs`; `QualifiedAdmissionProjectionStore::load_payment_journal` and `advance_payment_journal`; idempotency contract and `settlement_state` on `PaymentAdapter` (`chio-kernel/src/payment.rs`). |
 | F71 | Partially implemented: recovery and the reserved-hold reaper run periodically only in `chio api protect` (see F71 below) | `reconcile_durable_admission_startup` (`kernel/admission_coordinator/recovery.rs`), `reconcile_recoverable_admissions_batch` (`recovery/batch.rs`), `reap_expired_reserved_budget_holds` (`kernel/reconciliation.rs`); periodic tick in `chio-api-protect/src/proxy/state/admission_maintenance.rs`. |
 | F68 | Implemented; active only while a settlement observer runtime is installed | Attempt-zero row seeded in the receipt append (`kernel/responses/receipt_persistence.rs`), inline claim and CAS completion (`settlement_routing.rs`), `settle_attempts` and `settle_dead_letters` in `chio-store-sqlite`, `CHIO_SETTLEMENT_UNRESOLVED_TOTAL`. |
-| F69 | Implemented for inline settlement; retained-payment closures open | `KernelSettlementLedgerHook` (`chio-kernel/src/settlement_ledger.rs`), `ChioKernel::install_settlement_ledger`, `ChioKernel::drain_settlement_attempts` (`kernel/settlement_drain.rs`); installed by `chio api protect` whenever a payment adapter is configured and drained on its maintenance tick. A retained payment stays `Retryable` until the `chio.settlement-closure.v1` emission lands. |
+| F69 | Partially implemented: a historical settlement-observation ledger in `chio api protect`; other hosts and retained-payment closures open | `KernelSettlementLedgerHook` (`chio-kernel/src/settlement_ledger.rs`), `ChioKernel::install_settlement_ledger`, `ChioKernel::drain_settlement_attempts` (`kernel/settlement_drain.rs`); installed by `chio api protect` whenever a payment adapter is configured and drained on its maintenance tick. A retained payment stays `Retryable` and dead-letters at the configured retry bound until the `chio.settlement-closure.v1` emission lands. |
 | F72 | Implemented | `BudgetDenyReason::CurrencyMismatch` (`chio-metering/src/budget_hierarchy.rs`), tests in `chio-metering/tests/budget_hierarchy.rs`. |
 | F73 | Closed by deletion | The off-chain EIP-3009 lane (`prepare_transfer_with_authorization`, `Eip3009NonceStore`, `InMemoryEip3009NonceStore`) had no production consumer and no longer exists in `chio-settle`. |
 | F74 | Closed by deletion | `BudgetEnforcer` no longer exists in `chio-metering`. |
@@ -741,17 +741,20 @@ classification rather than a post-commit crash gap.
 The production driver is `KernelSettlementLedgerHook` in `chio-kernel`. It is a
 local projection and never calls a rail. Rail truth is queried only by RFC-0003
 admission recovery, which owns the payment journal, the recovery lease and the
-`settlement_state` call. The hook reads the journal through
-`QualifiedAdmissionProjectionStore::load_payment_journal`, read-only, and acts only
-on the monotonic terminal states `Settled` and `Closed`; it never writes the
-journal. Because both terminal states are monotonic, a read outside the recovery
-lease cannot observe a state that later reverses.
+`settlement_state` call. For a charge, the hook records the settlement status the
+signed receipt carries. That is a historical observation of the receipt, not a
+claim of rail finality. The closure branch may read the journal through
+`QualifiedAdmissionProjectionStore::load_payment_journal`, read-only, and never
+writes it. A journal state of `Settled` or `Closed` alone is not finality, because
+prepaid refund, normal close and cancel transitions remain. A closure binds the
+operation, hold, rail, action, amount, release evidence and journal version, and
+is tested against concurrent refund and close and against mismatches.
 
 | Terminal receipt | Hook action | Outcome |
 | --- | --- | --- |
 | Allow with `settlement_status = settled` | Upsert one `settled` `settlement_reconciliations` row carrying the rail and payment reference | `Accepted` |
 | Allow with `settlement_status = pending` or `failed` | None. Durable admission withholds pending terminal receipts, so this shape is a contract breach | `Permanent(UnsupportedEconomicForm)` |
-| Deny with a retained payment | None until the journal is terminal and a `chio.settlement-closure.v1` can be signed | `Retryable` |
+| Deny with a retained payment | None until a bound `chio.settlement-closure.v1` can be signed | `Retryable`, dead-lettered at the configured retry bound |
 | Deny without a retained payment, zero charge, or no economics | None | `Skipped` |
 
 The hook contract is that a hook never mutates receipt rows or receipt bytes.
