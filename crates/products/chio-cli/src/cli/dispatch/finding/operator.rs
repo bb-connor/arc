@@ -35,8 +35,8 @@ use chio_control_plane::trust_control::{
 use chio_core::{canonical_json_bytes, sha256_hex, Keypair};
 use chio_store_sqlite::{
     FindingDisputeLockDisposition, FindingOperatorBundleStoreError, SqliteAuthorityStore,
-    SqliteFindingOperatorBundleStore, SqliteFindingOperatorPaymentAdapter,
-    SqliteFindingPayloadStore, SqliteReceiptStore, TenantId, TenantKey,
+    SqliteFindingOperatorBundleStore, SqliteFindingOperatorPaymentAdapter, SqliteReceiptStore,
+    TenantId, TenantKey,
 };
 use subtle::ConstantTimeEq;
 
@@ -1241,12 +1241,7 @@ pub(super) fn load_profile(path: &Path) -> Result<(FindingOperatorProfile, PathB
 }
 
 fn initialize_operator_database(path: &Path) -> Result<(), CliError> {
-    SqliteFindingOperatorBundleStore::open(path)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    SqliteFindingPayloadStore::open(path)
-        .map_err(|error| CliError::cli_other_error(error.to_string()))?;
-    SqliteFindingOperatorPaymentAdapter::open(path).map_err(CliError::cli_other_error)?;
-    Ok(())
+    chio_store_sqlite::initialize_finding_operator_database(path).map_err(CliError::cli_other_error)
 }
 
 fn random_token(label: &str) -> String {

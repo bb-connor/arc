@@ -25,24 +25,7 @@ fn configure_pooled_connection(connection: &mut rusqlite::Connection) -> rusqlit
     connection.execute_batch("PRAGMA busy_timeout = 5000;")
 }
 
-fn verify_schema(connection: &rusqlite::Connection) -> Result<(), String> {
-    if crate::schema_catalog::matches_canonical_schema(connection, SCHEMA, SCHEMA_TABLES)
-        .map_err(|error| error.to_string())?
-    {
-        Ok(())
-    } else {
-        Err("finding operator payment schema differs from the canonical definition".to_owned())
-    }
-}
-
 const SCHEMA_KEY: &str = "finding_operator_payment";
-const SCHEMA_VERSION: i32 = 1;
-const SCHEMA_ANCHORS: &[&str] = &[
-    "chio_finding_operator_bundles",
-    "chio_finding_payloads",
-    "chio_finding_operator_payments",
-];
-const SCHEMA_TABLES: &[&str] = &["chio_finding_operator_payments"];
 pub(crate) const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS chio_finding_operator_payments (
     authorization_id TEXT PRIMARY KEY,
@@ -116,26 +99,9 @@ impl SqliteFindingOperatorPaymentAdapter {
     }
 
     fn initialize_schema(&self) -> Result<(), String> {
-        let mut conn = self.pool.get().map_err(|error| error.to_string())?;
-        let state = crate::check_current_schema(&conn, SCHEMA_KEY, SCHEMA_VERSION, SCHEMA_ANCHORS)
-            .map_err(|error| error.to_string())?;
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL; PRAGMA busy_timeout = 5000;",
-        )
-        .map_err(|error| error.to_string())?;
-        if state == crate::SchemaState::Current {
-            return verify_schema(&conn);
-        }
-        let transaction = conn
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|error| error.to_string())?;
-        transaction
-            .execute_batch(SCHEMA)
-            .map_err(|error| error.to_string())?;
-        crate::stamp_schema_version(&transaction, SCHEMA_KEY, SCHEMA_VERSION)
-            .map_err(|error| error.to_string())?;
-        verify_schema(&transaction)?;
-        transaction.commit().map_err(|error| error.to_string())
+        let mut connection = self.pool.get().map_err(|error| error.to_string())?;
+        crate::finding_operator_database::initialize_component(&mut connection, SCHEMA_KEY, SCHEMA)
+            .map_err(|error| error.to_string())
     }
 
     fn authorize_durable(
@@ -989,7 +955,9 @@ mod tests {
         let path = dir.path().join("operator.db");
         drop(SqliteFindingOperatorPaymentAdapter::open(&path).unwrap());
         let conn = rusqlite::Connection::open(&path).unwrap();
-        crate::stamp_schema_version(&conn, SCHEMA_KEY, 0).unwrap();
+        conn.execute_batch("PRAGMA ignore_check_constraints = ON;
+            UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'finding_operator_payment';
+            PRAGMA ignore_check_constraints = OFF;").unwrap();
         drop(conn);
         assert_eq!(
             SqliteFindingOperatorPaymentAdapter::open(&path)
@@ -1012,7 +980,7 @@ mod tests {
             SqliteFindingOperatorPaymentAdapter::open(&path)
                 .err()
                 .unwrap(),
-            "finding operator payment schema differs from the canonical definition"
+            "schema catalog differs from its canonical definition"
         );
         let conn = rusqlite::Connection::open(&path).unwrap();
         let restored: i64 = conn

@@ -120,26 +120,7 @@ pub(crate) fn validate_catalog(
     connection: &Connection,
     schema: &str,
 ) -> Result<(), SchemaVersionError> {
-    let expected = Connection::open_in_memory()?;
-    expected.execute_batch(METADATA_SCHEMA)?;
-    expected.execute_batch(schema)?;
-    if catalog(connection)? != catalog(&expected)? {
-        return Err(SchemaVersionError::CatalogMismatch);
-    }
-    Ok(())
-}
-
-type CatalogEntry = (String, String, String, Option<String>);
-
-fn catalog(connection: &Connection) -> Result<Vec<CatalogEntry>, SchemaVersionError> {
-    let mut statement = connection
-        .prepare("SELECT type, name, tbl_name, sql FROM sqlite_schema ORDER BY type, name")?;
-    let entries = statement
-        .query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(entries)
+    crate::schema_catalog::validate(connection, &format!("{METADATA_SCHEMA};\n{schema}"))
 }
 
 fn validate_metadata(connection: &Connection) -> Result<(), SchemaVersionError> {
