@@ -2,17 +2,27 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land M1 item 2 of the relying-party wedge as one squash-merged PR: `chio.receipt.v1` has one format, committed. Every producer computes salted commitments to arguments and results inside its own signing boundary, with salts drawn from the `Rng` seam of the process that signs. `RedactionMode`, `parameter_hash`, `content_hash`, `sign_receipt_relaying_trusted_body` and `HttpReceipt` are deleted with every caller, every verifier opens commitments, and every signed fixture is regenerated once through `cs cargo xtask gen signed-fixtures`.
+**Goal:** Land M1 item 2 of the relying-party wedge. `chio.receipt.v1` has one format, committed. Every producer computes salted commitments to arguments and results inside its own signing boundary, with salts drawn from the `Rng` seam of the process that signs. Every consumer that today binds to the unsalted `action.parameter_hash` or `content_hash` gets a planned binding to the committed value. `RedactionMode`, `parameter_hash`, `content_hash`, `sign_receipt_relaying_trusted_body` and `HttpReceipt` are deleted with every caller. Every verifier opens commitments, and every signed fixture is regenerated once.
 
-**Architecture:** `chio-core-types` gains `receipt/disclosure.rs` (commitments, salts, content preimages and the `chio.receipt-disclosure.v1` opening document) and the moved `Rng` seam. Producers stop building a signed body. They build a `ReceiptDraft` (the body without commitments) and pass `ReceiptPreimages` and an `Rng` to the one receipt signer, which draws salts, computes both commitments, signs through the item 1 wrapper and returns the receipt with its `ReceiptOpenings`. Relay adapters (FFI, WASM, mobile, ACP, HTTP) pass preimages, never hashes. The hosted kernel writes openings to a new `DisclosureStore`. The PR tip is the verified unit; intermediate commits need not build.
+**Shape:** four byte-neutral precursor PRs, then one atomic format PR (G1). The precursors add code that the format PR switches on. No precursor changes a signed byte, a fixture or a wire shape. Signed bytes change exactly once, in the format PR, which is squash-merged; its intermediate commits need not build, and its tip is the verified unit.
+
+| PR | Title | Bytes | Contents |
+|---|---|---|---|
+| P-a | `refactor(core-types): move the Rng seam into core types and make it fallible` | none | Task 2 |
+| P-b | `feat(core-types): receipt commitment and disclosure types with openers` | none (additive) | Task 3 |
+| P-c | `feat(store): receipt openings persist with the receipt append` | none (additive table, unused until the format PR) | Task 4 |
+| P-d | `feat(kernel): guard evidence declarations and the receipt metadata key registry` | none (declarations and registry; dropping and refusal off) | Task 5 |
+| F | `feat(core-types): committed receipts for every producer` | every receipt | Tasks 6 to 19 |
+
+**Architecture:** `chio-core-types` holds the moved `Rng` seam and `receipt/disclosure.rs` (commitments, salts, content preimages, the `chio.receipt-disclosure.v1` document and its opener). Producers stop building a signed body. They build a `ReceiptDraft` (the body without commitments) and pass `ReceiptPreimages` and an `Rng` to the one receipt signer. The signer draws salts, computes both commitments, signs through the item 1 wrapper and returns the receipt with its `ReceiptOpenings`. A hosted kernel persists the openings in the same transaction as the receipt append (SQLite, or trust-control through the same remote append request), so an opening is never written separately from its receipt. Relay adapters (FFI, WASM, mobile, ACP, HTTP) pass preimages, never hashes. Consumers bind to commitment values, to store-internal digests, or open with a persisted opening, per the consumer table in Task 1.
 
 **Tech Stack:** Rust workspace (every cargo command through `cs`, defined under Global Constraints), JSON Schema draft 2020-12, `cargo xtask codegen` (Rust, TS, Go, Python), `cargo xtask gen signed-fixtures` (from item 1), `cargo xtask freeze-vectors`, Python reference generator `scripts/gen-signing-wrapper-vectors.py`, Go, TypeScript (npm), Python (uv), Kotlin (Gradle), .NET (dotnet), C++ (CMake through `scripts/check-chio-cpp.sh`), Miniflare for the Workers test.
 
-**Spec:** `docs/superpowers/specs/2026-10-17-relying-party-wedge-design.md`, sections 2.2 (D2, D17), 2.5 (G1, G3, G4, G13, G14, G15, G18), 7.4 (producers without a root policy), 7.6, 7.7, 7.8, 8.4, 10.1 to 10.3, 10.7, 10.10, 11, 13.2, 13.3. Inputs from M0 and M1: `docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md` (sections "Receipt producers", "Receipt producers outside the first grep", "RedactionMode mapping"), `docs/superpowers/specs/relying-party-wedge/protocol/protocol-6-committed-receipts.md`, `docs/superpowers/specs/relying-party-wedge/in-place-schemas/receipt/record.schema.json` and its README, `docs/superpowers/specs/relying-party-wedge/verdict-matrix/` (`receipt_disclosure`), `tests/bindings/vectors/receipt/committed/v1.json`, `scripts/gen-signing-wrapper-vectors.py`, and the item 1 plan `docs/superpowers/plans/2026-10-20-m1-item1-signing-wrapper.md`.
+**Spec:** `docs/superpowers/specs/2026-10-17-relying-party-wedge-design.md`, sections 2.2 (D2, D17), 2.5 (G1, G3, G4, G13, G14, G15, G18), 7.4 (producers without a root policy), 7.6, 7.7, 7.8, 8.4, 9.4, 10.1 to 10.3, 10.7, 10.10, 11, 13.2, 13.3. Inputs: `docs/superpowers/specs/relying-party-wedge/receipt-producer-inventory.md`, `docs/superpowers/specs/relying-party-wedge/protocol/protocol-6-committed-receipts.md`, `docs/superpowers/specs/relying-party-wedge/in-place-schemas/receipt/record.schema.json` and its README, `docs/superpowers/specs/relying-party-wedge/verdict-matrix/` (`receipt_disclosure`), `tests/bindings/vectors/receipt/committed/v1.json`, `scripts/gen-signing-wrapper-vectors.py`, the item 1 plan `docs/superpowers/plans/2026-10-20-m1-item1-signing-wrapper.md`, the item 6 plan (part 6a moves `chio-control-plane/src/evidence_export/verification.rs` into `chio-bundle-verify`), and `docs/adr/ADR-0019-kernel-delivery-contract.md` item 7 (the receipt-metadata key registry).
 
-**Builds on:** #1715 (fwdcompat receipts, option 2: `deny_unknown_fields` across the receipt trees, `Decision` and `OperationTerminalState` through `lossless_serde`, commerce routing off the receipt bytes), the shared `lossless_serde!` decoder PR that the fwdcompat lane is opening (called "the shared decoder PR" below; not open at planning time, `gh pr list --repo bb-connor/arc --search lossless_serde` lists no such PR, so Task 1 records its number), and #1716 (closed receipt decode in the Go, Python and TypeScript verifiers). Receipt decode changes land in #1715 and the shared decoder PR first. Item 2 changes no decode mechanism of its own: every new receipt block is `deny_unknown_fields`, every new tagged enum and closed union (the relay `content` input, `SaltRef`, `CommitmentAlg`) decodes through the shared `lossless_serde!` decoder as that PR defines it, the commerce authority receipt route stays outside the signed bytes, and each SDK verifier's closed layer list gains the new blocks. If the shared decoder PR changes the macro's name, location or contract, item 2 follows it and adds no local helper (G18).
+**Builds on:** #1715 (fwdcompat receipts, option 2: `deny_unknown_fields` across the receipt trees, `Decision` and `OperationTerminalState` through `chio_security_types::lossless_serde!`, commerce routing off the receipt bytes) and #1716 (closed receipt decode in the Go, Python and TypeScript verifiers). Item 2 keeps both contracts and extends them to the new members: every new receipt block is `deny_unknown_fields`; every new tagged enum and closed union decodes through `chio_security_types::lossless_serde!`, the path #1706 already uses inside `chio-core-types` (no local helper, G18); the commerce authority receipt route stays outside the signed bytes; and each SDK verifier's closed layer list gains the new blocks. Item 2 also reuses #1706's `root_authority::wire::SaltRef` (an open dotted string of at most 64 characters), `Sha256Digest`, `RootAnchor` and `HolderClass`.
 
-**Census base:** facts below were measured at `origin/main` `a93a2f69a3`, where neither item 1 nor #1715 is merged. Task 1 re-runs every census at the integrated base (the `origin/main` commit that contains item 1 and every predecessor in the merge order) and updates the counts in the PR body. Counts from any earlier base are planning figures only.
+**Census base:** facts below were measured at `origin/main` `fcc31d25fb` (consumers) and `a93a2f69a3` (producers and fixtures), where neither item 1 nor #1715 is merged. Task 1 re-runs every census at each PR's integrated base and updates the counts in that PR's body. Counts from any earlier base are planning figures only.
 
 ## Global Constraints
 
@@ -83,166 +93,198 @@ Producers without a root policy (spec 7.4):
 
 Further constraints:
 
-- M1 scope (spec 13.1 cut 1): every receipt in this PR is fully committed. `parameters_inline` and `result_inline` exist in the types, the schema and the verifiers, and the signer refuses to set them (no producer has a root policy in this PR, and item 4 rejects a non-empty `tools` map at load). Inline disclosure lands in M2.
-- Merge order (precondition): #1674, #1601 (merged), #1607, #1715, the shared decoder PR, #1716, #1706 and the Root-2 K-stack in Root-2's order (T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, KERN-TRACE-LOCK-FSYNC), then item 1, then this PR. #1708 and #1710 rebase-merge before this PR if they land first; otherwise they rebase on it. Anchored-root capability changes (item 3, the `root_anchor` member in the capability body) follow this PR. Root-2's order is not an approval of any candidate head.
-- Preconditions (D17): the "D17 Coordination" list below is acknowledged by the lead and Root-2 on `ws2:~/lanes/claude-pr1160-evidence/lead2/sync.md` before the PR opens.
-- One PR, squash-merged. Commits follow "Commit Grouping": the inventory's five groups in order, and inside them each producer's salt-source wiring in its own commit. Intermediate commits need not build; the PR tip is verified.
-- Fixtures: every signed fixture is regenerated once, at the integrated base, by `cs cargo xtask gen signed-fixtures` (item 1 Task 11). No signed fixture is edited by hand, patched by a script or rewritten by any tool other than its owning generator. Fixture producers draw salts from `FixtureRng` (Task 2), so `--check` is reproducible.
-- No legacy, compat or dual paths; everything is v1. No `parameter_hash` or `content_hash` alias, no `redaction_mode` reader, no relay signer that accepts a hash, no second HTTP receipt, no default trait method standing in for a declaration, no store migration from the current receipt table shape (the DDL changes in place).
-- Fail-closed: salt generation failure, an unregistered `salt_ref`, a commitment that does not recompute, `tenant_id` beside `authority`, an inline field without a root policy and a decode error each refuse.
-- Strict decoding (G18) for every type this PR adds or changes: `deny_unknown_fields` at every level, closed string enums for `alg`, `salt_ref` and `holder`, `lossless_serde!` for tagged enums, no `#[serde(flatten)]`. Opaque caller data (`parameters_inline`, `result_inline`, an opening's `payload`, `metadata`) stays opaque.
+- M1 scope (spec 13.1 cut 1): every receipt is fully committed. `parameters_inline` and `result_inline` exist in the types, the schema and the verifiers, and the signer refuses to set them. Inline disclosure lands in M2.
+- Merge order (precondition): #1674, #1601 (merged), #1607, #1715, #1716, #1706, #1705, #1710, #1708, the Root-2 K-stack in Root-2's order (T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, KERN-TRACE-LOCK-FSYNC), subtree188a, the pending store schema-adoption cleanup, item 6 part 6a, item 1; then P-a to P-d in that order; then F. #1710 is an explicit predecessor of F (Root-2 condition 7), not "whichever lands second". Item 3's capability change (`root_anchor` in the capability body) follows F. Root-2's order is not an approval of any candidate head.
+- Preconditions (D17): the "D17 Coordination" list is acknowledged by the lead and Root-2 on `ws2:~/lanes/claude-pr1160-evidence/lead2/sync.md` before F opens. Each Root-held file in that list has Root-2's ACK before the lane edits it.
+- Precursors are byte-neutral: each one's tip passes the full changed-crate suites and `cs cargo xtask gen signed-fixtures --check` with no fixture change.
+- F is one PR, squash-merged. Commits follow "Commit Grouping" for F: the inventory's five groups in order, and inside them each producer's salt-source wiring in its own commit. Intermediate commits need not build. Each group's last commit passes `cs cargo check -p <crate>` for the crates that group finishes.
+- Fixtures: every signed fixture is regenerated once, in F, at the integrated base, by `cs cargo xtask gen signed-fixtures`. No signed fixture is edited by hand, patched by a script or rewritten by any tool other than its owning generator.
+- A signed or durably admitted receipt keeps its exact receipt id and its exact salts across every retry and recovery. Nothing re-signs with new entropy to recover an ambiguous append (Root-2 condition 3).
+- No legacy, compat or dual paths; everything is v1. No `parameter_hash` or `content_hash` alias, no `redaction_mode` reader, no relay signer that accepts a hash, no second HTTP receipt, no default trait method standing in for a declaration, no store migration or adoption fallback (the DDL changes in place, and v1 catalog validation refuses any other layout).
+- Fail-closed: salt generation failure, a malformed `salt_ref`, a commitment that does not recompute, `tenant_id` beside `authority`, an inline field without a root policy, an unregistered Chio-internal metadata key, an unavailable opening where a consumer needs one, and a decode error each refuse with an explicit error.
+- Strict decoding (G18) for every type added or changed: `deny_unknown_fields` at every level, closed string enums for `alg` and `holder`, `lossless_serde!` for tagged enums, no `#[serde(flatten)]`. Opaque caller data (`parameters_inline`, `result_inline`, an opening's `payload`, `metadata` values) stays opaque.
 - Clock reads only through the approved seams; fixtures use fixed timestamps (`issued_at = 1792234800`). Run `python3 scripts/check-security-clocks.py`.
 - Clippy denies `unwrap_used` and `expect_used` outside tests. Format with `cs cargo fmt --all`.
 - No em dashes (U+2014) in any file. No narrative or meta comments; comments state invariants and contracts.
 - Public-path rule: files under `spec/`, `docs/adr/`, `tests/`, `scripts/`, `crates/`, `sdks/`, `examples/` never mention milestones, the wedge, pilots or `docs/superpowers`.
-- Build slots: on ws2, `cs` means `CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/var/tmp/claude-targets/m1i2 ~/lanes/cslot.sh`; on the x86 runner and host 3 it means `CARGO_INCREMENTAL=0 ~/cslot.sh` with that host's lane target dir. Every cargo command runs under `cs`: `cargo build`, `test`, `check`, `clippy`, `fmt`, `run` and `xtask`, and every script, Makefile target, generator, freeze or fixture command and SDK manifest build that reaches cargo directly or nested (`make codegen-check`, `scripts/check-bindings-parity.sh`, `scripts/check-chio-cpp.sh`, `scripts/check-sdk-parity.sh`, `scripts/check-adapter-no-bypass.sh`, `scripts/check-security-ci-contract.py`, `scripts/check-aws-lc-fork.py`, `wasm-pack`, every `--manifest-path` build). No command in this plan invokes cargo outside `cs`.
-- Formal tools: no Lean, lake, Aeneas or Kani runs on ws2, including single harnesses. Kani runs only on the approved x86 runner under `cs`.
-- Work happens on ws2 in worktree `~/lanes/m1i2` off fresh `origin/main` (fetched over https). Coder checks run under `cs`; heavy suites run on the integrators (`integ-x86`, `integ-h3`) per the coder/integrator split. Never `git stash`. Inspect `git diff --cached --stat -M` before every commit. Push explicit SHAs over https.
-- Shared surfaces: before requesting merge, post `<UTC> <lane>: REVIEW? #<N> M1 item 2 committed receipts (core-types, kernel, store, CP, http-core, SDK middleware, every receipt fixture)` to `sync.md`, then `MERGING #<N>` with the 10-minute window and the OBJECT check.
+- Build slots: on ws2, `cs` means `CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/var/tmp/claude-targets/m1i2 ~/lanes/cslot.sh`; on the x86 runner and host 3 it means `CARGO_INCREMENTAL=0 ~/cslot.sh` with that host's lane target dir. Every cargo command runs under `cs`: `cargo build`, `test`, `check`, `clippy`, `fmt`, `run`, `tree` and `xtask`, and every script, Makefile target, generator, freeze or fixture command and SDK manifest build that reaches cargo directly or nested (`make codegen-check`, `scripts/check-bindings-parity.sh`, `scripts/check-chio-cpp.sh`, `scripts/check-sdk-parity.sh`, `scripts/check-adapter-no-bypass.sh`, `scripts/check-fixture-rng.py`, `scripts/check-security-ci-contract.py`, `scripts/check-aws-lc-fork.py`, `wasm-pack`, every `--manifest-path` build). No command in this plan invokes cargo outside `cs`.
+- Formal tools: no Lean, lake, Aeneas or Kani runs on ws2, including single harnesses. Kani and any Lean gate run only on the approved x86 runner under `cs`.
+- Work happens on ws2 in worktrees `~/lanes/m1i2-<pr>` off fresh `origin/main` (fetched over https). Coder checks run under `cs`; heavy suites run on the integrators (`integ-x86`, `integ-h3`). Never `git stash`. Inspect `git diff --cached --stat -M` before every commit. Push explicit SHAs over https.
+- Shared surfaces: before requesting merge of each PR, post `<UTC> <lane>: REVIEW? #<N> M1 item 2 <part> (<surfaces>)` to `sync.md`, then `MERGING #<N>` with the 10-minute window and the OBJECT check.
 
 ## Review Focus
 
-1. **A signing path that still accepts a hash or a commitment.** Expected: no public function in any crate takes a `content_hash`, `parameter_hash`, commitment value or a prebuilt `ChioReceiptBody` for signing; the only receipt signers take `ReceiptDraft`, `ReceiptPreimages` and `&dyn Rng`. `sign_receipt_relaying_trusted_body`, the WASM, mobile and C ABI relay exports and `ChioReceipt::sign(body, ..)` are gone. Pinned by Task 3 (`receipt_signers_take_preimages`, which calls every public receipt signer) and Task 1's grep re-run at the PR tip and Task 6 (`relay_api_has_no_hash_parameter` in each adapter).
-2. **A salt that is not fresh, not 32 bytes, or not from the signing process.** Expected: two salts per receipt drawn from the producer's own `Rng`, refused when equal; fallible `Rng::fill_bytes`; no zero-fill fallback anywhere; `FixtureRng` reachable only from the allowlisted harness and fixture producers. Pinned by Task 2 (`equal_salts_refuse`, `rng_failure_refuses_signing`) and `scripts/check-fixture-rng.py` (Task 11).
-3. **Plaintext surviving in a signed field.** Expected: for arguments and results built from random 16-byte markers, no marker (raw, hex or base64) appears in the canonical signed body, guard evidence, metadata or OCSF output; per-chunk stream digests never appear. Pinned by the marker property test (Task 5) run across every guard evidence producer and the OCSF projection.
-4. **A verifier deriving the content preimage from the opening.** Expected: Rust, TS, Python, Go and C++ verifiers take the output from the caller, never from `payload`; `payload: null` is salt only. Pinned by the `parameters_opening_for_content`, `content_opening_absent` and `empty_output` vector cases in every language (Tasks 13, 14).
-5. **A regenerated fixture that changed more than the committed fields.** Expected: in every regenerated receipt, the changed values are `action`, `content_commitment`, the removed `redaction_mode` and `content_hash`, the added `disclosure`, the signature, the receipt id (its id input changed) and derived digests traced to those. Pinned by the item 1 fixture diff aid, extended in Task 15.
-6. **An HTTP receipt path left behind.** Expected: `git grep -n -E "HttpReceipt|http_receipt|httpReceipt|http-receipt|caller_identity_hash"` returns nothing outside `docs/superpowers`; the sidecar evaluate response carries a `chio.receipt.v1` receipt; every middleware SDK verifies it with the shared receipt verifier. Pinned by Task 9 Step 5.
+1. **A consumer still binding to an unsalted receipt hash, or binding to a commitment it cannot check.** Expected: every row of the Task 1 consumer table has its planned binding at the F tip, `git grep -n -E "action\.parameter_hash|\.content_hash\b"` over `crates` returns only unrelated same-name fields listed as kind D, and every consumer that needs an opening fails with `OpeningUnavailable` when it is erased or unknown. Pinned by the per-consumer tests named in Tasks 7 and 16, and by `compacted_replay_survives_erased_openings` (Task 7).
+2. **An opening written apart from its receipt.** Expected: on every hosted path (SQLite and trust-control), openings are written in the receipt's append transaction; no `put_openings` call exists outside it; a crash, a lost ACK or a retry leaves the receipt and its salts identical. Pinned by the Task 4 crash and ACK tests and the Task 7 recovery tests.
+3. **A signing path that still accepts a hash or a commitment.** Expected: the only receipt signers take `ReceiptDraft`, `ReceiptPreimages` and `&dyn Rng`, including `chio-selective-disclosure` `sign_chio_receipt_with_bbs`. Pinned by `receipt_signers_take_preimages` (Task 6) and the Task 1 grep re-run at the F tip.
+4. **A salt that is not fresh, not 32 bytes, or seeded in a release build.** Expected: two salts per receipt from the producer's own `Rng`, refused when equal; fallible `Rng::fill_bytes`; no zero-fill fallback; `chio-fixture-rng` absent from the release dependency graph. Pinned by Task 2's tests and `scripts/check-fixture-rng.py` (Task 14).
+5. **Plaintext surviving in a signed field, or a required metadata block disappearing.** Expected: the marker property test passes across every guard evidence producer, the metadata merge and OCSF; an unregistered Chio-internal metadata key refuses signing; only caller and hook keys are dropped. Pinned by Task 5 and Task 8.
+6. **A regenerated fixture that changed more than the committed fields.** Expected: the changed values are the committed members, signatures, receipt ids and digests traced to them, and the consumer artifacts whose member changes the consumer table names. Pinned by the extended fixture diff aid (Task 18).
 
 ---
 
 ## File Structure
 
-| Path | Task | Responsibility |
-|---|---|---|
-| `crates/core/chio-core-types/src/rng.rs` (new; moved from `chio-kernel-core/src/rng.rs`) | 2 | `Rng` with fallible `fill_bytes`, `RngError`, `FixtureRng` behind the `fixture-rng` feature |
-| `crates/core/chio-core-types/src/receipt/disclosure.rs` (new) | 2 | `Salt`, `SaltRef`, `CommitmentAlg`, `ReceiptCommitment`, `CommitmentDomain`, `ContentPreimage`, `commit`, `ReceiptDisclosure`, `Opening`, `open_receipt`, `OpeningReport` |
-| `crates/core/chio-core-types/src/receipt/{body,decision,kinds,metadata,signing}.rs` | 2, 3 | committed body, `ToolCallAction`, `DisclosureBlock`, `ReceiptAuthority`, `ReceiptDraft`, `ReceiptPreimages`, `ReceiptOpenings`, `SignedReceipt`; `RedactionMode` deleted |
-| `crates/core/chio-core-types/tests/{committed_receipt_vectors,committed_receipt_negatives,receipt_marker_property}.rs` (new) | 2, 3, 5, 13 | vector cross-check, strict-decode and signing refusals, marker property |
-| `crates/kernel/chio-kernel-core/src/{receipts,rng,lib}.rs`, `src/guard.rs` | 3, 5 | committed `sign_receipt`, `sign_receipt_with_handle`, `ContentCommitmentMismatch`; relay signer and `rng.rs` deleted; `Guard::evidence_declaration` |
-| `crates/kernel/chio-kernel/src/rng.rs` (new), `src/receipt_support/*`, `src/kernel/responses/*`, `src/kernel/signing_task.rs`, `src/kernel/{admission_terminal_receipt,effect_obligation,kernel_drop_guard,reconciliation,session_ops}*`, `src/disclosure_store.rs` (new), `src/kernel/mod.rs` (`Guard`) | 4, 5 | `OsEntropyRng`, kernel salt wiring, `DisclosureStore`, evidence and metadata allowlist |
-| `crates/platform/chio-store-sqlite/src/disclosure_store.rs` (new), `src/receipt_store/bootstrap/open.rs` and readers | 4 | `disclosure_openings` table; `chio_tool_receipts.content_hash` replaced in place |
-| `crates/kernel/chio-kernel-browser/src/{pure,wasm,rng}.rs`, `crates/kernel/chio-kernel-mobile/src/{lib.rs,rng.rs,chio_kernel_mobile.udl}`, `crates/sdk/chio-cpp-kernel-ffi/src/lib.rs` and header, `sdks/typescript/packages/{workers,edge,deno}`, `sdks/swift/Sources/chio_kernel_mobile/*` | 6 | preimage-taking relays, fallible RNG, regenerated bindings |
-| `crates/security/chio-cage/src/receipt.rs`, `crates/platform/chio-control-plane/src/{keyring_runtime.rs,security/adapters/native_evidence.rs,security/response_simulation.rs,trust_control/config_and_public.rs,trust_control/finding_verified_fix.rs}`, `crates/kernel/chio-kernel/src/{response_simulation_report.rs,kernel/active_response_coordinator/execution_validation.inc}`, `crates/observability/chio-lineage/src/ingest_active_defense.rs`, `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs` | 7 | security and control-plane producers and their readers |
-| `crates/protocol/chio-acp-proxy/src/{interceptor,kernel_signer}.rs` | 8 | ACP preimage plumbing |
-| `crates/platform/chio-http-core/src/{authority,receipt}.rs`, `crates/products/chio-api-protect/src/proxy/**`, `crates/protocol/chio-tower/src/{evaluator,service}.rs`, `crates/platform/chio-control-plane/src/evidence_export/{verification.rs,tests/http_receipts.rs}`, `crates/platform/chio-store-sqlite/src/{receipt_store/retained_read.rs,receipt_query_snapshot/export/metadata.rs}`, `spec/schemas/chio-http/v1/evaluate-response.schema.json` | 9 | `HttpReceipt` deleted; HTTP signs `chio.receipt.v1` |
-| `sdks/python/{chio-sdk-python,chio-asgi,chio-django,chio-fastapi,chio-streaming,chio-langchain}`, `sdks/jvm/{chio-sdk-jvm,chio-spring-boot}`, `sdks/dotnet/ChioMiddleware`, `sdks/typescript/packages/{node-http,express,fastify,elysia,ai-sdk,chio-ai-sdk-middleware,conformance}`, `sdks/go/chio-go-http`, `examples/hello-*/smoke.sh` | 9 | HTTP middleware SDKs and examples on `chio.receipt.v1` |
-| `crates/observability/chio-otel-receipt-exporter`, `crates/kernel/chio-runtime-harness`, `crates/products/chio-cli/src/cli/{dispatch/proof/fixture*.rs,process_host/**}`, `crates/products/chio-mercury`, `crates/products/chio-wall`, `crates/tooling/chio-conformance/src/native_suite.rs`, `crates/trust/chio-attest-loopback` | 10, 11 | group 5 producers |
-| `crates/observability/chio-siem/src/**`, `crates/tooling/chio-conformance/verdict_matrix/src/driver.rs`, store query and export readers, `scripts/tests/check-receipt-query-http.test.py` | 12 | readers on commitments |
-| `sdks/typescript/chio-ts/src/invariants/receipt.ts`, `sdks/python/chio-py/src/chio/invariants/receipt.py`, `sdks/go/chio-go/invariants/receipt.go`, `sdks/cpp/chio-cpp`, `crates/sdk/chio-bindings-ffi`, `sdks/python/packages/chio-bedrock` and the other SDK receipt readers in the census | 14 | verifiers: commitments, openings, closed decode of the new blocks |
-| `spec/schemas/chio-wire/v1/receipt/record.schema.json` (moved in), new `spec/schemas/chio-wire/v1/receipt/receipt-disclosure.schema.json`, `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, `spec/wire-schemas.lock`, generated code, `spec/errors/registry.yaml` | 2 | contract move-in and codegen |
-| `tests/bindings/vectors/receipt/committed/v1.json`, `scripts/gen-signing-wrapper-vectors.py`, `tests/bindings/vectors/MANIFEST.sha256` | 13 | cross-check, padding negatives |
-| `xtask/src/signed_fixtures.rs` (from item 1), `scripts/check-fixture-rng.py` (new) | 11, 15 | seeded fixture producers, regeneration |
-| `spec/PROTOCOL.md` (section 6), `docs/superpowers/specs/relying-party-wedge/protocol/protocol-6-committed-receipts.md` (deleted on move), `docs/superpowers/specs/relying-party-wedge/in-place-schemas/receipt/record.schema.json` (moved), docs naming deleted APIs | 16 | contract text |
-| `docs/formal/COVERAGE.md`, `formal/rust-verification/kani-public-harnesses.toml`, `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs` | 17 | formal touchpoints |
+| Path | PR | Task | Responsibility |
+|---|---|---|---|
+| `crates/core/chio-core-types/src/rng.rs` (new; moved from `chio-kernel-core/src/rng.rs`) | P-a | 2 | `Rng` with fallible `fill_bytes`, `RngError` |
+| `crates/kernel/chio-kernel/src/rng.rs` (new) | P-a | 2 | `OsEntropyRng` |
+| `crates/tooling/chio-fixture-rng/` (new crate, `publish = false`) | P-a | 2 | `FixtureRng` (ChaCha20, `rand_chacha`) |
+| `crates/core/chio-core-types/src/receipt/disclosure.rs` (new) | P-b | 3 | `Salt`, `CommitmentAlg`, `ReceiptCommitment`, `CommitmentDomain`, `ContentPreimage`, `commit`, `ReceiptDisclosure`, `Opening`, `open_receipt`, `OpeningReport`, `OpeningState` |
+| `sdks/typescript/chio-ts`, `sdks/python/chio-py`, `sdks/go/chio-go` `invariants/disclosure.*` (new) | P-b | 3 | SDK openers |
+| `spec/schemas/chio-wire/v1/receipt/receipt-disclosure.schema.json` (new) | P-b | 3 | unsigned opening document |
+| `crates/kernel/chio-kernel/src/receipt_store.rs`, `crates/platform/chio-store-sqlite/src/receipt_store/**` (new `receipt_openings` table), `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs` and the trust-control append route | P-c | 4 | openings in the append transaction, local and remote; `OpeningState` reads; erase tombstones |
+| `crates/kernel/chio-kernel-core/src/guard.rs`, `crates/kernel/chio-kernel/src/kernel/mod.rs`, every `Guard` impl (111, 65 non-test at `fcc31d25fb`), `chio-wasm-guards` `WasmGuard`, `chio-external-guards` `ExternalGuard` and `ScopedAsyncGuard` | P-d | 5 | `evidence_declaration` |
+| `crates/core/chio-core-types/src/receipt/metadata.rs` (key registry), `crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs`, `spec/PROTOCOL.md` 6.4 key table | P-d | 5 | ADR-0019 item 7 registry with committed-disclosure declarations |
+| `crates/core/chio-core-types/src/receipt/{body,decision,kinds,metadata,signing}.rs`, `spec/schemas/chio-wire/v1/receipt/record.schema.json` (moved in), registry, manifest, generated code, `spec/errors/registry.yaml` | F | 6 | committed body; `RedactionMode` deleted |
+| `crates/kernel/chio-kernel-core/src/receipts.rs`, `kani_public_harnesses.rs` | F | 6 | committed portable signer |
+| `crates/kernel/chio-kernel/src/**` (producers and the internal consumers in the Task 1 table), `crates/platform/chio-store-sqlite/src/**` (receipt and admission rows) | F | 7 | kernel salt wiring; store-internal bindings |
+| `crates/kernel/chio-kernel-browser`, `chio-kernel-mobile`, `crates/sdk/chio-cpp-kernel-ffi`, `sdks/typescript/packages/{workers,edge,deno}`, `sdks/swift` | F | 9 | preimage-taking relays |
+| `crates/security/chio-cage`, `crates/platform/chio-control-plane/src/{keyring_runtime.rs,security/**,trust_control/{config_and_public,finding_verified_fix}.rs}`, `crates/kernel/chio-kernel/src/response_simulation_report.rs`, `crates/observability/chio-lineage` | F | 10 | security and control-plane producers and their readers |
+| `crates/trust/chio-selective-disclosure/src/lib.rs` | F | 10 | BBS signer and projection |
+| `crates/protocol/chio-acp-proxy` | F | 11 | ACP preimages |
+| `crates/platform/chio-http-core`, `crates/products/chio-api-protect`, `crates/protocol/chio-tower`, `crates/tooling/chio-bundle-verify` (after 6a), store retained-read and export metadata, `spec/schemas/chio-http/v1/evaluate-response.schema.json`, HTTP middleware SDKs, `examples/hello-*/smoke.sh` | F | 12 | `HttpReceipt` deleted |
+| group 5 producers and harnesses | F | 13, 14 | std and fixture producers |
+| cross-artifact consumers (federation, attest, credit, settle, web3, open-market, enterprise-export, agent-web, commerce-order, finding market, mcp-remote, runtime-harness) | F | 16 | consumer bindings |
+| `crates/observability/chio-siem`, verdict-matrix driver, store query readers | F | 15 | readers |
+| SDK receipt verifiers | F | 17 | commitments, openings, closed decode |
+| `tests/bindings/vectors/receipt/committed/v1.json`, `scripts/gen-signing-wrapper-vectors.py` | F | 17 | cross-check, padding and HTTP preimage vectors |
+| `xtask/src/signed_fixtures.rs`, `scripts/check-fixture-rng.py` (new) | F | 14, 18 | regeneration, release-graph gate |
+| `spec/PROTOCOL.md` 6, `spec/HTTP-SUBSTRATE.md`, `spec/OPENAPI-INTEGRATION.md`, `spec/WIRE_PROTOCOL.md`, docs | F | 19 | contract text |
+| `docs/formal/COVERAGE.md`, Kani manifest and harnesses | each PR | 20 | formal touchpoints |
 
 ## Commit Grouping
 
-One branch `feat/m1-committed-receipts`, one PR `feat(core-types): committed receipts for every producer`, squash-merged. Commits in this order (conventional messages, trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`). A "producer" is one signing entry point that owns a salt source: one row of the producer table in Task 1, which groups the inventory's 54 call sites by the `Rng` they draw from.
+Precursors are ordinary PRs with conventional commits. F is one branch `feat/m1-committed-receipts`, one PR, squash-merged, commits in this order (trailer `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`). A "producer" is one signing entry point that owns a salt source: one row of the producer table in Task 1.
 
 | # | Group | Commit | Task |
 |---|---|---|---|
-| 1 | 1 | `feat(core-types): move the Rng seam into core types and make it fallible` | 2 |
-| 2 | 1 | `feat(core-types): committed receipt body, commitments and the receipt disclosure document` | 2 |
-| 3 | 1 | `feat(schemas): move the committed receipt record schema in and add chio.receipt-disclosure.v1` | 2 |
-| 4 | 1 | `feat(kernel-core): sign committed receipts from preimages and delete the trusted-body relay` | 3 |
-| 5 | 2 | `feat(kernel): draw receipt salts from the OS RNG in the hosted kernel` | 4 |
-| 6 | 2 | `feat(store): disclosure openings store and committed receipt columns` | 4 |
-| 7 | 2 | `feat(kernel): declare guard evidence disclosure and drop undeclared evidence and metadata` | 5 |
-| 8 | 3 | `feat(kernel-browser): sign committed receipts from preimages with Web Crypto salts` | 6 |
-| 9 | 3 | `feat(kernel-mobile): sign committed receipts from preimages with OS RNG salts` | 6 |
-| 10 | 3 | `feat(cpp-kernel-ffi): sign committed receipts from preimages with OS RNG salts` | 6 |
-| 11 | 4 | `feat(cage): draw cage receipt salts from the host RNG` | 7 |
-| 12 | 4 | `feat(control-plane): commit keyring enterprise receipt projections` | 7 |
-| 13 | 4 | `feat(control-plane): commit native active-defense evidence receipts` | 7 |
-| 14 | 4 | `feat(control-plane): commit response simulation receipts` | 7 |
-| 15 | 4 | `feat(control-plane): commit SCIM deprovision receipts` | 7 |
-| 16 | 4 | `feat(control-plane): pass verified-fix evidence preimages to the receipt signer` | 7 |
-| 17 | 4 | `feat(acp-proxy): pass ACP session update preimages to the receipt signer` | 8 |
-| 18 | 4 | `feat(http-core): sign chio.receipt.v1 for HTTP calls and delete HttpReceipt` | 9 |
-| 19 | 4 | `feat(api-protect): sign committed sidecar receipts with OS RNG salts` | 9 |
-| 20 | 4 | `refactor(tower): read chio.receipt.v1 from the HTTP authority` | 9 |
-| 21 | 4 | `feat(sdks): HTTP middleware carries chio.receipt.v1` (Python, JVM, .NET, TS, Go, examples) | 9 |
-| 22 | 5 | `feat(otel-exporter): commit span receipts with OS RNG salts` | 10 |
-| 23 | 5 | `feat(cli): commit chio run evidence and swarm bootstrap receipts` | 10 |
-| 24 | 5 | `feat(mercury): commit step receipts with OS RNG salts` | 10 |
-| 25 | 5 | `feat(wall): commit wall receipts with OS RNG salts` | 10 |
-| 26 | 5 | `test(runtime-harness): seed treaty proof receipt salts` | 11 |
-| 27 | 5 | `test(cli): seed proof fixture receipt salts and re-sign from recorded preimages` | 11 |
-| 28 | 5 | `test(conformance): seed native suite receipt salts` | 11 |
-| 29 | 5 | `test(attest-loopback): seed loopback receipt salts` | 11 |
-| 30 | 5 | `refactor: read commitments in SIEM, lineage, store queries and the verdict-matrix driver` | 12 |
-| 31 | 5 | `test(vectors): cross-check committed receipt vectors and add padding negatives` | 13 |
-| 32 | 5 | `feat(sdk): verify committed receipts and openings in every SDK` | 14 |
-| 33 | 5 | `test: regenerate signed fixtures for committed receipts` | 15 |
-| 34 | 5 | `docs(spec): specify committed receipts in PROTOCOL 6` | 16 |
-| 35 | 5 | `chore(formal): refresh proof coverage` | 17 (last, after the final rebase) |
+| 1 | 1 | `feat(core-types): committed receipt body and the record schema move-in` | 6 |
+| 2 | 1 | `feat(kernel-core): sign committed receipts from preimages and delete the trusted-body relay` | 6 |
+| 3 | 2 | `feat(kernel): draw receipt salts from the OS RNG in the hosted kernel and persist openings with the append` | 7 |
+| 4 | 2 | `refactor(kernel): bind admission, recovery and delivery to commitment values and store-internal digests` | 7 |
+| 5 | 2 | `feat(kernel): drop undeclared guard evidence and caller metadata; refuse unregistered internal keys` | 8 |
+| 6 | 2 | `feat(secret-broker): sign broker-hosted kernel receipts with OS RNG salts` | 7 |
+| 7 | 3 | `feat(kernel-browser): sign committed receipts from preimages with Web Crypto salts` | 9 |
+| 8 | 3 | `feat(kernel-mobile): sign committed receipts from preimages with OS RNG salts` | 9 |
+| 9 | 3 | `feat(cpp-kernel-ffi): sign committed receipts from preimages with OS RNG salts` | 9 |
+| 10 | 4 | `feat(cage): draw cage receipt salts from the host RNG and persist openings with cage evidence` | 10 |
+| 11 | 4 | `feat(control-plane): commit keyring enterprise receipt projections` | 10 |
+| 12 | 4 | `feat(control-plane): commit native active-defense evidence receipts; readers bind to the signed body` | 10 |
+| 13 | 4 | `feat(control-plane): commit response simulation receipts; readers bind to the signed report` | 10 |
+| 14 | 4 | `feat(control-plane): commit SCIM deprovision receipts` | 10 |
+| 15 | 4 | `feat(control-plane): pass verified-fix evidence preimages to the receipt signer` | 10 |
+| 16 | 4 | `feat(selective-disclosure): sign committed receipts with BBS over the committed projection` | 10 |
+| 17 | 4 | `feat(acp-proxy): pass ACP session update preimages to the receipt signer` | 11 |
+| 18 | 4 | `feat(http-core): sign chio.receipt.v1 for HTTP calls and delete HttpReceipt` | 12 |
+| 19 | 4 | `feat(api-protect): sign committed sidecar receipts with OS RNG salts` | 12 |
+| 20 | 4 | `refactor(tower): read chio.receipt.v1 from the HTTP authority` | 12 |
+| 21 | 4 | `feat(sdks): HTTP middleware carries chio.receipt.v1` (Python, JVM, .NET, TS, Go, examples) | 12 |
+| 22 | 5 | `feat(otel-exporter): commit span receipts with OS RNG salts` | 13 |
+| 23 | 5 | `feat(cli): commit chio run evidence and swarm bootstrap receipts and persist their openings` | 13 |
+| 24 | 5 | `feat(mercury): commit step receipts with OS RNG salts` | 13 |
+| 25 | 5 | `feat(wall): commit wall receipts with OS RNG salts` | 13 |
+| 26 | 5 | `test(runtime-harness): take the caller's Rng for treaty proof receipts` | 14 |
+| 27 | 5 | `test(cli): seed proof fixture receipt salts and re-sign from recorded preimages` | 14 |
+| 28 | 5 | `test(conformance): take the caller's Rng for native suite receipts` | 14 |
+| 29 | 5 | `test(attest-loopback): take the caller's Rng for loopback receipts` | 14 |
+| 30 | 5 | `refactor: read commitments in SIEM, lineage, store queries and the verdict-matrix driver` | 15 |
+| 31 | 5 | `refactor: bind cross-artifact receipt consumers to commitment values or persisted openings` | 16 |
+| 32 | 5 | `test(vectors): cross-check committed receipt vectors and add padding and HTTP preimage negatives` | 17 |
+| 33 | 5 | `feat(sdk): verify committed receipts and openings in every SDK` | 17 |
+| 34 | 5 | `test: regenerate signed fixtures for committed receipts` | 18 |
+| 35 | 5 | `docs(spec): specify committed receipts in PROTOCOL 6` | 19 |
+| 36 | 5 | `chore(formal): refresh proof coverage` | 20 (last, after the final rebase) |
 
 A diff touching `.github/workflows/` is handed to the lead to push from the Mac (ws2 has no workflow scope).
 
 ---
 
-### Task 1: Base, census and coordination
+### Task 1: Base, census and coordination (before each PR)
 
-**Files:** none changed. Output goes to `ws2:~/lanes/claude-pr1160-evidence/m1i2/census-<base>.md`.
+**Files:** none changed. Output goes to `ws2:~/lanes/claude-pr1160-evidence/m1i2/census-<pr>-<base>.md`.
 
-- [ ] **Step 1: Preconditions.** `gh pr view <N> --repo bb-connor/arc --json state` reports `MERGED` for #1674, #1607, #1715, the shared decoder PR (find it with `gh pr list --repo bb-connor/arc --search lossless_serde` and record its number in the census), #1716, #1706, the K-stack in Root-2's order and the item 1 PR. If any is open, the lane waits; it does not reorder. Create the worktree at that integrated base: `git -C /home/connor/backbay/arc fetch -q https://github.com/bb-connor/arc.git main:refs/remotes/origin/main && git -C /home/connor/backbay/arc worktree add -b feat/m1-committed-receipts ~/lanes/m1i2 origin/main`.
-- [ ] **Step 2: Re-run the inventory greps** from the inventory's Method section, adjusted for item 1's names, plus:
+- [ ] **Step 1: Preconditions.** `gh pr view <N> --repo bb-connor/arc --json state` reports `MERGED` for every predecessor in the merge order. If any is open, the lane waits; it does not reorder. Create the worktree at that base: `git -C /home/connor/backbay/arc fetch -q https://github.com/bb-connor/arc.git main:refs/remotes/origin/main && git -C /home/connor/backbay/arc worktree add -b <branch> ~/lanes/m1i2-<pr> origin/main`.
+- [ ] **Step 2: Producer census.** The inventory's Method greps with the corrected signer regex, which matches every receipt signer spelling including handle and BBS variants and aliases:
 ```bash
-git grep -n -E "sign_receipt(_with_handle|_relaying_trusted_body)?\(|ChioReceipt::sign(_with_backend|_with_handle|_with_backend_using_handle|_with_bbs|_prepared_with_bbs)?\(|build_and_sign_receipt\(|core_sign_receipt|core_relay_trusted_body" -- crates sdks ':!**/tests/**' ':!*_tests.rs'
-git grep -n -E "content_hash|parameter_hash|RedactionMode|redaction_mode|ToolCallAction::from_parameters|verify_hash\(" -- crates sdks xtask ':!**/_generated/**'
+git grep -n -E "sign_receipt(_with_handle|_relaying_trusted_body)?\(|ChioReceipt::sign[A-Za-z_]*\(|\.sign_prepared_with_bbs[A-Za-z_]*\(|sign_chio_receipt_with_bbs\(|build_and_sign_receipt\(|core_sign_receipt|core_relay_trusted_body|HttpReceipt::sign" -- crates sdks ':!**/tests/**' ':!*_tests.rs'
+git grep -n -E "use [a-z_:]*(sign_receipt|ChioReceipt)[a-z_]* as " -- crates sdks
+git grep -n -E "pub fn [a-z_]*sign[a-z_]*\(" -- crates | grep -i receipt
+```
+  The last grep lists every public function with `sign` and `receipt` in its name; each hit is either a producer row or recorded as not a `chio.receipt.v1` signer. Expected at `a93a2f69a3`: the inventory's 54 call sites plus `chio-selective-disclosure` `sign_chio_receipt_with_bbs` (through `ChioReceipt::sign_prepared_with_bbs_using_handle`), which the inventory regex missed.
+- [ ] **Step 3: Consumer census.** Every non-test reader, comparer or copier of the receipt hashes, and every caller of `ToolCallAction::from_parameters` (which F deletes):
+```bash
+git grep -n -E "action\.parameter_hash|\.content_hash\b|ToolCallAction::from_parameters|verify_hash\(" -- crates sdks ':!**/tests/**' ':!*_tests.rs' ':!**/tests.rs' ':!**/_generated/**'
+git grep -n -E '"content_hash"|"parameter_hash"' -- crates sdks ':!**/tests/**'
+```
+  Expected at `fcc31d25fb`: 483 hit lines in 190 files. Each hit is classified into exactly one kind of the consumer table below; a hit that fits no kind stops the lane for a plan update.
+- [ ] **Step 4: Other censuses.**
+```bash
+git grep -n -E "content_hash|parameter_hash|RedactionMode|redaction_mode" -- crates sdks xtask ':!**/_generated/**'
 git grep -n -E "HttpReceipt|http_receipt|httpReceipt|http-receipt|caller_identity_hash" -- . ':!docs/superpowers'
-git grep -n -E "impl [A-Za-z_:]*Guard for" -- crates sdks
-git grep -n -E "GuardEvidence \{" -- crates ':!**/tests/**' ':!*tests.rs'
-git grep -n -E "NullRng|fill_bytes|impl [A-Za-z_:]*Rng for" -- crates sdks
+git grep -n -E "impl[^{]*Guard for" -- crates sdks
+git grep -n -E "NullRng|fill_bytes|impl [A-Za-z_:<>]*Rng for" -- crates sdks
+git grep -n -E "ChioKernel::new|build_kernel|set_receipt_store" -- crates
+git grep -n -E "\"[a-z_]+\"" -- crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs crates/core/chio-core-types/src/receipt/metadata.rs
 git grep -l -E '"content_hash"|"parameter_hash"|"redaction_mode"' -- '*.json' '*.ndjson' '*.jsonl'
 ```
-  Expected at `a93a2f69a3`: 54 non-test producer call sites (inventory), `content_hash` in 423 files (1102 lines), `parameter_hash` in 289 (751, including the unrelated approval and admission-operation `parameter_hash` columns, which this PR does not touch), `RedactionMode|redaction_mode` in 299, `ToolCallAction` in 292, the relay signer in 27, `HttpReceipt` and its spellings in 103 files (417 lines), 89 `Guard` impls (48 non-test), 62 non-test `GuardEvidence` constructions, 893 JSON fixtures carrying `content_hash` (861 under `fixtures/proof-room/`), 189 Rust test files naming `content_hash`. Record each inventory row at its current `file:line`.
-- [ ] **Step 3: Producer table.** Write the census table that the commit grouping uses: one row per producer, with its call sites, its salt source (spec 7.8 row), where its openings go (disclosure store, returned to the host, or fixture material) and how it obtains each preimage. Starting rows, from the inventory:
+  Expected: `HttpReceipt` and its spellings in 103 files (417 lines); 111 `Guard` impls (65 non-test); 421 kernel construction sites; 893 JSON fixtures with `content_hash` (861 under `fixtures/proof-room/`); 189 Rust test files naming `content_hash`. The metadata census lists every key read by non-test code (at least 25 at `fcc31d25fb`, including `receipt_context`, `financial`, `chio_runtime`, `admission_operation`, `caller_delivery`, `budget_authority`, `post_invocation`, `lineage`, `parent_receipt_ids`, `route_selection`, `security_event_projection`, `mercury`, `active_defense_body`, `delivery_contract`, `execution_nonce_id`) with its writer and its readers, including the admission, active-response and settlement paths (Root-2 condition 5).
+
+**Producer table** (Step 2 output; starting rows from the inventory):
 
 | Producer | Call sites | Salt source | Openings | Preimages |
 |---|---|---|---|---|
-| Portable signer (`chio-kernel-core`) | `receipts.rs` `sign_receipt`, `sign_receipt_with_handle` | host-supplied `Rng` | returned in `SignedReceipt` | passed in |
-| Hosted kernel (`chio-kernel`) | the 20 kernel rows of the inventory (allow, deny, pending, cancelled, terminal, reconciliation, effect obligation, drop guard, session ops, signing task, backend signer) | `OsEntropyRng` injected at kernel construction | `DisclosureStore` | request arguments; `receipt_content_for_output` through `ReceiptSigningHandle` |
-| Browser WASM | `pure.rs` signer, `wasm.rs` exports, TS workers, edge and deno | `WebCryptoRng` | returned to JS | passed in from JS |
-| Mobile | `lib.rs` signer, UDL, Swift | `MobileRng` | returned to the host | passed in |
-| C ABI | `chio-cpp-kernel-ffi` signer | `OsEntropyRng` inside the library | returned to the caller | passed in |
-| Cage | `chio-cage/src/receipt.rs` | host `Rng` passed into `prepare_cage_receipt` | returned to the cage host | in scope |
-| Keyring projection | `keyring_runtime.rs` | `OsEntropyRng` | returned, discarded (no store) | the signed key enterprise receipt |
-| Native evidence | `native_evidence.rs` | `OsEntropyRng` | returned, discarded | the active-defense body |
-| Response simulation | `response_simulation.rs` | `OsEntropyRng` | returned, discarded | the simulation report |
-| SCIM deprovision | `config_and_public.rs` | `OsEntropyRng` | returned, discarded | the deprovision request and result |
-| Verified-fix evidence | `finding_verified_fix.rs` | `OsEntropyRng` | returned, discarded | the evidence body (today only its hash reaches the signer) |
-| ACP proxy | `interceptor.rs` (two), `kernel_signer.rs` | `OsEntropyRng` | returned, discarded | the session update and audit entry (today only `entry.content_hash`) |
-| HTTP authority (`chio-http-core`) | `authority.rs` decision and final receipts (four construction sites) | `OsEntropyRng` | returned to the sidecar host | canonical HTTP request and response |
-| `api protect` sidecar | `sidecar.rs` | `OsEntropyRng` | returned, discarded until M3 | in scope |
-| OTel exporter | `sink.rs` | `OsEntropyRng` | returned, discarded | sanitized span attributes |
-| `chio run` | `call_evidence/export.rs`, `outcomes_export.rs`, `run_evidence/export.rs`, `swarm/requests.rs` | `OsEntropyRng` | returned with the evidence export | in scope |
-| Mercury | `builders.rs` | `OsEntropyRng` | returned, discarded | in scope |
-| Wall | `commands.rs` | `OsEntropyRng` | returned, discarded | in scope |
-| Runtime harness | `treaty.rs` | `FixtureRng` | fixture material | synthetic outcome label |
-| Proof fixtures | `fixture.rs` (two), `fixture_agent_web.rs` | `FixtureRng` | fixture material | recorded preimages (two sites copy a recorded hash today) |
-| Conformance native suite | `native_suite.rs` | `FixtureRng` | fixture material | fixed literal |
-| Attest loopback | `lib.rs`, `package.rs` | `FixtureRng` | fixture material | vendor output label |
+| Portable signer (`chio-kernel-core`) | `sign_receipt`, `sign_receipt_with_handle` | host-supplied `Rng` | returned in `SignedReceipt` | passed in |
+| Hosted kernel (`chio-kernel`; also `serve-http`, `chio mcp serve`, `api protect` mediated kernel, the secret broker's hosted kernel) | the 20 kernel rows of the inventory | `OsEntropyRng` injected at construction | persisted with the append (SQLite or trust-control) | request arguments; `ReceiptSigningHandle` content |
+| Browser WASM | `pure.rs`, `wasm.rs`, TS workers, edge, deno | `WebCryptoRng` | returned to JS | passed in |
+| Mobile | `lib.rs`, UDL, Swift | `MobileRng` | returned to the host | passed in |
+| C ABI | `chio-cpp-kernel-ffi` | `OsEntropyRng` inside the library | returned to the caller | passed in |
+| Cage | `prepare_cage_receipt` | host `Rng` | written beside the cage evidence (consumer kind E) | in scope |
+| Keyring projection | `keyring_runtime.rs` | `OsEntropyRng` | dropped (no downstream content check) | the signed key enterprise receipt |
+| Native evidence | `native_evidence.rs` | `OsEntropyRng` | dropped; readers bind to the signed body (kind F) | the active-defense body |
+| Response simulation | `response_simulation.rs` | `OsEntropyRng` | dropped; readers bind to the signed report (kind F) | the simulation report |
+| SCIM deprovision | `config_and_public.rs` | `OsEntropyRng` | dropped (no downstream content check) | request and result |
+| Verified-fix evidence | `finding_verified_fix.rs` | `OsEntropyRng` | persisted in the trust-control store (kind E) | the evidence body |
+| BBS selective disclosure | `chio-selective-disclosure` `sign_chio_receipt_with_bbs` | caller `Rng` | returned to the caller | passed in |
+| ACP proxy | `interceptor.rs` (two), `kernel_signer.rs` | `OsEntropyRng` | dropped (telemetry and compliance read commitment values only) | session update and audit entry body |
+| HTTP authority (`chio-http-core`) | `authority.rs` (four construction sites) | `OsEntropyRng` | persisted by `api protect` mediated mode with its receipt store; otherwise dropped | canonical HTTP request and response |
+| `api protect` sidecar | `sidecar.rs` | `OsEntropyRng` | as the HTTP authority row | in scope |
+| OTel exporter | `sink.rs` | `OsEntropyRng` | dropped | sanitized span attributes |
+| `chio run` | four sites, one producer | `OsEntropyRng` | written with the evidence export (kind E) | in scope |
+| Mercury, Wall | `builders.rs`, `commands.rs` | `OsEntropyRng` | dropped | in scope |
+| Runtime harness, conformance native suite, attest loopback | `treaty.rs`, `native_suite.rs`, `lib.rs`, `package.rs` | the caller's `Rng` (`OsEntropyRng` in release commands; `FixtureRng` in tests and generators) | returned | in scope |
+| Proof fixtures | `fixture.rs` (two), `fixture_agent_web.rs` | `FixtureRng` (generator only) | fixture material | recorded preimages |
 
-  The Lambda extension (`sdks/lambda/chio-lambda-extension`) emits an unsigned detect-only `EvaluateResponse` with no receipt body, hash or arguments at `a93a2f69a3`, so it is not a producer; Task 10 pins that.
-- [ ] **Step 4: D17 check.** Post the "D17 Coordination" list below to `sync.md` as `<UTC> <lane>: D17 m1i2 byte changes: <list>; holding PR open until lead and Root-2 ACK`. Record the merge SHA of every predecessor; the PR is based on the commit that contains all of them.
+The Lambda extension emits an unsigned detect-only `EvaluateResponse` with no receipt body, hash or arguments, so it is not a producer; Task 13 pins that.
+
+**Consumer table** (Step 3 output; one kind per site; rows at `fcc31d25fb`):
+
+| Kind | Rule | Sites |
+|---|---|---|
+| A. Store-internal binding | The kernel or store row keeps its own digest of material it already retains (the operation binding's request digest, the retained output blob digest, the session credential call row's result digest), and records the receipt's `parameter_commitment.value` and `content_commitment.value` in the same transaction that durably admits or terminates the operation. Replay and recovery compare receipt to row by commitment equality and blob to row by the row's digest. They never read openings, so erasure or loss of an opening cannot wedge them. The row's request and output digests stay unsalted inside the store only; the same store already retains the request and output themselves, so no new disclosure results. | `admission_operation/projection.rs:241,243,1233`, `projection/authorization.rs:111`, `projection/refusal_receipt.rs:54`, `remote_projection.rs:1325`, `admission_coordinator/terminal.rs:800-801` and its content plumbing, `terminal/compacted_replay.rs:192,264`, `return_context/caller.rs:103`, `admission_coordinator/refusal.rs:482`, `admission_terminal_receipt.rs:807-809`, `effect_obligation/preparation.rs:62`, `receipt_support/coupling.rs:29-30`, `responses/receipt_persistence.rs:158-216`, `chio-store-sqlite` `receipt_store/{append.rs:61,evidence_retention.rs:782,964,1101,reports/read_boundary/projection.rs:91,support/security_evidence.rs:61}`, `receipt_query_snapshot/project.rs:34,68,111,144`, `finding_pool_ledger.rs:1573` (as kind E when the ledger checks a delivery payload), `chio-mcp-remote` `session_credentials/completed_result.rs:133,154`, `session_credentials.rs:795` |
+| A0. Request digest helper | `ToolCallAction::from_parameters` used only to hash request arguments for a non-receipt binding (operation binding, execution nonce, treaty request, obligation, caller delivery). Replaced by `chio_core_types::receipt::canonical_parameter_digest(&Value) -> Result<Sha256Hex>`, which never appears in a receipt. | `admission_coordinator.rs:820-826`, `refusal.rs:273,462`, `terminal.rs:706,1542`, `compacted_replay.rs:182`, `nonce_admission.rs:241`, `reconciliation.rs:157-162`, `effect_obligation/preparation.rs:98,126`, `validation/tool_output.rs:548-563`, `verified_treaty.rs:104-119,210`, `tool_outcome/caller_delivery.rs:60-64`, `execution_nonce.rs`, `admission_operation/execution_nonce{,/profile}.rs` |
+| B. At-signing check | The check runs in the signing process before or right after signing, with the preimage in hand and the salts from `SignedReceipt.openings`; it recomputes the commitment. | `verified_treaty.rs:257` (receipt parameters equal the treaty request), `kernel/receipt_support/signing.rs:274`, `chio-kernel-core` `receipts.rs`, `nonce_admission.rs:79` and `authoritative_spend.rs:243,422` (nonce parameter binding; the offline check in `authoritative_spend` reduces to the receipt's signed `execution_nonce_id` equal to the nonce id, open question 8) |
+| C. Copy the commitment value | A later artifact copies a receipt hash today. It copies the commitment value instead, in a member renamed to say so, and compares by equality. The artifact's bytes change (D17). | `verified_treaty.rs:269` (`outcome_sha256` becomes `outcome_commitment`), federation `bilateral_dsse/builder.rs:186`, `bilateral_dsse/verify.rs:476`, `bilateral_verifier/cosign.rs:188`, `bilateral_verifier/treaty.rs:357`; `chio-attest-loopback` `lib.rs:326,456,512`, `package.rs:91`, `runtime_validation.rs:211,276`; `chio-attest-buyer-core/src/report.rs:741,959`; `chio-credit/src/receivable_iou.rs:188,818,949`; `settlement_observer.rs:222` (#1705's `SettlementObservation.content_hash` becomes `content_commitment`); `allow_responses.rs:547,879,947` (child contract `expected_digest` against the parent's content commitment); `chio-runtime-harness` `buyer_closure.rs:90`, `proof_parity.rs:335`; `finding_verified_fix.rs:1371`; `chio-acp-proxy` `telemetry.rs:313`, `compliance/bundle/bounds.rs:98`; `chio-selective-disclosure/src/lib.rs:234` (BBS message slot); `chio-tee` `tap.rs`, `runner.rs`; `chio-cli/src/cli/process_host/nonce_evidence.rs:91,103` |
+| D. Unrelated same-name field | Not a receipt hash; unchanged. | `chio-policy/src/receipt.rs` (policy receipt), `chio-http-core/src/request.rs` `content_hash()` (request body digest; feeds the HTTP preimage and is otherwise internal), `chio-api-protect/src/proxy/router.rs:418,505`, approval-store and admission-operation `parameter_hash` columns, `chio-acp-proxy` audit entry `content_hash` and `authorization_parameter_hash` |
+| E. Open with a persisted opening | The verifier holds the preimage (or the payload digest's preimage) and the producer's operator persists the opening. The verifier reads the opening from the operator's store or from the evidence that carries it and calls `open_receipt`. An erased, lost or absent opening fails closed with `OpeningUnavailable { state: Erased | Unknown }`. | finding market: `chio-finding-verifier/src/verify.rs:524`, `chio-finding-challenge/src/{standing.rs:187,replay_contradiction.rs:254}`, `chio-open-market/src/recovery.rs:320`, `trust_control/finding_purchase_routes.rs:392`, `finding_pool_ledger.rs:1573`; commerce: `chio-commerce-order/src/{replay.rs:362,settlement.rs:158}` (the opening rides in the commerce authority receipt artifact beside #1715's route); `chio-enterprise-export/src/artifacts.rs:456`; `chio-agent-web-interop/src/interop.rs:996`; cage reader `chio-cage/src/receipt.rs:395`; `chio run`: `process_host/{call_evidence.rs:130,304,348,367,run_evidence/verify.rs:181}`, `process_response_verify.rs:335`, `session/response.rs:134` |
+| F. Bind to signed Chio-internal metadata | The content is a Chio-internal body already carried in signed `metadata` under a registered key declared committed-safe (Task 5). The reader verifies that body and the receipt's signature, and stops comparing the content commitment; the producer's preimages are that body, so the commitment is redundant and documented as such. | native evidence: `execution_validation.inc:467-503,587-684`, `native_evidence.rs:558-606`, `chio-lineage/src/ingest_active_defense.rs:164-193`, `event_consumer/verification.rs:295-325`, store `support/security_evidence.rs:61`; response simulation: `response_simulation_report.rs` `verify_response_simulation_receipt`, `active_response_simulation.rs:135` |
+| G. External protocol | Off-chain anchor proof checks compare the anchored receipt's content binding with an expected value. `contracts/src` names no receipt hash at `fcc31d25fb`, so the contracts under the web3 freeze are unchanged; the expected value the off-chain checker derives becomes `content_commitment.value` (same 32-byte width). If Task 1 finds a contract or deployed artifact that recomputes the hash, the lane stops and escalates under the freeze. | `chio-settle/src/evm/prepare.rs:524`, `chio-web3/src/settlement.rs:698`, `chio-anchor/src/functions.rs:342`, `chio-settle/src/hook.rs` |
+| H. Format-only reader | Checks shape (lowercase hex) or projects the value. Moves to the commitment value. | `chio-http-core/src/evaluation.rs:52`, `chio-api-protect/src/proxy/sidecar.rs:861`, `chio-siem` (`ocsf.rs:72`, `sink_projection.rs:199,202`, `alerting/projection.rs:26`, `event.rs:42`), verdict-matrix `driver.rs:877`, `chio-cli` `trust/receipt/{health,explain}.rs`, `chio-eval-receipt/src/verify.rs`, `chio-binding-helpers/src/receipt.rs` |
+
+Test-only sites (`from_parameters` in tests, fixtures inside test modules) move to a test helper `chio_core_types::receipt::testing::draft_for(params)` behind `#[cfg(any(test, feature = "test-support"))]`.
+
+- [ ] **Step 5: D17 check (before F).** Post the "D17 Coordination" list to `sync.md` as `<UTC> <lane>: D17 m1i2 byte changes: <list>; holding PR open until lead and Root-2 ACK`. Record the merge SHA of every predecessor.
 
 ---
 
-### Task 2: Core types, the `Rng` seam and the contract move-in (commits 1 to 3)
+### Task 2: P-a, the `Rng` seam (byte-neutral)
 
-**Files:**
-- Create: `crates/core/chio-core-types/src/rng.rs`, `src/receipt/disclosure.rs`, `tests/committed_receipt_negatives.rs`, `spec/schemas/chio-wire/v1/receipt/receipt-disclosure.schema.json`
-- Delete: `crates/kernel/chio-kernel-core/src/rng.rs`
-- Modify: `src/receipt/{body,decision,kinds,metadata,signing,mod}.rs`, `src/lib.rs`, `crates/kernel/chio-kernel-core/src/lib.rs`, every `Rng` import and impl (`chio-kernel-browser`, `chio-kernel-mobile`, `chio-kernel-core`), `spec/schemas/chio-wire/v1/receipt/record.schema.json`, `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, `spec/wire-schemas.lock`, generated code, `spec/errors/registry.yaml`
+**Files:** create `crates/core/chio-core-types/src/rng.rs`, `crates/kernel/chio-kernel/src/rng.rs`, `crates/tooling/chio-fixture-rng/{Cargo.toml,src/lib.rs}`; delete `crates/kernel/chio-kernel-core/src/rng.rs`; modify every `Rng` impl and import (`chio-kernel-browser`, `chio-kernel-mobile`, `chio-kernel-core`, `chio-kernel` `session_ops.rs`), workspace `Cargo.toml` members.
 
-**Interfaces (produced; every later task consumes them):**
+**Interfaces:**
 
 ```rust
-// rng.rs. The seam moves down one crate because chio-core-types signs receipts and the
-// cage and attest-loopback producers do not depend on chio-kernel-core. Every import
-// changes; chio-kernel-core does not re-export it.
+// chio-core-types/src/rng.rs
 pub trait Rng {
     /// Fills `dest` with cryptographically secure random bytes or fails. No implementation
     /// zero-fills on failure.
@@ -252,505 +294,489 @@ pub trait Rng {
 pub struct RngError(pub &'static str);
 impl<T: Rng + ?Sized> Rng for &T { /* forwards */ }
 
-/// Deterministic ChaCha20 stream from a 32-byte seed (`rand_chacha`). Output is fixture
-/// material only. Compiled only with the `fixture-rng` feature, which only the harness,
-/// conformance and fixture producers enable (Task 11 gate).
-#[cfg(feature = "fixture-rng")]
+// chio-kernel/src/rng.rs
+/// OS CSPRNG through `getrandom`. The `Rng` every std producer injects in release code.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OsEntropyRng;
+
+// chio-fixture-rng (publish = false; a dev-dependency or an optional dependency only)
+/// Deterministic ChaCha20 stream from a 32-byte seed. Output is fixture material only.
 pub struct FixtureRng { /* interior-mutable ChaCha20Rng */ }
-#[cfg(feature = "fixture-rng")]
-impl FixtureRng { pub fn from_seed(seed: [u8; 32]) -> Self; }
+impl FixtureRng {
+    /// `seed = SHA-256("chio.fixture-rng.v1\0" || label || 0x00 || fixture_id)`.
+    pub fn for_fixture(label: &str, fixture_id: &str) -> Self;
+}
 ```
 
-`NullRng` is deleted (no non-test user at the census base). The browser and mobile zero-fill fallbacks are deleted; both return `RngError`. The browser receipt path's all-zero seed probe is deleted with them.
+`NullRng` is deleted (no non-test user). The browser and mobile zero-fill fallbacks and the browser's all-zero seed probe are deleted; both adapters return `RngError`. Existing callers (receipt ids, DPoP nonces, the browser seed) propagate the error as a refusal. `chio-kernel-core` does not re-export the trait.
+
+- [ ] **Step 1: Failing tests:** `os_entropy_rng_fills`; browser and mobile `fill_failure_returns_error` (test builds with an injected failing source); `fixture_rng_is_deterministic_per_fixture`.
+- [ ] **Step 2: Implement, run** `cs cargo test -p chio-core-types -p chio-kernel-core -p chio-kernel -p chio-kernel-browser -p chio-kernel-mobile -p chio-fixture-rng --no-fail-fast`, `cs wasm-pack test --node crates/kernel/chio-kernel-browser`, clippy for each, and `cs cargo xtask gen signed-fixtures --check` (expected: no change). Expected: PASS.
+
+---
+
+### Task 3: P-b, commitment and disclosure types with openers (additive)
+
+**Files:** create `crates/core/chio-core-types/src/receipt/disclosure.rs`, `tests/receipt_disclosure.rs`, `spec/schemas/chio-wire/v1/receipt/receipt-disclosure.schema.json`, SDK `invariants/disclosure.*` in TS, Python and Go with tests; modify `src/receipt/mod.rs`, `spec/schemas/registry.json`, `MANIFEST.sha256`, generated code.
+
+**Interfaces:**
 
 ```rust
-// receipt/disclosure.rs
+use crate::root_authority::wire::SaltRef; // #1706: open dotted string, at most 64 chars
+
 pub const SALT_LEN: usize = 32;
 pub const PARAMETERS_COMMITMENT_DOMAIN: &[u8] = b"chio.receipt.parameters.v1\0";
 pub const CONTENT_COMMITMENT_DOMAIN: &[u8] = b"chio.receipt.content.v1\0";
 pub const CHAIN_DIGEST_DOMAIN: &[u8] = b"chio.receipt.chain-digest.v1\0";
 pub const CHIO_RECEIPT_DISCLOSURE_SCHEMA: &str = "chio.receipt-disclosure.v1";
+pub const PARAMS_SALT_REF: &str = "params";
+pub const CONTENT_SALT_REF: &str = "content";
 
-/// 32 secret bytes. Debug prints `Salt(..)`. Wire form `b64u:` plus unpadded base64url;
-/// a padded form or any length other than 32 rejects at decode.
-#[derive(Clone, PartialEq, Eq)]
+/// 32 secret bytes, zeroized on drop. Debug prints `Salt(..)`. Wire form `b64u:` plus
+/// unpadded base64url; a padded form or a length other than 32 rejects at decode.
+#[derive(Clone, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct Salt([u8; SALT_LEN]);
 impl Salt { pub fn draw(rng: &dyn Rng) -> Result<Self>; pub fn as_bytes(&self) -> &[u8; SALT_LEN]; }
 
-/// Closed. Serializes as `params`, `content`, `anchor.sub`, `anchor.tenant`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SaltRef { Params, Content, AnchorSubject, AnchorTenant }
-
 /// Closed. Serializes as `sha256-salted`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommitmentAlg { Sha256Salted }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// The receipt's commitment. Its wire shape (`alg`, `value`, `salt_ref`) is fixed by spec 7.6
+/// and differs from the delegation context's `SaltedCommitment` (`commit`, `salt_ref`), which
+/// spec 7.3 fixes; both reuse `SaltRef` and `Sha256Digest`. Decoding checks `salt_ref` by
+/// position: `params` under `action.parameter_commitment`, `content` under `content_commitment`.
 #[serde(deny_unknown_fields)]
 pub struct ReceiptCommitment { pub alg: CommitmentAlg, pub value: Sha256Digest, pub salt_ref: SaltRef }
 
-/// The domain comes from the commitment's position, never from an opening.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommitmentDomain { Parameters, Content, DelegationSubject, DelegationTenant }
-impl CommitmentDomain { pub fn bytes(self) -> &'static [u8]; }
-
-/// `SHA-256(domain || salt || preimage)`.
+pub enum CommitmentDomain { Parameters, Content, DelegationSubject, DelegationTenant, DelegationClaim }
 pub fn commit(domain: CommitmentDomain, salt: &Salt, preimage: &[u8]) -> Sha256Digest;
 
-/// The three content preimage forms (G13). `Stream` holds each canonical chunk's SHA-256;
-/// an empty `Stream` encodes as `Empty`.
+/// G13. `Stream` holds each canonical chunk's SHA-256; an empty `Stream` encodes as `Empty`.
 pub enum ContentPreimage<'a> { Value(&'a serde_json::Value), Empty, Stream(&'a [[u8; 32]]) }
 impl ContentPreimage<'_> { pub fn to_bytes(&self) -> Result<Vec<u8>>; }
 
 /// `chio.receipt-disclosure.v1`, unsigned. `receipt_id` is bare lowercase hex (G14).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReceiptDisclosure { pub schema: DisclosureSchema, pub receipt_id: String, pub openings: Vec<Opening> }
-
-/// `payload` is opaque caller data. `None` serializes as `null` (a salt-only opening).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// `payload` is opaque. `None` serializes as `null` (a salt-only opening).
 #[serde(deny_unknown_fields)]
 pub struct Opening { pub salt_ref: SaltRef, pub salt: Salt, pub payload: Option<serde_json::Value> }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FieldVerdict { Verified, Rejected, Unverifiable }
 pub struct OpeningReport { pub parameters: FieldVerdict, pub content: FieldVerdict, pub disclosure_valid: bool }
 
+/// The persisted state of one receipt's openings (Task 4).
+pub enum OpeningState { Present(ReceiptOpenings), Erased { erased_at: u64 }, Unknown }
+pub struct OpeningUnavailable { pub receipt_id: String, pub state: OpeningStateKind }
+
 /// The caller supplies its own arguments and output; `payload` never supplies a content
-/// preimage. A salt shared by two `salt_ref`s, a malformed salt or a `receipt_id` that is
-/// not the receipt's id marks `disclosure_valid = false` and every field `Rejected` (G15).
-pub fn open_receipt(receipt: &ChioReceipt, disclosure: &ReceiptDisclosure,
+/// preimage. A salt shared by two `salt_ref`s, a malformed salt, a duplicate `salt_ref` or a
+/// `receipt_id` that is not the receipt's id marks `disclosure_valid = false` and every field
+/// `Rejected` (G15). Generic over the receipt's two commitment values so it lands before the
+/// receipt body changes.
+pub fn open_commitments(receipt_id: &str, parameter_commitment: &ReceiptCommitment,
+    content_commitment: &ReceiptCommitment, disclosure: &ReceiptDisclosure,
     own_parameters: Option<&serde_json::Value>, own_output: Option<ContentPreimage<'_>>) -> OpeningReport;
 ```
 
+Payload forms (P2-4): a parameters opening's `payload` is the arguments value. A content opening's `payload` exists only for a value output and is the canonical result (spec 7.7). Empty and stream outputs have salt-only content openings; a holder of such an opening derives the preimage from its own copy of the output, as for every opening. The auditor payload form for empty and stream outputs is left to `auditor_full` in M2.
+
+Register `chio.receipt-disclosure.v1` as an unsigned artifact; the schema is `additionalProperties: false` on the document and each opening, `salt` pattern `^b64u:[A-Za-z0-9_-]{43}$`, `salt_ref` as #1706's `SaltRef` grammar, `payload` unconstrained.
+
+- [ ] **Step 1: Failing tests** in `receipt_disclosure.rs`: `commitment_matches_layout` (domain, then salt, then preimage); `empty_output_preimage_is_zero_length`; `salt_wire_form_is_strict` (padded, 31 and 33 bytes fail); `duplicate_salt_marks_disclosure_invalid`; `padded_document_and_opening_fail_decoding`; `delegation_claim_salt_refs_are_accepted` (`anchor.claims.client_id` decodes as an opening `salt_ref`); `opener_reproduces_committed_vectors` (reads `tests/bindings/vectors/receipt/committed/v1.json` and calls `open_commitments` on each case's commitments and preimages; every `parameters`, `content` and `disclosure_valid` matches). SDK openers run the same vector file.
+- [ ] **Step 2: Implement, run** `cs cargo test -p chio-core-types --no-fail-fast`, `--no-default-features --lib`, the SDK tests, `bash scripts/check-chio-schema-registry.sh`, `cs make -C ~/lanes/m1i2-pb codegen-check`, and `cs cargo xtask gen signed-fixtures --check` (no change). Expected: PASS.
+
+---
+
+### Task 4: P-c, openings persist with the receipt append (additive)
+
+**Files:** `crates/kernel/chio-kernel/src/receipt_store.rs` (trait), `crates/platform/chio-store-sqlite/src/receipt_store/{bootstrap/open.rs,append.rs,openings.rs (new)}`, the publication batch from #1708, `crates/platform/chio-control-plane/src/trust_control/service_runtime/remote_stores.rs` and the trust-control receipt append route and handler, the store's v1 catalog validation.
+
+**Design (P1-1, P2-2, Root-2 conditions 1 to 3, 6):**
+- Openings are written in the same transaction as the receipt they open. There is no separate `put_openings` call and no separate failure to handle. A receipt append that fails takes its openings with it, and the kernel's existing append-failure handling applies unchanged. Spec 8.4's "opening marked lost" state therefore cannot arise on a hosted path (open question 2 records the spec amendment).
+- SQLite: the openings rows join the receipt row in the #1708 publication batch, under the same writer and inside the same guard. No extra I/O runs inside the publication guard beyond the rows of that batch; alerts and callbacks run after the guard is released (Root-2 condition 2).
+- Remote trust-control (`--control-url`, used by `chio mcp serve`, `chio run` and `serve-http`): the remote append request carries the openings, and trust-control writes the receipt and openings in one transaction on its own SQLite store. The remote `ReceiptStore` client never stores openings locally. Erase and read go through two new trust-control routes under the same token. This keeps the remote store path (D1, F14).
+- Durable admission: when a terminal receipt is durably admitted before publication, the admission row stores the signed receipt and its openings together, so recovery republishes the exact receipt and salts (Root-2 condition 3).
+- Idempotency: an append of a receipt id that exists with byte-identical receipt and salts is a no-op success; with different bytes or salts it refuses with `ReceiptStoreError::ConflictingOpenings`. A retry after a lost ACK resends the same request, held in memory until ACK or recovered from the admission row. Nothing re-signs.
+- Erasure: `erase_openings(receipt_id)` replaces the salt rows with a tombstone in one transaction. An append retry after erasure finds the receipt present and does not resurrect salts. A missing row reads as `OpeningState::Unknown`, never as erased or lost.
+
+**Interfaces:**
+
 ```rust
-// receipt/decision.rs
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub trait ReceiptStore {
+    /// Appends the receipt and its openings atomically. Replaces `append_chio_receipt` and
+    /// every `append_chio_receipt_*` variant's receipt argument with `&SignedReceipt` (one path).
+    fn append_chio_receipt(&self, signed: &SignedReceipt) -> Result<(), ReceiptStoreError>;
+    fn opening_state(&self, receipt_id: &str) -> Result<OpeningState, ReceiptStoreError>;
+    fn erase_openings(&self, receipt_id: &str, erased_at: u64) -> Result<(), ReceiptStoreError>;
+}
+```
+
+In P-c the trait gains the two read and erase methods and the table; the append signature change itself lands in F with `SignedReceipt` (P-c is additive: its append path accepts an optional openings argument internally, and F removes the option).
+
+DDL (fresh-only v1; catalog validation refuses any other layout with an exact error and mutates nothing, Root-2 condition 6):
+
+```sql
+CREATE TABLE receipt_openings (
+  receipt_id TEXT NOT NULL CHECK (length(receipt_id) = 64 AND receipt_id NOT GLOB '*[^0-9a-f]*'),
+  salt_ref TEXT NOT NULL CHECK (length(salt_ref) BETWEEN 1 AND 64 AND instr(salt_ref, char(0)) = 0),
+  state TEXT NOT NULL CHECK (state IN ('present','erased')),
+  salt BLOB CHECK ((state = 'present') = (salt IS NOT NULL AND length(salt) = 32)),
+  state_at INTEGER NOT NULL,
+  PRIMARY KEY (receipt_id, salt_ref)
+) WITHOUT ROWID;
+```
+
+`salt_ref` follows #1706's grammar, so delegation-context claim salts (`anchor.claims.*`) fit without a later table change. Writer custody and fencing follow the existing serving writer.
+
+- [ ] **Step 1: Failing tests** (SQLite, `chio-kernel --test durable_admission_sqlite`, trust-control client and server):
+  - `append_writes_receipt_and_openings_atomically` (fault injected after the receipt row: neither row exists);
+  - `crash_after_commit_before_ack_retains_salts` (commit, drop the ACK, restart, retry: same receipt id and salts, no duplicate);
+  - `retry_with_conflicting_salts_refuses`;
+  - `erase_then_retry_keeps_tombstone`;
+  - `missing_row_reads_unknown`;
+  - `concurrent_append_replay_and_failure` (append, replay and an injected append failure race under #1708's ordering; no lock held during alert callbacks);
+  - `unknown_ack_remote_append_is_idempotent` (trust-control);
+  - `old_layout_refuses_without_mutation` (catalog validation).
+- [ ] **Step 2: Implement, run** `cs cargo test -p chio-store-sqlite -p chio-kernel -p chio-control-plane --no-fail-fast`, clippy, `cs cargo xtask gen signed-fixtures --check` (no change). Expected: PASS.
+
+---
+
+### Task 5: P-d, guard evidence declarations and the metadata key registry (declarations only)
+
+**Files:** both `Guard` traits, every impl including test impls (111 at `fcc31d25fb`), `chio-wasm-guards/src/runtime/guard.rs`, `chio-external-guards/src/lib.rs` (`ExternalGuard`, `ScopedAsyncGuard`), `crates/core/chio-core-types/src/receipt/metadata.rs`, `crates/kernel/chio-kernel/src/receipt_support/receipt_metadata.rs`, `spec/PROTOCOL.md` 6.4.
+
+**Interfaces:**
+
+```rust
+pub enum EvidenceDisclosure { /// `details` never carries argument or result values.
+    Safe, Unsafe }
+pub struct GuardEvidenceDeclaration { pub details: EvidenceDisclosure, pub details_required: bool }
+// Required on both Guard traits and on ExternalGuard; no default method.
+fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
+```
+
+- `WasmGuard` declares `{ details: Unsafe, details_required: false }` for every module, because one impl covers modules whose output Chio cannot inspect. `ScopedAsyncGuard<E>` returns `E::evidence_declaration()`.
+- Registration refuses `{ details: Unsafe, details_required: true }` (spec 8.4 "fails at load"). This refusal is live in P-d; no current guard declares it, which P-d's test pins.
+- Operator impact (P3): a guard declared `Unsafe` loses its `details` text in receipts from F onward, for example the forbidden-path guard's matched path. The text still reaches the kernel's structured deny log and the caller's error response, which the PR body states.
+
+Metadata key registry (ADR-0019 item 7, built here as that ADR schedules): a named-const registry in `receipt/metadata.rs`:
+
+```rust
+pub enum MetadataKeyOrigin { ChioInternal, CallerOrHook }
+pub enum MetadataDisclosure { /// carries no argument or result value
+    CommittedSafe, /// carries an argument or result value
+    Unsafe }
+pub struct MetadataKeySpec { pub key: &'static str, pub origin: MetadataKeyOrigin, pub disclosure: MetadataDisclosure, pub schema: Option<&'static str> }
+pub const RECEIPT_METADATA_KEYS: &[MetadataKeySpec];
+pub fn metadata_key_spec(key: &str) -> Option<&'static MetadataKeySpec>;
+```
+
+Every Chio-internal key the Task 1 metadata census found is registered with its declaration, including the operational blocks admission, active response and settlement need (`admission_operation`, `budget_authority`, `financial`, `execution_nonce_id`, `delivery_contract`, `caller_delivery`, `lineage`, `parent_receipt_ids`, `route_selection`, `security_event_projection`, `active_defense_body`, `receipt_context`, `chio_runtime`, `post_invocation`, `mercury`). `active_defense_body` and the response simulation report are Chio-internal bodies the kernel generates, not caller data; they are declared `CommittedSafe`, and the consumer table's kind F records that their content commitments are redundant. A required block that would carry argument or result values is redesigned in F to a committed-safe typed form or the producer fails closed (Root-2 condition 5); Task 1 lists any such block, and an unexpected one stops the lane. The scattered key literals move to the registry constants; PROTOCOL 6.4 gains the normative key table; the kernel's reserved-key collision assertion and metadata-is-object assertion run before body construction. Dropping and refusal stay off in P-d and are switched on in F (Task 8).
+
+- [ ] **Step 1: Failing tests:** `unsafe_required_guard_refuses_registration`; `every_guard_declares` (compiles only when every impl declares); `wasm_guard_declares_unsafe`; `registry_covers_census_keys` (every key the census found is registered); `reserved_key_from_caller_refuses`.
+- [ ] **Step 2: Implement, run** `cs cargo test -p chio-kernel-core -p chio-kernel -p chio-guards -p chio-external-guards -p chio-wasm-guards -p chio-security-kernel -p chio-core-types --no-fail-fast`, clippy, `cs cargo xtask gen signed-fixtures --check` (no change). Expected: PASS.
+
+---
+
+### Task 6: F commits 1 and 2, committed body and the portable signer
+
+**Files:** `crates/core/chio-core-types/src/receipt/{body,decision,kinds,metadata,signing}.rs`, `tests/committed_receipt_negatives.rs` (new); `crates/kernel/chio-kernel-core/src/{receipts,lib,kani_public_harnesses}.rs`; contract move-in files.
+
+**Interfaces:**
+
+```rust
 #[serde(deny_unknown_fields)]
 pub struct ToolCallAction {
     pub parameter_commitment: ReceiptCommitment,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parameters_inline: Option<serde_json::Map<String, serde_json::Value>>,
 }
-// ToolCallAction::from_parameters and verify_hash are deleted.
+// ToolCallAction::from_parameters and verify_hash are deleted; canonical_parameter_digest
+// (consumer kind A0) is the request digest helper.
+pub fn canonical_parameter_digest(arguments: &serde_json::Value) -> Result<Sha256Hex>;
 
-// receipt/body.rs: ChioReceiptBody, field order as the staged schema
-//   removed: redaction_mode, content_hash
-//   added:   content_commitment: ReceiptCommitment,
-//            result_inline: Option<serde_json::Map<String, serde_json::Value>>,
-//            disclosure: DisclosureBlock,
-//            authority: Option<ReceiptAuthority>
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+// ChioReceiptBody: removed redaction_mode, content_hash; added
+//   content_commitment: ReceiptCommitment, result_inline: Option<Map>,
+//   disclosure: DisclosureBlock, authority: Option<ReceiptAuthority>
 #[serde(deny_unknown_fields)]
-pub struct DisclosureBlock {
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub policy_digest: Option<Sha256Digest>,
-    pub parameter_inline_fields: Vec<JsonPointer>,
-    pub result_inline_fields: Vec<JsonPointer>,
-}
-impl DisclosureBlock { pub const FULLY_COMMITTED: Self; }
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DisclosureBlock { pub policy_digest: Option<Sha256Digest>,
+    pub parameter_inline_fields: Vec<JsonPointer>, pub result_inline_fields: Vec<JsonPointer> }
 #[serde(deny_unknown_fields)]
-pub struct ReceiptAuthority {
-    pub root_anchor: RootAnchor,      // #1706, capability/anchor.rs
-    pub chain_digest: Sha256Digest,
-    pub chain_depth: u32,
-    pub holder: HolderClass,          // #1706, root_authority/delegation_context.rs
-}
+pub struct ReceiptAuthority { pub root_anchor: RootAnchor, pub chain_digest: Sha256Digest,
+    pub chain_depth: u32, pub holder: HolderClass }
 
-/// Every body member except the two commitments, `result_inline` and `disclosure`.
 pub struct ReceiptDraft { /* id, timestamp, capability_id, tool_server, tool_name, decision,
     receipt_kind, boundary_class, observation_outcome, tool_origin, actor_chain, policy_hash,
     evidence, metadata, trust_level, tenant_id, authority, kernel_key, bbs_projection_version */ }
-
 pub struct ReceiptPreimages<'a> { pub parameters: &'a serde_json::Value, pub content: ContentPreimage<'a> }
-
-/// The salts of one receipt. Debug prints the receipt id only.
+/// Salts of one receipt; zeroized on drop; Debug prints the receipt id only.
 pub struct ReceiptOpenings { pub receipt_id: String, pub parameters: Salt, pub content: Salt }
 impl ReceiptOpenings {
-    /// Salt-only openings for the caller copy and `caller` bundles.
     pub fn salt_only(&self) -> ReceiptDisclosure;
-    /// Openings with payloads, for auditor bundles.
-    pub fn with_payloads(&self, parameters: &serde_json::Value, content: Option<&serde_json::Value>) -> ReceiptDisclosure;
+    /// Value outputs only (Task 3 payload forms).
+    pub fn with_value_payloads(&self, parameters: &serde_json::Value, content: &serde_json::Value) -> ReceiptDisclosure;
 }
-
 #[must_use]
 pub struct SignedReceipt { pub receipt: ChioReceipt, pub openings: ReceiptOpenings }
 
 impl ChioReceipt {
-    /// Draws two salts from `rng` (refusing equal salts), computes both commitments from
-    /// `preimages`, sets `disclosure` to `FULLY_COMMITTED`, checks the body, signs
-    /// `chio.receipt.v1` through the item 1 wrapper. Refuses `tenant_id` beside `authority`.
     pub fn sign(draft: ReceiptDraft, preimages: ReceiptPreimages<'_>, rng: &dyn Rng, keypair: &Keypair) -> Result<SignedReceipt>;
     pub fn sign_with_backend(draft: ReceiptDraft, preimages: ReceiptPreimages<'_>, rng: &dyn Rng, backend: &dyn SigningBackend) -> Result<SignedReceipt>;
     pub fn sign_with_backend_using_handle(draft: ReceiptDraft, parameters: &serde_json::Value, rng: &dyn Rng, backend: &dyn SigningBackend, handle: ReceiptSigningHandle) -> Result<SignedReceipt>;
+    pub fn sign_prepared_with_bbs_using_handle(draft: ReceiptDraft, parameters: &serde_json::Value, rng: &dyn Rng, backend: &dyn SigningBackend, handle: ReceiptSigningHandle, bbs: &BbsSigner) -> Result<SignedReceipt>;
+    pub fn open(&self, disclosure: &ReceiptDisclosure, own_parameters: Option<&serde_json::Value>, own_output: Option<ContentPreimage<'_>>) -> OpeningReport;
 }
+
+// chio-kernel-core
+pub enum ReceiptSigningError { ContentCommitmentMismatch { salt_ref: SaltRef }, KernelKeyMismatch,
+    SaltGeneration(RngError), DuplicateSalt, TenantIdWithAuthority, InlineFieldsWithoutPolicy, SigningFailed(String) }
+pub fn sign_receipt(draft: ReceiptDraft, preimages: ReceiptPreimages<'_>, rng: &dyn Rng, backend: &dyn SigningBackend) -> Result<SignedReceipt, ReceiptSigningError>;
+pub fn sign_receipt_with_handle(draft: ReceiptDraft, parameters: &serde_json::Value, rng: &dyn Rng, backend: &dyn SigningBackend, handle: ReceiptSigningHandle) -> Result<SignedReceipt, ReceiptSigningError>;
 ```
 
-`ChioReceipt::sign_with_bbs` and `sign_prepared_with_bbs` take the same draft, preimages and `Rng` and keep the BBS signature inside the signing body. `ReceiptSigningHandle` holds a `ContentPreimage` it owns (`from_content_preimage`, `from_content`) instead of an unsalted digest. `RedactionMode` and `ReceiptSemanticFields.redaction_mode` are deleted; `ReceiptSemanticFields::trace_detect_only` and `advisory_only` lose their mode member (inventory "RedactionMode mapping": every target is fully committed). New `Error` variants: `SaltGeneration(RngError)`, `DuplicateSalt`, `TenantIdWithAuthority`, `InlineFieldsWithoutPolicy`, `CommitmentMismatch { field: SaltRef }`.
+Signer order: kernel key check against `backend.public_key()?`, two salt draws (equal salts refuse), commitment computation, recompute check (`ContentCommitmentMismatch`), body validation (`validate_signable_semantics`, `tenant_id` rule, inline-field rule), wrapped signing. Deleted: `sign_receipt_relaying_trusted_body`, `ContentHashMismatch`, every signer that takes a `ChioReceiptBody`, `RedactionMode`, `ReceiptSemanticFields.redaction_mode`. `ReceiptSigningHandle` owns a `ContentPreimage`. Every producer sets `authority: None` (open question 3).
 
-Contract move-in (in-place schemas README, move-in rule): `git mv` the staged `in-place-schemas/receipt/record.schema.json` over the live `spec/schemas/chio-wire/v1/receipt/record.schema.json` after removing the members later milestones own (`enforcement`, the `pdp_decision`, `prevent_external` and `delegated` values with their rule, `settlement`), re-diffing against the live file and carrying in #1715's `additionalProperties: false` layers and item 1's `algorithm` removal first. `content_commitment` is required (no `pdp_decision` kind exists in this PR). Add `receipt/receipt-disclosure.schema.json` (`additionalProperties: false` on the document and on each opening, `salt` pattern `^b64u:[A-Za-z0-9_-]{43}$`, `payload` unconstrained) and register `chio.receipt-disclosure.v1` as an unsigned artifact. Register `urn:chio:error:attest:receipt-tenant-id-with-authority` (first emitted here) in `spec/errors/registry.yaml`.
+Contract move-in (in-place schemas README): `git mv` the staged `record.schema.json` over the live file after removing `enforcement`, the `pdp_decision`, `prevent_external` and `delegated` values and rule, and `settlement`; re-diff against live and carry in #1715's closed layers and item 1's `algorithm` removal first. `content_commitment` is required. Register `urn:chio:error:attest:receipt-tenant-id-with-authority`. Regenerate code in four languages.
 
-- [ ] **Step 1: Write the failing tests** in `crates/core/chio-core-types/tests/committed_receipt_negatives.rs`:
-```rust
-#![allow(clippy::expect_used, clippy::unwrap_used)]
-#[test]
-fn commitment_matches_layout() {
-    let salt = Salt::from_bytes([7; 32]);
-    let mut expected = Vec::new();
-    expected.extend_from_slice(b"chio.receipt.parameters.v1\0");
-    expected.extend_from_slice(&[7; 32]);
-    expected.extend_from_slice(br#"{"a":1}"#);
-    assert_eq!(commit(CommitmentDomain::Parameters, &salt, br#"{"a":1}"#), Sha256Digest::of(&expected));
-}
-#[test]
-fn empty_output_preimage_is_zero_length() {
-    assert!(ContentPreimage::Empty.to_bytes().unwrap().is_empty());
-    assert!(ContentPreimage::Stream(&[]).to_bytes().unwrap().is_empty());
-}
-#[test]
-fn equal_salts_refuse() { /* ConstantRng; ChioReceipt::sign errs with Error::DuplicateSalt; no signature */ }
-#[test]
-fn rng_failure_refuses_signing() { /* FailingRng; Err(Error::SaltGeneration(_)); no backend sign call */ }
-#[test]
-fn tenant_id_with_authority_refuses_signing() { /* Err(Error::TenantIdWithAuthority) */ }
-#[test]
-fn padded_blocks_fail_decoding() { /* "pad":0 added to parameter_commitment, content_commitment, disclosure, authority, authority.root_anchor, the disclosure document and one opening: each fails decode with the exact serde unknown-field error, over a valid wrapper signature */ }
-#[test]
-fn removed_members_fail_decoding() { /* "content_hash", "redaction_mode", "action.parameters", "action.parameter_hash" each fail decode */ }
-#[test]
-fn salt_wire_form_is_strict() { /* padded base64url, 31 bytes and 33 bytes each fail decode */ }
-```
-- [ ] **Step 2: Run and confirm failure.** `cs cargo test -p chio-core-types --test committed_receipt_negatives`. Expected: compile error (types missing).
-- [ ] **Step 3: Implement** commit 1 (the `Rng` move and fallible signature, every impl and import), then commit 2 (the types above, `ChioReceipt::sign*`), then commit 3 (schemas, registry, `MANIFEST.sha256`, error registry). Regenerate code: `for lang in rust ts go python; do cs cargo xtask codegen --lang "$lang" || exit 1; done && cs cargo xtask snippets regen && python3 scripts/check-wire-schemas.py --update`.
-- [ ] **Step 4: Run.** `cs cargo test -p chio-core-types --test committed_receipt_negatives --test wire_protocol_schema --test signed_artifact_schema --test receipt_strict_decode`, `cs cargo test -p chio-core-types --no-default-features --lib`, `bash scripts/check-chio-schema-registry.sh`, `python3 scripts/check-error-urn-registry.py`. Expected: PASS except golden-signature tests that Task 15 regenerates (list them).
+- [ ] **Step 1: Failing tests** in `committed_receipt_negatives.rs` and `receipts.rs`: `equal_salts_refuse`, `rng_failure_refuses_signing` (no backend call), `tenant_id_with_authority_refuses_signing`, `padded_blocks_fail_decoding` (each new block and `authority.root_anchor`), `removed_members_fail_decoding` (`content_hash`, `redaction_mode`, `action.parameters`, `action.parameter_hash`), `commitment_salt_ref_checked_by_position`, `kernel_key_mismatch_refuses_before_salts`, `receipt_signers_take_preimages` (calls every public receipt signer in core-types, kernel-core and selective-disclosure with the new signatures).
+- [ ] **Step 2: Run** `cs cargo test -p chio-core-types -p chio-kernel-core --no-fail-fast` (expected: PASS except golden signatures, listed for Task 18).
 
 ---
 
-### Task 3: Portable signer (commit 4)
+### Task 7: F commits 3, 4 and 6, hosted kernel salts and internal consumers
 
-**Files:** `crates/kernel/chio-kernel-core/src/receipts.rs`, `src/lib.rs`, `src/kani_public_harnesses.rs`, `tests/` that call the relay.
+**Files:** `crates/kernel/chio-kernel/src/{kernel/construction.rs,kernel_struct.rs,receipt_support/**,kernel/responses/**,kernel/signing_task.rs,kernel/admission_terminal_receipt.rs,kernel/effect_obligation/**,kernel/kernel_drop_guard.rs,kernel/reconciliation.rs,kernel/session_ops/**,kernel/admission_coordinator/**,admission_operation/**,tool_outcome/caller_delivery.rs,kernel/verified_treaty.rs,kernel/nonce_admission.rs,kernel/validation/tool_output.rs,kernel/settlement_observer.rs}`, `chio-store-sqlite` admission operation rows, `chio-secret-broker` kernel host, `chio-control-plane/src/lib.rs` (`build_kernel_with_clock`, `configure_receipt_store`), `chio-api-protect/src/proxy/mediated.rs`.
 
-**Interfaces:**
+- Kernel construction carries `rng: Arc<dyn Rng + Send + Sync>` in `KernelConfig` (one constructor input, no setter), defaulting nowhere: every one of the 421 construction sites passes it (release code `OsEntropyRng`, tests `OsEntropyRng` or `FixtureRng`). A durable receipt store, local or remote, always stores openings (Task 4), so no "store without disclosure store" state exists (P1-1).
+- Commit 3 wires the kernel `Rng` into all 20 kernel producer rows (one producer). `api protect`'s mediated kernel and the secret broker's hosted kernel are this producer; commit 6 wires the broker host's `Rng` and store.
+- Commit 4 applies consumer kinds A, A0 and B to every kernel and store row in the Task 1 table. The admission operation row gains `receipt_parameter_commitment` and `receipt_content_commitment`, written in the same transaction that records the terminal receipt; the row's existing `action_parameter_hash` becomes the `canonical_parameter_digest` value; the retained output blob keeps its own digest. Compacted replay compares `sha256(blob)` with the row's output digest and the receipt's commitment values with the row's commitment values; it never reads openings.
+- Any kernel path that needs an opening (none in this plan) fails with `KernelError::ReceiptOpeningUnavailable(OpeningUnavailable)`.
 
-```rust
-pub enum ReceiptSigningError {
-    /// The assembled body's commitment does not recompute from the drawn salt and the
-    /// preimage. Checked before the signing call.
-    ContentCommitmentMismatch { field: SaltRef },
-    KernelKeyMismatch,
-    SaltGeneration(RngError),
-    DuplicateSalt,
-    TenantIdWithAuthority,
-    SigningFailed(String),
-}
-pub fn sign_receipt(draft: ReceiptDraft, preimages: ReceiptPreimages<'_>, rng: &dyn Rng, backend: &dyn SigningBackend)
-    -> Result<SignedReceipt, ReceiptSigningError>;
-pub fn sign_receipt_with_handle(draft: ReceiptDraft, parameters: &serde_json::Value, rng: &dyn Rng,
-    backend: &dyn SigningBackend, handle: ReceiptSigningHandle) -> Result<SignedReceipt, ReceiptSigningError>;
-```
-
-Deleted: `sign_receipt_relaying_trusted_body`, `ContentHashMismatch`. Order inside the signer: kernel key check against `backend.public_key()?`, salt draws, commitment computation, recompute check, body validation (`validate_signable_semantics`, the `tenant_id` rule), wrapped signing.
-
-- [ ] **Step 1: Failing tests** in `receipts.rs` tests: `commitment_recomputes_from_preimage` (sign, then `open_receipt` with the same arguments and output verifies both fields); `different_output_rejects` (open with a one-bit different output: content `Rejected`); `kernel_key_mismatch_refuses_before_salts` (a counting `Rng` records zero draws); `receipt_signers_take_preimages` (calls every public receipt signer in `chio_kernel_core` and `chio_core_types::receipt` with the new signatures, so a reintroduced body-only signer is a compile-visible API change in review).
-- [ ] **Step 2: Implement and run.** `cs cargo test -p chio-kernel-core --no-fail-fast` and `cs cargo clippy -p chio-kernel-core --all-targets -- -D warnings`. Update the `#[cfg(kani)]` blocks by hand (the `mem::forget(body)` path moves to the draft). Expected: PASS.
+- [ ] **Step 1: Failing tests:**
+  - `kernel_receipt_openings_persist_with_append`; `deny_receipt_commits_empty_output`;
+  - `compacted_replay_survives_erased_openings` (erase the openings of a compacted admission, replay: completes with the same receipt; no wedge);
+  - `compacted_replay_blob_mismatch_refuses` (the existing refusal, now against the row digest);
+  - `recovery_republishes_exact_receipt_and_salts` (crash after durable admission before publication);
+  - `post_effect_stop_races_receipt_append` (C6: a durable stop racing the append still withholds post-effect output, Root-2 condition 4);
+  - the existing T7, native-ledger and D5 admission and security dispatch identity and refusal tests keep their assertions; where a signature or API changes they are rewritten to assert the same refusal, not only regenerated (Root-2 condition 4);
+  - `settlement_seed_and_drain_keep_receipt_references` (#1710 seeding, durable append and drain reconciliation after ids change, Root-2 condition 5);
+  - `treaty_request_binding_checked_at_signing`, `nonce_parameter_binding_checked_at_signing`, `caller_delivery_uses_request_digest`;
+  - `remote_receipt_store_kernel_starts` (`chio mcp serve --control-url` against a trust-control stub: starts, appends with openings).
+- [ ] **Step 2: Run** `cs cargo test -p chio-kernel --no-fail-fast`, `cs cargo test -p chio-kernel --test durable_admission_sqlite`, `cs cargo test -p chio-store-sqlite -p chio-control-plane -p chio-api-protect -p chio-secret-broker --no-fail-fast`, clippy. Expected: PASS except golden signatures.
 
 ---
 
-### Task 4: Hosted kernel salt source and the disclosure store (commits 5, 6)
+### Task 8: F commit 5, evidence and metadata enforcement
 
-**Files:** `crates/kernel/chio-kernel/src/rng.rs` (new), `src/disclosure_store.rs` (new), `src/receipt_support/{signing,receipt_scopes}.rs`, `src/kernel/responses/{allow_responses,deny_responses,pending_responses,receipt_persistence,terminal_responses}.rs`, `src/kernel/{admission_terminal_receipt,effect_obligation,effect_obligation/recovery,kernel_drop_guard,reconciliation,session_ops,session_ops/protocol_refusal,session_ops/reports,signing_task}.rs`, `src/kernel/construction.rs`; `crates/platform/chio-store-sqlite/src/disclosure_store.rs` (new), `src/receipt_store/bootstrap/open.rs`, every store reader of `content_hash`; `crates/platform/chio-control-plane/src/lib.rs` (`build_kernel_with_clock`).
-
-**Interfaces:**
-
-```rust
-// chio-kernel/src/rng.rs
-/// OS CSPRNG through `getrandom`. The only `Rng` std producers inject.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct OsEntropyRng;
-impl chio_core_types::rng::Rng for OsEntropyRng { /* getrandom::getrandom(dest).map_err(..) */ }
-
-// chio-kernel/src/disclosure_store.rs
-pub trait DisclosureStore: Send + Sync {
-    /// Writes both salts of one receipt keyed by `(receipt_id, salt_ref)`. Idempotent for
-    /// identical salts; a different salt under an existing key refuses.
-    fn put_openings(&self, openings: &ReceiptOpenings) -> Result<(), DisclosureStoreError>;
-    fn openings(&self, receipt_id: &str) -> Result<Option<StoredOpenings>, DisclosureStoreError>;
-    /// Records that this receipt's openings could not be stored. The commitments stay hiding.
-    fn mark_lost(&self, receipt_id: &str) -> Result<(), DisclosureStoreError>;
-    /// Erasure: deletes the openings; the signed receipt is untouched.
-    fn erase(&self, receipt_id: &str) -> Result<(), DisclosureStoreError>;
-}
-pub enum StoredOpenings { Present(ReceiptOpenings), Lost }
-```
-
-- Kernel construction takes `rng: Arc<dyn Rng + Send + Sync>` and `disclosure_store: Option<Arc<dyn DisclosureStore>>`. `build_and_sign_receipt`, the signing task and every `sign_receipt_with_handle` caller pass the kernel's `Rng` and the request arguments as the parameter preimage. A kernel configured with a durable receipt store and no disclosure store refuses construction (open question 6). After signing, the kernel appends the receipt first, then calls `put_openings`; on its failure it calls `mark_lost`, emits the operator alert through the existing security alert path and returns the receipt (spec 8.4, open question 2).
-- `chio-store-sqlite`: table `disclosure_openings (receipt_id TEXT NOT NULL, salt_ref TEXT NOT NULL CHECK (salt_ref IN ('params','content','anchor.sub','anchor.tenant')), salt BLOB CHECK (salt IS NULL OR length(salt) = 32), state TEXT NOT NULL CHECK (state IN ('present','lost')), PRIMARY KEY (receipt_id, salt_ref)) WITHOUT ROWID`, written through the existing serving writer. `erase` deletes rows. `chio_tool_receipts.content_hash TEXT NOT NULL` becomes `content_commitment TEXT NOT NULL` (the `sha256:` value) in place; every reader and query snapshot changes with it. No migration (house rule).
-- Each hosted-kernel commit wires one producer: commit 5 is the kernel `Rng` wiring for all 20 kernel rows (they share `build_and_sign_receipt`, the signing task and `sign_receipt_with_handle`, so they are one producer); commit 6 is the store.
-
-- [ ] **Step 1: Failing tests:** `kernel_receipt_openings_reach_store` (allow receipt; store holds both salts; `open_receipt` with the call's arguments and output verifies); `deny_receipt_commits_empty_output` (deny has `content_commitment` over the zero-length preimage); `disclosure_store_failure_appends_and_marks_lost` (faulting store: receipt appended, `StoredOpenings::Lost`, alert recorded); `erase_keeps_receipt_valid`; `durable_receipt_store_without_disclosure_store_refuses`; SQLite tests for the CHECK constraints and the salt-mismatch refusal; `stream_chunk_digests_absent` (streaming tool with three chunks: no chunk digest in the signed body, evidence or metadata).
-- [ ] **Step 2: Implement, run** `cs cargo test -p chio-kernel --no-fail-fast`, `cs cargo test -p chio-store-sqlite --no-fail-fast`, clippy for both, and `cs cargo test -p chio-kernel --test durable_admission_sqlite` (real-SQLite kernel tests live there). Expected: PASS except golden signatures.
+- Receipt assembly drops `GuardEvidence.details` of guards declared `Unsafe`, drops every caller or hook metadata key (origin `CallerOrHook`, untrusted input, spec 8.4), and refuses signing with `Error::UnregisteredMetadataKey(key)` for a Chio-internal key absent from the registry or declared `Unsafe` (P1-4). A revocation entry id in deny evidence (spec 7.11) is `Safe`.
+- [ ] **Step 1: Failing tests:** `undeclared_guard_evidence_field_dropped` (backing staged `receipt-disclosure-003`); `unregistered_internal_metadata_key_refuses`; `caller_metadata_dropped`; `required_operational_blocks_survive` (admission, budget authority, settlement and active-response blocks present after assembly); `receipt_marker_property` (proptest with `PROPTEST_CASES=512`: random 16-byte markers through every guard evidence producer, the metadata merge and the `chio-siem` OCSF projection; no marker raw, hex or base64 in the signed body, evidence, metadata or OCSF; backing staged `receipt-disclosure-004`); `stream_chunk_digests_absent` (backing `receipt-disclosure-006`).
+- [ ] **Step 2: Run** `cs cargo test -p chio-kernel -p chio-guards -p chio-external-guards -p chio-security-kernel -p chio-siem --no-fail-fast`, clippy. Expected: PASS.
 
 ---
 
-### Task 5: Guard evidence and metadata allowlist (commit 7)
-
-**Files:** `crates/kernel/chio-kernel-core/src/guard.rs`, `crates/kernel/chio-kernel/src/kernel/mod.rs` (`Guard`), every `Guard` impl (48 non-test at the census base), `crates/kernel/chio-kernel/src/receipt_support/receipt_scopes.rs` (evidence assembly), the metadata merge, `crates/core/chio-core-types/tests/receipt_marker_property.rs` (new).
+### Task 9: F commits 7 to 9, FFI, WASM and mobile relays
 
 **Interfaces:**
-
-```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EvidenceDisclosure { /// `details` never carries argument or result values.
-    Safe, Unsafe }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GuardEvidenceDeclaration { pub details: EvidenceDisclosure, pub details_required: bool }
-// Both Guard traits gain a required method (no default):
-fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
-```
-
-- At guard registration the kernel refuses a guard whose declaration is `{ details: Unsafe, details_required: true }` (spec 8.4 "fails at load").
-- At receipt assembly the kernel drops `GuardEvidence.details` of every guard declared `Unsafe`. `guard_name` and `verdict` are always kept. A denied call's revocation entry id (spec 7.11) is a `Safe` field.
-- Metadata: the signed `metadata` keeps only the reserved typed blocks of the metadata key registry (ADR-0018 item 7) that the producing component declares committed-safe; every other caller or hook key is dropped before signing (open question 5). Task 1 records each reserved key with its declaration.
-
-- [ ] **Step 1: Failing tests:** `unsafe_required_guard_refuses_registration`; `undeclared_guard_evidence_field_dropped` (the kernel-level backing for staged `receipt-disclosure-003`); `receipt_marker_property` (proptest: arguments and results built from random 16-byte markers, run through every guard evidence producer in the workspace and the kernel's metadata merge, then `chio-siem` OCSF projection; assert no marker in raw, hex or base64 form in the canonical signed body, evidence, metadata or OCSF output; the backing for staged `receipt-disclosure-004`).
-- [ ] **Step 2: Declare every guard.** Each impl states its declaration with a one-line invariant comment (what `details` holds). Guards whose `details` echo request content (path, URL, pattern match text) declare `Unsafe`.
-- [ ] **Step 3: Run** `cs cargo test -p chio-kernel-core -p chio-kernel -p chio-guards -p chio-external-guards -p chio-security-kernel --no-fail-fast`, the property test with `PROPTEST_CASES=512`, and clippy. Expected: PASS.
-
----
-
-### Task 6: FFI, WASM and mobile relays (commits 8 to 10)
-
-**Files:** `crates/kernel/chio-kernel-browser/src/{pure,wasm,rng}.rs`, `tests/wasm_bindings.rs`; `crates/kernel/chio-kernel-mobile/src/{lib.rs,rng.rs,chio_kernel_mobile.udl}`; `crates/sdk/chio-cpp-kernel-ffi/src/lib.rs` and its header; `sdks/typescript/packages/{workers,edge,deno}/src/index.ts` and tests; `sdks/swift/Sources/chio_kernel_mobile/*` (regenerated).
-
-**Interfaces:**
-
-- Browser WASM: `#[wasm_bindgen] pub fn sign_receipt(draft_json: &str, parameters_json: &str, content: JsValue, signing_seed_hex: &str) -> Result<JsValue, JsError>` where `content` is `{ "kind": "value", "value": <json> }`, `{ "kind": "empty" }` or `{ "kind": "stream", "chunk_sha256": [<hex>, ..] }` (closed, decoded through `lossless_serde!`). Returns `{ "receipt": <ChioReceipt>, "openings": <chio.receipt-disclosure.v1 salt-only> }`. Salts from `WebCryptoRng`. `sign_receipt_relaying_trusted_body` export and `sign_receipt_relaying_trusted_body_pure` are deleted. `WebCryptoRng::try_new` already probes `globalThis.crypto` at the census base, so Workers no longer need `window`; the Miniflare test pins it.
-- Mobile UniFFI: `sign_receipt(draft_json: String, parameters_json: String, content: ContentInput, signing_seed_hex: String) -> Result<SignedReceiptOutput, MobileError>`; UDL `dictionary ContentInput` and `SignedReceiptOutput`; the relay export and UDL entries are deleted; Swift bindings regenerated.
-- C ABI: `ChioFfiResult chio_kernel_sign_receipt(const char *draft_json, const char *parameters_json, const char *content_json, const char *signing_seed_hex);` (`content_json` is the same closed object as the browser's); salts from `OsEntropyRng` inside the library; the relay symbol is deleted from the header and `tests/abi/*.symbols`.
+- Browser: `#[wasm_bindgen] pub fn sign_receipt(draft_json: &str, parameters_json: &str, content: JsValue, signing_seed_hex: &str) -> Result<JsValue, JsError>`; `content` is `{"kind":"value","value":..}`, `{"kind":"empty"}` or `{"kind":"stream","chunk_sha256":[..]}`, decoded through `lossless_serde!`; returns `{"receipt":..,"openings":<salt-only chio.receipt-disclosure.v1>}`; salts from `WebCryptoRng`. Relay exports deleted.
+- Mobile: `sign_receipt(draft_json, parameters_json, content: ContentInput, signing_seed_hex) -> Result<SignedReceiptOutput, MobileError>`; UDL and Swift regenerated; relay deleted.
+- C ABI: `ChioFfiResult chio_kernel_sign_receipt(const char *draft_json, const char *parameters_json, const char *content_json, const char *signing_seed_hex);` with `OsEntropyRng`; relay symbol deleted from header and `tests/abi/*.symbols`.
 - TS `workers`, `edge`, `deno`: `signReceipt(draft, parameters, content, signingSeedHex): { receipt, openings }`.
-
-- [ ] **Step 1: Failing tests:** in each adapter, `relay_api_has_no_hash_parameter` (the exported signature list, read from the generated bindings or symbols file, has no hash or body-only signer); `signed_receipt_opens` (sign through the adapter, open with the same inputs); `rng_failure_refuses` (mobile and C ABI with an injected failing `Rng` in a test build). Miniflare test in `sdks/typescript/packages/workers`: the WASM build signs one receipt with salts from `globalThis.crypto`, and the opening verifies.
-- [ ] **Step 2: Implement, run** `cs cargo test -p chio-kernel-browser -p chio-kernel-mobile -p chio-cpp-kernel-ffi --no-fail-fast`, `cs wasm-pack test --node crates/kernel/chio-kernel-browser`, the three TS packages' tests (under `cs` when their build reaches cargo or wasm-pack), the Miniflare test, `cs bash scripts/check-chio-cpp.sh`, and the Swift binding regeneration check. Expected: PASS.
-
----
-
-### Task 7: Cage and control-plane producers (commits 11 to 16)
-
-**Files:** listed in the File Structure row for Task 7.
-
-Each commit converts one producer to `ChioReceipt::sign*` with a draft, its preimages and its salt source, and changes its readers in the same commit (inventory "RedactionMode mapping": each reader drops its mode check in the same commit as its producer).
-
-| Commit | Producer | Preimages | Reader changed with it |
-|---|---|---|---|
-| 11 | Cage (`prepare_cage_receipt`) | the cage request as parameters; the cage outcome as content | cage receipt verification (`receipt.rs` reader) |
-| 12 | Keyring projection (`key_enterprise_receipt_to_chio_receipt`) | the projected request; the signed key enterprise receipt as content | none |
-| 13 | Native evidence (`build_signed_receipt`) | the action; the active-defense body as content (it already rides in `metadata.active_defense_body`, so the content commitment covers the same value) | `verify_native_security_receipt`, `execution_validation.inc` (both readers), `chio-lineage` active-defense ingest, `event_consumer/verification.rs` |
-| 14 | Response simulation (`ResponseSimulationReport::receipt_body`) | the simulation request; the report as content | none |
-| 15 | SCIM deprovision | the deprovision request; the deprovision result as content | none |
-| 16 | Verified-fix evidence | the evidence body as content, carried from `finding_verified_fix.rs` to the signer over the existing call path instead of its hash (G3) | the verified-fix verifier, which now opens from the body it holds |
-
-The cage takes `&dyn Rng` from its host (`chio-cage` gains no `chio-kernel` dependency; its std host passes `OsEntropyRng`). The control-plane producers use `OsEntropyRng`; their openings are returned and dropped (no disclosure store in those paths), so their commitments are permanently hiding by design.
-
-- [ ] **Step 1:** Per commit: convert, add `<producer>_receipt_opens_with_its_preimages`, run `cs cargo test -p <crate> --no-fail-fast` and clippy. For commit 16, add `verified_fix_signer_refuses_hash_only_input` (the signer API has no hash parameter; the test builds from the body).
-- [ ] **Step 2:** `cs cargo test -p chio-control-plane --no-fail-fast` (full) and `cs cargo test -p chio-lineage -p chio-cage --no-fail-fast`. Expected: PASS except golden signatures.
+- [ ] **Step 1: Failing tests:** per adapter `relay_api_has_no_hash_parameter`, `signed_receipt_opens`, `rng_failure_refuses`; Miniflare test in `sdks/typescript/packages/workers` signing with salts from `globalThis.crypto` (`WebCryptoRng::try_new` already probes `globalThis.crypto`).
+- [ ] **Step 2: Run** `cs cargo test -p chio-kernel-browser -p chio-kernel-mobile -p chio-cpp-kernel-ffi --no-fail-fast`, `cs wasm-pack test --node crates/kernel/chio-kernel-browser`, the three TS packages and Miniflare, `cs bash scripts/check-chio-cpp.sh`, the Swift regeneration check. Expected: PASS.
 
 ---
 
-### Task 8: ACP proxy preimages (commit 17)
+### Task 10: F commits 10 to 16, cage, control-plane and BBS producers
 
-**Files:** `crates/protocol/chio-acp-proxy/src/{interceptor,kernel_signer}.rs` and tests.
+Per-producer opening decisions for receipts that are content-checked downstream (P1-6):
 
-**Interfaces:** `sign_acp_receipt(&self, update: &AcpSessionUpdate, entry: &AuditEntry, rng: &dyn Rng) -> Result<SignedReceipt>`. The parameter preimage is the canonical tool-call arguments of the session update; the content preimage is the canonical audit entry body that `entry.content_hash` hashes today. `entry.content_hash` stays as the audit log's own field and never reaches the receipt signer. `ReceiptSemanticFields::trace_detect_only` loses its mode member here.
+| Producer | Downstream content checks | Decision | Reader after F | Fail-closed test |
+|---|---|---|---|---|
+| Cage | `chio-cage` receipt verification (`receipt.rs:395`) | (a) persist: the cage host writes `<receipt_id>.disclosure.json` (value payloads) beside the cage evidence it already writes | opens with the persisted document and its own canonical output | `cage_reader_refuses_missing_opening` (`OpeningUnavailable { Unknown }`) |
+| Native evidence | `execution_validation.inc` (two), `verify_native_security_receipt`, lineage active-defense ingest, store `security_evidence.rs`, security event consumer | (b) rebind: readers verify the signed `metadata.active_defense_body` (registered, `CommittedSafe`) and its digest binding; the content commitment is redundant | body from signed metadata | `native_evidence_reader_refuses_missing_body`, `..._refuses_tampered_body` |
+| Response simulation | `verify_response_simulation_receipt`, `verify_active_response_simulation` | (b) rebind to the signed report in metadata | report from signed metadata | `simulation_reader_refuses_missing_report` |
+| Verified-fix evidence | finding verified-fix verifier, finding market (kind E) | (a) persist in the trust-control receipt store (append with openings) | opens from the store | `verified_fix_reader_refuses_erased_opening` (`Erased`) |
+| Keyring projection, SCIM deprovision | none | openings dropped; commitments permanently hiding | n/a | n/a |
+| BBS selective disclosure | BBS projection verifiers | the projection's content slot carries `content_commitment.value` and its action slot the canonical `action` (commitment only) | BBS verify over the committed projection | `bbs_projection_has_no_unsalted_digest` |
 
-- [ ] **Step 1:** `acp_receipt_commits_session_update_preimages` for both interceptor paths (tool call and tool call update); `acp_signer_has_no_hash_input`.
-- [ ] **Step 2:** `cs cargo test -p chio-acp-proxy --no-fail-fast` and clippy. Expected: PASS.
+Each commit converts one producer to `ChioReceipt::sign*` with a draft, preimages and its salt source, and changes its readers in the same commit. The cage takes `&dyn Rng` from its host (no `chio-kernel` dependency). Verified-fix passes the evidence body, not its hash (G3).
+
+- [ ] **Step 1:** Per commit: convert; `<producer>_receipt_opens_with_its_preimages`; the fail-closed test in the table; `cs cargo test -p <crate> --no-fail-fast` and clippy.
+- [ ] **Step 2:** `cs cargo test -p chio-control-plane -p chio-lineage -p chio-cage -p chio-selective-disclosure -p chio-store-sqlite --no-fail-fast`. Expected: PASS except golden signatures.
 
 ---
 
-### Task 9: `HttpReceipt` deletion and the HTTP middleware SDKs (commits 18 to 21)
+### Task 11: F commit 17, ACP proxy preimages
 
-**Files:** listed in the File Structure rows for Task 9.
+`sign_acp_receipt(&self, update: &AcpSessionUpdate, entry: &AuditEntry, rng: &dyn Rng) -> Result<SignedReceipt>`. Parameters: the update's canonical tool-call arguments; content: the canonical audit entry body. `entry.content_hash` stays the audit log's own field (kind D) and never reaches the signer. Telemetry and compliance bundle bounds read commitment values (kind C).
+
+- [ ] `acp_receipt_commits_session_update_preimages` (both interceptor paths), `acp_signer_has_no_hash_input`; `cs cargo test -p chio-acp-proxy --no-fail-fast`, clippy.
+
+---
+
+### Task 12: F commits 18 to 21, `HttpReceipt` deletion and the HTTP middleware SDKs
 
 **Interfaces:**
-
-- `chio-http-core`: `HttpReceipt`, `HttpReceiptBody`, `HttpReceipt::sign`, the `ChioReceipt` projection (`receipt.rs:350` at the inventory commit) and `caller_identity_hash` are deleted. The authority signs through the shared kernel signer:
+- `chio-http-core` (Root-held `receipt.rs`, D17 ACK): `HttpReceipt`, `HttpReceiptBody`, `HttpReceipt::sign`, the `ChioReceipt` projection and `caller_identity_hash` are deleted.
   ```rust
   pub struct HttpCallPreimages {
-      /// `{"body": <request body>, "method": .., "request_id": .., "route": <route pattern>}`
+      /// `{"body": <HttpBody>, "method": .., "request_id": .., "route": <route pattern>}`
       pub request: serde_json::Value,
-      /// `{"body": <response body>, "status": <u16>}`; `None` before the upstream answers.
+      /// `{"body": <HttpBody>, "status": <u16>}`; `None` before the upstream answers.
       pub response: Option<serde_json::Value>,
   }
+  /// The body is always committed as the raw bytes the upstream received or returned, tagged
+  /// (P1-5): `{"kind":"bytes","content_type":<string or null>,"b64u":<unpadded base64url>}`
+  /// or `{"kind":"absent"}`. No JSON parsing, so the preimage is unambiguous and WYSIWYS holds.
   impl HttpAuthority {
-      pub fn sign_decision_receipt(&self, draft: ReceiptDraft, preimages: &HttpCallPreimages) -> Result<SignedReceipt>;
-      pub fn sign_final_receipt(&self, draft: ReceiptDraft, preimages: &HttpCallPreimages) -> Result<SignedReceipt>;
+      pub fn sign_decision_receipt(&self, draft: ReceiptDraft, preimages: &HttpCallPreimages, rng: &dyn Rng) -> Result<SignedReceipt>;
+      pub fn sign_final_receipt(&self, draft: ReceiptDraft, preimages: &HttpCallPreimages, rng: &dyn Rng) -> Result<SignedReceipt>;
   }
   ```
-  `tool_server = "http"`, `tool_name = "<METHOD> <route_pattern>"`. A JSON body is its parsed value; any other body is `{"b64u": <unpadded base64url of the raw bytes>}` (open question 7). The decision receipt commits the empty output; the final receipt commits the response object. Salts from `OsEntropyRng`.
-- `chio-api-protect`: the sidecar `/v1/evaluate` response carries `{"receipt": <chio.receipt.v1>, "openings": <chio.receipt-disclosure.v1 salt-only>}` in place of the HTTP receipt. `spec/schemas/chio-http/v1/evaluate-response.schema.json` changes with it (`$ref` to the receipt record and disclosure schemas). `sidecar.rs` signs through `ChioReceipt::sign_with_backend` with `OsEntropyRng`.
-- `chio-tower`: the evaluator and service read `SignedReceipt` from the authority and attach the receipt and salt-only openings to the response extensions.
-- Readers: `chio-control-plane/src/evidence_export/verification.rs` and its `http_receipts.rs` tests, `chio-store-sqlite` `retained_read.rs` and `receipt_query_snapshot/export/metadata.rs` drop every HTTP receipt branch; one receipt kind remains.
-- SDK middleware, each verifying the receipt with its language's shared receipt verifier (Task 14) and exposing the receipt and openings to the application:
-  - Python: `chio_sdk` (`client.py`, `models.py`, `models_supplemental.py`, `testing.py`, `__init__.py`, README), `chio-asgi`, `chio-django`, `chio-fastapi`, `chio-streaming`, `chio-langchain` tests.
-  - JVM: `chio-sdk-jvm` (`ChioClient.kt`, `ChioTypes.kt` and tests), `chio-spring-boot` (`ChioFilter.kt`).
-  - .NET: `ChioMiddleware` (`ChioSidecarClient.cs`, `ChioTypes.cs`, tests).
-  - TypeScript: `node-http`, `express`, `fastify`, `elysia`, `ai-sdk`, `chio-ai-sdk-middleware`, `conformance` (sources and e2e fixtures).
-  - Go: `chio-go-http` (`types.go`, `types_helpers.go`, `sidecar.go`, tests).
-  - Examples: the ten `examples/hello-*/smoke.sh` scripts assert the new response shape; `scripts/tests/check-receipt-query-http.test.py`.
-
-- [ ] **Step 1: Failing tests:** `http_final_receipt_commits_request_and_response` (Rust, opens with the canonical request and response); `http_decision_receipt_commits_empty_output`; `evaluate_response_carries_chio_receipt` (api-protect); `tower_attaches_receipt_and_openings`; per SDK, `evaluate_response_receipt_verifies` against a recorded sidecar response produced by the Rust sidecar test (fixture written by its owning generator in Task 15).
-- [ ] **Step 2: Implement** commits 18 to 21 in order.
-- [ ] **Step 3: Run** `cs cargo test -p chio-http-core -p chio-api-protect -p chio-tower -p chio-control-plane -p chio-store-sqlite --no-fail-fast`, clippy; `uv run pytest` in each Python package above; `./gradlew test` in `sdks/jvm`; `dotnet test sdks/dotnet/ChioMiddleware`; the TS packages' tests and typecheck; `(cd sdks/go/chio-go-http && go test ./...)`; each example smoke script that CI runs.
-- [ ] **Step 4:** `python3 scripts/check-trust-boundaries.py` (the HTTP receipt reader entries in `docs/security/trust-boundary-inventory.json` change with this commit).
-- [ ] **Step 5:** `git grep -n -E "HttpReceipt|http_receipt|httpReceipt|http-receipt|caller_identity_hash" -- . ':!docs/superpowers'; test $? -eq 1`.
+  `tool_server = "http"`, `tool_name = "<METHOD> <route_pattern>"`. The decision receipt commits the empty output; the final receipt commits the response object.
+- `chio-api-protect`: `/v1/evaluate` returns `{"receipt": <chio.receipt.v1>}` and no openings in M1 (P2-3: spec 7.7 lists no such surface, and the caller copy is an M2 cut). In mediated mode the openings persist with the append (Task 4); in sidecar mode without a store they are dropped. `spec/schemas/chio-http/v1/evaluate-response.schema.json` changes with it.
+- `chio-tower` reads `SignedReceipt` and attaches the receipt only.
+- Readers: `chio-bundle-verify` loses `verify_http_receipt_evidence` (item 6 part 6a moved `evidence_export/verification.rs` there and deleted the control-plane file; this PR edits the extracted verifier only); `chio-store-sqlite` `retained_read.rs` and `receipt_query_snapshot/export/metadata.rs` drop the HTTP branch.
+- SDK middleware verifies the receipt with its language's shared verifier (Task 17): Python (`chio_sdk`, `chio-asgi`, `chio-django`, `chio-fastapi`, `chio-streaming`, `chio-langchain` tests), JVM (`chio-sdk-jvm`, `chio-spring-boot`), .NET (`ChioMiddleware`), TypeScript (`node-http`, `express`, `fastify`, `elysia`, `ai-sdk`, `chio-ai-sdk-middleware`, `conformance`), Go (`chio-go-http`), the ten `examples/hello-*/smoke.sh` and `scripts/tests/check-receipt-query-http.test.py`.
+- [ ] **Step 1: Failing tests:** `http_final_receipt_commits_raw_bodies`; `json_body_and_raw_bytes_never_share_a_preimage` (a JSON body `{"b64u":"AA"}` and a raw `0x00` body yield different preimages; also a committed vector, Task 17); `http_decision_receipt_commits_empty_output`; `evaluate_response_carries_receipt_without_openings`; `tower_attaches_receipt`; per SDK `evaluate_response_receipt_verifies` against a recorded sidecar response.
+- [ ] **Step 2: Run** `cs cargo test -p chio-http-core -p chio-api-protect -p chio-tower -p chio-bundle-verify -p chio-store-sqlite --no-fail-fast`, clippy; each Python package's `uv run pytest`; `./gradlew test` in `sdks/jvm`; `dotnet test sdks/dotnet/ChioMiddleware`; the TS packages; `(cd sdks/go/chio-go-http && go test ./...)`; the example smokes CI runs; `python3 scripts/check-trust-boundaries.py`.
+- [ ] **Step 3:** `git grep -n -E "HttpReceipt|http_receipt|httpReceipt|http-receipt|caller_identity_hash" -- . ':!docs/superpowers'; test $? -eq 1`.
 
 ---
 
-### Task 10: Group 5 std producers (commits 22 to 25)
-
-**Files:** `crates/observability/chio-otel-receipt-exporter/src/sink.rs`; `crates/products/chio-cli/src/cli/process_host/{call_evidence/export.rs,call_evidence/outcomes_export.rs,run_evidence/export.rs,swarm/requests.rs}`; `crates/products/chio-mercury/src/commands/shared/builders.rs`; `crates/products/chio-wall/src/commands.rs`; `sdks/lambda/chio-lambda-extension/src/main.rs` (test only).
+### Task 13: F commits 22 to 25, group 5 std producers
 
 | Commit | Producer | Preimages | Openings |
 |---|---|---|---|
-| 22 | OTel exporter (`canonical_receipt_for_span`) | span arguments; sanitized span attributes as content | dropped |
-| 23 | `chio run` (four sites, one producer) | call arguments; call outcome | written beside the evidence export as `chio.receipt-disclosure.v1` files with payloads, so the run's own operator can open them |
+| 22 | OTel exporter | span arguments; sanitized span attributes | dropped |
+| 23 | `chio run` (four sites) | call arguments; call outcome | written beside the evidence export as `chio.receipt-disclosure.v1` (value payloads for value outputs, salt-only otherwise); the run's verifiers (kind E) open them |
 | 24 | Mercury | step input; step output | dropped |
 | 25 | Wall | command input; command output | dropped |
 
-- [ ] **Step 1:** Per commit, convert with `OsEntropyRng` and add `<producer>_receipt_opens`. Add `lambda_evaluate_response_carries_no_arguments` in the Lambda extension (it is not a producer; the test pins that its unsigned output carries no argument, hash or receipt member).
-- [ ] **Step 2:** `cs cargo test -p chio-otel-receipt-exporter -p chio-mercury -p chio-wall --no-fail-fast`, `cs cargo test -p chio-cli --test <process-host tests touched>`, `cs cargo test --locked --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml`, clippy. Expected: PASS except golden signatures.
+- [ ] Per commit: convert with `OsEntropyRng`; `<producer>_receipt_opens`; for `chio run`, `run_verify_refuses_missing_opening`. Add `lambda_evaluate_response_carries_no_arguments` (not a producer). Run the touched crates' tests, `cs cargo test --locked --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml`, clippy.
 
 ---
 
-### Task 11: Harness, conformance and fixture producers (commits 26 to 29)
+### Task 14: F commits 26 to 29, harness, conformance and fixture producers
 
-**Files:** `crates/kernel/chio-runtime-harness/src/treaty.rs`; `crates/products/chio-cli/src/cli/dispatch/proof/{fixture.rs,fixture_agent_web.rs}`; `crates/tooling/chio-conformance/src/native_suite.rs`; `crates/trust/chio-attest-loopback/src/{lib.rs,package.rs}`; their `Cargo.toml` (enable `chio-core-types/fixture-rng`); `scripts/check-fixture-rng.py` (new).
-
-**Interfaces:**
-- Each producer builds `FixtureRng::from_seed(seed)` with `seed = SHA-256("chio.fixture-rng.v1\0" || <producer label> || 0x00 || <fixture id>)`, so regeneration is deterministic per fixture.
-- Proof fixtures: the commerce event receipt (`fixture.rs`, today copies `event_sha256`) and the agent-web re-sign (`fixture_agent_web.rs`, today copies a recorded hash) take the recorded event and agent-web output bodies from the fixture inputs and pass them as content preimages (G3). The settlement anchor reseal passes its existing preimage.
-- `scripts/check-fixture-rng.py`: fails unless the set of crates whose `Cargo.toml` enables `fixture-rng` equals its embedded allowlist (`chio-runtime-harness`, `chio-cli`, `chio-conformance`, `chio-attest-loopback`, plus dev-dependencies) and every non-test `FixtureRng::from_seed` call site is one of the allowlisted functions. In `chio-cli` the feature is enabled only for the `proof fixture` module through a dedicated `fixture-producers` feature of the binary that release builds do not enable; the script checks `deploy/` and the release manifest build commands for its absence.
-
-- [ ] **Step 1:** Convert each producer; `fixture_receipts_are_reproducible` (two runs of each producer with the same fixture id produce byte-identical receipts and openings).
-- [ ] **Step 2:** `python3 scripts/check-fixture-rng.py`; `cs cargo test -p chio-runtime-harness -p chio-conformance -p chio-attest-loopback --no-fail-fast`; `cs cargo test -p chio-cli --test proof_cli_contract --test proof_verify`. Expected: PASS except golden fixtures.
+- `chio-runtime-harness`, `chio-conformance` (native suite) and `chio-attest-loopback` producers take `&dyn Rng` from their caller. Release commands (`chio runtime loopback` and every CLI and control-plane path) pass `OsEntropyRng`. Their tests and fixture generators pass `FixtureRng` through dev-dependencies on `chio-fixture-rng`.
+- Proof fixtures: `chio proof fixture regenerate` moves behind a `chio-cli` feature `proof-fixture-regenerate` that alone depends on `chio-fixture-rng` and that no release build enables. Item 1's `gen signed-fixtures` row becomes `cs cargo run -p chio-cli --features proof-fixture-regenerate --bin chio -- proof fixture regenerate`. The commerce event receipt and the agent-web re-sign take the recorded event and output bodies as content preimages (G3).
+- `scripts/check-fixture-rng.py`: runs `cs cargo tree -e normal,features --target all -p chio-cli --no-default-features --features <release feature set>` and the same for every release binary and `chio-control-plane`, and fails if `chio-fixture-rng` appears; and fails if any crate depends on `chio-fixture-rng` outside `[dev-dependencies]`, xtask, or `chio-cli`'s `proof-fixture-regenerate` feature.
+- [ ] `fixture_receipts_are_reproducible`; `release_loopback_uses_os_entropy` (two runs differ in salts); `cs python3 scripts/check-fixture-rng.py`; the touched crates' tests.
 
 ---
 
-### Task 12: Readers (commit 30)
+### Task 15: F commit 30, readers
 
-**Files:** `crates/observability/chio-siem/src/{ocsf.rs,event.rs,alerting/projection.rs,sink_projection.rs}`; `crates/tooling/chio-conformance/verdict_matrix/src/driver.rs` and any live scenario asserting `parameter_hash` or `content_hash`; store query and export readers; `chio-proof-room` and `chio-commerce-order` receipt readers that name the removed members.
+OCSF 1.3.0 reads commitment values only (spec 7.13); `parameter_hash_valid`, the `parameter_hash` projection member and `source_redaction_mode` are deleted. The verdict-matrix driver asserts commitments. Store query projections and read-boundary checks use `content_commitment` (kind A/H). `chio-cli` receipt `health` and `explain` read commitments.
 
-- OCSF 1.3.0 reads commitments only (spec 7.13: "In M1 the 1.3.0 projection is updated only to read commitments instead of the deleted fields"). `parameter_hash_valid` and `parameter_hash` projection members are deleted; the projection carries `parameter_commitment.value` and `content_commitment.value`, never inline values. `source_redaction_mode` is deleted.
-- The verdict-matrix driver asserts commitments; the corpus index hash is re-pinned only if a scenario file changes.
-- [ ] **Step 1:** `ocsf_projection_carries_commitments_only`; the marker property test from Task 5 covers the projection.
-- [ ] **Step 2:** `cs cargo test -p chio-siem -p chio-conformance -p chio-proof-room -p chio-commerce-order --no-fail-fast`, clippy. Expected: PASS except golden fixtures.
+- [ ] `ocsf_projection_carries_commitments_only`; `cs cargo test -p chio-siem -p chio-conformance -p chio-proof-room -p chio-commerce-order -p chio-store-sqlite --no-fail-fast`, clippy.
 
 ---
 
-### Task 13: Vector cross-check (commit 31)
+### Task 16: F commit 31, cross-artifact consumers
 
-**Files:** `crates/core/chio-core-types/tests/committed_receipt_vectors.rs` (new); `scripts/gen-signing-wrapper-vectors.py`; `tests/bindings/vectors/receipt/committed/v1.json`; `tests/bindings/vectors/MANIFEST.sha256`.
+Applies kinds C, E and G of the consumer table outside the kernel. Each artifact whose member changes is listed in D17. For kind E, each consumer reads the opening from where its producer persists it:
 
-**Interfaces:**
-- `committed_receipt_vectors.rs` reads `committed/v1.json`:
-  - every `commitment_domains` entry equals the Rust constant;
-  - for every case, Rust decodes `receipt` (or refuses it exactly when `receipt_valid` is false for a decode reason), verifies the wrapper signature as `signature_valid` says, and `open_receipt` with the case's `preimages` returns the case's `parameters`, `content` and `disclosure_valid`; the `authority_chain_depth_0`, `tenant_id_with_authority`, `subject_opening_as_tenant` and `subject_value_as_tenant` cases also open the delegation-context commitments with `CommitmentDomain::DelegationSubject` and `DelegationTenant`;
-  - Rust signing with a scripted test `Rng` that yields the case's `fixture_salts` reproduces each positive receipt byte for byte (Ed25519 is deterministic);
-  - `empty_output` uses the zero-length preimage (G13). If the file still carries a `null` preimage from #1537, regenerate it with the script first; the diff touches only that case.
-- Padding negatives (spec 11.2 [M1]), generated by the Python script so the file stays single-sourced, each with a valid wrapper signature over the padded body: an added member in `parameter_commitment`, `content_commitment`, `disclosure`, `authority`, `authority.root_anchor`, the opening document and one opening. `expected_decode: false`.
-- [ ] **Step 1:** Write the test; run `cs cargo test -p chio-core-types --test committed_receipt_vectors`. Expected: FAIL only on the missing padding cases.
-- [ ] **Step 2:** Extend the script; `uv run --with-requirements scripts/gen-signing-wrapper-vectors.requirements.txt python3 -I scripts/gen-signing-wrapper-vectors.py write`, then `check`. Expected: `git diff tests/bindings/vectors/receipt/committed/v1.json` shows only added cases (plus the G13 case if it was stale). The script's `check` also validates every positive receipt against the moved-in `record.schema.json` and the `tenant_id_with_authority` case against its failure (in-place schemas README, "Checks").
-- [ ] **Step 3:** `cs cargo xtask freeze-vectors`, then `--check`; rerun Step 1. Expected: PASS.
-
----
-
-### Task 14: SDK verifiers (commit 32)
-
-**Files:** `sdks/typescript/chio-ts/src/invariants/receipt.ts` and tests; `sdks/python/chio-py/src/chio/invariants/receipt.py` and tests; `sdks/go/chio-go/invariants/receipt.go` and tests; `crates/sdk/chio-bindings-ffi` (`chio_verify_receipt_json*`), `sdks/cpp/chio-cpp` receipt verification; `sdks/python/packages/chio-bedrock/src/chio_bedrock/receipt.py`; every other SDK receipt reader in the Task 1 census (Python adapters, JVM `chio-streaming-flink`, C++).
-
-**Interfaces (per language, matching Rust):**
-- `openReceipt(receipt, disclosure, ownParameters?, ownOutput?) -> { parameters, content, disclosureValid }` (TS), `open_receipt(...)` (Python), `OpenReceipt(...)` (Go), with `ownOutput` one of value, empty or stream chunk digests; never read from `payload`.
-- The closed layer lists from #1716 gain `action.parameter_commitment`, `content_commitment`, `disclosure`, `authority`, `authority.root_anchor`, and lose `action.parameters`, `action.parameter_hash`, `content_hash`, `redaction_mode`. `parameters_inline`, `result_inline` and `metadata` stay open JSON. The disclosure document and each opening are closed. The refusal message keeps #1716's form, `unknown receipt member: <path>`.
-- Salt decoding: `b64u:` plus 43 unpadded base64url characters decoding to 32 bytes; anything else fails.
-- [ ] **Step 1: Failing tests first** in each language: every case of `committed/v1.json` returns its `expected` values; each padding negative refuses with the exact path; `salt_reused_across_fields` marks `disclosureValid = false`.
-- [ ] **Step 2: Implement; run** `cs bash scripts/check-bindings-parity.sh`, `bash scripts/check-chio-py.sh`, `cs bash scripts/check-chio-cpp.sh`, `(cd sdks/go/chio-go && CGO_ENABLED=0 go test ./...)`, `(cd sdks/python/packages/chio-bedrock && uv run pytest)`, the `chio-ts` typecheck and tests, `cs bash scripts/check-sdk-parity.sh`, `bash scripts/check-consumer-sdk-parity.sh`. Expected: PASS.
-
----
-
-### Task 15: Fixture regeneration (commit 33)
-
-Every receipt fixture changes bytes, and every receipt id changes because its `ChioReceiptIdInput` changes. Item 1 regenerated every signed fixture once; this task regenerates once more on top of it with the same command: `cs cargo xtask gen signed-fixtures` runs each fixture set's owning generator and repeats until a pass changes nothing; `--check` runs one pass and fails without writing. No signed fixture is edited by hand or patched by a script. The PR body lists every changed fixture path and the generator that wrote it.
-
-Generators this PR adds to `xtask/src/signed_fixtures.rs` (the item 1 table is otherwise unchanged):
-
-| Fixture set | Generator |
+| Consumer | Opening source |
 |---|---|
-| `tests/bindings/vectors/receipt/committed/v1.json` | `scripts/gen-signing-wrapper-vectors.py write` (already in Task 13; listed so `--check` covers it) |
-| recorded sidecar evaluate responses used by the SDK middleware tests (Task 9) | the `#[ignore]` regenerator in `crates/products/chio-api-protect/tests/evaluate_response_fixtures.rs` (new) |
-| `crates/platform/chio-control-plane/src/evidence_export/tests/**` HTTP receipt fixtures | deleted with the HTTP receipt branch; no regeneration |
+| finding market (`chio-finding-verifier`, `chio-finding-challenge`, `chio-open-market` recovery, trust-control purchase routes, `finding_pool_ledger`) | the trust-control receipt store; challenge evidence carries a salt-only opening for the payload the challenger holds |
+| commerce-order replay and settlement | a salt-only opening in the commerce authority receipt artifact (beside #1715's route; the event bytes are in the same bundle) |
+| enterprise export, agent-web interop | a salt-only opening carried with the event or envelope that already carries the artifact digest's preimage |
 
-- [ ] **Step 1:** After Tasks 2 to 14, run the full suites (Verification) and collect every golden failure; each maps to one generator row (item 1 table or above).
-- [ ] **Step 2:** `cs cargo xtask gen signed-fixtures`, then run the lane-local review aid from item 1 (`ws2:~/lanes/claude-pr1160-evidence/m1i1/diff-signed-fixtures.py origin/main HEAD`, copied to `m1i2/` and extended): for every changed JSON or NDJSON fixture it allows only the committed-receipt member changes (`action`, `content_commitment`, `disclosure`, removed `redaction_mode` and `content_hash`), signatures, and ids and digests it traces to a changed receipt body; a changed receipt whose `action` does not recompute from its recorded fixture preimage and the fixture salt fails; an untraced derived change fails. Its output goes in the PR body.
-- [ ] **Step 3:** `cs cargo xtask gen signed-fixtures --check`, `cs cargo xtask freeze-vectors --check`, `cs cargo run -p chio-cli --bin chio -- proof fixture regenerate --check`. Expected: PASS.
+Salt-only openings outside spec 7.7's list are an owner decision (open question 9). Each kind E consumer gets `<consumer>_refuses_unavailable_opening` with the explicit `OpeningUnavailable` state; each kind C consumer gets `<consumer>_binds_commitment_value`; each kind G checker gets `<checker>_expects_content_commitment`.
 
----
-
-### Task 16: PROTOCOL and docs (commit 34)
-
-- [ ] **Step 1:** Move `docs/superpowers/specs/relying-party-wedge/protocol/protocol-6-committed-receipts.md` into `spec/PROTOCOL.md` after "Receipt Identity And DAG", delete the staged file, remove its HTML comment, status line and "Sections in force" line. In the "Export profiles" part keep only what this PR implements in the type system (the profile names and the salt-only rule) and leave the manifest member text to item 6. Rewrite the section 6 receipt field table and the "WYSIWYS Signing Invariant" for commitments, delete every `redaction_mode`, `content_hash` and `parameter_hash` row, and delete the HTTP receipt text in `spec/HTTP-SUBSTRATE.md`, `spec/OPENAPI-INTEGRATION.md` and `spec/WIRE_PROTOCOL.md`.
-- [ ] **Step 2:** Update docs naming deleted APIs: `git grep -n -E "HttpReceipt|content_hash|parameter_hash|redaction_mode|RedactionMode|sign_receipt_relaying_trusted_body|caller_identity_hash" -- docs spec sdks/*/README.md crates/*/*/README.md ':!docs/superpowers'`.
-- [ ] **Step 3:** `grep -rn $'\xe2\x80\x94' <changed files>; test $? -eq 1`; `grep -n -i -E '\bM[0-3]\b|wedge|pilot|docs/superpowers' spec/PROTOCOL.md; test $? -eq 1`; `bash scripts/check-chio-owned-v1-only.sh && python3 scripts/check-native-host-docs.py`; `cs cargo test -p chio-spec-validate --no-fail-fast`.
+- [ ] Run the touched crates' tests (`chio-federation`, `chio-attest-loopback`, `chio-attest-buyer-core`, `chio-credit`, `chio-settle`, `chio-web3`, `chio-anchor`, `chio-open-market`, `chio-enterprise-export`, `chio-agent-web-interop`, `chio-commerce-order`, `chio-finding-verifier`, `chio-finding-challenge`, `chio-mcp-remote`, `chio-runtime-harness`, `chio-tee`), clippy. Then the Task 1 consumer grep returns only kind D sites.
 
 ---
 
-### Task 17: Formal touchpoints and coverage (commit 35)
+### Task 17: F commits 32 and 33, vectors and SDK verifiers
 
-- [ ] **Step 1: Kani.** Update `crates/kernel/chio-kernel-core/src/kani_public_harnesses.rs` (its test backend and its `Rng` now return `Result`), the `#[cfg(kani)]` blocks in `receipts.rs` and `formal/rust-verification/kani-public-harnesses.toml` (`sign_receipt_relaying_trusted_body` entries removed). Add a harness `receipt_commitment_layout` over a pure `assemble_commitment_input(domain: &'static [u8], salt: [u8; 32], preimage: [u8; 8]) -> [u8; N]` on fixed buffers (no symbolic strings): the domain bytes, then the salt, then the preimage, at fixed offsets. `commit` calls it.
-- [ ] **Step 2: Formal mirrors.** `cs cargo xtask check formal-mirrors`. When the `receipt/body.rs` or `receipt/decision.rs` mirror digests drift, confirm `formal/lean4/Chio/Chio/Core/Receipt.lean` models the action and content as opaque commitments and carries no `redaction_mode`, then `--bless` and say so in the PR body. If `Receipt.lean` names `content_hash` or `parameter_hash`, the rename lands in a `.lean` edit in this PR and the Lean gates run on the x86 runner, never on ws2. Formal-mirrors and proof-coverage are required.
-- [ ] **Step 3: Coverage, last.** After the final rebase, from a clean tree in the real worktree: `cs cargo xtask gen proof-coverage` then `--check`; commit `docs/formal/COVERAGE.md`.
+- `crates/core/chio-core-types/tests/committed_receipt_vectors.rs`: every `commitment_domains` entry equals the Rust constant; every case decodes or refuses as `receipt_valid` says, verifies as `signature_valid` says and opens as its `expected` says (including the delegation-context cases); Rust signing with a scripted test `Rng` yielding `fixture_salts` reproduces each positive receipt byte for byte; `empty_output` uses the zero-length preimage (regenerate through the script if #1537's `null` form remains).
+- Generator additions (single-sourced): padding negatives for `parameter_commitment`, `content_commitment`, `disclosure`, `authority`, `authority.root_anchor`, the document and one opening; an HTTP case pair (`http_json_body_lookalike` and `http_raw_zero_byte`) with distinct preimages and commitments. Regeneration only adds cases.
+- SDK verifiers (TS, Python, Go, C++ through the FFI, `chio-bedrock` and every SDK receipt reader in the census): `openReceipt`/`open_receipt`/`OpenReceipt`; #1716's closed layers gain the new blocks and lose the removed members, with its message form `unknown receipt member: <path>`; salts decode strictly.
+- [ ] Run `cs cargo test -p chio-core-types --test committed_receipt_vectors`; `uv run --with-requirements scripts/gen-signing-wrapper-vectors.requirements.txt python3 -I scripts/gen-signing-wrapper-vectors.py write` then `check`; `cs cargo xtask freeze-vectors` then `--check`; `cs bash scripts/check-bindings-parity.sh`, `bash scripts/check-chio-py.sh`, `cs bash scripts/check-chio-cpp.sh`, `(cd sdks/go/chio-go && CGO_ENABLED=0 go test ./...)`, `(cd sdks/python/packages/chio-bedrock && uv run pytest)`, `chio-ts` typecheck and tests, `cs bash scripts/check-sdk-parity.sh`, `bash scripts/check-consumer-sdk-parity.sh`.
+
+---
+
+### Task 18: F commit 34, fixture regeneration
+
+Every receipt fixture changes bytes and receipt id; every kind C artifact fixture changes its renamed member. One command, `cs cargo xtask gen signed-fixtures`, runs each owning generator until a pass changes nothing; `--check` fails without writing. Added generator rows: `committed/v1.json` (the Python script), recorded sidecar evaluate responses (`#[ignore]` regenerator in `crates/products/chio-api-protect/tests/evaluate_response_fixtures.rs`, new), and the proof-room row with `--features proof-fixture-regenerate`. The PR body lists every changed fixture and its generator.
+
+- [ ] **Step 1:** Collect every golden failure after Tasks 6 to 17; map each to a generator.
+- [ ] **Step 2:** Regenerate; run the item 1 fixture diff aid extended in `ws2:~/lanes/claude-pr1160-evidence/m1i2/diff-signed-fixtures.py`: allowed changes are the committed receipt members, signatures, ids and digests traced to a changed body, and the kind C renamed members whose new value equals the referenced receipt's commitment; a receipt whose `action` does not recompute from its recorded fixture preimage and fixture salt fails; an untraced change fails. Output in the PR body.
+- [ ] **Step 3:** `cs cargo xtask gen signed-fixtures --check`, `cs cargo xtask freeze-vectors --check`, `cs cargo run -p chio-cli --features proof-fixture-regenerate --bin chio -- proof fixture regenerate --check`.
+
+---
+
+### Task 19: F commit 35, PROTOCOL and docs
+
+- [ ] Move `protocol-6-committed-receipts.md` into `spec/PROTOCOL.md` after "Receipt Identity And DAG"; delete the staged file, its comment, status and "Sections in force" lines; keep only the export-profile text this PR implements; apply the spec amendments the owner approves (open questions 2 and 9); rewrite the section 6 field table and "WYSIWYS Signing Invariant"; delete HTTP receipt text in `spec/HTTP-SUBSTRATE.md`, `spec/OPENAPI-INTEGRATION.md`, `spec/WIRE_PROTOCOL.md`.
+- [ ] `git grep -n -E "HttpReceipt|content_hash|parameter_hash|redaction_mode|RedactionMode|sign_receipt_relaying_trusted_body|caller_identity_hash" -- docs spec sdks/*/README.md crates/*/*/README.md ':!docs/superpowers'`, then the em-dash, public-path, `check-chio-owned-v1-only.sh`, `check-native-host-docs.py` and `cs cargo test -p chio-spec-validate` checks.
+
+---
+
+### Task 20: Formal touchpoints and coverage (each PR; last commit of F)
+
+- [ ] Kani: update `kani_public_harnesses.rs` and the `#[cfg(kani)]` blocks for the fallible `Rng` (P-a) and the committed signer (F); remove `sign_receipt_relaying_trusted_body` entries from `kani-public-harnesses.toml`; add `receipt_commitment_layout` over a pure `assemble_commitment_input(domain: &'static [u8], salt: [u8; 32], preimage: [u8; 8])` on fixed buffers (F).
+- [ ] `cs cargo xtask check formal-mirrors`. If `Receipt.lean` names `content_hash` or `parameter_hash`, F edits it and the Lean gates run on the x86 runner only.
+- [ ] After each PR's final rebase: `cs cargo xtask gen proof-coverage` then `--check`; commit `docs/formal/COVERAGE.md` last.
 
 ---
 
 ## D17 Coordination
 
-This PR changes the signed bytes of every `chio.receipt.v1` receipt and deletes the only other receipt artifact. Root-2 and the lead check the list below against their in-flight work before the PR opens.
+F changes the signed bytes of every `chio.receipt.v1` receipt and deletes the only other receipt artifact. The precursors change no signed byte. Root-2 and the lead check this list before F opens.
 
-Signed artifacts whose bytes change:
-1. Every `chio.receipt.v1` receipt from every producer: `action` becomes `{parameter_commitment}`, `content_hash` becomes `content_commitment`, `redaction_mode` becomes `disclosure`. Every receipt id changes, because `ChioReceiptIdInput` contains the body. Every artifact that embeds a receipt id, a receipt digest or a whole receipt changes transitively: child receipts and lineage statements, checkpoints and inclusion proofs, evidence export manifests and their `chio.evidence_export_commitment.v1` signatures, commerce authority receipt artifacts (#1715's route stays outside the receipt bytes), session compliance certificates and proof-room graph nodes, passports and bundle manifests.
-2. `HttpReceipt` is deleted. The sidecar `/v1/evaluate` response (`chio-http/v1/evaluate-response`) carries `chio.receipt.v1` and a salt-only opening. Every HTTP middleware SDK and example changes in the same PR.
-3. Relay APIs: the browser WASM, mobile UniFFI and C ABI receipt signers change signature and lose their relay exports; the TS workers, edge and deno packages and the Swift bindings change with them.
-4. `Rng`: moves to `chio-core-types` with a fallible `fill_bytes`; `NullRng` is deleted. Any in-flight branch implementing or importing `chio_kernel_core::Rng` rebases onto the new path.
-5. Guard trait: both `Guard` traits gain a required `evidence_declaration`. Any in-flight branch adding a guard implements it.
-6. Store: `chio_tool_receipts.content_hash` becomes `content_commitment` in place, and `disclosure_openings` is added.
+Signed artifacts whose bytes change in F:
+1. Every `chio.receipt.v1` receipt and every receipt id (`ChioReceiptIdInput` contains the body), and transitively every artifact embedding a receipt id, digest or whole receipt: child receipts, lineage statements, checkpoints and inclusion proofs, evidence export manifests and their commitments, commerce authority receipt artifacts, session compliance certificates, proof-room graph nodes, passports and bundle manifests.
+2. Kind C consumer artifacts, whose renamed member now carries a commitment value: verified treaties (`outcome_commitment`), federation bilateral DSSE envelopes and cosign bindings, attest loopback issuance requests and packages, attest buyer reports, IOU receivables, settlement observations (#1705), child contracts, runtime-harness buyer closures and proof parity records, verified-fix nonce bindings, ACP telemetry and compliance bundles, BBS selective-disclosure projections, TEE tap and runner records, `chio run` nonce evidence.
+3. Kind E carriers gain a salt-only opening member: commerce authority receipt artifacts, finding challenge evidence, enterprise export events, agent-web envelopes.
+4. `HttpReceipt` is deleted; `/v1/evaluate` carries `chio.receipt.v1` without openings; every HTTP middleware SDK and example changes.
+5. Relay APIs (browser, mobile, C ABI, TS workers, edge and deno, Swift) change.
+6. Store: `chio_tool_receipts.content_hash` becomes `content_commitment` in place, the admission operation row gains the two commitment columns, `receipt_openings` is used; the trust-control append request carries openings.
+
+Changes before F (no signed bytes): P-a moves `Rng` and makes it fallible; P-b adds types; P-c adds `receipt_openings`, the trust-control read and erase routes and the append's openings argument; P-d adds `evidence_declaration` to every guard and the metadata registry. In-flight branches that implement `Rng`, a guard, a receipt store or a metadata key rebase on these.
+
+Root-held files (Root-2 ACK before the lane edits them):
+- `crates/platform/chio-http-core/src/receipt.rs` (deleted in F).
+- `crates/kernel/chio-kernel/src/tool_outcome/caller_delivery.rs` and `tool_outcome/security_release/context.rs` (kind A0).
+- `crates/kernel/chio-kernel/src/kernel/admission_coordinator.rs` and `admission_coordinator/**`, `admission_operation/**`, the `admission_operation_store` and `dispatch_ledger/policy.rs` that consume the admission binding (kind A).
+- `crates/platform/chio-store-sqlite/src/serving_owner*` and the receipt store publication path (Task 4).
+- `crates/kernel/chio-kernel/src/kernel/construction.rs` and `kernel_struct.rs` (also edited by #1708).
+- `crates/tooling/chio-bundle-verify` verification module (moved there by 6a; item 2 edits only the extracted verifier).
 
 Shared files with in-flight work:
-- #1715 and #1716 (fwdcompat receipts, lead): the receipt structs, `receipt_strict_decode.rs`, the commerce authority receipt decoder and the Go, Python and TypeScript `invariants/receipt.*`. Both land first; this PR extends their closed layer lists and keeps their refusal message form.
-- The shared `lossless_serde!` decoder PR (fwdcompat lane, not yet open): every receipt decode change lands there first. This PR's new tagged enums and closed unions use that decoder and its refusal form; it touches no decoder code.
-- Item 1 (signing wrapper): lands first; this PR signs through `sign_wrapped` and regenerates with its `gen signed-fixtures` command.
-- #1706 (anchored-root types): lands first; `ReceiptAuthority` uses its `RootAnchor` and `HolderClass`.
-- #1674 (`SigningBackend` collapse): lands first; `receipts.rs`, `receipt_support/signing.rs`, `receipt_persistence.rs`, `evidence_export/tests.rs` are shared.
-- #1708 (concurrent durable receipt publication, Root-2): `receipt_persistence.rs`, `receipt_store.rs`, the publication tests. The disclosure-store write follows the publication order #1708 establishes.
-- #1710 (settlement ledger hook): `receipt_store.rs`, `chio-store-sqlite` receipt store support and reconciliation, `chio-api-protect` proxy state. Whichever lands second rebases.
-- #1682 (C6) and #1717: `chio-store-sqlite` receipt store and query snapshot files.
-- K-stack (#1675, #1678, #1701, #1269, KERN-TRACE-LOCK-FSYNC): merged before item 1; this PR keeps every K-stack invariant test and regenerates only golden receipt bytes inside them.
-- #1607 (coop2c): no receipt bytes; shares `spec/schemas/registry.json`, `MANIFEST.sha256` and `spec/wire-schemas.lock`. Lands first.
-- Item 3 (`root_anchor` in the capability body): follows this PR. It fills `ReceiptAuthority` from verified capability state in the kernel (open question 3) and regenerates through the same command.
+- #1715 and #1716: receipt structs, `receipt_strict_decode.rs`, the commerce authority decoder, SDK `invariants/receipt.*`. Both land first.
+- Item 1: lands first; F signs through `sign_wrapped` and regenerates through its command, with the proof-room row's feature change.
+- Item 6 part 6a: lands first; F edits `chio-bundle-verify`, never `evidence_export/verification.rs`.
+- #1706: lands first; F and P-b reuse `SaltRef`, `Sha256Digest`, `RootAnchor`, `HolderClass`; `receipt_openings` accepts `anchor.claims.*`.
+- #1674: lands first; receipt signing files shared.
+- #1705 (settlement observations): `observation_for` and `tests/settlement_observer_byte_identity.rs`; lands before F; F renames `SettlementObservation.content_hash` to `content_commitment` and rewrites the byte-identity test's expected bytes through its generator.
+- #1710 (settlement ledger hook): lands before F (explicit). F keeps its seeding, durable append and drain reconciliation tests with exact receipt references after id changes.
+- #1708 (concurrent publication): lands before P-c; openings join its publication batch; its lock ordering and projection visibility boundary are preserved.
+- #1682 (C6) and #1717: store receipt and query snapshot files, including the adjacent `receipt_query_snapshot/project.rs` and `receipt_store/evidence_retention.rs` that F changes.
+- K-stack (#1675, #1678, #1701, #1269, KERN-TRACE-LOCK-FSYNC): merged before item 1; F keeps every K-stack invariant test's assertions.
+- subtree188a and the pending store schema-adoption cleanup: predecessors of P-c and F (Root-2 condition 7).
+- #1607: shares the registry, `MANIFEST.sha256` and `wire-schemas.lock`; lands first.
+- Item 3: follows F and fills `ReceiptAuthority` from verified capability state.
 
-Fixtures whose bytes change: every receipt-bearing set in item 1's Task 11 table (about 893 JSON files carry `content_hash` at the census base, 861 of them under `fixtures/proof-room/`), the Rust golden receipts in about 189 test files, `tests/bindings/vectors/receipt/v1.json` and `MANIFEST.sha256`, the new evaluate-response fixtures, and `committed/v1.json` (added padding cases only).
+Fixtures whose bytes change in F: every receipt-bearing set in item 1's Task 11 table (893 JSON files carry `content_hash` at the census base, 861 under `fixtures/proof-room/`), the Rust golden receipts in about 189 test files, `tests/bindings/vectors/receipt/v1.json` and `MANIFEST.sha256`, the kind C and kind E artifact fixtures, the new evaluate-response fixtures, and `committed/v1.json` (added cases only).
 
-Merge order (precondition): #1674, #1607, #1715, the shared decoder PR, #1716, #1706, the K-stack in Root-2's order, item 1; then this PR; then item 3's capability change. The census and every signed fixture are refreshed at the integrated base that contains all predecessors.
+Merge order: as under Global Constraints. The census and every signed fixture are refreshed at F's integrated base.
 
 ## Verification
 
-Run at the PR head after the final rebase. Every cargo command, direct or nested, runs under `cs` (Global Constraints). Coder checks on ws2; heavy suites on `integ-x86` and `integ-h3`. Logs are kept under `ws2:~/lanes/claude-pr1160-evidence/m1i2/` with sha256 recorded in the PR body.
+Run at each PR's head after its final rebase. Every cargo command, direct or nested, runs under `cs`. Coder checks on ws2; heavy suites on `integ-x86` and `integ-h3`. Logs under `ws2:~/lanes/claude-pr1160-evidence/m1i2/<pr>/` with sha256 in the PR body.
 
-**Changed crates (integrators).** For every crate in `git diff --name-only origin/main...HEAD -- crates`: `cs cargo test -p <crate> --no-fail-fast` and `cs cargo clippy -p <crate> --all-targets -- -D warnings`. Plus `cs cargo test -p chio-core-types --features fips,pq --no-fail-fast`, `cs cargo test -p chio-core-types --no-default-features --lib`, `cs cargo test -p chio-kernel --test durable_admission_sqlite`, `cs cargo check --locked --workspace --all-targets`, `--all-features`, `cs cargo fmt --all --check`, and the CLAUDE.md one-liner once at the final tip with each step under `cs`: `cs cargo build --workspace && cs cargo test --workspace && cs cargo clippy --workspace -- -D warnings && cs cargo fmt --all -- --check`.
+**Every PR (P-a to P-d and F).** For every crate in `git diff --name-only origin/main...HEAD -- crates`: `cs cargo test -p <crate> --no-fail-fast` and `cs cargo clippy -p <crate> --all-targets -- -D warnings`. Plus `cs cargo check --locked --workspace --all-targets`, `--all-features`, `cs cargo fmt --all --check`, and `cs cargo xtask gen signed-fixtures --check` (precursors: no change; F: after regeneration).
 
-**Native-cage chio-cli and chio-conformance (required; lane-common "CLI/conformance full runs need the native cage").** `chio-core-types` and `chio-kernel` are upstream of both, so the full suites run on host 3 (or x86) with the setup copied from `ws2:~/lanes/claude-pr1160-evidence/root2/k6/verify-native-final-fa34a7dc65.sh`: self-contained node 24 and npm 9.2.0 first on `PATH`; `cs cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement` and `CHIO_CAGE_INIT` exported to it; the privileged `enforced_discovery` test; `scripts/prepare-native-python-runtime.py` and `scripts/prepare-enforced-native-fixture.py` with the fixture env exported; `CHIO_CAGE_SYSCALL_PROFILE=native-standard-v1`; `CHIO_CHECKOUT_ROOT` set; then `cs cargo test --locked --no-fail-fast -p chio-conformance` and `cs cargo test --locked --no-fail-fast -p chio-cli`. Required: rc=0 for both. Environment-only failures are not accepted.
+**F additionally.** `cs cargo test -p chio-core-types --features fips,pq --no-fail-fast`, `cs cargo test -p chio-core-types --no-default-features --lib`, `cs cargo test -p chio-kernel --test durable_admission_sqlite`, and the CLAUDE.md one-liner once at the final tip with each step under `cs`: `cs cargo build --workspace && cs cargo test --workspace && cs cargo clippy --workspace -- -D warnings && cs cargo fmt --all -- --check`.
 
-**Final qualification at the new main.** Candidate integration and the final native qualification run at the `origin/main` commit this PR merges onto, not at an earlier base, and record that SHA. The final run covers the stop-error MCP routes (#1701), the CLI transport paths, `chio mcp serve-http` with `--auth-token` against the conformance peers, and `chio api protect` sidecar evaluation, in addition to the suites above.
+**Native-cage chio-cli and chio-conformance (required for P-a, P-c, P-d and F; lane-common "CLI/conformance full runs need the native cage").** Full suites on host 3 (or x86) with the setup copied from `ws2:~/lanes/claude-pr1160-evidence/root2/k6/verify-native-final-fa34a7dc65.sh`: self-contained node 24 and npm 9.2.0 first on `PATH`; `cs cargo build --locked --target x86_64-unknown-linux-musl -p chio-cage-init --bin chio-cage-init --features real-linux-enforcement` and `CHIO_CAGE_INIT` exported to it; the privileged `enforced_discovery` test; `scripts/prepare-native-python-runtime.py` and `scripts/prepare-enforced-native-fixture.py` with the fixture env exported; `CHIO_CAGE_SYSCALL_PROFILE=native-standard-v1`; `CHIO_CHECKOUT_ROOT` set; then `cs cargo test --locked --no-fail-fast -p chio-conformance` and `cs cargo test --locked --no-fail-fast -p chio-cli`. Required: rc=0 for both. Environment-only failures are not accepted.
+
+**Final qualification at the new main (F).** At the `origin/main` commit F merges onto, recorded by SHA: the suites above, the stop-error MCP routes (#1701), the CLI transport paths, `chio mcp serve-http` with `--auth-token` against the conformance peers, `chio mcp serve --control-url` against a live trust-control, and `chio api protect` in sidecar and mediated modes.
 
 **Gates.**
 ```bash
@@ -758,11 +784,9 @@ python3 scripts/check-security-clocks.py && python3 scripts/check-escape-hatches
  && python3 scripts/check-trust-boundaries.py && python3 scripts/check-rust-file-hygiene.py && bash scripts/check-http-egress-contract.sh \
  && python3 scripts/check-error-urn-registry.py && cs bash scripts/check-adapter-no-bypass.sh \
  && python3 scripts/check-domain-separation.py && python3 scripts/check-signing-exemptions.py \
- && python3 scripts/check-fixture-rng.py \
- && python3 scripts/check-receipt-trace-negative-registry.py \
+ && cs python3 scripts/check-fixture-rng.py && python3 scripts/check-receipt-trace-negative-registry.py \
  && python3 scripts/check-kani-crypto-scope.py && python3 scripts/check-kani-public-harnesses.py
 ```
-`check-domain-separation.py` covers the new commitment and chain-digest domains as hash domains (G5 keeps them in its scope).
 
 **Wire-schemas, schema-registry and freeze gates.**
 ```bash
@@ -770,84 +794,93 @@ python3 scripts/check-wire-schemas.py && bash scripts/tests/check-wire-schemas.t
 bash scripts/check-chio-schema-registry.sh && bash scripts/tests/check-chio-schema-registry.test.sh && bash scripts/check-chio-owned-v1-only.sh
 uv run --with jsonschema==4.26.0 --with referencing==0.37.0 python3 -I scripts/check-root-authority-schema-examples.py
 python3 scripts/check-security-wire-vectors.py
-cs make -C ~/lanes/m1i2 codegen-check && cs cargo xtask snippets regen --check
+cs make -C ~/lanes/m1i2-<pr> codegen-check && cs cargo xtask snippets regen --check
 cs cargo xtask freeze-vectors --check
 uv run --with-requirements scripts/gen-signing-wrapper-vectors.requirements.txt python3 -I scripts/gen-signing-wrapper-vectors.py check
 cs cargo xtask gen signed-fixtures --check
-cs cargo run -p chio-cli --bin chio -- proof fixture regenerate --check
+cs cargo run -p chio-cli --features proof-fixture-regenerate --bin chio -- proof fixture regenerate --check
 cs cargo xtask eval-receipt-regen --check
 cs cargo test -p chio-conformance --test vectors_schema_pair --no-fail-fast
 cs cargo test -p chio-binding-helpers --test vector_fixtures --no-fail-fast
 ```
-If `Cargo.lock` changes: the Cargo.lock digest pin in `scripts/check-security-ci-contract.py` and `deploy/docker/Dockerfile.security-evidence-runner`, then `git lfs pull` per lane-common, `cs python3 scripts/check-security-ci-contract.py` and `cs python3 scripts/check-aws-lc-fork.py`.
+If `Cargo.lock` changes (P-a adds `chio-fixture-rng`; `rand_chacha` is already in the lock): the Cargo.lock digest pin in `scripts/check-security-ci-contract.py` and `deploy/docker/Dockerfile.security-evidence-runner`, `git lfs pull` per lane-common, `cs python3 scripts/check-security-ci-contract.py`, `cs python3 scripts/check-aws-lc-fork.py`, and the cargo-deny and cargo-vet checks with the duplicate baseline.
 
-**Formal-mirrors and Kani.** `cs cargo xtask check formal-mirrors`. Kani 0.68 (the CI pin) runs only on the approved x86 runner, under `cs` (`CARGO_INCREMENTAL=0 ~/cslot.sh`), launched detached with `setsid -f` and a pid file through `~/lanes/claude-pr1160-evidence/q.sh ... < /dev/null`: every harness in `formal/rust-verification/kani-public-harnesses.toml` plus `receipt_commitment_layout`, through `scripts/run-kani-manifest.sh`. A single-harness rerun also runs on the x86 runner under `cs`; no Kani, Lean, lake or Aeneas runs on ws2. If Task 17 Step 2 edits `Receipt.lean`, the Lean gates run on the x86 runner. `cs cargo xtask gen proof-coverage --check` last.
+**Formal-mirrors and Kani.** `cs cargo xtask check formal-mirrors`. Kani 0.68 runs only on the approved x86 runner under `cs`, detached with `setsid -f` and a pid file through `~/lanes/claude-pr1160-evidence/q.sh ... < /dev/null`: every harness in the manifest plus `receipt_commitment_layout` (F). No Kani, Lean, lake or Aeneas on ws2. `cs cargo xtask gen proof-coverage --check` last.
 
-**SDK builds.** `cs bash scripts/check-bindings-parity.sh` (node on `PATH` from mise shims), `bash scripts/check-chio-py.sh`, `cs bash scripts/check-chio-cpp.sh`, `(cd sdks/go/chio-go && CGO_ENABLED=0 go test ./...)`, `(cd sdks/go/chio-go-http && go test ./...)`, `(cd sdks/k8s/webhooks && go test ./...)`, `uv run pytest` in every Python package Task 9 or 14 touched, `./gradlew test` in `sdks/jvm`, `dotnet test sdks/dotnet/ChioMiddleware`, the TS packages' tests, typecheck and lint (including `workers`, `edge`, `deno` and the Miniflare test, under `cs` when they reach cargo or wasm-pack), `cs wasm-pack test --node crates/kernel/chio-kernel-browser`, the Swift binding regeneration check, `cs bash scripts/check-sdk-parity.sh`, `bash scripts/check-consumer-sdk-parity.sh`, `python3 scripts/tests/check-consumer-sdk-inventory.test.py`, `cs cargo test --locked --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml`, and every `examples/hello-*/smoke.sh` that CI runs.
+**SDK builds (P-b and F).** `cs bash scripts/check-bindings-parity.sh`, `bash scripts/check-chio-py.sh`, `cs bash scripts/check-chio-cpp.sh`, `(cd sdks/go/chio-go && CGO_ENABLED=0 go test ./...)`, `(cd sdks/go/chio-go-http && go test ./...)`, `(cd sdks/k8s/webhooks && go test ./...)`, `uv run pytest` in every touched Python package, `./gradlew test` in `sdks/jvm`, `dotnet test sdks/dotnet/ChioMiddleware`, the TS packages' tests, typecheck and lint (with `workers`, `edge`, `deno` and Miniflare under `cs` when they reach cargo or wasm-pack), `cs wasm-pack test --node crates/kernel/chio-kernel-browser`, the Swift regeneration check, `cs bash scripts/check-sdk-parity.sh`, `bash scripts/check-consumer-sdk-parity.sh`, `python3 scripts/tests/check-consumer-sdk-inventory.test.py`, `cs cargo test --locked --manifest-path sdks/lambda/chio-lambda-extension/Cargo.toml`, and every `examples/hello-*/smoke.sh` CI runs.
 
-Pre-existing reds on `main` are reported with `main`'s result at the same base for comparison.
+Pre-existing reds on `main` are reported with `main`'s result at the same base.
 
 ## Verdict-matrix scope
 
-The staged `receipt_disclosure` category stays staged in this PR. Every scenario in it starts `serve_http_edge` with a `root_policy`, a `tenant_index_key` and the `rust-mcp-serve-http` driver, none of which exist before items 4 and 7, and 007 to 010 are export scenarios that item 6 implements. This PR lands the kernel-level behavior and tests behind 001 to 006 (fully committed allow and deny receipts, the evidence drop, the marker property, the `tenant_id` refusal and the absent chunk digests, Tasks 2, 4 and 5) and registers `urn:chio:error:attest:receipt-tenant-id-with-authority`. The category moves into the live corpus with the driver (open question 4).
+The staged `receipt_disclosure` category stays staged. Every scenario in it starts `serve_http_edge` with a `root_policy`, a `tenant_index_key` and the `rust-mcp-serve-http` driver, none of which exist before items 4 and 7, and 007 to 010 are export scenarios that item 6 implements. F lands the kernel-level behavior and tests behind 001 to 006 and registers `urn:chio:error:attest:receipt-tenant-id-with-authority`. The category moves with the driver (open question 4).
 
 ## Size
 
-Spec 13.2 sizes item 2 at L, 26-37 engineer-days. Estimate from the census at `a93a2f69a3`:
+Spec 13.2 sizes item 2 at L, 26-37 engineer-days. Estimate from the census:
 
 | Part | Days |
 |---|---|
-| Core types: commitments, salts, opening document, body and action changes, `authority` and `tenant_id` rule, `RedactionMode` deletion, `Rng` move and fallible signature, schema move-in and four-language codegen, strict-decode negatives (Task 2) | 3-4 |
-| Portable signer, relay deletion, handle on preimages (Task 3) | 1-2 |
-| Hosted kernel salt wiring across 20 call sites, `DisclosureStore` and its SQLite table, receipt table column (Task 4) | 3-4 |
-| Guard evidence declaration on 48 non-test guard impls, metadata allowlist, marker property test (Task 5) | 2-3 |
-| FFI, WASM and mobile relays, TS wrappers, Swift, Miniflare (Task 6) | 2-3 |
-| Cage, control-plane and ACP producers with preimage plumbing (Tasks 7, 8) | 3-4 |
-| `HttpReceipt` deletion across 103 files: http-core, api-protect, tower, readers, evaluate-response schema, middleware in Python, JVM, .NET, TS, Go and ten example smokes (Task 9) | 5-7 |
-| Group 5 std, harness and fixture producers, fixture RNG gate (Tasks 10, 11) | 2-3 |
-| Readers: SIEM, lineage, store queries, verdict-matrix driver (Task 12) | 1-2 |
-| Vector cross-check and padding negatives (Task 13) | 1 |
-| SDK verifiers in TS, Python, Go, C++ and bedrock (Task 14) | 2-3 |
-| Fixture regeneration, about 900 JSON fixtures and 189 Rust test files (Task 15) | 2-3 |
-| PROTOCOL, docs, formal touchpoints (Tasks 16, 17) | 1-2 |
-| Integration, native-cage runs, review rounds | 3-4 |
-| Total | 31-45 |
+| P-a `Rng` move, fallible fill, `OsEntropyRng`, `chio-fixture-rng` | 1-2 |
+| P-b types, opener, document schema, SDK openers, vector cross-check of the opener | 2-3 |
+| P-c openings in the append transaction (SQLite, #1708 batch, trust-control route and client, admission row), crash, ACK and erase tests | 3-4 |
+| P-d `evidence_declaration` on 111 impls including `WasmGuard` and `ScopedAsyncGuard`, metadata key registry (ADR-0019 item 7) with census | 3-4 |
+| F core body, schema move-in, portable signer (Task 6) | 2-3 |
+| F hosted kernel salt wiring across 421 construction sites and 20 producers; kernel and store consumer bindings (kinds A, A0, B) and their recovery and C6 tests (Task 7) | 5-7 |
+| F evidence and metadata enforcement, marker property (Task 8) | 1-2 |
+| F relays (Task 9) | 2-3 |
+| F cage, control-plane, BBS producers with the per-producer opening decisions (Task 10), ACP (Task 11) | 3-4 |
+| F `HttpReceipt` deletion across 103 files and the middleware SDKs (Task 12) | 5-6 |
+| F group 5 producers, fixture RNG release gate (Tasks 13, 14) | 2-3 |
+| F readers and cross-artifact consumers (kinds C, E, G across about 25 crates) (Tasks 15, 16) | 3-5 |
+| F vectors and SDK verifiers (Task 17) | 2-3 |
+| F fixture regeneration (Task 18) | 2-3 |
+| PROTOCOL, docs, formal (Tasks 19, 20) | 1-2 |
+| Integration, native-cage runs on four PRs, review rounds | 3-4 |
+| Total | 40-58 |
 
-Item 2 is L, 31-45 engineer-days, with a planning figure of 34 when the census holds at the real base. The range sits 5 to 8 days above spec 13.2 (26-37). Three items that 13.2 did not count make up the excess: the required `evidence_declaration` on every guard (house rules forbid a default method, so 48 impls change, 2-3 days), the fallible `Rng` move that removes the zero-fill fallbacks (spec 8.4 requires salt failure to fail signing, about 1 day), and the spread of `HttpReceipt` into ten example smokes and seven TS packages beyond the five SDKs G4 names (about 2 days). With item 1 at 26-40, the M1 total becomes 112-164 engineer-days (13.2's 104-148 plus 3-8 for item 1 and 5-8 for item 2).
+The parts sum to 40-58. Shared setup across the five PRs (one census, one D17 round, one regeneration) and agent assistance on the mechanical guard and construction-site edits bring the plan to **L, 38-52 engineer-days, planning figure 44**. That is 12 to 15 days above spec 13.2 (26-37). The excess is the consumer bindings that 13.2 did not count (about 40 sites binding to the unsalted hashes, 6-9 days), openings in the append transaction for local and remote stores (2-3 days), the metadata key registry (1-2 days), guard declarations across 111 impls (1-2 days), and the five-PR shape (1 day of integration). The M1 total is 124-177 engineer-days: 13.2's 104-148, plus 3-8 for item 1 (26-40), 5-6 for item 6's merged plan, and 12-15 for item 2.
 
 ## Open Questions
 
 Each needs an owner decision. The plan is written against the recommended default.
 
-1. **Where the `Rng` seam lives and whether it is fallible.** Spec 7.8 says "the existing `Rng` seam", which is `chio_kernel_core::Rng`, infallible, with zero-fill fallbacks in the browser and mobile adapters. `chio-core-types` signs receipts and the cage and attest-loopback producers do not depend on `chio-kernel-core`, and spec 8.4 requires salt failure to fail signing. **Default:** move the trait to `chio_core_types::rng` with `fill_bytes(&self, &mut [u8]) -> Result<(), RngError>`, update every import (no re-export), delete `NullRng` and both zero-fill fallbacks.
-2. **Disclosure-store loss (spec Q-B5).** Append the receipt and mark the opening lost, or deny when the opening cannot be stored first. **Default:** spec 8.4 as written: the receipt is appended first, the opening is marked lost, an operator alert fires and the commitment stays permanently hiding. The write follows the receipt publication order of #1708.
-3. **When the kernel fills `authority`.** Capabilities carry no `root_anchor` until item 3's capability change, which follows this PR. **Default:** this PR adds `ReceiptAuthority`, the `tenant_id` refusal, the schema and the vectors; every producer sets `authority: None`; item 3 fills it from verified capability state.
-4. **`receipt_disclosure` verdict-matrix category.** **Default:** stays staged (section "Verdict-matrix scope"); this PR lands the kernel tests behind 001 to 006 and the error code; the category moves with the `rust-mcp-serve-http` driver, and 007 to 010 with item 6.
-5. **Caller and hook metadata.** Spec 8.4 names guard evidence explicitly and metadata generally. **Default:** signed `metadata` keeps only the reserved typed blocks of the metadata key registry whose producers declare them committed-safe; every other caller or hook key is dropped before signing. Task 1 lists each reserved key and its declaration, and any feature that loses a key is named in the PR body.
-6. **Disclosure store as a kernel requirement.** **Default:** a kernel built with a durable receipt store refuses construction without a disclosure store (paired like the receipt store requirement of `build_kernel`). Producers with no receipt store (control-plane projections, OTel exporter, Mercury, Wall, `api protect` until M3) return openings to the host, which drops them, so their commitments are permanently hiding.
-7. **HTTP body preimage for non-JSON bodies.** G4 fixes the request and response members but not the encoding of a binary body inside canonical JSON. **Default:** a JSON body is its parsed value; any other body is `{"b64u": <unpadded base64url of the raw bytes>}`; an absent body is `null` inside the object (the object itself is the preimage, so the G13 `null` rule does not apply).
+1. **`Rng` home and fallibility.** **Default:** move to `chio_core_types::rng` with `fill_bytes -> Result<(), RngError>`; delete `NullRng` and the browser and mobile zero-fill fallbacks; P-a.
+2. **Opening persistence versus spec 8.4.** Spec 8.4 says a disclosure-store write failure after signing appends the receipt and marks the opening lost. **Default:** openings are written in the receipt's append transaction (SQLite and trust-control), so an opening is never lost apart from its receipt and a failure is a receipt append failure handled as today. Amend spec 8.4 and Q-B5 to say so in F's PROTOCOL commit.
+3. **When the kernel fills `authority`.** **Default:** F adds the type, the `tenant_id` refusal, the schema and the vectors; every producer sets `authority: None`; item 3 fills it.
+4. **`receipt_disclosure` verdict-matrix category.** **Default:** stays staged; F lands the kernel tests behind 001 to 006 and the error code.
+5. **Metadata policy.** **Default:** drop guard evidence declared `Unsafe` and every caller or hook metadata key; refuse signing on an unregistered or `Unsafe` Chio-internal key; register every internal key in the ADR-0019 item 7 registry in P-d.
+6. **`active_defense_body` and the simulation report in metadata.** **Default:** both are Chio-internal bodies the kernel generates, registered `CommittedSafe`; their content commitments are redundant and documented; their readers bind to the signed metadata (consumer kind F).
+7. **HTTP body preimage.** **Default:** always the raw bytes, tagged: `{"kind":"bytes","content_type":..,"b64u":..}` or `{"kind":"absent"}`, never parsed; vectors pin the lookalike pair.
+8. **Offline nonce parameter binding in `authoritative_spend`.** The offline check compares the nonce's bound parameter digest with the receipt's `parameter_hash`, which F removes. **Default:** the parameter binding is checked at signing time by the kernel (it already is in `reconciliation.rs`), and the offline check reduces to the receipt's signed `execution_nonce_id` equal to the nonce id.
+9. **Salt-only openings for verifiers that hold the preimage.** Spec 7.7 lists only the caller copy, `caller` bundles and the PEP response. Kind E consumers (finding market, commerce replay, enterprise export, agent-web interop) need a salt-only opening, and each holder already has the payload, so spec 9.4's dictionary concern does not apply. **Default:** amend spec 7.7 to add "evidence for a verifier that holds the committed payload", in F's PROTOCOL commit. The alternative is to rebind each of those consumers to a receipt id recorded by a signed Chio artifact at signing time, which adds about 3 days.
+10. **`/v1/evaluate` openings.** **Default:** none in M1 (spec 7.7 and the 13.1 caller-copy cut); mediated mode persists them, sidecar mode without a store drops them.
+
+## Unresolved in this revision
+
+- The shared `lossless_serde!` decoder PR is removed as a precondition (it is an independent decoder fix). Item 2 uses `chio_security_types::lossless_serde!` as #1706 does.
+- "subtree188a" and "the pending store schema-adoption cleanup" are named as predecessors from Root-2's review; Task 1 records their PR numbers, which this plan could not find by name.
+- The kind E salt-only openings depend on open question 9. If the owner rejects the amendment, Task 16 switches those consumers to the rebind alternative and the size rises by about 3 days.
 
 ## Spec coverage
 
 | Spec requirement | Task |
 |---|---|
-| D2 protocol-wide committed receipts, every producer on the `Rng` seam | 2 to 11 |
-| G1 one PR, inventory commit groups, one commit per producer's salt wiring | Commit Grouping |
-| G3 salt source per producer, preimages for hash-only producers, fixtures from recorded preimages | 1, 7, 8, 11 |
-| G4 `HttpReceipt` deletion with the SDK middleware | 9 |
-| G13 three content preimage forms | 2, 13, 14 |
-| G14 bare hex `receipt_id` in the opening document | 2 |
-| G15 duplicate salt rejection | 2, 13, 14 |
-| G18 strict decoding of every new receipt block and the opening document | 2, 13, 14 |
-| 7.6 body changes, commitment rules, `chain_digest`, `tenant_id` exclusion | 2, 3 |
-| 7.7 `chio.receipt-disclosure.v1` | 2, 14 |
-| 7.8 producer salt sources, relay replacement, Lambda extension | 1, 6, 10 |
-| 8.4 privacy: evidence and metadata allowlist, salt failure, disclosure-store loss | 4, 5 |
-| 10.1 to 10.3 core-types, kernel-core and producer changes | 2 to 12 |
-| 10.7 `disclosure_openings` | 4 |
-| 10.10 SDK verifiers for commitments, openings and strict decoding | 14 |
-| 11.1 commitment and producer unit tests, marker property | 2 to 11 |
-| 11.2 committed receipt vectors and padding negatives | 13 |
-| 11.3 `receipt_disclosure` (kernel-level backing; category move deferred) | Verdict-matrix scope |
-| 11.5 gates and regenerated fixtures listed in the PR | 15, Verification |
-| 13.3 step 2 (after item 1 and the D17 coordination) | 1, D17 Coordination |
+| D2 protocol-wide committed receipts, every producer on the `Rng` seam | 2, 6 to 14 |
+| G1 one atomic format PR, inventory commit groups, one commit per producer's salt wiring | Shape, Commit Grouping |
+| G3 salt source per producer, preimages for hash-only producers | 1, 10, 11, 14 |
+| G4 `HttpReceipt` deletion with the SDK middleware | 12 |
+| G13 three content preimage forms | 3, 6, 17 |
+| G14 bare hex `receipt_id` | 3 |
+| G15 duplicate salt rejection | 3, 17 |
+| G18 strict decoding of every new block and the opening document | 3, 6, 17 |
+| 7.6 body changes, commitment rules, `chain_digest`, `tenant_id` exclusion | 3, 6 |
+| 7.7 `chio.receipt-disclosure.v1` | 3, 17 |
+| 7.8 producer salt sources, relay replacement, Lambda extension | 1, 9, 13 |
+| 8.4 evidence and metadata, salt failure, opening persistence | 4, 5, 8 |
+| 10.1 to 10.3, 10.7 | 2 to 16 |
+| 10.10 SDK verifiers | 3, 17 |
+| 11.1, 11.2 | 2 to 17 |
+| 11.3 `receipt_disclosure` (kernel-level backing) | Verdict-matrix scope |
+| 11.5 gates and regenerated fixtures | 18, Verification |
+| 13.3 step 2 (after item 1 and D17) | 1, D17 Coordination |
