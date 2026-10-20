@@ -49,6 +49,10 @@ kernel.set_settlement_observer_runtime(hook, outcome_store, retry_policy)?;
 Propagate the error or fail startup on it. A discarded error leaves the kernel
 dispatching charges with settlement uninstalled.
 
+No production `SettlementHook` ships in-tree yet, and no host drains
+`settle_attempts` after the inline attempt (RFC-0013 F69). A host that installs
+its own hook owns that drain.
+
 ### Required receipt-store capabilities
 
 The receipt store paired with a settlement runtime implements three

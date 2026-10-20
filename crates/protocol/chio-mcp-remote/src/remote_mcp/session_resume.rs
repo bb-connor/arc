@@ -324,20 +324,17 @@ struct RemoteAuthContractFingerprint {
     enterprise_provider_registry_hash: Option<String>,
 }
 
-fn enterprise_provider_registry_hash(path: Option<&FsPath>) -> Result<Option<String>, CliError> {
-    let Some(path) = path else {
-        return Ok(None);
-    };
-    let bytes = std::fs::read(path)?;
-    Ok(Some(sha256_hex(&bytes)))
-}
-
 fn fingerprint_remote_auth_contract(config: &RemoteServeHttpConfig) -> Result<String, CliError> {
     let provider_profile = config
         .auth_jwt_provider_profile
         .unwrap_or(JwtProviderProfile::Generic);
-    let enterprise_provider_registry_hash =
-        enterprise_provider_registry_hash(config.enterprise_providers_file.as_deref())?;
+    // Binds the session to the registry as it reads now; any provider change
+    // refuses resume of a session admitted under an earlier registry.
+    let enterprise_provider_registry_hash = config
+        .enterprise_providers_file
+        .as_deref()
+        .map(|path| EnterpriseProviderRegistryFile::new(path).digest())
+        .transpose()?;
     let fingerprint = if let Some(token) = config.auth_token.as_deref() {
         RemoteAuthContractFingerprint {
             mode: "static_bearer",

@@ -23,6 +23,8 @@ mod bearer_verifier;
 mod clock_custody;
 #[path = "tests/enterprise_provider_freshness.rs"]
 mod enterprise_provider_freshness;
+#[path = "tests/enterprise_provider_session_spawn.rs"]
+mod enterprise_provider_session_spawn;
 #[path = "tests/local_authorization.rs"]
 mod local_authorization;
 #[path = "tests/protocol_refusal.rs"]
