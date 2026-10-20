@@ -187,7 +187,11 @@ fn cancellation_after_attachment_keeps_custody_until_removal_is_confirmed(
             );
             if cleanup_failure {
                 let failure = result.err().ok_or("unconfirmed removal accepted")?;
-                assert_eq!(failure.to_string(), "process host: local Docker control client exited (exit_1); preserve state and engine for recovery");
+                let CliError::Chio(failure) = failure else {
+                    return Err("container cleanup returned an unregistered error".into());
+                };
+                assert_eq!(failure.code().as_str(), "urn:chio:error:cli:other");
+                assert_eq!(failure.message(), "process host: local Docker control client exited (exit_1); preserve state and engine for recovery");
                 assert_eq!(journal.containers()?.len(), 1);
                 fixture.scenario(serde_json::json!({}))?;
             } else {
