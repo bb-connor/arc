@@ -1183,6 +1183,14 @@ const SIGNED_ARTIFACT_SCHEMA_SPECS: &[SignedArtifactSchemaSpec] = &[
         CHIO_TOOL_MANIFEST_SCHEMA,
         Some(("tool_manifest", "manifest-v1")),
     ),
+    (
+        crate::root_authority::CHIO_ROOT_POLICY_SCHEMA,
+        Some(("root_policy", "root-authority-v1")),
+    ),
+    (
+        crate::root_authority::CHIO_IDP_KEY_SNAPSHOT_SCHEMA,
+        Some(("idp_key_snapshot", "root-authority-v1")),
+    ),
     (AZURE_MAA_ATTESTATION_SCHEMA, None),
     (AWS_NITRO_ATTESTATION_SCHEMA, None),
     (GOOGLE_CONFIDENTIAL_VM_ATTESTATION_SCHEMA, None),

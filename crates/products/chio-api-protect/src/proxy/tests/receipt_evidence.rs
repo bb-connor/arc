@@ -47,7 +47,7 @@ async fn submitted_observation_verifies_without_authorizing_execution() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn evidence_sink_rejects_duplicate_http_receipt_and_exports_original() {
-    use chio_kernel::EvidenceExportQuery;
+    use chio_core_types::receipt::evidence::EvidenceExportQuery;
     let directory = tempfile::tempdir().test_unwrap();
     let database = directory.path().join("receipts.db");
     let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database).test_unwrap();
@@ -75,7 +75,7 @@ async fn evidence_sink_rejects_duplicate_http_receipt_and_exports_original() {
     assert!(duplicate.to_string().contains("duplicate"));
     let bundle = canonical
         .build_evidence_export_bundle(&EvidenceExportQuery {
-            read_boundary: Some(chio_kernel::ReceiptReadBoundary::AdminAll),
+            read_boundary: Some(chio_core_types::receipt::evidence::ReceiptReadBoundary::AdminAll),
             ..Default::default()
         })
         .test_unwrap();

@@ -1327,8 +1327,8 @@
   },
   "composition_sites": [
     "crates/guards/chio-guards/src/external/cache.rs::default::native-adapter",
-    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_chain_frontier::native-adapter",
-    "crates/kernel/chio-kernel/src/checkpoint/builders.rs::build_checkpoint_with_previous::native-adapter",
+    "crates/kernel/chio-kernel/src/checkpoint.rs::build_checkpoint_with_chain_frontier::native-adapter",
+    "crates/kernel/chio-kernel/src/checkpoint.rs::build_checkpoint_with_previous::native-adapter",
     "crates/kernel/chio-kernel/src/federation_artifact_store.rs::with_capacity::native-adapter",
     "crates/platform/chio-control-plane/src/durable_admission.rs::open::native-adapter",
     "crates/platform/chio-control-plane/src/issuance/authority.rs::wrap_capability_authority::native-adapter",

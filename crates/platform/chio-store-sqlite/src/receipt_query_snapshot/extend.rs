@@ -72,7 +72,7 @@ pub(super) fn extend_cycle(
             settle_streaming(published, &owned, chunk)?;
             publish_verified(ctx, &mut sink, published, &mut next, owned.batch_end)?;
             accepted_chain.append(
-                chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint.body)
+                chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint.body)
                     .map_err(|error| WalkError::Integrity(error.to_string()))?,
             );
             published.accept_checkpoint(
@@ -242,7 +242,7 @@ fn settle_streaming(
     checkpoint: &super::db::OwnedCheckpoint,
     chunk: i64,
 ) -> Result<(), WalkError> {
-    let mut frontier = chio_kernel::checkpoint::CheckpointChainFrontier::empty();
+    let mut frontier = chio_kernel_core::evidence_verify::CheckpointChainFrontier::empty();
     let mut expected = checkpoint.batch_start;
     while expected <= checkpoint.batch_end {
         let high = expected.saturating_add(chunk - 1).min(checkpoint.batch_end);

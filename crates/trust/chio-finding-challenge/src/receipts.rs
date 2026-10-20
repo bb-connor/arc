@@ -10,13 +10,14 @@
 
 use chio_core_types::canonical_json_bytes;
 use chio_core_types::crypto::{sha256_hex, PublicKey};
+use chio_core_types::receipt::checkpoint::KernelCheckpoint;
 use chio_finding::{
     verify_signed_authority_status, FindingAuthorityKeyPolicy, FindingChallengeVerifierProfile,
     FindingCheckpointRef, FindingReceiptRole, FindingReceiptSignerRole,
     SignedFindingAuthorityStatus,
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
-use chio_kernel::checkpoint::{checkpoint_body_sha256, KernelCheckpoint};
+use chio_kernel_core::evidence_verify::checkpoint_body_sha256;
 
 /// Maximum age of a role status reading at the trusted evaluation time.
 pub(crate) const MAX_AUTHORITY_STATUS_AGE_SECS: u64 = 3_600;

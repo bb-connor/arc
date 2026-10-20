@@ -7,6 +7,7 @@
 //! the ones the outcome names.
 
 use chio_core_types::crypto::PublicKey;
+use chio_core_types::receipt::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_finding::{
     FindingAuthorityKeyPolicy, FindingChallengeFacet, FindingChallengeVerdict, FindingError,
     SignedFindingAuditEpoch, SignedFindingAuditRoundAuthorization, SignedFindingAuthorityStatus,
@@ -14,7 +15,6 @@ use chio_finding::{
     SignedFindingKeyRevocation, SignedFindingPurchaseRecord,
 };
 use chio_finding_verifier::ResolvedReceiptEvidence;
-use chio_kernel::checkpoint::{CheckpointTransparencySummary, KernelCheckpoint};
 use chio_open_market::bidding::{SignedAcceptedBid, SignedBidRequest, SignedReservationReceipt};
 use chio_open_market::finding_audit::EligibleListing;
 

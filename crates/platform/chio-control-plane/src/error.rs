@@ -42,7 +42,7 @@ pub enum CliError {
     Kernel(#[from] chio_kernel::KernelError),
 
     #[error("checkpoint error: {0}")]
-    Checkpoint(#[from] chio_kernel::CheckpointError),
+    Checkpoint(#[from] chio_kernel_core::evidence_verify::CheckpointError),
 
     #[error("evidence export error: {0}")]
     EvidenceExport(#[from] chio_kernel::EvidenceExportError),
@@ -353,6 +353,18 @@ impl CliError {
                 serde_json::json!({ "detail": message }),
                 "Read the error detail, correct the conflicting inputs or missing prerequisite, and retry the command.",
             ),
+        }
+    }
+}
+
+impl From<chio_bundle_verify::BundleVerifyError> for CliError {
+    fn from(error: chio_bundle_verify::BundleVerifyError) -> Self {
+        match error.into_signed_json() {
+            Ok(source) => Self::SignedJson(source),
+            Err(error) => match error.code() {
+                Some(spec) => Self::registry_error(spec, error.message()),
+                None => Self::cli_io_error(error.message()),
+            },
         }
     }
 }

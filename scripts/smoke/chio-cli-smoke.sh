@@ -399,10 +399,29 @@ smoke_core() {
 
   run_cmd "core" "evidence-export" "${CHIO_BIN}" \
     --receipt-db "${receipt_db}" \
-    evidence export --output "${evidence_dir}"
+    evidence export --admin-all --kernel-seed-file "${dir}/evidence-kernel.seed" \
+    --output "${evidence_dir}"
+  python3 - "${evidence_dir}" "${dir}/verifier-trust.json" <<PY
+import json
+import sys
+from pathlib import Path
+
+package = Path(sys.argv[1])
+keys = {json.loads((package / "export-envelope.json").read_text())["signerKey"]}
+for line in (package / "receipts.ndjson").read_text().splitlines():
+    if line.strip():
+        keys.add(json.loads(line)["receipt"]["kernel_key"])
+trust = {
+    "schema": "chio.verifier-trust.v1",
+    "kernel_keys": sorted(keys),
+    "exchange_keys": [],
+    "root_policy_keys": [],
+}
+Path(sys.argv[2]).write_text(json.dumps(trust), encoding="utf-8")
+PY
   run_cmd "core" "evidence-verify" "${CHIO_BIN}" \
     --format json \
-    evidence verify --input "${evidence_dir}"
+    evidence verify --input "${evidence_dir}" --trust "${dir}/verifier-trust.json"
   json_assert "${ARTIFACT_ROOT}/core/evidence-verify.out" "payload['toolReceipts'] >= 1 and payload['verifiedFiles'] >= 1"
 
   cp -R "${evidence_dir}" "${tampered_dir}"
@@ -413,7 +432,7 @@ Path(sys.argv[1]).write_text('{"tampered":true}\n', encoding="utf-8")
 PY
   run_cmd_expect_failure "core" "evidence-tamper-fails" "${CHIO_BIN}" \
     --format json \
-    evidence verify --input "${tampered_dir}"
+    evidence verify --input "${tampered_dir}" --trust "${dir}/verifier-trust.json"
 }
 
 smoke_guard() {

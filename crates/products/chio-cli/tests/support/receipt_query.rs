@@ -53,6 +53,7 @@ pub(crate) use chio_core::credit::{
     CREDIT_LOSS_LIFECYCLE_REPORT_SCHEMA,
 };
 pub(crate) use chio_core::crypto::Keypair;
+pub(crate) use chio_core::receipt::evidence::CapabilitySnapshot;
 pub(crate) use chio_core::receipt::{
     body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
     economics::FinancialBudgetAuthorityReceiptMetadata,
@@ -66,7 +67,7 @@ pub(crate) use chio_core::receipt::{
 };
 pub(crate) use chio_kernel::{
     build_checkpoint, AuthorizationContextReport, BudgetStore, BudgetUsageRecord,
-    CapabilitySnapshot, CreditBacktestReport, CreditBondListReport, CreditBondReport,
+    CreditBacktestReport, CreditBondListReport, CreditBondReport,
     CreditBondedExecutionSimulationReport, CreditFacilityListReport, CreditFacilityReport,
     CreditLossLifecycleListReport, FederatedEvidenceShareImport, LiabilityMarketWorkflowReport,
     LiabilityProviderListReport, LiabilityProviderResolutionReport, ReceiptStore,

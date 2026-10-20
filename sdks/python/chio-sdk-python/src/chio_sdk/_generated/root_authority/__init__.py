@@ -2,7 +2,7 @@
 #
 # Source: spec/schemas/chio-wire/v1/**/*.schema.json
 # Tool:   datamodel-code-generator==0.34.0 (see xtask/codegen-tools.lock.toml)
-# Schema sha256: a2e478710c7df7c8aa19631f97c0ee5f72fd435e2d6c0963be6f0ab8122ed548
+# Schema sha256: f9c25e1eb1ce1c8ea4083ef04968d45682cd9f79d853175aac0d03e295257b73
 #
 # Manual edits will be overwritten by the next regeneration; the
 # spec-drift CI lane enforces this header on every file
@@ -16,10 +16,11 @@ from .idp_key_snapshot_schema import ChioIdpKeySnapshot
 from .revocation_request_schema import ChioRevocationRequest
 from .root_anchor_schema import AnchorKind, ChioRootAnchor, ClaimValue, Commitment, Crv, Digest, HolderClass, HttpsUrl, Identifier, Jwk, JwsAlgorithm, Kty, PublicKeyHex, RecordedClaims, Salt, SaltRef, SignatureHex, Text, Uri, Use, X5cItem
 from .root_policy_schema import ChioRootPolicy, ClaimMode, InlineField, InlineFields, MatchClaims, RecordedClaimModes, RootPolicyDisclosure, RootPolicyMatch, RootPolicyRule, ToolDisclosure
-from .verifier_trust_schema import ChioVerifierTrust, RequiredColumn
+from .verifier_trust_schema import CheckpointTrustAnchorBinding, ChioVerifierTrust, Kind, Kind20, PublicationIdentity, RequiredColumn, TrustAnchorIdentity
 
 __all__ = [
     "AnchorKind",
+    "CheckpointTrustAnchorBinding",
     "ChioDelegationContext",
     "ChioEnterpriseProviderIdentity",
     "ChioIdpKeySnapshot",
@@ -43,9 +44,11 @@ __all__ = [
     "Jwk",
     "JwsAlgorithm",
     "Kind",
+    "Kind20",
     "Kty",
     "MatchClaims",
     "PublicKeyHex",
+    "PublicationIdentity",
     "RecordedClaimModes",
     "RecordedClaims",
     "RequiredColumn",
@@ -60,6 +63,7 @@ __all__ = [
     "TenantCommitment",
     "Text",
     "ToolDisclosure",
+    "TrustAnchorIdentity",
     "Uri",
     "Use",
     "X5cItem",

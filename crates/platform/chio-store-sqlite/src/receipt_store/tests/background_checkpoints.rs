@@ -169,7 +169,7 @@ fn maybe_build_checkpoint_builds_one_checkpoint_per_crossed_threshold(
         (4, 6)
     );
     // previous_checkpoint_sha256 links to the head's cached predecessor.
-    let expected_digest = chio_kernel::checkpoint::checkpoint_body_sha256(&first.body)?;
+    let expected_digest = chio_kernel_core::evidence_verify::checkpoint_body_sha256(&first.body)?;
     assert_eq!(
         second.body.previous_checkpoint_sha256.as_deref(),
         Some(expected_digest.as_str())
@@ -603,9 +603,7 @@ fn flush_report_rejects_disconnected_checkpoint() -> Result<(), Box<dyn std::err
         &range_bytes,
         &keypair,
         Some(&checkpoint_one),
-        &[chio_kernel::checkpoint::checkpoint_chain_leaf_hash(
-            &checkpoint_one.body,
-        )?],
+        &[chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?],
     )?;
     // Break the predecessor linkage while keeping the row individually valid:
     // point at a digest that is NOT cp1's, then re-sign so the body/signature
@@ -798,8 +796,8 @@ fn operator_checkpoint_append_reverifies_chain() -> Result<(), Box<dyn std::erro
         &keypair,
         Some(&checkpoint_two),
         &[
-            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_one.body)?,
-            chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_two.body)?,
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?,
+            chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_two.body)?,
         ],
     )?;
 
@@ -1062,7 +1060,7 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
     insert_checkpoint_row(&store, &checkpoint_one, checkpoint_one.body.batch_end_seq);
 
     let checkpoint_one_leaf =
-        chio_kernel::checkpoint::checkpoint_chain_leaf_hash(&checkpoint_one.body)?;
+        chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&checkpoint_one.body)?;
     let checkpoint_two = build_checkpoint_with_previous(
         2,
         max_batch + 1,
@@ -1125,10 +1123,13 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
         .checked_sub(1)
         .ok_or("checkpoint timestamp must permit a distinct predecessor")?;
     replacement.signature = keypair.sign(&canonical_json_bytes(&replacement.body)?);
-    chio_kernel::checkpoint::validate_checkpoint(&replacement)?;
+    chio_kernel_core::evidence_verify::validate_checkpoint(&replacement)?;
     assert!(
-        chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &checkpoint_two)
-            .is_err(),
+        chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
+            &replacement,
+            &checkpoint_two
+        )
+        .is_err(),
         "the retained checkpoint 2 must be disconnected from the replacement"
     );
     let replacement_json = serde_json::to_string(&replacement.body)?;
@@ -1205,10 +1206,13 @@ fn frontier_cache_miss_rejects_disconnected_prefix_after_failed_build(
     // the replacement frontier with the stale checkpoint 2 predecessor.
     let mut replacement_two = checkpoint_two.clone();
     replacement_two.body.previous_checkpoint_sha256 = Some(
-        chio_kernel::checkpoint::checkpoint_body_sha256(&replacement.body)?,
+        chio_kernel_core::evidence_verify::checkpoint_body_sha256(&replacement.body)?,
     );
     replacement_two.signature = keypair.sign(&canonical_json_bytes(&replacement_two.body)?);
-    chio_kernel::checkpoint::validate_checkpoint_predecessor(&replacement, &replacement_two)?;
+    chio_kernel_core::evidence_verify::validate_checkpoint_predecessor(
+        &replacement,
+        &replacement_two,
+    )?;
     let replacement_two_json = serde_json::to_string(&replacement_two.body)?;
     let replacement_two_signature = replacement_two.signature.to_hex();
     let replacement_predecessor = replacement_two
@@ -1356,7 +1360,7 @@ fn checkpoint_insert_rejects_prefix_replaced_after_frontier_audit(
         .checked_sub(1)
         .ok_or("checkpoint timestamp must permit a distinct predecessor")?;
     replacement_one.signature = keypair.sign(&canonical_json_bytes(&replacement_one.body)?);
-    chio_kernel::checkpoint::validate_checkpoint(&replacement_one)?;
+    chio_kernel_core::evidence_verify::validate_checkpoint(&replacement_one)?;
 
     let replacement_one_json = serde_json::to_string(&replacement_one.body)?;
     let replacement_one_signature = replacement_one.signature.to_hex();

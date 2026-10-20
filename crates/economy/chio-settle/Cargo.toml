@@ -63,6 +63,7 @@ chio-anchor = { workspace = true }
 chio-link = { workspace = true }
 chio-test-support = { workspace = true }
 chio-kernel = { workspace = true }
+chio-kernel-core = { workspace = true }
 chio-spec-validate = { workspace = true }
 
 [lints]

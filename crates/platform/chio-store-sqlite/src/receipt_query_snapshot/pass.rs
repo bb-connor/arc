@@ -3,7 +3,8 @@
 //! compares it with the owned rows. Both advance in bounded, resumable steps.
 use std::time::Instant;
 
-use chio_kernel::checkpoint::{CheckpointChainFrontier, KernelCheckpoint};
+use chio_core::receipt::checkpoint::KernelCheckpoint;
+use chio_kernel_core::evidence_verify::CheckpointChainFrontier;
 
 use super::db::{ChildCursor, OwnedCheckpoint, ProjectedToolRow, SnapshotBatch, SnapshotDb};
 use super::walk::{

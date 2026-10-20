@@ -256,13 +256,12 @@ impl SqliteReceiptStore {
                         ))
                     })?;
                 prior_chain_leaf_hashes.push(
-                    crate::checkpoint::checkpoint_chain_leaf_hash(&chained.body).map_err(
-                        |error| {
+                    chio_kernel_core::evidence_verify::checkpoint_chain_leaf_hash(&chained.body)
+                        .map_err(|error| {
                             ReceiptStoreError::Conflict(format!(
                                 "checkpoint chain leaf failed: {error}"
                             ))
-                        },
-                    )?,
+                        })?,
                 );
             }
         }
@@ -329,7 +328,7 @@ impl SqliteReceiptStore {
                 delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                 parent_capability_id: row.get::<_, Option<String>>(7)?,
                 federated_parent_capability_id: None,
-                provenance: crate::CapabilitySnapshotProvenance::SignedToken,
+                provenance: chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken,
                 signed_capability,
             })
         }
@@ -403,7 +402,8 @@ impl SqliteReceiptStore {
                         delegation_depth: row.get::<_, i64>(6)?.max(0) as u64,
                         parent_capability_id: row.get::<_, Option<String>>(7)?,
                         federated_parent_capability_id: None,
-                        provenance: crate::CapabilitySnapshotProvenance::SignedToken,
+                        provenance:
+                            chio_core::receipt::evidence::CapabilitySnapshotProvenance::SignedToken,
                         signed_capability,
                     })
                 },
