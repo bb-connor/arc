@@ -85,13 +85,7 @@ impl<'connection> SchemaTransaction<'connection> {
     }
 
     pub fn validate_catalog(&self, schema: &str) -> Result<(), SchemaVersionError> {
-        let expected = Connection::open_in_memory()?;
-        expected.execute_batch(METADATA_SCHEMA)?;
-        expected.execute_batch(schema)?;
-        if catalog(&self.transaction)? != catalog(&expected)? {
-            return Err(SchemaVersionError::CatalogMismatch);
-        }
-        Ok(())
+        validate_catalog(&self.transaction, schema)
     }
 
     pub fn stamp(&self, namespace: &str) -> Result<(), SchemaVersionError> {
@@ -120,6 +114,19 @@ impl<'connection> SchemaTransaction<'connection> {
         self.transaction.commit()?;
         Ok(())
     }
+}
+
+pub(crate) fn validate_catalog(
+    connection: &Connection,
+    schema: &str,
+) -> Result<(), SchemaVersionError> {
+    let expected = Connection::open_in_memory()?;
+    expected.execute_batch(METADATA_SCHEMA)?;
+    expected.execute_batch(schema)?;
+    if catalog(connection)? != catalog(&expected)? {
+        return Err(SchemaVersionError::CatalogMismatch);
+    }
+    Ok(())
 }
 
 type CatalogEntry = (String, String, String, Option<String>);

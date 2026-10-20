@@ -25,6 +25,7 @@
 use rusqlite::{params, Connection, OptionalExtension};
 
 mod creation;
+pub(crate) use creation::validate_catalog;
 pub use creation::{inspect_schema, SchemaTransaction};
 
 /// ASCII "CHIO" as a big-endian `i32`, stamped into every Chio operator store.
