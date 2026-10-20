@@ -35,6 +35,15 @@
 
 #1607 and item 5 change disjoint stores. #1607 writes the passport sparse-Merkle oracle in `chio-revocation-oracle` (credential keys, signed epoch roots under `chio.trust.passport-revocation-root.v1`); item 5 writes `chio-store-sqlite`'s capability revocation store inside the serve-http state directory. No table, column, file or wire type is shared, and neither PR edits the other's files. The one store shape for capability revocation is the one in this plan. #1607 does not need to land before item 5; it lands before item 1 for the `passport-revocation-root` wrapper id, which is unrelated to this item. The lead records this on `sync.md` as the D17 reconciliation result (Task 1 Step 3).
 
+## Signing form and item 1 sequencing
+
+- #1607's epoch root signs under `chio.trust.passport-revocation-root.v1`, and the vectors under `spec/vectors/passport-revocation/v1/` change bytes in M1 item 1 (the signing wrapper). Item 5 neither reads, signs, verifies nor regenerates them, and depends on no passport-revocation artifact.
+- Item 5 adds no signed artifact, no signed fixture and no signing vector. `chio.revocation-entry.v1` and `chio.revocation-admin-request.v1` are unsigned. Item 6 exports entries under the kernel-signed export manifest; that signature is item 6's and uses the post-wrapper form.
+- The hashes item 5 adds are hash domains, not signature domains: `chio.revocation-entry-id.v1` (entry id) and `chio.sqlite-authority-revocation-entry-reference.v1` (chain reference digest). G5 leaves hash domains unchanged, so the wrapper does not alter them, and `scripts/check-signing-exemptions.py` (item 1) has nothing to list for item 5.
+- The only signed bytes item 5 changes are deny receipts that gain the `chio.revocation` guard evidence (PR 2). Those receipts are signed by the existing producers in the post-wrapper, committed form. PR 2 tests assert decoded receipt members (`guard_evidence`, reason code) and verify signatures through the item 1 helper (`verify_wrapped` with the receipt schema id against the pinned kernel key); no test compares receipt bytes, signatures or a checked-in signed fixture, so no fixture joins item 1's `cargo xtask gen signed-fixtures` set.
+- Sequencing after item 1: PR 2, PR 3 and PR 4 merge after item 1. PR 2 also waits for item 2, which follows item 1 (13.3). PR 3 waits for item 4's anchored-root store, which follows item 3, which follows item 1. PR 4 adds `spec/schemas/registry.json` rows and regenerated code, which item 1 rewrites, so it rebases on item 1's merged registry. PR 0 (docs only) and PR 1 (unsigned core-types type, store DDL, chain kind) sign nothing and may land before item 1; PR 1 adds one new file under `root_authority/` and edits no file item 1 edits. If the lead prefers one rule, PR 1 also waits for item 1, at no cost to the critical path because PR 2 waits for item 1 anyway.
+- arc-5b ACKs this plan on `sync.md` before any item 5 code starts (Task 1 Step 3).
+
 ## Global Constraints
 
 - Merge order (precondition): #1708 (trace-lock publication fence) merges before PR 2, because both edit `kernel/validation/revocation_trace.rs` and the kernel revocation tests. M1 item 4's anchored-root store PR (the `anchored_roots` table, the tenant index and the mint transaction) merges before PR 3. M1 item 2 (committed receipts, guard-evidence allowlist) merges before PR 2, so the revocation guard evidence is declared safe once. #1706 merges before PR 1 (module location `root_authority`).
@@ -89,11 +98,11 @@
 |---|---|---|---|---|---|
 | 0 | 2 | `docs/m1i5-revocation-spec` | `docs(superpowers): state when a revocation stops an admitted call` | Q1 answer | no |
 | 1 | 3 | `feat/m1i5-revocation-entries` | `feat(store): record capability revocations as chained revocation entries` | #1706 | yes: `global_commit_chain.rs` (Q2) |
-| 2 | 4 | `feat/m1i5-revocation-attribution` | `feat(kernel): name the revocation entry in revocation denials` | PR 1, #1708, item 2 | no (Root-active files, after #1708) |
-| 3 | 5 | `feat/m1i5-revocation-targets` | `feat(store): revoke by root policy rule, subject, tenant and replay key` | PR 2, item 4 anchored-root store PR | no |
-| 4 | 6, 7 | `feat/m1i5-revocation-admin` | `feat(mcp-remote): revocation target kinds on the admin route and chio mcp revoke` | PR 3 | no |
+| 2 | 4 | `feat/m1i5-revocation-attribution` | `feat(kernel): name the revocation entry in revocation denials` | PR 1, #1708, item 1, item 2 | no (Root-active files, after #1708) |
+| 3 | 5 | `feat/m1i5-revocation-targets` | `feat(store): revoke by root policy rule, subject, tenant and replay key` | PR 2, item 1, item 4 anchored-root store PR | no |
+| 4 | 6, 7 | `feat/m1i5-revocation-admin` | `feat(mcp-remote): revocation target kinds on the admin route and chio mcp revoke` | PR 3, item 1 (registry) | no |
 
-PRs 1 and 2 do not need item 4 and can land while item 4 is in review. PR 0 is docs-only and independent.
+PRs 0 and 1 sign nothing and may land before item 1; PRs 2 to 4 merge after item 1 (see Signing form and item 1 sequencing). PRs 1 and 2 do not need item 4. PR 0 is docs-only and independent.
 
 ---
 
@@ -111,7 +120,7 @@ git grep -n -E "CapabilityRevoked|DelegationChainRevoked" -- crates/kernel
 git grep -n -E "revocation_db_path|ADMIN_REVOCATIONS_PATH|AdminRevokeCapabilityRequest"
 ```
   Expected at `a93a2f69a3`: the R4 readers (3 non-test sites) plus the store's own; 8 implementors; about 69 `is_revoked` call lines of which about 20 go through the trait; `revocation_db_path` in factory, admin and config.
-- [ ] **Step 3: D17 and Root-2.** Post `<UTC> <lane>: D17 m1i5 store reconciliation: #1607 and item 5 share no store, table or wire type (oracle vs chio-store-sqlite); item 5 adds revocation_entries + revocation_entry chain kind (global_commit_chain.rs, Root-held) - REVIEW? requested before PR 1 opens` to `sync.md`, and wait for the lead's ACK and Root-2's answer to Q2 and Q3.
+- [ ] **Step 3: D17, arc-5b and Root-2.** Wait for arc-5b's plan ACK on `sync.md`. Post `<UTC> <lane>: D17 m1i5 store reconciliation: #1607 and item 5 share no store, table or wire type (oracle vs chio-store-sqlite); item 5 adds revocation_entries + revocation_entry chain kind (global_commit_chain.rs, Root-held) - REVIEW? requested before PR 1 opens` to `sync.md`, and wait for the lead's ACK and Root-2's answer to Q2 and Q3.
 
 ---
 
