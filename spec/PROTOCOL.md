@@ -1401,9 +1401,9 @@ The v1 receipt shape makes authority structural:
 - `advisory_evaluation` receipts use `boundary_class = advisory_only`,
   `trust_level = advisory`, and MUST omit `decision`.
 
-Only `mediated_decision` + `prevent` + `Allow` may be displayed or exported as
-authorization. Trace and advisory records can be evidence, but they are never
-authorization receipts.
+Only `mediated_decision` + `prevent` + `trust_level = mediated` + `Allow` with
+no `observation_outcome` may be displayed or exported as authorization. Trace
+and advisory records can be evidence, but they are never authorization receipts.
 
 When present, the decision enum is:
 

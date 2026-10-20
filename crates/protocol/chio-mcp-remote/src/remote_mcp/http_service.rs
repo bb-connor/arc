@@ -726,11 +726,18 @@ async fn handle_initialize_post(
 }
 
 /// A provider registry refusal answers its fixed 503 message; any other
-/// session construction failure answers 500.
+/// session construction failure answers the fixed 500 URN. The cause stays
+/// in the server log because it can name local paths and store detail.
 fn spawn_session_error(error: CliError) -> Response {
     match EnterpriseProviderRegistryRefusal::find(&error) {
         Some(refusal) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &refusal.to_string()),
-        None => plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()),
+        None => {
+            error!(error = %error, "remote MCP session construction failed");
+            plain_http_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                chio_errors::_generated::error_codes::TRANSPORT_SESSION_SPAWN_FAILED.urn,
+            )
+        }
     }
 }
 

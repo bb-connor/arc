@@ -125,6 +125,7 @@ func VerifyReceiptWithTrustedSigners(
 	}
 	semanticAuthorized := receiptKind == "mediated_decision" &&
 		boundaryClass == "prevent" &&
+		trustLevel == "mediated" &&
 		receipt["observation_outcome"] == nil &&
 		verdict == "allow"
 	signerTrusted := false

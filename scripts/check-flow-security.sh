@@ -605,6 +605,7 @@ run_exact_target --label "kernel-owned native egress" --allow-filtered --expecte
   kernel::tests::durable_admission::native_egress::native_egress_observation_time_must_fall_inside_the_read_interval \
   kernel::tests::durable_admission::native_egress::native_egress_operation_change_after_preparation_prevents_acquisition \
   kernel::tests::durable_admission::native_egress::capture_once::direct::native_direct_retention_is_classified_by_committed_egress_readback \
+  kernel::tests::durable_admission::native_egress::capture_once::native_checkpoint_capture_is_single_use_and_classified_by_store_entry \
   kernel::tests::durable_admission::native_egress::capture_once::native_lifecycle_capture_is_single_use_and_classified_by_store_entry \
   kernel::tests::durable_admission::native_egress::capture_once::retained::native_authority_retention_classifies_failures_by_first_durable_write \
   -- cargo test -p chio-kernel --lib kernel::tests::durable_admission::native_egress

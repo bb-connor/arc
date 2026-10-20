@@ -155,6 +155,7 @@ impl ChioReceiptBody {
             tool_origin: self.tool_origin,
             redaction_mode: self.redaction_mode,
             actor_chain: self.actor_chain.clone(),
+            trust_level: self.trust_level,
         }
     }
 
@@ -552,14 +553,14 @@ impl ChioReceipt {
             tool_origin: self.tool_origin,
             redaction_mode: self.redaction_mode,
             actor_chain: self.actor_chain.clone(),
+            trust_level: self.trust_level,
         }
     }
 
     /// Whether this receipt records an allow decision.
     #[must_use]
     pub fn is_allowed(&self) -> bool {
-        self.trust_level == TrustLevel::Mediated
-            && self.semantic_fields().is_authorized(self.decision.as_ref())
+        self.semantic_fields().is_authorized(self.decision.as_ref())
     }
 
     /// Whether this receipt records a deny decision.

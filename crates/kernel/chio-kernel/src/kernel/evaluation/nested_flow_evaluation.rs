@@ -807,7 +807,7 @@ impl ChioKernel {
         // tool call. The selected grant, not the set of candidates, decides
         // whether money is at risk, and no financial hold may cross into the tool
         // server without a durable payment participant to reconcile ambiguity.
-        if !self.unsafe_ephemeral_financial_dispatch
+        if !self.ephemeral_financial_dispatch_allowed()
             && durable_admission
                 .as_ref()
                 .is_none_or(|admission| !admission.requires_payment())

@@ -11,7 +11,9 @@ use crate::capability::{
 use crate::error::{Error, Result};
 
 use super::decision::Decision;
-use super::kinds::{BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin};
+use super::kinds::{
+    BoundaryClass, ObservationOutcome, ReceiptKind, RedactionMode, ToolOrigin, TrustLevel,
+};
 use super::validation::{
     require_exact, require_lowercase_hex_chars, require_wire_hierarchical_identifier,
     require_wire_identifier,
@@ -38,6 +40,7 @@ pub struct ReceiptSemanticFields {
     pub redaction_mode: RedactionMode,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actor_chain: Vec<ActorRef>,
+    pub trust_level: TrustLevel,
 }
 
 impl ReceiptSemanticFields {
@@ -50,6 +53,7 @@ impl ReceiptSemanticFields {
             tool_origin: ToolOrigin::CallerExecuted,
             redaction_mode: RedactionMode::None,
             actor_chain: Vec::new(),
+            trust_level: TrustLevel::Mediated,
         }
     }
 
@@ -62,6 +66,7 @@ impl ReceiptSemanticFields {
             tool_origin: ToolOrigin::HostExecutedProviderReported,
             redaction_mode: RedactionMode::Summary,
             actor_chain: Vec::new(),
+            trust_level: TrustLevel::Verified,
         }
     }
 
@@ -74,6 +79,7 @@ impl ReceiptSemanticFields {
             tool_origin: ToolOrigin::HostExecutedUnmediated,
             redaction_mode: RedactionMode::Redacted,
             actor_chain: Vec::new(),
+            trust_level: TrustLevel::Advisory,
         }
     }
 
@@ -135,6 +141,7 @@ impl ReceiptSemanticFields {
     pub fn is_authorized(&self, decision: Option<&Decision>) -> bool {
         self.receipt_kind == ReceiptKind::MediatedDecision
             && self.boundary_class == BoundaryClass::Prevent
+            && self.trust_level == TrustLevel::Mediated
             && self.observation_outcome.is_none()
             && matches!(decision, Some(Decision::Allow))
     }

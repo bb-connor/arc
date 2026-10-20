@@ -155,6 +155,7 @@ def verify_receipt(
     semantic_authorized = (
         receipt_kind == "mediated_decision"
         and boundary_class == "prevent"
+        and receipt.get("trust_level") == "mediated"
         and receipt.get("observation_outcome") is None
         and decision == "allow"
     )

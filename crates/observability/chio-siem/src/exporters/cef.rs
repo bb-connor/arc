@@ -177,7 +177,7 @@ mod tests {
     use chio_core::crypto::Keypair;
     use chio_core::receipt::{
         body::ChioReceipt, body::ChioReceiptBody, decision::Decision, decision::ToolCallAction,
-        kinds::TrustLevel, metadata::ReceiptSemanticFields,
+        metadata::ReceiptSemanticFields,
     };
     use chio_test_support::prelude::*;
 
@@ -196,7 +196,6 @@ mod tests {
         let event = SiemEvent::from_receipt(test_receipt_with_semantics(
             Decision::Allow,
             ReceiptSemanticFields::trace_detect_only(),
-            TrustLevel::Verified,
         ));
         let cef = CefExporter::default()
             .format_event(&event)
@@ -212,11 +211,8 @@ mod tests {
 
     #[test]
     fn metadata_tenant_id_does_not_drive_authoritative_cef_tenant() {
-        let mut receipt = test_receipt_with_semantics(
-            Decision::Allow,
-            ReceiptSemanticFields::mediated_prevent(),
-            TrustLevel::Mediated,
-        );
+        let mut receipt =
+            test_receipt_with_semantics(Decision::Allow, ReceiptSemanticFields::mediated_prevent());
         receipt.metadata = Some(serde_json::json!({
             "tenant_id": "metadata-tenant"
         }));
@@ -232,7 +228,6 @@ mod tests {
     fn test_receipt_with_semantics(
         decision: Decision,
         semantics: ReceiptSemanticFields,
-        trust_level: TrustLevel,
     ) -> ChioReceipt {
         let kp = Keypair::generate();
         let action = ToolCallAction::from_parameters(serde_json::json!({
@@ -264,7 +259,7 @@ mod tests {
                 policy_hash: "policy-xyz".to_string(),
                 evidence: Vec::new(),
                 metadata: None,
-                trust_level,
+                trust_level: semantics.trust_level,
                 tenant_id: None,
                 kernel_key: kp.public_key(),
                 bbs_projection_version: None,

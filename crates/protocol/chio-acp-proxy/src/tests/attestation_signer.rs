@@ -673,7 +673,6 @@ fn kernel_receipt_signer_rejects_trace_authorization_receipt_for_enforced_entry(
         Decision::Incomplete {
             reason: "trace-only observation".to_string(),
         },
-        chio_core::receipt::kinds::TrustLevel::Verified,
         chio_core::receipt::metadata::ReceiptSemanticFields::trace_detect_only(),
     );
     shared

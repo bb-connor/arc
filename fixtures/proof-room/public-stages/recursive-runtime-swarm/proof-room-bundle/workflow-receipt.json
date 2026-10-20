@@ -17,7 +17,7 @@
       "server_id": "vendor-a.files",
       "tool_name": "read_refund_case",
       "allowed": true,
-      "tool_receipt_id": "bfd77ab5f23e999083e696ee6bef8d2d0b1a64bf591b0f8a1727bfb1b33a6097",
+      "tool_receipt_id": "5ff4aec1b903c503ec77e500794e77e585edda083770ee4f6e9802ce4c1b1104",
       "outcome": "success",
       "duration_ms": 12,
       "cost": {
@@ -25,7 +25,7 @@
         "currency": "USD"
       },
       "output_hash": "6c7596557f061fb92c19195dd7184598e026bb5212185a1231f6bcefc6fee009",
-      "bilateral_dsse_sha256": "72c9c69d88794dddf2d1f3d4d3ced0b5a72e59cefc20c1e9a5a67a7ca2d72692",
+      "bilateral_dsse_sha256": "2e72bf448ad340cd58e79940b4041193e41d8b159b3f1c835352dffab2fa9c6f",
       "consistency_anchor": "chio:consistency:wf-chio-refund-001:0"
     },
     {
@@ -33,7 +33,7 @@
       "server_id": "vendor-b.kyc",
       "tool_name": "verify_customer",
       "allowed": true,
-      "tool_receipt_id": "4dea7976648c0900c13dec9125573fff3249a6ac5023687a763e5d92d9723053",
+      "tool_receipt_id": "167903bd304e78e927e39b75c63b884f0e54d32853b4cf0a84e7a488be6711f0",
       "outcome": "success",
       "duration_ms": 18,
       "cost": {
@@ -41,8 +41,8 @@
         "currency": "USD"
       },
       "output_hash": "20d1a73014db4806b985f39c23c7391e269b66a7bfcbf13f014636c13146dd0f",
-      "bilateral_dsse_sha256": "53c922bc46ec2f9f08fda9649ffd9d0299a6836ac7a47247c90b50abdb77e3a5",
-      "parent_receipt_sha256": "45bfd89b60a50ca55edac811549bef4353e2041efdf4f31804dc208971b93e36",
+      "bilateral_dsse_sha256": "3add549e6c256618868dda2deeed25b5d3d2eb87bfa16d7e792ae7c24f5f2d9c",
+      "parent_receipt_sha256": "bbb2e95d15a62dbd3370091f3960fba580d8bafff8f5be4b1edf6b2e2eb6aa1b",
       "consistency_anchor": "chio:consistency:wf-chio-refund-001:1"
     },
     {
@@ -50,7 +50,7 @@
       "server_id": "vendor-c.payments",
       "tool_name": "stage_refund",
       "allowed": true,
-      "tool_receipt_id": "38030948697d517762bca71f24980e6617929e358c7d8b7d05c0b765d0a48681",
+      "tool_receipt_id": "afa680784003ad1f9f125aff5629b2f82be165e5904a8e98f706864e3cdb1403",
       "outcome": "success",
       "duration_ms": 12,
       "cost": {
@@ -58,9 +58,9 @@
         "currency": "USD"
       },
       "output_hash": "c9abf68ae26e738826dabd29da7f6c623608221b253a70e6be1ec05bd9803987",
-      "bilateral_dsse_sha256": "d6bf1a35f738d459b9e1588c4e7136688a8517fe9c8d9646d4dc5191e2aa4e24",
+      "bilateral_dsse_sha256": "1d886bb38be764d995b451ab93ec1ef08757296936f73b1d15228ecce5aeb99d",
       "governance_receipt_id": "gov-refund-stage-authorization",
-      "parent_receipt_sha256": "2f8f8c97a658cb10651658eff50db3378cc54e9464971f46a3a4ac2e76655360",
+      "parent_receipt_sha256": "172cc6b7af5156a25bb96d7bd06a68c687fa516a38a537e87f2ebdc41063fd4b",
       "consistency_anchor": "chio:consistency:wf-chio-refund-001:2",
       "destructive": true
     }
@@ -71,22 +71,22 @@
   },
   "duration_ms": 42000,
   "kernel_key": "66be7e332c7a453332bd9d0a7f7db055f5c5ef1a06ada66d98b39fb6810c473a",
-  "signature": "a954fa6b9f2963d4bd90c0a79284b5ada7386cda47ac95c8ab57dd5f5fd94cc11012e81ea95b71347cb66d0f8f92ec72e518f218c104e80b088251f6b1436009",
+  "signature": "ec2f50157572d838ac46f56edade8d7fd4a8a641186f4d4eeef01b7cc0f6d0caa006cfea67f9fe08d43f52467b8d36996cbb1adcbae2b7ffc0af399f838b7d08",
   "vendor_signatures": [
     {
       "vendorId": "vendor-a",
       "publicKey": "d54207da194977dcf46adbfec2bc2e75b52d5a8a42184fedfdc00024f0e3e8da",
-      "signature": "0bccb961f0b3f3d148e1ec24073702a9be55ec20058dcd84509514085fa757374566472c096c71976406521867b60ec28af30ce4f87cd2379df1aa2ad7841800"
+      "signature": "cdf554f119abfde8c18779ba19298c1d73825f9593288f3efea0126719ee9b66e65d28640c909c0c3ee56dc25f1cfe7954114bb9e0af42922c4b5e758f6c9608"
     },
     {
       "vendorId": "vendor-b",
       "publicKey": "511c34a1a2cb521df16bb246b8de8e7997ce235c7e76b22a3d7503a24819dd8a",
-      "signature": "89f0378113a96a05d7fbf001b88004b94143e74eebc771f2278b42a1cfcf48739defbe5d33ae9482ef5d0fe9be481b041888f764543c41b627f1b82590e61408"
+      "signature": "40705fcec72e64fcf6edc88502e9ad3badb38f0254a244b58a376d2ddd8fa2b5eccd4d799a9e654620319874dee3706e44114719f039a580a6164af32abe3e00"
     },
     {
       "vendorId": "vendor-c",
       "publicKey": "31debe55d37c722768b137131caa6087080b2e0b60b94bd785d14575cfa498bc",
-      "signature": "6ac530637c54466cc5da56cc16d939fd5ec0c66fd5fef218a415e3a9b665130070919d721b7a3a789b37f1312c162b90a3ed2666097dee87f23658db3e24d00f"
+      "signature": "a4fdec0b89df8cb5eb79b712292f5369934de79365f407b42636be7ff531461724ae3661d0e704db1abe107f43adef6e9ceed846a495dca00e4f1ec78fa8ab03"
     }
   ]
 }
