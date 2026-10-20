@@ -5,10 +5,11 @@ use std::path::{Path, PathBuf};
 use chio_kernel::ReceiptStoreError;
 use rusqlite::Connection;
 
+use super::SnapshotDbError;
 #[cfg(target_os = "linux")]
 use crate::receipt_query_snapshot_backing::{
     reclaim_abandoned as reclaim_backing, SnapshotBackingError, SnapshotCustodyRefusal,
-    SnapshotFileBacking,
+    SnapshotFileBacking, SnapshotLocationRefusal,
 };
 use crate::receipt_store::SqliteReceiptStore;
 
@@ -21,19 +22,24 @@ pub(super) enum Storage {
 
 impl Storage {
     /// Linux provisions a private file in `store`'s data directory, or under
-    /// `/tmp` when the store is in memory.
-    pub(super) fn create(store: &SqliteReceiptStore) -> Result<Self, ReceiptStoreError> {
+    /// `/tmp` when the store is in memory. Another process holding the
+    /// snapshot parent lock is contention, not unavailability.
+    pub(super) fn create(store: &SqliteReceiptStore) -> Result<Self, SnapshotDbError> {
         #[cfg(target_os = "linux")]
         {
             let directory = data_directory(store)?;
-            SnapshotFileBacking::create(directory.as_deref())
-                .map(Self::File)
-                .map_err(backing_error)
+            match SnapshotFileBacking::create(directory.as_deref()) {
+                Ok(backing) => Ok(Self::File(backing)),
+                Err(error @ SnapshotBackingError::Unusable(SnapshotLocationRefusal::Contended)) => {
+                    Err(SnapshotDbError::Contended(error.to_string()))
+                }
+                Err(error) => Err(backing_error(error).into()),
+            }
         }
         #[cfg(not(target_os = "linux"))]
         {
             let _ = store;
-            Self::memory()
+            Ok(Self::memory()?)
         }
     }
 

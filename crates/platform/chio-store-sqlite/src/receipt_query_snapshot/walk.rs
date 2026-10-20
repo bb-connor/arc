@@ -79,6 +79,8 @@ impl From<SnapshotDbError> for WalkError {
                 quota_bytes,
                 used_bytes,
             },
+            #[cfg(target_os = "linux")]
+            SnapshotDbError::Contended(message) => Self::Busy(message),
             SnapshotDbError::Duplicate(message) => Self::Integrity(message),
             SnapshotDbError::Store(error) => classify(error, None),
             SnapshotDbError::Sqlite(error) => classify(ReceiptStoreError::Sqlite(error), None),

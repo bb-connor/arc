@@ -174,10 +174,15 @@ pub(super) struct SnapshotBatch {
 
 /// Failures of the owned store. Capacity is a resource limit; a uniqueness
 /// violation means the source offered the same cursor or receipt twice.
+/// Contention means another process holds the snapshot location for one
+/// bounded step; the location is untouched and provisioning may retry.
 #[derive(Debug, thiserror::Error)]
 pub(super) enum SnapshotDbError {
     #[error("receipt query snapshot storage is full: backing storage or configured quota may be exhausted ({quota_bytes} byte quota, {used_bytes} bytes used)")]
     Capacity { quota_bytes: u64, used_bytes: u64 },
+    #[cfg(target_os = "linux")]
+    #[error("{0}")]
+    Contended(String),
     #[error("authenticated receipt history repeats a receipt or cursor: {0}")]
     Duplicate(String),
     #[error(transparent)]

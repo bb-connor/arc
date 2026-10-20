@@ -3,20 +3,19 @@ use std::fs::File;
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::process::ExitStatusExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use chio_kernel::receipt_query::ReceiptQuerySnapshotError;
-use chio_kernel::ReceiptStoreError;
 use chio_security_types::clock::{Clock, ClockError, ClockReading, MonotonicInstant, UnixMillis};
 use rustix::fs::{flock, FlockOperation};
 
 use super::super::db::{SnapshotDb, SnapshotDbError};
+use super::super::pass::build_snapshot;
 use super::super::service::{ReceiptQuerySnapshotState, ReceiptQuerySnapshots};
 use super::super::walk::WalkError;
 use super::service::{config, ready, wait_for};
-use super::support::Fixture;
+use super::support::{context, limits, target, Fixture};
 use crate::receipt_store::test_hooks::FAIL_SEED_PATH_MARKER;
 use crate::receipt_store::SqliteReceiptStore;
 
@@ -215,8 +214,11 @@ fn wait_until(what: &str, mut done: impl FnMut() -> bool) {
     }
 }
 
+const CONTENDED: &str =
+    "receipt query snapshot location is unusable: another process holds the snapshot parent lock";
+
 #[test]
-fn parent_lock_contention_is_a_retried_unavailable_outcome() {
+fn parent_lock_contention_is_a_busy_outcome() {
     let fixture = Fixture::new(0);
     let parent = data_directory(&fixture).join(PARENT_NAME);
     private_directory(&parent);
@@ -226,17 +228,39 @@ fn parent_lock_contention_is_a_retried_unavailable_outcome() {
         Err(error) => error,
     };
     assert!(
-        matches!(
-            &error,
-            SnapshotDbError::Store(ReceiptStoreError::QuerySnapshot(
-                ReceiptQuerySnapshotError::Unavailable(_)
-            ))
-        ),
+        matches!(&error, SnapshotDbError::Contended(message) if message == CONTENDED),
         "{error:?}"
     );
-    assert!(matches!(WalkError::from(error), WalkError::Unavailable(_)));
+    assert_eq!(WalkError::from(error), WalkError::Busy(CONTENDED.into()));
     flock(&holder, FlockOperation::Unlock).unwrap();
     assert!(SnapshotDb::open_private(&fixture.store, 1 << 24).is_ok());
+}
+
+#[test]
+fn a_build_waits_out_parent_lock_contention_until_cancelled() {
+    let fixture = Fixture::new(0);
+    let parent = data_directory(&fixture).join(PARENT_NAME);
+    private_directory(&parent);
+    let cancel = Arc::new(AtomicBool::new(false));
+    let ctx = context(&fixture.store, &cancel, limits());
+    let contended = target(&ctx);
+    let holder = hold_lock(&parent);
+    let outcome = std::thread::scope(|scope| {
+        let builder =
+            scope.spawn(|| build_snapshot(&ctx, contended, 1 << 24, &mut |_, _| {}).map(|_| ()));
+        cancel.store(true, Ordering::SeqCst);
+        builder.join().unwrap()
+    });
+    assert_eq!(outcome, Err(WalkError::Cancelled));
+    assert_eq!(
+        snapshot_databases(data_directory(&fixture)),
+        Vec::<PathBuf>::new()
+    );
+    flock(&holder, FlockOperation::Unlock).unwrap();
+    cancel.store(false, Ordering::SeqCst);
+    let (db, _) = build_snapshot(&ctx, target(&ctx), 1 << 24, &mut |_, _| {}).unwrap();
+    assert_eq!(snapshot_databases(data_directory(&fixture)).len(), 1);
+    drop(db);
 }
 
 #[test]
