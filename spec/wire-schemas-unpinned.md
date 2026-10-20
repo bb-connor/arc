@@ -133,7 +133,7 @@ since been pinned is removed by the next `--update`.
 - `crates/platform/chio-control-plane/src/scim_lifecycle.rs:14` `SCIM_LIFECYCLE_RECORD_SCHEMA` = `chio.scim-lifecycle-record.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/admission.rs:43` `ATTESTED_FINDING_ADMISSION_ARTIFACT_BUNDLE_SCHEMA` = `chio.attested-finding-admission-artifacts.v1`
 - `crates/platform/chio-control-plane/src/security/event_consumer/verification.rs:14` `SECURITY_EVENT_RECEIPT_PROJECTION_VERSION` = `chio.security-event-receipt-projection.v1`
-- `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:29` `CLUSTER_PEER_SIGNATURE_SCHEME` = `chio.cluster.peer-signature.v1`
+- `crates/platform/chio-control-plane/src/trust_control/caller_credentials.rs:32` `CLUSTER_PEER_SIGNATURE_SCHEME` = `chio.cluster.peer-request.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:145` `DEFECT_DOMAIN` = `chio.finding.defect.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:157` `EFFECT_FEE_DOMAIN` = `chio.finding.effect.fee.v1`
 - `crates/platform/chio-control-plane/src/trust_control/finding_challenge_coordinator.rs:160` `EFFECT_ROOT_INTENT_DOMAIN` = `chio.finding.effect.root-intent.v1`

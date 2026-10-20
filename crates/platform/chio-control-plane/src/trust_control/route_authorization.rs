@@ -5,11 +5,13 @@
 //! kind it accepts, the scope it requires and its tenant rule. A request whose
 //! method and matched route have no row refuses, a row on the other listener
 //! refuses as absent, a peer signature is refused on caller routes and a
-//! bearer credential is refused on peer routes.
+//! bearer credential is refused on peer routes. `HEAD` follows the `GET`
+//! row of its route, as the router serves `HEAD` from `GET` handlers.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use axum::body::{Body, Bytes};
 use axum::extract::{MatchedPath, Request, State};
 use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, Method, StatusCode};
@@ -19,7 +21,8 @@ use chio_security_types::clock::Clock;
 
 use super::caller_credentials::{
     AuthenticatedCaller, AuthenticatedPeer, CallerAuthError, CallerCredentials, ClusterPeerPins,
-    CredentialKind, PeerAuthError, PeerRequestTarget, Scope, TenantAuthority,
+    CredentialKind, PeerAuthError, PeerNonceCache, PeerRequestTarget, Scope, TenantAuthority,
+    CLUSTER_AUTH_BODY_SHA256_HEADER, CLUSTER_AUTH_NONCE_HEADER,
 };
 use super::frost::{
     FROST_COORDINATOR_CANCEL_PATH, FROST_COORDINATOR_CLAIM_PATH, FROST_COORDINATOR_COMMITMENT_PATH,
@@ -80,7 +83,7 @@ impl RouteMethod {
     #[must_use]
     pub fn from_method(method: &Method) -> Option<Self> {
         match *method {
-            Method::GET => Some(RouteMethod::Get),
+            Method::GET | Method::HEAD => Some(RouteMethod::Get),
             Method::POST => Some(RouteMethod::Post),
             Method::PUT => Some(RouteMethod::Put),
             Method::DELETE => Some(RouteMethod::Delete),
@@ -353,6 +356,7 @@ pub struct RouteAuthorizer {
     credentials: Arc<CallerCredentials>,
     peers: Arc<ClusterPeerPins>,
     clock: Arc<dyn Clock>,
+    nonces: PeerNonceCache,
     rules: HashMap<(RouteMethod, &'static str), &'static RouteRule>,
 }
 
@@ -384,6 +388,7 @@ impl RouteAuthorizer {
             credentials,
             peers,
             clock,
+            nonces: PeerNonceCache::default(),
             rules,
         }
     }
@@ -393,8 +398,17 @@ impl RouteAuthorizer {
         self.listener
     }
 
+    fn rule(&self, method: &Method, matched_path: Option<&str>) -> Option<&'static RouteRule> {
+        matched_path
+            .zip(RouteMethod::from_method(method))
+            .and_then(|(matched, method)| self.rules.get(&(method, matched)))
+            .copied()
+            .filter(|rule| rule.listener == self.listener)
+    }
+
     /// Authorize one request. `matched_path` is the router's matched route
-    /// pattern and `path` the concrete request path a peer signature covers.
+    /// pattern; `path`, `query` and `body` are the concrete request parts a
+    /// peer signature covers.
     pub fn authorize(
         &self,
         method: &Method,
@@ -402,15 +416,9 @@ impl RouteAuthorizer {
         path: &str,
         query: &str,
         headers: &HeaderMap,
+        body: &[u8],
     ) -> Result<RouteGrant, Response> {
-        let rule = matched_path
-            .zip(RouteMethod::from_method(method))
-            .and_then(|(matched, method)| self.rules.get(&(method, matched)))
-            .copied()
-            .ok_or_else(route_absent)?;
-        if rule.listener != self.listener {
-            return Err(route_absent());
-        }
+        let rule = self.rule(method, matched_path).ok_or_else(route_absent)?;
         match rule.credential {
             RouteCredential::Anonymous
             | RouteCredential::FrostParticipant
@@ -421,7 +429,7 @@ impl RouteAuthorizer {
                 .map(RouteGrant::Caller)
                 .map_err(CallerAuthError::into_response),
             RouteCredential::Peer => self
-                .authorize_peer(rule, method, path, query, headers)
+                .authorize_peer(rule, method, path, query, headers, body)
                 .map(RouteGrant::Peer)
                 .map_err(PeerAuthError::into_response),
         }
@@ -458,6 +466,7 @@ impl RouteAuthorizer {
         path: &str,
         query: &str,
         headers: &HeaderMap,
+        body: &[u8],
     ) -> Result<AuthenticatedPeer, PeerAuthError> {
         if headers.contains_key(AUTHORIZATION) {
             return Err(PeerAuthError::CallerCredentialOnPeerRoute);
@@ -473,8 +482,10 @@ impl RouteAuthorizer {
             method: method.as_str(),
             path,
             query,
+            body,
         };
-        self.peers.verify(headers, &target, now, scope)
+        self.peers
+            .verify(headers, &target, now, scope, &self.nonces)
     }
 }
 
@@ -484,6 +495,8 @@ fn carries_peer_authentication(headers: &HeaderMap) -> bool {
         CLUSTER_AUTH_ISSUED_AT_HEADER,
         CLUSTER_AUTH_SIGNATURE_HEADER,
         CLUSTER_AUTH_TERM_HEADER,
+        CLUSTER_AUTH_NONCE_HEADER,
+        CLUSTER_AUTH_BODY_SHA256_HEADER,
     ]
     .iter()
     .any(|name| headers.contains_key(*name))
@@ -496,28 +509,50 @@ fn route_absent() -> Response {
     )
 }
 
+/// Largest request body a peer route accepts; the body is buffered so the
+/// signature can bind its digest.
+pub const PEER_ROUTE_MAX_BODY_BYTES: usize = 64 * 1024;
+
 /// Middleware enforcing the route table. Mount it with `route_layer` so the
 /// matched route is known; the grant is inserted into the request extensions.
 pub async fn authorize_route(
     State(authorizer): State<Arc<RouteAuthorizer>>,
-    mut request: Request,
+    request: Request,
     next: Next,
 ) -> Response {
     let matched = request
         .extensions()
         .get::<MatchedPath>()
         .map(|matched| matched.as_str().to_string());
+    let (mut parts, body) = request.into_parts();
+    let peer_route = authorizer
+        .rule(&parts.method, matched.as_deref())
+        .is_some_and(|rule| rule.credential == RouteCredential::Peer);
+    let (body, signed_body) = if peer_route {
+        match axum::body::to_bytes(body, PEER_ROUTE_MAX_BODY_BYTES).await {
+            Ok(bytes) => (Body::from(bytes.clone()), bytes),
+            Err(_) => {
+                return plain_http_error(
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "cluster peer request body exceeds its bound",
+                );
+            }
+        }
+    } else {
+        (body, Bytes::new())
+    };
     let grant = authorizer.authorize(
-        request.method(),
+        &parts.method,
         matched.as_deref(),
-        request.uri().path(),
-        request.uri().query().unwrap_or_default(),
-        request.headers(),
+        parts.uri.path(),
+        parts.uri.query().unwrap_or_default(),
+        &parts.headers,
+        &signed_body,
     );
     match grant {
         Ok(grant) => {
-            request.extensions_mut().insert(grant);
-            next.run(request).await
+            parts.extensions.insert(grant);
+            next.run(Request::from_parts(parts, body)).await
         }
         Err(response) => response,
     }
