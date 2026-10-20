@@ -5,37 +5,36 @@ use serde::{Deserialize, Serialize};
 use crate::crypto::{canonical_json_bytes, sha256_hex};
 use crate::error::Result;
 
-/// The Kernel's verdict on a tool call.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(
-    tag = "verdict",
-    rename_all = "snake_case",
-    deny_unknown_fields,
-    remote = "Self"
-)]
-pub enum Decision {
-    /// The tool call was allowed and executed.
-    Allow,
-    /// The tool call was denied.
-    Deny {
-        /// Human-readable reason for the denial.
-        reason: String,
-        /// The guard or validation step that triggered the denial.
-        guard: String,
-    },
-    /// The tool call was interrupted by explicit cancellation.
-    Cancelled {
-        /// Human-readable reason for the cancellation.
-        reason: String,
-    },
-    /// The tool call did not reach a complete terminal result.
-    Incomplete {
-        /// Human-readable reason for the incomplete terminal state.
-        reason: String,
-    },
+chio_security_types::lossless_serde! {
+    /// The Kernel's verdict on a tool call.
+    #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+    #[serde(
+        tag = "verdict",
+        rename_all = "snake_case",
+        deny_unknown_fields
+    )]
+    pub enum Decision {
+        /// The tool call was allowed and executed.
+        Allow,
+        /// The tool call was denied.
+        Deny {
+            /// Human-readable reason for the denial.
+            reason: String,
+            /// The guard or validation step that triggered the denial.
+            guard: String,
+        },
+        /// The tool call was interrupted by explicit cancellation.
+        Cancelled {
+            /// Human-readable reason for the cancellation.
+            reason: String,
+        },
+        /// The tool call did not reach a complete terminal result.
+        Incomplete {
+            /// Human-readable reason for the incomplete terminal state.
+            reason: String,
+        },
+    }
 }
-
-chio_security_types::lossless_serde!(Decision);
 
 /// Describes the tool call that was evaluated.
 #[derive(Debug, Clone, Serialize, Deserialize)]

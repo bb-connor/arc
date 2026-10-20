@@ -12,6 +12,7 @@ use chio_core_types::receipt::metadata::{ActorRef, GuardEvidence};
 use chio_core_types::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 use chio_core_types::Keypair;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -192,4 +193,22 @@ fn a_unit_terminal_state_refuses_an_unknown_member() -> TestResult {
         Some(chio_security_types::strict_serde::DROPPED_INPUT)
     );
     Ok(())
+}
+
+#[test]
+fn the_direct_decoders_refuse_a_padded_unit_variant() {
+    let decision = <Decision>::deserialize(json!({"verdict": "allow", "pad": 0}))
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(
+        decision.as_deref(),
+        Some(chio_security_types::strict_serde::DROPPED_INPUT)
+    );
+    let state = <OperationTerminalState>::deserialize(json!({"state": "completed", "pad": 0}))
+        .err()
+        .map(|error| error.to_string());
+    assert_eq!(
+        state.as_deref(),
+        Some(chio_security_types::strict_serde::DROPPED_INPUT)
+    );
 }

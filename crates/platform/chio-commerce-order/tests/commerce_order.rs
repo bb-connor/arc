@@ -1753,7 +1753,18 @@ fn original_authority_receipt_duplicate_member_is_rejected() {
     *receipt = original.into_bytes();
     let error = chio_commerce_order::verify_commerce_order(&bundle)
         .test_expect_err("duplicate receipt fields must reject before signature projection");
-    assert!(std::error::Error::source(&error).is_some());
+    assert!(
+        matches!(
+            &error,
+            chio_commerce_order::CommerceOrderError::Input(input)
+                if input.code() == "urn:chio:error:attest:signed-json-invalid-input"
+        ),
+        "{error:?}"
+    );
+    assert!(
+        error_chain_starts_with(&error, "canonical JSON error: duplicate object key: \"id\""),
+        "{error:?}"
+    );
 }
 
 fn error_chain_starts_with(error: &dyn std::error::Error, prefix: &str) -> bool {
