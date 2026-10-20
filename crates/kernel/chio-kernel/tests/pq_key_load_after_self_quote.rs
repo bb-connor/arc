@@ -152,8 +152,11 @@ fn allow_classical_skips_verifier_and_returns_classical_backend() {
         &PanicVerifier,
     )
     .expect("classical floor must succeed without a verifier call");
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Ed25519);
-    assert_eq!(backend.public_key(), kp.public_key());
+    assert_eq!(
+        backend.public_key().unwrap().algorithm(),
+        SigningAlgorithm::Ed25519
+    );
+    assert_eq!(backend.public_key().unwrap(), kp.public_key());
 }
 
 #[test]
@@ -192,7 +195,10 @@ fn allow_hybrid_loads_pq_only_after_verified_self_quote() {
         &classical_pk,
         "boot path MUST thread the classical kernel public key into the verifier"
     );
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(
+        backend.public_key().unwrap().algorithm(),
+        SigningAlgorithm::Hybrid
+    );
 }
 
 #[test]
@@ -212,7 +218,10 @@ fn pq_required_loads_pq_only_after_verified_self_quote() {
         &verifier,
     )
     .expect("pq_required must unlock the hybrid backend on a verified self-quote");
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(
+        backend.public_key().unwrap().algorithm(),
+        SigningAlgorithm::Hybrid
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
 }
 
@@ -235,7 +244,10 @@ fn kernel_helper_routes_hybrid_signing_through_self_quote_gate() {
         .with_hybrid_signing_backend(&hybrid, b"kernel-self-quote", &verifier)
         .expect("kernel helper must unlock hybrid backend after self-quote");
 
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Hybrid);
+    assert_eq!(
+        backend.public_key().unwrap().algorithm(),
+        SigningAlgorithm::Hybrid
+    );
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     let seen_pk_value = seen_pk.lock().unwrap();
     assert_eq!(

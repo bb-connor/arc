@@ -347,13 +347,16 @@ fn validate_issued_response_at(
 }
 
 pub trait CapabilityAuthority: Send + Sync {
-    /// Compatibility identity of this authority. A rotating authority may
-    /// report a key it no longer signs with, so trust decisions use
-    /// [`Self::trusted_public_keys`] and issuance signs with the current key.
-    fn authority_public_key(&self) -> PublicKey;
+    /// The key this authority signs with now. An unreadable identity is an
+    /// error.
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError>;
 
+    /// Keys trusted as issuers of this authority's capabilities. An
+    /// unreadable identity trusts nothing.
     fn trusted_public_keys(&self) -> Vec<PublicKey> {
-        vec![self.authority_public_key()]
+        self.authority_public_key()
+            .map(|key| vec![key])
+            .unwrap_or_default()
     }
 
     /// Enforce managed issuer lifetimes in addition to the kernel trust-set check.
@@ -529,8 +532,8 @@ fn sign_capability_with_backend(
 }
 
 impl CapabilityAuthority for LocalCapabilityAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.keypair.public_key()
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
+        Ok(self.keypair.public_key())
     }
 
     fn issue_aggregate_family_root(
@@ -544,7 +547,7 @@ impl CapabilityAuthority for LocalCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.authority_public_key(),
+            issuer: self.authority_public_key()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -594,14 +597,6 @@ impl GovernedCapabilityAuthority {
         Self { backend, clock }
     }
 
-    /// The backend's current signing identity. An unreadable selector refuses
-    /// issuance rather than naming an older key as issuer.
-    fn current_issuer(&self) -> Result<PublicKey, KernelError> {
-        self.backend
-            .current_public_key()
-            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
-    }
-
     /// Issue a capability with an explicit aggregate limit over its own calls.
     /// Delegation-family limits use `issue_aggregate_family_root` instead.
     pub fn issue_capability_with_aggregate_budget(
@@ -619,7 +614,7 @@ impl GovernedCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.current_issuer()?,
+            issuer: self.authority_public_key()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -637,17 +632,11 @@ impl GovernedCapabilityAuthority {
 }
 
 impl CapabilityAuthority for GovernedCapabilityAuthority {
-    fn authority_public_key(&self) -> PublicKey {
-        self.backend.public_key()
-    }
-
-    /// Only the backend's current identity is trusted; an unreadable selector
-    /// trusts nothing.
-    fn trusted_public_keys(&self) -> Vec<PublicKey> {
+    /// An unreadable selector refuses issuance.
+    fn authority_public_key(&self) -> Result<PublicKey, KernelError> {
         self.backend
-            .current_public_key()
-            .map(|key| vec![key])
-            .unwrap_or_default()
+            .public_key()
+            .map_err(|error| KernelError::CapabilityIssuanceFailed(error.to_string()))
     }
 
     fn issue_aggregate_family_root(
@@ -661,7 +650,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.current_issuer()?,
+            issuer: self.authority_public_key()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -687,7 +676,7 @@ impl CapabilityAuthority for GovernedCapabilityAuthority {
         let now = capability_authority_now_unix_secs(self.clock.as_ref())?;
         let body = CapabilityTokenBody {
             id: capability_id_at(now)?,
-            issuer: self.current_issuer()?,
+            issuer: self.authority_public_key()?,
             subject: subject.clone(),
             scope,
             issued_at: now,
@@ -1204,20 +1193,11 @@ pub(crate) mod tests {
         assert!(matches!(capability.verify_signature(), Ok(true)));
     }
 
-    /// A rotating backend whose current selector is unreadable while its
-    /// compatibility identity still names an earlier key.
+    /// A rotating backend whose current selector cannot be read.
     pub(crate) struct UnreadableSelectorBackend(pub(crate) chio_core::crypto::Ed25519Backend);
 
     impl SigningBackend for UnreadableSelectorBackend {
-        fn algorithm(&self) -> chio_core::SigningAlgorithm {
-            self.0.algorithm()
-        }
-
-        fn public_key(&self) -> PublicKey {
-            self.0.public_key()
-        }
-
-        fn current_public_key(&self) -> chio_core::error::Result<PublicKey> {
+        fn public_key(&self) -> chio_core::error::Result<PublicKey> {
             Err(chio_core::Error::InvalidPublicKey(
                 "selector unavailable".to_string(),
             ))
@@ -1246,6 +1226,11 @@ pub(crate) mod tests {
         };
 
         assert!(authority.trusted_public_keys().is_empty());
+        assert!(matches!(
+            authority.authority_public_key(),
+            Err(KernelError::CapabilityIssuanceFailed(message))
+                if message == "invalid public key: selector unavailable"
+        ));
         assert!(refused(authority.issue_capability(
             &subject,
             ChioScope::default(),

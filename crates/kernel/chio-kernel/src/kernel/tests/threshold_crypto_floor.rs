@@ -90,16 +90,17 @@ impl Fixture {
         let policy_hash = sha256_hex(b"threshold-crypto-floor-policy");
         let mut config = make_config();
         config.policy_hash = policy_hash.clone();
-        config
-            .ca_public_keys
-            .extend([authority.public_key(), issuer.public_key()]);
+        config.ca_public_keys.extend([
+            authority.public_key().unwrap(),
+            issuer.public_key().unwrap(),
+        ]);
         let mut kernel = make_kernel(config);
         let requirement = ThresholdApprovalRequirement::new(
             policy_hash.clone(),
             1,
             vec![ThresholdApproverIdentity {
                 identifier: "reviewer".into(),
-                public_key: approver.public_key(),
+                public_key: approver.public_key()?,
             }],
             "directory-v1".into(),
             90,
@@ -110,7 +111,7 @@ impl Fixture {
         let capability = CapabilityToken::sign_with_backend(
             CapabilityTokenBody {
                 id: "threshold-floor-capability".into(),
-                issuer: issuer.public_key(),
+                issuer: issuer.public_key()?,
                 subject: subject.public_key(),
                 scope: make_scope(vec![grant]),
                 issued_at: now - 1,
@@ -162,14 +163,14 @@ impl Fixture {
                 eligible_set_digest: requirement.eligible_set_digest.clone(),
                 proposal_created_at: now,
                 proposal_deadline: now + 90,
-                policy_authority: authority.public_key(),
+                policy_authority: authority.public_key()?,
             },
             authority.as_ref(),
         )?;
         let token = GovernedApprovalToken::sign_with_backend(
             GovernedApprovalTokenBody {
                 id: "threshold-floor-vote".into(),
-                approver: approver.public_key(),
+                approver: approver.public_key()?,
                 subject: subject.public_key(),
                 governed_intent_hash: intent_hash.clone(),
                 request_id: "threshold-floor-request".into(),

@@ -248,9 +248,15 @@ impl AttestedFindingResponseCoordinator for ExecutingResponseCoordinator {
 
 fn executing_fixture() -> (HostFixture, Arc<ExecutingResponseCoordinator>) {
     let mut fixture = HostFixture::new();
-    let executor_identity =
-        ActiveResponseExecutorAuthorityIdentity::new(fixture.config.signer.public_key(), 1)
-            .unwrap_or_else(|error| panic!("executor identity: {error}"));
+    let executor_identity = ActiveResponseExecutorAuthorityIdentity::new(
+        fixture
+            .config
+            .signer
+            .public_key()
+            .unwrap_or_else(|error| panic!("signer key: {error}")),
+        1,
+    )
+    .unwrap_or_else(|error| panic!("executor identity: {error}"));
     let executor_subject = RecordId::new(executor_identity.subject().to_hex())
         .unwrap_or_else(|error| panic!("executor subject: {error}"));
     let effects = Arc::new(

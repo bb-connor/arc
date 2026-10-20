@@ -230,9 +230,7 @@ impl SqliteKeyLogStore {
         event: &SignedKeyLogEvent,
         operator: &dyn SigningBackend,
     ) -> Result<SignedKeyLogCheckpoint> {
-        if operator.public_key() != self.policy.operator_key
-            || operator.algorithm() != self.policy.operator_key.algorithm()
-        {
+        if operator.public_key()? != self.policy.operator_key {
             return Err(KeyringError::InvalidCheckpoint(
                 "operator backend does not match configured key",
             ));
@@ -434,9 +432,7 @@ impl SqliteKeyLogStore {
         checkpoint_hash: &Hash,
         operator: &dyn SigningBackend,
     ) -> Result<KeyLogState> {
-        if operator.public_key() != self.policy.operator_key
-            || operator.algorithm() != self.policy.operator_key.algorithm()
-        {
+        if operator.public_key()? != self.policy.operator_key {
             return Err(KeyringError::InvalidCheckpoint(
                 "operator backend does not match configured key",
             ));
@@ -789,7 +785,7 @@ impl SqliteKeyLogStore {
         anchor_id: &AnchorId,
         signer: &dyn SigningBackend,
     ) -> Result<SignedArtifactTimeAnchor> {
-        self.validate_artifact_time_signer(anchor_id, &signer.public_key())?;
+        self.validate_artifact_time_signer(anchor_id, &signer.public_key()?)?;
         let connection = self.connection()?;
         let stored = load_checkpoints_from(&connection)?
             .into_iter()

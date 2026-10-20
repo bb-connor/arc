@@ -126,7 +126,9 @@ impl Fixture {
                     threshold: 1,
                     maximum_token_lifetime_seconds: 60,
                 },
-                receipt_signing_backend.public_key(),
+                receipt_signing_backend
+                    .public_key()
+                    .unwrap_or_else(|error| panic!("signing identity: {error}")),
                 Arc::new(FixedClock(100)),
             )
             .test_expect("admin"),

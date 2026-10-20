@@ -6,7 +6,7 @@ use crate::admission_operation::{
     AdmissionRecoveryError, AdmissionRecoveryFailureKind, AdmissionRecoveryPhase,
 };
 use crate::tool_outcome::FrozenReceiptSigningIdentityV1;
-use chio_core::crypto::{Ed25519Backend, SigningAlgorithm, SigningBackend};
+use chio_core::crypto::{Ed25519Backend, SigningBackend};
 use chio_core::{PublicKey, Signature};
 
 const SIGNER_UNAVAILABLE: &str = "original receipt signing authority is unavailable";
@@ -81,9 +81,9 @@ fn assert_signer_unavailable(result: Result<(), KernelError>) {
 #[test]
 fn replaced_signer_defers_until_the_original_authority_returns() -> TestResult {
     let (mut kernel, store, _lapsed) = finalizing("replaced-signer-deferral")?;
-    let original_key = kernel.receipt_signing_public_key();
+    let original_key = kernel.receipt_signing_public_key().unwrap();
     replace_receipt_authority(&mut kernel);
-    assert_ne!(kernel.receipt_signing_public_key(), original_key);
+    assert_ne!(kernel.receipt_signing_public_key().unwrap(), original_key);
     assert_eq!(kernel.reconcile_recoverable_admissions()?, 0);
     let status = recovery_status(&store)?.ok_or("replaced signer deferral")?;
     assert!(status.quarantined);
@@ -131,27 +131,22 @@ fn replaced_signer_defers_until_the_original_authority_returns() -> TestResult {
 
 #[derive(Clone, Copy)]
 enum BackendFault {
-    MisreportedAlgorithm,
+    UnreadableKey,
     PanickingKey,
 }
 
-/// Selects a key other than the retained one, then fails identity selection.
+/// Fails identity selection for a signer other than the retained one.
 struct FaultyBackend {
     inner: Ed25519Backend,
     fault: BackendFault,
 }
 
 impl SigningBackend for FaultyBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
         match self.fault {
-            BackendFault::MisreportedAlgorithm => SigningAlgorithm::Hybrid,
-            BackendFault::PanickingKey => self.inner.algorithm(),
-        }
-    }
-
-    fn public_key(&self) -> PublicKey {
-        match self.fault {
-            BackendFault::MisreportedAlgorithm => self.inner.public_key(),
+            BackendFault::UnreadableKey => Err(chio_core::Error::InvalidPublicKey(
+                "signing backend key selection fault".to_string(),
+            )),
             BackendFault::PanickingKey => panic!("signing backend key selection fault"),
         }
     }
@@ -181,10 +176,10 @@ fn backend_fault_stays_global(fault: BackendFault, expected: &str) -> TestResult
 }
 
 #[test]
-fn misreported_backend_algorithm_stays_global_with_a_replaced_signer() -> TestResult {
+fn unreadable_backend_key_stays_global() -> TestResult {
     backend_fault_stays_global(
-        BackendFault::MisreportedAlgorithm,
-        "receipt signing identity changed during selection",
+        BackendFault::UnreadableKey,
+        "invalid public key: signing backend key selection fault",
     )
 }
 
@@ -203,7 +198,7 @@ fn malformed_retained_identity_stays_global_before_signer_comparison() -> TestRe
     let expected =
         crate::tool_outcome::ToolOutcomeError::Binding("raw.receipt_signing_floor").to_string();
     for key in [
-        kernel.receipt_signing_public_key(),
+        kernel.receipt_signing_public_key().unwrap(),
         Keypair::generate().public_key(),
     ] {
         let mut value = serde_json::to_value(&current)?;

@@ -172,7 +172,6 @@ impl SqliteCapabilityAuthority {
         let mut status = Self::read_status_from_connection(&transaction)?;
         status.trusted_public_keys = live_public_keys(&next, now.as_secs())?;
         transaction.commit()?;
-        self.update_cached_public_key(status.public_key.clone());
         Ok(status)
     }
 

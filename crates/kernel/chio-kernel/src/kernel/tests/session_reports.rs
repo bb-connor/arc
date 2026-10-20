@@ -54,7 +54,7 @@ fn report_binds_original_operation_and_exact_content_without_caller_authority() 
         "session_report": {"execution_outcome": "completed"}, "secret": "do not copy",
     }));
     let receipt = kernel.record_session_tool_failure(&context, &operation)?;
-    assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key());
+    assert_eq!(receipt.kernel_key, kernel.receipt_signing_public_key()?);
     assert_eq!(receipt.policy_hash, kernel.config.policy_hash);
     assert!(receipt.verify_signature()?);
     assert!(receipt.action.verify_hash()?);
@@ -225,11 +225,8 @@ fn append_failure_cannot_return_or_locally_mirror_a_report() -> TestResult {
 struct UnavailableSigner(PublicKey);
 
 impl chio_core::SigningBackend for UnavailableSigner {
-    fn algorithm(&self) -> chio_core::SigningAlgorithm {
-        chio_core::SigningAlgorithm::Ed25519
-    }
-    fn public_key(&self) -> PublicKey {
-        self.0.clone()
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Ok(self.0.clone())
     }
     fn sign_bytes(&self, _: &[u8]) -> Result<chio_core::Signature, chio_core::Error> {
         Err(chio_core::Error::InvalidSignature(
@@ -246,6 +243,43 @@ fn failed_signer_cannot_fall_back_to_an_independent_key() -> TestResult {
     assert!(matches!(
         kernel.record_session_tool_failure(&context, &operation),
         Err(KernelError::ReceiptSigningFailed(reason)) if reason.contains("test signer unavailable")
+    ));
+    assert!(kernel.receipt_log().receipts().is_empty());
+    Ok(())
+}
+
+#[test]
+fn receipt_signing_public_key_fails_closed_on_unreadable_identity() -> TestResult {
+    let mut kernel = make_kernel(make_config());
+    let (context, operation) = report_operation(&kernel)?;
+    kernel.signing_authority.backend =
+        Arc::new(crate::authority::tests::UnreadableSelectorBackend(
+            chio_core::crypto::Ed25519Backend::new(chio_core::Keypair::from_seed(&[63; 32])),
+        ));
+    assert!(matches!(
+        kernel.receipt_signing_public_key(),
+        Err(KernelError::ReceiptSigningFailed(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.record_session_tool_failure(&context, &operation),
+        Err(KernelError::ReceiptSigningFailed(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.trusted_threshold_proposal_authorities(),
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.threshold_proposal_signing_key(),
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "invalid public key: selector unavailable"
+    ));
+    assert!(matches!(
+        kernel.ensure_threshold_proposal_signer_ready(),
+        Err(KernelError::GovernedTransactionDenied(reason))
+            if reason == "invalid public key: selector unavailable"
     ));
     assert!(kernel.receipt_log().receipts().is_empty());
     Ok(())

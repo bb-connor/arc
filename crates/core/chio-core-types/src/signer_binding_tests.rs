@@ -3,67 +3,18 @@ use crate::capability::governance::{
     GovernedApprovalDecision, GovernedApprovalToken, GovernedApprovalTokenBody,
     ThresholdApprovalProposal, ThresholdApprovalProposalBody, THRESHOLD_APPROVAL_PROPOSAL_SCHEMA,
 };
-use crate::crypto::{
-    sha256_hex, Ed25519Backend, Keypair, PublicKey, Signature, SigningAlgorithm, SigningBackend,
-    SigningOutcome,
-};
+use crate::crypto::{sha256_hex, Ed25519Backend, Keypair, SigningAlgorithm};
 use crate::error::Result;
 use crate::receipt::lineage::{ChildRequestReceipt, ChildRequestReceiptBody, SignedExportEnvelope};
 use crate::session::{OperationKind, OperationTerminalState, RequestId, SessionId};
 
-/// Infallible accessors still report the retired P-256 identity; the
-/// selector signs with `active`.
-struct RotatedBackend {
-    retired: Ed25519Backend,
-    active: Ed25519Backend,
-}
-
-impl RotatedBackend {
-    fn new() -> Self {
-        Self {
-            retired: Ed25519Backend::new(Keypair::from_seed(&[81; 32])),
-            active: Ed25519Backend::new(Keypair::from_seed(&[82; 32])),
-        }
-    }
-
-    fn active_key(&self) -> PublicKey {
-        self.active.public_key()
-    }
-}
-
-impl SigningBackend for RotatedBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::P256
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.retired.public_key()
-    }
-
-    fn current_public_key(&self) -> Result<PublicKey> {
-        Ok(self.active.public_key())
-    }
-
-    fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
-        self.active.sign_bytes(message)
-    }
-
-    fn sign_bytes_with_identity(&self, message: &[u8]) -> Result<SigningOutcome> {
-        self.active.sign_bytes_with_identity(message)
-    }
-
-    fn sign_bytes_for_identity(&self, key: &PublicKey, message: &[u8]) -> Result<SigningOutcome> {
-        self.active.sign_bytes_for_identity(key, message)
-    }
-}
-
 #[test]
 fn governed_approval_token_stamps_the_signing_identity() -> Result<()> {
-    let backend = RotatedBackend::new();
+    let backend = Ed25519Backend::new(Keypair::from_seed(&[82; 32]));
     let token = GovernedApprovalToken::sign_with_backend(
         GovernedApprovalTokenBody {
             id: "approval-rotated".to_string(),
-            approver: backend.active_key(),
+            approver: backend.keypair().public_key(),
             subject: Keypair::from_seed(&[83; 32]).public_key(),
             governed_intent_hash: "a".repeat(64),
             request_id: "req-rotated".to_string(),
@@ -74,7 +25,7 @@ fn governed_approval_token_stamps_the_signing_identity() -> Result<()> {
         },
         &backend,
     )?;
-    assert_eq!(token.approver, backend.active_key());
+    assert_eq!(token.approver, backend.keypair().public_key());
     assert_eq!(token.algorithm, Some(SigningAlgorithm::Ed25519));
     assert_eq!(token.signature.algorithm(), SigningAlgorithm::Ed25519);
     assert!(token.verify_signature()?);
@@ -83,7 +34,7 @@ fn governed_approval_token_stamps_the_signing_identity() -> Result<()> {
 
 #[test]
 fn threshold_approval_proposal_stamps_the_signing_identity() -> Result<()> {
-    let backend = RotatedBackend::new();
+    let backend = Ed25519Backend::new(Keypair::from_seed(&[82; 32]));
     let proposal = ThresholdApprovalProposal::sign_with_backend(
         ThresholdApprovalProposalBody {
             schema: THRESHOLD_APPROVAL_PROPOSAL_SCHEMA.to_string(),
@@ -97,7 +48,7 @@ fn threshold_approval_proposal_stamps_the_signing_identity() -> Result<()> {
             eligible_set_digest: "d".repeat(64),
             proposal_created_at: 100,
             proposal_deadline: 200,
-            policy_authority: backend.active_key(),
+            policy_authority: backend.keypair().public_key(),
         },
         &backend,
     )?;
@@ -109,7 +60,7 @@ fn threshold_approval_proposal_stamps_the_signing_identity() -> Result<()> {
 
 #[test]
 fn child_request_receipt_stamps_the_signing_identity() -> Result<()> {
-    let backend = RotatedBackend::new();
+    let backend = Ed25519Backend::new(Keypair::from_seed(&[82; 32]));
     let receipt = ChildRequestReceipt::sign_with_backend(
         ChildRequestReceiptBody {
             id: "child-rotated".to_string(),
@@ -122,7 +73,7 @@ fn child_request_receipt_stamps_the_signing_identity() -> Result<()> {
             outcome_hash: sha256_hex(b"rotated"),
             policy_hash: "c".repeat(64),
             metadata: None,
-            kernel_key: backend.active_key(),
+            kernel_key: backend.keypair().public_key(),
         },
         &backend,
     )?;
@@ -134,9 +85,9 @@ fn child_request_receipt_stamps_the_signing_identity() -> Result<()> {
 
 #[test]
 fn signed_export_envelope_stamps_the_signing_identity() -> Result<()> {
-    let backend = RotatedBackend::new();
+    let backend = Ed25519Backend::new(Keypair::from_seed(&[82; 32]));
     let envelope = SignedExportEnvelope::sign_with_backend("export-rotated".to_string(), &backend)?;
-    assert_eq!(envelope.signer_key, backend.active_key());
+    assert_eq!(envelope.signer_key, backend.keypair().public_key());
     assert!(envelope.verify_signature()?);
     Ok(())
 }

@@ -236,7 +236,9 @@ pub(super) fn open_rollback_anchor(
     database_identity: &QualifiedDatabaseIdentity,
     store_identity: &dyn SigningBackend,
 ) -> Result<Arc<RollbackGenerationAnchor>, FindingPoolLedgerError> {
-    let public_key = store_identity.public_key();
+    let public_key = store_identity
+        .public_key()
+        .map_err(|_| FindingPoolLedgerError::InvalidLedgerStoreIdentity)?;
     let public_key_bytes = chio_core::canonical::canonical_json_bytes(&public_key)
         .map_err(|_| FindingPoolLedgerError::InvalidLedgerStoreIdentity)?;
     let mut scope = Vec::new();
@@ -511,7 +513,9 @@ fn derive_ledger_store_binding(
     store_identity: &dyn SigningBackend,
     anchor_instance_id: &str,
 ) -> Result<String, FindingPoolLedgerError> {
-    let public_key = store_identity.public_key();
+    let public_key = store_identity
+        .public_key()
+        .map_err(|_| FindingPoolLedgerError::InvalidLedgerStoreIdentity)?;
     if public_key.algorithm() == SigningAlgorithm::Ed25519 && public_key.is_weak_ed25519() {
         return Err(FindingPoolLedgerError::InvalidLedgerStoreIdentity);
     }

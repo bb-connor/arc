@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 
 use chio_core_types::canonical::UntrustedJsonText;
 use chio_core_types::capability::{attenuation::ScopeHash, features::CapabilityNegotiation};
-use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey, SigningBackend};
+use chio_core_types::crypto::{Ed25519Backend, Keypair, PublicKey};
 use chio_core_types::receipt::{body::chio_receipt_id, body::ChioReceipt, decision::Decision};
 use chio_kernel_core::{
     evaluate_with_full_floor_and_root as core_evaluate_with_full_floor,
@@ -169,7 +169,7 @@ pub fn sign_receipt_pure(
     let backend = Ed25519Backend::new(keypair);
 
     let mut body = input.body;
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.keypair().public_key();
 
     core_sign_receipt(body, &backend, &canonical_content)
         .map_err(|error| BindingError::new("receipt_signing_failed", format_signing(&error)))
@@ -201,7 +201,7 @@ pub fn sign_receipt_relaying_trusted_body_pure(
     let backend = Ed25519Backend::new(keypair);
 
     let mut body = input.body;
-    body.kernel_key = backend.public_key();
+    body.kernel_key = backend.keypair().public_key();
 
     core_relay_trusted_body(body, &backend)
         .map_err(|error| BindingError::new("receipt_signing_failed", format_signing(&error)))

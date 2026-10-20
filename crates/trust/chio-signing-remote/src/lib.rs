@@ -176,12 +176,8 @@ impl HttpSigningBackend {
 }
 
 impl SigningBackend for HttpSigningBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Ed25519
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.key.public_key.clone()
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Ok(self.key.public_key.clone())
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
@@ -359,12 +355,8 @@ impl VaultTransitSigningBackend {
 }
 
 impl SigningBackend for VaultTransitSigningBackend {
-    fn algorithm(&self) -> SigningAlgorithm {
-        SigningAlgorithm::Ed25519
-    }
-
-    fn public_key(&self) -> PublicKey {
-        self.key.public_key.clone()
+    fn public_key(&self) -> chio_core::error::Result<PublicKey> {
+        Ok(self.key.public_key.clone())
     }
 
     fn sign_bytes(&self, message: &[u8]) -> Result<Signature> {
@@ -563,7 +555,10 @@ mod tests {
         .test_unwrap();
 
         let signature = backend.sign_bytes(message).test_unwrap();
-        assert!(backend.public_key().verify_strict(message, &signature));
+        assert!(backend
+            .public_key()
+            .test_unwrap()
+            .verify_strict(message, &signature));
         let request = request_rx.recv().test_unwrap();
         assert!(request.starts_with("POST /v1/signing-keys/finding-listing/sign HTTP/1.1"));
         assert!(request.contains("Authorization: Bearer remote-secret"));
@@ -674,7 +669,10 @@ mod tests {
         .test_unwrap();
 
         let signature = backend.sign_bytes(message).test_unwrap();
-        assert!(backend.public_key().verify_strict(message, &signature));
+        assert!(backend
+            .public_key()
+            .test_unwrap()
+            .verify_strict(message, &signature));
         let request = request_rx.recv().test_unwrap();
         assert!(request.starts_with("POST /v1/transit/sign/finding-status HTTP/1.1"));
         assert!(request.contains("X-Vault-Token: vault-token"));

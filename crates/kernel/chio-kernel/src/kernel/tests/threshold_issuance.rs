@@ -157,9 +157,12 @@ impl Fixture {
 fn classical_boot_preserves_canonical_proposal() -> TestResult {
     let mut fixture = Fixture::new()?;
     let backend = fixture.configure(KernelCryptoFloor::AllowClassical)?;
-    assert_eq!(backend.algorithm(), SigningAlgorithm::Ed25519);
+    assert_eq!(
+        backend.public_key().unwrap().algorithm(),
+        SigningAlgorithm::Ed25519
+    );
     let proposal = fixture.pending()?;
-    assert_eq!(proposal.body.policy_authority, backend.public_key());
+    assert_eq!(proposal.body.policy_authority, backend.public_key()?);
     let legacy =
         ThresholdApprovalProposal::sign(proposal.body.clone(), &fixture.kernel.config.keypair)?;
     assert_eq!(
@@ -347,7 +350,7 @@ fn installed_hybrid_backend_signs_cumulative_proposal() -> TestResult {
     let backend = fixture.configure(KernelCryptoFloor::AllowHybrid)?;
     let proposal = fixture.pending()?;
     assert_eq!(proposal.algorithm, Some(SigningAlgorithm::Hybrid));
-    assert_eq!(proposal.body.policy_authority, backend.public_key());
+    assert_eq!(proposal.body.policy_authority, backend.public_key()?);
     assert_eq!(proposal.signature.algorithm(), SigningAlgorithm::Hybrid);
     Ok(())
 }
@@ -358,16 +361,16 @@ fn pq_required_proposal_uses_the_boot_verified_authority() -> TestResult {
     let mut fixture = Fixture::new()?;
     let backend = fixture.configure(KernelCryptoFloor::PqRequired)?;
     let mut capability = fixture.request.capability.body();
-    capability.issuer = backend.public_key();
+    capability.issuer = backend.public_key()?;
     fixture
         .kernel
         .config
         .ca_public_keys
-        .push(backend.public_key());
+        .push(backend.public_key()?);
     fixture.request.capability = CapabilityToken::sign_with_backend(capability, backend.as_ref())?;
     let proposal = fixture.pending()?;
     assert_eq!(proposal.algorithm, Some(SigningAlgorithm::Hybrid));
-    assert_eq!(proposal.body.policy_authority, backend.public_key());
+    assert_eq!(proposal.body.policy_authority, backend.public_key()?);
     Ok(())
 }
 
@@ -542,7 +545,7 @@ fn returned_backend_drop_keeps_installed_authority() -> TestResult {
     let backend = fixture.configure(KernelCryptoFloor::AllowHybrid)?;
     let public_key = backend.public_key();
     drop(backend);
-    assert_eq!(fixture.pending()?.body.policy_authority, public_key);
+    assert_eq!(fixture.pending()?.body.policy_authority, public_key?);
     Ok(())
 }
 
@@ -574,7 +577,7 @@ fn failed_boot_reconfiguration_preserves_previous_authority_and_floor() -> TestR
     );
     assert_eq!(
         fixture.pending()?.body.policy_authority,
-        backend.public_key()
+        backend.public_key()?
     );
     Ok(())
 }
@@ -607,7 +610,7 @@ fn missing_seed_preserves_previous_authority_and_floor() -> TestResult {
     );
     assert_eq!(
         fixture.pending()?.body.policy_authority,
-        backend.public_key()
+        backend.public_key()?
     );
     Ok(())
 }
@@ -771,12 +774,12 @@ fn pq_capability_without_boot_signer_cannot_publish_classical_proposal() -> Test
         chio_core::MlDsa65Backend::from_seed(&[93; 32]),
     )?;
     let mut capability = fixture.request.capability.body();
-    capability.issuer = issuer.public_key();
+    capability.issuer = issuer.public_key()?;
     fixture
         .kernel
         .config
         .ca_public_keys
-        .push(issuer.public_key());
+        .push(issuer.public_key()?);
     fixture.request.capability = CapabilityToken::sign_with_backend(capability, &issuer)?;
     fixture
         .kernel

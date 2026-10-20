@@ -207,13 +207,9 @@ impl ActiveResponseAuthorityProtocolServer {
         config: &ActiveResponseAuthorityProtocolServerConfig,
         authority_signer: &Arc<dyn SigningBackend>,
     ) -> Result<PublicKey, String> {
-        let authority_identity = authority_signer.public_key();
-        if authority_identity.algorithm() != authority_signer.algorithm() {
-            return Err(
-                "active-response authority signer algorithm does not match its public key"
-                    .to_string(),
-            );
-        }
+        let authority_identity = authority_signer
+            .public_key()
+            .map_err(|error| error.to_string())?;
         if authority_identity == config.trusted_client {
             return Err(
                 "active-response authority server and broker client signing roles must use distinct keys"
@@ -272,9 +268,11 @@ impl ActiveResponseAuthorityProtocolServer {
         let result = self.dispatch(&request.body.operation)?;
         validate_operation_result(&request.body.operation, &result)
             .map_err(ServeFailure::Internal)?;
-        if self.authority_signer.public_key() != self.authority_identity
-            || self.authority_signer.algorithm() != self.authority_identity.algorithm()
-        {
+        let authority_key = self
+            .authority_signer
+            .public_key()
+            .map_err(|_| ServeFailure::Internal(PortError::unavailable()))?;
+        if authority_key != self.authority_identity {
             return Err(ServeFailure::Internal(PortError::integrity_failure()));
         }
         let body = ActiveResponseAuthorityResponseBody {

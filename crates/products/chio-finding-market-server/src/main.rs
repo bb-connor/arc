@@ -390,7 +390,13 @@ async fn write_replication_check(
         )
         .map_err(|error| ServerError::Replication(error.to_string()))?;
         match replicator
-            .append_replication_check(tenant_id, &signer.public_key(), &check)
+            .append_replication_check(
+                tenant_id,
+                &signer
+                    .public_key()
+                    .map_err(|error| ServerError::Replication(error.to_string()))?,
+                &check,
+            )
             .await
         {
             Ok(_) => return Ok(()),
