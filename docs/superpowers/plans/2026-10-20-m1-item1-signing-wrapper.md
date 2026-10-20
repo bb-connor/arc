@@ -136,6 +136,7 @@ grep -rl '"algorithm"' spec/schemas
 git grep -h -o -E "SignedExportEnvelope<[A-Za-z0-9_]+>" -- crates ':!**/tests/**' | sort -u
 ```
   Expected at `59393b862c`: 143 canonical-signing, 83 `sign_bytes*`, about 102 raw `Keypair::sign`, 117 canonical-verify and about 118 raw-verify non-test call sites; 74 `algorithm: SigningAlgorithm` fields; 52 schema files with an `algorithm` property; 165 distinct `SignedExportEnvelope` payload types. Record each row of the inventory tables with its current `file:line`, and record every exempt caller in the Task 8 table that signs through a remote or rotating backend (input to the Task 7 route table).
+  The census includes the two root-authority verification sites that #1706 adds before this PR: `RootPolicy` load in `crates/core/chio-core-types/src/root_authority/root_policy.rs` (`load`) and `IdpKeySnapshot::verify_signature` in `root_authority/idp_key_snapshot.rs`. Both move to `verify_wrapped` with `CHIO_ROOT_POLICY_SCHEMA` and `CHIO_IDP_KEY_SNAPSHOT_SCHEMA`, against the pinned key the caller passes.
 - [ ] **Step 3: D17 check.** Post the "D17 Coordination" list below to `sync.md` as `<UTC> <lane>: D17 m1i1 byte changes: <list>; holding PR open until lead and Root-2 ACK`. Record the merge SHA of every predecessor in the merge order; the PR is based on the commit that contains all of them.
 
 ---
@@ -503,7 +504,7 @@ Fixtures whose bytes change: every set in Task 11. Shared with in-flight work:
 - `fixtures/proof-room/**` (3027 signed files) and receipt fixtures generally: also touched by the fwdcompat RECEIPT-UNKNOWN-FIELDS change (receipt `deny_unknown_fields`, commerce schema tag off receipt bytes, about 389 fixtures). fwdcompat lands first, including its receipt fixture regeneration and receipt `deny_unknown_fields`; this PR regenerates once on top of it.
 - `spec/vectors/passport-revocation/v1/*`, `spec/schemas/registry.json`, `spec/schemas/MANIFEST.sha256`, `spec/wire-schemas.lock`: also changed by #1607. #1607 lands first.
 - `tests/bindings/fixtures/dpop-authority-v1.json`: owned by the DPoP lane; #1489 is merged, so no conflict, bytes only.
-- M1 item 3 (`anchorroot`) adds `root_anchor` to the capability signing body and merges after this PR. It rebases on this PR and regenerates capability fixtures through `cs cargo xtask gen signed-fixtures`.
+- M1 item 3 lands in two parts. #1706 adds the anchored-root types, the root-authority artifacts and a crate-private depth-0 verifier with no signed-byte change, and merges before this PR. The `root_anchor` member in the capability signing body merges after this PR. It rebases on this PR and regenerates capability fixtures through `cs cargo xtask gen signed-fixtures`.
 
 Merge order (precondition for this PR): #1674, #1601, #1607 and fwdcompat receipts; the K-stack in Root-2's order, T7 #1675, C6 #1682, native-ledger #1678, stop-error #1701, D5 #1269, then KERN-TRACE-LOCK-FSYNC; then this PR. Anchored-root capability changes (M1 item 3) and M1 item 2 follow this PR. The census and every signed fixture are refreshed at the integrated base that contains all predecessors.
 
