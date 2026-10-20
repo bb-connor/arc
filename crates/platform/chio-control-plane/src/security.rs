@@ -341,6 +341,10 @@ mod tests {
             "configured-allow"
         }
 
+        fn evidence_declaration(&self) -> chio_kernel::GuardEvidenceDeclaration {
+            chio_kernel::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow())
         }

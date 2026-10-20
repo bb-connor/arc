@@ -74,6 +74,10 @@ impl Guard for LegacyDefaultGuard {
         "legacy-default-guard"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
         Ok(GuardDecision::allow())
     }
@@ -84,6 +88,10 @@ struct OptInFailingGuard;
 impl Guard for OptInFailingGuard {
     fn name(&self) -> &str {
         "opt-in-failing-guard"
+    }
+
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
@@ -104,6 +112,10 @@ impl Guard for OptInFailingGuard {
 impl Guard for ImmediateMutationGuard {
     fn name(&self) -> &str {
         "immediate-mutation-guard"
+    }
+
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

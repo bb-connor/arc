@@ -4,9 +4,10 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::{CapabilityToken, CapabilityTokenBody};
 use chio_core::Keypair;
 use chio_kernel::{
-    ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, MemoryBudgetConfig,
-    NestedFlowBridge, SecurityInvocationContext, SecurityInvocationContextV1, ToolCallRequest,
-    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    ChioKernel, Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelConfig,
+    KernelError, MemoryBudgetConfig, NestedFlowBridge, SecurityInvocationContext,
+    SecurityInvocationContextV1, ToolCallRequest, ToolServerConnection, Verdict,
+    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_security_kernel::{Clock, MissingContextPolicy, SessionThrottleGuard};
@@ -250,6 +251,10 @@ struct SharedGuard {
 impl Guard for SharedGuard {
     fn name(&self) -> &str {
         self.guard.name()
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

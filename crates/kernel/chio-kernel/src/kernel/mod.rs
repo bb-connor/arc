@@ -5,7 +5,7 @@ pub use active_response_simulation::{
 use std::sync::Arc;
 
 use chio_appraisal::VerifiedRuntimeAttestationRecord;
-use chio_core::receipt::metadata::GuardEvidence;
+use chio_core::receipt::metadata::{GuardEvidence, GuardEvidenceDeclaration};
 use dashmap::DashMap;
 
 use crate::budget_store::BudgetCommitMetadata;
@@ -915,6 +915,10 @@ impl PartialEq<GuardDecision> for Verdict {
 pub trait Guard: Send + Sync {
     /// Human-readable guard name (e.g., "forbidden-path").
     fn name(&self) -> &str;
+
+    /// Whether the `details` of this guard's evidence may appear in a
+    /// committed receipt.
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration;
 
     /// Evaluate the guard against a tool call request.
     ///

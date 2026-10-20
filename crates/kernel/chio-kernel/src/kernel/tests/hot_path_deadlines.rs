@@ -17,6 +17,9 @@ impl Guard for SleepingGuard {
     fn name(&self) -> &str {
         &self.label
     }
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         // Well past any test budget, but bounded so the detached blocking thread
         // does not stall tokio runtime teardown after the deadline has fired.
@@ -38,6 +41,9 @@ struct RecordingGuard {
 impl Guard for RecordingGuard {
     fn name(&self) -> &str {
         &self.label
+    }
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
     }
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         self.ran.fetch_add(1, Ordering::SeqCst);
@@ -682,6 +688,9 @@ struct ThreadRecordingGuard {
 impl Guard for ThreadRecordingGuard {
     fn name(&self) -> &str {
         &self.label
+    }
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
     }
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         *self.thread.lock().expect("record guard thread") = Some(std::thread::current().id());

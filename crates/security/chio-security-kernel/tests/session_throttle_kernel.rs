@@ -6,10 +6,10 @@ use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::session::{OperationContext, SessionOperation, ToolCallOperation};
 use chio_core::{canonical_json_bytes, sha256, Keypair};
 use chio_kernel::{
-    ChioKernel, Guard, GuardContext, GuardDecision, KernelConfig, KernelError, MemoryBudgetConfig,
-    NestedFlowBridge, SecurityInvocationContext, SecurityInvocationContextAuthority,
-    SecurityInvocationContextV1, ToolCallRequest, ToolServerConnection, Verdict,
-    DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
+    ChioKernel, Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelConfig,
+    KernelError, MemoryBudgetConfig, NestedFlowBridge, SecurityInvocationContext,
+    SecurityInvocationContextAuthority, SecurityInvocationContextV1, ToolCallRequest,
+    ToolServerConnection, Verdict, DEFAULT_CHECKPOINT_BATCH_SIZE, DEFAULT_MAX_STREAM_DURATION_SECS,
     DEFAULT_MAX_STREAM_TOTAL_BYTES,
 };
 use chio_manifest::{
@@ -69,6 +69,10 @@ struct DenyFirstMatchingGrant;
 impl Guard for DenyFirstMatchingGrant {
     fn name(&self) -> &str {
         "deny-first-matching-grant"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

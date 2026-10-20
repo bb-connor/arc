@@ -29,7 +29,9 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, Verdict,
+};
 
 /// Default allowlist of input types.
 pub fn default_allowed_input_types() -> Vec<String> {
@@ -155,6 +157,10 @@ impl Default for InputInjectionCapabilityGuard {
 impl Guard for InputInjectionCapabilityGuard {
     fn name(&self) -> &str {
         "input-injection-capability"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

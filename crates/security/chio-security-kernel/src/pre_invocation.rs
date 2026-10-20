@@ -4,7 +4,8 @@ use crate::MissingContextPolicy;
 use chio_core::receipt::metadata::GuardEvidence;
 use chio_flow::{evaluate_pre_invocation, FlowAdmission, FlowDenial, ResolvedFlowRequest};
 use chio_kernel::{
-    Guard, GuardContext, GuardDecision, KernelError, SecurityInvocationContextV1, ToolCallRequest,
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError,
+    SecurityInvocationContextV1, ToolCallRequest,
 };
 
 pub struct FlowPreInvocationInput<'a> {
@@ -88,6 +89,10 @@ impl FlowPreInvocationGuard {
 impl Guard for FlowPreInvocationGuard {
     fn name(&self) -> &str {
         "chio-flow-pre-invocation"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

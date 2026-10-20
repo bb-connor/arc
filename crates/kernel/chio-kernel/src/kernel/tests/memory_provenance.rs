@@ -277,6 +277,10 @@ impl Guard for RequiredFindingStatusFeedGuard {
         "required-finding-status-feed"
     }
 
+    fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+        crate::GuardEvidenceDeclaration::SAFE
+    }
+
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
         Ok(GuardDecision::allow())
     }

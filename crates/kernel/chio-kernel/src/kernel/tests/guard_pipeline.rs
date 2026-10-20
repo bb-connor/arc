@@ -9,6 +9,9 @@ fn guard_denies_request() {
         fn name(&self) -> &str {
             "deny-all"
         }
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::deny(Vec::new()))
         }
@@ -35,6 +38,9 @@ fn allowing_guard_evidence_is_signed_into_success_receipt() {
     impl Guard for EvidenceGuard {
         fn name(&self) -> &str {
             "evidence-allow"
+        }
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
         }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow_with_evidence(vec![GuardEvidence {
@@ -101,6 +107,10 @@ async fn async_allowing_guard_evidence_is_signed_into_success_receipt() {
             "async-evidence-allow"
         }
 
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
+
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow_with_evidence(vec![GuardEvidence {
                 guard_name: "async-evidence-allow".to_string(),
@@ -137,6 +147,10 @@ fn denying_guard_evidence_is_signed_into_deny_receipt() {
     impl Guard for EvidenceDenyGuard {
         fn name(&self) -> &str {
             "evidence-deny"
+        }
+
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
         }
 
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
@@ -357,6 +371,9 @@ fn unlimited_grant_guard_denial_does_not_reverse_budget_store() {
         fn name(&self) -> &str {
             "deny-all"
         }
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::deny(Vec::new()))
         }
@@ -390,6 +407,9 @@ fn guard_error_treated_as_deny() {
         fn name(&self) -> &str {
             "broken"
         }
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Err(KernelError::Internal("guard crashed".to_string()))
         }
@@ -418,6 +438,9 @@ fn kernel_guard_registration() {
         fn name(&self) -> &str {
             "test-guard"
         }
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
+        }
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
             Ok(GuardDecision::allow())
         }
@@ -440,6 +463,10 @@ fn matched_grant_index_populated_in_guard_context() {
     impl Guard for IndexCapturingGuard {
         fn name(&self) -> &str {
             "index-capture"
+        }
+
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
         }
 
         fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {
@@ -534,6 +561,10 @@ fn velocity_guard_denial_produces_signed_deny_receipt_no_panic() {
     impl Guard for CountingRateLimitGuard {
         fn name(&self) -> &str {
             "counting-rate-limit"
+        }
+
+        fn evidence_declaration(&self) -> crate::GuardEvidenceDeclaration {
+            crate::GuardEvidenceDeclaration::SAFE
         }
 
         fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

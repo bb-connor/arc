@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 use chio_security_types::ports::{
     DestinationId, EgressDestinationQuery, EgressRestrictionDecision, EgressRestrictionSessionKey,
     EgressRestrictionStore,
@@ -49,6 +49,10 @@ impl EgressRestrictionGuard {
 impl Guard for EgressRestrictionGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, guard_context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {

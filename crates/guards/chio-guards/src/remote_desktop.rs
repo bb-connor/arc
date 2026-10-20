@@ -30,7 +30,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, Verdict};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError, Verdict,
+};
 
 /// Configuration for [`RemoteDesktopSideChannelGuard`].
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -147,6 +149,10 @@ impl Default for RemoteDesktopSideChannelGuard {
 impl Guard for RemoteDesktopSideChannelGuard {
     fn name(&self) -> &str {
         "remote-desktop-side-channel"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

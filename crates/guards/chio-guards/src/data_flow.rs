@@ -12,7 +12,7 @@ use std::sync::Arc;
 use chio_http_session::SessionJournal;
 #[cfg(test)]
 use chio_kernel::Verdict;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError};
+use chio_kernel::{Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError};
 
 // ---------------------------------------------------------------------------
 // DataFlowConfig
@@ -52,6 +52,10 @@ impl DataFlowGuard {
 impl Guard for DataFlowGuard {
     fn name(&self) -> &str {
         "data-flow"
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::SAFE
     }
 
     fn evaluate(&self, _ctx: &GuardContext) -> Result<GuardDecision, KernelError> {

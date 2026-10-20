@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use chio_core::receipt::metadata::GuardEvidence;
-use chio_kernel::{Guard, GuardContext, GuardDecision, KernelError, SecurityInvocationContextV1};
+use chio_kernel::{
+    Guard, GuardContext, GuardDecision, GuardEvidenceDeclaration, KernelError,
+    SecurityInvocationContextV1,
+};
 pub use chio_security_types::ports::ContainmentTargetKind;
 use chio_security_types::ports::{
     containment_target as derive_containment_target, ContainmentOverlayStore, PortError,
@@ -72,6 +75,10 @@ impl ContainmentGuard {
 impl Guard for ContainmentGuard {
     fn name(&self) -> &str {
         GUARD_NAME
+    }
+
+    fn evidence_declaration(&self) -> GuardEvidenceDeclaration {
+        GuardEvidenceDeclaration::UNSAFE
     }
 
     fn evaluate(&self, guard_context: &GuardContext<'_>) -> Result<GuardDecision, KernelError> {
