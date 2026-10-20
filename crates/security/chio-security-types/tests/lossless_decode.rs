@@ -6,7 +6,7 @@ use chio_security_types::knowledge::ArtifactSinkV1;
 use chio_security_types::ports::{
     EffectExecutionStatus, IssuanceFreezeOperationStatus, ResponseDispatchApproval,
 };
-use chio_security_types::strict_serde::DROPPED_INPUT;
+use chio_security_types::strict_serde::{DROPPED_INPUT, DUPLICATE_KEY};
 use chio_security_types::{
     DetectorGroupBindingEvidence, DetectorWatermarkEvidence, ResponseApprovalRequirement,
     ResponseRollbackOutcome,
@@ -52,4 +52,74 @@ fn every_security_lossless_enum_refuses_a_padded_unit_variant() {
         json!({"approval_type": "automatic"})
     );
     assert_unit_refuses_padding!(ResponseRollbackOutcome, json!({"outcome": "requested"}));
+}
+
+// Both raw paths read the input before the derived decoder sees it, so a
+// repeated key refuses instead of keeping the last value.
+macro_rules! assert_raw_duplicate_refused {
+    ($ty:ty, $text:expr, $key:expr) => {{
+        let expected = format!("{}: {:?}", DUPLICATE_KEY, $key);
+        let direct = <$ty>::deserialize(&mut serde_json::Deserializer::from_str($text))
+            .err()
+            .map(|error| error.to_string());
+        assert!(
+            direct
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{direct:?}"
+        );
+        let decoded = serde_json::from_str::<$ty>($text)
+            .err()
+            .map(|error| error.to_string());
+        assert!(
+            decoded
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{decoded:?}"
+        );
+    }};
+}
+
+#[test]
+fn every_security_lossless_enum_refuses_a_raw_duplicate_key() {
+    assert_raw_duplicate_refused!(
+        DetectorWatermarkEvidence,
+        r#"{"kind":"unknown","kind":"unknown"}"#,
+        "kind"
+    );
+    assert_raw_duplicate_refused!(
+        DetectorGroupBindingEvidence,
+        r#"{"kind":"unresolved","kind":"unresolved"}"#,
+        "kind"
+    );
+    assert_raw_duplicate_refused!(
+        ArtifactSinkV1,
+        r#"{"kind":"agent","kind":"archive"}"#,
+        "kind"
+    );
+    assert_raw_duplicate_refused!(
+        ResponseDispatchApproval,
+        r#"{"approval_mode":"automatic","approval_mode":"automatic"}"#,
+        "approval_mode"
+    );
+    assert_raw_duplicate_refused!(
+        EffectExecutionStatus,
+        r#"{"status":"not_executed","status":"unknown"}"#,
+        "status"
+    );
+    assert_raw_duplicate_refused!(
+        IssuanceFreezeOperationStatus,
+        r#"{"status":"not_executed","status":"not_executed"}"#,
+        "status"
+    );
+    assert_raw_duplicate_refused!(
+        ResponseApprovalRequirement,
+        r#"{"approval_type":"automatic","approval_type":"automatic"}"#,
+        "approval_type"
+    );
+    assert_raw_duplicate_refused!(
+        ResponseRollbackOutcome,
+        r#"{"outcome":"requested","outcome":"requested"}"#,
+        "outcome"
+    );
 }
