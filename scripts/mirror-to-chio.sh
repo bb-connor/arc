@@ -5,15 +5,20 @@
 # arc is upstream; chio is a derived, public downstream. Each sync writes one
 # commit on chio whose tree is arc main's tree minus every path matched by
 # scripts/mirror-exclude.txt (read from the arc commit being mirrored), whose
-# parent is the previous chio main, and whose subject names the arc commit:
+# parent is the previous chio main, and whose message reads as ordinary
+# project history: the mirrored commit's own subject, a count of the changes
+# it brings in, and a trailer recording the upstream commit:
 #
-#   mirror: bb-connor/arc@<sha>
+#   docs: settle the README program on outcomes under cross-examination
+#
+#   Includes 2 changes.
+#
+#   Upstream-Commit: <sha>
 #
 # Nothing is ever committed directly to chio. The script refuses to push unless
-# chio/main is either a mirror commit for an arc commit that is an ancestor of
-# origin/main, or (before the first filtered sync) itself an ancestor of
-# origin/main. Anything else means chio has diverged and a push would bury
-# commits that exist only there.
+# chio/main carries an Upstream-Commit trailer naming an arc commit that is an
+# ancestor of origin/main. Anything else means chio has diverged and a push
+# would bury commits that exist only there.
 #
 # Git LFS needs a separate transfer. `git lfs push <remote> <ref>` only computes
 # objects for commits the remote lacks, so it exits 0 having transferred nothing
@@ -117,31 +122,25 @@ else
   SRC_LABEL="$UPSTREAM_REMOTE/$UPSTREAM_REF"
 fi
 DST="$(git rev-parse --verify --quiet "$MIRROR_REMOTE/main" || true)"
-SUBJECT="mirror: $UPSTREAM_SLUG@$SRC"
+# arc PR numbers would link to unrelated issues on the mirror, so drop them
+SUBJECT="$(git log -1 --format=%s "$SRC" | sed -E 's/ \(#[0-9]+\)$//')"
+TRAILER_KEY="Upstream-Commit"
 
 printf '    upstream %s = %s\n' "$SRC_LABEL" "$SRC"
 printf '    mirror   %s/main = %s\n' "$MIRROR_REMOTE" "${DST:-<absent>}"
 
-# A chio/main that is a mirror commit must record an arc commit that origin/main
-# still contains; a chio/main that predates filtering must itself be an arc
-# ancestor. Either way, arc has every commit chio's tip depends on.
+# chio/main must record, in its Upstream-Commit trailer, an arc commit that
+# origin/main still contains, so arc has every commit chio's tip depends on.
+MIRRORED=""
 if [ -n "$DST" ]; then
-  DST_SUBJECT="$(git log -1 --format=%s "$DST")"
-  case "$DST_SUBJECT" in
-    "mirror: $UPSTREAM_SLUG@"*)
-      MIRRORED="${DST_SUBJECT#"mirror: $UPSTREAM_SLUG@"}"
-      git merge-base --is-ancestor "$MIRRORED" "$SRC" 2>/dev/null \
-        || die "$MIRROR_REMOTE/main mirrors $MIRRORED, which is not an ancestor of
+  MIRRORED="$(git log -1 --format="%(trailers:key=$TRAILER_KEY,valueonly,separator=)" "$DST")"
+  [ -n "$MIRRORED" ] \
+    || die "$MIRROR_REMOTE/main ($DST) has no $TRAILER_KEY trailer. Something was
+committed directly to the mirror. Resolve by hand; this script will not bury it."
+  git merge-base --is-ancestor "$MIRRORED" "$SRC" 2>/dev/null \
+    || die "$MIRROR_REMOTE/main mirrors $MIRRORED, which is not an ancestor of
 $SRC_LABEL ($SRC). Resolve by hand; this script will not
 move the mirror backwards or across a rewritten upstream."
-      ;;
-    *)
-      git merge-base --is-ancestor "$DST" "$SRC" \
-        || die "$MIRROR_REMOTE/main ($DST) is neither a mirror commit nor an ancestor of
-$SRC_LABEL ($SRC). Something was committed directly to the mirror.
-Resolve by hand; this script will not bury it."
-      ;;
-  esac
 fi
 
 WORK="$(mktemp -d)"
@@ -200,8 +199,14 @@ if [ -n "$DST" ] && [ "$(git rev-parse "$DST^{tree}")" = "$TREE" ]; then
   printf '==> mirror already current\n'
   NEW="$DST"
 else
+  if [ -n "$MIRRORED" ]; then
+    CHANGES="$(git rev-list --count "$MIRRORED..$SRC")"
+  else
+    CHANGES="$(git rev-list --count "$SRC")"
+  fi
+  [ "$CHANGES" -eq 1 ] && NOUN="change" || NOUN="changes"
   NEW="$(git commit-tree "$TREE" ${DST:+-p "$DST"} -m "$SUBJECT" \
-    -m "Tree of $UPSTREAM_SLUG@$SRC with $EXCLUDED path(s) removed by $EXCLUDE_PATH.")"
+    -m "Includes $CHANGES $NOUN." -m "$TRAILER_KEY: $SRC")"
   printf '==> mirror commit %s\n' "$NEW"
   printf '    %s\n' "$SUBJECT"
   if [ "$DRY_RUN" -eq 0 ]; then
