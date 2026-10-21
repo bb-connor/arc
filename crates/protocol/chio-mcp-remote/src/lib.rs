@@ -6,6 +6,8 @@ use rate_limit::{rate_limit_mcp_request, McpRateLimiter};
 mod clock;
 use chio_security_types::clock::{AuthorityDeadline, Clock, ClockError, UnixMillis};
 pub use clock::RemoteClock;
+#[path = "remote_mcp/idp_keys/mod.rs"]
+pub mod idp_keys;
 mod oauth_error;
 pub use oauth_error::{OAuthError, OAuthRejection};
 #[path = "remote_mcp/enterprise_provider_registry.rs"]
@@ -16,6 +18,8 @@ mod sender_constraint;
 use enterprise_provider_registry::{
     EnterpriseProviderRegistryFile, EnterpriseProviderRegistryRefusal,
 };
+#[path = "remote_mcp/root_exchange/mod.rs"]
+pub mod root_exchange;
 mod transport_identity;
 use input::{
     decode as decode_json, BoundedJson, SenderConstraintError, MAX_AUTH_JSON_BYTES,
