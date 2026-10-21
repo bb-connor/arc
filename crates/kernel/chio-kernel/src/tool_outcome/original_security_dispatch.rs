@@ -35,15 +35,12 @@ impl OriginalSecurityDispatchBindingV1 {
     pub(crate) fn from_ledger(
         ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
         context: &crate::SecurityInvocationContext,
-    ) -> Result<Option<Self>, ToolOutcomeError> {
-        NativeSecurityDispatchRequestBindingV1::from_ledger(ledger, context)
-            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?
-            .map(|binding| {
-                let mut value = Self::new(&binding)?;
-                value.native_dispatch_ledger_digest = Some(ledger.record_digest.clone());
-                Ok(value)
-            })
-            .transpose()
+    ) -> Result<Self, ToolOutcomeError> {
+        let binding = NativeSecurityDispatchRequestBindingV1::from_ledger(ledger, context)
+            .map_err(|error| ToolOutcomeError::Canonical(error.to_string()))?;
+        let mut value = Self::new(&binding)?;
+        value.native_dispatch_ledger_digest = Some(ledger.record_digest.clone());
+        Ok(value)
     }
 
     pub(crate) fn bind_native_ledger(
@@ -51,7 +48,7 @@ impl OriginalSecurityDispatchBindingV1 {
         ledger: &crate::admission_operation::NativeSecurityDispatchLedgerRecordV1,
         context: &crate::SecurityInvocationContext,
     ) -> Result<(), ToolOutcomeError> {
-        let retained = Self::from_ledger(ledger, context)?.ok_or_else(invalid)?;
+        let retained = Self::from_ledger(ledger, context)?;
         if self.native_dispatch_ledger_digest.is_some()
             || self.dispatch_commitment_id != retained.dispatch_commitment_id
             || self.live_request_digest != retained.live_request_digest
@@ -104,8 +101,7 @@ impl RawInvocationOutcomeV1 {
         let binding = self
             .original_security_dispatch_binding()
             .ok_or_else(invalid)?;
-        let original =
-            OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?.ok_or_else(invalid)?;
+        let original = OriginalSecurityDispatchBindingV1::from_ledger(ledger, context)?;
         if binding != &original
             || self.operation_id != ledger.operation_id
             || self.security_invocation_context.as_ref() != Some(context)

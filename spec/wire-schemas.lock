@@ -3450,11 +3450,6 @@ files = ["crates/kernel/chio-kernel/src/admission_operation/native_dispatch_bind
 first_seen = "7e54c14a60"
 
 [[schema]]
-value = "chio.native-dispatch-preparation-ledger.v2"
-files = ["crates/kernel/chio-kernel/src/admission_operation/native_dispatch_binding.rs"]
-first_seen = "de519d7776"
-
-[[schema]]
 value = "chio.native-flow-dispatch-policy.v1"
 files = ["crates/security/chio-security-types/src/flow.rs"]
 first_seen = "7e54c14a60"
