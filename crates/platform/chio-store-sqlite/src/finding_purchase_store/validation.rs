@@ -113,6 +113,9 @@ pub(super) fn admission_error(error: AdmissionOperationStoreError) -> FindingPur
         AdmissionOperationStoreError::Invariant(detail) => {
             FindingPurchaseStoreError::Invariant(detail)
         }
+        AdmissionOperationStoreError::KernelStopped => {
+            invariant("durable output release is withheld while the kernel is stopped")
+        }
         AdmissionOperationStoreError::Operation(error) => invariant(error.to_string()),
     }
 }

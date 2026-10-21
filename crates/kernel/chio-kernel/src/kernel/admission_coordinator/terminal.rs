@@ -153,14 +153,10 @@ impl ChioKernel {
         returned: &DurableToolReturn,
         request: &ToolCallRequest,
     ) -> Result<(), KernelError> {
+        if self.is_emergency_stopped() {
+            return Err(KernelError::OutputWithheld);
+        }
         if returned.caller_report_digest().is_some() {
-            // A persisted checkpoint authenticates the original output. It
-            // does not exempt a later delivery from the current stop state.
-            if self.is_emergency_stopped() {
-                return Err(KernelError::GuardDenied(
-                    EMERGENCY_STOP_DENY_REASON.to_string(),
-                ));
-            }
             self.check_revocation(&request.capability)?;
             #[cfg(feature = "delegation")]
             super::super::delegation::consult_revocation_view(
@@ -346,6 +342,9 @@ impl ChioKernel {
         admission: &DurableToolAdmission,
         request: &ToolCallRequest,
     ) -> Result<ToolCallResponse, KernelError> {
+        if self.is_emergency_stopped() {
+            return Err(KernelError::OutputWithheld);
+        }
         let runtime = self.durable_runtime()?;
         let tool_return = match self.load_retained_durable_tool_return(admission)? {
             RetainedDurableToolReturn::Present(tool_return) => *tool_return,
@@ -765,12 +764,9 @@ impl ChioKernel {
                     signing_nonce
             })),
         );
-        let expected_metadata = if matches!(expected_decision, Decision::Allow) {
-            expected_metadata
-        } else {
+        let expected_metadata =
             RefusalReceiptMetadata::new(expected_metadata, IdentityDisposition::Terminal)
-                .into_signed_metadata(operation.binding().request_namespace_digest())
-        };
+                .into_signed_metadata(operation.binding().request_namespace_digest());
         let dispatch_fence = operation
             .dispatch_commit()
             .map(|commit| &commit.store_fence);
@@ -1542,12 +1538,8 @@ impl ChioKernel {
             ToolCallAction::from_parameters(request.arguments.clone()).map_err(|error| {
                 KernelError::ReceiptSigningFailed(format!("failed to hash parameters: {error}"))
             })?;
-        let metadata = if matches!(terminal_decision, Decision::Allow) {
-            metadata
-        } else {
-            RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal)
-                .into_signed_metadata(admission.operation.binding().request_namespace_digest())
-        };
+        let metadata = RefusalReceiptMetadata::new(metadata, IdentityDisposition::Terminal)
+            .into_signed_metadata(admission.operation.binding().request_namespace_digest());
         let persisted_binding = admission.operation.binding().to_persisted();
         let authenticated_tenant_id = persisted_binding.authenticated_tenant_id.as_str();
         let receipt_tenant_id = (authenticated_tenant_id != LOCAL_SYSTEM_TENANT_ID)
@@ -1702,7 +1694,7 @@ impl ChioKernel {
             let terminal = runtime
                 .store
                 .commit_admission_projection(&projection)
-                .map_err(KernelError::ReceiptPersistence)?;
+                .map_err(terminal_receipt_error)?;
             (terminal, AdmissionOperationState::DeniedAfterDelivery)
         } else {
             let projection =
@@ -1746,7 +1738,7 @@ impl ChioKernel {
                 runtime
                     .store
                     .commit_admission_projection(&projection)
-                    .map_err(KernelError::ReceiptPersistence)?
+                    .map_err(terminal_receipt_error)?
             };
             (terminal, AdmissionOperationState::Completed)
         };
@@ -1804,6 +1796,7 @@ impl ChioKernel {
         {
             self.append_memory_provenance_for_write(store, key, request, &projected_receipt)?;
         }
+        self.require_caller_output_release(tool_return, request)?;
         let (verdict, reason, terminal_state, execution_nonce) =
             if let Some(denial) = delivery_evaluation.denial.as_ref() {
                 (
@@ -1851,6 +1844,13 @@ impl ChioKernel {
             receipt: projected_receipt,
             execution_nonce,
         })
+    }
+}
+
+fn terminal_receipt_error(error: crate::receipt_store::ReceiptStoreError) -> KernelError {
+    match error {
+        crate::receipt_store::ReceiptStoreError::OutputWithheld => KernelError::OutputWithheld,
+        error => KernelError::ReceiptPersistence(error),
     }
 }
 

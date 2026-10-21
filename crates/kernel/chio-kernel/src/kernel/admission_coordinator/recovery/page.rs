@@ -95,6 +95,7 @@ impl ChioKernel {
                         })?;
                     }
                 }
+                Err(KernelError::OutputWithheld) => continue,
                 Err(error) if failure::classify(&error).is_some() => {
                     self.defer_admission_recovery(&operation, previous.as_ref(), &error, item_now)?;
                 }

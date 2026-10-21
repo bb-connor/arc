@@ -38,6 +38,15 @@ def invoke(client, key, tool, arguments):
         raise AssertionError(f"{key} surfaced {failure.code} instead of a signed verdict") from None
 
 
+def invoke_withheld(client, key, tool, arguments):
+    try:
+        response = client.invoke(key, "reports", tool, arguments)
+    except WorkerError as failure:
+        assert failure.code == "output_withheld", failure.code
+        return
+    raise AssertionError(f"{key} released a response while stopped: {response}")
+
+
 def ready_state(serving):
     status = serving.readiness()
     assert status["via"] == "control_socket", status
@@ -122,6 +131,58 @@ def c7(binary, root):
     }
 
 
+def c6(binary, root):
+    """A call that returns while stopped stays Finalizing with its output withheld."""
+    node = Host(binary, root / "C6")
+    control = node.publications.with_suffix(".control")
+    control.write_text("hold-after")
+    first = Serving(node, "first")
+    outcome = {}
+    def held_call():
+        try:
+            outcome["response"] = invoke_withheld(
+                first.client, "c6-append", "append", {"report": "C6"}
+            )
+        except Exception as failure:
+            outcome["failure"] = failure
+
+    caller = threading.Thread(target=held_call)
+    caller.start()
+    wait_for_hold(node.publications.with_suffix(".held"), first.host)
+    epoch = stop(node)
+    control.write_text("ready")
+    caller.join(timeout=90)
+    assert not caller.is_alive(), "held call never returned under the stop"
+    if "failure" in outcome:
+        raise outcome["failure"]
+    during = outcome["response"]
+    assert during is None, during
+    assert ready_state(first)["withheld_operations"] == 1
+    kill(first.host)
+    assert node.lines() == 1
+    second = Serving(node, "second")
+    status = ready_state(second)
+    assert status["readiness"] == {"state": "ready_stopped"}, status
+    assert status["withheld_operations"] == 1, status
+    retried = invoke_withheld(second.client, "c6-append", "append", {"report": "C6"})
+    assert retried is None, retried
+    node.stop(second.host)
+    resume_offline(node, epoch)
+    third = Serving(node, "third")
+    released = invoke(third.client, "c6-append", "append", {"report": "C6"})
+    assert released["verdict"] == "allow" and released["output"] is not None, released
+    again = invoke(third.client, "c6-append", "append", {"report": "C6"})
+    assert again["receipt_json"] == released["receipt_json"]
+    node.stop(third.host)
+    assert node.lines() == 1
+    return {
+        "cutpoint": "C6",
+        "receipts": [released["receipt_json"]],
+        "kernel_key": node.kernel_key,
+        "publications": node.lines(),
+    }
+
+
 def c8(binary, root):
     node = Host(binary, root / "C8")
     first = Serving(node, "first")
@@ -147,7 +208,9 @@ def c8(binary, root):
 
 
 def exercise(binary, root):
-    return {"cases": [released_hold(binary, root), c7(binary, root), c8(binary, root)]}
+    return {
+        "cases": [released_hold(binary, root), c7(binary, root), c6(binary, root), c8(binary, root)]
+    }
 
 
 if __name__ == "__main__":

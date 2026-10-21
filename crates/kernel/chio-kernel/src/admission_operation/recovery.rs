@@ -5,6 +5,7 @@ use super::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RemoteRecoveryFailureKind {
+    OutputWithheld,
     Unavailable,
     Fenced,
     NotFound,
@@ -42,6 +43,9 @@ impl AdmissionRecoveryPortError {
             Self::Local(error) => match error {
                 AdmissionOperationStoreError::Unavailable(_) => {
                     RemoteRecoveryFailureKind::Unavailable
+                }
+                AdmissionOperationStoreError::KernelStopped => {
+                    RemoteRecoveryFailureKind::OutputWithheld
                 }
                 AdmissionOperationStoreError::Fenced => RemoteRecoveryFailureKind::Fenced,
                 AdmissionOperationStoreError::NotFound => RemoteRecoveryFailureKind::NotFound,

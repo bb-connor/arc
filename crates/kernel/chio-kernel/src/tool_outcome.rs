@@ -1603,6 +1603,9 @@ fn claimed_outcome_error(error: AdmissionOperationStoreError) -> ToolOutcomeStor
         }
         AdmissionOperationStoreError::Fenced => ToolOutcomeStoreError::Fenced,
         AdmissionOperationStoreError::NotFound => ToolOutcomeStoreError::NotFound,
+        AdmissionOperationStoreError::KernelStopped => ToolOutcomeStoreError::Invariant(
+            "stopped admission cannot acquire an outcome recovery claim".into(),
+        ),
         AdmissionOperationStoreError::Invariant(detail) => ToolOutcomeStoreError::Invariant(detail),
         AdmissionOperationStoreError::OutcomeUnknown(detail) => ToolOutcomeStoreError::Unavailable(
             format!("recovery claim durable outcome is unknown: {detail}"),

@@ -132,7 +132,7 @@ pub use security_participant_state::{
     SecurityParticipantEgressHistory, SecurityParticipantFlowJoinHistory,
     SecurityParticipantStateInitialization,
 };
-mod stop_epoch;
+pub(crate) mod stop_epoch;
 pub(crate) use stop_epoch::{
     projection_reference as stop_epoch_projection_reference,
     verify_projection_coverage as verify_stop_epoch_projection_coverage,
@@ -993,7 +993,11 @@ impl SqliteAdmissionOperationStore {
             context.trusted_time_unix_ms,
             &self.serving_owner,
         )?;
-        crate::tool_outcome_store::require_terminal_release(transaction, &stored.operation)?;
+        crate::tool_outcome_store::require_terminal_release(
+            transaction,
+            &stored.operation,
+            &self.serving_owner.fence.store_uuid,
+        )?;
         verify_payment_terminal_source(
             transaction,
             &stored.operation,
@@ -1635,6 +1639,7 @@ pub(crate) fn receipt_projection_error(error: AdmissionOperationStoreError) -> R
     match error {
         AdmissionOperationStoreError::Unavailable(detail) => ReceiptStoreError::Pool(detail),
         AdmissionOperationStoreError::Fenced => ReceiptStoreError::Fenced,
+        AdmissionOperationStoreError::KernelStopped => ReceiptStoreError::OutputWithheld,
         AdmissionOperationStoreError::NotFound => {
             ReceiptStoreError::NotFound("admission operation".to_string())
         }
