@@ -47,27 +47,34 @@ end. The evidence remains.
   </picture>
 </p>
 
-```sh
-cargo run -p chio-swarm-authority --example agent_os
+```ts
+import { Computer, USD, firstPassing } from "@chio-protocol/sdk";
+
+const project = await Computer.open("quickstart");
+const partners = await Computer.partners();   // every kernel you have paired with
+
+// Each partner's agents get a fork, five dollars, and fifteen minutes.
+// The forks are granted together, and every run works at the same time.
+const runs = await Promise.all(partners.map(async (partner) => {
+  const fork = await project.fork();
+  const authority = fork.grant({
+    to: partner,
+    under: partner.treaty,
+    resources: { "/workspace": ["read", "write"] },
+    budget: USD(5),
+    expiresIn: "15m",
+  });
+  return partner.exec("fix issue #417", { on: fork, authority });
+}));
+
+const winner = await firstPassing(runs, { check: "pytest" });   // the first fork whose tests pass
+await project.apply(winner.changes);   // the merge happens under your authority
+
+const evidence = await project.history.export("audit/");
+await evidence.verify();   // every agent, call, and dollar
 ```
 
-```text
-task graph  swarm-incident-42
-  orchestrator      depth 0  scope 6ab7b09faf2a  route -                budget holds the pool
-  researcher        depth 1  scope c5a04ca641ec  route route-researcher budget 2500 of 10000 units
-  writer            depth 1  scope c5a04ca641ec  route route-writer     budget 2500 of 10000 units
-  join researcher + writer -> orchestrator  (all_success)
-
-verdict  verified  (3 tasks, 2 continuations, 1 joins, 2 routes)
-  researcher   continuation continuation-researcher    witness witness-researcher (1 hop)
-  writer       continuation continuation-writer        witness witness-writer (1 hop)
-
-then someone tries to
-  add an edge from the writer back to the orchestrator rejected: swarm task graph cycle at task-orchestrator
-  hide a hop by understating the writer's depth        rejected: swarm task depth mismatch: task-researcher -> task-writer
-  allocate 5,000 units out of a 100 unit pool          rejected: swarm budget allocations exceed pool total
-  run the researcher after its task was revoked        rejected: swarm task is revoked: task-researcher
-```
+The same program in [Python and Rust](https://www.chio.computer/docs).
 
 ## Start building
 
