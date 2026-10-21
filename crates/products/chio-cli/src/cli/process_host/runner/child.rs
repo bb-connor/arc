@@ -480,7 +480,20 @@ async fn wait(
     timeout: Duration,
     resident_ceiling: Option<u64>,
 ) -> io::Result<Outcome> {
-    wait_bounded(spawned, input, None, timeout, resident_ceiling, None).await
+    wait_bounded(spawned, input, None, timeout, resident_ceiling, None, None).await
+}
+
+pub(super) async fn cancelled(receiver: &mut Option<tokio::sync::watch::Receiver<bool>>) {
+    let Some(receiver) = receiver else {
+        std::future::pending::<()>().await;
+        return;
+    };
+    loop {
+        let requested = *receiver.borrow_and_update();
+        if requested || receiver.changed().await.is_err() {
+            return;
+        }
+    }
 }
 
 pub(super) async fn wait_bounded(
@@ -490,9 +503,18 @@ pub(super) async fn wait_bounded(
     timeout: Duration,
     resident_ceiling: Option<u64>,
     output_ceiling: Option<usize>,
+    cancellation: Option<tokio::sync::watch::Receiver<bool>>,
 ) -> io::Result<Outcome> {
-    let (mut outcome, diagnostics) =
-        observe(spawned, input, release, timeout, resident_ceiling, output_ceiling).await?;
+    let (mut outcome, diagnostics) = observe(
+        spawned,
+        input,
+        release,
+        timeout,
+        resident_ceiling,
+        output_ceiling,
+        cancellation,
+    )
+    .await?;
     diagnostics.finish(&mut outcome).await?;
     Ok(outcome)
 }
@@ -508,6 +530,7 @@ pub(super) async fn observe(
     timeout: Duration,
     resident_ceiling: Option<u64>,
     output_ceiling: Option<usize>,
+    mut cancellation: Option<tokio::sync::watch::Receiver<bool>>,
 ) -> io::Result<(Outcome, Diagnostics)> {
     let Spawned {
         mut guard,
@@ -570,6 +593,7 @@ pub(super) async fn observe(
                 reaped = Some(result);
                 break End::Exited;
             }
+            () = cancelled(&mut cancellation) => break End::Interrupted,
             _ = &mut deadline => break End::Timeout,
             result = &mut bootstrap, if !bootstrapped => {
                 if result.is_err() { break End::BootstrapFailed; }

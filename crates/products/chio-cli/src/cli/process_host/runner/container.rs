@@ -33,6 +33,19 @@ pub(super) struct LaunchAuthority {
     pub runtime: chio_process::ProcessRuntime,
 }
 
+pub(super) struct AttemptControl {
+    pub authority: std::sync::Arc<LaunchAuthority>,
+    pub cancellation: Option<tokio::sync::watch::Receiver<bool>>,
+}
+
+impl AttemptControl {
+    fn cancelled(&self) -> bool {
+        self.cancellation
+            .as_ref()
+            .is_some_and(|receiver| *receiver.borrow() || receiver.has_changed().is_err())
+    }
+}
+
 // The unit suite replaces only the engine executable. All supervision, durable
 // transitions, ownership validation and completion classification remain real.
 #[cfg(test)]
@@ -128,6 +141,7 @@ async fn control_attempt(arguments: &[&str]) -> Result<Vec<u8>, ControlFailure> 
         Duration::from_secs(30),
         None,
         Some(65_536),
+        None,
     )
     .await
     .map_err(|failure| ControlFailure::Uncertain(failure.to_string()))?;
@@ -655,7 +669,11 @@ impl LaunchEvidence<'_> {
         writer: &mut ContainerWriter,
         lease: &Lease,
         release: tokio::sync::oneshot::Sender<()>,
+        control: &AttemptControl,
     ) -> Result<(), CliError> {
+        if control.cancelled() {
+            return Ok(());
+        }
         let (started_at, digest) = match self.confirm_start(lease).await {
             Ok(confirmed) => confirmed,
             Err(failure) => {
@@ -665,9 +683,15 @@ impl LaunchEvidence<'_> {
                     ContainerLaunchFailure::StartUnconfirmed,
                     None,
                 )?;
+                if control.cancelled() {
+                    return Ok(());
+                }
                 return Err(failure);
             }
         };
+        if control.cancelled() {
+            return Ok(());
+        }
         let record = self.record(
             CageEnforcementState::FullyEnforced,
             Some(digest),
@@ -679,6 +703,9 @@ impl LaunchEvidence<'_> {
             .runtime
             .bind_worker_profile(self.process, signed.worker_profile().map_err(error)?)
             .map_err(error)?;
+        if control.cancelled() {
+            return Ok(());
+        }
         release
             .send(())
             .map_err(|()| error("worker attachment ended before its bootstrap"))
@@ -695,17 +722,28 @@ pub(super) async fn run(
     socket: std::path::PathBuf,
     input: Vec<u8>,
     attempt: u32,
-    authority: std::sync::Arc<LaunchAuthority>,
+    control: AttemptControl,
 ) -> (Result<Outcome, CliError>, Cleanup) {
     let result: Result<Outcome, CliError> = async {
+        if control.cancelled() {
+            writer.create_rejected(&mut lease)?;
+            return Ok(cancelled_outcome());
+        }
         create(&mut writer, &mut lease, &worker, &socket).await?;
+        if control.cancelled() {
+            if !remove(&lease).await? {
+                return Err(error("cancelled container cleanup is unconfirmed"));
+            }
+            writer.removed(&lease)?;
+            return Ok(cancelled_outcome());
+        }
         let image = &worker
             .container
             .as_ref()
             .ok_or_else(|| error("missing container profile"))?
             .image;
         let evidence = LaunchEvidence {
-            authority: &authority,
+            authority: &control.authority,
             process: &worker.process,
             attempt,
             image,
@@ -756,15 +794,31 @@ pub(super) async fn run(
                 Duration::from_secs(worker.timeout_seconds),
                 None,
                 Some(2 * 1024 * 1024),
+                control.cancellation.clone(),
             ),
-            evidence.confirm_and_release(&mut writer, &lease, release),
+            evidence.confirm_and_release(&mut writer, &lease, release, &control),
         );
-        authority
+        control
+            .authority
             .runtime
             .clear_worker_profile(&worker.process)
             .map_err(error)?;
         confirmed?;
-        observe_attachment(&lease, attachment.map_err(CliError::from)).await
+        let mut outcome = observe_attachment(&lease, attachment.map_err(CliError::from)).await?;
+        if control.cancelled()
+            && !outcome.success
+            && matches!(
+                outcome.reason.as_str(),
+                "container_attachment_lost" | "container_never_started" | "runner_interrupted"
+            )
+        {
+            if !remove(&lease).await? {
+                return Err(error("cancelled container cleanup is unconfirmed"));
+            }
+            writer.removed(&lease)?;
+            outcome.reason = "process_cancelled".into();
+        }
+        Ok(outcome)
     }
     .await;
     let result = result.or_else(|failure| {
@@ -782,6 +836,17 @@ pub(super) async fn run(
         }
     });
     (result, Cleanup { writer, lease })
+}
+
+fn cancelled_outcome() -> Outcome {
+    Outcome {
+        success: false,
+        reason: "process_cancelled".into(),
+        usage: Usage::default(),
+        stdout: vec![],
+        stderr: vec![],
+        diagnostic: None,
+    }
 }
 
 async fn observe_attachment(

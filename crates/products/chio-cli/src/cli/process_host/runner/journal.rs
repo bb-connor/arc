@@ -401,6 +401,52 @@ impl<'a> Journal<'a> {
         super::supervision::evaluate(&snapshots, &self.plan.workers, &self.parents, &settlements)
     }
 
+    pub fn has_stop_failure(
+        &self,
+        snapshots: &[Snapshot],
+        cancelled: &BTreeSet<String>,
+    ) -> Result<bool, CliError> {
+        let failed: BTreeSet<_> = snapshots
+            .iter()
+            .filter(|s| s.state == "failed")
+            .map(|s| s.process.as_str())
+            .collect();
+        let mut scoped: BTreeSet<_> = snapshots
+            .iter()
+            .filter(|s| {
+                s.state == "failed"
+                    && s.outcome.as_deref() == Some("process_cancelled")
+                    && cancelled.contains(&s.process)
+            })
+            .map(|s| s.process.as_str())
+            .collect();
+        loop {
+            let before = scoped.len();
+            for snapshot in snapshots.iter().filter(|s| {
+                s.state == "failed" && s.outcome.as_deref() == Some("dependency_failed")
+            }) {
+                let worker = self
+                    .workers
+                    .iter()
+                    .find(|w| w.process == snapshot.process)
+                    .ok_or_else(|| error("worker journal does not match its plan"))?;
+                let dependencies = self.dependencies(worker)?;
+                if dependencies.iter().any(|id| scoped.contains(id.as_str()))
+                    && dependencies
+                        .iter()
+                        .filter(|id| failed.contains(id.as_str()))
+                        .all(|id| scoped.contains(id.as_str()))
+                {
+                    scoped.insert(snapshot.process.as_str());
+                }
+            }
+            if scoped.len() == before {
+                break;
+            }
+        }
+        Ok(failed.iter().any(|id| !scoped.contains(id)))
+    }
+
     /// Pending work whose prerequisite failed cannot run. Propagate through
     /// declared dependencies and recorded joins without spending an attempt or
     /// changing completed or active work. Parentage alone is not a dependency.
@@ -551,6 +597,18 @@ impl<'a> Journal<'a> {
         Ok(attempt)
     }
 
+    pub fn cancel_pending(&mut self, worker: &Worker) -> Result<(), CliError> {
+        let changed = self.db.execute(
+            "UPDATE run_workers SET state='failed',outcome='process_cancelled' WHERE process=?1 AND state='pending'",
+            [&worker.process],
+        ).map_err(error)?;
+        if changed != 1 {
+            return Err(error("cancellation does not match pending worker state"));
+        }
+        self.publish_observation();
+        Ok(())
+    }
+
     /// Record a create-only intent before contacting the engine. Until an exact
     /// ID is committed, no start request may be sent for this container.
     pub fn reserve_container(
@@ -673,3 +731,7 @@ fn stored(value: u64) -> i64 {
 fn accounted(value: i64, column: usize) -> rusqlite::Result<u64> {
     u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(column, value))
 }
+
+#[cfg(test)]
+#[path = "journal_tests.rs"]
+mod tests;
