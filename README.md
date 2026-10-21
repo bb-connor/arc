@@ -48,33 +48,33 @@ end. The evidence remains.
 </p>
 
 ```ts
-import { Computer, USD, firstPassing } from "@chio-protocol/sdk";
+import { Computer, USD } from "@chio-protocol/sdk";
 
 const project = await Computer.open("quickstart");
-const partners = await Computer.partners();   // every kernel you have paired with
+const partners = await Computer.partners();     // every kernel you have paired with
+const issue = await project.issues.get(417);
+const escrow = await project.escrow(USD(25));   // held by your kernel, released only on evidence
 
-// Each partner's agents get a fork, five dollars, and fifteen minutes.
-// The forks are granted together, and every run works at the same time.
-const runs = await Promise.all(partners.map(async (partner) => {
-  const fork = await project.fork();
-  const authority = fork.grant({
-    to: partner,
-    under: partner.treaty,
-    resources: { "/workspace": ["read", "write"] },
-    budget: USD(5),
-    expiresIn: "15m",
-  });
-  return partner.exec("fix issue #417", { on: fork, authority });
-}));
+// Every partner's agents write a fix in their own fork, under their own treaty.
+const patches = await Promise.all(partners.map((partner) =>
+  partner.exec(issue, { on: project.fork(), budget: USD(5), under: partner.treaty })));
 
-const winner = await firstPassing(runs, { check: "pytest" });   // the first fork whose tests pass
-await project.apply(winner.changes);   // the merge happens under your authority
+// Then every partner attacks every other partner's patch with new failing tests.
+const trial = await project.crossExamine(patches, { attackers: partners, budget: USD(2) });
 
-const evidence = await project.history.export("audit/");
-await evidence.verify();   // every agent, call, and dollar
+const winner = trial.unbroken().smallest();     // no rival could break it
+await project.apply(winner.changes, { cosign: winner.partner });   // both kernels sign the merge
+
+await escrow.settle({
+  merged: USD(15),    // to the partner whose patch shipped
+  perBreak: USD(2),   // to any partner who broke a rival's patch
+});                   // paid for outcomes, not effort
+
+const evidence = await project.history.export();
+await evidence.verify();   // every agent, attack, and dollar
 ```
 
-The same program in [Python and Rust](https://www.chio.computer/docs).
+The [docs](https://www.chio.computer/docs) walk through the SDK in TypeScript, Python, and Rust.
 
 ## Start building
 
