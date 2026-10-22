@@ -104,7 +104,8 @@ pub struct ChioReceiptSigningBody {
 }
 
 pub const CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY: &str = "chio_receipt_signing_nonce";
-const CHIO_RECEIPT_ORIGINAL_METADATA_KEY: &str = "original_metadata";
+/// Top-level key under which the signing path wraps a non-object metadata value.
+pub const CHIO_RECEIPT_ORIGINAL_METADATA_KEY: &str = "original_metadata";
 
 /// Bind the canonical signing nonce into a receipt body's metadata before the
 /// content-addressed id is computed.

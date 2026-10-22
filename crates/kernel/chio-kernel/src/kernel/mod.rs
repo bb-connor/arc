@@ -161,9 +161,10 @@ const CALLER_DELIVERY_METADATA_KEY: &str = "caller_delivery";
 const PROTOCOL_REFUSAL_METADATA_KEY: &str = "protocol_refusal";
 const RUNTIME_ADMISSION_METADATA_KEY: &str = "chio_runtime";
 
-/// Top-level receipt-metadata keys only the kernel writes. Caller or hook
-/// metadata that names one is refused before any effect.
-const RESERVED_RECEIPT_METADATA_KEYS: [&str; 32] = [
+/// Top-level receipt-metadata keys that only a Chio signer writes: the kernel,
+/// the receipt signing path, or the HTTP receipt projection. Caller metadata
+/// that names one is refused before any effect.
+const RESERVED_RECEIPT_METADATA_KEYS: [&str; 35] = [
     crate::admission_operation::ADMISSION_RECEIPT_METADATA_KEY,
     "attribution",
     MANIFEST_SECURITY_METADATA_KEY,
@@ -195,16 +196,17 @@ const RESERVED_RECEIPT_METADATA_KEYS: [&str; 32] = [
     "active_response_terminal_evidence",
     "chio_http_receipt_v1",
     chio_core::receipt::signing::CHIO_RECEIPT_SIGNING_NONCE_METADATA_KEY,
-    "original_metadata",
+    chio_core::receipt::signing::CHIO_RECEIPT_ORIGINAL_METADATA_KEY,
+    "finding_pool_mutation",
+    "session_report",
+    "prior_metadata",
 ];
 
-/// A runtime-admission hook writes only `chio_runtime`; `runtime_admission` is
-/// the kernel's own record of the hook outcome. Every other reserved key is
-/// forbidden in hook metadata.
+/// Hook output may name only `chio_runtime` among the reserved keys. The kernel
+/// writes `runtime_admission` itself, only on its own error paths and never
+/// from hook output, so a hook can never supply it.
 fn is_hook_forbidden_metadata_key(key: &str) -> bool {
-    key != RUNTIME_ADMISSION_METADATA_KEY
-        && key != "runtime_admission"
-        && RESERVED_RECEIPT_METADATA_KEYS.contains(&key)
+    key != RUNTIME_ADMISSION_METADATA_KEY && RESERVED_RECEIPT_METADATA_KEYS.contains(&key)
 }
 
 /// The first reserved key a runtime-admission hook may not write, if its
@@ -816,14 +818,6 @@ impl LocalReceiptArtifact {
         })?;
         Ok(sha256_hex(&canonical))
     }
-
-    fn session_anchor_reference(&self) -> Option<chio_core::session::SessionAnchorReference> {
-        let metadata = match self {
-            Self::Tool(receipt) => receipt.metadata.as_ref(),
-            Self::Child(receipt) => receipt.metadata.as_ref(),
-        };
-        extract_session_anchor_reference_from_metadata(metadata)
-    }
 }
 
 /// Bridge a sync caller to the async tool-server dispatch path.
@@ -886,26 +880,6 @@ fn is_unpolled_sync_bridge_refusal(error: &KernelError) -> bool {
         KernelError::SyncBridgeIncompatibleWithCurrentThreadRuntime
     ) && tokio::runtime::Handle::try_current()
         .is_ok_and(|handle| handle.runtime_flavor() != tokio::runtime::RuntimeFlavor::MultiThread)
-}
-
-fn extract_session_anchor_reference_from_metadata(
-    metadata: Option<&serde_json::Value>,
-) -> Option<chio_core::session::SessionAnchorReference> {
-    let call_chain = metadata?
-        .get("governed_transaction")
-        .and_then(|value| value.get("call_chain"))?;
-    let session_anchor_id = call_chain
-        .get("sessionAnchorId")
-        .and_then(serde_json::Value::as_str)
-        .filter(|value| !value.trim().is_empty())?;
-    let session_anchor_hash = call_chain
-        .get("sessionAnchorHash")
-        .and_then(serde_json::Value::as_str)
-        .filter(|value| !value.trim().is_empty())?;
-    Some(chio_core::session::SessionAnchorReference::new(
-        session_anchor_id,
-        session_anchor_hash,
-    ))
 }
 
 /// A policy guard that the kernel evaluates before forwarding a tool call.
