@@ -23,7 +23,7 @@ fn security_state_rejects_ephemeral_sqlite_paths() {
 }
 
 #[test]
-fn opening_is_idempotent_and_preserves_sibling_tables() {
+fn opening_refuses_namespace_extension_and_preserves_sibling_tables() {
     let directory =
         chio_test_support::private_tempdir().unwrap_or_else(|error| panic!("tempdir: {error}"));
     let path = directory.path().join("state.db");
@@ -63,13 +63,12 @@ fn opening_is_idempotent_and_preserves_sibling_tables() {
         .unwrap_or_else(|error| panic!("append receipt: {error}"));
     drop(receipt_store);
 
-    drop(
-        SqliteSecurityStateStore::open(&path).unwrap_or_else(|error| panic!("first open: {error}")),
-    );
-    drop(
-        SqliteSecurityStateStore::open(&path)
-            .unwrap_or_else(|error| panic!("second open: {error}")),
-    );
+    for _ in 0..2 {
+        assert_eq!(
+            require_error(SqliteSecurityStateStore::open(&path)).kind(),
+            PortErrorKind::IntegrityFailure
+        );
+    }
 
     let connection = rusqlite::Connection::open(&path)
         .unwrap_or_else(|error| panic!("reopen database: {error}"));

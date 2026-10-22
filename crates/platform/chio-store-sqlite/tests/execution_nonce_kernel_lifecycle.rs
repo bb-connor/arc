@@ -372,16 +372,11 @@ fn assert_unconfirmed_cleanup(runtime: &Runtime, request: &ToolCallRequest) -> T
 #[test]
 fn reserved_nonce_operation_is_compensated_by_startup_recovery() -> TestResult {
     let fixture = Fixture::new()?;
-    // Refuse capture preparation once: the nonce is reserved, the executable
-    // hold is authorized, and the coordinator retains the admission.
-    execute_sql(
-        &fixture,
-        "CREATE TRIGGER capture_cutpoint BEFORE INSERT ON admission_execution_nonce_transitions
-         WHEN NEW.kind = 'capture_pending'
-         AND (SELECT COUNT(*) FROM admission_operations) = 1
-         BEGIN SELECT RAISE(ABORT, 'injected capture cutpoint'); END;",
-    )?;
     let runtime = fixture.open()?;
+    runtime
+        .authority
+        .admission_operation_store()
+        .inject_nonce_capture_preparation_failure_for_test()?;
     let request = fixture.request(&runtime, "reserved-nonce")?;
     let nonce = preflight(&runtime, &request)?;
     let receipts = runtime.kernel.receipt_log().len();

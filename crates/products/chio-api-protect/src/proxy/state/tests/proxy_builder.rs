@@ -114,11 +114,12 @@ fn evidence_custody_is_existing_private_and_stable() {
 
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn evidence_startup_ignores_oversized_legacy_receipts(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn evidence_startup_refuses_unknown_receipt_tables() -> Result<(), Box<dyn std::error::Error>>
+{
     use std::os::unix::fs::PermissionsExt;
     let directory = tempfile::tempdir()?;
     let database = directory.path().join("receipts.db");
+    chio_store_sqlite::initialize_receipt_approval_database(&database)?;
     let canonical = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
     let raw = rusqlite::Connection::open(&database)?;
     raw.execute_batch("CREATE TABLE http_receipts (raw_json TEXT); INSERT INTO http_receipts VALUES (zeroblob(2000000));")?;
@@ -134,27 +135,23 @@ async fn evidence_startup_ignores_oversized_legacy_receipts(
     config.sidecar_control_token = Some("evidence-test-control".into());
     config.spec_content =
         Some("openapi: 3.0.3\ninfo:\n  title: Evidence\n  version: 1.0.0\npaths: {}\n".into());
-    let (ready, address) = tokio::sync::oneshot::channel();
-    let task = tokio::spawn(ProtectProxy::new(config).run_with_observer(move |address| {
-        let _ = ready.send(address);
-    }));
-    let address = tokio::time::timeout(Duration::from_secs(10), address).await??;
-    let response = reqwest::Client::new().post(format!("http://{address}/v1/receipts"))
-            .bearer_auth("evidence-test-control")
-            .json(&serde_json::json!({"job_name":"legacy-restart", "namespace":"operator", "job_uid":"one", "outcome":"succeeded", "steps":[]}))
-            .send().await?;
-    assert_eq!(response.status(), StatusCode::OK);
-    task.abort();
-    let _ = task.await;
-    let reopened = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
-    let receipts =
-        reopened.query_receipts(&chio_kernel::ReceiptQuery::default().local_operator_admin())?;
-    assert_eq!(receipts.total_count, 1);
-    assert_eq!(receipts.receipts[0].receipt.kernel_key, key.public_key());
-    let error = reopened
-        .build_evidence_export_bundle(&chio_kernel::EvidenceExportQuery::admin_all())
-        .test_unwrap_err();
-    assert!(error.to_string().contains("legacy mutable receipt history"));
+    let error = tokio::time::timeout(
+        Duration::from_secs(10),
+        ProtectProxy::new(config).run_with_observer(|_| panic!("invalid receipt catalog served")),
+    )
+    .await?
+    .err()
+    .ok_or("unknown receipt table was admitted")?;
+    assert!(
+        matches!(&error, ProtectError::ReceiptStore(message) if message == "conflict: schema catalog differs from its canonical definition"),
+        "{error:?}"
+    );
+    let count: i64 = rusqlite::Connection::open(&database)?.query_row(
+        "SELECT COUNT(*) FROM http_receipts WHERE length(raw_json) = 2000000",
+        [],
+        |row| row.get(0),
+    )?;
+    assert_eq!(count, 1);
     Ok(())
 }
 
@@ -165,6 +162,7 @@ async fn evidence_startup_refuses_a_receipt_database_holding_revocations(
     use std::os::unix::fs::PermissionsExt;
     let directory = tempfile::tempdir()?;
     let database = directory.path().join("receipts.db");
+    chio_store_sqlite::initialize_receipt_approval_database(&database)?;
     drop(chio_store_sqlite::SqliteReceiptStore::open(&database)?);
     rusqlite::Connection::open(&database)?.execute_batch(
         "CREATE TABLE revoked_capabilities (capability_id TEXT PRIMARY KEY); INSERT INTO revoked_capabilities VALUES ('revoked-in-receipt-db');",
@@ -185,7 +183,7 @@ async fn evidence_startup_refuses_a_receipt_database_holding_revocations(
     )
     .await;
     assert!(
-        matches!(outcome, Ok(Err(ProtectError::RevocationsInReceiptStore))),
+        matches!(&outcome, Ok(Err(ProtectError::ReceiptStore(message))) if message == "conflict: schema catalog differs from its canonical definition"),
         "{outcome:?}"
     );
     let mut revocations = database.into_os_string();
@@ -218,6 +216,7 @@ async fn receipt_retention_runs_from_the_actual_proxy_serving_lifetime(
         None,
         "test",
     )?;
+    chio_store_sqlite::initialize_receipt_approval_database(&database)?;
     let store = chio_store_sqlite::SqliteReceiptStore::open(&database)?;
     store.append_chio_receipt_returning_seq(
         &receipt.to_chio_receipt_with_keypair(&fixture.signer_keypair)?,

@@ -78,9 +78,11 @@ fn sealed_source_with_stale_stamp_cannot_authenticate_its_seal() -> TestResult {
         "SELECT sql FROM sqlite_schema WHERE type = 'trigger' AND name = 'chio_security_participant_source_version_no_update'",
         [], |row| row.get(0),
     )?;
+    connection.execute_batch("DROP TRIGGER chio_security_participant_source_version_no_update")?;
     connection.execute_batch(
-        "DROP TRIGGER chio_security_participant_source_version_no_update;
-         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';",
+        "PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'security_state';
+         PRAGMA ignore_check_constraints = OFF;",
     )?;
     connection.execute_batch(&version_trigger)?;
     let error = source

@@ -286,12 +286,14 @@ fn startup_refuses_a_receipt_history_that_fails_verification(
     let tamper = rusqlite::Connection::open(&database)?;
     let triggers = tamper
         .prepare(
-            "SELECT name FROM sqlite_master
+            "SELECT name, sql FROM sqlite_master
              WHERE type = 'trigger' AND tbl_name = 'checkpoint_tree_heads'",
         )?
-        .query_map([], |row| row.get::<_, String>(0))?
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?
         .collect::<Result<Vec<_>, _>>()?;
-    for trigger in triggers {
+    for (trigger, _) in &triggers {
         tamper.execute_batch(&format!("DROP TRIGGER \"{trigger}\""))?;
     }
     // The interior checkpoint's tree-head projection no longer mirrors its
@@ -303,6 +305,9 @@ fn startup_refuses_a_receipt_history_that_fails_verification(
         )?,
         1
     );
+    for (_, sql) in triggers {
+        tamper.execute_batch(&sql)?;
+    }
     drop(tamper);
 
     let error = match open_service_receipt_store(Some(&database)) {
@@ -430,6 +435,7 @@ mod snapshot_recovery {
         config.joint_authority_db_path = None;
         config.receipt_db_path = Some(fixture.directory.path().join("receipts.sqlite3"));
         configure_store(&mut config, &fixture.database);
+        let joint = config.joint_authority_db_path.as_deref() == Some(&fixture.database);
         let error = tokio::time::timeout(
             Duration::from_secs(30),
             super::super::serve_async(config, None, None, None, None, None, None),
@@ -437,7 +443,17 @@ mod snapshot_recovery {
         .await?
         .err()
         .ok_or("a foreign startup database was admitted")?;
-        assert!(error.to_string().contains("is not a Chio store"), "{error}");
+        if joint {
+            assert!(
+                matches!(&error,
+                crate::error::CliError::SqliteServingOwner(
+                    chio_store_sqlite::SqliteServingOwnerError::PartialProvision(path)
+                ) if path == &fixture.database.display().to_string()),
+                "{error:?}"
+            );
+        } else {
+            assert!(error.to_string().contains("is not a Chio store"), "{error}");
+        }
         fixture.assert_reclaimed_before_open_refusal()
     }
 
