@@ -32,11 +32,9 @@ pub(crate) fn observe_capability_revocation_lag(revoked_at: i64) {
 pub(crate) async fn handle_internal_revocations_delta(
     State(state): State<TrustServiceState>,
     Query(query): Query<RevocationDeltaQuery>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_REVOCATIONS_DELTA_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     let store = match state.revocation_store() {
@@ -91,11 +89,9 @@ pub(crate) async fn handle_internal_revocations_delta(
 pub(crate) async fn handle_internal_tool_receipts_delta(
     State(state): State<TrustServiceState>,
     Query(query): Query<ReceiptDeltaQuery>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_TOOL_RECEIPTS_DELTA_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -125,11 +121,9 @@ pub(crate) async fn handle_internal_tool_receipts_delta(
 pub(crate) async fn handle_internal_child_receipts_delta(
     State(state): State<TrustServiceState>,
     Query(query): Query<ReceiptDeltaQuery>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CHILD_RECEIPTS_DELTA_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -159,11 +153,9 @@ pub(crate) async fn handle_internal_child_receipts_delta(
 pub(crate) async fn handle_internal_budgets_delta(
     State(state): State<TrustServiceState>,
     Query(query): Query<BudgetDeltaQuery>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_BUDGETS_DELTA_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     let store = match state.budget_store() {
@@ -239,11 +231,9 @@ pub(crate) async fn handle_internal_budgets_delta(
 pub(crate) async fn handle_internal_lineage_delta(
     State(state): State<TrustServiceState>,
     Query(query): Query<ReceiptDeltaQuery>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_LINEAGE_DELTA_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     let store = match state.receipt_store() {
@@ -370,15 +360,12 @@ pub(crate) fn sync_peer(state: &TrustServiceState, peer_url: &str) -> Result<(),
     if peer_is_partitioned(state, peer_url) {
         return Ok(());
     }
-    let Some(self_url) = cluster_self_url(state) else {
+    if cluster_self_url(state).is_none() {
         return Ok(());
-    };
+    }
     super::authority_evidence::refresh_signing_custody(state);
-    let client = service_runtime::client::build_cluster_peer_client(
-        peer_url,
-        &state.config.service_token,
-        &self_url,
-    )?;
+    let client =
+        service_runtime::client::build_cluster_peer_client(&state.config.access, peer_url)?;
     let peer_status = match client.cluster_status() {
         Ok(status) => status,
         Err(error) => {

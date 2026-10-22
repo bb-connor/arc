@@ -3,16 +3,14 @@
 //! trust-activation, governance, and open-market artifact endpoints.
 
 use super::report_rendering::forward_post_to_leader;
-use super::report_validation::{
-    inspect_authority_state, run_authority_commit, validate_service_auth,
-};
+use super::report_validation::{inspect_authority_state, run_authority_commit, validate_caller};
 use super::*;
 
 pub(crate) async fn handle_list_certifications(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsRead) {
         return response;
     }
     match load_certification_registry_for_admin(&state.config) {
@@ -31,7 +29,7 @@ pub(crate) async fn handle_get_certification(
     AxumPath(artifact_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsRead) {
         return response;
     }
     let registry = match load_certification_registry_for_admin(&state.config) {
@@ -53,7 +51,7 @@ pub(crate) async fn handle_publish_certification(
     Json(artifact): Json<SignedCertificationCheck>,
 ) -> Response {
     use super::registry_write_lane::{configured_registry_file, run_registry_update};
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsWrite) {
         return response;
     }
     let path = match configured_registry_file(
@@ -76,7 +74,7 @@ pub(crate) async fn handle_resolve_certification(
     AxumPath(tool_server_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsRead) {
         return response;
     }
     let registry = match load_certification_registry_for_admin(&state.config) {
@@ -166,7 +164,7 @@ pub(crate) async fn handle_issue_generic_trust_activation(
     headers: HeaderMap,
     Json(request): Json<GenericTrustActivationIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     match inspect_authority_state(&state, move |state| {
@@ -184,7 +182,7 @@ pub(crate) async fn handle_evaluate_generic_trust_activation(
     headers: HeaderMap,
     Json(request): Json<GenericTrustActivationEvaluationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     match inspect_authority_state(&state, move |state| {
@@ -202,7 +200,7 @@ pub(crate) async fn handle_issue_generic_governance_charter(
     headers: HeaderMap,
     Json(request): Json<GenericGovernanceCharterIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     match inspect_authority_state(&state, move |state| {
@@ -220,7 +218,7 @@ pub(crate) async fn handle_issue_generic_governance_case(
     headers: HeaderMap,
     Json(request): Json<GenericGovernanceCaseIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     match inspect_authority_state(&state, move |state| {
@@ -238,7 +236,7 @@ pub(crate) async fn handle_evaluate_generic_governance_case(
     headers: HeaderMap,
     Json(request): Json<GenericGovernanceCaseEvaluationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     match service_runtime::issuance::evaluate_generic_governance_case_request(&request) {
@@ -252,14 +250,21 @@ pub(crate) async fn handle_issue_open_market_fee_schedule(
     headers: HeaderMap,
     Json(request): Json<OpenMarketFeeScheduleIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     // Governed issuance binds the signed schedule under the local fiscal fence, so
     // it has to run on the leader. Ungoverned issuance stays local and keeps signing
     // with this node's authority key.
     if state.fiscal_runtime.is_some() {
-        match forward_post_to_leader(&state, OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH, &request).await {
+        match forward_post_to_leader(
+            &state,
+            &headers,
+            OPEN_MARKET_FEE_SCHEDULE_ISSUE_PATH,
+            &request,
+        )
+        .await
+        {
             Ok(Some(response)) => return response,
             Ok(None) => {}
             Err(response) => return response,
@@ -294,14 +299,16 @@ pub(crate) async fn handle_issue_open_market_penalty(
     headers: HeaderMap,
     Json(request): Json<OpenMarketPenaltyIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     // A fiscal penalty is authoritative against the active fee-schedule binding.
     // Followers can hold a stale resolver or still be in fallback, so governed
     // issuance must run on the leader before any validation or signing occurs.
     if state.fiscal_runtime.is_some() {
-        match forward_post_to_leader(&state, OPEN_MARKET_PENALTY_ISSUE_PATH, &request).await {
+        match forward_post_to_leader(&state, &headers, OPEN_MARKET_PENALTY_ISSUE_PATH, &request)
+            .await
+        {
             Ok(Some(response)) => return response,
             Ok(None) => {}
             Err(response) => return response,
@@ -322,7 +329,7 @@ pub(crate) async fn handle_evaluate_open_market_penalty(
     headers: HeaderMap,
     Json(request): Json<OpenMarketPenaltyEvaluationRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::RegistryWrite) {
         return response;
     }
     match inspect_authority_state(&state, move |state| {
@@ -340,7 +347,7 @@ pub(crate) async fn handle_publish_certification_network(
     headers: HeaderMap,
     Json(request): Json<CertificationNetworkPublishRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsWrite) {
         return response;
     }
     let (_, network) = match load_certification_discovery_network_for_admin(&state.config) {
@@ -362,7 +369,7 @@ pub(crate) async fn handle_discover_certification(
     AxumPath(tool_server_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsRead) {
         return response;
     }
     let (_, network) = match load_certification_discovery_network_for_admin(&state.config) {
@@ -379,7 +386,7 @@ pub(crate) async fn handle_search_certification_marketplace(
     headers: HeaderMap,
     Query(query): Query<CertificationMarketplaceSearchQuery>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsRead) {
         return response;
     }
     let (_, network) = match load_certification_discovery_network_for_admin(&state.config) {
@@ -397,7 +404,7 @@ pub(crate) async fn handle_transparency_certification_marketplace(
     headers: HeaderMap,
     Query(query): Query<CertificationMarketplaceTransparencyQuery>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsRead) {
         return response;
     }
     let (_, network) = match load_certification_discovery_network_for_admin(&state.config) {
@@ -417,7 +424,7 @@ pub(crate) async fn handle_consume_certification_marketplace(
     headers: HeaderMap,
     Json(request): Json<CertificationConsumptionRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsWrite) {
         return response;
     }
     let (_, network) = match load_certification_discovery_network_for_admin(&state.config) {
@@ -437,7 +444,7 @@ pub(crate) async fn handle_revoke_certification(
     Json(request): Json<CertificationRevocationRequest>,
 ) -> Response {
     use super::registry_write_lane::{configured_registry_file, run_registry_update};
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsWrite) {
         return response;
     }
     let path = match configured_registry_file(
@@ -464,7 +471,7 @@ pub(crate) async fn handle_dispute_certification(
     Json(request): Json<CertificationDisputeRequest>,
 ) -> Response {
     use super::registry_write_lane::{configured_registry_file, run_registry_update};
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CertificationsWrite) {
         return response;
     }
     let path = match configured_registry_file(

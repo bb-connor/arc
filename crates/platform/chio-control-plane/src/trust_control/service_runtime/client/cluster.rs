@@ -17,6 +17,12 @@ impl TrustControlClient {
         self.get_internal_json(INTERNAL_CLUSTER_STATUS_PATH, None)
     }
 
+    /// The authority status the peer admits for serving.
+    pub(crate) fn peer_authority_status(&self) -> Result<TrustAuthorityStatus, CliError> {
+        self.validate_authority_transport()?;
+        self.get_internal_json(INTERNAL_AUTHORITY_STATUS_PATH, None)
+    }
+
     pub(crate) fn authority_snapshot(&self) -> Result<AuthoritySnapshotView, CliError> {
         self.validate_authority_transport()?;
         self.get_internal_json(INTERNAL_AUTHORITY_SNAPSHOT_PATH, None)

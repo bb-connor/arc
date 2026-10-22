@@ -7,7 +7,7 @@ use super::report_rendering::{
 };
 use super::report_validation::{
     bearer_token_from_headers, load_capability_authority,
-    load_capability_authority_with_deferred_lineage, validate_service_auth,
+    load_capability_authority_with_deferred_lineage, validate_caller,
 };
 use super::*;
 
@@ -189,10 +189,10 @@ pub(crate) async fn handle_create_passport_issuance_offer(
     headers: HeaderMap,
     Json(payload): Json<CreatePassportIssuanceOfferRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, PASSPORT_ISSUANCE_OFFERS_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, PASSPORT_ISSUANCE_OFFERS_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -342,7 +342,7 @@ pub(crate) async fn handle_list_passport_statuses(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportRead) {
         return response;
     }
     match load_passport_status_registry_for_admin(&state.config) {
@@ -361,7 +361,7 @@ pub(crate) async fn handle_get_passport_status(
     AxumPath(passport_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportRead) {
         return response;
     }
     let registry = match load_passport_status_registry_for_admin(&state.config) {
@@ -387,7 +387,7 @@ pub(crate) async fn handle_publish_passport_status(
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
     use super::registry_write_lane::{configured_registry_file, run_registry_update};
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
     let path = match configured_registry_file(
@@ -419,7 +419,7 @@ pub(crate) async fn handle_resolve_passport_status(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportRead) {
         return response;
     }
     let resolution =
@@ -459,7 +459,7 @@ pub(crate) async fn handle_revoke_passport_status(
     Json(request): Json<PassportStatusRevocationRequest>,
 ) -> Response {
     use super::registry_write_lane::{configured_registry_file, run_registry_update};
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
     let path = match configured_registry_file(
@@ -486,7 +486,7 @@ pub(crate) async fn handle_list_verifier_policies(
     State(state): State<TrustServiceState>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportRead) {
         return response;
     }
     match load_verifier_policy_registry_for_admin(&state.config) {
@@ -505,7 +505,7 @@ pub(crate) async fn handle_get_verifier_policy(
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportRead) {
         return response;
     }
     let registry = match load_verifier_policy_registry_for_admin(&state.config) {
@@ -527,7 +527,7 @@ pub(crate) async fn handle_upsert_verifier_policy(
     headers: HeaderMap,
     Json(mut document): Json<SignedPassportVerifierPolicy>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
     use super::registry_write_lane::{
@@ -561,7 +561,7 @@ pub(crate) async fn handle_delete_verifier_policy(
     AxumPath(policy_id): AxumPath<String>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
     use super::registry_write_lane::{
@@ -594,10 +594,10 @@ pub(crate) async fn handle_create_passport_challenge(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, PASSPORT_CHALLENGES_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, PASSPORT_CHALLENGES_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -766,10 +766,10 @@ pub(crate) async fn handle_verify_passport_challenge(
     headers: HeaderMap,
     Json(payload): Json<VerifyPassportChallengeRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, PASSPORT_CHALLENGE_VERIFY_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, PASSPORT_CHALLENGE_VERIFY_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -923,10 +923,10 @@ pub(crate) async fn handle_create_oid4vp_request(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::PassportWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, PASSPORT_OID4VP_REQUESTS_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, PASSPORT_OID4VP_REQUESTS_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,
@@ -1292,10 +1292,10 @@ pub(crate) async fn handle_federated_issue(
         Ok(now) => now,
         Err(error) => return plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()),
     };
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::FederationWrite) {
         return response;
     }
-    match forward_post_to_leader(&state, FEDERATED_ISSUE_PATH, &payload).await {
+    match forward_post_to_leader(&state, &headers, FEDERATED_ISSUE_PATH, &payload).await {
         Ok(Some(response)) => return response,
         Ok(None) => {}
         Err(response) => return response,

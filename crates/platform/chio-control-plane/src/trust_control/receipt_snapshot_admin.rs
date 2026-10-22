@@ -15,7 +15,7 @@
 //! A raised quota is runtime-only: it is lost on restart, which applies the
 //! configured `--receipt-query-snapshot-quota-bytes` again. Change that setting
 //! to keep the larger quota.
-use super::report_validation::validate_service_auth;
+use super::report_validation::validate_caller;
 use super::*;
 use chio_store_sqlite::receipt_query_snapshot::{
     ReceiptQuerySnapshotRecovery, ReceiptQuerySnapshotRecoveryError,
@@ -40,7 +40,7 @@ pub(crate) async fn handle_receipt_query_snapshot_recovery(
     headers: HeaderMap,
     Json(request): Json<ReceiptQuerySnapshotRecoveryRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReceiptsAdmin) {
         return response;
     }
     let Some(snapshots) = state.receipt_query_snapshots.as_ref() else {

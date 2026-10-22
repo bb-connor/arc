@@ -7,7 +7,7 @@ impl TrustControlClient {
         path: &str,
         term: Option<u64>,
     ) -> Result<T, CliError> {
-        self.request_internal_get_json(path, path, term)
+        self.request_internal_get_json(path, term)
     }
 
     pub(super) fn get_internal_json_with_query<Q: Serialize, T: for<'de> Deserialize<'de>>(
@@ -24,7 +24,7 @@ impl TrustControlClient {
         } else {
             format!("{path}?{encoded_query}")
         };
-        self.request_internal_get_json(&url, path, term)
+        self.request_internal_get_json(&url, term)
     }
 
     pub(super) fn get_json<T: for<'de> Deserialize<'de>>(&self, path: &str) -> Result<T, CliError> {
@@ -118,18 +118,36 @@ impl TrustControlClient {
         )
     }
 
-    pub(crate) fn post_internal_json<B: Serialize, T: for<'de> Deserialize<'de>>(
+    /// Forward an authority mutation to the leader with the caller's bearer
+    /// and the authority term this follower observed.
+    pub(crate) fn post_json_forwarding_authority_term<
+        B: Serialize,
+        T: for<'de> Deserialize<'de>,
+    >(
         &self,
         path: &str,
         body: &B,
-        term: Option<u64>,
+        term: u64,
     ) -> Result<T, CliError> {
         let json = serde_json::to_value(body).map_err(|error| {
             CliError::cli_other_error(format!(
                 "failed to serialize trust control request: {error}"
             ))
         })?;
-        self.request_internal_post_json(path, json, term)
+        let term = term.to_string();
+        self.request_json(
+            |client, url, token| {
+                client
+                    .post(url)
+                    .set(AUTHORIZATION.as_str(), &format!("Bearer {token}"))
+                    .set(
+                        super::super::super::report_validation::FORWARDED_AUTHORITY_TERM_HEADER,
+                        &term,
+                    )
+                    .send_json(json.clone())
+            },
+            path,
+        )
     }
 
     pub(super) fn public_post_json<B: Serialize, T: for<'de> Deserialize<'de>>(
@@ -217,7 +235,6 @@ impl TrustControlClient {
     fn request_internal_get_json<T>(
         &self,
         request_path: &str,
-        auth_endpoint: &str,
         term: Option<u64>,
     ) -> Result<T, CliError>
     where
@@ -235,60 +252,8 @@ impl TrustControlClient {
                     ))?,
                 request_path
             );
-            let request = if self.cluster_peer_auth.is_some() {
-                self.build_internal_get_request(&self.http, &url, auth_endpoint, term)?
-            } else {
-                self.http
-                    .get(&url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
-            };
+            let request = self.build_internal_get_request(&self.http, &url, request_path, term)?;
             match request.call() {
-                Ok(response) => {
-                    self.mark_preferred(index);
-                    return read_capped_json(response.into_reader(), MAX_PEER_RESPONSE_BYTES);
-                }
-                Err(ureq::Error::Status(_, response)) => {
-                    last_error = Some(response.into_string().unwrap_or_default());
-                }
-                Err(ureq::Error::Transport(error)) => {
-                    last_error = Some(format!("trust control service transport failed: {error}"));
-                }
-            }
-        }
-        Err(CliError::cli_other_error(last_error.unwrap_or_else(|| {
-            "trust control service request failed".to_string()
-        })))
-    }
-
-    fn request_internal_post_json<T>(
-        &self,
-        path: &str,
-        body: Value,
-        term: Option<u64>,
-    ) -> Result<T, CliError>
-    where
-        T: for<'de> Deserialize<'de>,
-    {
-        let endpoint_order = self.endpoint_order();
-        let mut last_error = None;
-        for index in endpoint_order {
-            let url = format!(
-                "{}{}",
-                self.endpoints
-                    .get(index)
-                    .ok_or_else(|| CliError::cli_other_error(
-                        "endpoint order contains an unknown endpoint".to_owned()
-                    ))?,
-                path
-            );
-            let request = if self.cluster_peer_auth.is_some() {
-                self.build_internal_post_request(&self.http, &url, path, term)?
-            } else {
-                self.http
-                    .post(&url)
-                    .set(AUTHORIZATION.as_str(), &format!("Bearer {}", self.token))
-            };
-            match request.send_json(body.clone()) {
                 Ok(response) => {
                     self.mark_preferred(index);
                     return read_capped_json(response.into_reader(), MAX_PEER_RESPONSE_BYTES);

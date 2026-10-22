@@ -630,7 +630,8 @@ async fn final_f11_former_custodian_requires_an_unexpired_imported_envelope() {
     .await;
     let mut standalone = state;
     standalone.cluster = None;
-    standalone.config.peer_urls.clear();
+    standalone.config.access =
+        crate::trust_control::caller_credentials::tests::test_access("token");
     load_authority_status_for_state(&standalone).test_unwrap();
 }
 
@@ -802,8 +803,12 @@ fn final_f11_cluster_startup_does_not_substitute_a_native_clock_for_its_owner() 
         .initialize_replication("cluster-clock-owner")
         .test_unwrap();
     let mut config = base_config();
-    config.advertise_url = Some("https://node-a".into());
-    config.peer_urls = vec!["https://node-b".into()];
+    crate::trust_control::caller_credentials::tests::set_test_peers_with_secret(
+        &mut config,
+        "token",
+        "https://node-a",
+        &["https://node-b"],
+    );
     config.authority_db_path = Some(path);
     build_cluster_state(&config, config.listen, owner_clock).test_unwrap();
     assert!(

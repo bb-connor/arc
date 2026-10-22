@@ -19851,7 +19851,6 @@
     "crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs": [
       "read_capped_json::shared-reader::crates/platform/chio-control-plane/src/json_input.rs::read",
       "request_internal_get_json::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json",
-      "request_internal_post_json::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json",
       "request_json_capped::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json",
       "request_json_without_service_auth::shared-reader::crates/platform/chio-control-plane/src/trust_control/service_runtime/client/transport.rs::read_capped_json"
     ],

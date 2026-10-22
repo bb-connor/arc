@@ -351,10 +351,11 @@ async fn http_pages_use_the_pinned_projection_and_refuse_a_changed_returned_leaf
     state.config.receipt_db_path = Some(path.clone());
     state.receipt_store = Some(store);
     state.receipt_query_snapshots = Some(Arc::clone(&snapshots));
-    state
-        .config
-        .tenant_read_tokens
-        .insert("snapshot-tenant".into(), "tenant-secret".into());
+    state.config.access = crate::trust_control::caller_credentials::tests::test_access_with_roles(
+        "snapshot-secret",
+        None,
+        &[("snapshot-tenant", "tenant-secret")],
+    );
     let original = appended
         .last()
         .test_expect("fixture contains a live final row");

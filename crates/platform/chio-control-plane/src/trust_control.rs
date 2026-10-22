@@ -246,7 +246,6 @@ use chio_store_sqlite::{
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{json, Value};
-use subtle::ConstantTimeEq;
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::set_header::SetResponseHeaderLayer;
 use tracing::{info, warn};
@@ -421,6 +420,7 @@ pub(crate) use self::finding_status_handlers::*;
 // The evidenced-rail seam is part of the finding lane's deployment
 // surface: the dispute-fee charge takes it by injection exactly as the
 // admission and participation charges do.
+pub(crate) use self::caller_credentials::Scope;
 pub use self::finding_handlers::{
     FindingRailInstruction, FindingRailObservation, FindingRailObserver, VenueLedgerRailObserver,
 };

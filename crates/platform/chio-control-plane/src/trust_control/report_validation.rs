@@ -183,229 +183,69 @@ pub(crate) fn bearer_token_from_headers(headers: &HeaderMap) -> Result<String, R
     Err(response)
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ClusterPeerAuthContext {
-    pub(crate) node_id: String,
-    pub(crate) issued_at: i64,
-    pub(crate) term: Option<u64>,
-}
+/// Header a follower sets when it forwards an authority mutation to the
+/// leader: the authority lease term the follower observed. It only narrows a
+/// request; a mismatching term refuses and it grants nothing.
+pub(crate) const FORWARDED_AUTHORITY_TERM_HEADER: &str = "x-chio-forwarded-authority-term";
 
-static CLUSTER_PEER_AUTH_FAILURES: LazyLock<Mutex<HashMap<String, Vec<u64>>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-
-fn prune_cluster_peer_auth_failures(failures: &mut Vec<u64>, now: u64) {
-    let cutoff = now.saturating_sub(CLUSTER_AUTH_FAILURE_WINDOW_SECS);
-    failures.retain(|recorded_at| *recorded_at >= cutoff);
-}
-
-fn cluster_peer_auth_is_rate_limited(node_id: &str, now: u64) -> bool {
-    let Ok(mut failures) = CLUSTER_PEER_AUTH_FAILURES.lock() else {
-        return false;
-    };
-    let Some(history) = failures.get_mut(node_id) else {
-        return false;
-    };
-    prune_cluster_peer_auth_failures(history, now);
-    if history.is_empty() {
-        failures.remove(node_id);
-        return false;
-    }
-    history.len() >= CLUSTER_AUTH_FAILURE_BURST
-}
-
-fn record_cluster_peer_auth_failure(node_id: &str) {
-    let Ok(clock_now) = unix_timestamp_now() else {
-        return;
-    };
-    let now = clock_now;
-    let Ok(mut failures) = CLUSTER_PEER_AUTH_FAILURES.lock() else {
-        return;
-    };
-    let history = failures.entry(node_id.to_string()).or_default();
-    prune_cluster_peer_auth_failures(history, now);
-    history.push(now);
-}
-
-pub(crate) fn clear_cluster_peer_auth_failures(node_id: &str) {
-    if let Ok(mut failures) = CLUSTER_PEER_AUTH_FAILURES.lock() {
-        failures.remove(node_id);
-    }
-}
-
-pub(crate) fn cluster_peer_auth_unverified_failure_key(node_id: &str, endpoint: &str) -> String {
-    let payload = format!("{node_id}\0{endpoint}");
-    format!("unverified:{}", sha256_hex(payload.as_bytes()))
-}
-
-pub(crate) fn cluster_peer_auth_signature(
-    service_token: &str,
-    node_id: &str,
-    endpoint: &str,
-    issued_at: i64,
-    term: Option<u64>,
-) -> Result<String, CliError> {
-    let payload = canonical_json_bytes(&json!({
-        "scheme": CLUSTER_AUTH_SCHEME,
-        "serviceToken": service_token,
-        "nodeId": node_id,
-        "endpoint": endpoint,
-        "issuedAt": issued_at,
-        "term": term,
-    }))
-    .map_err(|error| {
-        CliError::cli_other_error(format!(
-            "failed to encode cluster peer auth payload: {error}"
-        ))
-    })?;
-    Ok(sha256_hex(&payload))
-}
-
-pub(crate) fn validate_cluster_peer_auth(
+/// Authenticate the bearer caller credential and require `scope`.
+pub(crate) fn validate_caller(
     headers: &HeaderMap,
     config: &TrustServiceConfig,
-    endpoint: &str,
-) -> Result<ClusterPeerAuthContext, Response> {
-    let clock_now = unix_timestamp_now()
-        .map_err(|error| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, error.code()))?;
-    let node_id = headers
-        .get(CLUSTER_NODE_ID_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| normalize_cluster_url(value).ok())
-        .ok_or_else(cluster_peer_auth_error)?;
-    let issued_at = headers
-        .get(CLUSTER_AUTH_ISSUED_AT_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.parse::<i64>().ok())
-        .ok_or_else(cluster_peer_auth_error)?;
-    let signature = headers
-        .get(CLUSTER_AUTH_SIGNATURE_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(cluster_peer_auth_error)?;
-    let term = headers
-        .get(CLUSTER_AUTH_TERM_HEADER)
-        .and_then(|value| value.to_str().ok())
-        .map(|value| {
-            value.parse::<u64>().map_err(|_| {
-                plain_http_error(StatusCode::UNAUTHORIZED, "invalid cluster peer term header")
-            })
+    scope: super::caller_credentials::Scope,
+) -> Result<super::caller_credentials::AuthenticatedCaller, Response> {
+    config
+        .access
+        .credentials()
+        .validate_caller(headers, scope)
+        .map_err(super::caller_credentials::CallerAuthError::into_response)
+}
+
+fn forwarded_authority_term(headers: &HeaderMap) -> Result<Option<u64>, Response> {
+    let mut values = headers.get_all(FORWARDED_AUTHORITY_TERM_HEADER).iter();
+    let Some(value) = values.next() else {
+        return Ok(None);
+    };
+    if values.next().is_some() {
+        return Err(plain_http_error(
+            StatusCode::BAD_REQUEST,
+            "forwarded authority term header must appear once",
+        ));
+    }
+    value
+        .to_str()
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(Some)
+        .ok_or_else(|| {
+            plain_http_error(StatusCode::BAD_REQUEST, "invalid forwarded authority term")
         })
-        .transpose()?;
-    let unverified_failure_key = cluster_peer_auth_unverified_failure_key(&node_id, endpoint);
-    let allowlisted = config
-        .peer_urls
-        .iter()
-        .filter_map(|peer_url| normalize_cluster_url(peer_url).ok())
-        .any(|peer_url| peer_url == node_id);
-    if !allowlisted {
-        return Err(plain_http_error(
-            StatusCode::FORBIDDEN,
-            "cluster peer is not in the configured allowlist",
-        ));
-    }
-    let now = i64::try_from(clock_now).map_err(|_| {
-        plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "clock exceeds signed timestamp field",
-        )
-    })?;
-    let expected =
-        cluster_peer_auth_signature(&config.service_token, &node_id, endpoint, issued_at, term)
-            .map_err(|error| {
-                plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string())
-            })?;
-    if !bool::from(signature.as_bytes().ct_eq(expected.as_bytes())) {
-        if cluster_peer_auth_is_rate_limited(&unverified_failure_key, clock_now) {
-            let mut response = plain_http_error(
-                StatusCode::TOO_MANY_REQUESTS,
-                "cluster peer authentication temporarily rate limited after repeated invalid signatures",
-            );
-            response.headers_mut().insert(
-                axum::http::header::RETRY_AFTER,
-                HeaderValue::from_static("60"),
-            );
-            return Err(response);
-        }
-        record_cluster_peer_auth_failure(&unverified_failure_key);
-        return Err(cluster_peer_auth_error());
-    }
-    if cluster_peer_auth_is_rate_limited(&node_id, clock_now) {
-        let mut response = plain_http_error(
-            StatusCode::TOO_MANY_REQUESTS,
-            "cluster peer authentication temporarily rate limited after repeated verified failures",
-        );
-        response.headers_mut().insert(
-            axum::http::header::RETRY_AFTER,
-            HeaderValue::from_static("60"),
-        );
-        return Err(response);
-    }
-    if issued_at > now.saturating_add(CLUSTER_AUTH_MAX_SKEW_SECS) {
-        record_cluster_peer_auth_failure(&node_id);
-        return Err(plain_http_error(
-            StatusCode::UNAUTHORIZED,
-            "cluster peer auth timestamp is in the future",
-        ));
-    }
-    if issued_at < now.saturating_sub(CLUSTER_AUTH_MAX_SKEW_SECS) {
-        record_cluster_peer_auth_failure(&node_id);
-        return Err(plain_http_error(
-            StatusCode::UNAUTHORIZED,
-            "cluster peer auth timestamp expired outside the allowed skew window",
-        ));
-    }
-    clear_cluster_peer_auth_failures(&node_id);
-    Ok(ClusterPeerAuthContext {
-        node_id,
-        issued_at,
-        term,
-    })
 }
 
-fn cluster_peer_auth_error() -> Response {
-    let mut response = plain_http_error(
-        StatusCode::UNAUTHORIZED,
-        "missing or invalid cluster peer authentication",
-    );
-    response.headers_mut().insert(
-        WWW_AUTHENTICATE,
-        HeaderValue::from_static(CLUSTER_AUTH_SCHEME),
-    );
-    response
-}
-
+/// Authenticate an authority mutation (`authority:admin`) and return the
+/// forwarded authority term when a follower forwarded it.
 pub(crate) fn validate_authority_mutation_auth(
     headers: &HeaderMap,
     state: &TrustServiceState,
-    endpoint: &str,
-) -> Result<Option<ClusterPeerAuthContext>, Response> {
-    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
-    if has_cluster_peer_headers {
-        let peer = validate_cluster_peer_auth(headers, &state.config, endpoint)?;
-        validate_authority_mutation_term(state, Some(&peer))?;
-        return Ok(Some(peer));
-    }
-    validate_service_auth(headers, &state.config.service_token)?;
-    Ok(None)
+) -> Result<Option<u64>, Response> {
+    validate_caller(
+        headers,
+        &state.config,
+        super::caller_credentials::Scope::AuthorityAdmin,
+    )?;
+    let term = forwarded_authority_term(headers)?;
+    validate_authority_mutation_term(state, term)?;
+    Ok(term)
 }
 
-/// Recheck an authenticated forward against the live lease at execution time.
+/// Recheck a forwarded mutation against the live lease at execution time.
 /// Queueing must not transfer a request from an earlier election into a new term.
 pub(crate) fn validate_authority_mutation_term(
     state: &TrustServiceState,
-    peer: Option<&ClusterPeerAuthContext>,
+    term: Option<u64>,
 ) -> Result<(), Response> {
-    let Some(peer) = peer else {
+    let Some(term) = term else {
         return Ok(());
-    };
-    let Some(term) = peer.term else {
-        return Err(plain_http_error(
-            StatusCode::UNAUTHORIZED,
-            "cluster authority mutation is missing the forwarded term",
-        ));
     };
     let Some(authority_lease) = cluster_authority_lease_view(state) else {
         return Err(plain_http_error(
@@ -428,41 +268,20 @@ pub(crate) fn validate_authority_mutation_term(
     Ok(())
 }
 
-pub(crate) fn validate_authority_workload_auth(
-    headers: &HeaderMap,
-    config: &TrustServiceConfig,
-) -> Result<(), Response> {
-    let service_error = match validate_service_auth(headers, &config.service_token) {
-        Ok(()) => return Ok(()),
-        Err(response) => response,
-    };
-    let Some(expected) = config.authority_workload_token.as_deref() else {
-        return Err(service_error);
-    };
-    let Some(provided) = control_bearer_token(headers) else {
-        return Err(service_error);
-    };
-    if bool::from(provided.as_bytes().ct_eq(expected.as_bytes())) {
-        Ok(())
-    } else {
-        Err(service_error)
-    }
-}
-
+/// Authenticate capability issuance (`capabilities:issue`) and return the
+/// forwarded authority term when a follower forwarded it.
 pub(crate) fn validate_authority_issue_auth(
     headers: &HeaderMap,
     state: &TrustServiceState,
-    endpoint: &str,
-) -> Result<Option<ClusterPeerAuthContext>, Response> {
-    let has_cluster_peer_headers = headers.contains_key(CLUSTER_NODE_ID_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_ISSUED_AT_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_SIGNATURE_HEADER)
-        || headers.contains_key(CLUSTER_AUTH_TERM_HEADER);
-    if has_cluster_peer_headers {
-        return validate_authority_mutation_auth(headers, state, endpoint);
-    }
-    validate_authority_workload_auth(headers, &state.config)?;
-    Ok(None)
+) -> Result<Option<u64>, Response> {
+    validate_caller(
+        headers,
+        &state.config,
+        super::caller_credentials::Scope::CapabilitiesIssue,
+    )?;
+    let term = forwarded_authority_term(headers)?;
+    validate_authority_mutation_term(state, term)?;
+    Ok(term)
 }
 
 pub(crate) fn enforce_authority_mutation_fence(
@@ -525,44 +344,6 @@ pub(crate) fn refresh_authority_mutation_fence(state: &TrustServiceState) -> Res
     Ok(())
 }
 
-pub(crate) fn validate_service_auth(
-    headers: &HeaderMap,
-    service_token: &str,
-) -> Result<(), Response> {
-    if service_token.is_empty() {
-        return Err(plain_http_error(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "control service token must be non-empty",
-        ));
-    }
-    let Some(provided) = control_bearer_token(headers) else {
-        return Err(missing_or_invalid_control_token());
-    };
-    if bool::from(provided.as_bytes().ct_eq(service_token.as_bytes())) {
-        return Ok(());
-    }
-    Err(missing_or_invalid_control_token())
-}
-
-fn control_bearer_token(headers: &HeaderMap) -> Option<&str> {
-    let header = headers
-        .get(AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())?;
-    let provided = header.strip_prefix("Bearer ")?;
-    (!provided.is_empty()).then_some(provided)
-}
-
-fn missing_or_invalid_control_token() -> Response {
-    let mut response = plain_http_error(
-        StatusCode::UNAUTHORIZED,
-        "missing or invalid control bearer token",
-    );
-    response
-        .headers_mut()
-        .insert(WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
-    response
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ResolvedControlReadPrincipal {
     AdminService,
@@ -590,13 +371,13 @@ impl ResolvedControlReadPrincipal {
                     Some(ReceiptReadBoundary::AdminAll) => {
                         return Err(plain_http_error(
                             StatusCode::FORBIDDEN,
-                            "tenant read token cannot request admin-all evidence export",
+                            "tenant credential cannot request admin-all evidence export",
                         ));
                     }
                     Some(ReceiptReadBoundary::TenantScoped { tenant }) if tenant != tenant_id => {
                         return Err(plain_http_error(
                             StatusCode::FORBIDDEN,
-                            "tenant read token cannot export evidence for another tenant",
+                            "tenant credential cannot export evidence for another tenant",
                         ));
                     }
                     Some(ReceiptReadBoundary::TenantScoped { .. }) => {}
@@ -613,7 +394,7 @@ impl ResolvedControlReadPrincipal {
                 {
                     return Err(plain_http_error(
                         StatusCode::FORBIDDEN,
-                        "tenant read token cannot narrow evidence export to another tenant",
+                        "tenant credential cannot narrow evidence export to another tenant",
                     ));
                 }
                 query.tenant = Some(tenant_id.clone());
@@ -623,27 +404,23 @@ impl ResolvedControlReadPrincipal {
     }
 }
 
+/// Authenticate a read caller requiring `scope` and resolve its read boundary:
+/// a `Deployment` credential reads its deployment, a `Tenant(t)` credential
+/// only tenant `t`.
 pub(crate) fn resolve_control_read_principal(
     headers: &HeaderMap,
     config: &TrustServiceConfig,
+    scope: super::caller_credentials::Scope,
 ) -> Result<ResolvedControlReadPrincipal, Response> {
-    config
-        .validate()
-        .map_err(|error| plain_http_error(StatusCode::INTERNAL_SERVER_ERROR, &error.to_string()))?;
-    let Some(provided) = control_bearer_token(headers) else {
-        return Err(missing_or_invalid_control_token());
-    };
-    if bool::from(provided.as_bytes().ct_eq(config.service_token.as_bytes())) {
-        return Ok(ResolvedControlReadPrincipal::AdminService);
-    }
-    for (tenant_id, token) in &config.tenant_read_tokens {
-        if bool::from(provided.as_bytes().ct_eq(token.as_bytes())) {
-            return Ok(ResolvedControlReadPrincipal::TenantRead {
-                tenant_id: tenant_id.clone(),
-            });
+    let caller = validate_caller(headers, config, scope)?;
+    Ok(match caller.tenant_authority {
+        super::caller_credentials::TenantAuthority::Deployment => {
+            ResolvedControlReadPrincipal::AdminService
         }
-    }
-    Err(missing_or_invalid_control_token())
+        super::caller_credentials::TenantAuthority::Tenant(tenant_id) => {
+            ResolvedControlReadPrincipal::TenantRead { tenant_id }
+        }
+    })
 }
 
 pub(crate) fn validate_metered_billing_reconciliation_request(

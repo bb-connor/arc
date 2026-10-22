@@ -914,3 +914,159 @@ fn cluster_identity_rules_refuse_at_startup() {
         TrustAccessError::SelfPinned(SELF_NODE.to_string())
     );
 }
+
+/// Deterministic test node key for `node_id`, so every test node pins the same
+/// key for a peer.
+pub(crate) fn test_node_keypair(node_id: &str) -> Keypair {
+    let normalized = normalize_cluster_url(node_id).test_unwrap();
+    let seed: [u8; 32] = Sha256::digest(format!("chio-test-node:{normalized}").as_bytes()).into();
+    Keypair::from_seed(&seed)
+}
+
+/// Every non-cluster scope, for a test credential standing in for a full
+/// deployment client.
+pub(crate) fn all_caller_scopes() -> Vec<&'static str> {
+    Scope::ALL
+        .iter()
+        .filter(|scope| !scope.is_cluster())
+        .map(|scope| scope.as_str())
+        .collect()
+}
+
+/// Access for a single test node: one deployment credential for `secret`
+/// holding every caller scope.
+pub(crate) fn test_access(secret: &str) -> std::sync::Arc<TrustAccess> {
+    test_access_with_cluster(secret, &[], None, &[])
+}
+
+/// Access for a test node: a full deployment credential for `secret`, one
+/// `Tenant(t)` read credential per `(tenant, secret)` pair, and when
+/// `self_node` is set, a cluster identity pinning each of `peers` (with
+/// `internal_url` equal to the peer node id).
+pub(crate) fn test_access_with_cluster(
+    secret: &str,
+    tenant_readers: &[(&str, &str)],
+    self_node: Option<&str>,
+    peers: &[&str],
+) -> std::sync::Arc<TrustAccess> {
+    let mut body = credential(
+        "test-deployment-client",
+        "deployment",
+        secret,
+        &all_caller_scopes(),
+        None,
+    );
+    for (index, (tenant, tenant_secret)) in tenant_readers.iter().enumerate() {
+        body.push_str(&credential(
+            &format!("test-tenant-reader-{index}"),
+            "caller",
+            tenant_secret,
+            &["receipts:read", "reports:read", "evidence:read"],
+            Some(tenant),
+        ));
+    }
+    let node_keypair = match self_node {
+        Some(self_node) if !peers.is_empty() => {
+            body.push_str(&format!(
+                "[cluster]\nnode_id = \"{self_node}\"\nnode_key_file = \"/test/node.seed\"\n"
+            ));
+            for peer_url in peers {
+                body.push_str(&peer(
+                    peer_url,
+                    &test_node_keypair(peer_url),
+                    &["cluster:replicate", "cluster-openings:replicate"],
+                ));
+            }
+            Some(test_node_keypair(self_node))
+        }
+        _ => None,
+    };
+    let text = format!("deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:0\"\n{body}");
+    let config = TrustAccessConfig::from_toml_str(&text).test_unwrap();
+    std::sync::Arc::new(TrustAccess::from_parts(config, node_keypair).test_unwrap())
+}
+
+/// Access with one deployment credential for `secret` holding only `scopes`.
+pub(crate) fn test_access_with_scopes(
+    secret: &str,
+    scopes: &[&str],
+) -> std::sync::Arc<TrustAccess> {
+    let text = format!(
+        "deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:0\"\n{}",
+        credential("test-limited-client", "deployment", secret, scopes, None)
+    );
+    let config = TrustAccessConfig::from_toml_str(&text).test_unwrap();
+    std::sync::Arc::new(TrustAccess::from_parts(config, None).test_unwrap())
+}
+
+/// Make `config` a clustered test node at `self_node` pinning `peers`, with
+/// the same full deployment credential for `"token"`.
+pub(crate) fn set_test_peers(
+    config: &mut super::super::TrustServiceConfig,
+    self_node: &str,
+    peers: &[&str],
+) {
+    set_test_peers_with_secret(config, "token", self_node, peers);
+}
+
+/// As `set_test_peers`, with the full deployment credential for `secret`.
+pub(crate) fn set_test_peers_with_secret(
+    config: &mut super::super::TrustServiceConfig,
+    secret: &str,
+    self_node: &str,
+    peers: &[&str],
+) {
+    let self_id = normalize_cluster_url(self_node).test_unwrap();
+    let peers: Vec<&str> = peers
+        .iter()
+        .copied()
+        .filter(|peer| normalize_cluster_url(peer).test_unwrap() != self_id)
+        .collect();
+    config.advertise_url = Some(self_node.to_string());
+    config.access = test_access_with_cluster(secret, &[], Some(self_node), &peers);
+}
+
+/// Scopes of the authority workload credential tests stand up beside the
+/// full client: authority status and capability issuance only.
+pub(crate) const WORKLOAD_SCOPES: &[&str] = &["authority:read", "capabilities:issue"];
+
+/// Scopes a migrated tenant read credential holds.
+pub(crate) const TENANT_READ_SCOPES: &[&str] = &["receipts:read", "reports:read", "evidence:read"];
+
+/// Access with the full deployment credential for `secret`, an optional
+/// authority workload credential, and one tenant read credential per
+/// `(tenant, secret)`.
+pub(crate) fn test_access_with_roles(
+    secret: &str,
+    workload_secret: Option<&str>,
+    tenant_readers: &[(&str, &str)],
+) -> std::sync::Arc<TrustAccess> {
+    let mut body = credential(
+        "test-deployment-client",
+        "deployment",
+        secret,
+        &all_caller_scopes(),
+        None,
+    );
+    if let Some(workload_secret) = workload_secret {
+        body.push_str(&credential(
+            "test-authority-workload",
+            "deployment",
+            workload_secret,
+            WORKLOAD_SCOPES,
+            None,
+        ));
+    }
+    for (index, (tenant, tenant_secret)) in tenant_readers.iter().enumerate() {
+        body.push_str(&credential(
+            &format!("test-tenant-reader-{index}"),
+            "caller",
+            tenant_secret,
+            TENANT_READ_SCOPES,
+            Some(tenant),
+        ));
+    }
+    let text = format!("deployment = \"{DEPLOYMENT}\"\ninternal_listen = \"127.0.0.1:0\"\n{body}");
+    let config = TrustAccessConfig::from_toml_str(&text).test_unwrap();
+    std::sync::Arc::new(TrustAccess::from_parts(config, None).test_unwrap())
+}

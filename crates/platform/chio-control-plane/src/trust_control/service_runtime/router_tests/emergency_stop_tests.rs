@@ -57,9 +57,12 @@ async fn call(
     } else {
         axum::body::Body::from(serde_json::to_vec(&body)?)
     };
-    let response = super::super::build_router(state.clone())
-        .oneshot(request.body(body)?)
-        .await?;
+    let router = if uri.starts_with("/v1/internal/") {
+        super::super::build_internal_router(state.clone())
+    } else {
+        super::super::build_router(state.clone())
+    };
+    let response = router.oneshot(request.body(body)?).await?;
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024).await?;
     Ok((

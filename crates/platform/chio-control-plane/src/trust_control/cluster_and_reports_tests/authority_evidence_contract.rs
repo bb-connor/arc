@@ -153,11 +153,7 @@ pub(super) fn assert_source_unadmitted_sync(result: Result<(), CliError>) {
         ]
         .iter()
         .any(|reason| error.to_string()
-            == CliError::cli_other_error(format!(
-                "trust control service request failed with 503: {}",
-                json!({"error": reason})
-            ))
-            .to_string()),
+            == CliError::cli_other_error(json!({"error": reason}).to_string()).to_string()),
         "expected elected-source admission refusal, got {error}"
     );
 }
@@ -853,10 +849,7 @@ async fn final_f11_repair_peer_identity_alias_cannot_grant_elected_serving_or_is
     let mut state = state_with_cluster(&own_url, &[&alias_url], None, None, None);
     state.config.authority_db_path = Some(path);
     state.finding_challenge_clock = fixed_clock(now);
-    // Normal cluster construction removes the node's own URL from its peer
-    // entries while the configured authentication allowlist may retain it.
     // Both actual loopback listeners serve clones of ONE logical service.
-    state.config.peer_urls.push(own_url.clone());
     state.cluster = build_cluster_state(
         &state.config,
         state.config.listen,
@@ -865,18 +858,21 @@ async fn final_f11_repair_peer_identity_alias_cannot_grant_elected_serving_or_is
     .test_unwrap();
     let _own = ServedPeer::serve(own_listener, own_url.clone(), state.clone(), None);
     let _alias = ServedPeer::serve(alias_listener, alias_url.clone(), state.clone(), None);
-    let sync = sync_peer(&state, &alias_url);
-    eprintln!("alias sync result: {sync:?}");
+    // A request this node signs for the alias names the alias as recipient,
+    // so the node's own listener refuses it: an alias never authenticates.
+    let sync = sync_peer(&state, &alias_url).test_unwrap_err();
+    assert!(
+        sync.to_string()
+            .contains("cluster peer signature does not verify under a pinned key"),
+        "{sync}"
+    );
     let local =
         public_authority_status(&state.config, &state.finding_challenge_clock).test_unwrap();
     assert_eq!(
         local.public_key,
         Some(authority.status().test_unwrap().public_key.to_hex())
     );
-    assert_eq!(
-        current_leader_url(&state).as_deref(),
-        Some(own_url.as_str())
-    );
+    assert_eq!(current_leader_url(&state), None);
     let read = handle_authority_status(State(state.clone()), workload_headers()).await;
     let read_status = read.status();
     let read_body: Value =
@@ -903,14 +899,32 @@ async fn final_f11_repair_peer_identity_alias_cannot_grant_elected_serving_or_is
         StatusCode::SERVICE_UNAVAILABLE,
         "one logical service acquired trust quorum through its own URL alias"
     );
-    assert_eq!(
-        read_body.get("error").and_then(Value::as_str),
-        Some(UNRESOLVED)
+    assert!(
+        [
+            UNRESOLVED,
+            "cluster authority context changed during inspection"
+        ]
+        .contains(
+            &read_body
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+        ),
+        "{read_body}"
     );
     assert_eq!(issue_status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(
-        issue_body.get("error").and_then(Value::as_str),
-        Some(UNRESOLVED)
+    assert!(
+        [
+            UNRESOLVED,
+            "cluster quorum is unavailable for authority writes"
+        ]
+        .contains(
+            &issue_body
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+        ),
+        "{issue_body}"
     );
     assert!(with_peer_state(&state, &alias_url, |peer| peer
         .authority_agreement_confirmation
