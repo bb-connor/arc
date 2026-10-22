@@ -434,6 +434,93 @@ mod tests {
         );
     }
 
+    /// A digest of `path` read by a handle that holds no cached entry.
+    fn fresh_digest(path: &Path) -> String {
+        EnterpriseProviderRegistryFile::new(path)
+            .digest(&RemoteClock::new(Arc::new(FixedClock(0))))
+            .unwrap()
+    }
+
+    #[test]
+    fn a_rename_replace_with_the_same_length_and_mtime_is_read_again() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        let staged = directory.path().join("enterprise-providers.json.next");
+        let original = registry_bytes("https://issuer-a.example");
+        let replacement = registry_bytes("https://issuer-b.example");
+        assert_eq!(original.len(), replacement.len());
+        std::fs::write(&path, &original).unwrap();
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        let before = file.digest(&settled).unwrap();
+        assert_eq!(cached(&file), Some(before.clone()));
+        let admitted = FileIdentity::of(&path).unwrap();
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+
+        std::fs::write(&staged, &replacement).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&staged)
+            .unwrap()
+            .set_modified(modified)
+            .unwrap();
+        std::fs::rename(&staged, &path).unwrap();
+        let replaced = FileIdentity::of(&path).unwrap();
+        assert_ne!(replaced.ino, admitted.ino);
+        assert_eq!(
+            (replaced.dev, replaced.len, replaced.mtime),
+            (admitted.dev, admitted.len, admitted.mtime)
+        );
+
+        let after = file.digest(&settled).unwrap();
+        assert_ne!(
+            after, before,
+            "a rename-replace under the cached digest was missed"
+        );
+        assert_eq!(after, fresh_digest(&path));
+    }
+
+    #[test]
+    fn a_delete_and_recreate_within_one_second_is_read_again() {
+        let directory = chio_test_support::private_tempdir().unwrap();
+        let path = directory.path().join("enterprise-providers.json");
+        let original = registry_bytes("https://issuer-a.example");
+        let recreated = registry_bytes("https://issuer-b.example");
+        assert_eq!(original.len(), recreated.len());
+        std::fs::write(&path, &original).unwrap();
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        let settled = clock_after_change(&path, SETTLE_MILLIS);
+        // A cached identity is at least the settle interval old, so its
+        // ctime differs from any later write whether or not the inode is reused.
+        std::thread::sleep(std::time::Duration::from_millis(SETTLE_MILLIS + 100));
+        let file = EnterpriseProviderRegistryFile::new(&path);
+        let before = file.digest(&settled).unwrap();
+        assert_eq!(cached(&file), Some(before.clone()));
+        let admitted = FileIdentity::of(&path).unwrap();
+
+        std::fs::remove_file(&path).unwrap();
+        std::fs::write(&path, &recreated).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(modified)
+            .unwrap();
+        let recreated_identity = FileIdentity::of(&path).unwrap();
+        assert_eq!(
+            (recreated_identity.len, recreated_identity.mtime),
+            (admitted.len, admitted.mtime)
+        );
+        assert_ne!(recreated_identity.ctime, admitted.ctime);
+
+        let after = file.digest(&settled).unwrap();
+        assert_ne!(
+            after, before,
+            "a recreated registry under the cached digest was missed"
+        );
+        assert_eq!(after, fresh_digest(&path));
+    }
+
     #[test]
     fn a_removed_registry_refuses_after_a_cached_digest() {
         let directory = chio_test_support::private_tempdir().unwrap();
