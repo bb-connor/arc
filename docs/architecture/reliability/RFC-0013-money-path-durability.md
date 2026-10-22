@@ -185,13 +185,6 @@ The module doc at `budget_hierarchy.rs:9` claims "the tree renders a fail-closed
 (`budget_hierarchy.rs:334-364`) has `{ NodeDisabled, DimensionExceeded, WindowExpired,
 UnknownNode }`, no currency variant.
 
-The only `Eip3009NonceStore` implementation
-(`crates/economy/chio-settle/src/payments.rs:406`) is `InMemoryEip3009NonceStore`
-(`Mutex<HashMap>`); the doc at `payments.rs:366-371` claims a SQLite store "wired by
-default" that does not exist. At `DEFAULT_MAX_EIP3009_NONCE_ENTRIES = 65_536`
-(`payments.rs:284`) the record path returns `SettlementError::InvalidBinding`
-(`payments.rs:426-432`) and `gc_expired` (`payments.rs:437-442`) has no scheduler.
-
 `BudgetEnforcer` (`crates/economy/chio-metering/src/budget.rs:78-89`) holds a plain
 `u64 total_spent` and three `HashMap`s zeroed in `new()` (`budget.rs:91-101`);
 `record()` (`budget.rs:167-181`) mutates in memory only. No persistence seam.
