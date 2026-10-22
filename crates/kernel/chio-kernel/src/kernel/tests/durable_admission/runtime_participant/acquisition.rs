@@ -396,3 +396,101 @@ fn exhausted_budget_with_unconfirmed_runtime_release(nested: bool) {
     assert!(kernel.receipt_log().is_empty());
     assert_eq!(store.operation(), retained);
 }
+
+/// An operation-owned hook that claims its runtime reservation and then
+/// returns a decision naming a reserved key other than `chio_runtime`.
+struct ForgingClaimingVerifier {
+    binding: RuntimeParticipantAuthorityBindingV1,
+    forged_key: &'static str,
+    allow: bool,
+}
+
+impl RuntimeAdmissionHook for ForgingClaimingVerifier {
+    fn name(&self) -> &str {
+        "forging-claim-test"
+    }
+
+    fn runtime_participant_binding(&self) -> Option<&RuntimeParticipantAuthorityBindingV1> {
+        Some(&self.binding)
+    }
+
+    fn requires_dispatch_revalidation(&self) -> bool {
+        true
+    }
+
+    fn evaluate(
+        &self,
+        _: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        panic!("legacy evaluation is outside this test profile");
+    }
+
+    fn evaluate_operation_owned(
+        &self,
+        _: &RuntimeAdmissionContext<'_>,
+        authority: &RuntimeParticipantClaimAuthority<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        authority.claim(digest('b'), vec![])?;
+        let metadata = Some(serde_json::json!({
+            "chio_runtime": {"admission_id": "operation-owned"},
+            self.forged_key: {"hook": "other-hook", "accepted": false}
+        }));
+        Ok(if self.allow {
+            RuntimeAdmissionDecision::allow(metadata)
+        } else {
+            RuntimeAdmissionDecision::deny("operation-owned hook policy denies", metadata)
+        })
+    }
+}
+
+fn operation_owned_forgery_is_refused_and_released(forged_key: &'static str, allow: bool) {
+    let (mut kernel, request, store, invocations) =
+        durable_admission_fixture("runtime-claim-forged-metadata");
+    kernel.set_runtime_admission_hook(Arc::new(ForgingClaimingVerifier {
+        binding: RuntimeParticipantAuthorityBindingV1::new(
+            AdmissionIdentifier::try_new("runtime", "test-runtime").expect("runtime"),
+            AdmissionIdentifier::try_new("source", "test-source").expect("source"),
+        ),
+        forged_key,
+        allow,
+    }));
+    *store.runtime_recovery.0.lock().expect("fixture") = RecoveryState {
+        enabled: true,
+        history: Some(vec![]),
+        claim_mode: ClaimMode::Normal,
+        ..RecoveryState::default()
+    };
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("runtime admission denial");
+    assert_eq!(response.verdict, Verdict::Deny);
+    assert_eq!(
+        response.reason.as_deref(),
+        Some(format!("{forged_key} is reserved for kernel-derived receipts").as_str())
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0);
+    assert!(response
+        .receipt
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.get(forged_key))
+        .is_none());
+    let state = store.runtime_recovery.0.lock().expect("fixture");
+    let history = state.history.as_ref().expect("history");
+    assert_eq!(history.len(), 1);
+    assert_eq!(
+        history[0].disposition,
+        RuntimeParticipantDisposition::ReleasedBeforeDispatch
+    );
+    assert_eq!(state.release_calls, 1);
+}
+
+#[test]
+fn operation_owned_allow_naming_a_reserved_key_is_refused_and_released() {
+    operation_owned_forgery_is_refused_and_released("delivery_contract", true);
+}
+
+#[test]
+fn operation_owned_deny_forging_the_kernel_runtime_admission_record_is_refused_and_released() {
+    operation_owned_forgery_is_refused_and_released("runtime_admission", false);
+}

@@ -1402,12 +1402,9 @@ fn continuation_token_session_anchor_ignores_top_level_lineage_references() {
         .unwrap();
 
     assert_eq!(response.verdict, Verdict::Deny);
-    assert!(
-        response.reason.as_deref().is_some_and(|reason| reason.contains(
-            "governed call_chain continuation token parent_session_anchor could not be verified against authoritative parent lineage"
-        )),
-        "reason: {:?}",
-        response.reason
+    assert_eq!(
+        response.reason.as_deref(),
+        Some("governed transaction denied: governed call_chain continuation token parent_session_anchor could not be verified against authoritative parent lineage")
     );
 }
 

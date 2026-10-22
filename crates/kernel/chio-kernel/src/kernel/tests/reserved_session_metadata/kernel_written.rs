@@ -254,6 +254,95 @@ fn caller_cannot_set_original_metadata() {
     );
 }
 
+#[test]
+fn caller_cannot_set_finding_pool_mutation() {
+    assert_refused_on_every_caller_path(
+        "finding_pool_mutation",
+        "finding_pool_mutation is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
+fn caller_cannot_set_session_report() {
+    assert_refused_on_every_caller_path(
+        "session_report",
+        "session_report is reserved for kernel-derived receipts",
+    );
+}
+
+#[test]
+fn caller_cannot_set_prior_metadata() {
+    assert_refused_on_every_caller_path(
+        "prior_metadata",
+        "prior_metadata is reserved for kernel-derived receipts",
+    );
+}
+
+/// Pins the reserved set exactly, so a key added to or removed from the const
+/// fails here until its own refusal test exists, and pins each key's exact
+/// refusal reason.
+#[test]
+fn reserved_receipt_metadata_keys_are_pinned_exactly() {
+    assert_eq!(
+        crate::kernel::RESERVED_RECEIPT_METADATA_KEYS,
+        [
+            "admission_operation",
+            "attribution",
+            "chio_manifest_security_v1",
+            "protocol_admission",
+            "budget_authority",
+            "budget_denial_authority",
+            "financial",
+            "governed_transaction",
+            "caller_delivery",
+            "protocol_refusal",
+            "chio_runtime",
+            "receipt_context",
+            "governed_transaction_diagnostics",
+            "model_metadata",
+            "channel",
+            "delivery_contract",
+            "finding_delivery",
+            "finding_recovery",
+            "finding_purchase_replay_snapshot",
+            "finding_recovery_replay_snapshot",
+            "findingDenial",
+            "stream",
+            "threshold_approval",
+            "memory_provenance",
+            "post_invocation",
+            "execution_nonce",
+            "chio_kernel",
+            "runtime_admission",
+            "active_response_terminal_evidence",
+            "chio_http_receipt_v1",
+            "chio_receipt_signing_nonce",
+            "original_metadata",
+            "finding_pool_mutation",
+            "session_report",
+            "prior_metadata",
+        ]
+    );
+    for key in crate::kernel::RESERVED_RECEIPT_METADATA_KEYS {
+        let purpose = match key {
+            "chio_manifest_security_v1" => "registry-validated kernel entrypoints",
+            "protocol_admission" => "kernel-derived admission receipts",
+            "budget_authority" | "budget_denial_authority" => "kernel-derived budget receipts",
+            "financial" | "governed_transaction" => "kernel-derived economic receipts",
+            "chio_runtime" => "kernel-derived runtime admission reservations",
+            _ => "kernel-derived receipts",
+        };
+        let metadata = serde_json::json!({ key: {"forged": true} });
+        assert!(
+            refused(
+                crate::kernel::validate_caller_receipt_metadata(Some(&metadata)),
+                &format!("{key} is reserved for {purpose}")
+            ),
+            "{key}"
+        );
+    }
+}
+
 /// A refused forged HTTP receipt projection leaves nothing in the receipt log,
 /// and the next call signs a receipt without the projection key, so receipt
 /// readers and evidence export never see the forgery.
