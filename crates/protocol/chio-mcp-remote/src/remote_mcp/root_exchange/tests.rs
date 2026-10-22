@@ -4,17 +4,15 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use std::collections::{BTreeMap, HashMap};
-use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use crate::root_exchange::exchange::EntropyFailure;
 use crate::root_exchange::OAuthErrorCode;
 use crate::root_exchange::{
     jws::{CompactJws, VerifyingKey},
-    ClientRegistry, ConfidentialClient, ExchangeEntropy, ExchangeReplayStore, ExchangeServices,
-    IdJagGrant, IdpKey, IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord, ReplayBinding,
-    ReplayKey, RequestedTokenType, RootExchange, RootExchangeError,
-    CLIENT_ASSERTION_TYPE_JWT_BEARER,
+    ClientRegistry, ConfidentialClient, ExchangeReplayStore, ExchangeServices, IdJagGrant, IdpKey,
+    IdpKeyLookup, PreparedAnchoredRoot, ProviderRecord, ReplayBinding, ReplayKey,
+    RequestedTokenType, RootExchange, RootExchangeError, CLIENT_ASSERTION_TYPE_JWT_BEARER,
 };
 use async_trait::async_trait;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -23,6 +21,7 @@ use chio_control_plane::enterprise_federation::EnterpriseProviderRecord;
 use chio_core::capability::scope::{ChioScope, Operation, ToolGrant};
 use chio_core::capability::token::CapabilityToken;
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::rng::{Rng, RngError};
 use chio_core::root_authority::{
     check_root_consistency, ClaimValue, EnterpriseProviderIdentity, HolderClass, IdpKeySnapshot,
     Jwk, JwsAlgorithm, LoadedRootPolicy, RootConsistencyInput, RootPolicy, Sha256Digest,
@@ -264,14 +263,29 @@ impl ExchangeReplayStore for MemoryReplay {
     }
 }
 
-struct CountingEntropy(AtomicU64, AtomicBool);
+/// Deterministic bytes per draw. Draw `n` (0-based) and every later draw
+/// fail once `n >= fail_from`.
+struct CountingRng {
+    draws: AtomicU64,
+    fail_from: AtomicU64,
+}
 
-impl ExchangeEntropy for CountingEntropy {
-    fn fill(&self, dest: &mut [u8]) -> Result<(), EntropyFailure> {
-        if self.1.load(Ordering::SeqCst) {
-            return Err(EntropyFailure);
+impl CountingRng {
+    fn new() -> Self {
+        Self {
+            draws: AtomicU64::new(0),
+            fail_from: AtomicU64::new(u64::MAX),
         }
-        let seed = self.0.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl Rng for CountingRng {
+    fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), RngError> {
+        let draw = self.draws.fetch_add(1, Ordering::SeqCst);
+        if draw >= self.fail_from.load(Ordering::SeqCst) {
+            return Err(RngError("fixture source offline"));
+        }
+        let seed = draw + 1;
         for (index, byte) in dest.iter_mut().enumerate() {
             *byte = (seed as u8).wrapping_mul(31).wrapping_add(index as u8);
         }
@@ -332,7 +346,7 @@ struct Harness {
     exchange: RootExchange,
     keys: StubKeys,
     replay: MemoryReplay,
-    entropy: CountingEntropy,
+    entropy: CountingRng,
 }
 
 impl Harness {
@@ -365,7 +379,7 @@ impl Harness {
             exchange,
             keys: StubKeys::serving(&[idp_jwk(IDP_KID)]),
             replay: MemoryReplay::default(),
-            entropy: CountingEntropy(AtomicU64::new(1), AtomicBool::new(false)),
+            entropy: CountingRng::new(),
         }
     }
 
@@ -1622,23 +1636,41 @@ async fn root_lifetime_is_capped_by_the_policy_validity() {
     assert_eq!(prepared.anchor().assertion_exp, NOW + 290);
 }
 
+fn assert_entropy_denied_before_the_bind(harness: &Harness, error: RootExchangeError) {
+    assert_eq!(error, RootExchangeError::EntropyUnavailable);
+    assert_eq!(error.to_string(), "entropy source failed");
+    assert_eq!(error.oauth_error(), OAuthErrorCode::ServerError);
+    let bound = harness.replay.bound.lock().unwrap();
+    let ids: Vec<&str> = bound.keys().map(|key| key.id.as_str()).collect();
+    assert_eq!(ids, vec!["client-assertion-1"]);
+}
+
 #[tokio::test]
-async fn entropy_failure_denies_and_spends_no_id_jag() {
+async fn failing_rng_denies_before_the_replay_bind_and_root_insert() {
     let harness = Harness::new();
-    harness.entropy.1.store(true, Ordering::SeqCst);
+    harness.entropy.fail_from.store(0, Ordering::SeqCst);
     let error = harness
         .run(id_jag_header(), id_jag_claims())
         .await
         .unwrap_err();
-    assert_eq!(error, RootExchangeError::EntropyUnavailable);
-    assert_eq!(error.oauth_error(), OAuthErrorCode::ServerError);
-    assert!(harness
-        .replay
-        .bound
-        .lock()
-        .unwrap()
-        .keys()
-        .all(|key| key.id != "id-jag-1"));
+    assert_entropy_denied_before_the_bind(&harness, error);
+}
+
+#[tokio::test]
+async fn failing_last_draw_still_denies_before_the_replay_bind() {
+    let counted = Harness::new();
+    counted.run(id_jag_header(), id_jag_claims()).await.unwrap();
+    let draws = counted.entropy.draws.load(Ordering::SeqCst);
+    assert!(draws >= 2);
+
+    let harness = Harness::new();
+    harness.entropy.fail_from.store(draws - 1, Ordering::SeqCst);
+    let error = harness
+        .run(id_jag_header(), id_jag_claims())
+        .await
+        .unwrap_err();
+    assert_entropy_denied_before_the_bind(&harness, error);
+    assert_eq!(harness.entropy.draws.load(Ordering::SeqCst), draws);
 }
 
 #[tokio::test]

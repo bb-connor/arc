@@ -8,6 +8,7 @@ use chio_core::capability::anchor::{AnchorKind, RootAnchor};
 use chio_core::capability::scope::{ChioScope, ToolGrant};
 use chio_core::capability::token::CapabilityTokenBody;
 use chio_core::crypto::{Keypair, PublicKey};
+use chio_core::rng::Rng;
 use chio_core::root_authority::{
     ClaimMode, ClaimValue, DelegationAnchor, DelegationAnchorFields, DelegationContext,
     DelegationContextFields, DelegationExchange, HolderClass, LoadedRootPolicy, MatchClaims,
@@ -29,16 +30,6 @@ use super::replay::{ExchangeReplayStore, ReplayBinding, ReplayKey, ReplayNamespa
 const SUBJECT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.subject.v1\0";
 const TENANT_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.tenant.v1\0";
 const CLAIM_COMMITMENT_DOMAIN: &[u8] = b"chio.delegation-context.claim.v1\0";
-
-/// The entropy source could not produce bytes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct EntropyFailure;
-
-/// Cryptographically secure randomness for salts, edge-session subject keys
-/// and capability identifiers. A failure denies the exchange.
-pub trait ExchangeEntropy: Send + Sync {
-    fn fill(&self, dest: &mut [u8]) -> Result<(), EntropyFailure>;
-}
 
 /// Configuration of the exchange inside the provider's `serve-http` process.
 pub struct RootExchange {
@@ -63,7 +54,10 @@ pub struct RootExchange {
 pub struct ExchangeServices<'a> {
     pub keys: &'a dyn IdpKeyLookup,
     pub replay: &'a dyn ExchangeReplayStore,
-    pub entropy: &'a dyn ExchangeEntropy,
+    /// Randomness for salts, edge-session subject keys and capability
+    /// identifiers. Every draw happens before the replay bind, so a failed
+    /// draw denies the exchange with the assertion unbound.
+    pub entropy: &'a (dyn Rng + Send + Sync),
 }
 
 /// One salted opening the disclosure store keeps under `salt_ref`.
@@ -145,11 +139,11 @@ impl PreparedAnchoredRoot {
     }
 }
 
-fn random<const N: usize>(entropy: &dyn ExchangeEntropy) -> Result<[u8; N], RootExchangeError> {
+fn random<const N: usize>(entropy: &dyn Rng) -> Result<[u8; N], RootExchangeError> {
     let mut bytes = [0_u8; N];
     entropy
-        .fill(&mut bytes)
-        .map_err(|EntropyFailure| RootExchangeError::EntropyUnavailable)?;
+        .fill_bytes(&mut bytes)
+        .map_err(|_| RootExchangeError::EntropyUnavailable)?;
     Ok(bytes)
 }
 
@@ -336,7 +330,7 @@ fn plain_claim(name: &'static str, value: &Value) -> Result<ClaimValue, RootExch
 fn record_claims(
     rule: &RootPolicyRule,
     verified: &VerifiedIdJag,
-    entropy: &dyn ExchangeEntropy,
+    entropy: &dyn Rng,
     openings: &mut Vec<ContextOpening>,
 ) -> Result<RecordedClaims, RootExchangeError> {
     let mut recorded = RecordedClaims::default();
@@ -392,7 +386,7 @@ fn salted(
     domain: &[u8],
     reference: &str,
     value: &str,
-    entropy: &dyn ExchangeEntropy,
+    entropy: &dyn Rng,
     openings: &mut Vec<ContextOpening>,
 ) -> Result<SaltedCommitment, RootExchangeError> {
     let salt = random::<32>(entropy)?;
