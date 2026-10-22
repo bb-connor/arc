@@ -5,7 +5,7 @@ pub(crate) async fn handle_issue_liability_provider(
     headers: HeaderMap,
     Json(request): Json<LiabilityProviderIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -39,7 +39,7 @@ pub(crate) async fn handle_query_liability_providers(
     Query(query): Query<LiabilityProviderListQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 
@@ -58,7 +58,7 @@ pub(crate) async fn handle_resolve_liability_provider(
     Query(query): Query<LiabilityProviderResolutionQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditRead) {
         return response;
     }
 
@@ -77,7 +77,7 @@ pub(crate) async fn handle_issue_liability_quote_request(
     headers: HeaderMap,
     Json(request): Json<LiabilityQuoteRequestIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -108,7 +108,7 @@ pub(crate) async fn handle_issue_liability_quote_response(
     headers: HeaderMap,
     Json(request): Json<LiabilityQuoteResponseIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -139,7 +139,7 @@ pub(crate) async fn handle_issue_liability_placement(
     headers: HeaderMap,
     Json(request): Json<LiabilityPlacementIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -170,7 +170,7 @@ pub(crate) async fn handle_issue_liability_pricing_authority(
     headers: HeaderMap,
     Json(request): Json<LiabilityPricingAuthorityIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -201,7 +201,7 @@ pub(crate) async fn handle_issue_liability_bound_coverage(
     headers: HeaderMap,
     Json(request): Json<LiabilityBoundCoverageIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -232,7 +232,7 @@ pub(crate) async fn handle_issue_liability_auto_bind(
     headers: HeaderMap,
     Json(request): Json<LiabilityAutoBindIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -263,7 +263,7 @@ pub(crate) async fn handle_query_liability_market_workflows(
     Query(query): Query<LiabilityMarketWorkflowQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 
@@ -282,7 +282,7 @@ pub(crate) async fn handle_issue_liability_claim_package(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimPackageIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -313,7 +313,7 @@ pub(crate) async fn handle_issue_liability_claim_response(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimResponseIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -344,7 +344,7 @@ pub(crate) async fn handle_issue_liability_claim_dispute(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimDisputeIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -375,7 +375,7 @@ pub(crate) async fn handle_issue_liability_claim_adjudication(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimAdjudicationIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -417,7 +417,7 @@ pub(crate) async fn handle_issue_liability_claim_payout_instruction(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimPayoutInstructionIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -459,7 +459,7 @@ pub(crate) async fn handle_issue_liability_claim_payout_receipt(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimPayoutReceiptIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -490,7 +490,7 @@ pub(crate) async fn handle_issue_liability_claim_settlement_instruction(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimSettlementInstructionIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -532,7 +532,7 @@ pub(crate) async fn handle_issue_liability_claim_settlement_receipt(
     headers: HeaderMap,
     Json(request): Json<LiabilityClaimSettlementReceiptIssueRequest>,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::CreditWrite) {
         return response;
     }
 
@@ -563,7 +563,7 @@ pub(crate) async fn handle_query_liability_claim_workflows(
     Query(query): Query<LiabilityClaimWorkflowQuery>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = validate_service_auth(&headers, &state.config.service_token) {
+    if let Err(response) = validate_caller(&headers, &state.config, Scope::ReportsRead) {
         return response;
     }
 

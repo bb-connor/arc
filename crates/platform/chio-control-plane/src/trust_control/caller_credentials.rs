@@ -311,14 +311,178 @@ impl TrustAccessConfig {
         })
     }
 
-    /// The internal listener never shares the public listener's address.
+    /// The internal listener never shares the public listener's address. Port
+    /// zero asks for two distinct ephemeral sockets and is not a shared address.
     pub fn validate_listeners(&self, public_listen: SocketAddr) -> Result<(), TrustAccessError> {
-        if self.internal_listen == public_listen {
+        if self.internal_listen == public_listen && public_listen.port() != 0 {
             return Err(TrustAccessError::InternalListenerShared(
                 self.internal_listen,
             ));
         }
         Ok(())
+    }
+}
+
+/// Largest access configuration document trust-control reads.
+pub const MAX_ACCESS_CONFIG_BYTES: u64 = 1024 * 1024;
+
+/// A validated access configuration and, for a clustered node, the Ed25519
+/// key it signs peer requests with. The key is present exactly when the
+/// configuration declares a cluster identity.
+pub struct TrustAccess {
+    config: TrustAccessConfig,
+    node_keypair: Option<Keypair>,
+}
+
+impl std::fmt::Debug for TrustAccess {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TrustAccess")
+            .field("config", &self.config)
+            .field(
+                "node_public_key",
+                &self.node_keypair.as_ref().map(Keypair::public_key),
+            )
+            .finish()
+    }
+}
+
+impl TrustAccess {
+    /// Read, parse and validate the access configuration at `path` and load
+    /// the node key its cluster identity names.
+    pub fn load(path: &std::path::Path) -> Result<Self, crate::CliError> {
+        use std::io::Read;
+        let mut text = String::new();
+        std::fs::File::open(path)
+            .and_then(|file| {
+                file.take(MAX_ACCESS_CONFIG_BYTES + 1)
+                    .read_to_string(&mut text)
+            })
+            .map_err(|error| {
+                crate::CliError::cli_other_error(format!(
+                    "failed to read trust-control access configuration {}: {error}",
+                    path.display()
+                ))
+            })?;
+        if u64::try_from(text.len()).map_or(true, |length| length > MAX_ACCESS_CONFIG_BYTES) {
+            return Err(crate::CliError::cli_other_error(format!(
+                "trust-control access configuration {} exceeds {MAX_ACCESS_CONFIG_BYTES} bytes",
+                path.display()
+            )));
+        }
+        let config = TrustAccessConfig::from_toml_str(&text)
+            .map_err(|error| crate::CliError::cli_other_error(error.to_string()))?;
+        let node_keypair = config
+            .peers
+            .identity()
+            .map(|identity| crate::load_existing_authority_keypair(&identity.node_key_file))
+            .transpose()?;
+        Self::from_parts(config, node_keypair)
+            .map_err(|error| crate::CliError::cli_other_error(error.to_string()))
+    }
+
+    /// Access for a single, unclustered process whose one client holds
+    /// `secret`: one deployment credential with every caller scope and
+    /// deployment tenant authority, and a loopback ephemeral internal listener.
+    pub fn single_client(
+        deployment: &str,
+        credential_id: &str,
+        secret: &str,
+    ) -> Result<Self, TrustAccessError> {
+        let deployment = validate_deployment(deployment)?;
+        if !valid_credential_id(credential_id) {
+            return Err(TrustAccessError::InvalidCredentialId(
+                credential_id.to_string(),
+            ));
+        }
+        if secret.is_empty() {
+            return Err(TrustAccessError::InvalidSecretDigest(
+                credential_id.to_string(),
+            ));
+        }
+        let record = CredentialRecord {
+            id: credential_id.to_string(),
+            kind: CredentialKind::Deployment,
+            secret_sha256: Sha256::digest(secret.as_bytes()).into(),
+            scopes: Scope::ALL
+                .iter()
+                .copied()
+                .filter(|scope| !scope.is_cluster())
+                .collect(),
+            tenant_authority: TenantAuthority::Deployment,
+        };
+        let config = TrustAccessConfig {
+            internal_listen: SocketAddr::from(([127, 0, 0, 1], 0)),
+            credentials: CallerCredentials {
+                deployment: deployment.clone(),
+                records: vec![record],
+            },
+            peers: ClusterPeerPins {
+                deployment: deployment.clone(),
+                identity: None,
+                peers: BTreeMap::new(),
+            },
+            deployment,
+        };
+        Self::from_parts(config, None)
+    }
+
+    /// Pair a validated configuration with its node key.
+    pub fn from_parts(
+        config: TrustAccessConfig,
+        node_keypair: Option<Keypair>,
+    ) -> Result<Self, TrustAccessError> {
+        if config.peers.identity().is_some() != node_keypair.is_some() {
+            return Err(TrustAccessError::ClusterIdentityRequired);
+        }
+        Ok(Self {
+            config,
+            node_keypair,
+        })
+    }
+
+    #[must_use]
+    pub fn config(&self) -> &TrustAccessConfig {
+        &self.config
+    }
+
+    #[must_use]
+    pub fn credentials(&self) -> &CallerCredentials {
+        &self.config.credentials
+    }
+
+    #[must_use]
+    pub fn peers(&self) -> &ClusterPeerPins {
+        &self.config.peers
+    }
+
+    /// The node key a clustered node signs peer requests with.
+    #[must_use]
+    pub fn node_keypair(&self) -> Option<&Keypair> {
+        self.node_keypair.as_ref()
+    }
+
+    /// Sign a request this node sends to `recipient`, returning the header
+    /// values. Refuses on a node without a cluster identity.
+    pub fn sign_peer_request(
+        &self,
+        recipient: &str,
+        request: &PeerRequestTarget<'_>,
+        nonce: &[u8; 32],
+        issued_at: i64,
+        term: Option<u64>,
+    ) -> Result<(String, PeerRequestSignature), TrustAccessError> {
+        let (Some(identity), Some(keypair)) = (self.peers().identity(), self.node_keypair()) else {
+            return Err(TrustAccessError::ClusterIdentityRequired);
+        };
+        let addressing = PeerAddressing {
+            deployment: &self.config.deployment,
+            sender: &identity.node_id,
+            recipient,
+        };
+        let signature =
+            sign_cluster_peer_request(keypair, &addressing, request, nonce, issued_at, term)?;
+        Ok((identity.node_id.clone(), signature))
     }
 }
 
@@ -489,6 +653,28 @@ impl CallerCredentials {
     #[must_use]
     pub fn deployment(&self) -> &str {
         &self.deployment
+    }
+
+    /// Whether some credential of `kind` holds `scope`.
+    #[must_use]
+    pub fn any_holds(&self, kind: CredentialKind, scope: Scope) -> bool {
+        self.records
+            .iter()
+            .any(|record| record.kind == kind && record.scopes.contains(&scope))
+    }
+
+    /// Credential ids, kinds, scopes and tenant authorities, never secrets.
+    pub fn summaries(
+        &self,
+    ) -> impl Iterator<Item = (&str, CredentialKind, &BTreeSet<Scope>, &TenantAuthority)> {
+        self.records.iter().map(|record| {
+            (
+                record.id.as_str(),
+                record.kind,
+                &record.scopes,
+                &record.tenant_authority,
+            )
+        })
     }
 
     /// Resolve the bearer credential. Every record is compared in constant

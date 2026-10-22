@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::body::{Body, Bytes};
-use axum::extract::{MatchedPath, Request, State};
+use axum::extract::{MatchedPath, NestedPath, Request, State};
 use axum::http::header::AUTHORIZATION;
 use axum::http::{HeaderMap, Method, StatusCode};
 use axum::middleware::Next;
@@ -20,14 +20,9 @@ use axum::response::Response;
 use chio_security_types::clock::Clock;
 
 use super::caller_credentials::{
-    AuthenticatedCaller, AuthenticatedPeer, CallerAuthError, CallerCredentials, ClusterPeerPins,
-    CredentialKind, PeerAuthError, PeerNonceCache, PeerRequestTarget, Scope, TenantAuthority,
+    AuthenticatedCaller, AuthenticatedPeer, CallerAuthError, CredentialKind, PeerAuthError,
+    PeerNonceCache, PeerRequestTarget, Scope, TenantAuthority, TrustAccess,
     CLUSTER_AUTH_BODY_SHA256_HEADER, CLUSTER_AUTH_NONCE_HEADER,
-};
-use super::frost::{
-    FROST_COORDINATOR_CANCEL_PATH, FROST_COORDINATOR_CLAIM_PATH, FROST_COORDINATOR_COMMITMENT_PATH,
-    FROST_COORDINATOR_COMPLETE_PATH, FROST_COORDINATOR_PACKAGE_PATH, FROST_COORDINATOR_RENEW_PATH,
-    FROST_COORDINATOR_SHARE_PATH,
 };
 use super::*;
 
@@ -39,18 +34,22 @@ pub enum Listener {
     Internal,
 }
 
-/// The authentication a route accepts. `Anonymous`, `FrostParticipant`,
-/// `FindingSeller` and `WalletHolder` routes keep their own non-credential
-/// authentication in the handler.
+/// The authentication a route accepts. `Anonymous`, `FindingSeller` and
+/// `WalletHolder` routes keep their own non-credential authentication in the
+/// handler.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RouteCredential {
     Anonymous,
     Caller,
     Deployment,
     Peer,
-    FrostParticipant,
     FindingSeller,
     WalletHolder,
+    /// A finding buyer bearer token, which the handler authenticates, or a
+    /// caller credential holding the row's scope. A bearer that is a caller
+    /// credential is held to the caller rules; any other bearer reaches the
+    /// handler unchanged.
+    FindingBuyerOrCaller,
 }
 
 /// Which tenant authority a route admits.
@@ -196,12 +195,12 @@ pub static ROUTE_TABLE: &[RouteRule] = &[
     route!(Get, FINDING_PATH, Public, Anonymous, None, NotApplicable),
     route!(Post, FINDING_ACTIVATE_PATH, Public, Caller, Some(Scope::FindingsWrite), DeploymentOnly),
     route!(Get, FINDING_ADMISSION_PATH, Public, Anonymous, None, NotApplicable),
-    route!(Post, FINDING_CHALLENGES_PATH, Public, Caller, Some(Scope::FindingsWrite), DeploymentOnly),
-    route!(Get, FINDING_CHALLENGE_PATH, Public, Caller, Some(Scope::FindingsRead), DeploymentOnly),
+    route!(Post, FINDING_CHALLENGES_PATH, Public, FindingBuyerOrCaller, Some(Scope::FindingsWrite), DeploymentOnly),
+    route!(Get, FINDING_CHALLENGE_PATH, Public, FindingBuyerOrCaller, Some(Scope::FindingsRead), DeploymentOnly),
     route!(Post, FINDING_OPERATOR_LIVE_STATUS_PATH, Public, Caller, Some(Scope::FindingsWrite), DeploymentOnly),
     route!(Post, FINDING_PARTICIPATION_PATH, Public, Caller, Some(Scope::FindingsWrite), DeploymentOnly),
     route!(Get, FINDING_PROOF_BUNDLE_PATH, Public, Anonymous, None, NotApplicable),
-    route!(Post, FINDING_PURCHASE_PATH, Public, Caller, Some(Scope::FindingsWrite), DeploymentOnly),
+    route!(Post, FINDING_PURCHASE_PATH, Public, FindingBuyerOrCaller, Some(Scope::FindingsWrite), DeploymentOnly),
     route!(Post, FISCAL_ACTIVATIONS_PATH, Public, Caller, Some(Scope::FiscalWrite), DeploymentOnly),
     route!(Post, FISCAL_APPROVALS_PATH, Public, Caller, Some(Scope::FiscalWrite), DeploymentOnly),
     route!(Post, FISCAL_MARKETPLACE_CREDIT_LIMIT_PATH, Public, Caller, Some(Scope::ReportsRead), TenantScoped),
@@ -211,15 +210,9 @@ pub static ROUTE_TABLE: &[RouteRule] = &[
     route!(Post, FISCAL_PROPOSAL_PREVIEW_PATH, Public, Caller, Some(Scope::FiscalWrite), DeploymentOnly),
     route!(Post, FISCAL_RESOLVE_PATH, Public, Caller, Some(Scope::FiscalWrite), DeploymentOnly),
     route!(Get, FISCAL_RUNTIME_STATUS_PATH, Public, Caller, Some(Scope::FiscalRead), DeploymentOnly),
-    route!(Post, FROST_COORDINATOR_CANCEL_PATH, Public, FrostParticipant, None, NotApplicable),
-    route!(Post, FROST_COORDINATOR_CLAIM_PATH, Public, FrostParticipant, None, NotApplicable),
-    route!(Post, FROST_COORDINATOR_COMMITMENT_PATH, Public, FrostParticipant, None, NotApplicable),
-    route!(Post, FROST_COORDINATOR_COMPLETE_PATH, Public, FrostParticipant, None, NotApplicable),
-    route!(Post, FROST_COORDINATOR_PACKAGE_PATH, Public, FrostParticipant, None, NotApplicable),
-    route!(Post, FROST_COORDINATOR_RENEW_PATH, Public, FrostParticipant, None, NotApplicable),
-    route!(Post, FROST_COORDINATOR_SHARE_PATH, Public, FrostParticipant, None, NotApplicable),
     route!(Post, INTERNAL_ADMISSION_AUTHORITY_PATH, Internal, Deployment, Some(Scope::AdmissionAuthorityWrite), DeploymentOnly),
     route!(Get, INTERNAL_AUTHORITY_SNAPSHOT_PATH, Internal, Peer, Some(Scope::ClusterReplicate), NotApplicable),
+    route!(Get, INTERNAL_AUTHORITY_STATUS_PATH, Internal, Peer, Some(Scope::ClusterReplicate), NotApplicable),
     route!(Get, INTERNAL_BUDGETS_DELTA_PATH, Internal, Peer, Some(Scope::ClusterReplicate), NotApplicable),
     route!(Post, INTERNAL_CLUSTER_PARTITION_PATH, Internal, Peer, Some(Scope::ClusterReplicate), NotApplicable),
     route!(Get, INTERNAL_CLUSTER_SNAPSHOT_PATH, Internal, Peer, Some(Scope::ClusterOpeningsReplicate), NotApplicable),
@@ -350,11 +343,21 @@ pub enum RouteGrant {
     Peer(AuthenticatedPeer),
 }
 
+/// The verified peer of a peer route. A handler reached without the route
+/// table middleware's peer grant refuses.
+pub(crate) fn require_peer_grant(
+    grant: Option<&axum::Extension<RouteGrant>>,
+) -> Result<&AuthenticatedPeer, Response> {
+    match grant {
+        Some(axum::Extension(RouteGrant::Peer(peer))) => Ok(peer),
+        _ => Err(PeerAuthError::Unauthenticated.into_response()),
+    }
+}
+
 /// Enforces the route table for one listener.
 pub struct RouteAuthorizer {
     listener: Listener,
-    credentials: Arc<CallerCredentials>,
-    peers: Arc<ClusterPeerPins>,
+    access: Arc<TrustAccess>,
     clock: Arc<dyn Clock>,
     nonces: PeerNonceCache,
     rules: HashMap<(RouteMethod, &'static str), &'static RouteRule>,
@@ -365,7 +368,7 @@ impl std::fmt::Debug for RouteAuthorizer {
         formatter
             .debug_struct("RouteAuthorizer")
             .field("listener", &self.listener)
-            .field("deployment", &self.credentials.deployment())
+            .field("deployment", &self.access.credentials().deployment())
             .field("rules", &self.rules.len())
             .finish()
     }
@@ -373,20 +376,14 @@ impl std::fmt::Debug for RouteAuthorizer {
 
 impl RouteAuthorizer {
     #[must_use]
-    pub fn new(
-        listener: Listener,
-        credentials: Arc<CallerCredentials>,
-        peers: Arc<ClusterPeerPins>,
-        clock: Arc<dyn Clock>,
-    ) -> Self {
+    pub fn new(listener: Listener, access: Arc<TrustAccess>, clock: Arc<dyn Clock>) -> Self {
         let rules = ROUTE_TABLE
             .iter()
             .map(|rule| ((rule.method, rule.path), rule))
             .collect();
         Self {
             listener,
-            credentials,
-            peers,
+            access,
             clock,
             nonces: PeerNonceCache::default(),
             rules,
@@ -406,6 +403,14 @@ impl RouteAuthorizer {
             .filter(|rule| rule.listener == self.listener)
     }
 
+    fn serves_path(&self, matched_path: Option<&str>) -> bool {
+        matched_path.is_some_and(|matched| {
+            ROUTE_TABLE
+                .iter()
+                .any(|rule| rule.path == matched && rule.listener == self.listener)
+        })
+    }
+
     /// Authorize one request. `matched_path` is the router's matched route
     /// pattern; `path`, `query` and `body` are the concrete request parts a
     /// peer signature covers.
@@ -418,16 +423,30 @@ impl RouteAuthorizer {
         headers: &HeaderMap,
         body: &[u8],
     ) -> Result<RouteGrant, Response> {
-        let rule = self.rule(method, matched_path).ok_or_else(route_absent)?;
+        let rule = match self.rule(method, matched_path) {
+            Some(rule) => rule,
+            None if self.serves_path(matched_path) => return Err(method_not_allowed()),
+            None => return Err(route_absent()),
+        };
         match rule.credential {
             RouteCredential::Anonymous
-            | RouteCredential::FrostParticipant
             | RouteCredential::FindingSeller
             | RouteCredential::WalletHolder => Ok(RouteGrant::Unchanged),
             RouteCredential::Caller | RouteCredential::Deployment => self
                 .authorize_caller(rule, headers)
                 .map(RouteGrant::Caller)
                 .map_err(CallerAuthError::into_response),
+            RouteCredential::FindingBuyerOrCaller => {
+                if carries_peer_authentication(headers) {
+                    return Err(CallerAuthError::PeerAuthenticationOnCallerRoute.into_response());
+                }
+                if self.access.credentials().authenticate(headers).is_err() {
+                    return Ok(RouteGrant::Unchanged);
+                }
+                self.authorize_caller(rule, headers)
+                    .map(RouteGrant::Caller)
+                    .map_err(CallerAuthError::into_response)
+            }
             RouteCredential::Peer => self
                 .authorize_peer(rule, method, path, query, headers, body)
                 .map(RouteGrant::Peer)
@@ -444,7 +463,7 @@ impl RouteAuthorizer {
             return Err(CallerAuthError::PeerAuthenticationOnCallerRoute);
         }
         let scope = rule.scope.ok_or(CallerAuthError::Unauthenticated)?;
-        let caller = self.credentials.validate_caller(headers, scope)?;
+        let caller = self.access.credentials().validate_caller(headers, scope)?;
         if rule.credential == RouteCredential::Deployment
             && caller.kind != CredentialKind::Deployment
         {
@@ -484,7 +503,8 @@ impl RouteAuthorizer {
             query,
             body,
         };
-        self.peers
+        self.access
+            .peers()
             .verify(headers, &target, now, scope, &self.nonces)
     }
 }
@@ -502,11 +522,35 @@ fn carries_peer_authentication(headers: &HeaderMap) -> bool {
     .any(|name| headers.contains_key(*name))
 }
 
+fn method_not_allowed() -> Response {
+    plain_http_error(
+        StatusCode::METHOD_NOT_ALLOWED,
+        "method is not served on this trust-control route",
+    )
+}
+
 fn route_absent() -> Response {
     plain_http_error(
         StatusCode::NOT_FOUND,
         "route is not served on this trust-control listener",
     )
+}
+
+/// The matched route pattern relative to any outer nest. Axum includes every
+/// outer nest prefix in `MatchedPath`; `NestedPath` is framework-owned route
+/// context, so the prefix is removed without trusting request URI text.
+fn relative_matched_path(request: &Request) -> Result<Option<String>, Response> {
+    let Some(matched) = request.extensions().get::<MatchedPath>() else {
+        return Ok(None);
+    };
+    match request.extensions().get::<NestedPath>() {
+        None => Ok(Some(matched.as_str().to_string())),
+        Some(prefix) => matched
+            .as_str()
+            .strip_prefix(prefix.as_str().trim_end_matches('/'))
+            .map(|relative| Some(relative.to_string()))
+            .ok_or_else(route_absent),
+    }
 }
 
 /// Largest request body a peer route accepts; the body is buffered so the
@@ -520,10 +564,10 @@ pub async fn authorize_route(
     request: Request,
     next: Next,
 ) -> Response {
-    let matched = request
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|matched| matched.as_str().to_string());
+    let matched = match relative_matched_path(&request) {
+        Ok(matched) => matched,
+        Err(response) => return response,
+    };
     let (mut parts, body) = request.into_parts();
     let peer_route = authorizer
         .rule(&parts.method, matched.as_deref())

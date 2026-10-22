@@ -8,11 +8,9 @@ struct RevocationSnapshotExport {
 
 pub(crate) async fn handle_internal_cluster_snapshot(
     State(state): State<TrustServiceState>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_CLUSTER_SNAPSHOT_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     if state.cluster.is_none() {
@@ -27,13 +25,31 @@ pub(crate) async fn handle_internal_cluster_snapshot(
     }
 }
 
+/// The authority status this node admits for serving, for a pinned peer
+/// confirming that the elected source serves the state it exported.
+pub(crate) async fn handle_internal_authority_status(
+    State(state): State<TrustServiceState>,
+    grant: Option<axum::Extension<RouteGrant>>,
+) -> Response {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
+        return response;
+    }
+    match super::super::report_validation::inspect_authority_state(
+        &state,
+        super::super::report_validation::load_authority_status_for_state,
+    )
+    .await
+    {
+        Ok(status) => Json(status).into_response(),
+        Err(response) => response,
+    }
+}
+
 pub(crate) async fn handle_internal_authority_snapshot(
     State(state): State<TrustServiceState>,
-    headers: HeaderMap,
+    grant: Option<axum::Extension<RouteGrant>>,
 ) -> Response {
-    if let Err(response) =
-        validate_cluster_peer_auth(&headers, &state.config, INTERNAL_AUTHORITY_SNAPSHOT_PATH)
-    {
+    if let Err(response) = require_peer_grant(grant.as_ref()) {
         return response;
     }
     if let Some(path) = state.config.authority_db_path.as_deref() {
@@ -217,8 +233,12 @@ pub(crate) fn build_cluster_state_snapshot(
                         .unwrap_or(0),
                     generated_at,
                 )?;
-                let cluster_authenticator =
-                    budget_snapshot_anchor_authenticator(&state.config.service_token, &chain)?;
+                let node_key = state.config.access.node_keypair().ok_or_else(|| {
+                    CliError::cli_other_error(
+                        "budget snapshot anchor provenance requires a cluster node key".to_string(),
+                    )
+                })?;
+                let cluster_authenticator = budget_snapshot_anchor_authenticator(node_key, &chain)?;
                 Some(BudgetSnapshotAnchorProvenance {
                     schema: "chio.budget-snapshot-anchor-provenance.v1".to_string(),
                     chain,
@@ -425,13 +445,24 @@ pub(super) fn recover_cluster_snapshot(
                     "budget snapshot anchor provenance came from `{peer_url}`, not elected leader `{elected_leader}`"
                 )));
             }
+            let leader_node_key = state
+                .config
+                .access
+                .peers()
+                .get(&elected_leader)
+                .map(|peer| peer.public_key.clone())
+                .ok_or_else(|| {
+                    CliError::cli_other_error(format!(
+                        "elected leader `{elected_leader}` is not a pinned cluster peer"
+                    ))
+                })?;
             store
                 .import_budget_snapshot_with_anchor_provenance(
                     &budget_snapshot,
                     provenance,
                     &elected_leader,
                     local_term,
-                    &state.config.service_token,
+                    &leader_node_key,
                 )
                 .map_err(|error| CliError::cli_other_error(error.to_string()))?;
         } else {

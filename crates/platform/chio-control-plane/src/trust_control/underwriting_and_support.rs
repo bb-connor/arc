@@ -1574,9 +1574,7 @@ mod underwriting_and_support_tests {
         TrustServiceConfig {
             transport: Default::default(),
             listen: "127.0.0.1:0".parse().test_unwrap(),
-            service_token: "token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            authority_workload_token: None,
+            access: crate::trust_control::caller_credentials::tests::test_access("token"),
             receipt_db_path: None,
             receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
@@ -1601,7 +1599,6 @@ mod underwriting_and_support_tests {
             advertise_url: None,
             allow_local_peer_urls: false,
             certification_public_metadata_ttl_seconds: 900,
-            peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(200),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,

@@ -5,8 +5,8 @@ use super::report_rendering::{
 };
 use super::report_validation::{
     normalize_cluster_config_url, normalize_cluster_url, run_blocking_authority_task,
-    validate_cluster_peer_auth,
 };
+use super::route_authorization::{require_peer_grant, RouteGrant};
 use super::*;
 
 #[path = "cluster/authority_evidence.rs"]
@@ -57,7 +57,8 @@ pub(crate) use pull_budget::{
     PEER_ROUND_WALL_CLOCK_BUDGET,
 };
 pub(crate) use snapshots::{
-    cluster_replication_heads, handle_internal_authority_snapshot, handle_internal_cluster_snapshot,
+    cluster_replication_heads, handle_internal_authority_snapshot,
+    handle_internal_authority_status, handle_internal_cluster_snapshot,
 };
 
 #[cfg(test)]

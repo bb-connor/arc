@@ -69,9 +69,9 @@ pub struct TrustServiceConfig {
     pub listen: SocketAddr,
     /// Listener confidentiality and explicit plaintext policy.
     pub transport: chio_http_serve::ServerTransportConfig,
-    pub service_token: String,
-    pub tenant_read_tokens: BTreeMap<String, String>,
-    pub authority_workload_token: Option<String>,
+    /// Caller credentials, the internal listener and the pinned cluster
+    /// peers. Every route authenticates against this and nothing else.
+    pub access: Arc<crate::trust_control::caller_credentials::TrustAccess>,
     pub receipt_db_path: Option<PathBuf>,
     /// Maximum private receipt query snapshot database bytes (at least 1 MiB).
     pub receipt_query_snapshot_quota_bytes: u64,
@@ -100,7 +100,6 @@ pub struct TrustServiceConfig {
     pub advertise_url: Option<String>,
     pub allow_local_peer_urls: bool,
     pub certification_public_metadata_ttl_seconds: u64,
-    pub peer_urls: Vec<String>,
     pub cluster_sync_interval: Duration,
     /// Explicit future-issue skew for signed authority replication (0 to 60
     /// seconds). Expiry and local clock floors receive no tolerance.
@@ -120,6 +119,22 @@ pub struct TrustServiceConfig {
 const MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES: u64 = 1024 * 1024;
 
 impl TrustServiceConfig {
+    /// Node ids of the pinned cluster peers, in order.
+    #[must_use]
+    pub fn peer_urls(&self) -> Vec<String> {
+        self.access
+            .peers()
+            .iter()
+            .map(|peer| peer.node_id.clone())
+            .collect()
+    }
+
+    /// Whether this node replicates with any peer.
+    #[must_use]
+    pub fn is_clustered(&self) -> bool {
+        self.access.peers().iter().next().is_some()
+    }
+
     pub(crate) fn authority_replication_clock_policy(
         &self,
     ) -> Result<chio_kernel::authority::replication::AuthorityEnvelopeClockPolicy, CliError> {
@@ -152,7 +167,23 @@ impl TrustServiceConfig {
                 "--receipt-query-snapshot-quota-bytes must be at least {MIN_RECEIPT_QUERY_SNAPSHOT_QUOTA_BYTES} bytes (1 MiB)"
             )));
         }
-        validate_control_secret(&self.service_token, "control service token")?;
+        self.access
+            .config()
+            .validate_listeners(self.listen)
+            .map_err(|error| CliError::cli_other_error(error.to_string()))?;
+        if let Some(identity) = self.access.peers().identity() {
+            let advertised = self
+                .advertise_url
+                .as_deref()
+                .map(super::super::report_validation::normalize_cluster_url)
+                .transpose()?;
+            if advertised.as_deref() != Some(identity.node_id.as_str()) {
+                return Err(CliError::cli_other_error(
+                    "--advertise-url must equal the access configuration [cluster] node_id"
+                        .to_string(),
+                ));
+            }
+        }
         if self.authority_seed_path.is_some() && self.authority_db_path.is_some() {
             return Err(CliError::cli_other_error(
                 "use either --authority-seed-file or --authority-db, not both".to_string(),
@@ -162,14 +193,17 @@ impl TrustServiceConfig {
             if self.authority_db_path.is_some()
                 || self.receipt_db_path.is_none()
                 || self.authority_keyring_receipt_anchor_root.is_none()
-                || self.authority_workload_token.is_none()
+                || !self.access.credentials().any_holds(
+                    crate::trust_control::caller_credentials::CredentialKind::Deployment,
+                    crate::trust_control::caller_credentials::Scope::CapabilitiesIssue,
+                )
             {
                 return Err(CliError::cli_other_error(
-                    "authority keyring configuration requires --receipt-db, --authority-keyring-receipt-anchor-root, and --authority-workload-token and forbids --authority-db"
+                    "authority keyring configuration requires --receipt-db, --authority-keyring-receipt-anchor-root, and a deployment credential with capabilities:issue and forbids --authority-db"
                         .to_string(),
                 ));
             }
-            if !self.peer_urls.is_empty() {
+            if self.is_clustered() {
                 return Err(CliError::cli_other_error(
                     "clustered keyring authority issuance is unavailable until selector leases share the cluster consensus domain"
                         .to_string(),
@@ -182,47 +216,6 @@ impl TrustServiceConfig {
             return Err(CliError::cli_other_error(
                 "authority keyring receipt anchors require --authority-keyring-config".to_string(),
             ));
-        }
-        for (tenant_id, token) in &self.tenant_read_tokens {
-            if tenant_id.trim().is_empty() {
-                return Err(CliError::cli_other_error(
-                    "tenant read token id must be non-empty".to_string(),
-                ));
-            }
-            if tenant_id.trim() != tenant_id {
-                return Err(CliError::cli_other_error(
-                    "tenant read token id must not contain surrounding whitespace".to_string(),
-                ));
-            }
-            if tenant_id.chars().any(char::is_control) {
-                return Err(CliError::cli_other_error(
-                    "tenant read token id must not contain control characters".to_string(),
-                ));
-            }
-            let token_label = format!("tenant read token for `{tenant_id}`");
-            validate_control_secret(token, &token_label)?;
-            if token == &self.service_token {
-                return Err(CliError::cli_other_error(
-                    "control tenant read token must not equal service token".to_string(),
-                ));
-            }
-        }
-        if let Some(token) = self.authority_workload_token.as_deref() {
-            validate_control_secret(token, "authority workload token")?;
-            if token == self.service_token {
-                return Err(CliError::cli_other_error(
-                    "authority workload token must not equal service token".to_string(),
-                ));
-            }
-            if self
-                .tenant_read_tokens
-                .values()
-                .any(|tenant_token| tenant_token == token)
-            {
-                return Err(CliError::cli_other_error(
-                    "authority workload token must not equal a tenant read token".to_string(),
-                ));
-            }
         }
         if self.cluster_sync_interval.is_zero() {
             return Err(CliError::cli_other_error(
@@ -245,7 +238,7 @@ impl TrustServiceConfig {
                     .to_string(),
             ));
         }
-        if self.joint_authority_db_path.is_some() && !self.peer_urls.is_empty() {
+        if self.joint_authority_db_path.is_some() && self.is_clustered() {
             return Err(CliError::cli_other_error(
                 "a local joint authority database cannot run with peer cluster replication"
                     .to_string(),
@@ -321,6 +314,7 @@ pub(crate) fn validate_control_secret(secret: &str, label: &str) -> Result<(), C
 #[cfg(test)]
 mod service_config_tests {
     use super::*;
+    use crate::trust_control::caller_credentials::tests::set_test_peers;
     use chio_test_support::prelude::*;
 
     fn base_config() -> TrustServiceConfig {
@@ -331,9 +325,7 @@ mod service_config_tests {
         TrustServiceConfig {
             transport: Default::default(),
             listen,
-            service_token: "token".to_string(),
-            tenant_read_tokens: BTreeMap::new(),
-            authority_workload_token: None,
+            access: crate::trust_control::caller_credentials::tests::test_access("token"),
             receipt_db_path: None,
             receipt_query_snapshot_quota_bytes: 2_147_483_648,
             revocation_db_path: None,
@@ -358,7 +350,6 @@ mod service_config_tests {
             advertise_url: None,
             allow_local_peer_urls: true,
             certification_public_metadata_ttl_seconds: PUBLIC_DISCOVERY_TTL_SECS,
-            peer_urls: Vec::new(),
             cluster_sync_interval: Duration::from_millis(25),
             authority_replication_max_future_skew_seconds: 0,
             roster_policy: None,
@@ -424,56 +415,12 @@ mod service_config_tests {
     }
 
     #[test]
-    fn trust_service_config_rejects_padded_service_token_at_startup() {
-        for token in [" token", "token "] {
-            let mut config = base_config();
-            config.service_token = token.to_string();
-
-            let error = match config.validate() {
-                Ok(()) => panic!("padded service token should fail closed at startup"),
-                Err(error) => error,
-            };
-
-            assert!(
-                error
-                    .to_string()
-                    .contains("control service token must not contain surrounding whitespace"),
-                "unexpected error for token `{token:?}`: {error}",
-            );
-        }
-    }
-
-    #[test]
-    fn trust_service_config_separates_authority_workload_credentials() {
-        let mut config = base_config();
-        config.authority_workload_token = Some("token".to_string());
-        let service_error = config
-            .validate()
-            .test_expect_err("authority workload token must differ from service token");
-        assert!(service_error
-            .to_string()
-            .contains("authority workload token must not equal service token"));
-
-        config.authority_workload_token = Some("tenant-token".to_string());
-        config
-            .tenant_read_tokens
-            .insert("tenant-a".to_string(), "tenant-token".to_string());
-        let tenant_error = config
-            .validate()
-            .test_expect_err("authority workload token must differ from tenant read tokens");
-        assert!(tenant_error
-            .to_string()
-            .contains("authority workload token must not equal a tenant read token"));
-
-        config.authority_workload_token = Some("authority-only".to_string());
-        config
-            .validate()
-            .test_expect("a distinct authority workload token is valid");
-    }
-
-    #[test]
     fn keyring_authority_requires_complete_single_node_custody() {
         let mut config = base_config();
+        config.access = crate::trust_control::caller_credentials::tests::test_access_with_scopes(
+            "token",
+            &["reports:read"],
+        );
         config.authority_keyring_config_path = Some(PathBuf::from("keyring.yml"));
         let incomplete = config
             .validate()
@@ -483,7 +430,13 @@ mod service_config_tests {
         ));
 
         config.receipt_db_path = Some(PathBuf::from("receipts.sqlite3"));
-        config.authority_workload_token = Some("authority-only".to_string());
+        let without_issuer = config
+            .validate()
+            .test_expect_err("keyring without a capability issuer credential must fail");
+        assert!(without_issuer
+            .to_string()
+            .contains("a deployment credential with capabilities:issue"));
+        config.access = crate::trust_control::caller_credentials::tests::test_access("token");
         let unanchored = config
             .validate()
             .test_expect_err("keyring receipt custody requires independent rollback anchors");
@@ -506,7 +459,11 @@ mod service_config_tests {
             .validate_bootstrap()
             .test_expect("complete single-node keyring config is valid at startup");
 
-        config.peer_urls = vec!["https://peer.example".to_string()];
+        set_test_peers(
+            &mut config,
+            "https://self.example",
+            &["https://peer.example"],
+        );
         let clustered = config
             .validate()
             .test_expect_err("keyring cluster without selector consensus must fail");
@@ -534,7 +491,11 @@ mod service_config_tests {
     fn trust_service_config_rejects_joint_authority_with_peer_cluster() {
         let mut config = base_config();
         config.joint_authority_db_path = Some(PathBuf::from("joint.sqlite3"));
-        config.peer_urls = vec!["https://peer.example".to_string()];
+        set_test_peers(
+            &mut config,
+            "https://self.example",
+            &["https://peer.example"],
+        );
 
         let error = config
             .validate()
@@ -562,73 +523,6 @@ mod service_config_tests {
         assert!(error
             .to_string()
             .contains("joint authority database must not alias receipt database"));
-    }
-
-    #[test]
-    fn trust_service_config_rejects_padded_tenant_read_tokens_at_startup() {
-        for token in [" tenant-token", "tenant-token "] {
-            let mut config = base_config();
-            config
-                .tenant_read_tokens
-                .insert("tenant-a".to_string(), token.to_string());
-
-            let error = match config.validate() {
-                Ok(()) => panic!("padded tenant read token should fail closed at startup"),
-                Err(error) => error,
-            };
-
-            assert!(
-                error.to_string().contains(
-                    "tenant read token for `tenant-a` must not contain surrounding whitespace"
-                ),
-                "unexpected error for token `{token:?}`: {error}",
-            );
-        }
-    }
-
-    #[test]
-    fn trust_service_config_rejects_padded_tenant_read_token_ids_at_startup() {
-        for tenant_id in [" tenant-a", "tenant-a "] {
-            let mut config = base_config();
-            config
-                .tenant_read_tokens
-                .insert(tenant_id.to_string(), "tenant-token".to_string());
-
-            let error = match config.validate() {
-                Ok(()) => panic!("padded tenant read token id should fail closed at startup"),
-                Err(error) => error,
-            };
-
-            assert!(
-                error
-                    .to_string()
-                    .contains("tenant read token id must not contain surrounding whitespace"),
-                "unexpected error for tenant id `{tenant_id:?}`: {error}",
-            );
-        }
-    }
-
-    #[test]
-    fn trust_service_config_rejects_control_bearing_tenant_read_tokens_at_startup() {
-        for (tenant_id, token) in [
-            ("tenant-\na", "tenant-token"),
-            ("tenant-a", "tenant\u{7f}token"),
-        ] {
-            let mut config = base_config();
-            config
-                .tenant_read_tokens
-                .insert(tenant_id.to_string(), token.to_string());
-
-            let error = match config.validate() {
-                Ok(()) => panic!("control-bearing tenant read token should fail closed at startup"),
-                Err(error) => error,
-            };
-
-            assert!(
-                error.to_string().contains("control characters"),
-                "unexpected error for tenant token mapping `{tenant_id:?}`: {error}",
-            );
-        }
     }
 
     #[test]

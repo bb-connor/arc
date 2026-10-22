@@ -13,17 +13,16 @@ use tower::ServiceExt;
 use super::super::caller_credentials::tests::{
     config, credential, peer, signed_peer_headers, signed_peer_headers_for, DEPLOYMENT,
 };
-use super::super::caller_credentials::TrustAccessConfig;
+use super::super::caller_credentials::{TrustAccess, TrustAccessConfig};
 use super::*;
 
 const NOW: u64 = 1_792_234_800;
 const NODE_B: &str = "https://node-b.example:9101";
 const NODE_C: &str = "https://node-c.example:9101";
 
-const ROUTER_SOURCES: [&str; 3] = [
+const ROUTER_SOURCES: [&str; 2] = [
     include_str!("service_runtime/router.rs"),
     include_str!("health.rs"),
-    include_str!("frost/coordinator.rs"),
 ];
 
 fn strip_line_comments(text: &str) -> String {
@@ -103,7 +102,7 @@ fn route_table_covers_every_router_route() {
         })
         .collect();
     table.sort();
-    assert_eq!(router.len(), 217);
+    assert_eq!(router.len(), 211);
     let mut unique = router.clone();
     unique.dedup();
     assert_eq!(
@@ -135,7 +134,9 @@ fn route_table_rows_are_well_formed() {
             rule.path
         );
         match rule.credential {
-            RouteCredential::Caller | RouteCredential::Deployment => {
+            RouteCredential::Caller
+            | RouteCredential::Deployment
+            | RouteCredential::FindingBuyerOrCaller => {
                 let scope = rule.scope.test_unwrap();
                 assert!(!scope.is_cluster(), "{}", rule.path);
                 assert_ne!(rule.tenant, TenantRule::NotApplicable, "{}", rule.path);
@@ -146,7 +147,6 @@ fn route_table_rows_are_well_formed() {
                 assert_eq!(rule.tenant, TenantRule::NotApplicable, "{}", rule.path);
             }
             RouteCredential::Anonymous
-            | RouteCredential::FrostParticipant
             | RouteCredential::FindingSeller
             | RouteCredential::WalletHolder => {
                 assert_eq!(rule.scope, None, "{}", rule.path);
@@ -296,13 +296,10 @@ fn mounted_router(authorizer: RouteAuthorizer) -> Router {
 }
 
 fn authorizer_for(listener: Listener, text: &str) -> RouteAuthorizer {
-    let access = TrustAccessConfig::from_toml_str(text).test_unwrap();
-    RouteAuthorizer::new(
-        listener,
-        Arc::new(access.credentials),
-        Arc::new(access.peers),
-        Arc::new(FixedClock::new(NOW)),
-    )
+    let config = TrustAccessConfig::from_toml_str(text).test_unwrap();
+    let node_keypair = config.peers.identity().map(|_| Keypair::generate());
+    let access = TrustAccess::from_parts(config, node_keypair).test_unwrap();
+    RouteAuthorizer::new(listener, Arc::new(access), Arc::new(FixedClock::new(NOW)))
 }
 
 fn fixture() -> Fixture {
@@ -459,7 +456,6 @@ async fn anonymous_and_self_authenticating_routes_pass_unchanged() {
     let fixture = fixture();
     for rule in rows(&[
         RouteCredential::Anonymous,
-        RouteCredential::FrostParticipant,
         RouteCredential::FindingSeller,
         RouteCredential::WalletHolder,
     ]) {
@@ -704,7 +700,7 @@ async fn internal_listener_refuses_without_credential() {
         .iter()
         .filter(|rule| rule.listener == Listener::Internal)
         .collect();
-    assert_eq!(internal.len(), 10);
+    assert_eq!(internal.len(), 11);
     for rule in internal {
         let (status, _) = call(&fixture.internal, rule, "", HeaderMap::new()).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
@@ -735,14 +731,17 @@ async fn service_token_secret_no_longer_authenticates_cluster_routes() {
     let issued_at = i64::try_from(NOW).test_unwrap();
     for rule in rows(&[RouteCredential::Peer]) {
         let path = concrete(rule.path);
-        let hmac = super::super::report_validation::cluster_peer_auth_signature(
-            "service-secret",
-            NODE_B,
-            &path,
-            issued_at,
-            None,
-        )
-        .test_unwrap();
+        let hmac = chio_core::sha256_hex(
+            &chio_core::canonical_json_bytes(&serde_json::json!({
+                "scheme": "chio.cluster.peer.v1",
+                "serviceToken": "service-secret",
+                "nodeId": NODE_B,
+                "endpoint": path,
+                "issuedAt": issued_at,
+                "term": null,
+            }))
+            .test_unwrap(),
+        );
         let mut headers = HeaderMap::new();
         headers.insert(CLUSTER_NODE_ID_HEADER, HeaderValue::from_static(NODE_B));
         headers.insert(
@@ -911,4 +910,43 @@ async fn peer_authorization_for_another_receiver_refused() {
         response.contains("cluster peer signature does not verify under a pinned key"),
         "{response}"
     );
+}
+
+#[tokio::test]
+async fn finding_buyer_routes_hold_caller_credentials_to_caller_rules() {
+    let fixture = fixture();
+    let buyer_rows: Vec<&RouteRule> = rows(&[RouteCredential::FindingBuyerOrCaller]).collect();
+    assert_eq!(buyer_rows.len(), 3);
+    for rule in buyer_rows {
+        let scope = rule.scope.test_unwrap();
+        let (status, body) = call(&fixture.public, rule, "", bearer("finding-buyer-token")).await;
+        assert_eq!(
+            (status, body.as_str()),
+            (StatusCode::OK, "unchanged"),
+            "{}",
+            rule.path
+        );
+        let (status, body) = call(
+            &fixture.public,
+            rule,
+            "",
+            bearer(&scope_secret("only", scope)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{} {body}", rule.path);
+        assert!(body.starts_with("caller:"), "{body}");
+        let (status, body) = call(
+            &fixture.public,
+            rule,
+            "",
+            bearer(&scope_secret("all-but", scope)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{} {body}", rule.path);
+        let (status, _) = call(&fixture.public, rule, "", bearer("tenant-a-secret")).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{}", rule.path);
+        let signed = peer_headers(&fixture.node_b, NODE_B, rule, "");
+        let (status, _) = call(&fixture.public, rule, "", signed).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{}", rule.path);
+    }
 }
