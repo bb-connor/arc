@@ -7,7 +7,7 @@
 mod support;
 
 use chio_store_sqlite::root_exchange_store::{
-    RetainedArtifact, RootExchangeIntegrityError as I, SqliteRootExchangeStoreError as E,
+    RetainedArtifact, RootExchangeIntegrityError as I, RootExchangeStoreError as E,
 };
 use rusqlite::ffi;
 use support::{Admit, Case, Env, TestResult, NOW};

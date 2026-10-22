@@ -9,7 +9,7 @@ use super::projection::read_root_row;
 use super::reads::retain_snapshot;
 use super::{
     change_digest, digest_column, sql_u64, sqlite_error, stored_u64, Change, MintRequestRefusal,
-    Mutation, Result, RetainedArtifact, SqliteRootExchangeStore, SqliteRootExchangeStoreError,
+    Mutation, Result, RetainedArtifact, RootExchangeStoreError, SqliteRootExchangeStore,
 };
 
 #[derive(Serialize)]
@@ -43,7 +43,7 @@ impl SqliteRootExchangeStore {
     ) -> Result<()> {
         self.mutate(fence, trusted_now_unix_ms, |tx, now| {
             if retain_until <= now {
-                return Err(SqliteRootExchangeStoreError::InvalidMintRequest(
+                return Err(RootExchangeStoreError::InvalidMintRequest(
                     MintRequestRefusal::ReplayRetentionPast,
                 ));
             }
@@ -58,7 +58,7 @@ impl SqliteRootExchangeStore {
                 .map_err(sqlite_error)?;
             if let Some(retained) = retained {
                 if stored_u64(retained)? > now {
-                    return Err(SqliteRootExchangeStoreError::AssertionReplay);
+                    return Err(RootExchangeStoreError::AssertionReplay);
                 }
                 tx.execute(
                     "DELETE FROM root_exchange_replay WHERE replay_key_digest = ?1",
@@ -101,7 +101,7 @@ impl SqliteRootExchangeStore {
     ) -> Result<()> {
         self.mutate(fence, trusted_now_unix_ms, |tx, now| {
             if read_root_row(tx, capability_id)?.is_none() {
-                return Err(SqliteRootExchangeStoreError::AnchoredRootMissing {
+                return Err(RootExchangeStoreError::AnchoredRootMissing {
                     capability_id: capability_id.to_owned(),
                 });
             }
@@ -153,11 +153,12 @@ impl SqliteRootExchangeStore {
         trusted_now_unix_ms: u64,
     ) -> Result<Sha256Digest> {
         self.mutate(fence, trusted_now_unix_ms, |tx, _| {
-            let digest = snapshot.digest().map_err(|_| {
-                SqliteRootExchangeStoreError::RetainedDigestMismatch {
-                    kind: RetainedArtifact::KeySnapshot,
-                }
-            })?;
+            let digest =
+                snapshot
+                    .digest()
+                    .map_err(|_| RootExchangeStoreError::RetainedDigestMismatch {
+                        kind: RetainedArtifact::KeySnapshot,
+                    })?;
             if !retain_snapshot(tx, snapshot)? {
                 return Ok((digest, None));
             }

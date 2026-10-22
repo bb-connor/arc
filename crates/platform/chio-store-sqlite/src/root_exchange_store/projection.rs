@@ -9,7 +9,7 @@ use serde::Serialize;
 
 use super::{
     canonical_blob, decode_blob, digest_column, parse_digest_column, sqlite_error, stored_u64,
-    Result, RootTags, SqliteRootExchangeStoreError, StoredRoot,
+    Result, RootExchangeStoreError, RootTags, StoredRoot,
 };
 
 pub(super) const PROJECTION_DOMAIN: &[u8] = b"chio.anchored-root-projection.v1\0";
@@ -98,7 +98,7 @@ impl RootRow {
     /// The row check: the projection recomputes, the blobs decode
     /// canonically, and the capability and context agree with the columns.
     pub(super) fn verify(&self) -> Result<StoredRoot> {
-        let tampered = || SqliteRootExchangeStoreError::AnchoredRootTampered {
+        let tampered = || RootExchangeStoreError::AnchoredRootTampered {
             capability_id: self.capability_id.clone(),
         };
         if self.projection_digest()? != self.authorization_projection_digest {
@@ -281,7 +281,7 @@ pub(super) fn all_root_rows(connection: &Connection) -> Result<Vec<RootRow>> {
 /// The checked root for `capability_id`, or `AnchoredRootMissing`.
 pub(super) fn required_root(connection: &Connection, capability_id: &str) -> Result<StoredRoot> {
     read_root_row(connection, capability_id)?
-        .ok_or_else(|| SqliteRootExchangeStoreError::AnchoredRootMissing {
+        .ok_or_else(|| RootExchangeStoreError::AnchoredRootMissing {
             capability_id: capability_id.to_owned(),
         })?
         .verify()

@@ -39,7 +39,7 @@ pub(crate) use schema::{
 pub const TAG_GENERATION_MISSING: &str = "tenant index key does not match the state directory";
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum SqliteRootExchangeStoreError {
+pub enum RootExchangeStoreError {
     #[error("assertion replay")]
     AssertionReplay,
     #[error("anchored root is revoked by entry {entry_id}")]
@@ -80,7 +80,7 @@ pub enum SqliteRootExchangeStoreError {
     Invalid(String),
 }
 
-type Result<T> = std::result::Result<T, SqliteRootExchangeStoreError>;
+type Result<T> = std::result::Result<T, RootExchangeStoreError>;
 
 /// Why a mint request's members disagree with each other. Checked before
 /// any durable step.
@@ -349,7 +349,7 @@ impl SqliteRootExchangeStore {
     fn connection(&self) -> Result<StoreGuard<'_>> {
         self.connection
             .lock()
-            .map_err(|error| SqliteRootExchangeStoreError::Unavailable(error.to_string()))
+            .map_err(|error| RootExchangeStoreError::Unavailable(error.to_string()))
     }
 
     fn read_only<T>(&self, read: impl FnOnce(&Transaction<'_>) -> Result<T>) -> Result<T> {
@@ -398,7 +398,7 @@ impl SqliteRootExchangeStore {
             )
             .map_err(unavailable)?;
         tx.commit().map_err(|error| {
-            SqliteRootExchangeStoreError::Unavailable(
+            RootExchangeStoreError::Unavailable(
                 self.serving_owner
                     .outcome_unknown(format!("sqlite root exchange commit is unknown: {error}"))
                     .to_string(),
@@ -486,16 +486,16 @@ fn stored_u64(value: i64) -> Result<u64> {
     u64::try_from(value).map_err(|_| invalid("stored integer is negative"))
 }
 
-fn sqlite_error(error: rusqlite::Error) -> SqliteRootExchangeStoreError {
-    SqliteRootExchangeStoreError::Unavailable(error.to_string())
+fn sqlite_error(error: rusqlite::Error) -> RootExchangeStoreError {
+    RootExchangeStoreError::Unavailable(error.to_string())
 }
 
-fn unavailable(error: impl std::fmt::Display) -> SqliteRootExchangeStoreError {
-    SqliteRootExchangeStoreError::Unavailable(error.to_string())
+fn unavailable(error: impl std::fmt::Display) -> RootExchangeStoreError {
+    RootExchangeStoreError::Unavailable(error.to_string())
 }
 
-fn invalid(detail: impl Into<String>) -> SqliteRootExchangeStoreError {
-    SqliteRootExchangeStoreError::Invalid(detail.into())
+fn invalid(detail: impl Into<String>) -> RootExchangeStoreError {
+    RootExchangeStoreError::Invalid(detail.into())
 }
 
 pub(super) fn owner_invalid(detail: impl Into<String>) -> SqliteServingOwnerError {

@@ -7,7 +7,7 @@ mod support;
 
 use chio_store_sqlite::root_exchange_store::{
     BearerLookup, BearerMapping, ContextOpenings, MintOutcome, MintRequestRefusal, OpeningState,
-    RetainedArtifact, SqliteRootExchangeStoreError as E,
+    RetainedArtifact, RootExchangeStoreError as E,
 };
 use support::{
     digest, loaded_policy, snapshot, tags, Admit, Case, Env, Failing, RevokedTenant, TestResult,
