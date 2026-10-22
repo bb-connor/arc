@@ -3,6 +3,7 @@
 
 use chio_core::capability::token::CapabilityToken;
 use chio_core::root_authority::{DelegationContext, Sha256Digest};
+use chio_core::tenant_index::KeyedIndexValue;
 use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 
@@ -69,9 +70,9 @@ impl RootRow {
         let projection = Projection {
             capability_id: &self.capability_id,
             root_policy_rule_id: &self.root_policy_rule_id,
-            tag_key_id: digest_column(&self.tags.key_id),
-            subject_tag: digest_column(&self.tags.subject_tag),
-            tenant_tag: self.tags.tenant_tag.as_ref().map(digest_column),
+            tag_key_id: digest_column(&self.tags.key_id()),
+            subject_tag: digest_column(&self.tags.subject.value),
+            tenant_tag: self.tags.tenant.map(|tag| digest_column(&tag.value)),
             replay_key_digest: digest_column(&self.replay_key_digest),
             replay_bound_at: self.replay_bound_at,
             client_id: &self.client_id,
@@ -199,10 +200,18 @@ fn root_row(raw: RawRoot) -> Result<RootRow> {
     Ok(RootRow {
         capability_id,
         root_policy_rule_id: rule,
-        tags: RootTags {
-            key_id: parse_digest_column(&key_id)?,
-            subject_tag: parse_digest_column(&subject_tag)?,
-            tenant_tag: tenant_tag.as_deref().map(parse_digest_column).transpose()?,
+        tags: {
+            let key_id = parse_digest_column(&key_id)?;
+            let keyed = |value: &str| -> Result<KeyedIndexValue> {
+                Ok(KeyedIndexValue {
+                    key_id,
+                    value: parse_digest_column(value)?,
+                })
+            };
+            RootTags {
+                subject: keyed(&subject_tag)?,
+                tenant: tenant_tag.as_deref().map(keyed).transpose()?,
+            }
         },
         replay_key_digest: parse_digest_column(&replay)?,
         replay_bound_at: stored_u64(replay_bound_at)?,
@@ -289,9 +298,9 @@ pub(super) fn insert_root_row(connection: &Connection, row: &RootRow) -> Result<
             rusqlite::params![
                 row.capability_id,
                 row.root_policy_rule_id,
-                digest_column(&row.tags.key_id),
-                digest_column(&row.tags.subject_tag),
-                row.tags.tenant_tag.as_ref().map(digest_column),
+                digest_column(&row.tags.key_id()),
+                digest_column(&row.tags.subject.value),
+                row.tags.tenant.map(|tag| digest_column(&tag.value)),
                 digest_column(&row.replay_key_digest),
                 super::sql_u64(row.replay_bound_at)?,
                 row.client_id,

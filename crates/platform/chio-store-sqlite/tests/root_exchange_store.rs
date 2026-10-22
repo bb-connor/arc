@@ -289,7 +289,14 @@ fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
         (
             "invalid mint request: only an operator key root may omit the tenant tag",
             Box::new(|case| {
-                case.tags.tenant_tag = None;
+                case.tags.tenant = None;
+                case.candidates = vec![case.tags];
+            }),
+        ),
+        (
+            "invalid mint request: root tags span two key generations",
+            Box::new(|case| {
+                case.tags.tenant = tags(2).tenant;
                 case.candidates = vec![case.tags];
             }),
         ),
@@ -497,10 +504,10 @@ fn pruning_removes_expired_bindings_and_mappings_and_keeps_roots() -> TestResult
 fn tag_generations_referenced_by_roots_must_be_loaded() -> TestResult {
     let env = Env::new()?;
     env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
-    env.store.verify_tag_generations(&[tags(1).key_id])?;
+    env.store.verify_tag_generations(&[tags(1).key_id()])?;
     let error = env
         .store
-        .verify_tag_generations(&[tags(2).key_id])
+        .verify_tag_generations(&[tags(2).key_id()])
         .err()
         .ok_or("missing generation accepted")?;
     assert_eq!(
@@ -510,7 +517,7 @@ fn tag_generations_referenced_by_roots_must_be_loaded() -> TestResult {
     assert!(matches!(
         error,
         SqliteRootExchangeStoreError::TagGenerationMissing { ref key_id }
-            if *key_id == tags(1).key_id.to_bare_hex()
+            if *key_id == tags(1).key_id().to_bare_hex()
     ));
     Ok(())
 }
@@ -527,7 +534,7 @@ fn tag_from_generation_n_still_matches_after_rotation_to_n_plus_1() -> TestResul
         "anchored root is revoked by entry rev-tenant-1"
     );
     env.store
-        .verify_tag_generations(&[tags(2).key_id, tags(1).key_id])?;
+        .verify_tag_generations(&[tags(2).key_id(), tags(1).key_id()])?;
     Ok(())
 }
 

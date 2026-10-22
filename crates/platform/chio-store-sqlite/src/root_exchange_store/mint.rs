@@ -198,7 +198,14 @@ fn check_request<'a>(request: &MintRequest<'a>, now: u64) -> Result<CheckedReque
     if !request.tag_candidates.contains(&request.tags) {
         return Err(refuse("root tags are not among the loaded generations"));
     }
-    if request.tags.tenant_tag.is_none() && anchor.kind != AnchorKind::ChioOperatorKey {
+    if request
+        .tags
+        .tenant
+        .is_some_and(|tenant| tenant.key_id != request.tags.subject.key_id)
+    {
+        return Err(refuse("root tags span two key generations"));
+    }
+    if request.tags.tenant.is_none() && anchor.kind != AnchorKind::ChioOperatorKey {
         return Err(refuse("only an operator key root may omit the tenant tag"));
     }
     if let Some(mapping) = request.bearer {

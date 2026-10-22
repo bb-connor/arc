@@ -7,6 +7,7 @@ use chio_core::root_authority::{
     DelegationContext, EnterpriseProviderIdentity, IdpKeySnapshot, LoadedRootPolicy, RootPolicy,
     SaltRef, Sha256Digest,
 };
+use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::StoreMutationFence;
 use chio_store_sqlite::root_exchange_store::{
     BearerMapping, ContextOpening, MintOutcome, MintRequest, MintRevocationCheck,
@@ -163,10 +164,16 @@ pub struct Case {
 }
 
 pub fn tags(generation: u8) -> RootTags {
+    let key_id = digest(0xa0 + generation);
     RootTags {
-        key_id: digest(0xa0 + generation),
-        subject_tag: digest(0xb0 + generation),
-        tenant_tag: Some(digest(0xc0 + generation)),
+        subject: KeyedIndexValue {
+            key_id,
+            value: digest(0xb0 + generation),
+        },
+        tenant: Some(KeyedIndexValue {
+            key_id,
+            value: digest(0xc0 + generation),
+        }),
     }
 }
 
@@ -367,7 +374,7 @@ impl MintRevocationCheck for RevokedTenant {
         if candidate
             .tag_candidates
             .iter()
-            .any(|tags| tags.key_id == self.0.key_id && tags.tenant_tag == self.0.tenant_tag)
+            .any(|tags| tags.tenant.is_some() && tags.tenant == self.0.tenant)
         {
             return Err(MintRevocationRefusal::Revoked {
                 entry_id: "rev-tenant-1".into(),
