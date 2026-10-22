@@ -147,8 +147,26 @@ baseline is present, and the keylog example configs agree with the units.
    done
    ```
 
-   The edge presents the trust service token as its control token and the
-   trust authority workload token as its workload token, so those two
+   Write the trust-control access configuration. It holds one credential per
+   caller role, each with only the SHA-256 digest of its secret: the control
+   client (every caller scope) and the authority workload (authority status
+   and capability issuance only). Check it before starting the service:
+
+   ```bash
+   {
+     printf 'deployment = "reference-runtime"\ninternal_listen = "127.0.0.1:8941"\n'
+     chio trust config credential --id edge-control --kind deployment \
+       --deployment reference-runtime --all-caller-scopes \
+       --secret-file /etc/chio/credentials/trust-service-token
+     chio trust config credential --id edge-workload --kind deployment \
+       --deployment reference-runtime --scope authority:read --scope capabilities:issue \
+       --secret-file /etc/chio/credentials/trust-authority-workload-token
+   } > /etc/chio/credentials/trust-access.toml
+   chio trust config check --access-config /etc/chio/credentials/trust-access.toml
+   ```
+
+   The edge presents the control client secret as its control token and the
+   authority workload secret as its workload token, so those two
    credentials are copies:
 
    ```bash

@@ -24,9 +24,10 @@ umask 022
 source "${repo_root}/examples/_shared/hello-http-common.sh"
 mkdir "${fixture_root}/state"
 control_url="http://127.0.0.1:$(pick_free_port)"
+write_trust_access_config "${CHIO_BIN}" "${fixture_root}/state/trust-access.toml" fixture-only-token
 "${CHIO_BIN}" trust serve \
   --listen "${control_url#http://}" \
-  --service-token fixture-only-token \
+  --access-config "${fixture_root}/state/trust-access.toml" \
   --receipt-db "${fixture_root}/state/receipts.sqlite3" \
   --revocation-db "${fixture_root}/state/revocations.sqlite3" \
   --authority-db "${fixture_root}/state/authority.sqlite3" \
