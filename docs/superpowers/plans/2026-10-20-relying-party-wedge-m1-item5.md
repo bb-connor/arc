@@ -43,14 +43,14 @@
 
 - #1607's epoch root signs under `chio.trust.passport-revocation-root.v1`, and the vectors under `spec/vectors/passport-revocation/v1/` change bytes in M1 item 1 (the signing wrapper). Item 5 neither reads, signs, verifies nor regenerates them, and depends on no passport-revocation artifact.
 - Item 5 adds no signed artifact, no signed fixture and no signing vector. `chio.revocation-entry.v1` and `chio.revocation-admin-request.v1` are unsigned. Item 6 exports entries under the kernel-signed export manifest; that signature is item 6's and uses the post-wrapper form.
-- The hashes item 5 adds are hash domains, not signature domains: `chio.revocation-entry-id.v1` (entry id) and `chio.sqlite-authority-revocation-entry-reference.v1` (chain reference digest); the index-key fingerprint is an HMAC domain (`chio.tenant-index-key-fingerprint.v1`). G5 leaves hash domains unchanged, so the wrapper does not alter them, and `scripts/check-signing-exemptions.py` (item 1) has nothing to list for item 5.
+- The hashes item 5 adds are hash domains, not signature domains: `chio.revocation-entry-id.v1` (entry id) and `chio.sqlite-authority-revocation-entry-reference.v1` (chain reference digest); the subject and tenant tags are keyed values under the tenant index key set (item 2 Task 5, `subject-tag` and `tenant-tag` purposes), which adds no domain here. G5 leaves hash domains unchanged, so the wrapper does not alter them, and `scripts/check-signing-exemptions.py` (item 1) has nothing to list for item 5.
 - The only signed bytes item 5 changes are deny receipts that gain the `chio.revocation` guard evidence (PR 2). Those receipts are signed by the existing producers in the post-wrapper, committed form. PR 2 tests assert decoded receipt members (`guard_evidence`, reason code) and verify signatures through the item 1 helper (`verify_wrapped` with the receipt schema id against the pinned kernel key); no test compares receipt bytes, signatures or a checked-in signed fixture, so no fixture joins item 1's `cargo xtask gen signed-fixtures` set.
 - Sequencing (lead decision 2026-10-20): PR 0 and PR 1 sign nothing and may land before item 1. PR 2, PR 3 and PR 4 merge after item 1. PR 2 also waits for item 2, which follows item 1 (13.3). PR 3 waits for item 4's anchored-root store, which follows item 3, which follows item 1. PR 4 adds `spec/schemas/registry.json` rows and regenerated code, which item 1 rewrites, so it rebases on item 1's merged registry.
 - arc-5b ACKs this plan on `sync.md` before any item 5 code starts (Task 1 Step 3).
 
 ## Global Constraints
 
-- Merge order (precondition): #1708 (trace-lock publication fence) merges before PR 2, because both edit `kernel/validation/revocation_trace.rs` and the kernel revocation tests. M1 item 4's anchored-root store PR (the `anchored_roots` table, the tenant index, its key fingerprint and the mint transaction) merges before PR 3. M1 item 2 (committed receipts, guard-evidence allowlist) merges before PR 2, so the revocation guard evidence is declared safe once. #1706 merges before PR 1 (module location `root_authority`).
+- Merge order (precondition): #1708 (trace-lock publication fence) merges before PR 2, because both edit `kernel/validation/revocation_trace.rs` and the kernel revocation tests. M1 item 4's anchored-root store PR (the `anchored_roots` table, the tenant index with per-row `tag_key_id`, and the mint transaction) merges before PR 3. M1 item 2 (committed receipts, guard-evidence allowlist) merges before PR 2, so the revocation guard evidence is declared safe once. #1706 merges before PR 1 (module location `root_authority`).
 - Every format is v1. `revocation_entries` lands in revocation store schema version 1 in place; fresh-only v1 catalog rules apply: no migration, no adoption of an older catalog, no second schema version, no `Legacy*` double, no default trait method that keeps `is_revoked` alive beside its replacement.
 - Fail-closed: a store error on any revocation read denies (admission, capture), refuses (mint) or answers 503 (admin). An unknown target member, kind or shape rejects with no state change. A commit whose anchor sync fails reports outcome unknown and never reports success. The existing capture-time and pre-receipt rechecks stay as they are; item 5 neither removes nor weakens them.
 - Privacy (spec 7.11, 7.12, 8.4): plaintext subjects and tenant values exist only in the admin request and in process memory while the tag is computed. They are never stored, logged, traced, echoed in a response, put in an error string or exported. `reason` is a closed enum, so no free text reaches the store or a caller bundle. The CLI reads plaintext from stdin only.
@@ -70,7 +70,7 @@
 2. **An in-transaction reader that stops seeing revocations.** Expected: no change to the R4 readers; every target revocation becomes `revoked_capabilities` rows that those readers already read. Pinned by schedules S1 to S3.
 3. **An overclaim about publication.** Expected: the plan, PROTOCOL and spec 7.11 state the guarantee G-A/G-C/G-M (Linearization) and the disclosed receipt gap; no text says an acknowledgement prevents every later allowed receipt or guarantees that an admitted call completes. Pinned by schedule S4, which asserts the gap as current behavior.
 4. **Plaintext reaching disk, logs or exports.** Expected: only `subject_tag` and `tenant_tag` (64 lowercase hex) are stored; `reason` is a closed enum. Pinned in PR 3 by `subject_and_tenant_revocations_store_only_tags` (scans the database file, WAL and SHM bytes for the fixture marker) and in PR 4 by a log-capture test on the admin route.
-5. **An entry lost on backup restore, or orphaned by a key change.** Expected: every entry advances the global commit chain, including an entry that matches no root; startup refuses a tenant index key whose fingerprint differs from the state directory's. Pinned in PR 1 by `restored_snapshot_missing_an_entry_refuses_open` and in PR 3 by `startup_refuses_a_different_index_key`.
+5. **An entry lost on backup restore, or orphaned by a key change.** Expected: every entry advances the global commit chain, including an entry that matches no root; startup refuses when a tenant index key generation that a stored entry references is not loaded, and an entry tag with an unknown `key_id` refuses. Pinned in PR 1 by `restored_snapshot_missing_an_entry_refuses_open` and in PR 3 by `startup_refuses_when_only_a_revocation_entry_references_a_generation` and `revoke_under_n_then_admit_under_n_plus_1_denies`.
 6. **A mis-attributed deny.** Expected: a deny names an entry only from evidence recorded by the read that refused, in the transaction that refused; no later read relabels an error. Pinned in PR 2 by `hold_denied_by_revocation_names_the_entry`, `capture_refused_by_revocation_names_the_entry`, `capture_failure_then_revoke_keeps_the_original_error` and `budget_denied_then_revoke_keeps_the_budget_denial`.
 7. **Export coverage that depends on fan-out order.** Expected: `revocations_covering` derives coverage from `anchored_roots` columns, so a root first revoked by entry E1 is still covered by a later rule entry E2. Pinned in PR 3 by `later_rule_entry_covers_a_root_revoked_earlier`.
 
@@ -89,14 +89,14 @@
 | 8 `RevocationStore` implementors (R14) and every trait `is_revoked` caller | 2 | trait change |
 | `crates/kernel/chio-kernel/src/budget_store.rs` (`DeniedBudgetHold.revoked_member`, `BudgetStoreError::Revoked`), `crates/platform/chio-store-sqlite/src/budget_store/composite.rs`, `composite/transitions/capture.rs`, `admission_operation_store/security_participant_state/dispatch_ledger/capture.rs` (Root-held, Q11 ACK) | 2 | typed revocation evidence recorded in the refusing transaction |
 | `crates/kernel/chio-kernel/tests/durable_admission_sqlite/revocation_targets.rs` (new), `revocation_schedules.rs` (new) | 2, 3 | real-SQLite attribution tests and the deterministic two-kernel schedules |
-| item 4's anchored-root store module in `chio-store-sqlite` and its mint call site in `chio-mcp-remote` | 3 | entry check inside the mint transaction; index-key fingerprint (if item 4 lacks it) |
+| item 4's anchored-root store module in `chio-store-sqlite` and its mint call site in `chio-mcp-remote` | 3 | entry check inside the mint transaction; per-entry `tag_key_id` and the referenced-generation startup check |
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/root_exchange/error.rs` | 3 | `RootExchangeError::Revoked { entry_id }` |
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/admin.rs`, `admin/revocation_targets.rs` (new), `session_forms.rs`, `admin/revocation_batch.rs` | 4 | admin POST and GET, fail-closed rules, fallback deletion |
 | `crates/protocol/chio-mcp-remote/src/remote_mcp/tests/revocation_admin.rs` (new) | 4 | HTTP tests |
 | `crates/products/chio-cli/src/cli/types/runtime.rs`, `src/cli/dispatch/mcp_revoke.rs` (new), `tests/mcp_revoke.rs` (new) | 4 | `chio mcp revoke` and `chio mcp revocations` |
 | `spec/schemas/chio-wire/v1/root_authority/revocation-entry.schema.json`, `revocation-admin-request.schema.json` (new), examples, `spec/schemas/registry.json`, `MANIFEST.sha256`, `spec/wire-schemas.lock`, generated code | 4 | wire shapes |
 | `spec/PROTOCOL.md` (`/admin/revocations` section near line 2946), `spec/errors/registry.yaml` | 2, 3, 4 | contract text and URNs |
-| `scripts/check-domain-separation.py` inventory | 1, 3 | entry-id and fingerprint domains |
+| `scripts/check-domain-separation.py` inventory | 1, 3 | entry-id domain |
 | `docs/superpowers/specs/2026-10-17-relying-party-wedge-design.md` 7.11, 8.3, 11.3 | 0 | revocation boundaries, index-key refusal, scenario count |
 | staged `revocation_local` scenarios 010a, 010b, 010c | 2 | replace 010 once capture attribution exists |
 
@@ -141,7 +141,7 @@ git grep -n -E "revocation_db_path|ADMIN_REVOCATIONS_PATH|AdminRevokeCapabilityR
 - [ ] **Step 1 (7.11):** Replace the paragraph from "Linearization:" to "'Next call' in this spec means exactly this." with:
 
   "Linearization: a revocation is one serving-writer transaction on the state-directory database, acknowledged after it commits and the authority anchor syncs. Let T be that commit. (1) Every budget authorize-hold transaction, which is where an admission commits, that begins after T denies, and the call does not dispatch. (2) Every root-exchange mint transaction that begins after T and matches the entry refuses. (3) A call admitted before T may dispatch. Its budget capture and its native dispatch capture re-check revocation inside the capture transaction, and a capture that begins after T refuses. By then the upstream effect has run and streamed chunks may already have reached the caller; the remaining output is withheld and the call ends with a revocation denial. (4) A call that captured before T reaches the allowed-receipt check, which is a read separate from the receipt append. If that read begins after T the allowed receipt is refused; if it began before T the allowed receipt is appended even when the append lands after T. An acknowledgement therefore guarantees (1) to (3) and does not guarantee that no allowed receipt is appended after it, nor that a call admitted before it completes. 'Next call' in this spec means a call whose budget authorize-hold begins after the acknowledgement."
-- [ ] **Step 2 (8.3):** Add to the refusal list: "the tenant index key's fingerprint differs from the one recorded in the state directory".
+- [ ] **Step 2 (8.3):** No 8.3 text: spec 7.12 (#1732) states the rotating key set, the referenced-generation startup refusal and the unknown `key_id` refusal.
 - [ ] **Step 3 (11.3):** `revocation_local` M1 count 12 becomes 14 (scenario 010 splits into 010a, 010b, 010c; the split itself lands in PR 2).
 - [ ] **Step 4:** `grep -rn $'\xe2\x80\x94' <changed files>; test $? -eq 1`.
 
@@ -355,7 +355,7 @@ pub trait RevocationStore: Send + Sync {
 
 ---
 
-### Task 5: Target kinds, fan-out, mint check, coverage and the key fingerprint (PR 3)
+### Task 5: Target kinds, fan-out, mint check, coverage and index-key generations (PR 3)
 
 **Files:** `chio-store-sqlite/src/revocation_store.rs`, `src/revocation_store/target_tests.rs` (new), item 4's anchored-root store module (the insert function), `chio-mcp-remote/src/remote_mcp/root_exchange/error.rs`, the mint call site item 4 owns, `tests/durable_admission_sqlite/revocation_schedules.rs` (new), `spec/errors/registry.yaml`, `scripts/check-domain-separation.py`.
 
@@ -363,7 +363,7 @@ pub trait RevocationStore: Send + Sync {
 - `anchored_roots`: `capability_id TEXT PRIMARY KEY`, `root_policy_rule_id TEXT NOT NULL`, `subject_tag TEXT NOT NULL` (64 hex, HMAC of the provider record's principal claim, R16), `tenant_tag TEXT` (64 hex or NULL when the rule has no tenant), `replay_key_digest TEXT NOT NULL` (64 hex, R11), `expires_at INTEGER NOT NULL`, one index on each of the four target columns.
 - Every insert goes through the serving owner's connection in an IMMEDIATE transaction; the root is returned to the client only after that transaction commits.
 - Rows are retained as long as any receipt under the root is retained, so export coverage stays computable (R15).
-- Index-key fingerprint: `fingerprint = hex(HMAC-SHA256(index_key, "chio.tenant-index-key-fingerprint.v1"))` is recorded once in a singleton row of the state database on first open, and startup refuses when the loaded key's fingerprint differs: `tenant index key does not match the state directory`. If item 4 lands without it, PR 3 adds it (table `tenant_index_meta(singleton, key_fingerprint)`) and registers the HMAC domain.
+- Index-key generations: the tenant index key set rotates (item 2 Task 5, all-generation match mode). Each `anchor_subject` and `tenant_tag` entry stores its tag with the `tag_key_id` of the generation that computed it. The fan-out and the mint check compute the candidate tag from the admin or request plaintext under every loaded generation (`key_ids()` with `derive_in`) and match on `(tag_key_id, tag)`. Startup refuses when a generation that any stored entry references is not loaded (`tenant index key generation <key_id> referenced by a revocation entry is not loaded`), and an entry or request naming an unknown `key_id` refuses. Tests: `startup_refuses_when_only_a_revocation_entry_references_a_generation`, `revoke_under_n_then_admit_under_n_plus_1_denies`, `revocation_entry_with_unknown_key_id_refuses`.
 
 **Store API:**
 
@@ -609,13 +609,13 @@ Spec 13.2 sizes item 5 at M, 4-6 engineer-days.
 | PR 0 spec text for 7.11, 8.3, 11.3 | 0.25 |
 | PR 1 entry types, closed reason, DDL, capability entries, reads, chain kind with full validation, tests | 1.5-2 |
 | PR 2 trait replacement over 8 implementors, hold and capture attribution, guard evidence, URN, scenario split, real-SQLite tests | 1.5-2 |
-| PR 3 fan-out for four kinds with expiry, mint check in item 4's insert, exchange error, `revocations_covering`, key fingerprint, tests | 1.5-2 |
+| PR 3 fan-out for four kinds with expiry, mint check in item 4's insert, exchange error, `revocations_covering`, per-generation tag matching, tests | 1.5-2 |
 | Schedules S1 to S8 with barrier wrappers over real stores | 1-1.5 |
 | PR 4 admin route and status table, schemas, PROTOCOL, CLI with warnings, egress inventory, tests | 1-1.5 |
 | Integration, native-cage runs, review rounds | 0.5-1 |
 | Total | 7.25-10.25 |
 
-Planning figure 8. The range agrees with arc-5b's 7-9 estimate at its low end and sits 3.25 to 4.25 days above 13.2. The additions over 13.2 are the chain kind (Q2), the trait replacement (Q7), capture attribution, export coverage, the key fingerprint and the deterministic schedules. Waiting time on #1708, item 1, item 2 and item 4 is not counted. If item 4 lands the fingerprint, PR 3 drops by about 0.25 days.
+Planning figure 8. The range agrees with arc-5b's 7-9 estimate at its low end and sits 3.25 to 4.25 days above 13.2. The additions over 13.2 are the chain kind (Q2), the trait replacement (Q7), capture attribution, export coverage, the per-generation tag matching and the deterministic schedules. Waiting time on #1708, item 1, item 2 and item 4 is not counted.
 
 ## Spec coverage
 
@@ -627,7 +627,7 @@ Planning figure 8. The range agrees with arc-5b's 7-9 estimate at its low end an
 | 7.11 deny names the entry in guard evidence | 4 |
 | 7.11 entries exported with tags only; coverage for item 6 | 3, 5 (`revocations_covering`, `chio.revocation-entry.v1`, closed `reason`) |
 | 7.11 D17 reconciliation with coop2c | Store reconciliation, Task 1 |
-| 7.12 tags under `index_key`; key continuity | 5 (fingerprint), 2 (8.3 text) |
+| 7.12 tags under the rotating tenant index key set; referenced-generation startup refusal | 5 (index-key generations) |
 | 8.2 any token in the chain matched by an entry denies; store error denies | 4, 5 |
 | 8.3 startup refusal on index-key mismatch | 2, 5 |
 | 10.7 existing revocation tables gain the target kinds, writes through the serving writer | 3, 5 |
