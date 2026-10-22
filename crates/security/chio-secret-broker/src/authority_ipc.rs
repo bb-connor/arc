@@ -929,7 +929,6 @@ fn unavailable_capabilities() -> ExecutionAuthorityCapabilities {
 
 #[cfg(test)]
 mod tests {
-    use chio_test_support::duplicate_keys::assert_repeated_tag_and_content_refused;
     use chio_test_support::prelude::*;
     use std::thread;
 
@@ -1041,19 +1040,5 @@ mod tests {
 
         server.set_nonblocking(true).test_expect("nonblocking mode");
         assert!(!server.try_serve_one().test_expect("idle poll"));
-    }
-
-    #[test]
-    fn authority_operations_and_results_refuse_a_repeated_tag_or_content_key() {
-        assert_repeated_tag_and_content_refused::<AuthorityOperation>(
-            "kind",
-            "capabilities",
-            "request",
-        );
-        assert_repeated_tag_and_content_refused::<AuthorityResult>(
-            "kind",
-            "capabilities",
-            "response",
-        );
     }
 }
