@@ -452,8 +452,8 @@ pub enum ExportDisclosure {
 /// chio-control-plane depends on (the reverse edge would be a cycle), so no
 /// trait sits between them.
 pub struct ExportStores<'a> {
-    pub authority: &'a SqliteAuthorityStore,   // item 4
-    pub receipts: &'a SqliteReceiptStore,      // items 2 and 4
+    pub exchange: &'a SqliteRootExchangeStore,  // item 4
+    pub receipts: &'a SqliteReceiptStore,      // item 2
     pub revocations: &'a SqliteRevocationStore, // item 5
 }
 
@@ -470,16 +470,16 @@ pub fn assemble_export(
 The reads `assemble_export` calls are plain inherent methods that chio-store-sqlite owns. Items 2, 4 and 5 add them (item 4 F13 and its "Reads for item 6" list, item 5 Task 3); this item adds none and defines no store trait. Every method returns shared `chio-core-types` types and a typed error from chio-store-sqlite, with a typed missing-row variant and never `Option`:
 
 ```rust
-// chio-store-sqlite, SqliteAuthorityStore (item 4), error AuthorityStoreError
-pub fn presentation(&self, root_capability_id: &str) -> Result<CapabilityPresentation, AuthorityStoreError>;
-pub fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext, AuthorityStoreError>;
-pub fn root_policy(&self, digest: &Sha256Digest) -> Result<RootPolicy, AuthorityStoreError>;
-pub fn provider_identity(&self, digest: &Sha256Digest) -> Result<EnterpriseProviderIdentity, AuthorityStoreError>;
-pub fn idp_key_snapshot(&self, digest: &Sha256Digest) -> Result<IdpKeySnapshot, AuthorityStoreError>;
-pub fn context_openings(&self, context_digest: &Sha256Digest) -> Result<ContextOpenings, AuthorityStoreError>;
+// chio-store-sqlite, SqliteRootExchangeStore (item 4), error RootExchangeStoreError
+pub fn presentation(&self, root_capability_id: &str) -> Result<CapabilityPresentation, RootExchangeStoreError>;
+pub fn delegation_context(&self, digest: &Sha256Digest) -> Result<DelegationContext, RootExchangeStoreError>;
+pub fn root_policy(&self, digest: &Sha256Digest) -> Result<RootPolicy, RootExchangeStoreError>;
+pub fn provider_identity(&self, digest: &Sha256Digest) -> Result<EnterpriseProviderIdentity, RootExchangeStoreError>;
+pub fn idp_key_snapshot(&self, digest: &Sha256Digest) -> Result<IdpKeySnapshot, RootExchangeStoreError>;
+pub fn context_openings(&self, context_digest: &Sha256Digest) -> Result<ContextOpenings, RootExchangeStoreError>;
+pub fn receipts_for_tenant(&self, tags: &[KeyedIndexValue], query: &EvidenceExportQuery) -> Result<Vec<EvidenceToolReceiptRecord>, RootExchangeStoreError>;
 
-// chio-store-sqlite, SqliteReceiptStore (items 2 and 4), error ReceiptStoreError
-pub fn receipts_for_tenant(&self, tags: &[KeyedIndexValue], query: &EvidenceExportQuery) -> Result<Vec<EvidenceToolReceiptRecord>, ReceiptStoreError>;
+// chio-store-sqlite, SqliteReceiptStore (item 2), error ReceiptStoreError
 pub fn receipt_openings(&self, receipt_id: &str) -> Result<ReceiptDisclosure, ReceiptStoreError>;
 
 // chio-store-sqlite, SqliteRevocationStore (item 5), error RevocationStoreError
