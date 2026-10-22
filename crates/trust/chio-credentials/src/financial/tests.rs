@@ -4,6 +4,7 @@ use chio_core::{
     capability::{governance::ProvenanceEvidenceClass, scope::MonetaryAmount},
     MerkleTree,
 };
+use chio_test_support::duplicate_keys::{assert_refused, assert_repeated_tag_and_content_refused};
 use chio_credit::underwriting::{
     SignedUnderwritingDecision, UnderwritingBudgetAction, UnderwritingBudgetRecommendation,
     UnderwritingDecisionArtifact, UnderwritingDecisionLifecycleState, UnderwritingDecisionOutcome,
@@ -276,5 +277,81 @@ fn credential_decode_and_inspection_reject_member_at_exact_window_end() -> TestR
         Err(CredentialError::InvalidFinancialCredential(reason))
             if reason.contains("committed leaves contain a gap")
     ), "unexpected decode result: {decoded:?}");
+    Ok(())
+}
+
+#[test]
+fn raw_financial_credentials_refuse_a_repeated_subject_family_or_claims() -> TestResult {
+    let issuer = Keypair::from_seed(&[44; 32]);
+    let holder = Keypair::from_seed(&[45; 32]);
+    let credential = signed_envelope(
+        &issuer,
+        FinancialCredentialSubjectV1::PremiumHistory(PremiumHistoryCredentialSubjectV1 {
+            id: DidChio::from_public_key(holder.public_key())?.to_string(),
+            quoted_count: 1,
+            quoted_amounts: vec![MonetaryAmount {
+                units: 7,
+                currency: "USD".to_string(),
+            }],
+        }),
+        FinancialCredentialEvidenceV1 {
+            window: FinancialCredentialWindowV1 {
+                starts_at: 100,
+                ends_at: 200,
+            },
+            source_disclosure: FinancialSourceDisclosureV1::Bundled {
+                artifacts: Vec::new(),
+            },
+            source_completeness_attestations: Vec::new(),
+        },
+        ProvenanceEvidenceClass::Asserted,
+        200,
+        300,
+    )?;
+    let text = serde_json::to_string(&credential)?;
+    assert_eq!(
+        serde_json::from_str::<FinancialCredentialEnvelope>(&text)?,
+        credential
+    );
+    let subject = serde_json::to_string(&credential.credential_subject)?;
+    let claims = subject
+        .strip_prefix(r#"{"family":"premium_history","claims":"#)
+        .and_then(|rest| rest.strip_suffix('}'))
+        .ok_or("subject is family then claims")?;
+    let (before, after) = text
+        .split_once(subject.as_str())
+        .ok_or("credential embeds its subject")?;
+
+    let head = format!(r#"{before}{{"family":"premium_history","family""#);
+    let repeated_family = (
+        format!(r#"{head}:"premium_history","claims":{claims}}}{after}"#),
+        "family",
+        head.len(),
+    );
+    let head = format!(r#"{before}{{"family":"premium_history","claims":{claims},"claims""#);
+    let repeated_claims = (format!(r#"{head}:{claims}}}{after}"#), "claims", head.len());
+
+    let wrapper = r#"{"kind":"financial","credential":"#;
+    for (raw, key, column) in [repeated_family, repeated_claims] {
+        assert_refused::<FinancialCredentialEnvelope>(&raw, key, column);
+        assert_refused::<FinancialPassportCredential>(
+            &format!("{wrapper}{raw}}}"),
+            key,
+            wrapper.len() + column,
+        );
+    }
+    assert_repeated_tag_and_content_refused::<FinancialPassportCredential>(
+        "kind",
+        "financial",
+        "credential",
+    );
+    assert_repeated_tag_and_content_refused::<FinancialCredentialSubjectV1>(
+        "family",
+        "premium_history",
+        "claims",
+    );
+    assert_repeated_tag_and_content_refused::<chio_reputation::MetricValue>(
+        "state", "known", "value",
+    );
     Ok(())
 }

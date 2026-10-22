@@ -3004,7 +3004,6 @@
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_value",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value",
-    "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value",
     "crates/trust/chio-credentials/src/financial.rs::from::custom_deserialize",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_value",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_value",
@@ -5432,7 +5431,6 @@
     "crates/trust/chio-credentials/src/artifact.rs::from::custom_deserialize": "Reviewed existing ReputationCredential custom Deserialize: deny-unknown-fields wire reconstruction creates an unverified credential, not proof of authority. Native JSON/JWT ingress is already bounded and duplicate-aware in financial.rs and jwt_decode.rs; verify_reputation_credential validates issuer proof separately. No redundant decoder introduced.",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_credential::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::decode_financial_agent_passport::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
-    "crates/trust/chio-credentials/src/financial.rs::deserialize::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial.rs::from::custom_deserialize": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/financial/validation.rs::validate_bundled_source_signers::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
     "crates/trust/chio-credentials/src/oid4vp.rs::inspect_chio_passport_sd_jwt_vc_unverified::from_value": "Typed conversion or custom shape decoder. Original-byte entry points in this owner first use the constrained signed reader; deserialization alone never authenticates the result.",
@@ -7590,7 +7588,6 @@
     "crates/trust/chio-credentials/src/financial.rs": [
       "decode_financial_agent_passport::from_value",
       "decode_financial_credential::from_value",
-      "deserialize::from_value",
       "from::custom_deserialize"
     ],
     "crates/trust/chio-credentials/src/fuzz.rs": [
@@ -12028,11 +12025,9 @@
         {
           "reader": "deserialize",
           "decoders": [
-            "custom_deserialize",
-            "from_value"
+            "custom_deserialize"
           ],
           "apis": [
-            "serde_json::from_value",
             "serde::Deserializer"
           ],
           "checked": true
