@@ -196,3 +196,117 @@ fn hook_deny_forging_the_kernel_runtime_admission_record_is_refused() {
         "runtime_admission is reserved for kernel-derived receipts",
     );
 }
+
+const NON_OBJECT_REFUSAL: &str = "runtime admission hook metadata must be a JSON object";
+
+/// A legacy hook whose `Ok` decision carries metadata that is not a JSON
+/// object.
+struct NonObjectMetadataHook {
+    metadata: serde_json::Value,
+    allow: bool,
+    released: Mutex<Vec<serde_json::Value>>,
+}
+
+impl RuntimeAdmissionHook for NonObjectMetadataHook {
+    fn name(&self) -> &str {
+        "non-object-metadata-hook"
+    }
+
+    fn evaluate_operation_owned(
+        &self,
+        _context: &RuntimeAdmissionContext<'_>,
+        _authority: &RuntimeParticipantClaimAuthority<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        Err(KernelError::DurableAdmission(
+            "non-object hook has no operation-owned plan".into(),
+        ))
+    }
+
+    fn evaluate(
+        &self,
+        _context: &RuntimeAdmissionContext<'_>,
+    ) -> Result<RuntimeAdmissionDecision, KernelError> {
+        let metadata = Some(self.metadata.clone());
+        Ok(if self.allow {
+            RuntimeAdmissionDecision::allow(metadata)
+        } else {
+            RuntimeAdmissionDecision::deny("hook policy denies", metadata)
+        })
+    }
+
+    fn release_reserved(&self, metadata: &serde_json::Value) -> Result<(), KernelError> {
+        self.released
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(metadata.clone());
+        Ok(())
+    }
+}
+
+fn assert_non_object_hook_metadata_refused(metadata: serde_json::Value, allow: bool) {
+    let (mut kernel, request, _context, invocations) = fixture();
+    let hook = StdArc::new(NonObjectMetadataHook {
+        metadata: metadata.clone(),
+        allow,
+        released: Mutex::new(Vec::new()),
+    });
+    kernel.set_runtime_admission_hook(hook.clone());
+    let response = kernel
+        .evaluate_tool_call_blocking(&request)
+        .expect("runtime admission denial");
+    assert_eq!(response.verdict, Verdict::Deny, "{metadata}");
+    assert_eq!(
+        response.reason.as_deref(),
+        Some(NON_OBJECT_REFUSAL),
+        "{metadata}"
+    );
+    assert_eq!(invocations.load(Ordering::SeqCst), 0, "{metadata}");
+    let signed = response.receipt.metadata.as_ref().expect("denial metadata");
+    assert!(signed.is_object(), "{metadata}");
+    assert!(signed.get("receipt_context").is_some(), "{metadata}");
+    assert!(signed.get("attribution").is_some(), "{metadata}");
+    assert_eq!(
+        signed.pointer("/runtime_admission/failure_code"),
+        Some(&serde_json::json!(
+            "runtime_admission_hook_metadata_not_object"
+        )),
+        "{metadata}"
+    );
+    let released = hook
+        .released
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    assert_eq!(released.len(), 1, "{metadata}");
+    assert!(released[0].is_object(), "{metadata}");
+}
+
+#[test]
+fn legacy_hook_allow_with_null_metadata_is_refused() {
+    assert_non_object_hook_metadata_refused(serde_json::Value::Null, true);
+}
+
+#[test]
+fn legacy_hook_allow_with_array_metadata_is_refused() {
+    assert_non_object_hook_metadata_refused(serde_json::json!(["chio_runtime"]), true);
+}
+
+#[test]
+fn legacy_hook_allow_with_scalar_metadata_is_refused() {
+    assert_non_object_hook_metadata_refused(serde_json::json!("chio_runtime"), true);
+}
+
+#[test]
+fn legacy_hook_deny_with_null_metadata_is_refused() {
+    assert_non_object_hook_metadata_refused(serde_json::Value::Null, false);
+}
+
+#[test]
+fn legacy_hook_deny_with_array_metadata_is_refused() {
+    assert_non_object_hook_metadata_refused(serde_json::json!(["chio_runtime"]), false);
+}
+
+#[test]
+fn legacy_hook_deny_with_scalar_metadata_is_refused() {
+    assert_non_object_hook_metadata_refused(serde_json::json!(7), false);
+}

@@ -112,6 +112,22 @@ impl ChioKernel {
         };
         match evaluated {
             Ok(mut decision) => {
+                if decision
+                    .metadata
+                    .as_ref()
+                    .is_some_and(|metadata| !metadata.is_object())
+                {
+                    return RuntimeAdmissionDecision::deny(
+                        crate::kernel::NON_OBJECT_HOOK_METADATA_REFUSAL,
+                        Some(serde_json::json!({
+                            "runtime_admission": {
+                                "hook": hook.name(),
+                                "accepted": false,
+                                "failure_code": "runtime_admission_hook_metadata_not_object"
+                            }
+                        })),
+                    );
+                }
                 if let Some(key) =
                     crate::kernel::reserved_hook_metadata_key(decision.metadata.as_ref())
                 {

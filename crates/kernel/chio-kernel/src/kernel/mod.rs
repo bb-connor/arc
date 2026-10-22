@@ -202,6 +202,11 @@ const RESERVED_RECEIPT_METADATA_KEYS: [&str; 35] = [
     "prior_metadata",
 ];
 
+/// Refusal reason for runtime-admission hook metadata that is present but not
+/// a JSON object; such metadata would displace every later kernel block.
+const NON_OBJECT_HOOK_METADATA_REFUSAL: &str =
+    "runtime admission hook metadata must be a JSON object";
+
 /// Hook output may name only `chio_runtime` among the reserved keys. The kernel
 /// writes `runtime_admission` itself, only on its own error paths and never
 /// from hook output, so a hook can never supply it.
