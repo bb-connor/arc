@@ -79,8 +79,8 @@ The [docs](https://www.chio.computer/docs) walk through the SDK in TypeScript, P
 ## Start building
 
 ```sh
-git clone https://github.com/bb-connor/arc.git
-cd arc
+git clone https://github.com/backbay-labs/chio.git
+cd chio
 cargo build --locked --release -p chio-cli --bin chio
 export PATH="$PWD/target/release:$PATH"
 ```
