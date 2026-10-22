@@ -12,7 +12,7 @@ use super::reads::{retain_identity, retain_policy, retain_snapshot};
 use super::{
     canonical_blob, digest_column, sql_u64, sqlite_error, stored_u64, Change, MintOutcome,
     MintRequest, MintRequestRefusal, MintRevocationCheck, MintRevocationRefusal, Mutation, Result,
-    RevocationCandidate, SqliteRootExchangeStore, SqliteRootExchangeStoreError, StoredRoot,
+    RevocationCandidate, RootExchangeStoreError, SqliteRootExchangeStore, StoredRoot,
 };
 
 impl SqliteRootExchangeStore {
@@ -116,8 +116,8 @@ impl CheckedRequest<'_> {
     }
 }
 
-fn refuse(refusal: MintRequestRefusal) -> SqliteRootExchangeStoreError {
-    SqliteRootExchangeStoreError::InvalidMintRequest(refusal)
+fn refuse(refusal: MintRequestRefusal) -> RootExchangeStoreError {
+    RootExchangeStoreError::InvalidMintRequest(refusal)
 }
 
 /// The request's members agree with each other before any durable step.
@@ -272,9 +272,9 @@ fn live_replay_root(
         .map_err(sqlite_error)?;
         return Ok(None);
     }
-    let capability_id = capability_id.ok_or(SqliteRootExchangeStoreError::AssertionReplay)?;
+    let capability_id = capability_id.ok_or(RootExchangeStoreError::AssertionReplay)?;
     let row = read_root_row(tx, &capability_id)?.ok_or_else(|| {
-        SqliteRootExchangeStoreError::AnchoredRootMissing {
+        RootExchangeStoreError::AnchoredRootMissing {
             capability_id: capability_id.clone(),
         }
     })?;
@@ -283,7 +283,7 @@ fn live_replay_root(
         || row.artifact_digest != request.artifact_digest
         || row.request_digest != request.context.exchange.request_digest
     {
-        return Err(SqliteRootExchangeStoreError::AssertionReplay);
+        return Err(RootExchangeStoreError::AssertionReplay);
     }
     Ok(Some(stored))
 }
@@ -327,10 +327,10 @@ fn recover(
 ) -> Result<()> {
     let capability_id = stored.capability.id.clone();
     if stored.capability.expires_at <= now {
-        return Err(SqliteRootExchangeStoreError::AnchoredRootExpired { capability_id });
+        return Err(RootExchangeStoreError::AnchoredRootExpired { capability_id });
     }
     if stored.root_policy_digest != *request.root_policy.digest() {
-        return Err(SqliteRootExchangeStoreError::RootPolicyChanged { capability_id });
+        return Err(RootExchangeStoreError::RootPolicyChanged { capability_id });
     }
     let current = request
         .provider_identity
@@ -338,7 +338,7 @@ fn recover(
         .transpose()
         .map_err(|_| refuse(MintRequestRefusal::ProviderIdentityNotCanonical))?;
     if stored.context.anchor.provider_identity_digest != current {
-        return Err(SqliteRootExchangeStoreError::ProviderIdentityChanged { capability_id });
+        return Err(RootExchangeStoreError::ProviderIdentityChanged { capability_id });
     }
     refuse_revoked(
         tx,
@@ -368,10 +368,10 @@ fn refuse_revoked(
         .refuse_revoked_root(tx, &candidate)
         .map_err(|refusal| match refusal {
             MintRevocationRefusal::Revoked { entry_id } => {
-                SqliteRootExchangeStoreError::Revoked { entry_id }
+                RootExchangeStoreError::Revoked { entry_id }
             }
             MintRevocationRefusal::Unavailable(detail) => {
-                SqliteRootExchangeStoreError::RevocationCheckUnavailable(detail)
+                RootExchangeStoreError::RevocationCheckUnavailable(detail)
             }
         })
 }
@@ -404,7 +404,7 @@ fn insert_openings(tx: &Transaction<'_>, request: &MintRequest<'_>, now: u64) ->
             .optional()
             .map_err(sqlite_error)?;
         if tombstone.is_some() {
-            return Err(SqliteRootExchangeStoreError::RootOpeningErased {
+            return Err(RootExchangeStoreError::RootOpeningErased {
                 capability_id: request.root.id.clone(),
                 salt_ref: opening.salt_ref.as_str().to_owned(),
             });

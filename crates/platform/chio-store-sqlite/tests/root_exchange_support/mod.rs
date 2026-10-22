@@ -11,8 +11,8 @@ use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::StoreMutationFence;
 use chio_store_sqlite::root_exchange_store::{
     BearerMapping, ContextOpening, MintOutcome, MintRequest, MintRevocationCheck,
-    MintRevocationRefusal, RevocationCandidate, RootExchangeIntegrityError, RootTags,
-    SqliteRootExchangeStore, SqliteRootExchangeStoreError,
+    MintRevocationRefusal, RevocationCandidate, RootExchangeIntegrityError, RootExchangeStoreError,
+    RootTags, SqliteRootExchangeStore,
 };
 use chio_store_sqlite::serving_owner::SqliteServingOwnerError;
 use chio_store_sqlite::SqliteAuthorityStore;
@@ -429,7 +429,7 @@ impl Env {
         case: &Case,
         check: &dyn MintRevocationCheck,
         seconds: u64,
-    ) -> TestResult<Result<MintOutcome, SqliteRootExchangeStoreError>> {
+    ) -> TestResult<Result<MintOutcome, RootExchangeStoreError>> {
         let built = case.build()?;
         Ok(self.store.mint_anchored_root(
             &built.request(case),
@@ -458,7 +458,7 @@ impl Env {
         case: &Case,
         check: &dyn MintRevocationCheck,
         seconds: u64,
-    ) -> TestResult<SqliteRootExchangeStoreError> {
+    ) -> TestResult<RootExchangeStoreError> {
         match self.mint(case, check, seconds)? {
             Ok(outcome) => Err(format!("mint unexpectedly succeeded: {outcome:?}").into()),
             Err(error) => Ok(error),

@@ -5,9 +5,7 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::projection::all_root_rows;
 use super::reads::{verify_retained_table, Retained};
-use super::{
-    digest_column, owner_invalid, RootExchangeIntegrityError, SqliteRootExchangeStoreError,
-};
+use super::{digest_column, owner_invalid, RootExchangeIntegrityError, RootExchangeStoreError};
 use crate::serving_owner::SqliteServingOwnerError;
 
 const SCHEMA_KEY: &str = "root_exchange";
@@ -62,9 +60,7 @@ fn verify_integrity(
         };
         match row.verify() {
             Ok(_) => {}
-            Err(SqliteRootExchangeStoreError::AnchoredRootTampered { .. }) => {
-                return Err(tampered())
-            }
+            Err(RootExchangeStoreError::AnchoredRootTampered { .. }) => return Err(tampered()),
             Err(error) => return Err(unreadable(&error)),
         }
         if event != digest_column(&row.authorization_projection_digest) {
@@ -88,7 +84,7 @@ fn verify_integrity(
     for retained in [Retained::Policy, Retained::Identity, Retained::Snapshot] {
         match verify_retained_table(connection, retained) {
             Ok(()) => {}
-            Err(SqliteRootExchangeStoreError::RetainedDigestMismatch { kind }) => {
+            Err(RootExchangeStoreError::RetainedDigestMismatch { kind }) => {
                 return Err(RootExchangeIntegrityError::RetainedDigestMismatch { kind })
             }
             Err(error) => return Err(unreadable(&error)),
