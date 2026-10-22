@@ -956,4 +956,51 @@ mod capability_snapshot_tests {
         );
         Ok(())
     }
+
+    #[test]
+    fn issue_capability_request_refuses_a_repeated_constraint_tag(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let request = IssueCapabilityRequest {
+            subject_public_key: "subject".to_string(),
+            scope: ChioScope {
+                grants: vec![chio_core::capability::scope::ToolGrant {
+                    server_id: "srv".to_string(),
+                    tool_name: "read".to_string(),
+                    operations: vec![chio_core::capability::scope::Operation::Invoke],
+                    constraints: vec![chio_core::capability::scope::Constraint::PathPrefix(
+                        "/workspace".to_string(),
+                    )],
+                    max_invocations: None,
+                    max_cost_per_invocation: None,
+                    max_total_cost: None,
+                    dpop_required: None,
+                }],
+                resource_grants: vec![],
+                prompt_grants: vec![],
+            },
+            ttl_seconds: 60,
+            runtime_attestation: None,
+        };
+        let honest = serde_json::to_vec(&request)?;
+        serde_json::from_slice::<IssueCapabilityRequest>(&honest)?;
+        let padded = String::from_utf8(honest)?.replacen(
+            r#"{"type":"path_prefix","value":"/workspace"}"#,
+            r#"{"type":"domain_exact","type":"path_prefix","value":"/workspace"}"#,
+            1,
+        );
+        let error = serde_json::from_slice::<IssueCapabilityRequest>(padded.as_bytes())
+            .err()
+            .map(|error| error.to_string());
+        let expected = format!(
+            "{}: \"type\"",
+            chio_security_types::strict_serde::DUPLICATE_KEY
+        );
+        assert!(
+            error
+                .as_deref()
+                .is_some_and(|error| error.starts_with(&expected)),
+            "{error:?}"
+        );
+        Ok(())
+    }
 }
