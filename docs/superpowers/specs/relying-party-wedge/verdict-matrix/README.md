@@ -97,7 +97,7 @@ Each file holds one `chio.verdict-matrix.scenario.v1` object on a single line, i
 | `revoke_and_acknowledge_then_call` | Waits for the admin route's acknowledgement of a revocation, then calls. |
 | `revoke_before_capture` | Starts a streaming call, lets its admission commit, then revokes and waits for acknowledgement before the budget capture begins. |
 | `revoke_after_capture_before_receipt_check` | Lets the call's capture commit, then revokes and waits for acknowledgement before the allowed-receipt check begins. |
-| `revoke_after_receipt_check_before_append` | Lets the allowed-receipt check pass, then revokes and waits for acknowledgement before the receipt append runs. |
+| `revoke_after_receipt_check_before_append` | Lets the allowed-receipt check pass, then revokes and waits for acknowledgement before the receipt append runs. `revocation-local-010c` expects `allow` because this is the disclosed check-to-append gap; the PR that closes the gap flips it to `deny` with `urn:chio:error:capability:revoked` and re-pins the manifest. |
 | `revoke_anchor_subject_inspect_store` | As `revoke_anchor_subject`, then reads the stored revocation row and checks it holds the subject tag and no plaintext subject or tenant. |
 | `revoke_other_subject` | Revokes a different principal by `anchor_subject`, then calls under the fixture principal. |
 

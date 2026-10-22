@@ -423,9 +423,11 @@ refuses. A call admitted before T may dispatch; its budget capture and native
 dispatch capture re-check revocation in the capture transaction, and a capture
 that begins after T refuses after the upstream effect has run, withholding the
 remaining output and ending the call with a revocation denial. The
-allowed-receipt check is a read separate from the receipt append: if it begins
-after T the allowed receipt is refused, and if it began before T the allowed
-receipt is appended even when the append lands after T. An acknowledgement
+allowed-receipt check is one read per id in the call's chain (the leaf, then
+each ancestor), each separate from the others and from the receipt append. If
+the read of the id the revocation marked begins after T the allowed receipt is
+refused; if it began before T the allowed receipt is appended, even when later
+reads or the append land after T. An acknowledgement
 does not guarantee that no allowed receipt is appended after it, nor that a
 call admitted before it completes. A denied call's receipt
 names the matching revocation entry id in its guard evidence. Revocation

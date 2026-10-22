@@ -317,7 +317,9 @@ Scenario ids and expected verdicts (reason URNs use existing error domains per s
 | | 007-matching-revocation-blocks-mint | deny | `urn:chio:error:transport:exchange-revoked` |
 | | 008-store-error-denies | deny | `urn:chio:error:kernel:revocation-store` (converted from `CHIO-KERNEL-REVOCATION-STORE` in M1 item 5) |
 | | 009-acknowledged-revocation-seen-by-later-admission | deny | capability-revoked code |
-| | 010-admission-committed-before-revocation-completes | allow | allow code |
+| | 010a-revocation-before-capture-denies | deny | capability-revoked code (replaces 010 in M1 item 5) |
+| | 010b-revocation-after-capture-before-receipt-check-denies | deny | capability-revoked code (replaces 010 in M1 item 5) |
+| | 010c-revocation-after-receipt-check-appends-allowed | allow | allow code (replaces 010 in M1 item 5) |
 | | 011-subject-revocation-stores-tag-only | deny | capability-revoked code |
 | | 012-unrelated-subject-unaffected | allow | allow code |
 
