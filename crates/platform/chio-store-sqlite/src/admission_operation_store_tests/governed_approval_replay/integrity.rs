@@ -221,7 +221,7 @@ fn ordinary_sealed_reopen_must_not_repair_a_cleared_application_identity() -> An
 #[test]
 fn source_inspection_rejects_damaged_metadata_without_adopting_or_stamping_it() -> AnchoredTestResult
 {
-    for mutation in ["PRAGMA application_id = 0", "UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'governed_approval_replay'",
+    for mutation in ["PRAGMA application_id = 0", "PRAGMA ignore_check_constraints = ON; UPDATE chio_store_schema_versions SET version = 0 WHERE store_key = 'governed_approval_replay'; PRAGMA ignore_check_constraints = OFF",
         "DROP TABLE chio_store_schema_versions; CREATE TABLE chio_store_schema_versions(store_key TEXT, version INTEGER); INSERT INTO chio_store_schema_versions VALUES ('governed_approval_replay', 1), ('governed_approval_replay', 0)"] {
         let fixture = fixture();
         let source = Source::new(&fixture, false)?;

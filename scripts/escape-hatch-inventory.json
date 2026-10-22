@@ -52,6 +52,7 @@
     "crates/platform/chio-store-sqlite/src/admission_operation_store/dispatch_ledger_test_support.rs::clear_native_dispatch_capture_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/dispatch_ledger_test_support.rs::clear_native_dispatch_ledger_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/dispatch_ledger_test_support.rs::inject_native_dispatch_capture_failure_for_test": 1,
+    "crates/platform/chio-store-sqlite/src/admission_operation_store/dispatch_ledger_test_support.rs::inject_nonce_capture_preparation_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/dispatch_ledger_test_support.rs::inject_native_dispatch_ledger_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs::clear_native_capture_response_failure_for_test": 1,
     "crates/platform/chio-store-sqlite/src/admission_operation_store/native_capture_test_support.rs::inject_native_capture_response_failure_for_test": 1,

@@ -330,10 +330,14 @@ fn orphan_local_recovery_rows_refuse_at_open_without_rewriting() -> TestResult {
         params![record, GENESIS_DIGEST, event],
     )?;
     drop(raw);
-    assert_open_refused(
-        &store,
-        "admission operation invariant failed: recovery history names an absent record",
-    )
+    let catalog_before = catalog(&store.database)?;
+    let state_before = recovery_state(&store.database)?;
+    assert!(matches!(open(&store),
+        Err(SqliteServingOwnerError::BudgetSchema(chio_kernel::BudgetStoreError::Invariant(message)))
+            if message == "sqlite foreign key violation in `admission_operation_recovery_events` row 1"));
+    assert_eq!(catalog(&store.database)?, catalog_before);
+    assert_eq!(recovery_state(&store.database)?, state_before);
+    Ok(())
 }
 
 #[test]

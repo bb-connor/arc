@@ -394,11 +394,6 @@ pub fn run_case(ops: &[Op], files: &CaseFiles, watchdog: &Watchdog<'_>) -> CaseR
     let live_ids = watchdog.step("read-live-ids", move || receipt_ids(&live));
     let archived_ids = if files.archive.exists() {
         let archive = files.archive.clone();
-        let archive_store =
-            watchdog.step("open-archive", move || SqliteReceiptStore::open(&archive));
-        let archive_store = archive_store.test_expect("open archive as a store");
-        watchdog.step("teardown-archive", move || drop(archive_store));
-        let archive = files.archive.clone();
         watchdog.step("read-archive-ids", move || receipt_ids(&archive))
     } else {
         BTreeSet::new()

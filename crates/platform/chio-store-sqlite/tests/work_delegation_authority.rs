@@ -821,14 +821,21 @@ fn store_refuses_a_stale_schema_stamp() -> TestResult {
     } = env;
     drop(store);
     drop(owner);
-    fixture.raw()?.execute(
-        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'work_delegation'",
-        [],
+    fixture.raw()?.execute_batch(
+        "PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'work_delegation';
+         PRAGMA ignore_check_constraints = OFF;",
     )?;
-    assert_open_invalid(
-        &fixture,
-        "database schema version 2 is not the current schema version 1; refusing to open",
-    );
+    let error = fixture.open().err().ok_or("stale schema was admitted")?;
+    assert!(matches!(
+        error.downcast_ref::<SqliteServingOwnerError>(),
+        Some(SqliteServingOwnerError::Schema(
+            chio_store_sqlite::SchemaVersionError::StaleSchema {
+                found: 2,
+                current: 1
+            }
+        ))
+    ));
     Ok(())
 }
 
@@ -847,10 +854,12 @@ fn store_refuses_populated_tables_without_a_schema_stamp() -> TestResult {
         "DELETE FROM chio_store_schema_versions WHERE store_key = 'work_delegation'",
         [],
     )?;
-    assert_open_invalid(
-        &fixture,
-        "delegation store was provisioned without a schema stamp",
-    );
+    let error = fixture
+        .open()
+        .err()
+        .ok_or("missing namespace was admitted")?;
+    assert!(matches!(error.downcast_ref::<SqliteServingOwnerError>(),
+        Some(SqliteServingOwnerError::Schema(chio_store_sqlite::SchemaVersionError::MissingSchema { store_key })) if store_key == "work_delegation"));
     Ok(())
 }
 

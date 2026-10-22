@@ -361,11 +361,24 @@ fn a_schema_stamp_mismatch_is_refused() -> TestResult {
     } = env;
     drop(store);
     drop(owner);
-    fixture.raw()?.execute(
-        "UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'work_graph'",
-        [],
+    fixture.raw()?.execute_batch(
+        "PRAGMA ignore_check_constraints = ON;
+         UPDATE chio_store_schema_versions SET version = 2 WHERE store_key = 'work_graph';
+         PRAGMA ignore_check_constraints = OFF;",
     )?;
-    assert!(fixture.open().is_err());
+    let error = fixture
+        .open()
+        .err()
+        .ok_or("stale graph schema was admitted")?;
+    assert!(matches!(
+        error.downcast_ref::<chio_store_sqlite::SqliteServingOwnerError>(),
+        Some(chio_store_sqlite::SqliteServingOwnerError::Schema(
+            chio_store_sqlite::SchemaVersionError::StaleSchema {
+                found: 2,
+                current: 1
+            }
+        ))
+    ));
     Ok(())
 }
 
