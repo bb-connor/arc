@@ -11,9 +11,10 @@ use chio_core::tenant_index::KeyedIndexValue;
 use chio_core::StoreMutationFence;
 use chio_store_sqlite::root_exchange_store::{
     BearerMapping, ContextOpening, MintOutcome, MintRequest, MintRevocationCheck,
-    MintRevocationRefusal, RevocationCandidate, RootTags, SqliteRootExchangeStore,
-    SqliteRootExchangeStoreError,
+    MintRevocationRefusal, RevocationCandidate, RootExchangeIntegrityError, RootTags,
+    SqliteRootExchangeStore, SqliteRootExchangeStoreError,
 };
+use chio_store_sqlite::serving_owner::SqliteServingOwnerError;
 use chio_store_sqlite::SqliteAuthorityStore;
 use rusqlite::Transaction;
 use serde_json::{json, Value};
@@ -457,10 +458,10 @@ impl Env {
         case: &Case,
         check: &dyn MintRevocationCheck,
         seconds: u64,
-    ) -> TestResult<String> {
+    ) -> TestResult<SqliteRootExchangeStoreError> {
         match self.mint(case, check, seconds)? {
             Ok(outcome) => Err(format!("mint unexpectedly succeeded: {outcome:?}").into()),
-            Err(error) => Ok(error.to_string()),
+            Err(error) => Ok(error),
         }
     }
 
@@ -470,7 +471,7 @@ impl Env {
         self,
         trigger: Option<&str>,
         sql: &str,
-    ) -> TestResult<(Fixture, Result<(), String>)> {
+    ) -> TestResult<(Fixture, RootExchangeIntegrityError)> {
         let fixture = self.fixture;
         drop(self.store);
         drop(self.owner);
@@ -489,10 +490,22 @@ impl Env {
             None => raw.execute_batch(sql)?,
         }
         drop(raw);
-        let reopened = fixture
-            .open()
-            .map(|_| ())
-            .map_err(|error| error.to_string());
-        Ok((fixture, reopened))
+        let refusal = open_refusal(&fixture)?;
+        Ok((fixture, refusal))
+    }
+}
+
+/// The typed integrity refusal of a serving open that must fail.
+pub fn open_refusal(fixture: &Fixture) -> TestResult<RootExchangeIntegrityError> {
+    let error = match fixture.open() {
+        Ok(_) => return Err("open unexpectedly succeeded".into()),
+        Err(error) => error,
+    };
+    match error.downcast::<SqliteServingOwnerError>() {
+        Ok(owner) => match *owner {
+            SqliteServingOwnerError::RootExchange(refusal) => Ok(refusal),
+            other => Err(format!("unexpected open refusal: {other}").into()),
+        },
+        Err(other) => Err(other),
     }
 }

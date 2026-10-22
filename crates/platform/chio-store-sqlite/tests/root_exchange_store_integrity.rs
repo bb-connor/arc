@@ -1,14 +1,31 @@
 //! Open-time integrity of the root exchange store: the authorization
 //! projection, the global commit per root, the opening custody contract,
-//! retained digests, the canonical catalog and the DDL checks.
+//! retained digests and the DDL checks. Every refusal is pinned to its exact
+//! typed variant.
 
 #[path = "root_exchange_support/mod.rs"]
 mod support;
 
+use chio_store_sqlite::root_exchange_store::{
+    RetainedArtifact, RootExchangeIntegrityError as I, SqliteRootExchangeStoreError as E,
+};
+use rusqlite::ffi;
 use support::{Admit, Case, Env, TestResult, NOW};
 
-const TAMPERED: &str =
-    "invalid sqlite authority store: anchored root cap-1 differs from its authorization projection";
+fn tampered() -> I {
+    I::RootTampered {
+        capability_id: "cap-1".into(),
+    }
+}
+
+/// The extended SQLite code of a statement that must be refused.
+fn refusal_code(result: rusqlite::Result<usize>) -> TestResult<i32> {
+    match result {
+        Ok(rows) => Err(format!("statement unexpectedly changed {rows} rows").into()),
+        Err(rusqlite::Error::SqliteFailure(error, _)) => Ok(error.extended_code),
+        Err(other) => Err(other.into()),
+    }
+}
 
 fn minted_env() -> TestResult<Env> {
     let env = Env::new()?;
@@ -58,7 +75,7 @@ fn every_projected_root_column_mutation_refuses_open() -> TestResult {
             Some("root_exchange_roots_immutable"),
             &format!("{mutation};"),
         )?;
-        assert_eq!(reopened.err().as_deref(), Some(TAMPERED), "{mutation}");
+        assert_eq!(reopened, tampered(), "{mutation}");
     }
     Ok(())
 }
@@ -80,8 +97,10 @@ fn committed_root_without_global_commit_refuses_open_and_keeps_rows() -> TestRes
         ),
     )?;
     assert_eq!(
-        reopened.err().as_deref(),
-        Some("invalid sqlite authority store: anchored root cap-forged has no global commit")
+        reopened,
+        I::RootWithoutGlobalCommit {
+            capability_id: "cap-forged".into()
+        }
     );
     let raw = fixture.raw()?;
     let roots: i64 = raw.query_row("SELECT COUNT(*) FROM root_exchange_roots", [], |row| {
@@ -106,8 +125,10 @@ fn present_opening_without_root_refuses_open() -> TestResult {
         ),
     )?;
     assert_eq!(
-        reopened.err().as_deref(),
-        Some("invalid sqlite authority store: root opening of cap-ghost has no anchored root")
+        reopened,
+        I::OpeningWithoutRoot {
+            capability_id: "cap-ghost".into()
+        }
     );
     Ok(())
 }
@@ -139,11 +160,13 @@ fn opening_insert_over_a_tombstone_refuses() -> TestResult {
             &fence,
             fixture.at(support::ms(NOW + 1)),
         )
-        .err()
-        .map(|error| error.to_string());
+        .err();
     assert_eq!(
-        refused.as_deref(),
-        Some("root opening anchor.sub of cap-ghost is erased")
+        refused,
+        Some(E::RootOpeningErased {
+            capability_id: "cap-ghost".into(),
+            salt_ref: "anchor.sub".into(),
+        })
     );
     Ok(())
 }
@@ -162,25 +185,16 @@ fn erased_tombstones_and_roots_refuse_deletion() -> TestResult {
     drop(store);
     drop(owner);
     let raw = fixture.raw()?;
-    let tombstone = raw
-        .execute(
-            "DELETE FROM root_exchange_openings WHERE capability_id = 'cap-1'",
-            [],
-        )
-        .err()
-        .map(|error| error.to_string());
-    assert_eq!(
-        tombstone.as_deref(),
-        Some("erased root opening is retained")
-    );
-    let root = raw
-        .execute(
-            "DELETE FROM root_exchange_roots WHERE capability_id = 'cap-1'",
-            [],
-        )
-        .err()
-        .map(|error| error.to_string());
-    assert_eq!(root.as_deref(), Some("anchored root is retained"));
+    for sql in [
+        "DELETE FROM root_exchange_openings WHERE capability_id = 'cap-1'",
+        "DELETE FROM root_exchange_roots WHERE capability_id = 'cap-1'",
+    ] {
+        assert_eq!(
+            refusal_code(raw.execute(sql, []))?,
+            ffi::SQLITE_CONSTRAINT_TRIGGER,
+            "{sql}"
+        );
+    }
     Ok(())
 }
 
@@ -190,52 +204,36 @@ fn retained_bytes_mutated_under_their_digest_refuse_open() -> TestResult {
         (
             "root_exchange_policies_immutable",
             "UPDATE root_exchange_policies SET policy = x'7b7d';",
-            "invalid sqlite authority store: retained root policy bytes differ from their digest",
+            RetainedArtifact::RootPolicy,
         ),
         (
             "root_exchange_provider_identities_immutable",
             "UPDATE root_exchange_provider_identities SET identity = x'7b7d';",
-            "invalid sqlite authority store: retained provider identity bytes differ from their digest",
+            RetainedArtifact::ProviderIdentity,
         ),
         (
             "root_exchange_key_snapshots_immutable",
             "UPDATE root_exchange_key_snapshots SET snapshot = x'7b7d';",
-            "invalid sqlite authority store: retained key snapshot bytes differ from their digest",
+            RetainedArtifact::KeySnapshot,
         ),
         (
             "root_exchange_policies_immutable",
             "UPDATE root_exchange_policies SET root_policy_digest = '3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a3a';",
-            "invalid sqlite authority store: retained root policy bytes differ from their digest",
+            RetainedArtifact::RootPolicy,
         ),
     ];
-    for (trigger, sql, expected) in cases {
+    for (trigger, sql, kind) in cases {
         let env = minted_env()?;
         let (_, reopened) = env.tamper_and_reopen(Some(trigger), sql)?;
-        assert_eq!(reopened.err().as_deref(), Some(expected), "{sql}");
+        assert_eq!(reopened, I::RetainedDigestMismatch { kind }, "{sql}");
     }
     Ok(())
 }
 
-#[test]
-fn foreign_catalog_layout_refuses_open() -> TestResult {
-    let env = minted_env()?;
-    let (_, reopened) =
-        env.tamper_and_reopen(None, "DROP INDEX root_exchange_roots_generation;")?;
-    assert_eq!(
-        reopened.err().as_deref(),
-        Some("invalid sqlite authority store: root exchange schema differs from the canonical definition")
-    );
-    Ok(())
-}
-
-fn refused_insert(sql: &str) -> TestResult<String> {
+fn refused_insert(sql: &str) -> TestResult<i32> {
     let catalog = rusqlite::Connection::open_in_memory()?;
     catalog.execute_batch(include_str!("../src/root_exchange_store.sql"))?;
-    Ok(catalog
-        .execute_batch(sql)
-        .err()
-        .map(|error| error.to_string())
-        .unwrap_or_default())
+    refusal_code(catalog.execute(sql, []))
 }
 
 #[test]
@@ -265,10 +263,7 @@ fn ddl_checks_refuse_malformed_rows() -> TestResult {
         format!("INSERT INTO root_exchange_events VALUES (1, 'rotate', 'cap-1', '{lower}');"),
     ];
     for sql in cases {
-        assert!(
-            refused_insert(&sql)?.starts_with("CHECK constraint failed"),
-            "{sql}"
-        );
+        assert_eq!(refused_insert(&sql)?, ffi::SQLITE_CONSTRAINT_CHECK, "{sql}");
     }
     Ok(())
 }

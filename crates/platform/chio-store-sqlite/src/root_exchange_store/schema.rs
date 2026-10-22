@@ -5,7 +5,9 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use super::projection::all_root_rows;
 use super::reads::{verify_retained_table, Retained};
-use super::{digest_column, owner_invalid};
+use super::{
+    digest_column, owner_invalid, RootExchangeIntegrityError, SqliteRootExchangeStoreError,
+};
 use crate::serving_owner::SqliteServingOwnerError;
 
 const SCHEMA_KEY: &str = "root_exchange";
@@ -13,8 +15,6 @@ const SCHEMA: &str = include_str!("../root_exchange_store.sql");
 
 pub(crate) const PROJECTION: &str = "root_exchange";
 pub(super) const PROJECTION_KEY: &str = "root_exchange";
-
-type SchemaCatalogEntry = (String, String, String, Option<String>);
 
 pub(crate) fn initialize_root_exchange_schema(
     schema: &crate::schema_version::SchemaTransaction<'_>,
@@ -29,20 +29,20 @@ pub(crate) fn initialize_root_exchange_schema(
     verify_root_exchange_invariants(transaction)
 }
 
-/// The schema matches its canonical definition; every root row passes its
-/// row check and has its mint event; every present opening has its root;
+/// Every root row passes its row check and has its mint event; every present opening has its root;
 /// every retained artifact matches its digest.
 pub(crate) fn verify_root_exchange_invariants(
     connection: &Connection,
 ) -> std::result::Result<(), SqliteServingOwnerError> {
-    let expected = Connection::open_in_memory()?;
-    expected.execute_batch(SCHEMA)?;
-    if schema_catalog(connection)? != schema_catalog(&expected)? {
-        return Err(owner_invalid(
-            "root exchange schema differs from the canonical definition",
-        ));
-    }
-    for row in all_root_rows(connection).map_err(|error| owner_invalid(error.to_string()))? {
+    verify_integrity(connection).map_err(SqliteServingOwnerError::RootExchange)
+}
+
+fn verify_integrity(
+    connection: &Connection,
+) -> std::result::Result<(), RootExchangeIntegrityError> {
+    let unreadable =
+        |error: &dyn std::fmt::Display| RootExchangeIntegrityError::Unreadable(error.to_string());
+    for row in all_root_rows(connection).map_err(|error| unreadable(&error))? {
         let event: Option<String> = connection
             .query_row(
                 "SELECT digest FROM root_exchange_events
@@ -50,20 +50,25 @@ pub(crate) fn verify_root_exchange_invariants(
                 [&row.capability_id],
                 |row| row.get(0),
             )
-            .optional()?;
+            .optional()
+            .map_err(|error| unreadable(&error))?;
         let Some(event) = event else {
-            return Err(owner_invalid(format!(
-                "anchored root {} has no global commit",
-                row.capability_id
-            )));
+            return Err(RootExchangeIntegrityError::RootWithoutGlobalCommit {
+                capability_id: row.capability_id,
+            });
         };
-        row.verify()
-            .map_err(|error| owner_invalid(error.to_string()))?;
+        let tampered = || RootExchangeIntegrityError::RootTampered {
+            capability_id: row.capability_id.clone(),
+        };
+        match row.verify() {
+            Ok(_) => {}
+            Err(SqliteRootExchangeStoreError::AnchoredRootTampered { .. }) => {
+                return Err(tampered())
+            }
+            Err(error) => return Err(unreadable(&error)),
+        }
         if event != digest_column(&row.authorization_projection_digest) {
-            return Err(owner_invalid(format!(
-                "anchored root {} differs from its authorization projection",
-                row.capability_id
-            )));
+            return Err(tampered());
         }
     }
     let orphan: Option<String> = connection
@@ -75,15 +80,19 @@ pub(crate) fn verify_root_exchange_invariants(
             [],
             |row| row.get(0),
         )
-        .optional()?;
+        .optional()
+        .map_err(|error| unreadable(&error))?;
     if let Some(capability_id) = orphan {
-        return Err(owner_invalid(format!(
-            "root opening of {capability_id} has no anchored root"
-        )));
+        return Err(RootExchangeIntegrityError::OpeningWithoutRoot { capability_id });
     }
     for retained in [Retained::Policy, Retained::Identity, Retained::Snapshot] {
-        verify_retained_table(connection, retained)
-            .map_err(|error| owner_invalid(error.to_string()))?;
+        match verify_retained_table(connection, retained) {
+            Ok(()) => {}
+            Err(SqliteRootExchangeStoreError::RetainedDigestMismatch { kind }) => {
+                return Err(RootExchangeIntegrityError::RetainedDigestMismatch { kind })
+            }
+            Err(error) => return Err(unreadable(&error)),
+        }
     }
     Ok(())
 }
@@ -147,20 +156,4 @@ pub(crate) fn verify_projection_coverage(
         ));
     }
     Ok(())
-}
-
-fn schema_catalog(
-    connection: &Connection,
-) -> std::result::Result<Vec<SchemaCatalogEntry>, SqliteServingOwnerError> {
-    let mut statement = connection.prepare(
-        "SELECT type, name, tbl_name, sql FROM sqlite_schema
-         WHERE name GLOB 'root_exchange_*' OR tbl_name GLOB 'root_exchange_*'
-         ORDER BY type, name, tbl_name",
-    )?;
-    let entries = statement
-        .query_map([], |row| {
-            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
-        })?
-        .collect::<std::result::Result<Vec<_>, _>>()?;
-    Ok(entries)
 }

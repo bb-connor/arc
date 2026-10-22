@@ -38,7 +38,7 @@ pub(crate) use schema::{
 /// The refusal text for a stored tag generation the loaded key set lacks.
 pub const TAG_GENERATION_MISSING: &str = "tenant index key does not match the state directory";
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SqliteRootExchangeStoreError {
     #[error("assertion replay")]
     AssertionReplay,
@@ -57,20 +57,23 @@ pub enum SqliteRootExchangeStoreError {
     #[error("anchored root {capability_id} was minted under another provider identity")]
     ProviderIdentityChanged { capability_id: String },
     #[error("retained {kind} bytes differ from their digest")]
-    RetainedDigestMismatch { kind: &'static str },
+    RetainedDigestMismatch { kind: RetainedArtifact },
     #[error("retained {kind} {digest} is absent")]
-    RetainedArtifactMissing { kind: &'static str, digest: String },
+    RetainedArtifactMissing {
+        kind: RetainedArtifact,
+        digest: Sha256Digest,
+    },
     #[error("delegation context {digest} is absent")]
-    DelegationContextMissing { digest: String },
+    DelegationContextMissing { digest: Sha256Digest },
     #[error("root opening {salt_ref} of {capability_id} is erased")]
     RootOpeningErased {
         capability_id: String,
         salt_ref: String,
     },
     #[error("{TAG_GENERATION_MISSING}")]
-    TagGenerationMissing { key_id: String },
+    TagGenerationMissing { key_id: Sha256Digest },
     #[error("invalid mint request: {0}")]
-    InvalidMintRequest(&'static str),
+    InvalidMintRequest(MintRequestRefusal),
     #[error("root exchange store is unavailable: {0}")]
     Unavailable(String),
     #[error("root exchange store invariant failed: {0}")]
@@ -78,6 +81,95 @@ pub enum SqliteRootExchangeStoreError {
 }
 
 type Result<T> = std::result::Result<T, SqliteRootExchangeStoreError>;
+
+/// Why a mint request's members disagree with each other. Checked before
+/// any durable step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum MintRequestRefusal {
+    #[error("root capability id")]
+    RootCapabilityId,
+    #[error("client id")]
+    ClientId,
+    #[error("root capability has a delegation chain")]
+    DelegationChain,
+    #[error("root issuer is not the exchange key")]
+    IssuerNotExchangeKey,
+    #[error("root issuer is not in the policy exchange keys")]
+    IssuerNotInPolicy,
+    #[error("root policy is not valid now")]
+    PolicyNotValid,
+    #[error("root policy has no matched rule")]
+    UnknownRule,
+    #[error("rule anchor kind differs from the context")]
+    RuleKindMismatch,
+    #[error("root scope does not canonicalize")]
+    ScopeNotCanonical,
+    #[error("root scope hash differs from the context")]
+    ScopeHashMismatch,
+    #[error("root is already expired")]
+    RootExpired,
+    #[error("replay retention is already past")]
+    ReplayRetentionPast,
+    #[error("provider identity does not canonicalize")]
+    ProviderIdentityNotCanonical,
+    #[error("provider identity differs from the context")]
+    ProviderIdentityMismatch,
+    #[error("provider identity presence differs from the anchor kind")]
+    ProviderIdentityPresence,
+    #[error("key snapshot does not canonicalize")]
+    KeySnapshotNotCanonical,
+    #[error("key snapshot differs from the context")]
+    KeySnapshotMismatch,
+    #[error("artifact digest differs from the context")]
+    ArtifactMismatch,
+    #[error("root tags span two key generations")]
+    TagsSpanGenerations,
+    #[error("root tags are not among the loaded generations")]
+    TagsNotLoaded,
+    #[error("only an operator key root may omit the tenant tag")]
+    TenantTagRequired,
+    #[error("bearer mapping retention ends before the root")]
+    BearerRetentionShort,
+    #[error("duplicate context opening")]
+    DuplicateOpening,
+    #[error("context openings differ from the committed values")]
+    OpeningsMismatch,
+    #[error("delegation context does not canonicalize")]
+    ContextNotCanonical,
+}
+
+/// An artifact retained by its recomputed digest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetainedArtifact {
+    RootPolicy,
+    ProviderIdentity,
+    KeySnapshot,
+}
+
+impl std::fmt::Display for RetainedArtifact {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::RootPolicy => "root policy",
+            Self::ProviderIdentity => "provider identity",
+            Self::KeySnapshot => "key snapshot",
+        })
+    }
+}
+
+/// Why the store refuses to open. Every variant leaves the rows in place.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum RootExchangeIntegrityError {
+    #[error("anchored root {capability_id} has no global commit")]
+    RootWithoutGlobalCommit { capability_id: String },
+    #[error("anchored root {capability_id} differs from its authorization projection")]
+    RootTampered { capability_id: String },
+    #[error("root opening of {capability_id} has no anchored root")]
+    OpeningWithoutRoot { capability_id: String },
+    #[error("retained {kind} bytes differ from their digest")]
+    RetainedDigestMismatch { kind: RetainedArtifact },
+    #[error("root exchange store is unreadable: {0}")]
+    Unreadable(String),
+}
 
 /// The keyed tags of one root. Both values are derived under one tenant
 /// index key generation, so both carry the same `key_id`.
@@ -198,7 +290,7 @@ pub enum ContextOpenings {
 
 #[derive(Debug, Clone)]
 pub enum BearerLookup {
-    Live(StoredRoot),
+    Live(Box<StoredRoot>),
     Expired { capability_id: String },
     Unknown,
 }

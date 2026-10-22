@@ -8,8 +8,8 @@ use serde::Serialize;
 use super::projection::read_root_row;
 use super::reads::retain_snapshot;
 use super::{
-    change_digest, digest_column, sql_u64, sqlite_error, stored_u64, Change, Mutation, Result,
-    SqliteRootExchangeStore, SqliteRootExchangeStoreError,
+    change_digest, digest_column, sql_u64, sqlite_error, stored_u64, Change, MintRequestRefusal,
+    Mutation, Result, RetainedArtifact, SqliteRootExchangeStore, SqliteRootExchangeStoreError,
 };
 
 #[derive(Serialize)]
@@ -44,7 +44,7 @@ impl SqliteRootExchangeStore {
         self.mutate(fence, trusted_now_unix_ms, |tx, now| {
             if retain_until <= now {
                 return Err(SqliteRootExchangeStoreError::InvalidMintRequest(
-                    "replay retention is already past",
+                    MintRequestRefusal::ReplayRetentionPast,
                 ));
             }
             let replay = digest_column(replay_key_digest);
@@ -155,7 +155,7 @@ impl SqliteRootExchangeStore {
         self.mutate(fence, trusted_now_unix_ms, |tx, _| {
             let digest = snapshot.digest().map_err(|_| {
                 SqliteRootExchangeStoreError::RetainedDigestMismatch {
-                    kind: "key snapshot",
+                    kind: RetainedArtifact::KeySnapshot,
                 }
             })?;
             if !retain_snapshot(tx, snapshot)? {

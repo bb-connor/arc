@@ -6,8 +6,8 @@
 mod support;
 
 use chio_store_sqlite::root_exchange_store::{
-    BearerLookup, BearerMapping, ContextOpenings, MintOutcome, OpeningState,
-    SqliteRootExchangeStoreError,
+    BearerLookup, BearerMapping, ContextOpenings, MintOutcome, MintRequestRefusal, OpeningState,
+    RetainedArtifact, SqliteRootExchangeStoreError as E,
 };
 use support::{
     digest, loaded_policy, snapshot, tags, Admit, Case, Env, Failing, RevokedTenant, TestResult,
@@ -60,11 +60,10 @@ fn retry_for_the_same_client_artifact_and_request_recovers_the_root() -> TestRes
         ("cap-1".to_string(), true)
     );
     assert_eq!(
-        env.store
-            .presentation("cap-2")
-            .err()
-            .map(|error| error.to_string()),
-        Some("anchored root row missing for cap-2".to_string())
+        env.store.presentation("cap-2").err(),
+        Some(E::AnchoredRootMissing {
+            capability_id: "cap-2".into()
+        })
     );
     Ok(())
 }
@@ -75,7 +74,7 @@ fn retry_from_another_client_refuses_replay() -> TestResult {
     env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
     let mut retry = Case::id_jag("cap-2")?;
     retry.client_id = "other-client".into();
-    assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, "assertion replay");
+    assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
 }
 
@@ -85,7 +84,7 @@ fn retry_with_changed_artifact_refuses_replay() -> TestResult {
     env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
     let mut retry = Case::id_jag("cap-2")?;
     retry.artifact = 0x99;
-    assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, "assertion replay");
+    assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
 }
 
@@ -95,7 +94,7 @@ fn retry_with_changed_request_refuses_replay() -> TestResult {
     env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
     let mut retry = Case::id_jag("cap-2")?;
     retry.request = 0x98;
-    assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, "assertion replay");
+    assert_eq!(env.refused(&retry, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
 }
 
@@ -105,14 +104,15 @@ fn refusing_checker_denies_with_entry_id_and_binds_nothing() -> TestResult {
     let case = Case::id_jag("cap-1")?;
     assert_eq!(
         env.refused(&case, &RevokedTenant(tags(1)), NOW)?,
-        "anchored root is revoked by entry rev-tenant-1"
+        E::Revoked {
+            entry_id: "rev-tenant-1".into()
+        }
     );
     assert_eq!(
-        env.store
-            .presentation("cap-1")
-            .err()
-            .map(|error| error.to_string()),
-        Some("anchored root row missing for cap-1".to_string())
+        env.store.presentation("cap-1").err(),
+        Some(E::AnchoredRootMissing {
+            capability_id: "cap-1".into()
+        })
     );
     assert_eq!(
         env.minted(&case, &Admit, NOW + 1)?,
@@ -127,7 +127,7 @@ fn checker_error_rolls_back_and_denies() -> TestResult {
     let case = Case::id_jag("cap-1")?;
     assert_eq!(
         env.refused(&case, &Failing, NOW)?,
-        "revocation check is unavailable: revocation store offline"
+        E::RevocationCheckUnavailable("revocation store offline".into())
     );
     assert_eq!(
         env.minted(&case, &Admit, NOW + 1)?,
@@ -142,7 +142,9 @@ fn recovery_of_a_revoked_root_refuses_with_entry_id() -> TestResult {
     env.minted(&Case::id_jag("cap-1")?, &Admit, NOW)?;
     assert_eq!(
         env.refused(&Case::id_jag("cap-2")?, &RevokedTenant(tags(1)), NOW + 1)?,
-        "anchored root is revoked by entry rev-tenant-1"
+        E::Revoked {
+            entry_id: "rev-tenant-1".into()
+        }
     );
     Ok(())
 }
@@ -157,7 +159,9 @@ fn recovery_of_an_expired_root_refuses() -> TestResult {
     retry.expires_at = NOW + 300;
     assert_eq!(
         env.refused(&retry, &Admit, NOW + 20)?,
-        "anchored root cap-1 has expired"
+        E::AnchoredRootExpired {
+            capability_id: "cap-1".into()
+        }
     );
     Ok(())
 }
@@ -170,7 +174,9 @@ fn recovery_under_another_policy_digest_refuses() -> TestResult {
     retry.policy = loaded_policy("rp_acme_rotated")?;
     assert_eq!(
         env.refused(&retry, &Admit, NOW + 1)?,
-        "anchored root cap-1 was minted under another root policy"
+        E::RootPolicyChanged {
+            capability_id: "cap-1".into()
+        }
     );
     Ok(())
 }
@@ -183,7 +189,9 @@ fn revoke_under_n_then_mint_under_n_plus_1_refuses() -> TestResult {
     case.candidates = vec![tags(2), tags(1)];
     assert_eq!(
         env.refused(&case, &RevokedTenant(tags(1)), NOW)?,
-        "anchored root is revoked by entry rev-tenant-1"
+        E::Revoked {
+            entry_id: "rev-tenant-1".into()
+        }
     );
     Ok(())
 }
@@ -224,7 +232,7 @@ fn expired_replay_binding_is_rebindable_only_after_retention() -> TestResult {
     second.client_id = "other-client".into();
     second.expires_at = NOW + 400;
     second.replay_retain_until = NOW + 460;
-    assert_eq!(env.refused(&second, &Admit, NOW + 109)?, "assertion replay");
+    assert_eq!(env.refused(&second, &Admit, NOW + 109)?, E::AssertionReplay);
     assert_eq!(
         env.minted(&second, &Admit, NOW + 110)?,
         ("cap-2".to_string(), false)
@@ -241,9 +249,8 @@ fn client_assertion_binds_once_until_retention() -> TestResult {
     assert_eq!(
         env.store
             .bind_client_assertion(&jti, NOW + 61, &env.fence, env.at(NOW + 1))
-            .err()
-            .map(|error| error.to_string()),
-        Some("assertion replay".to_string())
+            .err(),
+        Some(E::AssertionReplay)
     );
     env.store
         .bind_client_assertion(&jti, NOW + 120, &env.fence, env.at(NOW + 60))?;
@@ -256,11 +263,11 @@ fn client_assertion_binding_never_recovers_a_root() -> TestResult {
     let case = Case::id_jag("cap-1")?;
     env.store
         .bind_client_assertion(&digest(case.replay), NOW + 60, &env.fence, env.at(NOW))?;
-    assert_eq!(env.refused(&case, &Admit, NOW + 1)?, "assertion replay");
+    assert_eq!(env.refused(&case, &Admit, NOW + 1)?, E::AssertionReplay);
     Ok(())
 }
 
-fn refusal(edit: impl FnOnce(&mut Case)) -> TestResult<String> {
+fn refusal(edit: impl FnOnce(&mut Case)) -> TestResult<E> {
     let env = Env::new()?;
     let mut case = Case::id_jag("cap-1")?;
     edit(&mut case);
@@ -269,13 +276,13 @@ fn refusal(edit: impl FnOnce(&mut Case)) -> TestResult<String> {
 
 #[test]
 fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
-    let cases: Vec<(&str, Box<dyn FnOnce(&mut Case)>)> = vec![
+    let cases: Vec<(MintRequestRefusal, Box<dyn FnOnce(&mut Case)>)> = vec![
         (
-            "invalid mint request: root issuer is not the exchange key",
+            MintRequestRefusal::IssuerNotExchangeKey,
             Box::new(|case| case.signer = support::holder_keypair()),
         ),
         (
-            "invalid mint request: root scope hash differs from the context",
+            MintRequestRefusal::ScopeHashMismatch,
             Box::new(|case| {
                 case.edit_context = |value| {
                     value["effective_root_scope_hash"] = serde_json::json!(support::digest(0x01));
@@ -283,41 +290,41 @@ fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
             }),
         ),
         (
-            "invalid mint request: root tags are not among the loaded generations",
+            MintRequestRefusal::TagsNotLoaded,
             Box::new(|case| case.candidates = vec![tags(2)]),
         ),
         (
-            "invalid mint request: only an operator key root may omit the tenant tag",
+            MintRequestRefusal::TenantTagRequired,
             Box::new(|case| {
                 case.tags.tenant = None;
                 case.candidates = vec![case.tags];
             }),
         ),
         (
-            "invalid mint request: root tags span two key generations",
+            MintRequestRefusal::TagsSpanGenerations,
             Box::new(|case| {
                 case.tags.tenant = tags(2).tenant;
                 case.candidates = vec![case.tags];
             }),
         ),
         (
-            "invalid mint request: context openings differ from the committed values",
+            MintRequestRefusal::OpeningsMismatch,
             Box::new(|case| case.openings.truncate(1)),
         ),
         (
-            "invalid mint request: duplicate context opening",
+            MintRequestRefusal::DuplicateOpening,
             Box::new(|case| case.openings.push(("anchor.sub".into(), [9; 32]))),
         ),
         (
-            "invalid mint request: provider identity presence differs from the anchor kind",
+            MintRequestRefusal::ProviderIdentityPresence,
             Box::new(|case| case.with_identity = false),
         ),
         (
-            "invalid mint request: key snapshot differs from the context",
+            MintRequestRefusal::KeySnapshotMismatch,
             Box::new(|case| case.with_snapshot = false),
         ),
         (
-            "invalid mint request: artifact digest differs from the context",
+            MintRequestRefusal::ArtifactMismatch,
             Box::new(|case| {
                 case.edit_context = |value| {
                     value["anchor"]["artifact_digest"] = serde_json::json!(support::digest(0x02));
@@ -325,15 +332,15 @@ fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
             }),
         ),
         (
-            "invalid mint request: root is already expired",
+            MintRequestRefusal::RootExpired,
             Box::new(|case| case.expires_at = NOW),
         ),
         (
-            "invalid mint request: replay retention is already past",
+            MintRequestRefusal::ReplayRetentionPast,
             Box::new(|case| case.replay_retain_until = NOW),
         ),
         (
-            "invalid mint request: root policy has no matched rule",
+            MintRequestRefusal::UnknownRule,
             Box::new(|case| {
                 case.edit_context = |value| {
                     value["root_policy_rule_id"] = serde_json::json!("unknown-rule");
@@ -341,12 +348,12 @@ fn invalid_mint_requests_refuse_before_any_durable_step() -> TestResult {
             }),
         ),
         (
-            "invalid mint request: client id",
+            MintRequestRefusal::ClientId,
             Box::new(|case| case.client_id = String::new()),
         ),
     ];
     for (expected, edit) in cases {
-        assert_eq!(refusal(edit)?, expected);
+        assert_eq!(refusal(edit)?, E::InvalidMintRequest(expected));
     }
     Ok(())
 }
@@ -356,32 +363,29 @@ fn unknown_retained_digests_are_typed_missing_rows() -> TestResult {
     let env = Env::new()?;
     let unknown = digest(0x77);
     assert_eq!(
-        env.store
-            .root_policy(&unknown)
-            .err()
-            .map(|error| error.to_string()),
-        Some(format!("retained root policy {unknown} is absent"))
+        env.store.root_policy(&unknown).err(),
+        Some(E::RetainedArtifactMissing {
+            kind: RetainedArtifact::RootPolicy,
+            digest: unknown
+        })
     );
     assert_eq!(
-        env.store
-            .provider_identity(&unknown)
-            .err()
-            .map(|error| error.to_string()),
-        Some(format!("retained provider identity {unknown} is absent"))
+        env.store.provider_identity(&unknown).err(),
+        Some(E::RetainedArtifactMissing {
+            kind: RetainedArtifact::ProviderIdentity,
+            digest: unknown
+        })
     );
     assert_eq!(
-        env.store
-            .idp_key_snapshot(&unknown)
-            .err()
-            .map(|error| error.to_string()),
-        Some(format!("retained key snapshot {unknown} is absent"))
+        env.store.idp_key_snapshot(&unknown).err(),
+        Some(E::RetainedArtifactMissing {
+            kind: RetainedArtifact::KeySnapshot,
+            digest: unknown
+        })
     );
     assert_eq!(
-        env.store
-            .delegation_context(&unknown)
-            .err()
-            .map(|error| error.to_string()),
-        Some(format!("delegation context {unknown} is absent"))
+        env.store.delegation_context(&unknown).err(),
+        Some(E::DelegationContextMissing { digest: unknown })
     );
     assert_eq!(
         env.store.context_openings(&unknown)?,
@@ -422,9 +426,10 @@ fn erasing_openings_tombstones_them_and_keeps_the_root() -> TestResult {
     assert_eq!(
         env.store
             .erase_root_openings("cap-9", &env.fence, env.at(NOW + 2))
-            .err()
-            .map(|error| error.to_string()),
-        Some("anchored root row missing for cap-9".to_string())
+            .err(),
+        Some(E::AnchoredRootMissing {
+            capability_id: "cap-9".into()
+        })
     );
     Ok(())
 }
@@ -511,14 +516,11 @@ fn tag_generations_referenced_by_roots_must_be_loaded() -> TestResult {
         .err()
         .ok_or("missing generation accepted")?;
     assert_eq!(
-        error.to_string(),
-        "tenant index key does not match the state directory"
-    );
-    assert!(matches!(
         error,
-        SqliteRootExchangeStoreError::TagGenerationMissing { ref key_id }
-            if *key_id == tags(1).key_id().to_bare_hex()
-    ));
+        E::TagGenerationMissing {
+            key_id: tags(1).key_id()
+        }
+    );
     Ok(())
 }
 
@@ -531,7 +533,9 @@ fn tag_from_generation_n_still_matches_after_rotation_to_n_plus_1() -> TestResul
     rotated.tags = tags(1);
     assert_eq!(
         env.refused(&rotated, &RevokedTenant(tags(1)), NOW + 1)?,
-        "anchored root is revoked by entry rev-tenant-1"
+        E::Revoked {
+            entry_id: "rev-tenant-1".into()
+        }
     );
     env.store
         .verify_tag_generations(&[tags(2).key_id(), tags(1).key_id()])?;
