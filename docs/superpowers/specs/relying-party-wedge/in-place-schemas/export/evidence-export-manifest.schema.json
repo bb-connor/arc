@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://chio-protocol.dev/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json",
   "title": "Chio Evidence Export Manifest",
-  "description": "`chio.evidence_export_manifest.v1`, signed by the kernel key through `chio.evidence_export_commitment.v1`. Mirrors `EvidenceExportManifest` (camelCase members). `disclosureProfile`, `tenantTag` and `artifacts`: Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
+  "description": "`chio.evidence_export_manifest.v1`, signed by the kernel key through `chio.evidence_export_commitment.v1`. Mirrors `EvidenceExportManifest` (camelCase members). `disclosureProfile`, `tenantTags` and `artifacts`: Introduced with committed receipts (PROTOCOL \"Committed Receipts And Disclosure\").",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -249,10 +249,20 @@
       ],
       "description": "`caller`: receipts for one tenant, salts for their parameters and content and for the tenant's own subject and tenant commitments, no payloads. `auditor_full`: salts and payloads. `auditor_hash_only`: no salts and no payloads."
     },
-    "tenantTag": {
-      "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
-      "description": "HMAC-SHA256 tenant tag as 64 lowercase hex characters. Required for `caller`; the bundle holds only receipts whose stored tag matches."
+    "tenantTags": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "The tenant's tag set, one keyed index value per loaded tenant index key generation, sorted by `key_id`. Required for `caller`; the bundle holds exactly the receipts whose stored `(key_id, value)` is in the set.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key_id", "value"],
+        "properties": {
+          "key_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "value": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+        }
+      }
     },
     "artifacts": {
       "type": "array",
@@ -276,7 +286,7 @@
       },
       "then": {
         "required": [
-          "tenantTag"
+          "tenantTags"
         ],
         "properties": {
           "artifacts": {
@@ -295,7 +305,7 @@
       "else": {
         "not": {
           "required": [
-            "tenantTag"
+            "tenantTags"
           ]
         }
       }

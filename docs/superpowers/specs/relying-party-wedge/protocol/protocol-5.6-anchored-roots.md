@@ -450,12 +450,21 @@ Caller revocation request, signed by `revoker_key`:
 
 #### 5.6.8 Tenant and subject tags, and verifier trust
 
-- `tenant_tag = HMAC-SHA256(index_key, "chio.tenant-tag.v1\0" || issuer || "\0" || tenant_value)`,
+- Tags are keyed index values of the provider's tenant index key set
+  (`--tenant-index-keys <dir>`, 32-byte keys), under the HKDF purpose subkeys
+  of section 6: `tenant_tag = HMAC-SHA256(K[tenant-tag], "chio.tenant-tag.v1" || 0x00 || issuer || 0x00 || tenant_value)`,
   where `issuer` is the provider record's issuer and `tenant_value` is the
-  claim named by the record's `subject_mapping.tenant_id_field`.
-- `subject_tag = HMAC-SHA256(index_key, "chio.subject-tag.v1\0" || issuer || "\0" || subject)`.
-- `index_key` is a 32-byte provider secret loaded from a file at startup. It
-  never leaves the process and is not a signing key.
+  claim named by the record's `subject_mapping.tenant_id_field`, and
+  `subject_tag = HMAC-SHA256(K[subject-tag], "chio.subject-tag.v1" || 0x00 || issuer || 0x00 || subject)`.
+- Every tag carries the `key_id` of the generation it was derived under. A
+  tag carried as a string uses `tt1.<hex key_id>.<hex value>` or
+  `st1.<hex key_id>.<hex value>` and is parsed exactly.
+- New tags use the active generation. A lookup or revocation match computes
+  the candidate from plaintext it holds under every loaded generation and
+  matches on `(key_id, value)`. A retired generation stays loaded while any
+  stored tag or revocation entry references it; startup refuses when one is
+  missing, and an unknown `key_id` refuses.
+- The keys never leave the process and are not signing keys.
 - Tags are stored in SQLite columns beside each root and receipt. They are not
   part of any signed artifact. No plaintext tenant id or subject is stored
   outside the salted commitments in the delegation context.
@@ -494,11 +503,15 @@ pinned separately:
 - local authorization server key: signs local JWS access tokens. Never pinned
   by verifiers.
 
-The exchange signer is a local seed file or the pinned remote trust-control
-authority (`--exchange-signer trust-control`). A missing, unreadable or
-wrongly permissioned seed file refuses startup. An unreachable trust-control,
-or a returned signature that fails verification against the pinned authority
-key, fails the mint. No signer falls back to a generated or local key.
+The exchange signer is a local seed file (`--exchange-signer seed-file:<path>`)
+or a remote trust-control signer (`--exchange-signer trust-control:<url>` with
+`--exchange-signer-credential-file` and `--exchange-signer-trusted-public-keys`,
+the rotating set of keys trust-control may sign roots with). It never reads
+`--control-url` or `--control-token`, and `serve-http` refuses both. A missing,
+unreadable or wrongly permissioned seed file or credential file refuses
+startup. An unreachable trust-control, a response of another kind or for
+another body, or a returned signature that does not verify under a key in the
+trusted set fails the mint. No signer falls back to a generated or local key.
 
 #### 5.6.10 Fail-closed rules
 
@@ -589,12 +602,17 @@ Startup refusals. `serve-http` refuses to start when:
 - any two of the exchange, kernel, policy and local authorization server keys
   are equal;
 - a seed file is readable by group or other, or not owned by the process user;
-- the tenant index key is missing or not 32 bytes;
+- the tenant index key set has no active key, a key that is not 32 bytes or a
+  duplicate `key_id`, or lacks a generation a stored tag or revocation entry
+  references;
 - durable admission is off;
 - `--auth-token` is set without exactly one `operator_static_bearer` rule
   naming a `principal`, or such a rule exists without `--auth-token`;
-- `--exchange-signer trust-control` is set and the trust-control authority key
-  differs from `--control-authority-public-key`.
+- `--control-url` or `--control-token` is set;
+- `--exchange-signer trust-control:<url>` is set without
+  `--exchange-signer-credential-file` and `--exchange-signer-trusted-public-keys`;
+- the signer credential's secret equals `--auth-token`, the admin token, or any
+  other credential the edge accepts or presents.
 
 #### 5.6.11 Deployment limits
 

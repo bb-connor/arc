@@ -29,7 +29,7 @@ made after staging is carried into the staged file first.
 | `receipt/record.schema.json` (continued) | same | the `pdp_decision` change (M2) and the settlement change (M3) | `pdp_decision`, `prevent_external`, `delegated` enum values with their coherence rule and the required `enforcement` block; optional `settlement` block |
 | `capability/revocation.schema.json` | same | the provider revocation change (M1 item 5) | `entry_id`, closed `target_kind` (`capability_id`, `root_policy_rule`, `anchor_subject`, `tenant_tag`, `replay_key`) and `target` replace `capability_id`; reconcile with the parallel revocation-root store shape first (spec D17) |
 | `capability/grant.schema.json` | same | the settlement change (M3) | `monetaryAmount.currency` becomes `asset` with the closed `iso4217:` / `caip19:` grammar |
-| `export/evidence-export-manifest.schema.json` | `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (new live file) | the export-profile change (M1 committed receipts, caller profile M2) | full `chio.evidence_export_manifest.v1` shape from `EvidenceExportManifest`, plus `disclosureProfile`, `tenantTag` (required for `caller`) and `artifacts[]` with the closed role set |
+| `export/evidence-export-manifest.schema.json` | `spec/schemas/chio-wire/v1/export/evidence-export-manifest.schema.json` (new live file) | the export-profile change (M1 committed receipts, caller profile M2) | full `chio.evidence_export_manifest.v1` shape from `EvidenceExportManifest`, plus `disclosureProfile`, `tenantTags` (required for `caller`) and `artifacts[]` with the closed role set |
 
 `record.schema.json` collects changes from three milestones. A PR that moves
 it before the later changes land removes the members it does not implement
@@ -46,10 +46,12 @@ in the same PR.
 
 ## Choices made here that the spec leaves open
 
-- Manifest members are camelCase (`disclosureProfile`, `tenantTag`), because
+- Manifest members are camelCase (`disclosureProfile`, `tenantTags`), because
   `EvidenceExportManifest` is `#[serde(rename_all = "camelCase")]`.
-- Tags (`tenantTag`, revocation `anchor_subject` and `tenant_tag` targets) are
-  the HMAC-SHA256 output as 64 lowercase hex characters.
+- Tags are keyed index values (PROTOCOL 5.6.8). The manifest's `tenantTags`
+  holds typed values `{key_id, value}`, one per loaded generation; revocation
+  `anchor_subject` and `tenant_tag` targets use the string form
+  `st1.<hex key_id>.<hex value>` and `tt1.<hex key_id>.<hex value>`.
 - A `replay_key` revocation target is the `replay_key_digest` recorded in the
   delegation context.
 - New artifact roles are listed in a separate `artifacts` array; each entry's
