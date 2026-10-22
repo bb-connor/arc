@@ -674,7 +674,7 @@ fn inbound_authority_native_cli_accepts_operator_bound_agent_key() {
 
 #[test]
 fn server_transport_cli_flags_are_paired_and_explicit() {
-    for base in [vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"], vec!["chio", "trust", "serve", "--service-token", "test-token"]] {
+    for base in [vec!["chio", "api", "protect", "--upstream", "http://127.0.0.1:1"], vec!["chio", "trust", "serve", "--access-config", "access.toml"]] {
         let mut args = base.clone();
         args.extend(["--tls-cert", "cert.pem"]);
         assert!(parse_cli(args.clone()).is_err());

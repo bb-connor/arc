@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
+
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -61,8 +64,8 @@ fn spawn_trust_service_with_policy_registry(
         "serve",
         "--listen",
         &listen.to_string(),
-        "--service-token",
-        service_token,
+        "--access-config",
+        &trust_access::write_access_config(service_token, &[]),
     ]);
     if let Some(path) = enterprise_providers_file {
         command.args([

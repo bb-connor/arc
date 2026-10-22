@@ -214,6 +214,7 @@ pub(crate) fn run() {
     let budget_db = cli.budget_db.clone();
     let session_db = cli.session_db.clone();
     let control_url = cli.control_url.clone();
+    let control_internal_url = cli.control_internal_url.clone();
     let control_token = cli.control_token.clone();
     let control_authority_public_key = cli.control_authority_public_key.clone();
     let control_authority_trusted_public_keys = cli.control_authority_trusted_public_keys.clone();
@@ -253,6 +254,7 @@ pub(crate) fn run() {
             budget_db.as_deref(),
             session_db.as_deref(),
             control_url.as_deref(),
+            control_internal_url.as_deref(),
             control_token.as_deref(),
         ),
         Commands::Check {
@@ -277,6 +279,7 @@ pub(crate) fn run() {
             budget_db.as_deref(),
             session_db.as_deref(),
             control_url.as_deref(),
+            control_internal_url.as_deref(),
             control_token.as_deref(),
         ),
         Commands::Init { path } => scaffold::cmd_init(&path),
@@ -300,6 +303,7 @@ pub(crate) fn run() {
             budget_db,
             session_db,
             control_url,
+            control_internal_url,
             control_token,
             control_authority_public_key,
             control_authority_trusted_public_keys,

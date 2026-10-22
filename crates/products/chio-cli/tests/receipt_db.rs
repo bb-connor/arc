@@ -1,5 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
+#[path = "support/trust_access.rs"]
+mod trust_access;
+
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -73,8 +76,8 @@ fn spawn_trust_service(
             "serve",
             "--listen",
             &listen.to_string(),
-            "--service-token",
-            service_token,
+            "--access-config",
+            &trust_access::write_access_config_for(&listen.to_string(), service_token, &[]),
         ])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -203,6 +206,8 @@ fn check_command_persists_receipt_via_control_service() {
         .args([
             "--control-url",
             &base_url,
+            "--control-internal-url",
+            &trust_access::internal_url_for(&base_url),
             "--control-token",
             service_token,
             "--session-db",
