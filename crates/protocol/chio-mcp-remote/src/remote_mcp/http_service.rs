@@ -725,12 +725,18 @@ async fn handle_initialize_post(
     }
 }
 
+/// The fixed 503 message of a provider registry refusal carried by `error`.
+fn registry_refusal_response(error: &CliError) -> Option<Response> {
+    EnterpriseProviderRegistryRefusal::find(error)
+        .map(|refusal| plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &refusal.to_string()))
+}
+
 /// A provider registry refusal answers its fixed 503 message; any other
 /// session construction failure answers the fixed 500 URN. The cause stays
 /// in the server log because it can name local paths and store detail.
 fn spawn_session_error(error: CliError) -> Response {
-    match EnterpriseProviderRegistryRefusal::find(&error) {
-        Some(refusal) => plain_http_error(StatusCode::SERVICE_UNAVAILABLE, &refusal.to_string()),
+    match registry_refusal_response(&error) {
+        Some(response) => response,
         None => {
             error!(error = %error, "remote MCP session construction failed");
             plain_http_error(

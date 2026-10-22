@@ -463,6 +463,16 @@ pub(super) async fn authenticate_request(
     {
         return Err(unavailable());
     }
+    // The auth contract digests the provider registry as it reads now, so a
+    // credential holds only while the registry reads as it did at admission.
+    let auth_contract =
+        fingerprint_remote_auth_contract(&state.factory.config).map_err(|error| {
+            registry_refusal_response(&error)
+                .unwrap_or_else(|| input::with_source(unavailable(), error))
+        })?;
+    if auth_contract != record.auth_mode_fingerprint {
+        return Err(unavailable());
+    }
     validate_session_lifecycle(&session)?;
     Ok((session.auth_context.clone(), Some(record)))
 }
