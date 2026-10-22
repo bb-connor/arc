@@ -619,6 +619,25 @@ fn edge_session_root_with_a_proof_required_grant_denies() {
 }
 
 #[test]
+fn edge_session_under_a_ceiling_with_a_proof_required_grant_denies() {
+    let error = Fixture::with(
+        |policy| {
+            let mut ceiling = scope(vec![grant("search"), grant("get"), grant("update")]);
+            ceiling.grants[2].dpop_required = Some(true);
+            policy["rules"][0]["ceiling_scope"] = serde_json::to_value(&ceiling).unwrap();
+            policy["rules"][0]["ceiling_scope_hash"] =
+                serde_json::to_value(scope_digest(&ceiling)).unwrap();
+        },
+        |_| {},
+        &exchange_keypair(),
+        vec![grant("search")],
+    )
+    .check()
+    .unwrap_err();
+    assert_eq!(error, RootConsistencyError::ProofRequiredGrantOnEdgeSession);
+}
+
+#[test]
 fn context_provider_record_must_equal_the_rule() {
     let error = consistency_error(
         |_| {},

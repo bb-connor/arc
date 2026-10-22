@@ -278,10 +278,11 @@ fn check_holder(
         (HolderClass::Caller, None) => Err(RootConsistencyError::SenderKeyMissing),
         (HolderClass::EdgeSession, Some(_)) => Err(RootConsistencyError::SenderKeyOnEdgeSession),
         (HolderClass::EdgeSession, None) => require(
-            !root
-                .scope
+            !rule
+                .ceiling_scope
                 .grants
                 .iter()
+                .chain(&root.scope.grants)
                 .any(|grant| grant.dpop_required == Some(true)),
             RootConsistencyError::ProofRequiredGrantOnEdgeSession,
         ),
